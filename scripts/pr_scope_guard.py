@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
-import json
 import sys
 from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
+import json
 
 from scripts.common import REPO_ROOT, git_changed_files
 from scripts.policy.policy import allowed_categories, classify_paths, get_policy

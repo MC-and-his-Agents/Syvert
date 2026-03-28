@@ -6,6 +6,7 @@ import re
 import shlex
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -152,3 +153,31 @@ def env_with_repo_pythonpath(env: dict[str, str] | None = None) -> dict[str, str
     repo_text = str(REPO_ROOT)
     merged["PYTHONPATH"] = repo_text if not pythonpath else f"{repo_text}{os.pathsep}{pythonpath}"
     return merged
+
+
+def codex_home() -> Path:
+    return Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+
+
+def syvert_state_dir() -> Path:
+    return codex_home() / "state" / "syvert"
+
+
+def syvert_state_file(name: str) -> Path:
+    return syvert_state_dir() / name
+
+
+def legacy_state_file(name: str) -> Path:
+    return codex_home() / "state" / name
+
+
+def now_iso_utc() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def slugify(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    tokens = re.findall(r"[a-z0-9]+", normalized.lower())
+    return "-".join(tokens) or "task"

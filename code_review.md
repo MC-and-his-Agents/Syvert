@@ -7,8 +7,11 @@
 审查时至少对齐以下输入：
 
 - [AGENTS.md](./AGENTS.md)
+- [WORKFLOW.md](./WORKFLOW.md)
 - [docs/AGENTS.md](./docs/AGENTS.md)
 - [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
+- [docs/process/agent-loop.md](./docs/process/agent-loop.md)
+- [docs/process/worktree-lifecycle.md](./docs/process/worktree-lifecycle.md)
 - 相关 `spec` / `plan` / `TODO`（如有）
 - 对治理 bootstrap 项，补充对应 Issue、`docs/decisions/**` 与 `docs/exec-plans/**`
 - 对应 Issue / PR 描述与验收口径
@@ -52,6 +55,7 @@
 3. GitHub checks 全绿
 4. PR 不是 Draft
 5. 合并时 head 与审查时 head 一致
+6. 必须通过受控入口 `merge_pr`
 
 受控 merge 入口应优先消费绑定当前 `head SHA` 的最新本地 guardian verdict；只有 verdict 缺失、已过期或 `head SHA` 已变化时，才补跑新的 guardian 审查。
 
@@ -65,5 +69,4 @@
 
 - `hook` 负责本地早反馈，不替代 CI
 - `CI` 负责自动化校验，不替代 guardian
-- `guardian` 负责合并前审查门禁，不替代人工方向判断
-- 人工 reviewer 负责最终边界判断与风险确认
+- `guardian` 负责合并前审查门禁

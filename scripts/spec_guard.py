@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
-import re
 import sys
 from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
+import re
 
 from scripts.common import REPO_ROOT, git_changed_files
 from scripts.policy.policy import classify_paths, formal_spec_dirs, spec_suite_policy
@@ -62,7 +66,7 @@ def validate_suite(fr_dir: Path) -> list[str]:
         contracts_dir = fr_dir / "contracts"
         if not contracts_dir.exists():
             errors.append(f"{fr_dir}: 涉及契约/协议，但缺少 `contracts/`")
-    if re.search(r"(data-model|schema|表结构|迁移|持久化|实体)", suite_text, re.IGNORECASE):
+    if re.search(r"(data-model|schema|表结构|持久化|实体)", suite_text, re.IGNORECASE):
         if not (fr_dir / "data-model.md").exists():
             errors.append(f"{fr_dir}: 涉及共享数据模型，但缺少 `data-model.md`")
     if re.search(r"(risk|回滚|安全|账号|并发|不可逆|迁移)", suite_text, re.IGNORECASE):

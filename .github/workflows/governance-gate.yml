@@ -27,6 +27,7 @@ jobs:
       - name: Run governance gate
         run: |
           set -euo pipefail
+          python3 scripts/workflow_guard.py --mode ci
           python3 scripts/governance_gate.py \
             --mode ci \
             --base-sha "${{ github.event.pull_request.base.sha }}" \

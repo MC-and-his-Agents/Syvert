@@ -40,6 +40,7 @@
 7. `进入实现前条件`
 
 并且需要显式说明 `spec review` 通过后如何进入实现。
+若事项属于 repo harness 变更，`plan.md` 需覆盖 `WORKFLOW.md`、agent loop、worktree lifecycle、状态面一致性。
 
 ## 按需文档触发条件
 

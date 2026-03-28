@@ -41,6 +41,7 @@
       "name": "governance",
       "patterns": [
         "AGENTS.md",
+        "WORKFLOW.md",
         "code_review.md",
         "spec_review.md",
         "docs/AGENTS.md",

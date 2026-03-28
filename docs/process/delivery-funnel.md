@@ -41,5 +41,16 @@ Syvert 的唯一默认交付路径如下：
 - `commit-msg` hook 与 `commit-check` CI：保证中文 Conventional Commits
 - `docs-guard`：保证 Markdown 链接、仓内路径引用和治理脚本基础可用
 - `spec-guard`：保证正式规约区结构与边界不漂移
+- `workflow-guard`：保证 `WORKFLOW.md` 与必需流程文档结构合法
 - `governance-gate`：保证治理脚本、测试和 workflow 本身可回归
 - `pr_guardian` + `merge_pr`：保证 merge gate 不被裸命令绕过
+
+## Repo Harness 补充
+
+- 任务运行契约唯一来源：[WORKFLOW.md](../../WORKFLOW.md)
+- 长任务协议唯一来源：[agent-loop.md](./agent-loop.md)
+- workspace 生命周期唯一来源：[worktree-lifecycle.md](./worktree-lifecycle.md)
+- 状态面统一读取 `$CODEX_HOME/state/syvert/`：
+  - `guardian.json`
+  - `review-poller.json`
+  - `worktrees.json`

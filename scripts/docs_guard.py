@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import json
 import os
 import py_compile
 import re
-import sys
-from pathlib import Path
 
 from scripts.common import REPO_ROOT, git_ls_files
 
@@ -15,7 +19,7 @@ from scripts.common import REPO_ROOT, git_ls_files
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 PATH_RE = re.compile(
     r"(?<![A-Za-z0-9._/-])("
-    r"AGENTS\.md|vision\.md|adapter-sdk\.md|framework-positioning\.md|code_review\.md|spec_review\.md|"
+    r"AGENTS\.md|WORKFLOW\.md|vision\.md|adapter-sdk\.md|framework-positioning\.md|code_review\.md|spec_review\.md|"
     r"docs/[A-Za-z0-9._/-]+|scripts/[A-Za-z0-9._/-]+\.py|\.github/[A-Za-z0-9._/-]+|\.githooks/[A-Za-z0-9._/-]+"
     r")(?![A-Za-z0-9._/-])"
 )

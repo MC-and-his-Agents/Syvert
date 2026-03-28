@@ -6,10 +6,29 @@ import unittest
 from pathlib import Path
 from unittest.mock import ANY, patch
 
-from scripts.pr_guardian import find_latest_guardian_result, merge_if_safe, run_codex_review, save_guardian_result
+from scripts.pr_guardian import (
+    find_latest_guardian_result,
+    load_guardian_state,
+    merge_if_safe,
+    run_codex_review,
+    save_guardian_result,
+)
 
 
 class GuardianStateTests(unittest.TestCase):
+    def test_load_guardian_state_falls_back_to_legacy_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_new = Path(temp_dir) / "missing-guardian.json"
+            legacy_path = Path(temp_dir) / "syvert-pr-guardian-results.json"
+            legacy_path.write_text('{"prs":{"1":{"verdict":"APPROVE"}}}', encoding="utf-8")
+
+            with patch("scripts.pr_guardian.DEFAULT_STATE_FILE", missing_new):
+                with patch("scripts.pr_guardian.guardian_legacy_state_path", return_value=legacy_path):
+                    payload = load_guardian_state(missing_new)
+
+            self.assertIn("prs", payload)
+            self.assertIn("1", payload["prs"])
+
     def test_find_latest_guardian_result_uses_local_state_for_matching_head(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "guardian.json"
