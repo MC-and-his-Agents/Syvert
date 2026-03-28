@@ -18,7 +18,7 @@
 ## 验证清单
 
 - [x] 治理测试通过
-- [x] `docs-guard`、`spec-guard`、`governance-gate` 通过
+- [x] 文档门禁、规约门禁与治理门禁通过
 - [ ] guardian review 对当前 `head SHA` 通过
 - [ ] 受控 merge 成功完成
 

@@ -39,6 +39,6 @@
 
 ## 下一步
 
-- 补齐 Issue / formal spec / bootstrap contract
+- 补齐 Issue、formal spec 与 bootstrap contract
 - 重跑 guardian 审查
 - 通过 `merge_pr` 走受控合并
