@@ -21,7 +21,7 @@
 
 - 风险：若治理基线调整没有对应 Issue 与 formal spec，后续审查无法证明范围、风险与验收边界。
 - 缓解：
-  - 为治理栈 v1 建立 Issue `#2`
+  - 为治理栈 v1 建立 Issue `#5`
   - 为当前事项补齐 `docs/specs/FR-0001-governance-stack-v1/`
   - 在 PR body 中显式关联 Issue 与 formal spec
 
