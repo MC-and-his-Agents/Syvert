@@ -52,6 +52,8 @@
 4. PR 不是 Draft
 5. 合并时 head 与审查时 head 一致
 
+受控 merge 入口应优先消费绑定当前 `head SHA` 的最新 guardian verdict；只有 verdict 缺失、已过期或 `head SHA` 已变化时，才补跑新的 guardian 审查。
+
 ## 合并方式
 
 - 默认 Squash Merge
