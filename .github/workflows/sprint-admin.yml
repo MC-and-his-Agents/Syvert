@@ -1,0 +1,38 @@
+name: Sprint Admin
+
+on:
+  workflow_dispatch:
+    inputs:
+      sprint_name:
+        description: "Milestone 名称"
+        required: true
+      sprint_description:
+        description: "Milestone 描述"
+        required: false
+
+jobs:
+  sprint-admin:
+    name: Create Or Verify Sprint Milestone
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create or verify milestone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 scripts/start_sprint.py \
+            --name "${{ github.event.inputs.sprint_name }}" \
+            --description "${{ github.event.inputs.sprint_description }}"

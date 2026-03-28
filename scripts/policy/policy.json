@@ -1,0 +1,108 @@
+{
+  "pr_classes": [
+    "governance",
+    "spec",
+    "implementation",
+    "docs"
+  ],
+  "closing_modes": [
+    "fixes",
+    "refs",
+    "none"
+  ],
+  "risk_levels": {
+    "docs": "lightweight",
+    "governance": "high",
+    "implementation": "normal",
+    "spec": "high"
+  },
+  "allowed_categories": {
+    "docs": [
+      "docs"
+    ],
+    "governance": [
+      "governance",
+      "spec",
+      "spec_todo",
+      "docs"
+    ],
+    "implementation": [
+      "implementation",
+      "docs",
+      "spec_todo"
+    ],
+    "spec": [
+      "spec",
+      "docs"
+    ]
+  },
+  "path_categories": [
+    {
+      "name": "governance",
+      "patterns": [
+        "AGENTS.md",
+        "code_review.md",
+        "spec_review.md",
+        "docs/AGENTS.md",
+        "docs/process/**",
+        "docs/specs/README.md",
+        "docs/specs/_template/**",
+        ".github/**",
+        ".githooks/**",
+        "scripts/**",
+        "tests/governance/**"
+      ]
+    },
+    {
+      "name": "spec_todo",
+      "patterns": [
+        "docs/specs/FR-*/TODO.md"
+      ]
+    },
+    {
+      "name": "spec",
+      "patterns": [
+        "docs/specs/FR-*/**"
+      ]
+    },
+    {
+      "name": "docs",
+      "patterns": [
+        ".gitignore",
+        "LICENSE",
+        "vision.md",
+        "framework-positioning.md",
+        "adapter-sdk.md",
+        "docs/roadmap-v0-to-v1.md",
+        "docs/**/*.md"
+      ]
+    },
+    {
+      "name": "implementation",
+      "patterns": [
+        "**"
+      ]
+    }
+  ],
+  "spec_suite": {
+    "required_files": [
+      "spec.md",
+      "plan.md",
+      "TODO.md"
+    ],
+    "spec_required_headings": [
+      "## GWT 验收场景",
+      "## 异常与边界场景",
+      "## 验收标准"
+    ],
+    "plan_required_headings": [
+      "## 实施目标",
+      "## 分阶段拆分",
+      "## 实现约束",
+      "## 测试与验证策略",
+      "## TDD 范围",
+      "## 并行 / 串行关系",
+      "## 进入实现前条件"
+    ]
+  }
+}

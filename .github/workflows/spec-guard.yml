@@ -1,0 +1,41 @@
+name: Spec Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docs/specs/**"
+      - "spec_review.md"
+      - "docs/AGENTS.md"
+      - "docs/process/**"
+      - "scripts/spec_guard.py"
+      - "scripts/policy/**"
+      - ".github/workflows/spec-guard.yml"
+
+jobs:
+  spec-guard:
+    name: Validate Spec Review Boundaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run spec guard
+        run: |
+          set -euo pipefail
+          python3 scripts/spec_guard.py \
+            --mode ci \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}"
