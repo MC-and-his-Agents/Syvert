@@ -9,6 +9,7 @@ if __package__ in {None, ""}:
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import tempfile
