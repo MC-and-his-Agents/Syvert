@@ -174,7 +174,11 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
     )
     if completed.returncode != 0:
         raise SystemExit(completed.stderr.strip() or "Codex 审查失败。")
-    return json.loads(result_path.read_text(encoding="utf-8"))
+    if result_path.exists():
+        return json.loads(result_path.read_text(encoding="utf-8"))
+    if completed.stdout.strip():
+        return json.loads(completed.stdout)
+    raise SystemExit("Codex 审查未产出结构化结果。")
 
 
 def severity_label(severity: str) -> str:

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import ANY, patch
 
-from scripts.pr_guardian import find_latest_guardian_result, merge_if_safe, save_guardian_result
+from scripts.pr_guardian import find_latest_guardian_result, merge_if_safe, run_codex_review, save_guardian_result
 
 
 class GuardianStateTests(unittest.TestCase):
@@ -52,6 +52,23 @@ class GuardianStateTests(unittest.TestCase):
             payload = find_latest_guardian_result(1, "sha-2", path=state_path)
 
             self.assertIsNone(payload)
+
+
+class CodexReviewExecutionTests(unittest.TestCase):
+    @patch("scripts.pr_guardian.subprocess.run")
+    def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:
+        subprocess_run_mock.return_value = subprocess.CompletedProcess(
+            args=["codex"],
+            returncode=0,
+            stdout='{"verdict":"APPROVE","safe_to_merge":true,"summary":"ok","findings":[],"required_actions":[]}',
+            stderr="",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = run_codex_review(Path(temp_dir), "prompt", Path(temp_dir) / "review.json")
+
+        self.assertEqual(result["verdict"], "APPROVE")
+        self.assertTrue(result["safe_to_merge"])
 
     def test_find_latest_guardian_result_rejects_invalid_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
