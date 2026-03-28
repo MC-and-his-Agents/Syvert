@@ -1,0 +1,38 @@
+[
+  {
+    "name": "docs_only_ok",
+    "class": "docs",
+    "files": [
+      "docs/guide.md"
+    ],
+    "ok": true
+  },
+  {
+    "name": "docs_with_implementation_blocked",
+    "class": "docs",
+    "files": [
+      "docs/guide.md",
+      "core/runtime.py"
+    ],
+    "ok": false
+  },
+  {
+    "name": "implementation_with_spec_todo_ok",
+    "class": "implementation",
+    "files": [
+      "core/runtime.py",
+      "docs/specs/FR-0001-demo/TODO.md"
+    ],
+    "ok": true
+  },
+  {
+    "name": "implementation_with_spec_contract_blocked",
+    "class": "implementation",
+    "files": [
+      "core/runtime.py",
+      "docs/specs/FR-0001-demo/spec.md"
+    ],
+    "ok": false
+  }
+]
+

@@ -1,0 +1,19 @@
+[
+  {
+    "message": "feat: 新增治理脚本",
+    "ok": true
+  },
+  {
+    "message": "fix(policy): 修复 spec 守卫",
+    "ok": true
+  },
+  {
+    "message": "feat: add english only message",
+    "ok": false
+  },
+  {
+    "message": "新增提交信息",
+    "ok": false
+  }
+]
+

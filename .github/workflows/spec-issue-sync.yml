@@ -1,0 +1,35 @@
+name: Spec Issue Sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/specs/FR-*/spec.md"
+
+jobs:
+  sync-issue:
+    name: Sync Spec Metadata To Issue
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync spec metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 scripts/spec_issue_sync.py \
+            --before-sha "${{ github.event.before }}" \
+            --after-sha "${{ github.sha }}"
