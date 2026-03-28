@@ -89,6 +89,15 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(result["verdict"], "APPROVE")
         self.assertTrue(result["safe_to_merge"])
 
+    @patch("scripts.pr_guardian.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["codex"], timeout=300))
+    def test_run_codex_review_times_out_with_actionable_error(self, subprocess_run_mock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(SystemExit) as ctx:
+                run_codex_review(Path(temp_dir), "prompt", Path(temp_dir) / "review.json")
+
+        self.assertIn("Codex 审查超时", str(ctx.exception))
+        subprocess_run_mock.assert_called_once()
+
     def test_find_latest_guardian_result_rejects_invalid_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "guardian.json"

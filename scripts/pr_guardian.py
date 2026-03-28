@@ -23,6 +23,7 @@ SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 PROMPT_PATH = REPO_ROOT / "code_review.md"
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
+CODEX_REVIEW_TIMEOUT_SECONDS = int(os.environ.get("SYVERT_GUARDIAN_TIMEOUT_SECONDS", "300"))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -160,26 +161,30 @@ def build_prompt(meta: dict) -> str:
 
 
 def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict:
-    completed = subprocess.run(
-        [
-            "codex",
-            "exec",
-            "-C",
-            str(worktree_dir),
-            "-s",
-            "read-only",
-            "--output-schema",
-            str(SCHEMA_PATH),
-            "-o",
-            str(result_path),
-            "-",
-        ],
-        cwd=str(REPO_ROOT),
-        input=prompt,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                "codex",
+                "exec",
+                "-C",
+                str(worktree_dir),
+                "-s",
+                "read-only",
+                "--output-schema",
+                str(SCHEMA_PATH),
+                "-o",
+                str(result_path),
+                "-",
+            ],
+            cwd=str(REPO_ROOT),
+            input=prompt,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=CODEX_REVIEW_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(f"Codex 审查超时（>{CODEX_REVIEW_TIMEOUT_SECONDS} 秒），未产出 guardian verdict。") from exc
     if completed.returncode != 0:
         raise SystemExit(completed.stderr.strip() or "Codex 审查失败。")
     if result_path.exists():
