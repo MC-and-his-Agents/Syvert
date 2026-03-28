@@ -158,6 +158,7 @@ Syvert 统一使用以下术语：
 3. 不允许把关键前提只留在聊天里。
 4. 不允许通过代码改动悄悄重定义产品边界。
 5. 若任务属于当前阶段核心项，应先形成 `spec`、`contract` 或等价工件，再进入实现。
+6. 若事项本身用于首次建立治理/规约基础设施，且正式规约机制尚未在 `main` 可用，可暂以 `Issue + decision + exec-plan` 作为 bootstrap contract；该例外只适用于治理基线自举，不适用于普通实现事项。
 
 ### 完成标准
 
@@ -167,7 +168,7 @@ Syvert 统一使用以下术语：
 2. 未解决问题被显式记录。
 3. 若改变了方向、边界或执行方式，必须同步更新对应文档。
 4. 变更应通过 PR 进入主干，并默认以 Squash Merge 合并。
-5. 只有在 latest guardian verdict 为 `APPROVE` 且 GitHub checks 全绿时，统一通过受控 merge 入口合入。
+5. 只有满足 [code_review.md](./code_review.md) 定义的 merge gate，并通过统一受控 merge 入口校验后，才可合入主干。
 
 ## 仓库地图
 

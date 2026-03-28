@@ -6,6 +6,18 @@ from scripts.pr_scope_guard import build_report
 
 
 class PrScopeGuardTests(unittest.TestCase):
+    def test_governance_allows_formal_spec_suite(self) -> None:
+        report = build_report(
+            "governance",
+            [
+                "scripts/pr_guardian.py",
+                "docs/specs/FR-0001-governance-stack-v1/spec.md",
+                "docs/specs/FR-0001-governance-stack-v1/plan.md",
+                "docs/specs/FR-0001-governance-stack-v1/TODO.md",
+            ],
+        )
+        self.assertEqual(report["violations"], [])
+
     def test_implementation_allows_spec_todo(self) -> None:
         report = build_report(
             "implementation",

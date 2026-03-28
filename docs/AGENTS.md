@@ -41,6 +41,7 @@ Syvert 采用单向漏斗，不做本地 Markdown 与 GitHub Issues 的双向镜
 - 核心事项
   - 适用：Core/Adapter 契约变更、正式规约、治理基线、高风险运行时、跨模块设计
   - 默认输入：完整 `spec` 套件 + `spec review`
+  - 治理 bootstrap 例外：若事项本身是在 `main` 首次建立治理/规约基础设施，可先使用 `Issue + decision + exec-plan` 作为 bootstrap contract；落地后恢复正式 `spec` 常态路径
 
 成熟度状态统一为：
 

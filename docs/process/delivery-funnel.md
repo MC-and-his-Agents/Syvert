@@ -14,6 +14,7 @@ Syvert 的唯一默认交付路径如下：
    - 明确事项属于轻量事项、中等事项或核心事项
 4. `spec / contract`
    - 核心事项必须先形成正式规约或等价契约工件
+   - 若事项本身是在 `main` 首次建立治理/规约基础设施，可暂以 `Issue + decision + exec-plan` 形成 bootstrap contract
 5. `spec review`
    - 根据 [spec_review.md](../../spec_review.md) 收口边界、风险和验收
 6. `implementation PR`
@@ -21,7 +22,7 @@ Syvert 的唯一默认交付路径如下：
 7. `PR review`
    - 根据 [code_review.md](../../code_review.md) 判断阻断项与 merge-ready 状态
 8. `squash merge`
-   - 只有在 latest guardian verdict 为 `APPROVE` 且 GitHub checks 全绿时，通过受控入口 Squash Merge
+   - 只有满足 [code_review.md](../../code_review.md) 定义的 merge gate，并通过受控入口校验后，才可 Squash Merge
 
 ## 分流规则
 
@@ -33,6 +34,7 @@ Syvert 的唯一默认交付路径如下：
 - 核心事项
   - 必须先建立正式 `spec` 套件并完成 `spec review`
   - 默认与实现 PR 分离
+  - 治理 bootstrap 例外：在正式规约机制尚未落地前，可先按 bootstrap contract 进入 `governance` PR；PR 不得混入业务实现代码
 
 ## 与自动化门禁的关系
 

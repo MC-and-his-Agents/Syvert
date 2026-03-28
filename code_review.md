@@ -10,6 +10,7 @@
 - [docs/AGENTS.md](./docs/AGENTS.md)
 - [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
 - 相关 `spec` / `plan` / `TODO`（如有）
+- 对治理 bootstrap 项，补充对应 Issue、`docs/decisions/**` 与 `docs/exec-plans/**`
 - 对应 Issue / PR 描述与验收口径
 
 ## 审查优先级
@@ -52,7 +53,7 @@
 4. PR 不是 Draft
 5. 合并时 head 与审查时 head 一致
 
-受控 merge 入口应优先消费绑定当前 `head SHA` 的最新 guardian verdict；只有 verdict 缺失、已过期或 `head SHA` 已变化时，才补跑新的 guardian 审查。
+受控 merge 入口应优先消费绑定当前 `head SHA` 的最新本地 guardian verdict；只有 verdict 缺失、已过期或 `head SHA` 已变化时，才补跑新的 guardian 审查。
 
 ## 合并方式
 

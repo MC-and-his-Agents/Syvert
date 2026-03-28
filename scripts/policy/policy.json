@@ -22,6 +22,8 @@
     ],
     "governance": [
       "governance",
+      "spec",
+      "spec_todo",
       "docs"
     ],
     "implementation": [
