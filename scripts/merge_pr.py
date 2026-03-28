@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+
+from scripts.pr_guardian import main as guardian_main
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = argv or sys.argv[1:]
+    if not args:
+        print("用法: python3 scripts/merge_pr.py <pr-number> [--delete-branch]", file=sys.stderr)
+        return 1
+    return guardian_main(["merge-if-safe", *args])
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
