@@ -7,4 +7,4 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 git -C "${REPO_ROOT}" config core.hooksPath .githooks
 echo "Enabled hooks path: ${REPO_ROOT}/.githooks"
-
+echo "Pre-commit will run docs_guard, workflow_guard, and spec_guard."

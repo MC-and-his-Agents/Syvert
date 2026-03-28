@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
-import json
-import os
 import sys
 from pathlib import Path
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
+import json
+
 from scripts.common import dump_json, env_with_repo_pythonpath, load_json, parse_pr_class_from_body, require_cli, run
+from scripts.state_paths import review_poller_legacy_state_path, review_poller_state_path
 
 
-DEFAULT_STATE_FILE = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "state" / "syvert-pr-review.json"
+DEFAULT_STATE_FILE = review_poller_state_path()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -27,6 +31,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def ensure_state_file(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
+        legacy_path = review_poller_legacy_state_path()
+        if path == DEFAULT_STATE_FILE and legacy_path.exists():
+            dump_json(path, load_json(legacy_path))
+            return
         dump_json(path, {"prs": {}})
 
 

@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
+
 from scripts.common import REPO_ROOT, git_changed_files
 from scripts.policy.policy import classify_paths
+from scripts.workflow_guard import validate_repository
+
+
+REQUIRED_GOVERNANCE_FILES = (
+    Path("WORKFLOW.md"),
+    Path("docs/process/agent-loop.md"),
+    Path("docs/process/worktree-lifecycle.md"),
+    Path("scripts/create_worktree.py"),
+    Path("scripts/governance_status.py"),
+    Path("scripts/workflow_guard.py"),
+    Path("scripts/sync_repo_settings.py"),
+)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -37,6 +53,17 @@ def main(argv: list[str] | None = None) -> int:
         for item in classified:
             if item.category == "implementation":
                 print(f"- {item.path}", file=sys.stderr)
+        return 1
+
+    errors: list[str] = []
+    errors.extend(validate_repository(repo_root))
+    for relative_path in REQUIRED_GOVERNANCE_FILES:
+        if not (repo_root / relative_path).exists():
+            errors.append(f"缺少治理栈 v2 必需工件: {repo_root / relative_path}")
+
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
         return 1
 
     print("governance-gate 通过。")

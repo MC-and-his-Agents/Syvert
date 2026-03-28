@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from scripts import governance_status
+
+
+class GovernanceStatusTests(unittest.TestCase):
+    def test_aggregates_guardian_reviewer_and_worktree_state(self) -> None:
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {"7": {"verdict": "APPROVE"}}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {"7": {"head_sha": "abc"}}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k"}}}):
+                    with patch("scripts.governance_status.fetch_pr_meta", return_value={"headRefOid": "sha-1", "headRefName": "feature/x"}):
+                        with patch("scripts.governance_status.find_latest_guardian_result", return_value={"verdict": "APPROVE", "head_sha": "sha-1"}):
+                            with patch("scripts.governance_status.fetch_checks_summary", return_value=[{"name": "check", "bucket": "pass", "state": "SUCCESS"}]):
+                                payload = governance_status.build_status_payload(pr_number=7)
+
+        self.assertEqual(payload["guardian"]["verdict"], "APPROVE")
+        self.assertEqual(payload["review_poller"]["head_sha"], "abc")
+        self.assertEqual(len(payload["worktrees"]), 1)
+        self.assertEqual(payload["checks"][0]["name"], "check")
+
+    def test_load_state_with_legacy_reads_legacy_when_primary_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            primary = root / "new.json"
+            legacy = root / "legacy.json"
+            legacy.write_text(json.dumps({"prs": {"1": {"head_sha": "legacy-sha"}}}), encoding="utf-8")
+
+            payload = governance_status.load_state_with_legacy(primary, legacy)
+
+        self.assertIn("prs", payload)
+        self.assertEqual(payload["prs"]["1"]["head_sha"], "legacy-sha")
+
+    def test_text_and_json_outputs_are_consistent(self) -> None:
+        sample = {
+            "guardian": {"verdict": "APPROVE", "safe_to_merge": True, "head_sha": "sha-x", "reviewed_at": "2026-03-29T10:00:00Z"},
+            "review_poller": {"head_sha": "sha-x", "reviewed_at": "2026-03-29T10:00:01Z"},
+            "worktrees": [{"key": "issue-1-demo", "branch": "issue-1-demo", "path": "/tmp/demo"}],
+            "checks": [{"name": "Validate Governance Tooling", "bucket": "pass", "state": "SUCCESS"}],
+        }
+
+        text_output = governance_status.render_text(sample)
+        json_output = json.loads(json.dumps(sample, ensure_ascii=False))
+
+        self.assertIn("verdict=APPROVE", text_output)
+        self.assertIn("count=1", text_output)
+        self.assertEqual(json_output["guardian"]["head_sha"], "sha-x")
+        self.assertEqual(len(json_output["worktrees"]), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

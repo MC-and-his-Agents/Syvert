@@ -2,31 +2,33 @@
 
 ## 高风险项
 
-### 1. guardian verdict 被错误复用
+### 1. 状态面漂移
 
-- 风险：如果 merge 入口消费了不受控来源的 guardian 结果，可能绕过真正的合并门禁。
+- 风险：guardian、review poller、worktree 状态分散或写入路径不一致，导致判定面失真。
 - 缓解：
-  - 只信任本地受控 state 中、绑定当前 `head SHA` 的 guardian 结果
-  - 当结果缺失、过期或 `head SHA` 变化时，强制补跑 guardian 审查
-  - 为 verdict 复用路径补充回归测试
+  - 状态统一到 `$CODEX_HOME/state/syvert/`
+  - `governance_status.py` 统一读取并输出状态
+  - 对 legacy 状态读取兼容保留测试
 
-### 2. merge gate 文档口径漂移
+### 2. checkpoint 不一致
 
-- 风险：高优先级文档的 merge gate 条件不一致，会导致人和 agent 无法一致判断 `merge-ready`。
+- 风险：`exec-plan`、`TODO.md` 与实际 head SHA 或验证结果不一致，导致恢复失败或误判。
 - 缓解：
-  - 高优先级文档统一引用 `code_review.md`
-  - merge gate 的强条件只在 `code_review.md` 中完整定义
+  - `agent-loop` 定义 checkpoint 最小频率与必填字段
+  - 每次可验证改动后更新停点、下一步、已验证项、风险、head SHA
 
-### 3. 核心治理事项缺少正式输入
+### 3. workspace 污染
 
-- 风险：若治理基线调整没有对应 Issue 与 formal spec，后续审查无法证明范围、风险与验收边界。
+- 风险：不同事项复用同一目录或错误复用 worktree，导致上下文串扰。
 - 缓解：
-  - 为治理栈 v1 建立 Issue `#5`
-  - 为当前事项补齐 `docs/specs/FR-0001-governance-stack-v1/`
-  - 在 PR body 中显式关联 Issue 与 formal spec
+  - worktree key 固定为 `issue-<number>-<slug>`
+  - 创建/复用顺序固定为 `create_worktree.py`
+  - branch/worktree/issue 映射入库并可回读
 
 ## Stop-Ship 条件
 
+- `WORKFLOW.md` 非法或缺失
+- `workflow_guard` 未通过
 - guardian 未给出 `APPROVE`
 - `safe_to_merge=false`
 - GitHub checks 未全绿
@@ -34,4 +36,4 @@
 
 ## 回滚策略
 
-- 若治理栈合入后引发流程阻断或错误拒绝合并，通过独立 revert PR 回退本次治理栈改动。
+- 若 v2 引发阻断或误判，通过独立 revert PR 回退本次治理改动。

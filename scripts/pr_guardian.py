@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, load_json, require_cli, run
+from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
 SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 PROMPT_PATH = REPO_ROOT / "code_review.md"
-DEFAULT_STATE_FILE = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "state" / "syvert-pr-guardian-results.json"
+DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
+CODEX_REVIEW_TIMEOUT_SECONDS = int(os.environ.get("SYVERT_GUARDIAN_TIMEOUT_SECONDS", "300"))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -94,9 +100,12 @@ def build_guardian_payload(meta: dict, result: dict) -> dict:
 
 
 def load_guardian_state(path: Path = DEFAULT_STATE_FILE) -> dict:
-    if not path.exists():
-        return {"prs": {}}
-    return load_json(path)
+    if path.exists():
+        return load_json(path)
+    legacy_path = guardian_legacy_state_path()
+    if path == DEFAULT_STATE_FILE and legacy_path.exists():
+        return load_json(legacy_path)
+    return {"prs": {}}
 
 
 def save_guardian_result(pr_number: int, payload: dict, *, path: Path = DEFAULT_STATE_FILE) -> None:
@@ -152,26 +161,30 @@ def build_prompt(meta: dict) -> str:
 
 
 def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict:
-    completed = subprocess.run(
-        [
-            "codex",
-            "exec",
-            "-C",
-            str(worktree_dir),
-            "-s",
-            "read-only",
-            "--output-schema",
-            str(SCHEMA_PATH),
-            "-o",
-            str(result_path),
-            "-",
-        ],
-        cwd=str(REPO_ROOT),
-        input=prompt,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                "codex",
+                "exec",
+                "-C",
+                str(worktree_dir),
+                "-s",
+                "read-only",
+                "--output-schema",
+                str(SCHEMA_PATH),
+                "-o",
+                str(result_path),
+                "-",
+            ],
+            cwd=str(REPO_ROOT),
+            input=prompt,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=CODEX_REVIEW_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(f"Codex 审查超时（>{CODEX_REVIEW_TIMEOUT_SECONDS} 秒），未产出 guardian verdict。") from exc
     if completed.returncode != 0:
         raise SystemExit(completed.stderr.strip() or "Codex 审查失败。")
     if result_path.exists():

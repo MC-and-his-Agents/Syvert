@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - "WORKFLOW.md"
       - "**/*.md"
       - "scripts/**/*.py"
       - "scripts/**/*.json"

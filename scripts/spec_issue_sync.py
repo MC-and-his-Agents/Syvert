@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import datetime as dt
 import json
-import sys
-from pathlib import Path
 
 from scripts.common import REPO_ROOT, git_changed_files, require_cli, run
 
