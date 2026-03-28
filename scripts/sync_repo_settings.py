@@ -179,6 +179,20 @@ def ruleset_id_for_name(repo: str, name: str) -> int | None:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+    if args.dry_run:
+        print(
+            json.dumps(
+                {
+                    "repo": desired_repo_settings(),
+                    "branch_protection": desired_branch_protection(),
+                    "ruleset": desired_ruleset(),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
     require_cli("gh")
 
     repo_settings = current_repo_settings(args.repo)
@@ -193,10 +207,6 @@ def main(argv: list[str] | None = None) -> int:
         "branch_protection": diff_settings(branch_protection, expected_branch),
         "ruleset": diff_settings(current_ruleset, expected_ruleset),
     }
-
-    if args.dry_run:
-        print(json.dumps(diff, ensure_ascii=False, indent=2))
-        return 0
 
     if diff["repo"]:
         run_gh_with_json("PATCH", f"repos/{args.repo}", expected_repo)
