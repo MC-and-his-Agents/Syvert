@@ -43,9 +43,9 @@
 - `superseded` 策略必须显式填写替代关系与原因，避免无依据删除。
 - 退役脚本不负责判断产品方向正确性，只负责归档锚点与删除顺序正确。
 
-## 当前已退役分支记录
+## 当前待退役目标
 
 | branch | strategy | replaced_by | archive tag | 说明 |
 | --- | --- | --- | --- | --- |
-| `codex/repo-governance` | `superseded` | `main (PR #1 / 480ee1d)` | `archive/branches/codex/repo-governance` | 独立根历史上的治理 v1 分支，内容已由 PR `#1` 的 squash 结果吸收 |
-| `codex/remove-soft-collab-language` | `superseded` | `main (PR #7 / 7fc5e5a)` | `archive/branches/codex/remove-soft-collab-language` | 旧治理文档支线，意图已由治理栈 v2 文档收敛吸收 |
+| `codex/repo-governance` | `superseded` | `main (PR #1 / 480ee1d)` | `archive/branches/codex/repo-governance` | 独立根历史上的治理 v1 分支，计划在本专项合入后归档并退役 |
+| `codex/remove-soft-collab-language` | `superseded` | `main (PR #7 / 7fc5e5a)` | `archive/branches/codex/remove-soft-collab-language` | 旧治理文档支线，计划在本专项合入后归档并退役 |
