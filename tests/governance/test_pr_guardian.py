@@ -88,6 +88,10 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "APPROVE")
         self.assertTrue(result["safe_to_merge"])
+        command = subprocess_run_mock.call_args.args[0]
+        self.assertIn("workspace-write", command)
+        env = subprocess_run_mock.call_args.kwargs["env"]
+        self.assertTrue(env["TMPDIR"].endswith(".codex-tmp"))
 
     @patch("scripts.pr_guardian.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["codex"], timeout=300))
     def test_run_codex_review_times_out_with_actionable_error(self, subprocess_run_mock) -> None:
