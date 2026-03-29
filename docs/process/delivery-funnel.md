@@ -23,6 +23,7 @@ Syvert 的唯一默认交付路径如下：
    - 根据 [code_review.md](../../code_review.md) 判断阻断项与 merge-ready 状态
 8. `squash merge`
    - 只有满足 [code_review.md](../../code_review.md) 定义的 merge gate，并通过受控入口校验后，才可 Squash Merge
+   - 合并后若源分支不再承担活跃事项，应进入分支归档/退役流程
 
 ## 分流规则
 
@@ -50,6 +51,7 @@ Syvert 的唯一默认交付路径如下：
 - 任务运行契约唯一来源：[WORKFLOW.md](../../WORKFLOW.md)
 - 长任务协议唯一来源：[agent-loop.md](./agent-loop.md)
 - workspace 生命周期唯一来源：[worktree-lifecycle.md](./worktree-lifecycle.md)
+- 分支归档/退役唯一来源：[branch-retirement.md](./branch-retirement.md)
 - 状态面统一读取 `$CODEX_HOME/state/syvert/`：
   - `guardian.json`
   - `review-poller.json`

@@ -31,6 +31,7 @@ class CliSmokeTests(unittest.TestCase):
             "scripts/open_pr.py",
             "scripts/pr_guardian.py",
             "scripts/merge_pr.py",
+            "scripts/retire_branch.py",
             "scripts/review_poller.py",
             "scripts/workflow_guard.py",
             "scripts/sync_repo_settings.py",

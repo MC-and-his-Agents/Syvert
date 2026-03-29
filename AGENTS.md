@@ -67,5 +67,6 @@ Syvert 是任务驱动、适配器可插拔的采集底座。
 - [WORKFLOW.md](./WORKFLOW.md)：agent 运行契约唯一来源
 - [docs/process/agent-loop.md](./docs/process/agent-loop.md)：checkpoint / resume / compact 协议
 - [docs/process/worktree-lifecycle.md](./docs/process/worktree-lifecycle.md)：workspace/worktree 生命周期协议
+- [docs/process/branch-retirement.md](./docs/process/branch-retirement.md)：分支归档与退役协议
 - [spec_review.md](./spec_review.md)：正式规约套件准入标准
 - [code_review.md](./code_review.md)：实现 PR 审查标准与 merge gate

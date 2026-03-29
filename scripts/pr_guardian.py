@@ -157,10 +157,19 @@ def build_prompt(meta: dict) -> str:
         f"- 头部提交: {meta['headRefOid']}\n"
         f"- PR 描述:\n{meta.get('body') or ''}\n\n"
         f"请在当前工作树中审查 `origin/{base_ref}` 与当前 HEAD 的差异。\n"
+        "优先基于 diff 与必要文件做静态审查，仅在存在明确阻断线索时再运行最小必要命令。\n"
+        "不要运行完整测试套件或与当前变更无关的重型验证。\n"
     )
 
 
 def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict:
+    scratch_dir = worktree_dir / ".codex-tmp"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    scratch_dir_text = str(scratch_dir)
+    env["TMPDIR"] = scratch_dir_text
+    env["TMP"] = scratch_dir_text
+    env["TEMP"] = scratch_dir_text
     try:
         completed = subprocess.run(
             [
@@ -169,7 +178,7 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
                 "-C",
                 str(worktree_dir),
                 "-s",
-                "read-only",
+                "workspace-write",
                 "--output-schema",
                 str(SCHEMA_PATH),
                 "-o",
@@ -177,6 +186,7 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
                 "-",
             ],
             cwd=str(REPO_ROOT),
+            env=env,
             input=prompt,
             text=True,
             capture_output=True,
