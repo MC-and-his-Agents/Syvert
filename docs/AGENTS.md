@@ -9,6 +9,7 @@
 - `docs/process/delivery-funnel.md`：唯一交付漏斗
 - `docs/process/agent-loop.md`：长任务协议与恢复规则
 - `docs/process/worktree-lifecycle.md`：worktree 生命周期规则
+- `docs/process/branch-retirement.md`：分支归档与退役规则
 - `docs/specs/`：正式规约区
 - `docs/decisions/`：决策记录
 - `docs/exec-plans/`：执行计划与恢复工件

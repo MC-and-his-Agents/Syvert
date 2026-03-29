@@ -17,9 +17,11 @@ from scripts.workflow_guard import validate_repository
 REQUIRED_GOVERNANCE_FILES = (
     Path("WORKFLOW.md"),
     Path("docs/process/agent-loop.md"),
+    Path("docs/process/branch-retirement.md"),
     Path("docs/process/worktree-lifecycle.md"),
     Path("scripts/create_worktree.py"),
     Path("scripts/governance_status.py"),
+    Path("scripts/retire_branch.py"),
     Path("scripts/workflow_guard.py"),
     Path("scripts/sync_repo_settings.py"),
 )

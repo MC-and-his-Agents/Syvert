@@ -24,6 +24,7 @@ codex:
 
 - worktree key 固定为 `issue-{number}-{slug}`。
 - 优先通过 `python3 scripts/create_worktree.py --issue <n> --class <class>` 创建或复用工作区。
+- 分支完成合入或确认被替代后，通过 `python3 scripts/retire_branch.py` 执行归档与退役。
 - 治理基线自举允许 `Issue + decision + exec-plan` 作为 bootstrap contract。
 - 非治理基线事项进入实现前必须有 formal spec 输入。
 

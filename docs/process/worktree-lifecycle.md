@@ -23,6 +23,7 @@
 - 终止事项后可清理 worktree，但保留状态记录直到关闭周期完成。
 - 恢复时优先读取状态面，按 key 定位已有 worktree。
 - head SHA 漂移时先刷新状态，再继续执行。
+- 分支退役前必须先解除 worktree 绑定；退役顺序以 [branch-retirement.md](./branch-retirement.md) 为准。
 
 ## 路径写入边界
 
