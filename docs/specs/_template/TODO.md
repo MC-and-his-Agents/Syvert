@@ -5,6 +5,14 @@
 - 当前成熟度：`spec-ready` / `implementation-ready` / `merge-ready`
 - 当前阻塞：
 
+## 事项上下文
+
+- Issue：
+- item_key：
+- item_type：
+- release：
+- sprint：
+
 ## 实施清单
 
 - [ ] 任务 1

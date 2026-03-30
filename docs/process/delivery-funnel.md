@@ -8,10 +8,13 @@ Syvert 的唯一默认交付路径如下：
 
 1. `Roadmap / 阶段目标`
    - 先确认事项是否属于当前阶段边界
+   - 确认事项服务的 `release` 目标
 2. `GitHub backlog`
    - 在 GitHub Issues / Projects 中确认事项本体、状态和优先级
+   - `release` 与 `sprint` 语义来自执行绑定，不在仓库内维护状态镜像
 3. `候选项`
    - 明确事项属于轻量事项、中等事项或核心事项
+   - 明确事项在当前 `sprint` 中的角色：阻塞项、并行项或收尾项
 4. `spec / contract`
    - 核心事项必须先形成正式规约或等价契约工件
    - 若事项本身是在 `main` 首次建立治理/规约基础设施，可暂以 `Issue + decision + exec-plan` 形成 bootstrap contract
@@ -36,6 +39,14 @@ Syvert 的唯一默认交付路径如下：
   - 必须先建立正式 `spec` 套件并完成 `spec review`
   - 默认与实现 PR 分离
   - 治理 bootstrap 例外：在正式规约机制尚未落地前，可先按 bootstrap contract 进入 `governance` PR；PR 不得混入业务实现代码
+
+## 事项上下文绑定
+
+- 每个进入执行回合的事项必须绑定：`Issue`、`item_key`、`item_type`、`release`、`sprint`
+- `Issue` 仍是任务状态真相源的入口；`item_key`、`release`、`sprint` 只用于执行、恢复与交付映射
+- 新事项与新长任务必须显式声明完整事项上下文；存量事项可在进入新的执行回合时补齐
+- `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`
+- `item_key` 当前建议命名为 `<item_type>-<4-digit>-<slug>`
 
 ## 与自动化门禁的关系
 
