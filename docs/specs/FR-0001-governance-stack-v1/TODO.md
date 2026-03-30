@@ -1,13 +1,5 @@
 # FR-0001 TODO
 
-## 关联信息
-
-- item_key：`FR-0001-governance-stack-v1`
-- Issue：`#6`
-- item_type：`FR`
-- 所属 release：`v0.1.0`
-- 所属 sprint：`2026-S13`
-
 ## 状态
 
 - 当前成熟度：`implementation-ready`

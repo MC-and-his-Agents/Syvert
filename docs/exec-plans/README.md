@@ -41,9 +41,8 @@
 
 ## 示例链路
 
-- `item_key`：`FR-0001-governance-stack-v1`
-- formal spec：`docs/specs/FR-0001-governance-stack-v1/spec.md`
-- TODO：`docs/specs/FR-0001-governance-stack-v1/TODO.md`
-- exec-plan：`docs/exec-plans/governance-stack-v1.md`
-- release：`v0.1.0`
-- sprint：`2026-S13`
+- formal spec：`docs/specs/FR-XXXX-<slug>/spec.md`
+- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
+- exec-plan：`docs/exec-plans/<item_key>.md`
+- 聚合键：同一个 `item_key`
+- 目标：通过统一 `item_key`、`Issue`、`release`、`sprint` 串起规约、恢复工件与 PR

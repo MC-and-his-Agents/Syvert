@@ -1,11 +1,5 @@
 # FR-0001 治理栈 v2 Repo Harness 闭环
 
-## 关联信息
-
-- item_key：`FR-0001-governance-stack-v1`
-- Issue：`#6`
-- 所属 release：`v0.1.0`
-
 ## 背景与目标
 
 - 背景：v1 已建立规则闭环，但尚缺 repo harness 层的运行契约、长任务恢复协议、workspace 生命周期与统一状态面。本事项绑定 GitHub Issue `#6`。

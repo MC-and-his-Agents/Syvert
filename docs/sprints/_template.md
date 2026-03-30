@@ -6,13 +6,13 @@
 
 ## 本轮目标
 
-- 本 sprint 聚焦推进的能力：
+- 本 sprint 对应的协作主题：
 
-## 纳入事项
+## 入口事项
 
 - `ITEM-KEY`：关联 Issue / PR / spec / exec-plan
 
-## 依赖 / 阻塞
+## 进入前依赖
 
 - 
 
@@ -21,9 +21,10 @@
 - [ ] 条件 1
 - [ ] 条件 2
 
-## 当前 checkpoint 汇总入口
+## 协作入口
 
-- `ITEM-KEY`：当前停点 / 下一步
+- GitHub Project / iteration：
+- 相关 Issue / PR：
 
 ## 关联工件
 
