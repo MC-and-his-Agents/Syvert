@@ -12,7 +12,7 @@
 
 - 当前成熟度：`implementation-ready`
 - 当前阻塞：
-  - 需要对当前 `head SHA` 获得 latest valid guardian verdict
+  - 需要完成治理测试回归与仓库侧 dry-run 校验
 
 ## 实施清单
 
@@ -27,16 +27,16 @@
 ## 验证清单
 
 - [x] `workflow_guard`、`docs_guard`、`spec_guard` 通过
-- [x] GitHub checks 全绿
+- [ ] GitHub checks 全绿
 - [ ] 治理测试通过
-- [x] `governance_gate` 通过
+- [ ] `governance_gate` 通过
 - [ ] `sync_repo_settings.py --dry-run` 通过
-- [ ] guardian review 对当前 `head SHA` 通过
+- [ ] guardian review 对应主线 PR / head 通过
 - [ ] 受控 merge 成功完成
 
 ## 会话恢复信息
 
-- 当前停点：PR2 结构层文档与模板已落地，GitHub checks 全绿，等待 latest guardian verdict。
+- 当前停点：`FR-0001` 主线事项已形成协议与流程主干，结构层落点改由 `GOV-0014-release-sprint-structure` 独立推进。
 - 下一步动作：
-  - 通过 `governance_status.py` 核对最新 guardian verdict
-  - guardian 通过后执行 `python3 scripts/merge_pr.py 15 --delete-branch`
+  - 继续执行治理测试与仓库侧 dry-run 校验
+  - 通过独立事项追踪结构层与后续自动化门禁演进

@@ -8,7 +8,6 @@
 - release：`v0.1.0`
 - sprint：`2026-S13`
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 当前关联 PR：`#15`
 
 ## 目标
 
@@ -45,34 +44,34 @@
 
 ## 当前停点
 
-- PR2 结构层文档与模板已落地，正在补齐 active governance 工件的事项上下文与 review-ready 信息。
+- 治理栈 v2 repo harness 主事项已完成协议与主线实现，后续结构层落点由独立事项 `GOV-0014-release-sprint-structure` 持续推进。
 
 ## 下一步
 
-- 清理 guardian 指出的阻断项并重跑审查
-- 在 checks 全绿且 latest guardian=`APPROVE` 后走 `merge_pr`
+- 继续推进 `FR-0001` 主线剩余的治理测试回归与仓库侧 dry-run 校验
+- 独立结构层事项由 `docs/exec-plans/GOV-0014-release-sprint-structure.md` 维护恢复入口
 
 ## 当前 checkpoint 推进的 release 目标
 
-- 为 `v0.1.0` 治理基线补齐结构层索引与模板入口，使 `release / sprint / item_key` 能在仓内形成稳定聚合关系。
+- 为 `v0.1.0` 治理基线维持 repo harness 主线闭环，不直接承担 PR2 结构层事项的收口职责。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
-- 角色：治理结构层 PR2 的收口项，为后续 PR3 自动化门禁提供稳定的文档输入。
-- 阻塞：等待 guardian 基于当前 PR head 重新给出 `APPROVE`。
+- 角色：治理基线主事项与上位前提。
+- 阻塞：剩余治理测试回归与仓库侧配置 dry-run 尚未完成。
 
 ## 已验证项
 
 - `workflow-guard` 通过
 - `docs-guard` 通过
 - `spec-guard --all` 通过
-- PR #15 的 GitHub checks 已能稳定触发并转绿
+- repo harness 协议与门禁入口已入库
 
 ## 未决风险
 
-- `docs/sprints/` 仍需严格保持为索引入口，不能演化成仓内状态镜像
-- 后续 PR3 引入自动化门禁时，需要明确历史事项的兼容策略
+- 后续结构层与自动化门禁事项需保持与 `FR-0001` 主线的边界清晰
+- 仓库侧配置 dry-run 与完整治理测试尚待回归验证
 
 ## 当前 head SHA
 
-- 最近一次 checkpoint head：`5416f30d8e59f9991f6c40730f829329f0cf1975`
+- 最近一次 checkpoint head：`7fc5e5ae84b9e4f2f79a606d1267d2c9c78db02d`
