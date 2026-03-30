@@ -29,7 +29,7 @@
 - [x] `workflow_guard`、`docs_guard`、`spec_guard` 通过
 - [x] GitHub checks 全绿
 - [ ] 治理测试通过
-- [ ] `governance_gate` 通过
+- [x] `governance_gate` 通过
 - [ ] `sync_repo_settings.py --dry-run` 通过
 - [ ] guardian review 对当前 `head SHA` 通过
 - [ ] 受控 merge 成功完成

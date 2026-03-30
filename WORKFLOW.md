@@ -48,8 +48,8 @@ codex:
 ## checkpoint / resume / compact 规则
 
 - 长任务统一按 `kickoff -> checkpoint -> compact -> resume -> handoff -> merge-ready` 执行。
-- `核心事项` 强制存在 `exec-plan`，并记录事项上下文、停点、下一步、已验证项、未决风险、当前 head SHA。
-- `当前 head SHA` 默认记录精确提交；若执行回合正绑定当前 PR 头提交且尚未再次提交，可暂以符号值 `HEAD` 表示当前受审分支头，并由 guardian 结合 PR 元数据校验。
+- `核心事项` 强制存在 `exec-plan`，并记录事项上下文、停点、下一步、已验证项、未决风险、当前 checkpoint 对应的 head SHA。
+- `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
 - checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 `exec-plan` 与 `TODO.md`，再继续执行。
 - checkpoint 必须说明当前改动推进了哪个 `release` 目标，以及该事项在当前 `sprint` 中的角色或位置。
 - `compact` 仅压缩已入库且可复验的信息，不得压缩未落盘前提。

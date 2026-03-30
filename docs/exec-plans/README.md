@@ -14,9 +14,9 @@
   - 当前事项在 `sprint` 中的角色 / 阻塞关系
   - 已验证项
   - 未决风险
-  - 当前 head SHA
+  - 当前 checkpoint 对应的 head SHA
 - `存量事项` 在进入新的执行回合前补齐上述字段。
-- `当前 head SHA` 默认记录精确提交；若当前工件绑定的就是正在受审的分支头提交，可暂用符号值 `HEAD` 指向当前 PR head。
+- `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
 
 ## 职责边界
 

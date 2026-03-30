@@ -75,4 +75,4 @@
 
 ## 当前 head SHA
 
-- 当前 PR HEAD（进入 review 前同步）：`HEAD`
+- 最近一次 checkpoint head：`dc7174edf45a453fd4fda5d7d3a2470adf4deb19`
