@@ -1,5 +1,13 @@
 # FR-0001 TODO
 
+## 事项上下文
+
+- Issue：`#6`
+- item_key：`FR-0001-governance-stack-v1`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+
 ## 状态
 
 - 当前成熟度：`implementation-ready`
