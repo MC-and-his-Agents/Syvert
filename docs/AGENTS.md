@@ -6,6 +6,8 @@
 ## 目录职责
 
 - `docs/roadmap-v0-to-v1.md`：阶段目标与版本边界
+- `docs/releases/`：release 聚合索引与模板
+- `docs/sprints/`：sprint 聚合索引与模板
 - `docs/process/delivery-funnel.md`：唯一交付漏斗
 - `docs/process/agent-loop.md`：长任务协议与恢复规则
 - `docs/process/worktree-lifecycle.md`：worktree 生命周期规则
@@ -35,7 +37,15 @@
 - `事项层`
   - 定义单事项的规约、执行上下文、恢复入口、验证与交付状态
 
-本仓库当前不在 `docs/` 下维护 release / sprint 状态镜像；`release` 与 `sprint` 在 PR1 中只作为事项执行绑定字段存在。
+## 统一事项身份
+
+- 仓内事项统一使用 `item_key` 作为聚合键。
+- 支持前缀：`FR`、`HOTFIX`、`GOV`、`CHORE`
+- 命名格式：`<PREFIX>-<4位编号>-<slug>`
+- `PREFIX` 必须全大写，`slug` 使用短横线英文短语。
+- 一个事项在仓内只对应一个 `item_key`。
+- 从 PR2 起，新事项必须在相关工件中显式声明 `item_key`。
+- 历史事项允许保留旧文件名；若未迁移，只要求在后续增量工件中保持关联一致，不做一次性全量追溯。
 
 ## 正式规约区规则
 
@@ -51,11 +61,19 @@
 
 - Issue：事项边界与关闭条件
 - Project：状态、优先级、排期
+- `docs/releases/**`：release 目标、完成判据、事项聚合入口
+- `docs/sprints/**`：sprint 目标、依赖阻塞、checkpoint 汇总入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
 - `TODO.md`：事项级状态、执行停点、恢复入口、阻断项
 - `exec-plan`：长任务执行细节、事项上下文与恢复上下文
 - PR：变更范围、风险、验证证据、关闭语义，并显式映射回事项上下文
+
+## 聚合原则
+
+- 不采用“每个事项目录里混放 `spec`、`exec-plan`、`decision`”的物理嵌套方案。
+- 继续使用“按工件类型分区、按 `item_key` 逻辑聚合”的模型。
+- `docs/releases/` 与 `docs/sprints/` 是横向索引层，不是新的事实源，也不回写 GitHub backlog 状态。
 
 ## 门禁关系
 

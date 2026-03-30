@@ -1,5 +1,11 @@
 # FR-XXXX 标题
 
+## 关联信息
+
+- item_key：
+- Issue：
+- 所属 release：
+
 ## 背景与目标
 
 - 背景：

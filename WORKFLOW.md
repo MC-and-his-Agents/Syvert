@@ -26,6 +26,7 @@ codex:
   - `release`
   - `sprint`
 - `Issue` 仍是任务状态真相源入口；`item_key`、`release`、`sprint` 是执行上下文字段，不替代 GitHub Issues / Projects。
+- `docs/releases/` 与 `docs/sprints/` 只承载仓内聚合索引，不替代 GitHub Issues / Projects 的状态真相源。
 - 新事项与存量事项在进入新的执行回合前都必须补齐完整事项上下文。
 - 术语约定：
   - `新事项`：首次进入当前交付漏斗、且尚未在仓库内形成 `exec-plan` / `TODO.md` 恢复工件的事项
@@ -40,7 +41,7 @@ codex:
 - worktree key 仍仅由 `Issue` 生成；`item_key`、`release`、`sprint` 不改变现有 worktree 生成与复用机制。
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`。
 - `item_key` 当前建议命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
-- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。两者在本仓库中作为执行绑定字段存在，不要求当前在仓库内建立实体索引。
+- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。
 - 治理基线自举允许 `Issue + decision + exec-plan` 作为 bootstrap contract。
 - 非治理基线事项进入实现前必须有 formal spec 输入。
 

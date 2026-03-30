@@ -1,5 +1,12 @@
 # FR-XXXX 实施计划
 
+## 关联信息
+
+- item_key：
+- Issue：
+- 所属 release：
+- 关联 exec-plan：
+
 ## 实施目标
 
 - 本次实施要交付的能力：

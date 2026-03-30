@@ -1,5 +1,16 @@
 # 治理栈 v1 执行计划
 
+## 关联信息
+
+- item_key：`FR-0001-governance-stack-v1`
+- Issue：`#6`
+- 事项类型：`FR`
+- 所属 release：`v0.1.0`
+- 所属 sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- 关联 PR：`#13`
+
 ## 目标
 
 - 建立 Syvert 的治理文档分层结构
