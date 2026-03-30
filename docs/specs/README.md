@@ -6,6 +6,7 @@
 
 - 核心事项默认进入正式规约流程
 - 中等事项在触及共享契约、共享数据模型或高风险链路时升级到正式规约
+- `FR` 是事项类型之一；formal spec 默认围绕 `FR` 组织
 
 ## 最小套件
 
@@ -34,3 +35,4 @@
 
 - 目录命名建议：`FR-XXXX-<slug>`
 - `XXXX` 为四位数字，`slug` 使用短横线语义短语
+- formal spec 可通过统一 `item_key` 与 `exec-plan`、decision、PR 关联
