@@ -22,7 +22,7 @@
   - 当前事项在 `sprint` 中的角色、位置或阻塞关系
   - 已验证项
   - 未决风险
-  - 当前 head SHA
+  - 当前 head SHA（精确提交或当前受审分支头 `HEAD`）
 
 ## compact
 

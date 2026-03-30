@@ -62,7 +62,7 @@
 - Issue：事项边界与关闭条件
 - Project：状态、优先级、排期
 - `docs/releases/**`：release 目标、完成判据、事项聚合入口
-- `docs/sprints/**`：sprint 目标、依赖阻塞、checkpoint 汇总入口
+- `docs/sprints/**`：sprint 协作主题、退出条件与工件入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
 - `TODO.md`：事项级状态、执行停点、恢复入口、阻断项

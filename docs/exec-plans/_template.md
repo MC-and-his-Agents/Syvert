@@ -4,7 +4,7 @@
 
 - item_key：
 - Issue：
-- 事项类型：
+- item_type：
 - 所属 release：
 - 所属 sprint：
 - 关联 spec：

@@ -26,16 +26,17 @@
 
 ## 验证清单
 
+- [x] `workflow_guard`、`docs_guard`、`spec_guard` 通过
+- [x] GitHub checks 全绿
 - [ ] 治理测试通过
-- [ ] `workflow_guard`、`docs_guard`、`spec_guard`、`governance_gate` 通过
+- [ ] `governance_gate` 通过
 - [ ] `sync_repo_settings.py --dry-run` 通过
 - [ ] guardian review 对当前 `head SHA` 通过
 - [ ] 受控 merge 成功完成
 
 ## 会话恢复信息
 
-- 当前停点：v2 文档与脚本已落地，等待完整回归与 guardian 结论。
+- 当前停点：PR2 结构层文档与模板已落地，GitHub checks 全绿，等待 latest guardian verdict。
 - 下一步动作：
-  - 执行治理测试与门禁命令
-  - 通过 `governance_status.py` 核对状态面
-  - guardian 通过后执行 `python3 scripts/merge_pr.py <pr-number> --delete-branch`
+  - 通过 `governance_status.py` 核对最新 guardian verdict
+  - guardian 通过后执行 `python3 scripts/merge_pr.py 15 --delete-branch`
