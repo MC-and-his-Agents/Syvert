@@ -49,6 +49,6 @@
 
 - 待补充
 
-## 当前 head SHA
+## 最近一次 checkpoint 对应的 head SHA
 
 - `HEAD`
