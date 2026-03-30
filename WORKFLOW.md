@@ -26,7 +26,11 @@ codex:
   - `release`
   - `sprint`
 - `Issue` 仍是任务状态真相源入口；`item_key`、`release`、`sprint` 是执行上下文字段，不替代 GitHub Issues / Projects。
-- 新事项与新长任务必须显式声明完整事项上下文；存量事项允许在进入新的执行回合时补齐。
+- 新事项与存量事项在进入新的执行回合前都必须补齐完整事项上下文。
+- 术语约定：
+  - `新事项`：首次进入当前交付漏斗、且尚未在仓库内形成 `exec-plan` / `TODO.md` 恢复工件的事项
+  - `存量事项`：在本协议升级前已存在仓库内恢复工件，但尚未补齐事项上下文的事项
+  - `长任务`：需要 `checkpoint -> resume -> handoff` 恢复能力，并因此必须维护 `exec-plan` 的执行回合
 
 ## worktree / bootstrap 规则
 
@@ -53,7 +57,7 @@ codex:
 ## stop conditions
 
 - 缺少必需输入（Issue、事项上下文、formal spec 或 bootstrap contract）。
-- 新事项或新长任务缺少 `item_key` / `item_type` / `release` / `sprint` 绑定。
+- 任一进入执行回合的事项缺少 `item_key` / `item_type` / `release` / `sprint` 绑定。
 - 当前改动越过阶段边界或破坏规约/实现分离。
 - 关键门禁失败且无法在当前回合消除。
 - guardian 结果不是 `APPROVE` 或 `safe_to_merge=false`。
@@ -69,7 +73,7 @@ codex:
 
 - 进入 `open_pr` 条件：
   - 已声明 PR class 且与改动类别一致
-  - 新事项与新长任务已声明事项上下文；存量事项若沿用旧工件，需在当前执行回合补齐或在 PR 描述中显式说明补齐计划
+  - 已声明完整事项上下文，且该事项在进入当前执行回合前已完成补齐
   - PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪

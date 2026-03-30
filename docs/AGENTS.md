@@ -19,6 +19,10 @@
 - 事项上下文字段：`Issue` / `item_key` / `item_type` / `release` / `sprint`
 - 事项类型：`FR` / `HOTFIX` / `GOV` / `CHORE`
 - 事项术语：`轻量事项` / `中等事项` / `核心事项`
+- 执行术语：
+  - `新事项`：首次进入当前交付漏斗、且尚未形成仓库内恢复工件的事项
+  - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项
+  - `长任务`：需要 `checkpoint / resume / handoff` 恢复能力，并因此维护 `exec-plan` 的执行回合
 - 层次术语：`版本层` / `冲刺层` / `事项层`
 - 成熟度术语：`spec-ready` / `implementation-ready` / `merge-ready`
 
