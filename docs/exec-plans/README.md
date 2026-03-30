@@ -6,7 +6,7 @@
 
 - 新事项与新长任务的 `exec-plan` 至少记录以下字段：
 
-- `issue`
+- `Issue`
 - `item_key`
 - `item_type`
 - `release`
