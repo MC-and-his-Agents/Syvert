@@ -69,7 +69,8 @@ codex:
 
 - 进入 `open_pr` 条件：
   - 已声明 PR class 且与改动类别一致
-  - 已声明事项上下文，且 PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
+  - 新事项与新长任务已声明事项上下文；存量事项若沿用旧工件，需在当前执行回合补齐或在 PR 描述中显式说明补齐计划
+  - PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪
 - 进入 `merge_pr` 条件：
