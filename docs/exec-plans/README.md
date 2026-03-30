@@ -14,9 +14,10 @@
   - 当前事项在 `sprint` 中的角色 / 阻塞关系
   - 已验证项
   - 未决风险
-  - 当前 checkpoint 对应的 head SHA
+  - 最近一次 checkpoint 对应的 head SHA
 - `存量事项` 在进入新的执行回合前补齐上述字段。
 - `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
+- 若当前 PR 在最近一次 checkpoint 之后仍有跟进 commit，但尚未形成新的 checkpoint，可保留最近一次 checkpoint head，并由 guardian state 绑定当前受审 head。
 
 ## 职责边界
 
