@@ -23,6 +23,8 @@
   - 已验证项
   - 未决风险
   - 最近一次 checkpoint 对应的 head SHA
+- 只有当执行回合显式形成新的 checkpoint 时，才推进该 head SHA。
+- review 结论、GitHub checks、PR 关联等审查态信息的补充，不单独构成新的 checkpoint。
 
 ## compact
 
