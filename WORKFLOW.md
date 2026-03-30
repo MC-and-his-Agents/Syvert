@@ -40,10 +40,11 @@ codex:
 - 分支完成合入或确认被替代后，通过 `python3 scripts/retire_branch.py` 执行归档与退役。
 - worktree key 仍仅由 `Issue` 生成；`item_key`、`release`、`sprint` 不改变现有 worktree 生成与复用机制。
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`。
-- `item_key` 当前建议命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
+- `item_key` 固定命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
 - `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。
 - 治理基线自举允许 `Issue + decision + exec-plan` 作为 bootstrap contract。
 - 非治理基线事项进入实现前必须有 formal spec 输入。
+- 每个执行回合必须有且仅有一个 active `exec-plan` 与当前 `item_key` 一一对应；上位前提事项可在该工件中被引用，但不替代当前事项的 active 工件。
 
 ## checkpoint / resume / compact 规则
 
@@ -80,6 +81,7 @@ codex:
 - 进入 `open_pr` 条件：
   - 已声明 PR class 且与改动类别一致
   - 已声明完整事项上下文，且该事项在进入当前执行回合前已完成补齐
+  - 当前事项存在与 `item_key` 一致的 active `exec-plan`，并与 PR 关联信息一致
   - PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪

@@ -6,7 +6,8 @@
 - item_key：`FR-0001-governance-stack-v1`
 - item_type：`FR`
 - release：`v0.1.0`
-- sprint：`2026-S13`
+- sprint：`非当前 active sprint（结构层 active 已切换至 GOV-0014 / 2026-S13）`
+- active_exec_plan：`docs/exec-plans/governance-stack-v1.md`（主线前提工件，非 PR `#15` active）
 
 ## 状态
 

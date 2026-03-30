@@ -5,8 +5,9 @@
 - item_key：
 - Issue：
 - item_type：
-- 所属 release：
-- 所属 sprint：
+- release：
+- sprint：
+- active_exec_plan：`docs/exec-plans/<item_key>.md`
 
 ## 状态
 

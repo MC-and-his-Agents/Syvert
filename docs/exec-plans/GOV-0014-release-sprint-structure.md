@@ -8,11 +8,13 @@
 - release：`v0.1.0`
 - sprint：`2026-S13`
 - 关联 PR：`#15`
+- active 收口事项：`GOV-0014-release-sprint-structure`
+- 上位前提事项：`FR-0001-governance-stack-v1`（非当前 PR 收口主体）
 
 ## 目标
 
 - 为 PR2 落地 `release` / `sprint` 聚合索引与 `exec-plan` 模板入口。
-- 让当前治理结构层事项具备独立的恢复入口，而不是借用 `FR-0001` 的 active 工件。
+- 让当前治理结构层事项具备独立的恢复入口，并明确与 `FR-0001` 的前提/收口边界。
 
 ## 范围
 
@@ -36,6 +38,11 @@
 
 - 角色：PR2 结构层收口事项
 - 阻塞：等待 guardian 通过并进入 merge gate
+
+## 与 FR-0001 的边界
+
+- `FR-0001-governance-stack-v1` 在当前 PR 仅作为治理基线前提，不承担结构层收口责任
+- PR `#15` 的审查与收口以本工件（`GOV-0014-release-sprint-structure`）为 active 恢复入口
 
 ## 已验证项
 
