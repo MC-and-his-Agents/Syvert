@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 已连续指出历史兼容性、唯一 active 工件与 PR body 对齐三类阻断项；当前已补齐对应修复，停在第四轮 guardian 审查前的最新状态对齐。
+- guardian 已连续指出历史兼容性、唯一 active 工件与 PR body 对齐三类阻断项；当前已补齐对应修复并推送到最新受审 head，停在下一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -63,4 +63,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `bb68705cd3fb405e7ec860dccb479ce445427e2a`
+- `739b6e7949f833b1e58354936d88f0816dba65dd`
