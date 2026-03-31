@@ -594,6 +594,63 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("关联 decision" in error for error in errors))
 
+    def test_bootstrap_contract_touched_decision_issue_mismatch_with_exec_plan_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.write_text(
+                """# ADR-0001
+
+- Issue：`#999`
+- item_key：`GOV-0001-release-sprint-structure`
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertTrue(any("Issue" in error and "不一致" in error for error in errors))
+
+    def test_bootstrap_contract_touched_exec_plan_issue_mismatch_with_decision_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.write_text(
+                """# ADR-0001
+
+- Issue：`#999`
+- item_key：`GOV-0001-release-sprint-structure`
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("Issue" in error and "不一致" in error for error in errors))
+
+    def test_bootstrap_contract_touched_exec_plan_item_key_mismatch_with_decision_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.write_text(
+                """# ADR-0001
+
+- Issue：`#1`
+- item_key：`GOV-9999-unrelated`
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("item_key" in error and "不一致" in error for error in errors))
+
     def test_valid_governance_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

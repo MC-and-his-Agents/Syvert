@@ -232,6 +232,30 @@ def validate_decision(path: Path) -> list[str]:
     return []
 
 
+def validate_bootstrap_binding_consistency(
+    *,
+    decision_path: Path,
+    decision_fields: dict[str, str],
+    exec_plan_path: Path,
+    exec_plan_fields: dict[str, str],
+) -> list[str]:
+    errors: list[str] = []
+    decision_issue = decision_fields.get("Issue", "")
+    exec_issue = exec_plan_fields.get("Issue", "")
+    if decision_issue and exec_issue and decision_issue != exec_issue:
+        errors.append(
+            f"{decision_path}: `Issue` `{decision_issue}` 与关联 exec-plan `{exec_plan_path}` 的 `Issue` `{exec_issue}` 不一致。"
+        )
+
+    decision_item_key = decision_fields.get("item_key", "")
+    exec_item_key = exec_plan_fields.get("item_key", "")
+    if decision_item_key and exec_item_key and decision_item_key != exec_item_key:
+        errors.append(
+            f"{decision_path}: `item_key` `{decision_item_key}` 与关联 exec-plan `{exec_plan_path}` 的 `item_key` `{exec_item_key}` 不一致。"
+        )
+    return errors
+
+
 def collect_targets(
     repo_root: Path,
     changed_paths: list[str] | None,
@@ -348,9 +372,23 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 continue
             if not decision_path.exists():
                 errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
+                continue
+
+            decision_item_type = decision_item_type_from_name(Path(related_decision))
+            if decision_item_type in {"FR", "HOTFIX", "CHORE"}:
+                continue
+            decision_fields = extract_fields(decision_path.read_text(encoding="utf-8"))
+            errors.extend(
+                validate_bootstrap_binding_consistency(
+                    decision_path=decision_path,
+                    decision_fields=decision_fields,
+                    exec_plan_path=target,
+                    exec_plan_fields=fields,
+                )
+            )
 
         if touched_decision:
-            exec_plan_to_decision: set[str] = set()
+            exec_plan_to_decision: dict[str, list[tuple[Path, dict[str, str]]]] = {}
             for exec_plan in all_exec_plans:
                 fields = extract_fields(exec_plan.read_text(encoding="utf-8"))
                 item_type = fields.get("item_type", "")
@@ -364,7 +402,7 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                     normalized = decision_path.relative_to(repo_root.resolve()).as_posix()
                 except ValueError:
                     continue
-                exec_plan_to_decision.add(normalized)
+                exec_plan_to_decision.setdefault(normalized, []).append((exec_plan, fields))
 
             for raw_path in changed_paths:
                 path = Path(raw_path)
@@ -377,6 +415,17 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 normalized_target = target.resolve().relative_to(repo_root.resolve()).as_posix()
                 if normalized_target not in exec_plan_to_decision:
                     errors.append(f"{target}: 当前 touched decision 未被任何 exec-plan 通过 `关联 decision` 关联。")
+                    continue
+                decision_fields = extract_fields(target.read_text(encoding="utf-8"))
+                for exec_plan_path, exec_plan_fields in exec_plan_to_decision[normalized_target]:
+                    errors.extend(
+                        validate_bootstrap_binding_consistency(
+                            decision_path=target,
+                            decision_fields=decision_fields,
+                            exec_plan_path=exec_plan_path,
+                            exec_plan_fields=exec_plan_fields,
+                        )
+                    )
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path, repo_root=repo_root))
