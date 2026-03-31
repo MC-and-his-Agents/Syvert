@@ -23,11 +23,11 @@
 
 ## 当前停点
 
-- 已基于最新治理口径完成一次新的 checkpoint，收敛了结构层索引边界、字段命名与 checkpoint 语义对齐。
+- active 恢复入口已刷新并绑定到当前受审 PR head（`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`），等待 guardian 复核同一 head 的最终结论。
 
 ## 下一步动作
 
-- 基于当前 checkpoint head 重跑 guardian 审查
+- 基于当前受审 PR head（`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`）重跑 guardian 审查
 - 若 guardian 通过，则执行 `merge_pr` 进入受控合并
 
 ## 当前 checkpoint 推进的 release 目标
@@ -50,7 +50,12 @@
 - `docs-guard` 通过
 - `spec-guard --all` 通过
 - PR `#15` 的 GitHub checks 已全绿
-- active exec-plan 已刷新为当前 checkpoint，对齐最新受审 head
+- active exec-plan 已刷新并绑定到当前受审 head：`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`
+
+## 回滚方式
+
+- 若 guardian 继续阻断或合并前发现口径回归，回滚本次结构层文档变更提交并恢复到前一稳定 checkpoint（`8c016c20c780c1cd413e882684dd113451bb3f32`）后重新审查。
+- 若已合并后发现问题，按受控流程提交修复 PR，优先回退 `docs/releases/**`、`docs/sprints/**` 与本 exec-plan 的本轮改动，再补充修复说明。
 
 ## 未决风险
 
@@ -59,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7ea137a4edc6320b57c3643109a6085526790a5e`
+- `617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`
