@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 对 head `987df58cabaca70780775ba46840331b351e08fe` 又指出 3 个韧性问题：`worktrees.json` 损坏时受控入口会抛异常、active exec-plan 为 0 时错误文案误导、以及部分 `governance_status` 负例测试依赖现场短路；当前已在 head `0a195a428f485d82df80870cff9793b73c313fa5` 上补齐 fail-closed 兜底、诊断文案和测试隔离，停在新一轮 guardian 审查与 merge gate 核对。
+- guardian 审查在 head `05f845e451aeb90c21965aeab1b083db8573282b` 前后已经收敛到无阻断项；随后又补上 PR 状态面对非法 `Issue` 输入的 fail-closed 保护。当前代码与测试已对齐到 head `565b139b28bfe2712a16abed90d29b9de145e0cf`，停在最终 guardian 结论落盘与 squash merge。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0a195a428f485d82df80870cff9793b73c313fa5`
+- `565b139b28bfe2712a16abed90d29b9de145e0cf`
