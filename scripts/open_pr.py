@@ -135,7 +135,10 @@ def issue_requires_formal_input(issue: int) -> bool:
 def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FILE) -> dict[str, object]:
     if not path.exists():
         return {}
-    state = load_json(path)
+    try:
+        state = load_json(path)
+    except Exception:
+        return {"conflict": "invalid_worktree_state", "branch": branch}
     matches: list[dict[str, object]] = []
     for item in (state.get("worktrees") or {}).values():
         if item.get("branch") == branch:
@@ -157,6 +160,8 @@ def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> 
     except CommandError:
         return ["无法识别当前分支，无法确认事项上下文与执行现场一致。"]
     binding = load_worktree_binding_for_branch(branch)
+    if binding.get("conflict") == "invalid_worktree_state":
+        return ["`worktrees.json` 已损坏或不是合法 JSON，无法确认事项上下文与执行现场一致。"]
     if binding.get("conflict") == "multiple_branch_bindings":
         return ["当前分支在 `worktrees.json` 中命中多个 worktree 绑定，无法确认唯一执行现场。"]
     if not binding:
@@ -221,7 +226,10 @@ def validate_item_context(
         return errors
 
     issue_active_exec_plans = active_exec_plans_for_issue(repo_root, issue)
-    if len(issue_active_exec_plans) != 1:
+    if not issue_active_exec_plans:
+        errors.append("当前 `Issue` 缺少 active `exec-plan`，无法确认当前执行回合。")
+        return errors
+    if len(issue_active_exec_plans) > 1:
         errors.append("当前 `Issue` 存在多个 active `exec-plan`，不满足“每个执行回合有且仅有一个 active exec-plan”的要求。")
         return errors
     if issue_active_exec_plans[0].get("item_key", "") != item_key:

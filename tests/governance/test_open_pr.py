@@ -319,6 +319,18 @@ class OpenPrPreflightTests(unittest.TestCase):
                         errors = validate_current_worktree_binding(19, repo_root=repo)
         self.assertTrue(any("多个 worktree 绑定" in error for error in errors))
 
+    def test_invalid_worktree_state_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                    with patch(
+                        "scripts.open_pr.load_worktree_binding_for_branch",
+                        return_value={"conflict": "invalid_worktree_state", "branch": "issue-19-demo"},
+                    ):
+                        errors = validate_current_worktree_binding(19, repo_root=repo)
+        self.assertTrue(any("`worktrees.json` 已损坏" in error for error in errors))
+
     def test_invalid_binding_issue_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -330,6 +342,24 @@ class OpenPrPreflightTests(unittest.TestCase):
                     ):
                         errors = validate_current_worktree_binding(19, repo_root=repo)
         self.assertTrue(any("`issue` 值非法" in error for error in errors))
+
+    def test_missing_active_exec_plan_for_issue_has_precise_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0015-item-context-gate.md"
+            exec_plan.write_text(exec_plan.read_text(encoding="utf-8") + "- 状态：`inactive for PR #18`\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("当前事项缺少 active `exec-plan`" in error or "当前 `Issue` 缺少 active `exec-plan`" in error for error in errors))
 
     def test_missing_release_or_sprint_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

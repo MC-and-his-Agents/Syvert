@@ -77,7 +77,11 @@ class GovernanceStatusTests(unittest.TestCase):
                                     "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
                                 },
                             ):
-                                payload = governance_status.build_status_payload(pr_number=20)
+                                with patch(
+                                    "scripts.governance_status.active_exec_plans_for_issue",
+                                    return_value=[{"item_key": "GOV-0015-item-context-gate"}],
+                                ):
+                                    payload = governance_status.build_status_payload(pr_number=20)
 
         self.assertEqual(payload["item_context"], {})
 
@@ -105,7 +109,11 @@ class GovernanceStatusTests(unittest.TestCase):
                                     "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
                                 },
                             ):
-                                payload = governance_status.build_status_payload(pr_number=20)
+                                with patch(
+                                    "scripts.governance_status.active_exec_plans_for_issue",
+                                    return_value=[{"item_key": "GOV-0015-item-context-gate"}],
+                                ):
+                                    payload = governance_status.build_status_payload(pr_number=20)
 
         self.assertEqual(payload["item_context"], {})
 
