@@ -80,6 +80,8 @@ def filter_worktrees_by_issue(state: dict, issue_number: int) -> list[dict]:
 def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
     item_key = body_context.get("item_key", "")
+    if not worktree_item or worktree_item.get("issue") is None:
+        return {}
     required_fields = ("issue", "item_key", "item_type", "release", "sprint")
     if any(not body_context.get(field, "") for field in required_fields):
         return {}
@@ -97,6 +99,7 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
 
     comparisons = (
         ("issue", "Issue"),
+        ("item_key", "item_key"),
         ("item_type", "item_type"),
         ("release", "release"),
         ("sprint", "sprint"),
