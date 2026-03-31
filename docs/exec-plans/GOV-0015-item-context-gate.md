@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 已连续指出历史兼容性、唯一 active 工件、PR body 对齐、状态面约束与执行现场一致性五类阻断项；当前代码、PR 描述与验证证据已对齐到 head `e10a29292d5351bfdcefbc5fdfccccafffa24368`，停在覆盖该 head 的最终 guardian 审查与 merge gate 核对。
+- guardian 最新一轮对 head `01e3acfed1578a15bf54f6d99ef59b0a2c53bd37` 提出 3 个阻断：同一 Issue 的 active 工件唯一性、残缺 exec-plan 误报为合法事项上下文、以及受控入口在 foreign repo 场景的绑定误伤；当前已在 head `14be446020ffa40d9389914634f22bdfb401aed3` 上补齐对应修复与测试，停在新一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e10a29292d5351bfdcefbc5fdfccccafffa24368`
+- `14be446020ffa40d9389914634f22bdfb401aed3`
