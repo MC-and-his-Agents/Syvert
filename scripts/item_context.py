@@ -73,18 +73,19 @@ def exec_plan_path_for_item_key(repo_root: Path, item_key: str) -> Path:
 
 
 def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str, str]:
+    matches: list[dict[str, str]] = []
     path = exec_plan_path_for_item_key(repo_root, item_key)
     payload = parse_exec_plan_metadata(path)
     if payload and not is_inactive_exec_plan(payload):
-        return payload
+        matches.append(payload)
 
     exec_plans_dir = repo_root / "docs" / "exec-plans"
     if not exec_plans_dir.exists():
-        return {}
-
-    matches: list[dict[str, str]] = []
+        return matches[0] if len(matches) == 1 else {}
     for candidate in sorted(exec_plans_dir.glob("*.md")):
         if candidate.name == "README.md":
+            continue
+        if path.exists() and candidate.resolve() == path.resolve():
             continue
         metadata = parse_exec_plan_metadata(candidate)
         if metadata.get("item_key") == item_key and not is_inactive_exec_plan(metadata):
@@ -92,10 +93,8 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
 
     if len(matches) == 1:
         return matches[0]
-
-    explicit_active = [item for item in matches if item.get("active 收口事项") == item_key]
-    if len(explicit_active) == 1:
-        return explicit_active[0]
+    if len(matches) > 1:
+        return {"conflict": "multiple_active_exec_plans", "item_key": item_key}
     return {}
 
 

@@ -94,6 +94,40 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("缺少 active `exec-plan`" in error for error in errors))
 
+    def test_duplicate_active_exec_plans_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plans = repo / "docs" / "exec-plans"
+            (exec_plans / "legacy-duplicate.md").write_text(
+                "\n".join(
+                    [
+                        "# duplicate",
+                        "",
+                        "## 事项上下文",
+                        "",
+                        "- Issue：`#19`",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("多个 active `exec-plan`" in error for error in errors))
+
     def test_governance_without_issue_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

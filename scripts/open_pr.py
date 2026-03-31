@@ -159,6 +159,9 @@ def validate_item_context(
         errors.append("`item_key` 必须匹配 `<item_type>-<4-digit>-<slug>`，且前缀与 `item_type` 一致。")
 
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    if exec_plan.get("conflict") == "multiple_active_exec_plans":
+        errors.append("当前 `item_key` 对应多个 active `exec-plan`，不满足“有且仅有一个 active exec-plan”的要求。")
+        return errors
     if not exec_plan:
         errors.append(f"当前事项缺少 active `exec-plan`：`docs/exec-plans/{item_key}.md`。")
         return errors
