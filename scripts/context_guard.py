@@ -276,6 +276,7 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
     touched_exec_plan = bool(changed_paths) and any(
         is_exec_plan_file(Path(raw_path)) and not is_template(Path(raw_path)) for raw_path in changed_paths
     )
+    touched_decision = bool(changed_paths) and any(is_decision_file(Path(raw_path)) for raw_path in changed_paths)
 
     if changed_paths is not None:
         for raw_path in changed_paths:
@@ -294,10 +295,17 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
 
     # Governance bootstrap contract requires decision + exec-plan to co-exist.
     # This check is only enforced in diff mode to avoid forcing full-repo legacy migration.
-    if changed_paths is not None and touched_exec_plan:
+    if changed_paths is not None and (touched_exec_plan or touched_decision):
         all_decisions = [path for path in (repo_root / "docs" / "decisions").glob("*.md") if path.name != "README.md"]
+        all_exec_plans = [
+            path
+            for path in (repo_root / "docs" / "exec-plans").glob("*.md")
+            if path.name not in {"README.md", "_template.md"}
+        ]
         if not all_decisions:
             errors.append("治理/exec-plan 变更缺少 `docs/decisions/**` 工件，bootstrap contract 不完整。")
+        if not all_exec_plans:
+            errors.append("治理/decision 变更缺少 `docs/exec-plans/**` 工件，bootstrap contract 不完整。")
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path))
