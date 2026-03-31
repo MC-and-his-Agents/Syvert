@@ -7,7 +7,7 @@
 - item_type：
 - release：
 - sprint：
-- active_exec_plan：`docs/exec-plans/<item_key>.md`
+- exec_plan：`docs/exec-plans/<item_key>.md`
 
 ## 状态
 

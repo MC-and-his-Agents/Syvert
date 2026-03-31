@@ -4,6 +4,7 @@
 
 - item_key：
 - Issue：
+- item_type：
 - release：
 - sprint：
 - 关联 exec-plan：
