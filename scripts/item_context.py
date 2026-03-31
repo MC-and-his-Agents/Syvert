@@ -115,20 +115,12 @@ def matching_exec_plan_for_issue(repo_root: Path, issue_number: int) -> dict[str
         if payload.get("Issue") == str(issue_number):
             matches.append(payload)
 
-    active_matches = [
-        item
-        for item in matches
-        if not is_inactive_exec_plan(item) and item.get("active 收口事项") == item.get("item_key")
-    ]
-    if len(active_matches) == 1:
-        return active_matches[0]
+    eligible = [item for item in matches if not is_inactive_exec_plan(item)]
+    if len(eligible) != 1:
+        return {}
 
-    eligible = [
-        item
-        for item in matches
-        if not is_inactive_exec_plan(item)
-        and item.get("active 收口事项", item.get("item_key", "")) == item.get("item_key", "")
-    ]
-    if len(eligible) == 1:
-        return eligible[0]
-    return {}
+    candidate = eligible[0]
+    active_item = candidate.get("active 收口事项", "")
+    if active_item and active_item != candidate.get("item_key", ""):
+        return {}
+    return candidate

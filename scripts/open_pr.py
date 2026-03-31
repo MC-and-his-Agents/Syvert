@@ -14,19 +14,23 @@ import tempfile
 
 from scripts.item_context import ITEM_TYPES, load_item_context_from_exec_plan, normalize_issue, valid_item_key
 from scripts.common import (
+    CommandError,
     REPO_ROOT,
     format_changed_files,
     git_changed_files,
     git_current_branch,
     git_fetch_branch,
+    load_json,
     require_cli,
     run,
+    syvert_state_file,
 )
 from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level, spec_suite_policy
 from scripts.pr_scope_guard import build_report
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -122,6 +126,31 @@ def issue_requires_formal_input(issue: int) -> bool:
     return "FR-" in title.upper() or any(label in {"core", "governance", "spec"} or label.startswith("fr-") for label in labels)
 
 
+def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FILE) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    state = load_json(path)
+    for item in (state.get("worktrees") or {}).values():
+        if item.get("branch") == branch:
+            return item
+    return {}
+
+
+def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> list[str]:
+    if issue is None:
+        return []
+    try:
+        branch = git_current_branch(repo=repo_root)
+    except CommandError:
+        return []
+    binding = load_worktree_binding_for_branch(branch)
+    if not binding:
+        return ["当前分支未找到匹配的 worktree 状态绑定，无法确认事项上下文与执行现场一致。"]
+    if int(binding.get("issue", -1)) != issue:
+        return ["受控 PR 入口填写的 `Issue` 与当前 branch/worktree 绑定的事项不一致。"]
+    return []
+
+
 def validate_item_context(
     issue: int | None,
     item_key: str | None,
@@ -198,6 +227,7 @@ def validate_pr_preflight(
     errors: list[str] = []
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
+    errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
     if pr_class == "spec" and not formal_spec_dirs(changed_files):
         errors.append("`spec` 类 PR 必须包含正式规约区变更。")

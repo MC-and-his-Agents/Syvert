@@ -53,6 +53,34 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["item_context"], {})
 
+    def test_pr_status_rejects_worktree_issue_mismatch(self) -> None:
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k", "issue": 18}}}):
+                    with patch(
+                        "scripts.governance_status.fetch_pr_meta",
+                        return_value={
+                            "headRefOid": "sha-1",
+                            "headRefName": "feature/x",
+                            "body": "Issue: #19\nitem_key: `GOV-0015-item-context-gate`\nitem_type: `GOV`\nrelease: `v0.1.0`\nsprint: `2026-S14`\n",
+                        },
+                    ):
+                        with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                            with patch(
+                                "scripts.governance_status.load_item_context_from_exec_plan",
+                                return_value={
+                                    "Issue": "19",
+                                    "item_key": "GOV-0015-item-context-gate",
+                                    "item_type": "GOV",
+                                    "release": "v0.1.0",
+                                    "sprint": "2026-S14",
+                                    "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
+                                },
+                            ):
+                                payload = governance_status.build_status_payload(pr_number=20)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_pr_without_active_exec_plan_returns_empty_item_context(self) -> None:
         with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
             with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
@@ -229,6 +257,38 @@ class GovernanceStatusTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+
+            with patch("scripts.governance_status.REPO_ROOT", repo):
+                payload = governance_status.build_status_payload(issue_number=19)
+
+        self.assertEqual(payload["item_context"], {})
+
+    def test_issue_status_returns_empty_when_multiple_non_inactive_exec_plans_exist(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            for name, item_key in (
+                ("one.md", "GOV-0015-item-context-gate"),
+                ("two.md", "GOV-0014-release-sprint-structure"),
+            ):
+                (exec_plans / name).write_text(
+                    "\n".join(
+                        [
+                            "# plan",
+                            "",
+                            "## 关联信息",
+                            "",
+                            "- Issue：`#19`",
+                            f"- item_key：`{item_key}`",
+                            "- item_type：`GOV`",
+                            "- release：`v0.1.0`",
+                            "- sprint：`2026-S14`",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
 
             with patch("scripts.governance_status.REPO_ROOT", repo):
                 payload = governance_status.build_status_payload(issue_number=19)

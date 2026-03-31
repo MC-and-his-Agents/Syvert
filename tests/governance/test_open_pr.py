@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.open_pr import build_body, parse_args, validate_pr_preflight
+from unittest.mock import patch
+
+from scripts.open_pr import build_body, parse_args, validate_current_worktree_binding, validate_pr_preflight
 
 
 def write_exec_plan(
@@ -133,6 +135,14 @@ class OpenPrPreflightTests(unittest.TestCase):
             repo = Path(temp_dir)
             errors = validate_pr_preflight("governance", None, None, None, None, None, ["AGENTS.md"], repo_root=repo)
         self.assertTrue(any("缺少完整事项上下文" in error for error in errors))
+
+    def test_issue_must_match_current_worktree_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                with patch("scripts.open_pr.load_worktree_binding_for_branch", return_value={"issue": 18, "branch": "issue-19-demo"}):
+                    errors = validate_current_worktree_binding(19, repo_root=repo)
+        self.assertTrue(any("branch/worktree 绑定的事项不一致" in error for error in errors))
 
     def test_missing_release_or_sprint_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

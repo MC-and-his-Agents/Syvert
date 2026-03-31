@@ -80,33 +80,31 @@ def filter_worktrees_by_issue(state: dict, issue_number: int) -> list[dict]:
 def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
     item_key = body_context.get("item_key", "")
-    if item_key:
-        required_fields = ("issue", "item_type", "release", "sprint")
-        if any(not body_context.get(field, "") for field in required_fields):
-            return {}
-        payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
-        if payload.get("conflict") == "multiple_active_exec_plans":
-            return {}
-        if payload:
-            active_item = payload.get("active 收口事项", "")
-            if active_item and active_item != item_key:
-                return {}
-            comparisons = (
-                ("issue", "Issue"),
-                ("item_type", "item_type"),
-                ("release", "release"),
-                ("sprint", "sprint"),
-            )
-            for body_key, metadata_key in comparisons:
-                expected = body_context.get(body_key, "")
-                if expected and payload.get(metadata_key, "") != expected:
-                    return {}
-            return payload
+    required_fields = ("issue", "item_key", "item_type", "release", "sprint")
+    if any(not body_context.get(field, "") for field in required_fields):
         return {}
 
-    if worktree_item and worktree_item.get("issue"):
-        return matching_exec_plan_for_issue(REPO_ROOT, int(worktree_item["issue"]))
-    return {}
+    payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
+    if payload.get("conflict") == "multiple_active_exec_plans":
+        return {}
+    if not payload:
+        return {}
+    active_item = payload.get("active 收口事项", "")
+    if active_item and active_item != item_key:
+        return {}
+    if worktree_item and worktree_item.get("issue") is not None and str(worktree_item["issue"]) != body_context.get("issue", ""):
+        return {}
+
+    comparisons = (
+        ("issue", "Issue"),
+        ("item_type", "item_type"),
+        ("release", "release"),
+        ("sprint", "sprint"),
+    )
+    for body_key, metadata_key in comparisons:
+        if payload.get(metadata_key, "") != body_context.get(body_key, ""):
+            return {}
+    return payload
 
 
 def build_status_payload(issue_number: int | None = None, pr_number: int | None = None) -> dict:
