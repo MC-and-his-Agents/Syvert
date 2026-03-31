@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 对 head `0b2f6be97f5c5855816d8d79c974c7f98e41009f` 最后指出 1 个阻断：同一 `item_key` 的跨文件重复 metadata key 会因冲突 payload 丢失 `item_key` 而被静默漏检；当前已在 head `0cde66ca4785df4d7353b604dbfa0fd6c57b52bb` 上补齐冲突保留上下文与回归测试，停在最终 guardian 审查与 merge gate 核对。
+- guardian 对 head `987df58cabaca70780775ba46840331b351e08fe` 又指出 3 个韧性问题：`worktrees.json` 损坏时受控入口会抛异常、active exec-plan 为 0 时错误文案误导、以及部分 `governance_status` 负例测试依赖现场短路；当前已在 head `0a195a428f485d82df80870cff9793b73c313fa5` 上补齐 fail-closed 兜底、诊断文案和测试隔离，停在新一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0cde66ca4785df4d7353b604dbfa0fd6c57b52bb`
+- `0a195a428f485d82df80870cff9793b73c313fa5`
