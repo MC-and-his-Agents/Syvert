@@ -6,9 +6,10 @@
 - item_key：`FR-0001-governance-stack-v1`
 - item_type：`FR`
 - release：`v0.1.0`
-- sprint：`非当前 active sprint（结构层 active 已切换至 GOV-0014 / 2026-S13）`
+- sprint：`2026-S13`
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 状态：`inactive for PR #15`；当前结构层 active 工件为 `docs/exec-plans/GOV-0014-release-sprint-structure.md`
+- 状态：`inactive for PR #15`
+- 事项说明：当前结构层 active 工件为 `docs/exec-plans/GOV-0014-release-sprint-structure.md`，本事项仅作为上位前提。
 
 ## 目标
 

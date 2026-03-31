@@ -51,4 +51,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `HEAD`
+- `<checkpoint_commit_sha>`
