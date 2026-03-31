@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 对 head `3b44e6137f49159f7773e8a9a502ce988cb0edfd` 又指出 3 个稳健性阻断：PR 状态面未对同分支多 worktree 绑定 fail-closed、`binding.issue` 异常值可能导致校验崩溃、以及无关事项的重复键坏文件会污染当前事项门禁；当前已在 head `00dcf7fb36354cf83cb3e4482d3ab3ff98acb541` 上补齐对应修复与回归测试，停在新一轮 guardian 审查与 merge gate 核对。
+- guardian 对 head `0b2f6be97f5c5855816d8d79c974c7f98e41009f` 最后指出 1 个阻断：同一 `item_key` 的跨文件重复 metadata key 会因冲突 payload 丢失 `item_key` 而被静默漏检；当前已在 head `0cde66ca4785df4d7353b604dbfa0fd6c57b52bb` 上补齐冲突保留上下文与回归测试，停在最终 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `00dcf7fb36354cf83cb3e4482d3ab3ff98acb541`
+- `0cde66ca4785df4d7353b604dbfa0fd6c57b52bb`
