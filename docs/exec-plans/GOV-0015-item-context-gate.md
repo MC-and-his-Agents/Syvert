@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 自动审查曾在外部额度耗尽时中断；当前已在 head `e6fa325b40998169a169ae1232f48b4065584928` 上补齐 PR 状态面对“同一 Issue 只有一个 active exec-plan”的一致性约束，并完成对应测试与远端 checks 核对，停在恢复后的新一轮 guardian 审查与 merge gate 核对。
+- guardian 对 head `0e723e4fd83c88ffb3d632c547ca6fb7342b53ff` 新提出 4 个阻断：exec-plan 元数据重复键可绕过门禁、branch 读取异常 fail-open、branch 绑定未校验唯一性、以及 PR 状态面缺少 worktree `path` 一致性校验；当前已在 head `489fa6107f3404433c0b2c6243c0d67bc8994f7d` 上补齐对应 fail-closed 修复与回归测试，停在新一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e6fa325b40998169a169ae1232f48b4065584928`
+- `489fa6107f3404433c0b2c6243c0d67bc8994f7d`
