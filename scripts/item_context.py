@@ -14,6 +14,7 @@ BODY_ITEM_CONTEXT_RE = {
     "sprint": re.compile(r"sprint:\s*`?([A-Za-z0-9._-]+)`?", re.IGNORECASE),
     "issue": re.compile(r"Issue:\s*#?(\d+)", re.IGNORECASE),
 }
+REQUIRED_EXEC_PLAN_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
 
 
 def normalize_value(value: str) -> str:
@@ -72,11 +73,28 @@ def exec_plan_path_for_item_key(repo_root: Path, item_key: str) -> Path:
     return repo_root / "docs" / "exec-plans" / f"{item_key}.md"
 
 
+def has_complete_item_context(payload: dict[str, str]) -> bool:
+    return all(payload.get(field, "").strip() for field in REQUIRED_EXEC_PLAN_FIELDS)
+
+
+def is_eligible_active_exec_plan(payload: dict[str, str]) -> bool:
+    if not payload:
+        return False
+    if is_inactive_exec_plan(payload):
+        return False
+    if not has_complete_item_context(payload):
+        return False
+    active_item = payload.get("active 收口事项", "")
+    if active_item and active_item != payload.get("item_key", ""):
+        return False
+    return True
+
+
 def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str, str]:
     matches: list[dict[str, str]] = []
     path = exec_plan_path_for_item_key(repo_root, item_key)
     payload = parse_exec_plan_metadata(path)
-    if payload and not is_inactive_exec_plan(payload):
+    if is_eligible_active_exec_plan(payload):
         matches.append(payload)
 
     exec_plans_dir = repo_root / "docs" / "exec-plans"
@@ -88,7 +106,7 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
         if path.exists() and candidate.resolve() == path.resolve():
             continue
         metadata = parse_exec_plan_metadata(candidate)
-        if metadata.get("item_key") == item_key and not is_inactive_exec_plan(metadata):
+        if metadata.get("item_key") == item_key and is_eligible_active_exec_plan(metadata):
             matches.append(metadata)
 
     if len(matches) == 1:
@@ -102,25 +120,25 @@ def is_inactive_exec_plan(payload: dict[str, str]) -> bool:
     return payload.get("状态", "").lower().startswith("inactive")
 
 
-def matching_exec_plan_for_issue(repo_root: Path, issue_number: int) -> dict[str, str]:
+def active_exec_plans_for_issue(repo_root: Path, issue_number: int) -> list[dict[str, str]]:
     exec_plans_dir = repo_root / "docs" / "exec-plans"
     if not exec_plans_dir.exists():
-        return {}
+        return []
 
     matches: list[dict[str, str]] = []
     for path in sorted(exec_plans_dir.glob("*.md")):
         if path.name == "README.md":
             continue
         payload = parse_exec_plan_metadata(path)
-        if payload.get("Issue") == str(issue_number):
+        if payload.get("Issue") != str(issue_number):
+            continue
+        if is_eligible_active_exec_plan(payload):
             matches.append(payload)
+    return matches
 
-    eligible = [item for item in matches if not is_inactive_exec_plan(item)]
+
+def matching_exec_plan_for_issue(repo_root: Path, issue_number: int) -> dict[str, str]:
+    eligible = active_exec_plans_for_issue(repo_root, issue_number)
     if len(eligible) != 1:
         return {}
-
-    candidate = eligible[0]
-    active_item = candidate.get("active 收口事项", "")
-    if active_item and active_item != candidate.get("item_key", ""):
-        return {}
-    return candidate
+    return eligible[0]

@@ -130,6 +130,41 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("多个 active `exec-plan`" in error for error in errors))
 
+    def test_different_active_item_under_same_issue_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plans = repo / "docs" / "exec-plans"
+            (exec_plans / "other-item.md").write_text(
+                "\n".join(
+                    [
+                        "# other",
+                        "",
+                        "## 事项上下文",
+                        "",
+                        "- Issue：`#19`",
+                        "- item_key：`GOV-0014-release-sprint-structure`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- active 收口事项：`GOV-0014-release-sprint-structure`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("当前 `Issue` 存在多个 active `exec-plan`" in error for error in errors))
+
     def test_governance_without_issue_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -139,9 +174,10 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_issue_must_match_current_worktree_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
-                with patch("scripts.open_pr.load_worktree_binding_for_branch", return_value={"issue": 18, "branch": "issue-19-demo"}):
-                    errors = validate_current_worktree_binding(19, repo_root=repo)
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                    with patch("scripts.open_pr.load_worktree_binding_for_branch", return_value={"issue": 18, "branch": "issue-19-demo"}):
+                        errors = validate_current_worktree_binding(19, repo_root=repo)
         self.assertTrue(any("branch/worktree 绑定的事项不一致" in error for error in errors))
 
     def test_worktree_path_must_match_binding(self) -> None:
@@ -149,13 +185,25 @@ class OpenPrPreflightTests(unittest.TestCase):
             repo = Path(temp_dir)
             other = repo / "other"
             other.mkdir()
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                    with patch(
+                        "scripts.open_pr.load_worktree_binding_for_branch",
+                        return_value={"issue": 19, "branch": "issue-19-demo", "path": str(other)},
+                    ):
+                        errors = validate_current_worktree_binding(19, repo_root=repo)
+        self.assertTrue(any("worktree `path` 不一致" in error for error in errors))
+
+    def test_binding_check_is_skipped_for_foreign_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
             with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
                 with patch(
                     "scripts.open_pr.load_worktree_binding_for_branch",
-                    return_value={"issue": 19, "branch": "issue-19-demo", "path": str(other)},
+                    return_value={"issue": 18, "branch": "issue-19-demo"},
                 ):
                     errors = validate_current_worktree_binding(19, repo_root=repo)
-        self.assertTrue(any("worktree `path` 不一致" in error for error in errors))
+        self.assertEqual(errors, [])
 
     def test_missing_release_or_sprint_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -234,7 +282,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("active 收口事项" in error for error in errors))
+        self.assertTrue(any("缺少 active `exec-plan`" in error or "active 收口事项" in error for error in errors))
 
     def test_core_item_without_spec_or_bootstrap_contract_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

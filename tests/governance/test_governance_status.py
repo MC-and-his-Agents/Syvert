@@ -351,6 +351,32 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["item_context"], {})
 
+    def test_issue_status_ignores_incomplete_exec_plan_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            (exec_plans / "broken.md").write_text(
+                "\n".join(
+                    [
+                        "# broken",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- Issue：`#19`",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- item_type：`GOV`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("scripts.governance_status.REPO_ROOT", repo):
+                payload = governance_status.build_status_payload(issue_number=19)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_load_state_with_legacy_reads_legacy_when_primary_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

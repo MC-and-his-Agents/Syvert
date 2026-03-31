@@ -12,7 +12,13 @@ import json
 import os
 import tempfile
 
-from scripts.item_context import ITEM_TYPES, load_item_context_from_exec_plan, normalize_issue, valid_item_key
+from scripts.item_context import (
+    ITEM_TYPES,
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    normalize_issue,
+    valid_item_key,
+)
 from scripts.common import (
     CommandError,
     REPO_ROOT,
@@ -139,6 +145,8 @@ def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FI
 def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> list[str]:
     if issue is None:
         return []
+    if repo_root.resolve() != REPO_ROOT.resolve():
+        return []
     try:
         branch = git_current_branch(repo=repo_root)
     except CommandError:
@@ -196,6 +204,14 @@ def validate_item_context(
         return errors
     if not exec_plan:
         errors.append(f"当前事项缺少 active `exec-plan`：`docs/exec-plans/{item_key}.md`。")
+        return errors
+
+    issue_active_exec_plans = active_exec_plans_for_issue(repo_root, issue)
+    if len(issue_active_exec_plans) != 1:
+        errors.append("当前 `Issue` 存在多个 active `exec-plan`，不满足“每个执行回合有且仅有一个 active exec-plan”的要求。")
+        return errors
+    if issue_active_exec_plans[0].get("item_key", "") != item_key:
+        errors.append("当前 `Issue` 的唯一 active `exec-plan` 与受控入口填写的 `item_key` 不一致。")
         return errors
 
     expected = {
