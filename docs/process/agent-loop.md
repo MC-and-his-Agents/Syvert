@@ -48,6 +48,7 @@
 
 - 已满足 `code_review.md` 定义的 merge gate。
 - 可通过 `python3 scripts/governance_status.py` 输出当前状态面进行核对。
+- 核对 `item_context` 段时，应确认 `Issue`、`item_key`、`item_type`、`release`、`sprint` 与 active `exec-plan` 一致。
 
 ## `exec-plan` 与 `TODO.md` 职责边界
 

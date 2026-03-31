@@ -11,6 +11,7 @@ import argparse
 import json
 
 from scripts.common import REPO_ROOT, legacy_state_file, load_json, run, syvert_state_file
+from scripts.item_context import load_item_context_from_exec_plan, matching_exec_plan_for_issue, parse_item_context_from_body
 from scripts.pr_guardian import find_latest_guardian_result, load_guardian_state
 
 
@@ -76,6 +77,19 @@ def filter_worktrees_by_issue(state: dict, issue_number: int) -> list[dict]:
     return sorted((item for item in items if item.get("issue") == issue_number), key=lambda item: item["key"])
 
 
+def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
+    body_context = parse_item_context_from_body(str(meta.get("body") or ""))
+    item_key = body_context.get("item_key", "")
+    if item_key:
+        payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
+        if payload:
+            return payload
+
+    if worktree_item and worktree_item.get("issue"):
+        return matching_exec_plan_for_issue(REPO_ROOT, int(worktree_item["issue"]))
+    return {}
+
+
 def build_status_payload(issue_number: int | None = None, pr_number: int | None = None) -> dict:
     guardian_state = load_guardian_state(GUARDIAN_STATE_FILE)
     review_poller_state = load_review_poller_state()
@@ -86,6 +100,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         "review_poller": {},
         "worktrees": [],
         "checks": [],
+        "item_context": {},
     }
 
     if pr_number is not None:
@@ -95,14 +110,18 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
         payload["checks"] = fetch_checks_summary(pr_number)
         branch_name = meta.get("headRefName", "")
+        matched_worktree: dict | None = None
         for item in worktree_state.get("worktrees", {}).values():
             if item.get("branch") == branch_name:
+                matched_worktree = item
                 payload["worktrees"] = [item]
                 break
+        payload["item_context"] = build_item_context_for_pr(meta, matched_worktree)
         return payload
 
     if issue_number is not None:
         payload["worktrees"] = filter_worktrees_by_issue(worktree_state, issue_number)
+        payload["item_context"] = matching_exec_plan_for_issue(REPO_ROOT, issue_number)
         return payload
 
     payload["guardian"] = guardian_state.get("prs", {})
@@ -148,6 +167,18 @@ def render_text(payload: dict) -> str:
         lines.append(f"count={len(worktrees)}")
         for item in worktrees:
             lines.append(f"- {item.get('key')} {item.get('branch')} {item.get('path')}")
+
+    item_context = payload.get("item_context") or {}
+    lines.append("[item_context]")
+    if not item_context:
+        lines.append("empty=true")
+    else:
+        lines.append(f"issue={item_context.get('Issue', '')}")
+        lines.append(f"item_key={item_context.get('item_key', '')}")
+        lines.append(f"item_type={item_context.get('item_type', '')}")
+        lines.append(f"release={item_context.get('release', '')}")
+        lines.append(f"sprint={item_context.get('sprint', '')}")
+        lines.append(f"exec_plan={item_context.get('exec_plan', '')}")
 
     checks = payload.get("checks") or []
     lines.append("[checks]")

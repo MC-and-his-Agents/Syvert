@@ -14,15 +14,38 @@ class GovernanceStatusTests(unittest.TestCase):
         with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {"7": {"verdict": "APPROVE"}}}):
             with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {"7": {"head_sha": "abc"}}}):
                 with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k"}}}):
-                    with patch("scripts.governance_status.fetch_pr_meta", return_value={"headRefOid": "sha-1", "headRefName": "feature/x"}):
+                    with patch("scripts.governance_status.fetch_pr_meta", return_value={"headRefOid": "sha-1", "headRefName": "feature/x", "body": "item_key: `GOV-0015-item-context-gate`"}):
                         with patch("scripts.governance_status.find_latest_guardian_result", return_value={"verdict": "APPROVE", "head_sha": "sha-1"}):
                             with patch("scripts.governance_status.fetch_checks_summary", return_value=[{"name": "check", "bucket": "pass", "state": "SUCCESS"}]):
-                                payload = governance_status.build_status_payload(pr_number=7)
+                                with patch(
+                                    "scripts.governance_status.load_item_context_from_exec_plan",
+                                    return_value={
+                                        "Issue": "19",
+                                        "item_key": "GOV-0015-item-context-gate",
+                                        "item_type": "GOV",
+                                        "release": "v0.1.0",
+                                        "sprint": "2026-S14",
+                                        "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
+                                    },
+                                ):
+                                    payload = governance_status.build_status_payload(pr_number=7)
 
         self.assertEqual(payload["guardian"]["verdict"], "APPROVE")
         self.assertEqual(payload["review_poller"]["head_sha"], "abc")
         self.assertEqual(len(payload["worktrees"]), 1)
         self.assertEqual(payload["checks"][0]["name"], "check")
+        self.assertEqual(payload["item_context"]["item_key"], "GOV-0015-item-context-gate")
+
+    def test_pr_without_active_exec_plan_returns_empty_item_context(self) -> None:
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k", "issue": 19}}}):
+                    with patch("scripts.governance_status.fetch_pr_meta", return_value={"headRefOid": "sha-1", "headRefName": "feature/x", "body": ""}):
+                        with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                            with patch("scripts.governance_status.matching_exec_plan_for_issue", return_value={}):
+                                payload = governance_status.build_status_payload(pr_number=7)
+
+        self.assertEqual(payload["item_context"], {})
 
     def test_load_state_with_legacy_reads_legacy_when_primary_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -41,6 +64,14 @@ class GovernanceStatusTests(unittest.TestCase):
             "guardian": {"verdict": "APPROVE", "safe_to_merge": True, "head_sha": "sha-x", "reviewed_at": "2026-03-29T10:00:00Z"},
             "review_poller": {"head_sha": "sha-x", "reviewed_at": "2026-03-29T10:00:01Z"},
             "worktrees": [{"key": "issue-1-demo", "branch": "issue-1-demo", "path": "/tmp/demo"}],
+            "item_context": {
+                "Issue": "19",
+                "item_key": "GOV-0015-item-context-gate",
+                "item_type": "GOV",
+                "release": "v0.1.0",
+                "sprint": "2026-S14",
+                "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
+            },
             "checks": [{"name": "Validate Governance Tooling", "bucket": "pass", "state": "SUCCESS"}],
         }
 
@@ -49,6 +80,7 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertIn("verdict=APPROVE", text_output)
         self.assertIn("count=1", text_output)
+        self.assertIn("item_key=GOV-0015-item-context-gate", text_output)
         self.assertEqual(json_output["guardian"]["head_sha"], "sha-x")
         self.assertEqual(len(json_output["worktrees"]), 1)
 
