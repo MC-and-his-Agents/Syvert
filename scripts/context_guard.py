@@ -338,6 +338,31 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             if not decision_path.exists():
                 errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
 
+        if touched_decision:
+            gov_exec_plan_to_decision: set[str] = set()
+            for exec_plan in all_exec_plans:
+                fields = extract_fields(exec_plan.read_text(encoding="utf-8"))
+                if fields.get("item_type") != "GOV":
+                    continue
+                related_decision = fields.get("关联 decision", "")
+                if not related_decision:
+                    continue
+                decision_path = (repo_root / related_decision).resolve()
+                try:
+                    normalized = decision_path.relative_to(repo_root.resolve()).as_posix()
+                except ValueError:
+                    continue
+                gov_exec_plan_to_decision.add(normalized)
+
+            for raw_path in changed_paths:
+                path = Path(raw_path)
+                target = repo_root / path
+                if not (is_decision_file(path) and target.exists()):
+                    continue
+                normalized_target = target.resolve().relative_to(repo_root.resolve()).as_posix()
+                if normalized_target not in gov_exec_plan_to_decision:
+                    errors.append(f"{target}: 当前 touched decision 未被任何 GOV exec-plan 通过 `关联 decision` 关联。")
+
     for path in exec_plans:
         errors.extend(validate_exec_plan(path, repo_root=repo_root))
     for path in spec_files:

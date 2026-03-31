@@ -332,6 +332,27 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("exec-plan" in error.lower() or "exec-plans" in error.lower() for error in errors))
 
+    def test_bootstrap_contract_touched_related_decision_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertEqual(errors, [])
+
+    def test_bootstrap_contract_touched_unrelated_decision_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(repo / "docs" / "decisions" / "ADR-9999-unrelated.md", "# ADR-9999\n")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-9999-unrelated.md"],
+            )
+        self.assertTrue(any("未被任何 GOV exec-plan" in error for error in errors))
+
     def test_bootstrap_contract_requires_related_decision_for_touched_exec_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
