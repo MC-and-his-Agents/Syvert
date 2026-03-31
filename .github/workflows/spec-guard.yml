@@ -4,14 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "docs/specs/**"
-      - "spec_review.md"
-      - "docs/AGENTS.md"
-      - "docs/process/**"
-      - "scripts/spec_guard.py"
-      - "scripts/policy/**"
-      - ".github/workflows/spec-guard.yml"
 
 jobs:
   spec-guard:

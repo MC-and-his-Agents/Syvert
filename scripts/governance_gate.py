@@ -10,8 +10,9 @@ if __package__ in {None, ""}:
 import argparse
 
 from scripts.common import REPO_ROOT, git_changed_files
+from scripts.context_guard import validate_context_rules, validate_repository as validate_context_repository
 from scripts.policy.policy import classify_paths
-from scripts.workflow_guard import validate_repository
+from scripts.workflow_guard import validate_repository as validate_workflow_repository
 
 
 REQUIRED_GOVERNANCE_FILES = (
@@ -22,6 +23,7 @@ REQUIRED_GOVERNANCE_FILES = (
     Path("scripts/create_worktree.py"),
     Path("scripts/governance_status.py"),
     Path("scripts/retire_branch.py"),
+    Path("scripts/context_guard.py"),
     Path("scripts/workflow_guard.py"),
     Path("scripts/sync_repo_settings.py"),
 )
@@ -58,7 +60,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     errors: list[str] = []
-    errors.extend(validate_repository(repo_root))
+    errors.extend(validate_workflow_repository(repo_root))
+    errors.extend(validate_context_repository(repo_root))
+    errors.extend(validate_context_rules(repo_root, changed))
     for relative_path in REQUIRED_GOVERNANCE_FILES:
         if not (repo_root / relative_path).exists():
             errors.append(f"缺少治理栈 v2 必需工件: {repo_root / relative_path}")
