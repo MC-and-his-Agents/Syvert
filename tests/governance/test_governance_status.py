@@ -250,6 +250,51 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["item_context"], {})
 
+    def test_pr_status_returns_empty_when_issue_has_multiple_active_exec_plans(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            for name, item_key in (
+                ("GOV-0015-item-context-gate.md", "GOV-0015-item-context-gate"),
+                ("other-active.md", "GOV-0014-release-sprint-structure"),
+            ):
+                (exec_plans / name).write_text(
+                    "\n".join(
+                        [
+                            "# plan",
+                            "",
+                            "## 关联信息",
+                            "",
+                            "- Issue：`#19`",
+                            f"- item_key：`{item_key}`",
+                            "- item_type：`GOV`",
+                            "- release：`v0.1.0`",
+                            "- sprint：`2026-S14`",
+                            f"- active 收口事项：`{item_key}`",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            with patch("scripts.governance_status.REPO_ROOT", repo):
+                with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+                    with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                        with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k", "issue": 19}}}):
+                            with patch(
+                                "scripts.governance_status.fetch_pr_meta",
+                                return_value={
+                                    "headRefOid": "sha-1",
+                                    "headRefName": "feature/x",
+                                    "body": "Issue: #19\nitem_key: `GOV-0015-item-context-gate`\nitem_type: `GOV`\nrelease: `v0.1.0`\nsprint: `2026-S14`\n",
+                                },
+                            ):
+                                with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                                    payload = governance_status.build_status_payload(pr_number=20)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_pr_status_rejects_mismatched_active_item(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

@@ -11,7 +11,12 @@ import argparse
 import json
 
 from scripts.common import REPO_ROOT, legacy_state_file, load_json, run, syvert_state_file
-from scripts.item_context import load_item_context_from_exec_plan, matching_exec_plan_for_issue, parse_item_context_from_body
+from scripts.item_context import (
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    matching_exec_plan_for_issue,
+    parse_item_context_from_body,
+)
 from scripts.pr_guardian import find_latest_guardian_result, load_guardian_state
 
 
@@ -90,6 +95,11 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
     if payload.get("conflict") == "multiple_active_exec_plans":
         return {}
     if not payload:
+        return {}
+    issue_active_exec_plans = active_exec_plans_for_issue(REPO_ROOT, int(body_context["issue"]))
+    if len(issue_active_exec_plans) != 1:
+        return {}
+    if issue_active_exec_plans[0].get("item_key", "") != item_key:
         return {}
     active_item = payload.get("active 收口事项", "")
     if active_item and active_item != item_key:
