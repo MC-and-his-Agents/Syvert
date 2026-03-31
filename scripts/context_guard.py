@@ -256,6 +256,18 @@ def validate_bootstrap_binding_consistency(
     return errors
 
 
+def is_valid_strict_bootstrap_exec_plan(exec_plan_path: Path, fields: dict[str, str]) -> bool:
+    if fields.get("item_type") != "GOV":
+        return False
+    issue = fields.get("Issue", "").strip()
+    item_key = fields.get("item_key", "").strip()
+    if not issue or not item_key:
+        return False
+    if exec_plan_path.name != f"{item_key}.md":
+        return False
+    return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
+
+
 def collect_targets(
     repo_root: Path,
     changed_paths: list[str] | None,
@@ -391,8 +403,7 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             exec_plan_to_decision: dict[str, list[tuple[Path, dict[str, str]]]] = {}
             for exec_plan in all_exec_plans:
                 fields = extract_fields(exec_plan.read_text(encoding="utf-8"))
-                item_type = fields.get("item_type", "")
-                if item_type and item_type not in ALLOWED_ITEM_TYPES:
+                if not is_valid_strict_bootstrap_exec_plan(exec_plan, fields):
                     continue
                 related_decision = fields.get("关联 decision", "")
                 if not related_decision:

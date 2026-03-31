@@ -651,6 +651,71 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("item_key" in error and "不一致" in error for error in errors))
 
+    def test_bootstrap_contract_touched_decision_with_only_weak_legacy_exec_plan_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "legacy.md",
+                """# legacy
+
+关联 decision: docs/decisions/ADR-0001-example.md
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
+    def test_bootstrap_contract_weak_exec_plan_missing_context_fields_cannot_bind_decision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md",
+                """# weak exec-plan
+
+- 关联 decision：`docs/decisions/ADR-0001-example.md`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
+    def test_bootstrap_contract_non_item_key_exec_plan_filename_cannot_bind_decision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "legacy-binding.md",
+                """# legacy binding
+
+## 关联信息
+
+- item_key：`GOV-0001-release-sprint-structure`
+- Issue：`#1`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 decision：`docs/decisions/ADR-0001-example.md`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `0123456789abcdef0123456789abcdef01234567`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
     def test_valid_governance_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
