@@ -235,7 +235,10 @@ class ContextGuardTests(unittest.TestCase):
                 1,
             )
             plan.write_text(text, encoding="utf-8")
-            errors = validate_repository(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
         self.assertTrue(any("item_key" in error for error in errors))
 
     def test_exec_plan_missing_required_fields_fails(self) -> None:
@@ -247,7 +250,10 @@ class ContextGuardTests(unittest.TestCase):
             text = text.replace("- sprint：`2026-S13`\n", "")
             text = text.replace("## 最近一次 checkpoint 对应的 head SHA", "## checkpoint")
             plan.write_text(text, encoding="utf-8")
-            errors = validate_repository(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
         self.assertTrue(any("sprint" in error or "checkpoint" in error for error in errors))
 
     def test_formal_spec_missing_full_context_fields_fails(self) -> None:
@@ -257,7 +263,10 @@ class ContextGuardTests(unittest.TestCase):
             spec = repo / "docs" / "specs" / "FR-0001-example" / "spec.md"
             text = spec.read_text(encoding="utf-8").replace("- item_type：`FR`\n", "")
             spec.write_text(text, encoding="utf-8")
-            errors = validate_repository(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+            )
         self.assertTrue(any("item_type" in error for error in errors))
 
     def test_release_sprint_missing_structure_or_broken_ref_fails(self) -> None:
@@ -274,6 +283,29 @@ class ContextGuardTests(unittest.TestCase):
             sprint.write_text(text, encoding="utf-8")
             errors = validate_repository(repo)
         self.assertTrue(any("release" in error or "sprint" in error or "不存在" in error for error in errors))
+
+    def test_repository_mode_ignores_legacy_exec_plan_and_fr_spec_instances(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "legacy.md",
+                "# legacy\n\n- note：old format\n",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-0999-legacy" / "spec.md",
+                "# legacy spec\n",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-0999-legacy" / "plan.md",
+                "# legacy plan\n",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-0999-legacy" / "TODO.md",
+                "# legacy todo\n",
+            )
+            errors = validate_repository(repo)
+        self.assertEqual(errors, [])
 
     def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

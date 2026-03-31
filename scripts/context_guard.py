@@ -273,7 +273,9 @@ def collect_targets(
 def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = None) -> list[str]:
     errors: list[str] = []
     exec_plans, spec_files, release_files, sprint_files, decision_files = collect_targets(repo_root, changed_paths)
-    touched_exec_plan = bool(changed_paths) and any(is_exec_plan_file(Path(raw_path)) for raw_path in changed_paths)
+    touched_exec_plan = bool(changed_paths) and any(
+        is_exec_plan_file(Path(raw_path)) and not is_template(Path(raw_path)) for raw_path in changed_paths
+    )
 
     if changed_paths is not None:
         for raw_path in changed_paths:
@@ -291,7 +293,8 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
     # Governance bootstrap contract requires decision + exec-plan to co-exist.
-    if touched_exec_plan or exec_plans:
+    # This check is only enforced in diff mode to avoid forcing full-repo legacy migration.
+    if changed_paths is not None and touched_exec_plan:
         all_decisions = [path for path in (repo_root / "docs" / "decisions").glob("*.md") if path.name != "README.md"]
         if not all_decisions:
             errors.append("治理/exec-plan 变更缺少 `docs/decisions/**` 工件，bootstrap contract 不完整。")
@@ -310,7 +313,33 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
 
 
 def validate_repository(repo_root: Path) -> list[str]:
-    return validate_context_rules(repo_root, changed_paths=None)
+    # Repository-wide validation enforces current baseline artifacts only:
+    # templates plus release/sprint index documents. Historical instance files
+    # are validated when they re-enter a changed execution round.
+    baseline_paths: list[str] = []
+    template_candidates = (
+        repo_root / "docs" / "exec-plans" / "_template.md",
+        repo_root / "docs" / "specs" / "_template" / "spec.md",
+        repo_root / "docs" / "specs" / "_template" / "plan.md",
+        repo_root / "docs" / "specs" / "_template" / "TODO.md",
+        repo_root / "docs" / "releases" / "_template.md",
+        repo_root / "docs" / "sprints" / "_template.md",
+    )
+    for candidate in template_candidates:
+        if candidate.exists():
+            baseline_paths.append(candidate.relative_to(repo_root).as_posix())
+
+    for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
+        if path.name in {"README.md", "_template.md"}:
+            continue
+        baseline_paths.append(path.relative_to(repo_root).as_posix())
+
+    for path in sorted((repo_root / "docs" / "sprints").glob("*.md")):
+        if path.name in {"README.md", "_template.md"}:
+            continue
+        baseline_paths.append(path.relative_to(repo_root).as_posix())
+
+    return validate_context_rules(repo_root, changed_paths=baseline_paths)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -323,7 +352,10 @@ def main(argv: list[str] | None = None) -> int:
     if base_ref:
         changed_paths = git_changed_files(base_ref, head_ref, repo=repo_root)
 
-    errors = validate_context_rules(repo_root, changed_paths)
+    if changed_paths is None:
+        errors = validate_repository(repo_root)
+    else:
+        errors = validate_context_rules(repo_root, changed_paths)
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
