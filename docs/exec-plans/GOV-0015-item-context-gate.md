@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 已连续指出历史兼容性、唯一 active 工件、PR body 对齐、状态面约束与执行现场一致性五类阻断项；当前已补齐对应修复并推送到最新受审 head，停在最终 guardian 审查与 merge gate 核对。
+- guardian 已连续指出历史兼容性、唯一 active 工件、PR body 对齐、状态面约束与执行现场一致性五类阻断项；当前代码、PR 描述与验证证据已对齐到 head `e10a29292d5351bfdcefbc5fdfccccafffa24368`，停在覆盖该 head 的最终 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `aa8a45c620e776523be4b0c4a4407bdc68f2e709`
+- `e10a29292d5351bfdcefbc5fdfccccafffa24368`
