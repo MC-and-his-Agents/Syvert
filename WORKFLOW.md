@@ -80,8 +80,10 @@ codex:
 
 - 进入 `open_pr` 条件：
   - 已声明 PR class 且与改动类别一致
-  - 已声明完整事项上下文，且该事项在进入当前执行回合前已完成补齐
-  - 当前事项存在与 `item_key` 一致的 active `exec-plan`，并与 PR 关联信息一致
+  - 已通过受控入口显式填写完整事项上下文，且该事项在进入当前执行回合前已完成补齐
+  - 当前事项存在与 `item_key` 唯一匹配的 active `exec-plan`；历史事项可继续使用保留文件名，但不得出现多个 active 工件
+  - active `exec-plan` 的 `item_key` / `Issue` / `item_type` / `release` / `sprint` 与受控入口填写值一致
+  - 若 active `exec-plan` 声明 `active 收口事项`，其值必须与当前 `item_key` 一致
   - PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪

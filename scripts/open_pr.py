@@ -12,26 +12,41 @@ import json
 import os
 import tempfile
 
+from scripts.item_context import (
+    ITEM_TYPES,
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    normalize_issue,
+    valid_item_key,
+)
 from scripts.common import (
+    CommandError,
     REPO_ROOT,
     format_changed_files,
     git_changed_files,
     git_current_branch,
     git_fetch_branch,
+    load_json,
     require_cli,
     run,
+    syvert_state_file,
 )
 from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level, spec_suite_policy
 from scripts.pr_scope_guard import build_report
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="创建受控 PR。")
     parser.add_argument("--class", dest="pr_class", required=True, choices=get_policy()["pr_classes"])
     parser.add_argument("--issue", type=int)
+    parser.add_argument("--item-key")
+    parser.add_argument("--item-type")
+    parser.add_argument("--release")
+    parser.add_argument("--sprint")
     parser.add_argument("--title")
     parser.add_argument("--base", default="main")
     parser.add_argument("--closing", default="fixes", choices=get_policy()["closing_modes"])
@@ -117,11 +132,143 @@ def issue_requires_formal_input(issue: int) -> bool:
     return "FR-" in title.upper() or any(label in {"core", "governance", "spec"} or label.startswith("fr-") for label in labels)
 
 
-def validate_pr_preflight(pr_class: str, issue: int | None, changed_files: list[str], *, repo_root: Path) -> list[str]:
+def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FILE) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    try:
+        state = load_json(path)
+    except Exception:
+        return {"conflict": "invalid_worktree_state", "branch": branch}
+    matches: list[dict[str, object]] = []
+    for item in (state.get("worktrees") or {}).values():
+        if item.get("branch") == branch:
+            matches.append(item)
+    if len(matches) > 1:
+        return {"conflict": "multiple_branch_bindings", "branch": branch}
+    if len(matches) == 1:
+        return matches[0]
+    return {}
+
+
+def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> list[str]:
+    if issue is None:
+        return []
+    if repo_root.resolve() != REPO_ROOT.resolve():
+        return []
+    try:
+        branch = git_current_branch(repo=repo_root)
+    except CommandError:
+        return ["无法识别当前分支，无法确认事项上下文与执行现场一致。"]
+    binding = load_worktree_binding_for_branch(branch)
+    if binding.get("conflict") == "invalid_worktree_state":
+        return ["`worktrees.json` 已损坏或不是合法 JSON，无法确认事项上下文与执行现场一致。"]
+    if binding.get("conflict") == "multiple_branch_bindings":
+        return ["当前分支在 `worktrees.json` 中命中多个 worktree 绑定，无法确认唯一执行现场。"]
+    if not binding:
+        return ["当前分支未找到匹配的 worktree 状态绑定，无法确认事项上下文与执行现场一致。"]
+    try:
+        binding_issue = int(str(binding.get("issue", -1)).lstrip("#"))
+    except (TypeError, ValueError):
+        return ["当前 worktree 绑定中的 `issue` 值非法，无法确认事项上下文与执行现场一致。"]
+    if binding_issue != issue:
+        return ["受控 PR 入口填写的 `Issue` 与当前 branch/worktree 绑定的事项不一致。"]
+    recorded_path = str(binding.get("path", "")).strip()
+    if recorded_path and Path(recorded_path).resolve() != repo_root.resolve():
+        return ["当前仓库路径与 `worktrees.json` 中登记的 worktree `path` 不一致。"]
+    return []
+
+
+def validate_item_context(
+    issue: int | None,
+    item_key: str | None,
+    item_type: str | None,
+    release: str | None,
+    sprint: str | None,
+    *,
+    repo_root: Path,
+) -> list[str]:
+    errors: list[str] = []
+    missing = [
+        name
+        for name, value in (
+            ("Issue", issue),
+            ("item_key", item_key),
+            ("item_type", item_type),
+            ("release", release),
+            ("sprint", sprint),
+        )
+        if value in {None, ""}
+    ]
+    if missing:
+        errors.append(f"受控 PR 入口缺少完整事项上下文：{', '.join(missing)}。")
+        return errors
+
+    assert issue is not None
+    assert item_key is not None
+    assert item_type is not None
+    assert release is not None
+    assert sprint is not None
+
+    if item_type not in ITEM_TYPES:
+        errors.append("`item_type` 必须为 `FR` / `HOTFIX` / `GOV` / `CHORE`。")
+    if not valid_item_key(item_key, item_type):
+        errors.append("`item_key` 必须匹配 `<item_type>-<4-digit>-<slug>`，且前缀与 `item_type` 一致。")
+
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    if exec_plan.get("conflict") == "duplicate_metadata_keys":
+        errors.append("active `exec-plan` 在元数据区存在重复键，无法确认唯一事项上下文。")
+        return errors
+    if exec_plan.get("conflict") == "multiple_active_exec_plans":
+        errors.append("当前 `item_key` 对应多个 active `exec-plan`，不满足“有且仅有一个 active exec-plan”的要求。")
+        return errors
+    if not exec_plan:
+        errors.append(f"当前事项缺少 active `exec-plan`：`docs/exec-plans/{item_key}.md`。")
+        return errors
+
+    issue_active_exec_plans = active_exec_plans_for_issue(repo_root, issue)
+    if not issue_active_exec_plans:
+        errors.append("当前 `Issue` 缺少 active `exec-plan`，无法确认当前执行回合。")
+        return errors
+    if len(issue_active_exec_plans) > 1:
+        errors.append("当前 `Issue` 存在多个 active `exec-plan`，不满足“每个执行回合有且仅有一个 active exec-plan”的要求。")
+        return errors
+    if issue_active_exec_plans[0].get("item_key", "") != item_key:
+        errors.append("当前 `Issue` 的唯一 active `exec-plan` 与受控入口填写的 `item_key` 不一致。")
+        return errors
+
+    expected = {
+        "item_key": item_key,
+        "Issue": normalize_issue(issue),
+        "item_type": item_type,
+        "release": release,
+        "sprint": sprint,
+    }
+    for field, expected_value in expected.items():
+        actual = exec_plan.get(field, "")
+        if actual != str(expected_value):
+            label = "Issue" if field == "Issue" else field
+            errors.append(f"active `exec-plan` 的 `{label}` 与受控入口填写值不一致。")
+    active_item = exec_plan.get("active 收口事项")
+    if active_item and active_item != item_key:
+        errors.append("active `exec-plan` 的 `active 收口事项` 必须与当前 `item_key` 一致。")
+    return errors
+
+
+def validate_pr_preflight(
+    pr_class: str,
+    issue: int | None,
+    item_key: str | None,
+    item_type: str | None,
+    release: str | None,
+    sprint: str | None,
+    changed_files: list[str],
+    *,
+    repo_root: Path,
+) -> list[str]:
     errors: list[str] = []
 
-    if pr_class == "governance" and issue is None:
-        errors.append("`governance` 类 PR 必须绑定 Issue。")
+    errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
+    errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
     if pr_class == "spec" and not formal_spec_dirs(changed_files):
         errors.append("`spec` 类 PR 必须包含正式规约区变更。")
@@ -147,6 +294,10 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     replacements = {
         "{{PR_CLASS}}": args.pr_class,
         "{{ISSUE}}": f"#{args.issue}" if args.issue else "无",
+        "{{ITEM_KEY}}": args.item_key or "未填写",
+        "{{ITEM_TYPE}}": args.item_type or "未填写",
+        "{{RELEASE}}": args.release or "未填写",
+        "{{SPRINT}}": args.sprint or "未填写",
         "{{CLOSING}}": closing_line(args.issue, args.closing),
         "{{RISK_LEVEL}}": risk_level(args.pr_class),
         "{{RISK_REASON}}": risk_reason_for_class(args.pr_class),
@@ -171,7 +322,16 @@ def main(argv: list[str] | None = None) -> int:
         for item in report["violations"]:
             print(f"- {item['path']} ({item['category']})", file=sys.stderr)
         return 1
-    preflight_errors = validate_pr_preflight(args.pr_class, args.issue, changed_files, repo_root=REPO_ROOT)
+    preflight_errors = validate_pr_preflight(
+        args.pr_class,
+        args.issue,
+        args.item_key,
+        args.item_type,
+        args.release,
+        args.sprint,
+        changed_files,
+        repo_root=REPO_ROOT,
+    )
     if preflight_errors:
         for error in preflight_errors:
             print(error, file=sys.stderr)

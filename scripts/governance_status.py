@@ -11,6 +11,12 @@ import argparse
 import json
 
 from scripts.common import REPO_ROOT, legacy_state_file, load_json, run, syvert_state_file
+from scripts.item_context import (
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    matching_exec_plan_for_issue,
+    parse_item_context_from_body,
+)
 from scripts.pr_guardian import find_latest_guardian_result, load_guardian_state
 
 
@@ -76,6 +82,53 @@ def filter_worktrees_by_issue(state: dict, issue_number: int) -> list[dict]:
     return sorted((item for item in items if item.get("issue") == issue_number), key=lambda item: item["key"])
 
 
+def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
+    body_context = parse_item_context_from_body(str(meta.get("body") or ""))
+    item_key = body_context.get("item_key", "")
+    if not worktree_item or worktree_item.get("issue") is None:
+        return {}
+    recorded_path = str(worktree_item.get("path", "")).strip()
+    if recorded_path and Path(recorded_path).resolve() != REPO_ROOT.resolve():
+        return {}
+    required_fields = ("issue", "item_key", "item_type", "release", "sprint")
+    if any(not body_context.get(field, "") for field in required_fields):
+        return {}
+
+    payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
+    if payload.get("conflict") == "duplicate_metadata_keys":
+        return {}
+    if payload.get("conflict") == "multiple_active_exec_plans":
+        return {}
+    if not payload:
+        return {}
+    try:
+        issue_number = int(body_context["issue"])
+    except (TypeError, ValueError):
+        return {}
+    issue_active_exec_plans = active_exec_plans_for_issue(REPO_ROOT, issue_number)
+    if len(issue_active_exec_plans) != 1:
+        return {}
+    if issue_active_exec_plans[0].get("item_key", "") != item_key:
+        return {}
+    active_item = payload.get("active 收口事项", "")
+    if active_item and active_item != item_key:
+        return {}
+    if worktree_item and worktree_item.get("issue") is not None and str(worktree_item["issue"]) != body_context.get("issue", ""):
+        return {}
+
+    comparisons = (
+        ("issue", "Issue"),
+        ("item_key", "item_key"),
+        ("item_type", "item_type"),
+        ("release", "release"),
+        ("sprint", "sprint"),
+    )
+    for body_key, metadata_key in comparisons:
+        if payload.get(metadata_key, "") != body_context.get(body_key, ""):
+            return {}
+    return payload
+
+
 def build_status_payload(issue_number: int | None = None, pr_number: int | None = None) -> dict:
     guardian_state = load_guardian_state(GUARDIAN_STATE_FILE)
     review_poller_state = load_review_poller_state()
@@ -86,6 +139,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         "review_poller": {},
         "worktrees": [],
         "checks": [],
+        "item_context": {},
     }
 
     if pr_number is not None:
@@ -95,14 +149,15 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
         payload["checks"] = fetch_checks_summary(pr_number)
         branch_name = meta.get("headRefName", "")
-        for item in worktree_state.get("worktrees", {}).values():
-            if item.get("branch") == branch_name:
-                payload["worktrees"] = [item]
-                break
+        matching_worktrees = [item for item in worktree_state.get("worktrees", {}).values() if item.get("branch") == branch_name]
+        matched_worktree: dict | None = matching_worktrees[0] if len(matching_worktrees) == 1 else None
+        payload["worktrees"] = matching_worktrees[:1] if len(matching_worktrees) == 1 else matching_worktrees
+        payload["item_context"] = build_item_context_for_pr(meta, matched_worktree)
         return payload
 
     if issue_number is not None:
         payload["worktrees"] = filter_worktrees_by_issue(worktree_state, issue_number)
+        payload["item_context"] = matching_exec_plan_for_issue(REPO_ROOT, issue_number)
         return payload
 
     payload["guardian"] = guardian_state.get("prs", {})
@@ -148,6 +203,18 @@ def render_text(payload: dict) -> str:
         lines.append(f"count={len(worktrees)}")
         for item in worktrees:
             lines.append(f"- {item.get('key')} {item.get('branch')} {item.get('path')}")
+
+    item_context = payload.get("item_context") or {}
+    lines.append("[item_context]")
+    if not item_context:
+        lines.append("empty=true")
+    else:
+        lines.append(f"issue={item_context.get('Issue', '')}")
+        lines.append(f"item_key={item_context.get('item_key', '')}")
+        lines.append(f"item_type={item_context.get('item_type', '')}")
+        lines.append(f"release={item_context.get('release', '')}")
+        lines.append(f"sprint={item_context.get('sprint', '')}")
+        lines.append(f"exec_plan={item_context.get('exec_plan', '')}")
 
     checks = payload.get("checks") or []
     lines.append("[checks]")
