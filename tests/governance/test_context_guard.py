@@ -331,6 +331,20 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("exec-plan" in error.lower() or "exec-plans" in error.lower() for error in errors))
 
+    def test_bootstrap_contract_requires_related_decision_for_touched_exec_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            text = plan.read_text(encoding="utf-8")
+            text += "- 关联 decision：`docs/decisions/ADR-9999-unrelated.md`\n"
+            plan.write_text(text, encoding="utf-8")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("关联 decision" in error for error in errors))
+
     def test_diff_mode_deleted_governance_doc_returns_error_instead_of_crash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

@@ -10,9 +10,9 @@ if __package__ in {None, ""}:
 import argparse
 
 from scripts.common import REPO_ROOT, git_changed_files
-from scripts.context_guard import validate_context_rules
+from scripts.context_guard import validate_context_rules, validate_repository as validate_context_repository
 from scripts.policy.policy import classify_paths
-from scripts.workflow_guard import validate_repository
+from scripts.workflow_guard import validate_repository as validate_workflow_repository
 
 
 REQUIRED_GOVERNANCE_FILES = (
@@ -60,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     errors: list[str] = []
-    errors.extend(validate_repository(repo_root))
+    errors.extend(validate_workflow_repository(repo_root))
+    errors.extend(validate_context_repository(repo_root))
     errors.extend(validate_context_rules(repo_root, changed))
     for relative_path in REQUIRED_GOVERNANCE_FILES:
         if not (repo_root / relative_path).exists():

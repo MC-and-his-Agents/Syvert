@@ -148,6 +148,17 @@ def validate_exec_plan(path: Path) -> list[str]:
     else:
         if not template_mode and not SHA40_RE.search(text):
             errors.append(f"{path}: 缺少可解析的 40 位 checkpoint head SHA。")
+    if not template_mode:
+        related_decision = fields.get("关联 decision", "")
+        if related_decision:
+            decision_path = (REPO_ROOT / related_decision).resolve()
+            try:
+                decision_path.relative_to(REPO_ROOT.resolve())
+            except ValueError:
+                errors.append(f"{path}: `关联 decision` 指向仓库外路径：`{related_decision}`。")
+            else:
+                if not decision_path.exists():
+                    errors.append(f"{path}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
     return errors
 
 
@@ -306,6 +317,24 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             errors.append("治理/exec-plan 变更缺少 `docs/decisions/**` 工件，bootstrap contract 不完整。")
         if not all_exec_plans:
             errors.append("治理/decision 变更缺少 `docs/exec-plans/**` 工件，bootstrap contract 不完整。")
+        for raw_path in changed_paths:
+            path = Path(raw_path)
+            target = repo_root / path
+            if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
+                continue
+            fields = extract_fields(target.read_text(encoding="utf-8"))
+            related_decision = fields.get("关联 decision", "")
+            if not related_decision:
+                errors.append(f"{target}: 当前 exec-plan 缺少 `关联 decision`，bootstrap contract 无法与当前事项建立对应关系。")
+                continue
+            decision_path = (repo_root / related_decision).resolve()
+            try:
+                decision_path.relative_to(repo_root.resolve())
+            except ValueError:
+                errors.append(f"{target}: `关联 decision` 指向仓库外路径：`{related_decision}`。")
+                continue
+            if not decision_path.exists():
+                errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path))
