@@ -31,8 +31,17 @@
 - 实现 PR 审查标准见 [../../code_review.md](../../code_review.md)
 - 交付流程见 [../process/delivery-funnel.md](../process/delivery-funnel.md)
 
-## 命名建议
+## 事项身份与命名
 
-- 目录命名建议：`FR-XXXX-<slug>`
-- `XXXX` 为四位数字，`slug` 使用短横线语义短语
+- `docs/specs/` 中的事项默认使用 `item_key` 作为聚合键。
+- FR 目录命名固定为：`FR-XXXX-<slug>`
+- `XXXX` 为四位数字，`slug` 使用短横线英文短语
+- 新事项与存量事项在进入新的执行回合前，都必须在 formal spec、`TODO.md`、`exec-plan`、PR 描述中显式声明完整事项上下文，至少包含：`Issue`、`item_key`、`item_type`、`release`、`sprint`
+- 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 可通过统一 `item_key` 与 `exec-plan`、decision、PR 关联
+- `HOTFIX`、`GOV`、`CHORE` 仍使用统一 `item_key` 参与仓内聚合，但不在 `docs/specs/` 中引入非 `FR-*` 目录命名规则
+
+## 聚合而不嵌套
+
+- `docs/specs/` 只承载正式规约，不与 `exec-plan`、`decision` 混放在同一个事项目录中。
+- `release` / `sprint` 信息通过横向索引与 `item_key` 关联，不作为正式规约事实源。

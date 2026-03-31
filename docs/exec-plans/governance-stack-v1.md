@@ -1,5 +1,16 @@
 # 治理栈 v1 执行计划
 
+## 事项上下文
+
+- Issue：`#6`
+- item_key：`FR-0001-governance-stack-v1`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- 状态：`inactive for PR #15`
+- 事项说明：当前结构层 active 工件为 `docs/exec-plans/GOV-0014-release-sprint-structure.md`，本事项仅作为上位前提。
+
 ## 目标
 
 - 建立 Syvert 的治理文档分层结构
@@ -35,10 +46,34 @@
 
 ## 当前停点
 
-- 修复 guardian 指出的信任边界与流程输入问题
+- 治理栈 v2 repo harness 主事项已完成协议与主线实现，后续结构层落点由独立事项 `GOV-0014-release-sprint-structure` 持续推进。
 
 ## 下一步
 
-- 补齐 Issue、formal spec 与 bootstrap contract
-- 重跑 guardian 审查
-- 通过 `merge_pr` 走受控合并
+- 继续推进 `FR-0001` 主线剩余的治理测试回归与仓库侧 dry-run 校验
+- 独立结构层事项由 `docs/exec-plans/GOV-0014-release-sprint-structure.md` 维护恢复入口
+
+## 当前 checkpoint 推进的 release 目标
+
+- 为 `v0.1.0` 治理基线维持 repo harness 主线闭环，不直接承担 PR2 结构层事项的收口职责。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：治理基线主事项与上位前提。
+- 阻塞：剩余治理测试回归与仓库侧配置 dry-run 尚未完成。
+
+## 已验证项
+
+- `workflow-guard` 通过
+- `docs-guard` 通过
+- `spec-guard --all` 通过
+- repo harness 协议与门禁入口已入库
+
+## 未决风险
+
+- 后续结构层与自动化门禁事项需保持与 `FR-0001` 主线的边界清晰
+- 仓库侧配置 dry-run 与完整治理测试尚待回归验证
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `7fc5e5ada722930bf61b30b911f5bb666948fad5`

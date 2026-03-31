@@ -26,6 +26,7 @@ codex:
   - `release`
   - `sprint`
 - `Issue` 仍是任务状态真相源入口；`item_key`、`release`、`sprint` 是执行上下文字段，不替代 GitHub Issues / Projects。
+- `docs/releases/` 与 `docs/sprints/` 只承载仓内聚合索引，不替代 GitHub Issues / Projects 的状态真相源。
 - 新事项与存量事项在进入新的执行回合前都必须补齐完整事项上下文。
 - 术语约定：
   - `新事项`：首次进入当前交付漏斗、且尚未在仓库内形成 `exec-plan` / `TODO.md` 恢复工件的事项
@@ -39,15 +40,19 @@ codex:
 - 分支完成合入或确认被替代后，通过 `python3 scripts/retire_branch.py` 执行归档与退役。
 - worktree key 仍仅由 `Issue` 生成；`item_key`、`release`、`sprint` 不改变现有 worktree 生成与复用机制。
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`。
-- `item_key` 当前建议命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
-- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。两者在本仓库中作为执行绑定字段存在，不要求当前在仓库内建立实体索引。
+- `item_key` 固定命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
+- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。
 - 治理基线自举允许 `Issue + decision + exec-plan` 作为 bootstrap contract。
 - 非治理基线事项进入实现前必须有 formal spec 输入。
+- 每个执行回合必须有且仅有一个 active `exec-plan` 与当前 `item_key` 一一对应；上位前提事项可在该工件中被引用，但不替代当前事项的 active 工件。
 
 ## checkpoint / resume / compact 规则
 
 - 长任务统一按 `kickoff -> checkpoint -> compact -> resume -> handoff -> merge-ready` 执行。
-- `核心事项` 强制存在 `exec-plan`，并记录事项上下文、停点、下一步、已验证项、未决风险、当前 head SHA。
+- `核心事项` 强制存在 `exec-plan`，并记录事项上下文、停点、下一步、已验证项、未决风险、最近一次 checkpoint 对应的 head SHA。
+- `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
+- 仅当执行回合显式推进新的 checkpoint 时，才刷新 `exec-plan` 中记录的 checkpoint head。
+- review 结论、GitHub checks、PR 关联、索引入口等审查态信息的更新，不自动构成新的 checkpoint。
 - checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 `exec-plan` 与 `TODO.md`，再继续执行。
 - checkpoint 必须说明当前改动推进了哪个 `release` 目标，以及该事项在当前 `sprint` 中的角色或位置。
 - `compact` 仅压缩已入库且可复验的信息，不得压缩未落盘前提。
@@ -65,7 +70,9 @@ codex:
 ## 何时必须更新 `exec-plan` / `TODO`
 
 - 完成一组可验证改动后必须更新一次 checkpoint。
-- 变更停点、风险、验证结论或 head SHA 时必须更新。
+- 变更停点、风险、验证结论或形成新的 checkpoint 时必须更新。
+- 若仅发生后续跟进 commit、但尚未形成新的 checkpoint，可保留最近一次 checkpoint head，并由 guardian state 绑定当前受审 head。
+- 若仅补充 review / merge gate 元数据，而未显式推进新的执行停点，不要求刷新 checkpoint head。
 - 变更 `item_key`、`item_type`、`release`、`sprint` 或事项在当前轮次中的定位时必须更新。
 - 进入 review、进入 merge gate 前必须更新到最新状态。
 
@@ -74,6 +81,7 @@ codex:
 - 进入 `open_pr` 条件：
   - 已声明 PR class 且与改动类别一致
   - 已声明完整事项上下文，且该事项在进入当前执行回合前已完成补齐
+  - 当前事项存在与 `item_key` 一致的 active `exec-plan`，并与 PR 关联信息一致
   - PR 描述、风险与验证信息可映射回 `Issue`、`item_key`、`release`、`sprint`
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪

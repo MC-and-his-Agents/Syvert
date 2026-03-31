@@ -1,5 +1,13 @@
 # FR-XXXX 标题
 
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+
 ## 背景与目标
 
 - 背景：

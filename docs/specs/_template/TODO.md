@@ -1,17 +1,18 @@
 # FR-XXXX TODO
 
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+- exec_plan：`docs/exec-plans/<item_key>.md`
+
 ## 状态
 
 - 当前成熟度：`spec-ready` / `implementation-ready` / `merge-ready`
 - 当前阻塞：
-
-## 事项上下文
-
-- Issue：
-- item_key：
-- item_type：
-- release：
-- sprint：
 
 ## 实施清单
 

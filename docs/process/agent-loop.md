@@ -22,7 +22,9 @@
   - 当前事项在 `sprint` 中的角色、位置或阻塞关系
   - 已验证项
   - 未决风险
-  - 当前 head SHA
+  - 最近一次 checkpoint 对应的 head SHA
+- 只有当执行回合显式形成新的 checkpoint 时，才推进该 head SHA。
+- review 结论、GitHub checks、PR 关联等审查态信息的补充，不单独构成新的 checkpoint。
 
 ## compact
 
@@ -33,7 +35,7 @@
 ## resume
 
 - 从最近一次 checkpoint 恢复。
-- 若 head SHA 变化，必须先刷新风险与验证状态，再继续执行。
+- 若 head SHA 变化且形成新的 checkpoint，必须先刷新风险与验证状态，再继续执行。
 - 恢复前必须确认当前独立现场与事项上下文仍匹配；若 `release`、`sprint` 或事项角色变化，必须先更新 `exec-plan` 与 `TODO.md`。
 
 ## handoff
