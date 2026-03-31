@@ -88,6 +88,9 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
         if payload.get("conflict") == "multiple_active_exec_plans":
             return {}
         if payload:
+            active_item = payload.get("active 收口事项", "")
+            if active_item and active_item != item_key:
+                return {}
             comparisons = (
                 ("issue", "Issue"),
                 ("item_type", "item_type"),
