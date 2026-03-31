@@ -23,11 +23,11 @@
 
 ## 当前停点
 
-- active 恢复入口已刷新并与当前受审 PR 的 latest head 对齐，等待 guardian 基于同一受审 head 给出最终结论。
+- active 恢复入口当前绑定到最近一次 checkpoint（`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`），等待 guardian 基于当前受审 head 给出最终结论。
 
 ## 下一步动作
 
-- 基于当前受审 PR 的 latest head 重跑 guardian 审查
+- 基于当前受审 head 重跑 guardian 审查，并按结果决定是否刷新下一次 checkpoint
 - 若 guardian 通过，则执行 `merge_pr` 进入受控合并
 
 ## 当前 checkpoint 推进的 release 目标
@@ -50,7 +50,7 @@
 - `docs-guard` 通过
 - `spec-guard --all` 通过
 - PR `#15` 的 GitHub checks 已全绿
-- active exec-plan 已刷新并与当前受审 PR 的 latest head 对齐
+- active exec-plan 的最近一次 checkpoint 已记录为 `617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`
 
 ## 回滚方式
 

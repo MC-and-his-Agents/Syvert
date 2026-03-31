@@ -7,7 +7,7 @@
 - item_type：`FR`
 - release：`v0.1.0`
 - sprint：`2026-S13`
-- active_exec_plan：`docs/exec-plans/governance-stack-v1.md`（主线前提工件，非 PR `#15` active）
+- exec_plan：`docs/exec-plans/governance-stack-v1.md`（主线前提工件，非 PR `#15` active）
 - 事项说明：结构层 active 事项已切换至 `GOV-0014-release-sprint-structure`，本事项在当前轮次仅作为上位前提。
 
 ## 状态
@@ -28,10 +28,10 @@
 
 ## 验证清单
 
-- [x] `workflow_guard`、`docs_guard`、`spec_guard` 通过
+- [x] `workflow-guard`、`docs-guard`、`spec-guard` 通过
 - [ ] GitHub checks 全绿
 - [ ] 治理测试通过
-- [ ] `governance_gate` 通过
+- [ ] `governance-gate` 通过
 - [ ] `sync_repo_settings.py --dry-run` 通过
 - [ ] guardian review 对应主线 PR / head 通过
 - [ ] 受控 merge 成功完成
