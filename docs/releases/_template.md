@@ -27,4 +27,5 @@
 - sprint：
 - spec：
 - exec-plan：
+  - `docs/exec-plans/<item_key>.md`
 - decision：

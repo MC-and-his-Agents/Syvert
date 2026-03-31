@@ -74,6 +74,6 @@
 - 后续结构层与自动化门禁事项需保持与 `FR-0001` 主线的边界清晰
 - 仓库侧配置 dry-run 与完整治理测试尚待回归验证
 
-## 当前 head SHA
+## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次 checkpoint head：`7fc5e5ada722930bf61b30b911f5bb666948fad5`
+- `7fc5e5ada722930bf61b30b911f5bb666948fad5`
