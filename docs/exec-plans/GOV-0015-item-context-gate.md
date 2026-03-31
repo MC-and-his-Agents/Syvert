@@ -9,7 +9,7 @@
 - sprint：`2026-S14`
 - 关联 spec：无（治理修补事项）
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待创建
+- 关联 PR：`#20`
 - active 收口事项：`GOV-0015-item-context-gate`
 
 ## 目标
@@ -23,13 +23,13 @@
 
 ## 当前停点
 
-- `open_pr` 已要求完整事项上下文并校验 active `exec-plan`，`governance_status` 已输出 `item_context`，当前停在提交前的 checkpoint 收口。
+- 代码与测试已提交并推送，PR `#20` 已创建，当前停在 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
-- 提交当前治理修补改动并通过受控入口创建治理 PR。
-- 在 PR 上执行 guardian 审查并核对 merge gate。
-- 通过受控入口完成 squash merge。
+- 在 PR `#20` 上执行 guardian 审查并核对 checks / head SHA。
+- 若 guardian 通过，使用受控入口完成 squash merge。
+- 合并后按流程确认分支与 worktree 后续退役安排。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -62,4 +62,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3c0e3470b67d7cca320059fd95e41b7f5b2f6d11`
+- `f9432dd424a2a963e700f97fd5dec35ea9029044`
