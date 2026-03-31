@@ -23,11 +23,11 @@
 
 ## 当前停点
 
-- guardian 首轮审查提出两个历史兼容性阻断项，现已补齐兼容修复并重新推送，当前停在第二轮 guardian 审查与 merge gate 核对。
+- guardian 已连续指出历史兼容性、唯一 active 工件与 PR body 对齐三类阻断项；当前已补齐对应修复，停在第四轮 guardian 审查前的最新状态对齐。
 
 ## 下一步动作
 
-- 在 PR `#20` 上执行第二轮 guardian 审查并核对 checks / head SHA。
+- 在 PR `#20` 上执行下一轮 guardian 审查并核对 checks / head SHA。
 - 若 guardian 通过，使用受控入口完成 squash merge。
 - 合并后按流程确认分支与 worktree 后续退役安排。
 
@@ -54,7 +54,7 @@
 
 ## 未决风险
 
-- 第二轮 guardian 审查仍可能发现未覆盖的历史兼容性边界。
+- 下一轮 guardian 审查仍可能发现未覆盖的治理边界或文档/实现漂移。
 - 需确保重新推送后的 CI checks 与 guardian 审查使用同一 head SHA。
 
 ## 回滚方式

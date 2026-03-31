@@ -81,6 +81,9 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
     item_key = body_context.get("item_key", "")
     if item_key:
+        required_fields = ("issue", "item_type", "release", "sprint")
+        if any(not body_context.get(field, "") for field in required_fields):
+            return {}
         payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
         if payload.get("conflict") == "multiple_active_exec_plans":
             return {}
