@@ -12,6 +12,127 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_valid_template_docs(repo: Path) -> None:
+    write_file(
+        repo / "docs" / "exec-plans" / "_template.md",
+        """# ITEM-KEY 执行计划
+
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+
+## 最近一次 checkpoint 对应的 head SHA
+""",
+    )
+    write_file(
+        repo / "docs" / "specs" / "_template" / "spec.md",
+        """# FR-XXXX 标题
+
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+""",
+    )
+    write_file(
+        repo / "docs" / "specs" / "_template" / "plan.md",
+        """# FR-XXXX 实施计划
+
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+""",
+    )
+    write_file(
+        repo / "docs" / "specs" / "_template" / "TODO.md",
+        """# FR-XXXX TODO
+
+## 关联信息
+
+- item_key：
+- Issue：
+- item_type：
+- release：
+- sprint：
+- exec_plan：
+""",
+    )
+    write_file(
+        repo / "docs" / "releases" / "_template.md",
+        """# Release vX.Y.Z
+
+## 目标
+
+- x
+
+## 明确不在范围
+
+- x
+
+## 目标判据
+
+- x
+
+## 纳入事项
+
+- x
+
+## 关联工件
+
+- roadmap：`docs/roadmap-v0-to-v1.md`
+- sprint：`docs/sprints/2026-S13.md`
+- spec：`docs/specs/FR-0001-example/`
+- exec-plan：
+  - `docs/exec-plans/GOV-0001-release-sprint-structure.md`
+- decision：`docs/decisions/ADR-0001-example.md`
+""",
+    )
+    write_file(
+        repo / "docs" / "sprints" / "_template.md",
+        """# Sprint YYYY-SNN
+
+## release
+
+- `v0.1.0`
+
+## 本轮目标
+
+- x
+
+## 入口事项
+
+- x
+
+## 目标判据
+
+- x
+
+## 协作入口
+
+- GitHub Project / iteration：x
+
+## 关联工件
+
+- release：`docs/releases/v0.1.0.md`
+- spec：`docs/specs/FR-0001-example/`
+- exec-plan：
+  - `docs/exec-plans/GOV-0001-release-sprint-structure.md`
+- decision：`docs/decisions/ADR-0001-example.md`
+""",
+    )
+
+
 def write_valid_governance_docs(repo: Path) -> None:
     write_file(
         repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md",
@@ -215,6 +336,7 @@ Then
 """,
     )
     write_file(repo / "docs" / "roadmap-v0-to-v1.md", "# roadmap\n")
+    write_valid_template_docs(repo)
 
 
 class ContextGuardTests(unittest.TestCase):
@@ -308,6 +430,27 @@ class ContextGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
         self.assertEqual(errors, [])
 
+    def test_repository_mode_missing_required_template_should_fail(self) -> None:
+        required_templates = (
+            "docs/exec-plans/_template.md",
+            "docs/specs/_template/spec.md",
+            "docs/specs/_template/plan.md",
+            "docs/specs/_template/TODO.md",
+            "docs/releases/_template.md",
+            "docs/sprints/_template.md",
+        )
+        for template_path in required_templates:
+            with self.subTest(template=template_path):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    repo = Path(temp_dir)
+                    write_valid_governance_docs(repo)
+                    (repo / template_path).unlink()
+                    errors = validate_repository(repo)
+                self.assertTrue(
+                    any("缺少基线模板工件" in error and template_path in error for error in errors),
+                    f"expected missing-template error for {template_path}, got: {errors}",
+                )
+
     def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -318,7 +461,16 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
             )
-        self.assertTrue(any("decision" in error.lower() or "decisions" in error.lower() for error in errors))
+        self.assertTrue(
+            any(
+                all(
+                    token in error
+                    for token in ("治理/exec-plan", "docs/decisions/**", "bootstrap contract", "不完整")
+                )
+                for error in errors
+            ),
+            f"expected semantic bootstrap-contract error for missing decision docs, got: {errors}",
+        )
 
     def test_bootstrap_contract_requires_exec_plan_when_decision_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -330,7 +482,16 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-0001-example.md"],
             )
-        self.assertTrue(any("exec-plan" in error.lower() or "exec-plans" in error.lower() for error in errors))
+        self.assertTrue(
+            any(
+                all(
+                    token in error
+                    for token in ("治理/decision", "docs/exec-plans/**", "bootstrap contract", "不完整")
+                )
+                for error in errors
+            ),
+            f"expected semantic bootstrap-contract error for missing exec-plan docs, got: {errors}",
+        )
 
     def test_bootstrap_contract_touched_related_decision_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -450,7 +611,9 @@ class ContextGuardTests(unittest.TestCase):
                 errors = validate_context_rules(repo, changed_paths=["docs/releases/v0.1.0.md"])
             except FileNotFoundError as exc:
                 self.fail(f"validate_context_rules should not raise FileNotFoundError: {exc}")
-        self.assertTrue(errors)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("docs/releases/v0.1.0.md", errors[0])
+        self.assertIn("变更目标不存在（可能已删除）", errors[0])
 
 
 if __name__ == "__main__":

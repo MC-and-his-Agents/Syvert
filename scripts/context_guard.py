@@ -395,6 +395,7 @@ def validate_repository(repo_root: Path) -> list[str]:
     # Repository-wide validation enforces current baseline artifacts only:
     # templates plus release/sprint index documents. Historical instance files
     # are validated when they re-enter a changed execution round.
+    errors: list[str] = []
     baseline_paths: list[str] = []
     template_candidates = (
         repo_root / "docs" / "exec-plans" / "_template.md",
@@ -405,8 +406,11 @@ def validate_repository(repo_root: Path) -> list[str]:
         repo_root / "docs" / "sprints" / "_template.md",
     )
     for candidate in template_candidates:
+        relative = candidate.relative_to(repo_root).as_posix()
         if candidate.exists():
-            baseline_paths.append(candidate.relative_to(repo_root).as_posix())
+            baseline_paths.append(relative)
+        else:
+            errors.append(f"{candidate}: 缺少基线模板工件 `{relative}`。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:
@@ -418,7 +422,8 @@ def validate_repository(repo_root: Path) -> list[str]:
             continue
         baseline_paths.append(path.relative_to(repo_root).as_posix())
 
-    return validate_context_rules(repo_root, changed_paths=baseline_paths)
+    errors.extend(validate_context_rules(repo_root, changed_paths=baseline_paths))
+    return errors
 
 
 def main(argv: list[str] | None = None) -> int:
