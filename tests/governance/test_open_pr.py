@@ -76,6 +76,24 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_inactive_exec_plan_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0015-item-context-gate.md"
+            exec_plan.write_text(exec_plan.read_text(encoding="utf-8") + "- 状态：`inactive for PR #18`\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("缺少 active `exec-plan`" in error for error in errors))
+
     def test_governance_without_issue_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

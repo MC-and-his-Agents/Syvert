@@ -75,7 +75,7 @@ def exec_plan_path_for_item_key(repo_root: Path, item_key: str) -> Path:
 def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str, str]:
     path = exec_plan_path_for_item_key(repo_root, item_key)
     payload = parse_exec_plan_metadata(path)
-    if payload:
+    if payload and not is_inactive_exec_plan(payload):
         return payload
 
     exec_plans_dir = repo_root / "docs" / "exec-plans"
@@ -87,7 +87,7 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
         if candidate.name == "README.md":
             continue
         metadata = parse_exec_plan_metadata(candidate)
-        if metadata.get("item_key") == item_key:
+        if metadata.get("item_key") == item_key and not is_inactive_exec_plan(metadata):
             matches.append(metadata)
 
     if len(matches) == 1:

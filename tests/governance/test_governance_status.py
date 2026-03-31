@@ -76,6 +76,39 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["item_context"], {})
 
+    def test_pr_status_ignores_inactive_exec_plan_from_pr_body(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            (exec_plans / "GOV-0015-item-context-gate.md").write_text(
+                "\n".join(
+                    [
+                        "# plan",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- Issue：`#19`",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 状态：`inactive for PR #18`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with patch("scripts.governance_status.REPO_ROOT", repo):
+                with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+                    with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                        with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k"}}}):
+                            with patch("scripts.governance_status.fetch_pr_meta", return_value={"headRefOid": "sha-1", "headRefName": "feature/x", "body": "item_key: `GOV-0015-item-context-gate`"}):
+                                with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                                    payload = governance_status.build_status_payload(pr_number=20)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_load_state_with_legacy_reads_legacy_when_primary_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
