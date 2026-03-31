@@ -74,7 +74,11 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
         if key not in EXEC_PLAN_METADATA_KEYS:
             continue
         if key in seen_keys:
-            return {"exec_plan": path.as_posix(), "conflict": "duplicate_metadata_keys"}
+            payload["conflict"] = "duplicate_metadata_keys"
+            payload["duplicate_key"] = key
+            if "Issue" in payload:
+                payload["Issue"] = normalize_issue(payload["Issue"])
+            return payload
         seen_keys.add(key)
         payload[key] = value
 

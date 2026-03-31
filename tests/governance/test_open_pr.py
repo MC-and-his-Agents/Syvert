@@ -155,6 +155,41 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_duplicate_metadata_in_secondary_file_for_same_item_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plans = repo / "docs" / "exec-plans"
+            (exec_plans / "shadow.md").write_text(
+                "\n".join(
+                    [
+                        "# shadow",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- Issue：`#19`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- release：`v0.2.0`",
+                        "- sprint：`2026-S14`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("重复键" in error for error in errors))
+
     def test_duplicate_active_exec_plans_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
