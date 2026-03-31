@@ -23,11 +23,11 @@
 
 ## 当前停点
 
-- active 恢复入口已刷新并绑定到当前受审 PR head（`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`），等待 guardian 复核同一 head 的最终结论。
+- active 恢复入口已刷新并与当前受审 PR 的 latest head 对齐，等待 guardian 基于同一受审 head 给出最终结论。
 
 ## 下一步动作
 
-- 基于当前受审 PR head（`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`）重跑 guardian 审查
+- 基于当前受审 PR 的 latest head 重跑 guardian 审查
 - 若 guardian 通过，则执行 `merge_pr` 进入受控合并
 
 ## 当前 checkpoint 推进的 release 目标
@@ -50,7 +50,7 @@
 - `docs-guard` 通过
 - `spec-guard --all` 通过
 - PR `#15` 的 GitHub checks 已全绿
-- active exec-plan 已刷新并绑定到当前受审 head：`617d8cc16c0bb9a2fae9d82f8f38de87bf99088d`
+- active exec-plan 已刷新并与当前受审 PR 的 latest head 对齐
 
 ## 回滚方式
 

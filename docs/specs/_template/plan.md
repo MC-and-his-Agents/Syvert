@@ -5,6 +5,7 @@
 - item_key：
 - Issue：
 - release：
+- sprint：
 - 关联 exec-plan：
 
 ## 实施目标

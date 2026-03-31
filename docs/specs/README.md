@@ -36,7 +36,7 @@
 - `docs/specs/` 中的事项默认使用 `item_key` 作为聚合键。
 - FR 目录命名固定为：`FR-XXXX-<slug>`
 - `XXXX` 为四位数字，`slug` 使用短横线英文短语
-- 从 PR2 起，新事项必须在 formal spec、`TODO.md`、`exec-plan`、PR 描述中显式声明同一个 `item_key`
+- 新事项与存量事项在进入新的执行回合前，都必须在 formal spec、`TODO.md`、`exec-plan`、PR 描述中显式声明同一个 `item_key`
 - 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 可通过统一 `item_key` 与 `exec-plan`、decision、PR 关联
 - `HOTFIX`、`GOV`、`CHORE` 仍使用统一 `item_key` 参与仓内聚合，但不在 `docs/specs/` 中引入非 `FR-*` 目录命名规则
