@@ -23,11 +23,11 @@
 
 ## 当前停点
 
-- 代码与测试已提交并推送，PR `#20` 已创建，当前停在 guardian 审查与 merge gate 核对。
+- guardian 首轮审查提出两个历史兼容性阻断项，现已补齐兼容修复并重新推送，当前停在第二轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
-- 在 PR `#20` 上执行 guardian 审查并核对 checks / head SHA。
+- 在 PR `#20` 上执行第二轮 guardian 审查并核对 checks / head SHA。
 - 若 guardian 通过，使用受控入口完成 squash merge。
 - 合并后按流程确认分支与 worktree 后续退役安排。
 
@@ -50,11 +50,12 @@
 - `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
 - `python3 scripts/open_pr.py --class governance --issue 19 --item-key GOV-0015-item-context-gate --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "治理: 补齐事项上下文自动化闭环" --dry-run`
 - `python3 scripts/governance_status.py --issue 19 --format text`
+- `python3 scripts/governance_status.py --issue 6 --format text`
 
 ## 未决风险
 
-- 需要兼容历史 `exec-plan` 文件名与当前新增 `item_key` 命名规则，避免误伤已有治理流程。
-- `governance_status` 新增 `item_context` 后需保持无 active `exec-plan` 场景下的兼容输出。
+- 第二轮 guardian 审查仍可能发现未覆盖的历史兼容性边界。
+- 需确保重新推送后的 CI checks 与 guardian 审查使用同一 head SHA。
 
 ## 回滚方式
 
@@ -62,4 +63,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f9432dd424a2a963e700f97fd5dec35ea9029044`
+- `bb68705cd3fb405e7ec860dccb479ce445427e2a`
