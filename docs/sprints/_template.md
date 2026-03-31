@@ -1,6 +1,6 @@
 # Sprint YYYY-SNN
 
-## 所属 release
+## release
 
 - `vX.Y.Z`
 

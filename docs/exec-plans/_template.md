@@ -5,8 +5,8 @@
 - item_key：
 - Issue：
 - item_type：
-- 所属 release：
-- 所属 sprint：
+- release：
+- sprint：
 - 关联 spec：
 - 关联 decision：
 - 关联 PR：

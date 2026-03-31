@@ -46,7 +46,7 @@ Syvert 的唯一默认交付路径如下：
 - `Issue` 仍是任务状态真相源的入口；`item_key`、`release`、`sprint` 只用于执行、恢复与交付映射
 - 新事项与新长任务必须显式声明完整事项上下文；存量事项可在进入新的执行回合时补齐
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`
-- `item_key` 当前建议命名为 `<item_type>-<4-digit>-<slug>`
+- `item_key` 固定命名为 `<item_type>-<4-digit>-<slug>`
 
 ## 与自动化门禁的关系
 

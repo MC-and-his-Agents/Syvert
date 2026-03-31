@@ -4,7 +4,7 @@
 
 - item_key：
 - Issue：
-- 所属 release：
+- release：
 
 ## 背景与目标
 

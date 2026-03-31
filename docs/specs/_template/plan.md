@@ -4,7 +4,7 @@
 
 - item_key：
 - Issue：
-- 所属 release：
+- release：
 - 关联 exec-plan：
 
 ## 实施目标
