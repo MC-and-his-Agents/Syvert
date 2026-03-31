@@ -60,7 +60,7 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
             continue
         key = match.group(1).strip()
         value = normalize_value(match.group(2))
-        if key in {"item_key", "Issue", "item_type", "release", "sprint", "active 收口事项"}:
+        if key in {"item_key", "Issue", "item_type", "release", "sprint", "active 收口事项", "状态"}:
             payload[key] = value
 
     if "Issue" in payload:
@@ -74,7 +74,33 @@ def exec_plan_path_for_item_key(repo_root: Path, item_key: str) -> Path:
 
 def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str, str]:
     path = exec_plan_path_for_item_key(repo_root, item_key)
-    return parse_exec_plan_metadata(path)
+    payload = parse_exec_plan_metadata(path)
+    if payload:
+        return payload
+
+    exec_plans_dir = repo_root / "docs" / "exec-plans"
+    if not exec_plans_dir.exists():
+        return {}
+
+    matches: list[dict[str, str]] = []
+    for candidate in sorted(exec_plans_dir.glob("*.md")):
+        if candidate.name == "README.md":
+            continue
+        metadata = parse_exec_plan_metadata(candidate)
+        if metadata.get("item_key") == item_key:
+            matches.append(metadata)
+
+    if len(matches) == 1:
+        return matches[0]
+
+    explicit_active = [item for item in matches if item.get("active 收口事项") == item_key]
+    if len(explicit_active) == 1:
+        return explicit_active[0]
+    return {}
+
+
+def is_inactive_exec_plan(payload: dict[str, str]) -> bool:
+    return payload.get("状态", "").lower().startswith("inactive")
 
 
 def matching_exec_plan_for_issue(repo_root: Path, issue_number: int) -> dict[str, str]:
@@ -90,10 +116,15 @@ def matching_exec_plan_for_issue(repo_root: Path, issue_number: int) -> dict[str
         if payload.get("Issue") == str(issue_number):
             matches.append(payload)
 
-    if len(matches) == 1:
-        return matches[0]
-
-    active_matches = [item for item in matches if item.get("active 收口事项") == item.get("item_key")]
+    active_matches = [
+        item
+        for item in matches
+        if not is_inactive_exec_plan(item) and item.get("active 收口事项") == item.get("item_key")
+    ]
     if len(active_matches) == 1:
         return active_matches[0]
+
+    eligible = [item for item in matches if not is_inactive_exec_plan(item)]
+    if len(eligible) == 1:
+        return eligible[0]
     return {}

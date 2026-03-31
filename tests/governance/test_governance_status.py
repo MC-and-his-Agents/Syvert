@@ -47,6 +47,35 @@ class GovernanceStatusTests(unittest.TestCase):
 
         self.assertEqual(payload["item_context"], {})
 
+    def test_issue_status_ignores_inactive_legacy_exec_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            (exec_plans / "legacy.md").write_text(
+                "\n".join(
+                    [
+                        "# legacy",
+                        "",
+                        "## 事项上下文",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`FR-0001-governance-stack-v1`",
+                        "- item_type：`FR`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S13`",
+                        "- 状态：`inactive for PR #15`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("scripts.governance_status.REPO_ROOT", repo):
+                payload = governance_status.build_status_payload(issue_number=6)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_load_state_with_legacy_reads_legacy_when_primary_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

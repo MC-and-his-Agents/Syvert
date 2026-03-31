@@ -40,6 +40,42 @@ def write_exec_plan(
 
 
 class OpenPrPreflightTests(unittest.TestCase):
+    def test_legacy_filename_exec_plan_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            exec_plans = repo / "docs" / "exec-plans"
+            exec_plans.mkdir(parents=True, exist_ok=True)
+            (exec_plans / "governance-stack-v1.md").write_text(
+                "\n".join(
+                    [
+                        "# plan",
+                        "",
+                        "## 事项上下文",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`FR-0001-governance-stack-v1`",
+                        "- item_type：`FR`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S13`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo / "docs" / "decisions").mkdir(parents=True)
+            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S13",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_governance_without_issue_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
