@@ -148,6 +148,9 @@ def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> 
         return ["当前分支未找到匹配的 worktree 状态绑定，无法确认事项上下文与执行现场一致。"]
     if int(binding.get("issue", -1)) != issue:
         return ["受控 PR 入口填写的 `Issue` 与当前 branch/worktree 绑定的事项不一致。"]
+    recorded_path = str(binding.get("path", "")).strip()
+    if recorded_path and Path(recorded_path).resolve() != repo_root.resolve():
+        return ["当前仓库路径与 `worktrees.json` 中登记的 worktree `path` 不一致。"]
     return []
 
 

@@ -144,6 +144,19 @@ class OpenPrPreflightTests(unittest.TestCase):
                     errors = validate_current_worktree_binding(19, repo_root=repo)
         self.assertTrue(any("branch/worktree 绑定的事项不一致" in error for error in errors))
 
+    def test_worktree_path_must_match_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            other = repo / "other"
+            other.mkdir()
+            with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                with patch(
+                    "scripts.open_pr.load_worktree_binding_for_branch",
+                    return_value={"issue": 19, "branch": "issue-19-demo", "path": str(other)},
+                ):
+                    errors = validate_current_worktree_binding(19, repo_root=repo)
+        self.assertTrue(any("worktree `path` 不一致" in error for error in errors))
+
     def test_missing_release_or_sprint_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

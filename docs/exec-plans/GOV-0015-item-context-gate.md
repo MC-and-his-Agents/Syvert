@@ -51,6 +51,7 @@
 - `python3 scripts/open_pr.py --class governance --issue 19 --item-key GOV-0015-item-context-gate --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "治理: 补齐事项上下文自动化闭环" --dry-run`
 - `python3 scripts/governance_status.py --issue 19 --format text`
 - `python3 scripts/governance_status.py --issue 6 --format text`
+- `python3 scripts/governance_status.py --pr 20 --format text`
 
 ## 未决风险
 
