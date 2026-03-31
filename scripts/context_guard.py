@@ -15,7 +15,7 @@ from scripts.common import REPO_ROOT, git_changed_files
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
 ITEM_KEY_RE = re.compile(r"^(FR|HOTFIX|GOV|CHORE)-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
-FIELD_RE = re.compile(r"^- ([A-Za-z_]+)[：:][ \t]*(.*)$", re.MULTILINE)
+FIELD_RE = re.compile(r"^- ([^：:\n]+)[：:][ \t]*(.*)$", re.MULTILINE)
 HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -134,7 +134,7 @@ def validate_context_fields(path: Path, fields: dict[str, str], required: tuple[
     return errors
 
 
-def validate_exec_plan(path: Path) -> list[str]:
+def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
     if not path.exists():
         return [f"{path}: exec-plan 文件不存在（可能已删除）。"]
     text = path.read_text(encoding="utf-8")
@@ -151,9 +151,9 @@ def validate_exec_plan(path: Path) -> list[str]:
     if not template_mode:
         related_decision = fields.get("关联 decision", "")
         if related_decision:
-            decision_path = (REPO_ROOT / related_decision).resolve()
+            decision_path = (repo_root / related_decision).resolve()
             try:
-                decision_path.relative_to(REPO_ROOT.resolve())
+                decision_path.relative_to(repo_root.resolve())
             except ValueError:
                 errors.append(f"{path}: `关联 decision` 指向仓库外路径：`{related_decision}`。")
             else:
@@ -323,6 +323,8 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = extract_fields(target.read_text(encoding="utf-8"))
+            if fields.get("item_type") != "GOV":
+                continue
             related_decision = fields.get("关联 decision", "")
             if not related_decision:
                 errors.append(f"{target}: 当前 exec-plan 缺少 `关联 decision`，bootstrap contract 无法与当前事项建立对应关系。")
@@ -337,7 +339,7 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
 
     for path in exec_plans:
-        errors.extend(validate_exec_plan(path))
+        errors.extend(validate_exec_plan(path, repo_root=repo_root))
     for path in spec_files:
         errors.extend(validate_spec_context_file(path))
     for path in release_files:

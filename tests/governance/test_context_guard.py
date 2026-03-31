@@ -24,6 +24,7 @@ def write_valid_governance_docs(repo: Path) -> None:
 - item_type：`GOV`
 - release：`v0.1.0`
 - sprint：`2026-S13`
+- 关联 decision：`docs/decisions/ADR-0001-example.md`
 
 ## 最近一次 checkpoint 对应的 head SHA
 
@@ -337,13 +338,26 @@ class ContextGuardTests(unittest.TestCase):
             write_valid_governance_docs(repo)
             plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
             text = plan.read_text(encoding="utf-8")
-            text += "- 关联 decision：`docs/decisions/ADR-9999-unrelated.md`\n"
+            text = text.replace(
+                "docs/decisions/ADR-0001-example.md",
+                "docs/decisions/ADR-9999-unrelated.md",
+            )
             plan.write_text(text, encoding="utf-8")
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
             )
         self.assertTrue(any("关联 decision" in error for error in errors))
+
+    def test_valid_governance_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertEqual(errors, [])
 
     def test_diff_mode_deleted_governance_doc_returns_error_instead_of_crash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
