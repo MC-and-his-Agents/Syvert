@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
+import re
+
+from scripts.common import REPO_ROOT, git_changed_files
+
+
+ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
+ITEM_KEY_RE = re.compile(r"^(FR|HOTFIX|GOV|CHORE)-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+FIELD_RE = re.compile(r"^- ([A-Za-z_]+)[：:][ \t]*(.*)$", re.MULTILINE)
+HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
+CODE_RE = re.compile(r"`([^`]+)`")
+MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+SHA40_RE = re.compile(r"\b[0-9a-f]{40}\b")
+
+SPEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
+EXEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="校验治理事项上下文字段与索引语义。")
+    parser.add_argument("--mode", choices=("ci", "local"), default="local")
+    parser.add_argument("--repo-root", default=str(REPO_ROOT))
+    parser.add_argument("--base-ref")
+    parser.add_argument("--base-sha")
+    parser.add_argument("--head-ref", default="HEAD")
+    parser.add_argument("--head-sha")
+    return parser.parse_args(argv)
+
+
+def normalize_value(raw_value: str) -> str:
+    raw_value = raw_value.strip()
+    if not raw_value:
+        return ""
+    code_match = CODE_RE.search(raw_value)
+    if code_match:
+        return code_match.group(1).strip()
+    value = raw_value.strip("`").strip()
+    return value
+
+
+def extract_fields(text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for match in FIELD_RE.finditer(text):
+        key = match.group(1).strip()
+        value = normalize_value(match.group(2))
+        if key not in fields:
+            fields[key] = value
+    return fields
+
+
+def heading_exists(text: str, heading: str) -> bool:
+    headings = {item.group(1).strip() for item in HEADING_RE.finditer(text)}
+    return heading in headings
+
+
+def is_template(path: Path) -> bool:
+    return path.name == "_template.md" or "_template" in path.parts
+
+
+def _matches(path: Path, pattern: str) -> bool:
+    return re.search(pattern, path.as_posix()) is not None
+
+
+def is_exec_plan_file(path: Path) -> bool:
+    return _matches(path, r"(^|/)docs/exec-plans/[^/]+\.md$") and path.name != "README.md"
+
+
+def is_release_file(path: Path) -> bool:
+    return _matches(path, r"(^|/)docs/releases/[^/]+\.md$") and path.name != "README.md"
+
+
+def is_sprint_file(path: Path) -> bool:
+    return _matches(path, r"(^|/)docs/sprints/[^/]+\.md$") and path.name != "README.md"
+
+
+def is_spec_suite_file(path: Path) -> bool:
+    value = path.as_posix()
+    if re.search(r"(^|/)docs/specs/_template/(spec|plan|TODO)\.md$", value):
+        return True
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan|TODO)\.md$", value) is not None
+
+
+def should_skip_reference(value: str) -> bool:
+    if not value:
+        return True
+    if value.startswith(("http://", "https://", "mailto:")):
+        return True
+    placeholders = ("<", ">", "XXXX", "YYYY", "vX.Y.Z", "ITEM-KEY", "*")
+    return any(token in value for token in placeholders)
+
+
+def validate_item_key(path: Path, item_key: str, item_type: str, *, allow_empty: bool) -> list[str]:
+    errors: list[str] = []
+    if allow_empty and not item_key:
+        return errors
+    if not item_key:
+        return [f"{path}: `item_key` 不能为空。"]
+    if not ITEM_KEY_RE.match(item_key):
+        errors.append(f"{path}: `item_key` 格式非法，需为 `<item_type>-<4-digit>-<slug>`。")
+        return errors
+    prefix = item_key.split("-", 1)[0]
+    if item_type and prefix != item_type:
+        errors.append(f"{path}: `item_key` 前缀 `{prefix}` 与 `item_type` `{item_type}` 不一致。")
+    return errors
+
+
+def validate_context_fields(path: Path, fields: dict[str, str], required: tuple[str, ...], *, allow_empty: bool) -> list[str]:
+    errors: list[str] = []
+    for key in required:
+        if key not in fields:
+            errors.append(f"{path}: 缺少 `{key}` 字段。")
+            continue
+        if not allow_empty and not fields[key]:
+            errors.append(f"{path}: `{key}` 不能为空。")
+    if "item_type" in fields and fields.get("item_type") and fields["item_type"] not in ALLOWED_ITEM_TYPES:
+        errors.append(f"{path}: `item_type` 非法，必须是 {sorted(ALLOWED_ITEM_TYPES)} 之一。")
+    if "item_key" in fields:
+        errors.extend(
+            validate_item_key(path, fields.get("item_key", ""), fields.get("item_type", ""), allow_empty=allow_empty)
+        )
+    return errors
+
+
+def validate_exec_plan(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    fields = extract_fields(text)
+    template_mode = is_template(path)
+    errors = validate_context_fields(path, fields, EXEC_CONTEXT_FIELDS, allow_empty=template_mode)
+
+    checkpoint_heading = "最近一次 checkpoint 对应的 head SHA"
+    if not heading_exists(text, checkpoint_heading):
+        errors.append(f"{path}: 缺少 `{checkpoint_heading}` 段落。")
+    else:
+        if not template_mode and not SHA40_RE.search(text):
+            errors.append(f"{path}: 缺少可解析的 40 位 checkpoint head SHA。")
+    return errors
+
+
+def validate_spec_context_file(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    fields = extract_fields(text)
+    template_mode = is_template(path)
+    return validate_context_fields(path, fields, SPEC_CONTEXT_FIELDS, allow_empty=template_mode)
+
+
+def extract_doc_paths(text: str) -> list[str]:
+    refs: list[str] = []
+    refs.extend(match.group(1).strip() for match in MARKDOWN_LINK_RE.finditer(text))
+    refs.extend(match.group(1).strip() for match in CODE_RE.finditer(text) if "docs/" in match.group(1))
+    return refs
+
+
+def validate_release_or_sprint(path: Path, repo_root: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    errors: list[str] = []
+
+    if is_release_file(path):
+        required_headings = ("目标", "明确不在范围", "目标判据", "纳入事项", "关联工件")
+    else:
+        required_headings = ("本轮目标", "入口事项", "目标判据", "协作入口", "关联工件")
+        if not (heading_exists(text, "release") or heading_exists(text, "所属 release")):
+            errors.append(f"{path}: 缺少 `release` 段落。")
+
+    for heading in required_headings:
+        if not heading_exists(text, heading):
+            errors.append(f"{path}: 缺少 `{heading}` 段落。")
+
+    for ref in extract_doc_paths(text):
+        if should_skip_reference(ref):
+            continue
+        normalized = ref.split("#", 1)[0].rstrip("/")
+        if not normalized.startswith("docs/"):
+            continue
+        target = (repo_root / normalized).resolve()
+        try:
+            target.relative_to(repo_root.resolve())
+        except ValueError:
+            errors.append(f"{path}: 引用了仓库外路径 `{ref}`。")
+            continue
+        if not target.exists():
+            errors.append(f"{path}: 引用了不存在的路径 `{ref}`。")
+    return errors
+
+
+def collect_targets(repo_root: Path, changed_paths: list[str] | None) -> tuple[list[Path], list[Path], list[Path], list[Path]]:
+    exec_plans: set[Path] = set()
+    spec_files: set[Path] = set()
+    release_files: set[Path] = set()
+    sprint_files: set[Path] = set()
+
+    if changed_paths is not None:
+        for raw_path in changed_paths:
+            path = Path(raw_path)
+            if is_exec_plan_file(path):
+                exec_plans.add(repo_root / path)
+            if is_release_file(path):
+                release_files.add(repo_root / path)
+            if is_sprint_file(path):
+                sprint_files.add(repo_root / path)
+            if is_spec_suite_file(path):
+                path_parts = path.parts
+                if len(path_parts) >= 3 and path_parts[2] == "_template":
+                    spec_files.add(repo_root / path)
+                else:
+                    suite_dir = repo_root / "docs" / "specs" / path_parts[2]
+                    for name in ("spec.md", "plan.md", "TODO.md"):
+                        candidate = suite_dir / name
+                        if candidate.exists():
+                            spec_files.add(candidate)
+    else:
+        exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
+        release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
+        sprint_files.update(path for path in (repo_root / "docs" / "sprints").glob("*.md") if path.name != "README.md")
+        specs_root = repo_root / "docs" / "specs"
+        for suite_dir in specs_root.glob("FR-*"):
+            if not suite_dir.is_dir():
+                continue
+            for name in ("spec.md", "plan.md", "TODO.md"):
+                candidate = suite_dir / name
+                if candidate.exists():
+                    spec_files.add(candidate)
+        template_dir = specs_root / "_template"
+        for name in ("spec.md", "plan.md", "TODO.md"):
+            candidate = template_dir / name
+            if candidate.exists():
+                spec_files.add(candidate)
+
+    return (
+        sorted(exec_plans),
+        sorted(spec_files),
+        sorted(release_files),
+        sorted(sprint_files),
+    )
+
+
+def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = None) -> list[str]:
+    errors: list[str] = []
+    exec_plans, spec_files, release_files, sprint_files = collect_targets(repo_root, changed_paths)
+
+    for path in exec_plans:
+        errors.extend(validate_exec_plan(path))
+    for path in spec_files:
+        errors.extend(validate_spec_context_file(path))
+    for path in release_files:
+        errors.extend(validate_release_or_sprint(path, repo_root))
+    for path in sprint_files:
+        errors.extend(validate_release_or_sprint(path, repo_root))
+    return errors
+
+
+def validate_repository(repo_root: Path) -> list[str]:
+    return validate_context_rules(repo_root, changed_paths=None)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    repo_root = Path(args.repo_root).resolve()
+    base_ref = args.base_ref or args.base_sha
+    head_ref = args.head_sha or args.head_ref
+
+    changed_paths: list[str] | None = None
+    if base_ref:
+        changed_paths = git_changed_files(base_ref, head_ref, repo=repo_root)
+
+    errors = validate_context_rules(repo_root, changed_paths)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+
+    print("context-guard 通过。")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
