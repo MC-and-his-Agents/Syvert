@@ -82,6 +82,10 @@ def is_sprint_file(path: Path) -> bool:
     return _matches(path, r"(^|/)docs/sprints/[^/]+\.md$") and path.name != "README.md"
 
 
+def is_decision_file(path: Path) -> bool:
+    return _matches(path, r"(^|/)docs/decisions/[^/]+\.md$") and path.name != "README.md"
+
+
 def is_spec_suite_file(path: Path) -> bool:
     value = path.as_posix()
     if re.search(r"(^|/)docs/specs/_template/(spec|plan|TODO)\.md$", value):
@@ -131,6 +135,8 @@ def validate_context_fields(path: Path, fields: dict[str, str], required: tuple[
 
 
 def validate_exec_plan(path: Path) -> list[str]:
+    if not path.exists():
+        return [f"{path}: exec-plan 文件不存在（可能已删除）。"]
     text = path.read_text(encoding="utf-8")
     fields = extract_fields(text)
     template_mode = is_template(path)
@@ -146,6 +152,8 @@ def validate_exec_plan(path: Path) -> list[str]:
 
 
 def validate_spec_context_file(path: Path) -> list[str]:
+    if not path.exists():
+        return [f"{path}: formal spec 文件不存在（可能已删除）。"]
     text = path.read_text(encoding="utf-8")
     fields = extract_fields(text)
     template_mode = is_template(path)
@@ -160,6 +168,8 @@ def extract_doc_paths(text: str) -> list[str]:
 
 
 def validate_release_or_sprint(path: Path, repo_root: Path) -> list[str]:
+    if not path.exists():
+        return [f"{path}: release/sprint 索引文件不存在（可能已删除）。"]
     text = path.read_text(encoding="utf-8")
     errors: list[str] = []
 
@@ -191,24 +201,40 @@ def validate_release_or_sprint(path: Path, repo_root: Path) -> list[str]:
     return errors
 
 
-def collect_targets(repo_root: Path, changed_paths: list[str] | None) -> tuple[list[Path], list[Path], list[Path], list[Path]]:
+def validate_decision(path: Path) -> list[str]:
+    if not path.exists():
+        return [f"{path}: decision 文档不存在（可能已删除）。"]
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        return [f"{path}: decision 文档不能为空。"]
+    return []
+
+
+def collect_targets(
+    repo_root: Path,
+    changed_paths: list[str] | None,
+) -> tuple[list[Path], list[Path], list[Path], list[Path], list[Path]]:
     exec_plans: set[Path] = set()
     spec_files: set[Path] = set()
     release_files: set[Path] = set()
     sprint_files: set[Path] = set()
+    decision_files: set[Path] = set()
 
     if changed_paths is not None:
         for raw_path in changed_paths:
             path = Path(raw_path)
-            if is_exec_plan_file(path):
+            target = repo_root / path
+            if is_exec_plan_file(path) and target.exists():
                 exec_plans.add(repo_root / path)
-            if is_release_file(path):
+            if is_release_file(path) and target.exists():
                 release_files.add(repo_root / path)
-            if is_sprint_file(path):
+            if is_sprint_file(path) and target.exists():
                 sprint_files.add(repo_root / path)
+            if is_decision_file(path) and target.exists():
+                decision_files.add(repo_root / path)
             if is_spec_suite_file(path):
                 path_parts = path.parts
-                if len(path_parts) >= 3 and path_parts[2] == "_template":
+                if len(path_parts) >= 3 and path_parts[2] == "_template" and target.exists():
                     spec_files.add(repo_root / path)
                 else:
                     suite_dir = repo_root / "docs" / "specs" / path_parts[2]
@@ -220,6 +246,7 @@ def collect_targets(repo_root: Path, changed_paths: list[str] | None) -> tuple[l
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
         release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
         sprint_files.update(path for path in (repo_root / "docs" / "sprints").glob("*.md") if path.name != "README.md")
+        decision_files.update(path for path in (repo_root / "docs" / "decisions").glob("*.md") if path.name != "README.md")
         specs_root = repo_root / "docs" / "specs"
         for suite_dir in specs_root.glob("FR-*"):
             if not suite_dir.is_dir():
@@ -239,12 +266,35 @@ def collect_targets(repo_root: Path, changed_paths: list[str] | None) -> tuple[l
         sorted(spec_files),
         sorted(release_files),
         sorted(sprint_files),
+        sorted(decision_files),
     )
 
 
 def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = None) -> list[str]:
     errors: list[str] = []
-    exec_plans, spec_files, release_files, sprint_files = collect_targets(repo_root, changed_paths)
+    exec_plans, spec_files, release_files, sprint_files, decision_files = collect_targets(repo_root, changed_paths)
+    touched_exec_plan = bool(changed_paths) and any(is_exec_plan_file(Path(raw_path)) for raw_path in changed_paths)
+
+    if changed_paths is not None:
+        for raw_path in changed_paths:
+            path = Path(raw_path)
+            if not (
+                is_exec_plan_file(path)
+                or is_release_file(path)
+                or is_sprint_file(path)
+                or is_decision_file(path)
+                or is_spec_suite_file(path)
+            ):
+                continue
+            target = repo_root / path
+            if not target.exists():
+                errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
+
+    # Governance bootstrap contract requires decision + exec-plan to co-exist.
+    if touched_exec_plan or exec_plans:
+        all_decisions = [path for path in (repo_root / "docs" / "decisions").glob("*.md") if path.name != "README.md"]
+        if not all_decisions:
+            errors.append("治理/exec-plan 变更缺少 `docs/decisions/**` 工件，bootstrap contract 不完整。")
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path))
@@ -254,6 +304,8 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
         errors.extend(validate_release_or_sprint(path, repo_root))
     for path in sprint_files:
         errors.extend(validate_release_or_sprint(path, repo_root))
+    for path in decision_files:
+        errors.extend(validate_decision(path))
     return errors
 
 

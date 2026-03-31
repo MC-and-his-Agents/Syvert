@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.context_guard import validate_repository
+from scripts.context_guard import validate_context_rules, validate_repository
 
 
 def write_file(path: Path, content: str) -> None:
@@ -274,6 +274,27 @@ class ContextGuardTests(unittest.TestCase):
             sprint.write_text(text, encoding="utf-8")
             errors = validate_repository(repo)
         self.assertTrue(any("release" in error or "sprint" in error or "不存在" in error for error in errors))
+
+    def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.unlink()
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("decision" in error.lower() or "decisions" in error.lower() for error in errors))
+
+    def test_diff_mode_deleted_governance_doc_returns_error_instead_of_crash(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            try:
+                errors = validate_context_rules(repo, changed_paths=["docs/releases/v0.1.0.md"])
+            except FileNotFoundError as exc:
+                self.fail(f"validate_context_rules should not raise FileNotFoundError: {exc}")
+        self.assertTrue(errors)
 
 
 if __name__ == "__main__":
