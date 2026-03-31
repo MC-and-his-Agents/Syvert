@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 最新一轮对 head `01e3acfed1578a15bf54f6d99ef59b0a2c53bd37` 提出 3 个阻断：同一 Issue 的 active 工件唯一性、残缺 exec-plan 误报为合法事项上下文、以及受控入口在 foreign repo 场景的绑定误伤；当前已在 head `14be446020ffa40d9389914634f22bdfb401aed3` 上补齐对应修复与测试，停在新一轮 guardian 审查与 merge gate 核对。
+- guardian 自动审查曾在外部额度耗尽时中断；当前已在 head `e6fa325b40998169a169ae1232f48b4065584928` 上补齐 PR 状态面对“同一 Issue 只有一个 active exec-plan”的一致性约束，并完成对应测试与远端 checks 核对，停在恢复后的新一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `14be446020ffa40d9389914634f22bdfb401aed3`
+- `e6fa325b40998169a169ae1232f48b4065584928`
