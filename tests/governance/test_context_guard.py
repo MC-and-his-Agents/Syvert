@@ -353,6 +353,36 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("未被任何 GOV exec-plan" in error for error in errors))
 
+    def test_bootstrap_contract_touched_current_decision_with_only_legacy_exec_plan_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0999-legacy.md",
+                """# GOV-0999 legacy
+
+## 关联信息
+
+- item_key：`GOV-0999-legacy`
+- Issue：`#999`
+- item_type：`GOV`
+- release：`v0.0.0`
+- sprint：`2026-S01`
+- 关联 decision：`docs/decisions/ADR-9999-legacy.md`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `0123456789abcdef0123456789abcdef01234567`
+""",
+            )
+            write_file(repo / "docs" / "decisions" / "ADR-9999-legacy.md", "# ADR-9999 legacy\n")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertTrue(any("未被任何 GOV exec-plan" in error for error in errors))
+
     def test_bootstrap_contract_requires_related_decision_for_touched_exec_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

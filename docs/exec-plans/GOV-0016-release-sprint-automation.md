@@ -10,6 +10,7 @@
 - 关联 decision：`docs/decisions/ADR-0002-release-sprint-automation-gate.md`
 - 关联 PR：`#17`
 - active 收口事项：`GOV-0016-release-sprint-automation`
+- bootstrap contract：`当前 PR #17 的 active bootstrap contract`
 
 ## 目标
 
@@ -60,4 +61,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5bc3b01784698b953914af5048f4d5ae72aa7dc7`
+- `368227640a8865af8c97cdc4bc9ca2610f936bf8`

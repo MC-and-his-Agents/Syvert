@@ -6,6 +6,15 @@ Issue `#16` 对应的 PR3 目标是把已落地的治理协议与结构层约束
 
 在 PR `#17` 推进过程中，guardian 多次暴露“规则未接入主门禁”“bootstrap contract 关联可被历史工件绕过”等问题，说明需要为当前事项建立独立且可追踪的治理决策工件。
 
+## 事项绑定
+
+- Issue：`#16`
+- item_key：`GOV-0016-release-sprint-automation`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- PR：`#17`
+- active bootstrap contract：`docs/exec-plans/GOV-0016-release-sprint-automation.md`
+
 ## 决策
 
 对事项 `GOV-0016-release-sprint-automation` 采用以下收口策略：
