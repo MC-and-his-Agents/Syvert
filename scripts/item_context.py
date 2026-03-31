@@ -15,6 +15,8 @@ BODY_ITEM_CONTEXT_RE = {
     "issue": re.compile(r"Issue:\s*#?(\d+)", re.IGNORECASE),
 }
 REQUIRED_EXEC_PLAN_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
+EXEC_PLAN_METADATA_KEYS = {"item_key", "Issue", "item_type", "release", "sprint", "active 收口事项", "状态"}
+EXEC_PLAN_METADATA_HEADERS = {"## 关联信息", "## 事项上下文"}
 
 
 def normalize_value(value: str) -> str:
@@ -54,15 +56,27 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
         return {}
 
     payload: dict[str, str] = {"exec_plan": path.as_posix()}
+    seen_keys: set[str] = set()
+    in_metadata_section = False
 
     for raw_line in path.read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("## "):
+            in_metadata_section = stripped in EXEC_PLAN_METADATA_HEADERS
+            continue
+        if not in_metadata_section:
+            continue
         match = METADATA_RE.match(raw_line.strip())
         if not match:
             continue
         key = match.group(1).strip()
         value = normalize_value(match.group(2))
-        if key in {"item_key", "Issue", "item_type", "release", "sprint", "active 收口事项", "状态"}:
-            payload[key] = value
+        if key not in EXEC_PLAN_METADATA_KEYS:
+            continue
+        if key in seen_keys:
+            return {"exec_plan": path.as_posix(), "conflict": "duplicate_metadata_keys"}
+        seen_keys.add(key)
+        payload[key] = value
 
     if "Issue" in payload:
         payload["Issue"] = normalize_issue(payload["Issue"])
@@ -80,6 +94,8 @@ def has_complete_item_context(payload: dict[str, str]) -> bool:
 def is_eligible_active_exec_plan(payload: dict[str, str]) -> bool:
     if not payload:
         return False
+    if payload.get("conflict"):
+        return False
     if is_inactive_exec_plan(payload):
         return False
     if not has_complete_item_context(payload):
@@ -94,6 +110,8 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
     matches: list[dict[str, str]] = []
     path = exec_plan_path_for_item_key(repo_root, item_key)
     payload = parse_exec_plan_metadata(path)
+    if payload.get("conflict") == "duplicate_metadata_keys":
+        return payload
     if is_eligible_active_exec_plan(payload):
         matches.append(payload)
 
@@ -106,6 +124,8 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
         if path.exists() and candidate.resolve() == path.resolve():
             continue
         metadata = parse_exec_plan_metadata(candidate)
+        if metadata.get("conflict") == "duplicate_metadata_keys":
+            return metadata
         if metadata.get("item_key") == item_key and is_eligible_active_exec_plan(metadata):
             matches.append(metadata)
 

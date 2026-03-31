@@ -136,9 +136,14 @@ def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FI
     if not path.exists():
         return {}
     state = load_json(path)
+    matches: list[dict[str, object]] = []
     for item in (state.get("worktrees") or {}).values():
         if item.get("branch") == branch:
-            return item
+            matches.append(item)
+    if len(matches) > 1:
+        return {"conflict": "multiple_branch_bindings", "branch": branch}
+    if len(matches) == 1:
+        return matches[0]
     return {}
 
 
@@ -150,8 +155,10 @@ def validate_current_worktree_binding(issue: int | None, *, repo_root: Path) -> 
     try:
         branch = git_current_branch(repo=repo_root)
     except CommandError:
-        return []
+        return ["无法识别当前分支，无法确认事项上下文与执行现场一致。"]
     binding = load_worktree_binding_for_branch(branch)
+    if binding.get("conflict") == "multiple_branch_bindings":
+        return ["当前分支在 `worktrees.json` 中命中多个 worktree 绑定，无法确认唯一执行现场。"]
     if not binding:
         return ["当前分支未找到匹配的 worktree 状态绑定，无法确认事项上下文与执行现场一致。"]
     if int(binding.get("issue", -1)) != issue:
@@ -199,6 +206,9 @@ def validate_item_context(
         errors.append("`item_key` 必须匹配 `<item_type>-<4-digit>-<slug>`，且前缀与 `item_type` 一致。")
 
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    if exec_plan.get("conflict") == "duplicate_metadata_keys":
+        errors.append("active `exec-plan` 在元数据区存在重复键，无法确认唯一事项上下文。")
+        return errors
     if exec_plan.get("conflict") == "multiple_active_exec_plans":
         errors.append("当前 `item_key` 对应多个 active `exec-plan`，不满足“有且仅有一个 active exec-plan”的要求。")
         return errors

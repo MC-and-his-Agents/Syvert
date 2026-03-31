@@ -87,11 +87,16 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
     item_key = body_context.get("item_key", "")
     if not worktree_item or worktree_item.get("issue") is None:
         return {}
+    recorded_path = str(worktree_item.get("path", "")).strip()
+    if recorded_path and Path(recorded_path).resolve() != REPO_ROOT.resolve():
+        return {}
     required_fields = ("issue", "item_key", "item_type", "release", "sprint")
     if any(not body_context.get(field, "") for field in required_fields):
         return {}
 
     payload = load_item_context_from_exec_plan(REPO_ROOT, item_key)
+    if payload.get("conflict") == "duplicate_metadata_keys":
+        return {}
     if payload.get("conflict") == "multiple_active_exec_plans":
         return {}
     if not payload:
