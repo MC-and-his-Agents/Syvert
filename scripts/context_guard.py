@@ -86,6 +86,17 @@ def is_decision_file(path: Path) -> bool:
     return _matches(path, r"(^|/)docs/decisions/[^/]+\.md$") and path.name != "README.md"
 
 
+def decision_item_type_from_name(path: Path) -> str | None:
+    stem = path.stem
+    typed = re.match(r"^ADR-(FR|HOTFIX|GOV|CHORE)-\d{4}(?:-|$)", stem)
+    if typed:
+        return typed.group(1)
+    legacy = re.match(r"^ADR-\d{4}(?:-|$)", stem)
+    if legacy:
+        return None
+    return None
+
+
 def is_spec_suite_file(path: Path) -> bool:
     value = path.as_posix()
     if re.search(r"(^|/)docs/specs/_template/(spec|plan|TODO)\.md$", value):
@@ -339,10 +350,11 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
 
         if touched_decision:
-            gov_exec_plan_to_decision: set[str] = set()
+            exec_plan_to_decision: set[str] = set()
             for exec_plan in all_exec_plans:
                 fields = extract_fields(exec_plan.read_text(encoding="utf-8"))
-                if fields.get("item_type") != "GOV":
+                item_type = fields.get("item_type", "")
+                if item_type and item_type not in ALLOWED_ITEM_TYPES:
                     continue
                 related_decision = fields.get("关联 decision", "")
                 if not related_decision:
@@ -352,16 +364,19 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                     normalized = decision_path.relative_to(repo_root.resolve()).as_posix()
                 except ValueError:
                     continue
-                gov_exec_plan_to_decision.add(normalized)
+                exec_plan_to_decision.add(normalized)
 
             for raw_path in changed_paths:
                 path = Path(raw_path)
                 target = repo_root / path
                 if not (is_decision_file(path) and target.exists()):
                     continue
+                decision_item_type = decision_item_type_from_name(path)
+                if decision_item_type in {"FR", "HOTFIX", "CHORE"}:
+                    continue
                 normalized_target = target.resolve().relative_to(repo_root.resolve()).as_posix()
-                if normalized_target not in gov_exec_plan_to_decision:
-                    errors.append(f"{target}: 当前 touched decision 未被任何 GOV exec-plan 通过 `关联 decision` 关联。")
+                if normalized_target not in exec_plan_to_decision:
+                    errors.append(f"{target}: 当前 touched decision 未被任何 exec-plan 通过 `关联 decision` 关联。")
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path, repo_root=repo_root))
