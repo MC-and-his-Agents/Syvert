@@ -124,7 +124,7 @@ def load_item_context_from_exec_plan(repo_root: Path, item_key: str) -> dict[str
         if path.exists() and candidate.resolve() == path.resolve():
             continue
         metadata = parse_exec_plan_metadata(candidate)
-        if metadata.get("conflict") == "duplicate_metadata_keys":
+        if metadata.get("conflict") == "duplicate_metadata_keys" and metadata.get("item_key") == item_key:
             return metadata
         if metadata.get("item_key") == item_key and is_eligible_active_exec_plan(metadata):
             matches.append(metadata)

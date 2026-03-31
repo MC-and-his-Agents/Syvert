@@ -118,6 +118,43 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("重复键" in error for error in errors))
 
+    def test_unrelated_duplicate_exec_plan_metadata_does_not_block_current_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo)
+            exec_plans = repo / "docs" / "exec-plans"
+            (exec_plans / "broken-other.md").write_text(
+                "\n".join(
+                    [
+                        "# broken",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0099-other`",
+                        "- item_key：`GOV-0099-other-shadow`",
+                        "- Issue：`#99`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo / "docs" / "decisions").mkdir(parents=True)
+            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                19,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_duplicate_active_exec_plans_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -246,6 +283,18 @@ class OpenPrPreflightTests(unittest.TestCase):
                     ):
                         errors = validate_current_worktree_binding(19, repo_root=repo)
         self.assertTrue(any("多个 worktree 绑定" in error for error in errors))
+
+    def test_invalid_binding_issue_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                with patch("scripts.open_pr.git_current_branch", return_value="issue-19-demo"):
+                    with patch(
+                        "scripts.open_pr.load_worktree_binding_for_branch",
+                        return_value={"issue": "not-a-number", "branch": "issue-19-demo"},
+                    ):
+                        errors = validate_current_worktree_binding(19, repo_root=repo)
+        self.assertTrue(any("`issue` 值非法" in error for error in errors))
 
     def test_missing_release_or_sprint_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

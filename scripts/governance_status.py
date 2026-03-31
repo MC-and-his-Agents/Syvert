@@ -145,12 +145,9 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
         payload["checks"] = fetch_checks_summary(pr_number)
         branch_name = meta.get("headRefName", "")
-        matched_worktree: dict | None = None
-        for item in worktree_state.get("worktrees", {}).values():
-            if item.get("branch") == branch_name:
-                matched_worktree = item
-                payload["worktrees"] = [item]
-                break
+        matching_worktrees = [item for item in worktree_state.get("worktrees", {}).values() if item.get("branch") == branch_name]
+        matched_worktree: dict | None = matching_worktrees[0] if len(matching_worktrees) == 1 else None
+        payload["worktrees"] = matching_worktrees[:1] if len(matching_worktrees) == 1 else matching_worktrees
         payload["item_context"] = build_item_context_for_pr(meta, matched_worktree)
         return payload
 
