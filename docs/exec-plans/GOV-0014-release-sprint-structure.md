@@ -23,12 +23,12 @@
 
 ## 当前停点
 
-- release / sprint 的模板与当前实例已入库，等待 guardian 对 PR `#15` 的最新审查结论。
+- 已基于最新治理口径完成一次新的 checkpoint，收敛了结构层索引边界、字段命名与 checkpoint 语义对齐。
 
 ## 下一步动作
 
-- 基于最新 PR head 重跑 guardian 审查
-- guardian 通过后使用 `merge_pr` 执行受控合并
+- 基于当前 checkpoint head 重跑 guardian 审查
+- 若 guardian 通过，则执行 `merge_pr` 进入受控合并
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -50,6 +50,7 @@
 - `docs-guard` 通过
 - `spec-guard --all` 通过
 - PR `#15` 的 GitHub checks 已全绿
+- active exec-plan 已刷新为当前 checkpoint，对齐最新受审 head
 
 ## 未决风险
 
@@ -58,4 +59,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5416f30d8e59f9991f6c40730f829329f0cf1975`
+- `7ea137a4edc6320b57c3643109a6085526790a5e`
