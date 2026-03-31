@@ -101,7 +101,11 @@ def build_item_context_for_pr(meta: dict, worktree_item: dict | None) -> dict:
         return {}
     if not payload:
         return {}
-    issue_active_exec_plans = active_exec_plans_for_issue(REPO_ROOT, int(body_context["issue"]))
+    try:
+        issue_number = int(body_context["issue"])
+    except (TypeError, ValueError):
+        return {}
+    issue_active_exec_plans = active_exec_plans_for_issue(REPO_ROOT, issue_number)
     if len(issue_active_exec_plans) != 1:
         return {}
     if issue_active_exec_plans[0].get("item_key", "") != item_key:

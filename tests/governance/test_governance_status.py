@@ -360,6 +360,34 @@ class GovernanceStatusTests(unittest.TestCase):
         self.assertEqual(payload["item_context"], {})
         self.assertEqual(len(payload["worktrees"]), 2)
 
+    def test_pr_status_returns_empty_when_issue_in_body_is_not_numeric(self) -> None:
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k", "issue": 19}}}):
+                    with patch(
+                        "scripts.governance_status.fetch_pr_meta",
+                        return_value={
+                            "headRefOid": "sha-1",
+                            "headRefName": "feature/x",
+                            "body": "Issue: not-a-number\nitem_key: `GOV-0015-item-context-gate`\nitem_type: `GOV`\nrelease: `v0.1.0`\nsprint: `2026-S14`\n",
+                        },
+                    ):
+                        with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                            with patch(
+                                "scripts.governance_status.load_item_context_from_exec_plan",
+                                return_value={
+                                    "Issue": "19",
+                                    "item_key": "GOV-0015-item-context-gate",
+                                    "item_type": "GOV",
+                                    "release": "v0.1.0",
+                                    "sprint": "2026-S14",
+                                    "exec_plan": "docs/exec-plans/GOV-0015-item-context-gate.md",
+                                },
+                            ):
+                                payload = governance_status.build_status_payload(pr_number=20)
+
+        self.assertEqual(payload["item_context"], {})
+
     def test_pr_status_rejects_mismatched_active_item(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
