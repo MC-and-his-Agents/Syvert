@@ -23,7 +23,7 @@
 
 ## 当前停点
 
-- guardian 对 head `0e723e4fd83c88ffb3d632c547ca6fb7342b53ff` 新提出 4 个阻断：exec-plan 元数据重复键可绕过门禁、branch 读取异常 fail-open、branch 绑定未校验唯一性、以及 PR 状态面缺少 worktree `path` 一致性校验；当前已在 head `489fa6107f3404433c0b2c6243c0d67bc8994f7d` 上补齐对应 fail-closed 修复与回归测试，停在新一轮 guardian 审查与 merge gate 核对。
+- guardian 对 head `3b44e6137f49159f7773e8a9a502ce988cb0edfd` 又指出 3 个稳健性阻断：PR 状态面未对同分支多 worktree 绑定 fail-closed、`binding.issue` 异常值可能导致校验崩溃、以及无关事项的重复键坏文件会污染当前事项门禁；当前已在 head `00dcf7fb36354cf83cb3e4482d3ab3ff98acb541` 上补齐对应修复与回归测试，停在新一轮 guardian 审查与 merge gate 核对。
 
 ## 下一步动作
 
@@ -64,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `489fa6107f3404433c0b2c6243c0d67bc8994f7d`
+- `00dcf7fb36354cf83cb3e4482d3ab3ff98acb541`
