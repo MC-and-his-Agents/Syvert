@@ -38,6 +38,7 @@ REVIEW_SECTION_ALIASES = {
     "变更文件": "changed_files",
     "验证": "validation",
     "回滚": "rollback",
+    "检查清单": "checklist",
 }
 REVIEW_GUIDE_HEADINGS = (
     "## 审查输入",
@@ -477,6 +478,9 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "结构化事项上下文：",
         *render_bullet_dict(context["item_context"]),
         "",
+        "PR 关联事项补充：",
+        sections.get("item_context", "无结构化关联事项补充。"),
+        "",
         "PR 摘要：",
         sections.get("summary", summary_fallback),
         "",
@@ -488,6 +492,9 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "",
         "回滚摘要：",
         sections.get("rollback", "无结构化回滚摘要。"),
+        "",
+        "检查清单：",
+        sections.get("checklist", "无结构化检查清单。"),
         "",
         "变更文件：",
         format_changed_files(context["changed_files"]),
@@ -508,7 +515,7 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
 
-    if not sections and raw_body:
+    if raw_body:
         lines.extend(["", "PR 正文 fallback：", raw_body])
 
     return "\n".join(lines).rstrip() + "\n"

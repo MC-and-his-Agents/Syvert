@@ -150,10 +150,12 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 },
                 "item_context": {"issue": "24", "item_key": "GOV-0024-guardian-review-context"},
                 "pr_sections": {
+                    "item_context": "- Issue: #24\n- Closing: Fixes #24",
                     "summary": "- 变更目的：精简 prompt",
                     "risk": "- `medium`",
                     "validation": "- python3 -m unittest",
                     "rollback": "- revert PR",
+                    "checklist": "- [x] 已填写 Closing",
                 },
                 "checks": ["- governance: bucket=pass, state=SUCCESS"],
                 "worktree_binding": [{"key": "issue-24", "path": "/tmp/issue-24"}],
@@ -170,6 +172,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("Issue 摘要：", prompt)
         self.assertIn("## Goal", prompt)
         self.assertIn("GOV-0024-guardian-review-context", prompt)
+        self.assertIn("Fixes #24", prompt)
+        self.assertIn("检查清单：", prompt)
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
