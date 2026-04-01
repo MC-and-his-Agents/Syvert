@@ -12,6 +12,8 @@ from scripts.pr_guardian import (
     build_review_context,
     find_latest_guardian_result,
     load_guardian_state,
+    load_reviewer_rubric_excerpt,
+    load_worktree_binding,
     merge_if_safe,
     review_once,
     run_codex_review,
@@ -157,12 +159,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "context_notes": ["结构化事项上下文已加载。"],
             },
         ):
-            prompt = build_prompt(meta, Path("/tmp/worktree"))
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
 
         self.assertIn("结构化事项上下文：", prompt)
         self.assertIn("GOV-0024-guardian-review-context", prompt)
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
+        self.assertIn("## Review Rubric", prompt)
         self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)
         self.assertNotIn("默认 Squash Merge", prompt)
 
@@ -251,6 +255,51 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
+
+    def test_load_worktree_binding_tolerates_invalid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "worktrees.json"
+            state_path.write_text("{invalid-json", encoding="utf-8")
+
+            matches, note = load_worktree_binding("feature/x", path=state_path)
+
+        self.assertEqual(matches, [])
+        self.assertIn("损坏", note)
+
+    def test_load_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "code_review.md").write_text(
+                "\n".join(
+                    [
+                        "# 审查标准",
+                        "",
+                        "## 工件完整性检查",
+                        "",
+                        "- 输入必须完整",
+                        "",
+                        "## Review Rubric",
+                        "",
+                        "- 关注 contract 与回归风险",
+                        "",
+                        "## 合并门禁",
+                        "",
+                        "- 不应出现在 reviewer excerpt",
+                        "",
+                        "## 职责边界说明",
+                        "",
+                        "- reviewer 与 guardian 分层",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            excerpt = load_reviewer_rubric_excerpt(repo_root)
+
+        self.assertIn("## 工件完整性检查", excerpt)
+        self.assertIn("## Review Rubric", excerpt)
+        self.assertIn("## 职责边界说明", excerpt)
+        self.assertNotIn("## 合并门禁", excerpt)
 
     @patch("scripts.pr_guardian.cleanup")
     @patch("scripts.pr_guardian.run_codex_review")

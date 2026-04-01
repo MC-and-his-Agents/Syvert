@@ -22,13 +22,13 @@ from scripts.state_paths import guardian_legacy_state_path, guardian_state_path,
 
 
 SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
+CODE_REVIEW_PATH = "code_review.md"
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
 CODEX_REVIEW_TIMEOUT_SECONDS = int(os.environ.get("SYVERT_GUARDIAN_TIMEOUT_SECONDS", "300"))
 REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "sprint")
-REVIEW_RULES = (
+REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
-    "优先按 reviewer rubric 判断 contract 一致性、行为正确性、回归风险、测试有效性、错误处理、架构边界、可维护性、可观测性、安全/性能/成本、发布与回滚准备。",
     "若缺少必要工件或验证证据，应明确指出阻断项；merge gate、head 绑定与 squash merge 安全性由 guardian gate 入口单独消费。",
 )
 REVIEW_SECTION_ALIASES = {
@@ -39,6 +39,13 @@ REVIEW_SECTION_ALIASES = {
     "验证": "validation",
     "回滚": "rollback",
 }
+REVIEW_GUIDE_HEADINGS = (
+    "## 审查输入",
+    "## 工件完整性检查",
+    "## Review Rubric",
+    "## 事项分级视角",
+    "## 职责边界说明",
+)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -177,6 +184,29 @@ def parse_markdown_sections(body: str) -> dict[str, str]:
     return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
 
 
+def load_reviewer_rubric_excerpt(repo_root: Path) -> str:
+    path = repo_root / CODE_REVIEW_PATH
+    if not path.exists():
+        return "未找到 `code_review.md`，请按当前变更与最小必要上下文执行 reviewer rubric 审查。"
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    selected: list[str] = []
+    active = False
+    allowed = set(REVIEW_GUIDE_HEADINGS)
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            active = stripped in allowed
+        if active:
+            selected.append(line)
+
+    excerpt = "\n".join(selected).strip()
+    if excerpt:
+        return excerpt
+    return "未能从 `code_review.md` 提取 reviewer rubric 节选，请围绕当前 diff、工件完整性与职责边界执行审查。"
+
+
 def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]:
     changed = run(
         ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"],
@@ -216,7 +246,12 @@ def fetch_checks_summary(pr_number: int) -> list[str]:
 def load_worktree_binding(branch: str, *, path: Path = worktrees_state_path()) -> tuple[list[dict], str | None]:
     if not path.exists():
         return [], "worktree 状态文件缺失。"
-    state = load_json(path)
+    try:
+        state = load_json(path)
+    except Exception:
+        return [], "worktree 状态文件损坏，已跳过绑定信息。"
+    if not isinstance(state, dict):
+        return [], "worktree 状态文件结构异常，已跳过绑定信息。"
     matches = [item for item in (state.get("worktrees") or {}).values() if item.get("branch") == branch]
     if not matches:
         return [], "未找到当前分支的 worktree 绑定。"
@@ -356,6 +391,7 @@ def render_worktree_binding(matches: list[dict]) -> list[str]:
 def build_prompt(meta: dict, worktree_dir: Path) -> str:
     base_ref = meta["baseRefName"]
     context = build_review_context(meta, worktree_dir)
+    rubric_excerpt = load_reviewer_rubric_excerpt(worktree_dir)
     sections = context["pr_sections"]
     raw_body = str(meta.get("body") or "").strip()
     summary_fallback = raw_body if raw_body else "无 PR 正文。"
@@ -366,8 +402,11 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "优先基于 diff 与必要文件做静态审查，仅在存在明确阻断线索时再运行最小必要命令。",
         "不要运行完整测试套件或与当前变更无关的重型验证。",
         "",
-        "最小关键规则：",
-        *[f"- {rule}" for rule in REVIEW_RULES],
+        "执行约束：",
+        *[f"- {rule}" for rule in REVIEW_EXECUTION_RULES],
+        "",
+        "Reviewer Rubric 节选（来自 `code_review.md`）：",
+        rubric_excerpt,
         "",
         "PR 基本信息：",
         *context["pr_identity"],
