@@ -70,6 +70,7 @@
 - 已补齐 PR 描述中的 `Issue 摘要` 冻结方案，避免 guardian reviewer 默认依赖远端 issue 漂移
 - 已按 guardian 阻断反馈收口：trusted rubric 来源、Issue 摘要注入、模板关键信息保留、raw body fallback 收紧、item context 约束放宽
 - 已补齐 trusted rubric source 正向回归测试，并将 Issue contract 注入条件固定为“缺少 `Issue 摘要` 时必须补充”
+- 已补齐 guardian state 写入隔离、多 active exec-plan、PR preamble 保留等回归测试
 
 ## 未决风险
 
@@ -83,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `965a04840b2371d988bccfb1d4dfd71368899677`
+- `62c2fa96514c44832f6c14f897d2ffb89a0979ab`
