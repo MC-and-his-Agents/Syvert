@@ -25,13 +25,13 @@
 
 ## 当前停点
 
-- 已确认 `main` 包含 #22 与 #23；Issue `#24` 已创建独立 worktree，当前进入 guardian review context 冗余梳理与最小实现阶段。
+- `scripts/pr_guardian.py` 已完成结构化 review context 重构并通过本地治理验证；当前停在回写 checkpoint、推送分支与创建仅针对 Issue `#24` 的 governance PR 前。
 
 ## 下一步动作
 
-- 在 `scripts/pr_guardian.py` 中抽出结构化 review context 构建逻辑。
-- 用最小关键规则替代整份 `code_review.md` 注入，并保留 reviewer 必需的 rubric 语义。
-- 补齐 prompt/context builder 与 merge gate 回归测试，验证后通过受控入口推进 PR、guardian 与 merge。
+- 推送 issue-24 分支，并通过受控入口创建只针对 `#24` 的 governance PR。
+- 在 PR 描述中补齐本次仅做 guardian review context 瘦身、不触及 #25 模板/自动化入口的边界说明。
+- 持续推进 checks、guardian、merge gate、squash merge 与分支/worktree 清理。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -58,6 +58,13 @@
 - 已阅读：`scripts/pr_guardian.py`
 - 已阅读：`scripts/governance_status.py`
 - 已阅读：`tests/governance/test_pr_guardian.py`
+- 已完成最小改动文件：`scripts/pr_guardian.py`
+- 已完成最小改动文件：`tests/governance/test_pr_guardian.py`
+- 已完成最小改动文件：`docs/exec-plans/GOV-0024-guardian-review-context.md`
+- `python3 -m unittest tests.governance.test_pr_guardian`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/open_pr.py --class governance --issue 24 --item-key GOV-0024-guardian-review-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "refactor(governance): 精简 guardian review 上下文注入" --dry-run`
 
 ## 未决风险
 
@@ -71,4 +78,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `772e2d34e1f2f9ee7321e0b50fcfbdeee0145df6`
+- `d21b5dd5e4a6164192db71c098bef5073a8495b8`
