@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 
 from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, format_changed_files, load_json, require_cli, run
-from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.item_context import load_item_context_from_exec_plan, parse_item_context_from_body
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
@@ -347,14 +347,6 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
         return body_context, notes, related_paths
     if not exec_plan:
         notes.append("当前 item_key 未找到 active exec-plan。")
-        return body_context, notes, related_paths
-
-    issue_exec_plans = active_exec_plans_for_issue(repo_root, issue_number)
-    if len(issue_exec_plans) != 1:
-        notes.append(f"当前 Issue 命中的 active exec-plan 数量异常：{len(issue_exec_plans)}。")
-        return body_context, notes, related_paths
-    if issue_exec_plans[0].get("item_key", "") != item_key:
-        notes.append("当前 Issue 的 active exec-plan 与 PR 正文中的 item_key 不一致。")
         return body_context, notes, related_paths
 
     comparisons = (

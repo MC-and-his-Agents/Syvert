@@ -277,11 +277,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "exec_plan": "docs/exec-plans/GOV-0024-guardian-review-context.md",
                     },
                 ):
-                    with patch(
-                        "scripts.pr_guardian.active_exec_plans_for_issue",
-                        return_value=[{"item_key": "GOV-0024-guardian-review-context"}],
-                    ):
-                        payload, notes, related_paths = build_item_context_summary(meta, repo_root)
+                    payload, notes, related_paths = build_item_context_summary(meta, repo_root)
 
         self.assertEqual(payload["exec_plan"], "docs/exec-plans/GOV-0024-guardian-review-context.md")
         self.assertEqual(notes, [])
