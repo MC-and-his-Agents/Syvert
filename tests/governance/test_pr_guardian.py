@@ -7,9 +7,12 @@ from pathlib import Path
 from unittest.mock import ANY, patch
 
 from scripts.pr_guardian import (
+    build_item_context_summary,
+    build_prompt,
     find_latest_guardian_result,
     load_guardian_state,
     merge_if_safe,
+    review_once,
     run_codex_review,
     save_guardian_result,
 )
@@ -122,6 +125,147 @@ class CodexReviewExecutionTests(unittest.TestCase):
             payload = find_latest_guardian_result(1, "sha-1", path=state_path)
 
             self.assertIsNone(payload)
+
+    def test_build_prompt_prefers_structured_context_and_omits_merge_gate_doc_text(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "## 摘要\n\n- 变更目的：精简 prompt\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #24", "- 标题: 治理: 精简 guardian review context"],
+                "item_context": {"issue": "24", "item_key": "GOV-0024-guardian-review-context"},
+                "pr_sections": {
+                    "summary": "- 变更目的：精简 prompt",
+                    "risk": "- `medium`",
+                    "validation": "- python3 -m unittest",
+                    "rollback": "- revert PR",
+                },
+                "checks": ["- governance: bucket=pass, state=SUCCESS"],
+                "worktree_binding": [{"key": "issue-24", "path": "/tmp/issue-24"}],
+                "changed_files": ["scripts/pr_guardian.py", "tests/governance/test_pr_guardian.py"],
+                "diff_stat": "2 files changed, 42 insertions(+), 8 deletions(-)",
+                "related_paths": ["docs/exec-plans/GOV-0024-guardian-review-context.md"],
+                "context_notes": ["结构化事项上下文已加载。"],
+            },
+        ):
+            prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("结构化事项上下文：", prompt)
+        self.assertIn("GOV-0024-guardian-review-context", prompt)
+        self.assertIn("Diff Stat：", prompt)
+        self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
+        self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)
+        self.assertNotIn("默认 Squash Merge", prompt)
+
+    def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## 关联事项",
+                    "",
+                    "- Issue: #24",
+                    "- item_key: `GOV-0024-guardian-review-context`",
+                    "- item_type: `GOV`",
+                    "- release: `v0.1.0`",
+                    "- sprint: `2026-S14`",
+                ]
+            )
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs" / "exec-plans" / "GOV-0024-guardian-review-context.md"
+            exec_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            exec_plan_path.write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024 执行计划",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：无（治理脚本事项）",
+                        "- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`",
+                        "- active 收口事项：`GOV-0024-guardian-review-context`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("scripts.pr_guardian.REPO_ROOT", repo_root):
+                with patch(
+                    "scripts.pr_guardian.load_item_context_from_exec_plan",
+                    return_value={
+                        "Issue": "24",
+                        "item_key": "GOV-0024-guardian-review-context",
+                        "item_type": "GOV",
+                        "release": "v0.1.0",
+                        "sprint": "2026-S14",
+                        "exec_plan": "docs/exec-plans/GOV-0024-guardian-review-context.md",
+                    },
+                ):
+                    with patch(
+                        "scripts.pr_guardian.active_exec_plans_for_issue",
+                        return_value=[{"item_key": "GOV-0024-guardian-review-context"}],
+                    ):
+                        payload, notes, related_paths = build_item_context_summary(meta)
+
+        self.assertEqual(payload["exec_plan"], "docs/exec-plans/GOV-0024-guardian-review-context.md")
+        self.assertEqual(notes, [])
+        self.assertIn("docs/decisions/ADR-0001-governance-bootstrap-contract.md", related_paths)
+
+    @patch("scripts.pr_guardian.cleanup")
+    @patch("scripts.pr_guardian.run_codex_review")
+    @patch("scripts.pr_guardian.build_prompt", return_value="lean prompt")
+    @patch("scripts.pr_guardian.prepare_worktree")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    def test_review_once_builds_prompt_from_worktree_context(
+        self,
+        require_auth_mock,
+        pr_meta_mock,
+        prepare_worktree_mock,
+        build_prompt_mock,
+        run_codex_review_mock,
+        cleanup_mock,
+    ) -> None:
+        temp_dir = Path("/tmp/guardian-temp")
+        worktree_dir = Path("/tmp/guardian-temp/worktree")
+        pr_meta_mock.return_value = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "",
+        }
+        prepare_worktree_mock.return_value = (temp_dir, worktree_dir)
+        run_codex_review_mock.return_value = {
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "ok",
+            "findings": [],
+            "required_actions": [],
+        }
+
+        review_once(24, post=False, json_output=None)
+
+        build_prompt_mock.assert_called_once_with(pr_meta_mock.return_value, worktree_dir)
+        run_codex_review_mock.assert_called_once_with(worktree_dir, "lean prompt", temp_dir / "review.json")
+        cleanup_mock.assert_called_once_with(temp_dir)
 
 
 class MergeIfSafeTests(unittest.TestCase):
