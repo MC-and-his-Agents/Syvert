@@ -280,7 +280,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "exec_plan": "docs/exec-plans/GOV-0024-guardian-review-context.md",
                     },
                 ):
-                    payload, notes, related_paths = build_item_context_summary(meta, repo_root)
+                    with patch(
+                        "scripts.pr_guardian.active_exec_plans_for_issue",
+                        return_value=[{"item_key": "GOV-0024-guardian-review-context"}],
+                    ):
+                        payload, notes, related_paths = build_item_context_summary(meta, repo_root)
 
         self.assertEqual(payload["exec_plan"], "docs/exec-plans/GOV-0024-guardian-review-context.md")
         self.assertEqual(notes, [])
@@ -429,14 +433,78 @@ class CodexReviewExecutionTests(unittest.TestCase):
             )
 
             with patch("scripts.pr_guardian.load_item_context_from_exec_plan", return_value={"Issue": "24", "item_key": "GOV-0024-guardian-review-context", "item_type": "GOV", "release": "v0.1.1", "sprint": "2026-S14", "exec_plan": str(exec_plan_path)}):
-                payload, notes, related_paths = build_item_context_summary(meta, repo_root)
+                with patch(
+                    "scripts.pr_guardian.active_exec_plans_for_issue",
+                    return_value=[{"item_key": "GOV-0024-guardian-review-context"}],
+                ):
+                    payload, notes, related_paths = build_item_context_summary(meta, repo_root)
 
         self.assertEqual(payload["item_key"], "GOV-0024-guardian-review-context")
         self.assertIn("release", notes[0])
         self.assertIn(str(exec_plan_path), related_paths)
 
+    def test_build_item_context_summary_rejects_multiple_active_exec_plans_for_issue(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## 关联事项",
+                    "",
+                    "- Issue: #24",
+                    "- item_key: `GOV-0024-guardian-review-context`",
+                    "- item_type: `GOV`",
+                    "- release: `v0.1.0`",
+                    "- sprint: `2026-S14`",
+                ]
+            )
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs" / "exec-plans" / "GOV-0024-guardian-review-context.md"
+            exec_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            exec_plan_path.write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024 执行计划",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.pr_guardian.load_item_context_from_exec_plan",
+                return_value={
+                    "Issue": "24",
+                    "item_key": "GOV-0024-guardian-review-context",
+                    "item_type": "GOV",
+                    "release": "v0.1.0",
+                    "sprint": "2026-S14",
+                    "exec_plan": str(exec_plan_path),
+                },
+            ):
+                with patch(
+                    "scripts.pr_guardian.active_exec_plans_for_issue",
+                    return_value=[
+                        {"item_key": "GOV-0024-guardian-review-context"},
+                        {"item_key": "GOV-0099-other"},
+                    ],
+                ):
+                    payload, notes, related_paths = build_item_context_summary(meta, repo_root)
+
+        self.assertEqual(payload["item_key"], "GOV-0024-guardian-review-context")
+        self.assertIn("数量异常", notes[0])
+        self.assertIn(str(exec_plan_path), related_paths)
+
     @patch("scripts.pr_guardian.cleanup")
     @patch("scripts.pr_guardian.run_codex_review")
+    @patch("scripts.pr_guardian.save_guardian_result")
     @patch("scripts.pr_guardian.build_prompt", return_value="lean prompt")
     @patch("scripts.pr_guardian.prepare_worktree")
     @patch("scripts.pr_guardian.pr_meta")
@@ -447,6 +515,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         pr_meta_mock,
         prepare_worktree_mock,
         build_prompt_mock,
+        save_guardian_result_mock,
         run_codex_review_mock,
         cleanup_mock,
     ) -> None:
@@ -474,7 +543,44 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         build_prompt_mock.assert_called_once_with(pr_meta_mock.return_value, worktree_dir)
         run_codex_review_mock.assert_called_once_with(worktree_dir, "lean prompt", temp_dir / "review.json")
+        save_guardian_result_mock.assert_called_once()
         cleanup_mock.assert_called_once_with(temp_dir)
+
+    def test_build_prompt_preserves_preamble_in_raw_fallback(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "额外风险说明：需要注意手工回滚步骤。\\n\\n## 摘要\\n\\n- 变更目的：精简 prompt\\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #24"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "24"},
+                "raw_sections": {
+                    "__preamble__": "额外风险说明：需要注意手工回滚步骤。",
+                    "摘要": "- 变更目的：精简 prompt",
+                },
+                "pr_sections": {
+                    "summary": "- 变更目的：精简 prompt",
+                },
+                "changed_files": ["scripts/pr_guardian.py"],
+                "diff_stat": "1 file changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("PR 正文 fallback：", prompt)
+        self.assertIn("额外风险说明：需要注意手工回滚步骤。", prompt)
 
 
 class MergeIfSafeTests(unittest.TestCase):

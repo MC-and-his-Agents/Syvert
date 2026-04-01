@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 
 from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, format_changed_files, load_json, require_cli, run
-from scripts.item_context import load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
@@ -172,6 +172,7 @@ def find_latest_guardian_result(pr_number: int, head_sha: str, *, path: Path = D
 def parse_all_markdown_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current_heading: str | None = None
+    preamble: list[str] = []
 
     for line in body.splitlines():
         stripped = line.strip()
@@ -180,10 +181,17 @@ def parse_all_markdown_sections(body: str) -> dict[str, str]:
             current_heading = heading
             sections.setdefault(current_heading, [])
             continue
+        if current_heading is None:
+            preamble.append(line.rstrip())
+            continue
         if current_heading:
             sections[current_heading].append(line.rstrip())
 
-    return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
+    payload = {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
+    preamble_text = "\n".join(preamble).strip()
+    if preamble_text:
+        payload["__preamble__"] = preamble_text
+    return payload
 
 
 def parse_markdown_sections(body: str) -> dict[str, str]:
@@ -356,6 +364,14 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
             exec_plan_path = repo_root / exec_plan_path
         related_paths.extend(extract_related_links_from_exec_plan(exec_plan_path))
 
+    issue_exec_plans = active_exec_plans_for_issue(repo_root, issue_number)
+    if len(issue_exec_plans) != 1:
+        notes.append(f"当前 Issue 命中的 active exec-plan 数量异常：{len(issue_exec_plans)}。")
+        return body_context, notes, related_paths
+    if issue_exec_plans[0].get("item_key", "") != item_key:
+        notes.append("当前 Issue 的 active exec-plan 与 PR 正文中的 item_key 不一致。")
+        return body_context, notes, related_paths
+
     comparisons = (
         ("issue", "Issue"),
         ("item_key", "item_key"),
@@ -425,12 +441,17 @@ def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str
     if not raw_sections:
         return raw_body
 
+    preamble = raw_sections.get("__preamble__", "").strip()
     extra_headings = [heading for heading in raw_sections if heading not in REVIEW_SECTION_ALIASES]
-    if not extra_headings:
+    if not extra_headings and not preamble:
         return ""
 
     blocks: list[str] = []
+    if preamble:
+        blocks.extend([preamble, ""])
     for heading in extra_headings:
+        if heading == "__preamble__":
+            continue
         content = raw_sections.get(heading, "")
         if not content:
             continue
