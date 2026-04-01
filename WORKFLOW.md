@@ -59,6 +59,23 @@ codex:
 - `compact` 不得压缩未落盘的事项上下文判断，包括 `release`、`sprint` 绑定与事项角色判定。
 - 具体协议以 `docs/process/agent-loop.md` 为准。
 
+## review / guardian / CI 职责边界
+
+- reviewer 负责基于 [spec_review.md](./spec_review.md) 或 [code_review.md](./code_review.md) 的 rubric 做实质审查，判断边界、语义正确性、风险、验证充分性与是否存在阻断项。
+- reviewer 的结论不由工件完整性检查、CI 结果或 guardian 结果自动推导。
+- review rubric 不等于 merge gate；rubric 回答“是否值得进入下一阶段 / 是否达到 merge-ready 质量”，merge gate 回答“当前 head 是否允许受控合并”。
+- guardian 负责对当前 PR head 执行合并前审查门禁，输出绑定 `head SHA` 的 `verdict` 与 `safe_to_merge`，不替代 reviewer 的实质判断，也不替代 CI 的自动化校验。
+- CI 负责自动化检查与回归验证，回答“自动化门禁是否通过”，不替代 reviewer 的语义审查，也不替代 guardian 的 merge gate 结论。
+- `merge_pr` 负责消费当前 head 对应的 guardian 结果并执行受控合并，不生产 reviewer rubric，也不替代 guardian / CI 作出前置判断。
+- merge gate 由 guardian verdict、`safe_to_merge`、GitHub checks、PR 状态与 head 一致性共同构成；它不是 reviewer rubric 的别名。
+
+## review 输入最小化原则
+
+- review 与 guardian 的输入应优先采用与当前事项、当前 head、当前风险直接相关的最小必要上下文。
+- 优先提供：`Issue`、active `exec-plan`、相关 formal spec / bootstrap contract、PR 描述、风险/验证证据、与当前 diff 直接相关的流程或规约文档。
+- 不应把与当前判断无关的历史讨论、相邻事项材料或整仓重复探索默认塞给 reviewer / guardian。
+- 若要补充额外上下文，必须以“消除当前阻断或验证当前 head 风险”为目的，而不是让审查器无限制二次侦察。
+
 ## stop conditions
 
 - 缺少必需输入（Issue、事项上下文、formal spec 或 bootstrap contract）。
@@ -88,6 +105,8 @@ codex:
   - `核心事项` 已满足 formal spec 或 bootstrap contract 输入
   - 风险、验证、回滚信息已就绪
 - 进入 `merge_pr` 条件：
+  - reviewer 已按适用 rubric 完成当前事项所需的实质审查
+  - 以下 merge gate 条件必须同时满足：
   - latest guardian verdict=`APPROVE`
   - `safe_to_merge=true`
   - GitHub checks 全绿
