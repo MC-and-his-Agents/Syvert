@@ -25,11 +25,10 @@
 
 ## 当前停点
 
-- 已完成 Issue `#23`、父事项 `#21`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`code_review.md`、worktree / branch retirement 协议阅读；当前停在文档最小改动实现前。
+- 已完成 `WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md` 的最小范围改动，补齐 reviewer / guardian / CI / merge gate 职责分层与最小必要上下文原则；当前停在文档一致性复核与最小验证前。
 
 ## 下一步动作
 
-- 按最小范围更新流程文档，补齐 reviewer / guardian / CI / merge gate 的职责分层与最小必要上下文原则。
 - 运行治理文档最小验证并核对与 #22 rubric 的一致性。
 - 生成中文 Conventional Commit，推送 issue-23 分支并创建只关联 Issue `#23` 的 governance PR。
 - 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
@@ -59,11 +58,15 @@
 - 已阅读：`docs/process/branch-retirement.md`
 - 已阅读：`spec_review.md`
 - 已阅读：`code_review.md`
+- 已完成最小改动文件：`WORKFLOW.md`
+- 已完成最小改动文件：`docs/AGENTS.md`
+- 已完成最小改动文件：`docs/process/delivery-funnel.md`
 
 ## 未决风险
 
 - 若把 reviewer rubric 与 guardian / merge gate 再次写混，会直接违背 #22 与本事项目标。
 - 若把“最小必要上下文”写成脚本或模板行为承诺，会越界到 #24 / #25。
+- 需在验证阶段再次确认 `WORKFLOW.md` 新增的 `merge_pr` 入口表述没有把 reviewer 审查错误并入 merge gate 定义。
 
 ## 回滚方式
 
