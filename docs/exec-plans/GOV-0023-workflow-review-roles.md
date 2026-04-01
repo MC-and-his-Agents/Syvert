@@ -25,11 +25,10 @@
 
 ## 当前停点
 
-- 已完成 `WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md` 的最小范围改动，补齐 reviewer / guardian / CI / merge gate 职责分层与最小必要上下文原则；当前停在文档一致性复核与最小验证前。
+- 已完成 `WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md` 的最小范围改动，并通过治理文档最小验证；当前停在生成提交、推送分支与创建 Issue `#23` 专属 PR 前。
 
 ## 下一步动作
 
-- 运行治理文档最小验证并核对与 #22 rubric 的一致性。
 - 生成中文 Conventional Commit，推送 issue-23 分支并创建只关联 Issue `#23` 的 governance PR。
 - 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
 
@@ -61,6 +60,10 @@
 - 已完成最小改动文件：`WORKFLOW.md`
 - 已完成最小改动文件：`docs/AGENTS.md`
 - 已完成最小改动文件：`docs/process/delivery-funnel.md`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/context_guard.py`
+- 已用关键词检索复核 `WORKFLOW.md` / `docs/AGENTS.md` / `docs/process/delivery-funnel.md` 与 `spec_review.md` / `code_review.md` 的职责边界口径一致
 
 ## 未决风险
 
