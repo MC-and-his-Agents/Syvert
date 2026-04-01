@@ -9,6 +9,7 @@ from unittest.mock import ANY, patch
 from scripts.pr_guardian import (
     build_item_context_summary,
     build_prompt,
+    build_review_context,
     find_latest_guardian_result,
     load_guardian_state,
     merge_if_safe,
@@ -220,11 +221,36 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.active_exec_plans_for_issue",
                         return_value=[{"item_key": "GOV-0024-guardian-review-context"}],
                     ):
-                        payload, notes, related_paths = build_item_context_summary(meta)
+                        payload, notes, related_paths = build_item_context_summary(meta, repo_root)
 
         self.assertEqual(payload["exec_plan"], "docs/exec-plans/GOV-0024-guardian-review-context.md")
         self.assertEqual(notes, [])
         self.assertIn("docs/decisions/ADR-0001-governance-bootstrap-contract.md", related_paths)
+        self.assertNotIn("无（治理脚本事项）", related_paths)
+
+    def test_build_review_context_uses_pr_worktree_as_repo_root(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "",
+        }
+        worktree_dir = Path("/tmp/pr-worktree")
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"item_key": "GOV-0024-guardian-review-context"}, [], []),
+            ) as build_item_context_summary_mock:
+                with patch("scripts.pr_guardian.load_worktree_binding", return_value=([], None)):
+                    with patch("scripts.pr_guardian.fetch_checks_summary", return_value=["- checks ok"]):
+                        payload = build_review_context(meta, worktree_dir)
+
+        build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
+        self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
     @patch("scripts.pr_guardian.cleanup")
     @patch("scripts.pr_guardian.run_codex_review")

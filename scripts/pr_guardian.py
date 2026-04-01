@@ -238,12 +238,14 @@ def extract_related_links_from_exec_plan(exec_plan_path: Path) -> list[str]:
             if not match:
                 continue
             value = match.group(1).strip()
-            if value and value != "无":
+            if not value or value.startswith("无"):
+                continue
+            if "/" in value or value.endswith(".md"):
                 links.append(value)
     return links
 
 
-def build_item_context_summary(meta: dict) -> tuple[dict[str, str], list[str], list[str]]:
+def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, str], list[str], list[str]]:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
     notes: list[str] = []
     related_paths: list[str] = []
@@ -261,7 +263,7 @@ def build_item_context_summary(meta: dict) -> tuple[dict[str, str], list[str], l
         return body_context, notes, related_paths
 
     item_key = body_context["item_key"]
-    exec_plan = load_item_context_from_exec_plan(REPO_ROOT, item_key)
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
     if exec_plan.get("conflict") == "duplicate_metadata_keys":
         notes.append("active exec-plan 元数据存在重复键，无法确认唯一事项上下文。")
         return body_context, notes, related_paths
@@ -272,7 +274,7 @@ def build_item_context_summary(meta: dict) -> tuple[dict[str, str], list[str], l
         notes.append("当前 item_key 未找到 active exec-plan。")
         return body_context, notes, related_paths
 
-    issue_exec_plans = active_exec_plans_for_issue(REPO_ROOT, issue_number)
+    issue_exec_plans = active_exec_plans_for_issue(repo_root, issue_number)
     if len(issue_exec_plans) != 1:
         notes.append(f"当前 Issue 命中的 active exec-plan 数量异常：{len(issue_exec_plans)}。")
         return body_context, notes, related_paths
@@ -299,7 +301,10 @@ def build_item_context_summary(meta: dict) -> tuple[dict[str, str], list[str], l
     merged = dict(body_context)
     merged["exec_plan"] = exec_plan.get("exec_plan", "")
     if merged["exec_plan"]:
-        related_paths.extend(extract_related_links_from_exec_plan(REPO_ROOT / merged["exec_plan"]))
+        exec_plan_path = Path(merged["exec_plan"])
+        if not exec_plan_path.is_absolute():
+            exec_plan_path = repo_root / exec_plan_path
+        related_paths.extend(extract_related_links_from_exec_plan(exec_plan_path))
     return merged, notes, related_paths
 
 
@@ -307,7 +312,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     base_ref = meta["baseRefName"]
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     changed_files, diff_stat = fetch_diff_stats(worktree_dir, base_ref)
-    item_context, context_notes, related_paths = build_item_context_summary(meta)
+    item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
     worktree_matches, worktree_note = load_worktree_binding(meta.get("headRefName", ""))
     if worktree_note:
         context_notes.append(worktree_note)
