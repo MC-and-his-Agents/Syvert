@@ -223,7 +223,7 @@ def load_reviewer_rubric_excerpt(worktree_dir: Path, base_ref: str) -> str:
     if completed.returncode == 0 and completed.stdout.strip():
         return extract_reviewer_rubric_excerpt(completed.stdout)
 
-    path = REPO_ROOT / CODE_REVIEW_PATH
+    path = worktree_dir / CODE_REVIEW_PATH
     if path.exists():
         return extract_reviewer_rubric_excerpt(path.read_text(encoding="utf-8"))
     return "未找到 `code_review.md`，请按当前变更与最小必要上下文执行 reviewer rubric 审查。"
@@ -349,6 +349,12 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
         notes.append("当前 item_key 未找到 active exec-plan。")
         return body_context, notes, related_paths
 
+    exec_plan_path = Path(exec_plan.get("exec_plan", ""))
+    if exec_plan_path:
+        if not exec_plan_path.is_absolute():
+            exec_plan_path = repo_root / exec_plan_path
+        related_paths.extend(extract_related_links_from_exec_plan(exec_plan_path))
+
     comparisons = (
         ("issue", "Issue"),
         ("item_key", "item_key"),
@@ -367,11 +373,6 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
 
     merged = dict(body_context)
     merged["exec_plan"] = exec_plan.get("exec_plan", "")
-    if merged["exec_plan"]:
-        exec_plan_path = Path(merged["exec_plan"])
-        if not exec_plan_path.is_absolute():
-            exec_plan_path = repo_root / exec_plan_path
-        related_paths.extend(extract_related_links_from_exec_plan(exec_plan_path))
     return merged, notes, related_paths
 
 
@@ -386,6 +387,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         issue_number = int(str(item_context.get("issue", "")).strip())
     except ValueError:
         issue_number = 0
+    needs_issue_context = bool(issue_number) and (not sections.get("summary") or bool(context_notes))
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))
@@ -399,7 +401,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             f"- 头部提交: {meta['headRefOid']}",
             f"- 头部分支: {meta.get('headRefName', '')}",
         ],
-        "issue_context": fetch_issue_context(issue_number) if issue_number else {"identity": ["- 无可确认的 Issue 上下文"], "summary": "无 issue 摘要。"},
+        "issue_context": fetch_issue_context(issue_number) if needs_issue_context else {"identity": [], "summary": ""},
         "item_context": item_context,
         "raw_sections": raw_sections,
         "pr_sections": sections,
@@ -459,10 +461,6 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "PR 基本信息：",
         *context["pr_identity"],
         "",
-        "Issue 摘要：",
-        *context["issue_context"]["identity"],
-        str(context["issue_context"]["summary"]),
-        "",
         "结构化事项上下文：",
         *render_bullet_dict(context["item_context"]),
         "",
@@ -496,6 +494,14 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "Context Notes：",
         *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
+
+    if context["issue_context"]["identity"] or context["issue_context"]["summary"]:
+        lines[lines.index("结构化事项上下文："):lines.index("结构化事项上下文：")] = [
+            "Issue 摘要：",
+            *context["issue_context"]["identity"],
+            str(context["issue_context"]["summary"]),
+            "",
+        ]
 
     if raw_body_fallback:
         lines.extend(["", "PR 正文 fallback：", raw_body_fallback])

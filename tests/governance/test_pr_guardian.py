@@ -13,6 +13,7 @@ from scripts.pr_guardian import (
     extract_reviewer_rubric_excerpt,
     find_latest_guardian_result,
     load_guardian_state,
+    load_reviewer_rubric_excerpt,
     merge_if_safe,
     review_once,
     run_codex_review,
@@ -340,6 +341,77 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("## Review Rubric", excerpt)
         self.assertIn("## 职责边界说明", excerpt)
         self.assertNotIn("## 合并门禁", excerpt)
+
+    @patch(
+        "scripts.pr_guardian.run",
+        return_value=subprocess.CompletedProcess(args=["git"], returncode=1, stdout="", stderr="missing"),
+    )
+    def test_load_reviewer_rubric_excerpt_falls_back_to_pr_worktree_file(self, run_mock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            worktree_dir = Path(temp_dir)
+            (worktree_dir / "code_review.md").write_text(
+                "\n".join(
+                    [
+                        "## 工件完整性检查",
+                        "",
+                        "- 仅使用 worktree 内文件",
+                        "",
+                        "## Review Rubric",
+                        "",
+                        "- contract 一致性",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            excerpt = load_reviewer_rubric_excerpt(worktree_dir, "main")
+
+        self.assertIn("仅使用 worktree 内文件", excerpt)
+        run_mock.assert_called_once()
+
+    def test_build_item_context_summary_keeps_related_paths_on_metadata_mismatch(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## 关联事项",
+                    "",
+                    "- Issue: #24",
+                    "- item_key: `GOV-0024-guardian-review-context`",
+                    "- item_type: `GOV`",
+                    "- release: `v0.1.0`",
+                    "- sprint: `2026-S14`",
+                ]
+            )
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs" / "exec-plans" / "GOV-0024-guardian-review-context.md"
+            exec_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            exec_plan_path.write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024 执行计划",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.1`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("scripts.pr_guardian.load_item_context_from_exec_plan", return_value={"Issue": "24", "item_key": "GOV-0024-guardian-review-context", "item_type": "GOV", "release": "v0.1.1", "sprint": "2026-S14", "exec_plan": str(exec_plan_path)}):
+                payload, notes, related_paths = build_item_context_summary(meta, repo_root)
+
+        self.assertEqual(payload["item_key"], "GOV-0024-guardian-review-context")
+        self.assertIn("release", notes[0])
+        self.assertIn(str(exec_plan_path), related_paths)
 
     @patch("scripts.pr_guardian.cleanup")
     @patch("scripts.pr_guardian.run_codex_review")
