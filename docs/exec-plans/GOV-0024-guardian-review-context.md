@@ -71,6 +71,7 @@
 - 已按 guardian 阻断反馈收口：trusted rubric 来源、Issue 摘要注入、模板关键信息保留、raw body fallback 收紧、item context 约束放宽
 - 已补齐 trusted rubric source 正向回归测试，并将 Issue contract 注入条件固定为“缺少 `Issue 摘要` 时必须补充”
 - 已补齐 guardian state 写入隔离、多 active exec-plan、PR preamble 保留等回归测试
+- 已补齐 `Issue 摘要` 嵌套 `Goal/Scope` 段落的真实解析路径回归测试
 
 ## 未决风险
 
@@ -84,4 +85,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `62c2fa96514c44832f6c14f897d2ffb89a0979ab`
+- `74c74f27b70b723625125983886cffab50f7a448`
