@@ -25,7 +25,7 @@
 
 ## 当前停点
 
-- PR `#28` 已绑定 Issue `#24` 打开；guardian 迭代阻断已收口到当前 head，当前停在等待最新一轮 GitHub checks、guardian 审查与受控 merge。
+- PR `#28` 已绑定 Issue `#24` 打开；Issue 摘要已准备冻结到 PR 正文，guardian 迭代阻断已收口到当前 head，当前停在等待最新一轮 GitHub checks、guardian 审查与受控 merge。
 
 ## 下一步动作
 
@@ -67,6 +67,7 @@
 - `python3 scripts/open_pr.py --class governance --issue 24 --item-key GOV-0024-guardian-review-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "refactor(governance): 精简 guardian review 上下文注入" --dry-run`
 - 已确认 PR：`#28 https://github.com/MC-and-his-Agents/Syvert/pull/28`
 - 已补齐 PR 描述中的范围、风险、验证、回滚与 #25 非目标说明
+- 已补齐 PR 描述中的 `Issue 摘要` 冻结方案，避免 guardian reviewer 默认依赖远端 issue 漂移
 - 已按 guardian 阻断反馈收口：trusted rubric 来源、Issue 摘要注入、模板关键信息保留、raw body fallback 收紧、item context 约束放宽
 
 ## 未决风险
@@ -81,4 +82,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `4dc4192098eb26553e525efe3420caefae7ce9e5`
+- `0a29bc9ce7cfcf3ca0472df7868ed285c31e67da`
