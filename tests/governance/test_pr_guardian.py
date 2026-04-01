@@ -315,6 +315,41 @@ class CodexReviewExecutionTests(unittest.TestCase):
         fetch_issue_context_mock.assert_not_called()
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
+    def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "\n".join(
+                [
+                    "## Issue 摘要",
+                    "",
+                    "## Goal",
+                    "",
+                    "- 精简 guardian review context",
+                    "",
+                    "## Scope",
+                    "",
+                    "- 调整 scripts/pr_guardian.py",
+                ]
+            ),
+        }
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
+            ):
+                with patch("scripts.pr_guardian.fetch_issue_context") as fetch_issue_context_mock:
+                    payload = build_review_context(meta, Path("/tmp/pr-worktree"))
+
+        fetch_issue_context_mock.assert_not_called()
+        self.assertIn("## Goal", payload["pr_sections"]["issue_summary"])
+        self.assertIn("## Scope", payload["pr_sections"]["issue_summary"])
+
     def test_extract_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
         excerpt = extract_reviewer_rubric_excerpt(
             "\n".join(

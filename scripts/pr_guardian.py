@@ -178,6 +178,9 @@ def parse_all_markdown_sections(body: str) -> dict[str, str]:
         stripped = line.strip()
         if stripped.startswith("## "):
             heading = stripped[3:].strip()
+            if current_heading == "Issue 摘要" and heading in ISSUE_CONTEXT_HEADINGS:
+                sections.setdefault(current_heading, []).append(line.rstrip())
+                continue
             current_heading = heading
             sections.setdefault(current_heading, [])
             continue
