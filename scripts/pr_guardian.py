@@ -454,7 +454,9 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
     rubric_excerpt = load_reviewer_rubric_excerpt(worktree_dir)
     sections = context["pr_sections"]
     raw_body = str(meta.get("body") or "").strip()
-    summary_fallback = raw_body if raw_body else "无 PR 正文。"
+    summary_fallback = "无结构化 PR 摘要。"
+    fallback_keys = ("summary", "item_context", "risk", "validation", "rollback", "checklist")
+    needs_raw_body_fallback = bool(raw_body) and any(key not in sections for key in fallback_keys)
 
     lines = [
         "你是 Syvert PR guardian reviewer。",
@@ -515,7 +517,7 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
 
-    if raw_body:
+    if needs_raw_body_fallback:
         lines.extend(["", "PR 正文 fallback：", raw_body])
 
     return "\n".join(lines).rstrip() + "\n"

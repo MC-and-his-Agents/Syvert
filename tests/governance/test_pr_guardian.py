@@ -177,8 +177,44 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
+        self.assertNotIn("PR 正文 fallback：", prompt)
         self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)
         self.assertNotIn("默认 Squash Merge", prompt)
+
+    def test_build_prompt_uses_raw_body_only_when_structured_sections_are_incomplete(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "## 摘要\n\n- 变更目的：精简 prompt\n\n## 验证\n\n- 已执行：单测\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #24"],
+                "issue_context": {"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
+                "item_context": {"issue": "24"},
+                "pr_sections": {
+                    "summary": "- 变更目的：精简 prompt",
+                    "validation": "- 已执行：单测",
+                },
+                "checks": ["- governance: bucket=pass, state=SUCCESS"],
+                "worktree_binding": [],
+                "changed_files": ["scripts/pr_guardian.py"],
+                "diff_stat": "1 file changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("PR 正文 fallback：", prompt)
+        self.assertIn("## 验证", prompt)
 
     def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
         meta = {
