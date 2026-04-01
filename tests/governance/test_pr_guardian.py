@@ -10,9 +10,9 @@ from scripts.pr_guardian import (
     build_item_context_summary,
     build_prompt,
     build_review_context,
+    extract_reviewer_rubric_excerpt,
     find_latest_guardian_result,
     load_guardian_state,
-    load_reviewer_rubric_excerpt,
     load_worktree_binding,
     merge_if_safe,
     review_once,
@@ -149,6 +149,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "summary": "## Goal\n\n- 精简 review context",
                 },
                 "item_context": {"issue": "24", "item_key": "GOV-0024-guardian-review-context"},
+                "raw_sections": {
+                    "摘要": "- 变更目的：精简 prompt",
+                    "关联事项": "- Issue: #24\n- Closing: Fixes #24",
+                    "风险级别": "- `medium`",
+                    "验证": "- python3 -m unittest",
+                    "回滚": "- revert PR",
+                    "检查清单": "- [x] 已填写 Closing",
+                },
                 "pr_sections": {
                     "item_context": "- Issue: #24\n- Closing: Fixes #24",
                     "summary": "- 变更目的：精简 prompt",
@@ -189,7 +197,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "baseRefName": "main",
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
-            "body": "## 摘要\n\n- 变更目的：精简 prompt\n\n## 验证\n\n- 已执行：单测\n",
+            "body": "## 摘要\n\n- 变更目的：精简 prompt\n\n## 验证\n\n- 已执行：单测\n\n## 自定义说明\n\n- 保留给 reviewer 的补充信息\n",
         }
 
         with patch(
@@ -198,12 +206,15 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "pr_identity": ["- PR: #24"],
                 "issue_context": {"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
                 "item_context": {"issue": "24"},
+                "raw_sections": {
+                    "摘要": "- 变更目的：精简 prompt",
+                    "验证": "- 已执行：单测",
+                    "自定义说明": "- 保留给 reviewer 的补充信息",
+                },
                 "pr_sections": {
                     "summary": "- 变更目的：精简 prompt",
                     "validation": "- 已执行：单测",
                 },
-                "checks": ["- governance: bucket=pass, state=SUCCESS"],
-                "worktree_binding": [],
                 "changed_files": ["scripts/pr_guardian.py"],
                 "diff_stat": "1 file changed",
                 "related_paths": [],
@@ -214,7 +225,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 prompt = build_prompt(meta, Path("/tmp/worktree"))
 
         self.assertIn("PR 正文 fallback：", prompt)
-        self.assertIn("## 验证", prompt)
+        self.assertIn("## 自定义说明", prompt)
 
     def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
         meta = {
@@ -295,13 +306,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "scripts.pr_guardian.build_item_context_summary",
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ) as build_item_context_summary_mock:
-                with patch("scripts.pr_guardian.load_worktree_binding", return_value=([], None)):
-                    with patch("scripts.pr_guardian.fetch_checks_summary", return_value=["- checks ok"]):
-                        with patch(
-                            "scripts.pr_guardian.fetch_issue_context",
-                            return_value={"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
-                        ) as fetch_issue_context_mock:
-                            payload = build_review_context(meta, worktree_dir)
+                with patch(
+                    "scripts.pr_guardian.fetch_issue_context",
+                    return_value={"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
+                ) as fetch_issue_context_mock:
+                    payload = build_review_context(meta, worktree_dir)
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
         fetch_issue_context_mock.assert_called_once_with(24)
@@ -317,35 +326,30 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(matches, [])
         self.assertIn("损坏", note)
 
-    def test_load_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo_root = Path(temp_dir)
-            (repo_root / "code_review.md").write_text(
-                "\n".join(
-                    [
-                        "# 审查标准",
-                        "",
-                        "## 工件完整性检查",
-                        "",
-                        "- 输入必须完整",
-                        "",
-                        "## Review Rubric",
-                        "",
-                        "- 关注 contract 与回归风险",
-                        "",
-                        "## 合并门禁",
-                        "",
-                        "- 不应出现在 reviewer excerpt",
-                        "",
-                        "## 职责边界说明",
-                        "",
-                        "- reviewer 与 guardian 分层",
-                    ]
-                ),
-                encoding="utf-8",
+    def test_extract_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
+        excerpt = extract_reviewer_rubric_excerpt(
+            "\n".join(
+                [
+                    "# 审查标准",
+                    "",
+                    "## 工件完整性检查",
+                    "",
+                    "- 输入必须完整",
+                    "",
+                    "## Review Rubric",
+                    "",
+                    "- 关注 contract 与回归风险",
+                    "",
+                    "## 合并门禁",
+                    "",
+                    "- 不应出现在 reviewer excerpt",
+                    "",
+                    "## 职责边界说明",
+                    "",
+                    "- reviewer 与 guardian 分层",
+                ]
             )
-
-            excerpt = load_reviewer_rubric_excerpt(repo_root)
+        )
 
         self.assertIn("## 工件完整性检查", excerpt)
         self.assertIn("## Review Rubric", excerpt)

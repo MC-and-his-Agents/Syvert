@@ -168,30 +168,35 @@ def find_latest_guardian_result(pr_number: int, head_sha: str, *, path: Path = D
     return local_guardian_result(pr_number, head_sha, path=path)
 
 
-def parse_markdown_sections(body: str) -> dict[str, str]:
+def parse_all_markdown_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
-    current_key: str | None = None
+    current_heading: str | None = None
 
     for line in body.splitlines():
         stripped = line.strip()
         if stripped.startswith("## "):
             heading = stripped[3:].strip()
-            current_key = REVIEW_SECTION_ALIASES.get(heading)
-            if current_key:
-                sections.setdefault(current_key, [])
+            current_heading = heading
+            sections.setdefault(current_heading, [])
             continue
-        if current_key:
-            sections[current_key].append(line.rstrip())
+        if current_heading:
+            sections[current_heading].append(line.rstrip())
 
     return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
 
 
-def load_reviewer_rubric_excerpt(repo_root: Path) -> str:
-    path = repo_root / CODE_REVIEW_PATH
-    if not path.exists():
-        return "未找到 `code_review.md`，请按当前变更与最小必要上下文执行 reviewer rubric 审查。"
+def parse_markdown_sections(body: str) -> dict[str, str]:
+    raw_sections = parse_all_markdown_sections(body)
+    sections: dict[str, str] = {}
+    for heading, content in raw_sections.items():
+        key = REVIEW_SECTION_ALIASES.get(heading)
+        if key and content:
+            sections[key] = content
+    return sections
 
-    lines = path.read_text(encoding="utf-8").splitlines()
+
+def extract_reviewer_rubric_excerpt(text: str) -> str:
+    lines = text.splitlines()
     selected: list[str] = []
     active = False
     allowed = set(REVIEW_GUIDE_HEADINGS)
@@ -207,6 +212,21 @@ def load_reviewer_rubric_excerpt(repo_root: Path) -> str:
     if excerpt:
         return excerpt
     return "未能从 `code_review.md` 提取 reviewer rubric 节选，请围绕当前 diff、工件完整性与职责边界执行审查。"
+
+
+def load_reviewer_rubric_excerpt(worktree_dir: Path, base_ref: str) -> str:
+    completed = run(
+        ["git", "show", f"origin/{base_ref}:{CODE_REVIEW_PATH}"],
+        cwd=worktree_dir,
+        check=False,
+    )
+    if completed.returncode == 0 and completed.stdout.strip():
+        return extract_reviewer_rubric_excerpt(completed.stdout)
+
+    path = REPO_ROOT / CODE_REVIEW_PATH
+    if path.exists():
+        return extract_reviewer_rubric_excerpt(path.read_text(encoding="utf-8"))
+    return "未找到 `code_review.md`，请按当前变更与最小必要上下文执行 reviewer rubric 审查。"
 
 
 def extract_named_markdown_sections(body: str, headings: tuple[str, ...]) -> dict[str, str]:
@@ -399,6 +419,7 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
 
 def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     base_ref = meta["baseRefName"]
+    raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     changed_files, diff_stat = fetch_diff_stats(worktree_dir, base_ref)
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
@@ -407,10 +428,6 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         issue_number = int(str(item_context.get("issue", "")).strip())
     except ValueError:
         issue_number = 0
-    worktree_matches, worktree_note = load_worktree_binding(meta.get("headRefName", ""))
-    if worktree_note:
-        context_notes.append(worktree_note)
-
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))
@@ -426,9 +443,8 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         ],
         "issue_context": fetch_issue_context(issue_number) if issue_number else {"identity": ["- 无可确认的 Issue 上下文"], "summary": "无 issue 摘要。"},
         "item_context": item_context,
+        "raw_sections": raw_sections,
         "pr_sections": sections,
-        "checks": fetch_checks_summary(meta["number"]),
-        "worktree_binding": worktree_matches,
         "changed_files": changed_files,
         "diff_stat": diff_stat,
         "related_paths": related_paths,
@@ -448,15 +464,33 @@ def render_worktree_binding(matches: list[dict]) -> list[str]:
     return [f"- {item.get('key', '')}: {item.get('path', '')}" for item in matches]
 
 
+def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str:
+    if not raw_body:
+        return ""
+    if not raw_sections:
+        return raw_body
+
+    extra_headings = [heading for heading in raw_sections if heading not in REVIEW_SECTION_ALIASES]
+    if not extra_headings:
+        return ""
+
+    blocks: list[str] = []
+    for heading in extra_headings:
+        content = raw_sections.get(heading, "")
+        if not content:
+            continue
+        blocks.extend([f"## {heading}", content, ""])
+    return "\n".join(blocks).strip()
+
+
 def build_prompt(meta: dict, worktree_dir: Path) -> str:
     base_ref = meta["baseRefName"]
     context = build_review_context(meta, worktree_dir)
-    rubric_excerpt = load_reviewer_rubric_excerpt(worktree_dir)
+    rubric_excerpt = load_reviewer_rubric_excerpt(worktree_dir, base_ref)
     sections = context["pr_sections"]
     raw_body = str(meta.get("body") or "").strip()
     summary_fallback = "无结构化 PR 摘要。"
-    fallback_keys = ("summary", "item_context", "risk", "validation", "rollback", "checklist")
-    needs_raw_body_fallback = bool(raw_body) and any(key not in sections for key in fallback_keys)
+    raw_body_fallback = render_raw_body_fallback(raw_body, context["raw_sections"])
 
     lines = [
         "你是 Syvert PR guardian reviewer。",
@@ -507,18 +541,12 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "相关工件路径：",
         *([f"- `{path}`" for path in context["related_paths"]] or ["- 无直接定位到的 spec / exec-plan / decision 工件"]),
         "",
-        "Checks 摘要：",
-        *context["checks"],
-        "",
-        "Worktree 绑定：",
-        *render_worktree_binding(context["worktree_binding"]),
-        "",
         "Context Notes：",
         *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
 
-    if needs_raw_body_fallback:
-        lines.extend(["", "PR 正文 fallback：", raw_body])
+    if raw_body_fallback:
+        lines.extend(["", "PR 正文 fallback：", raw_body_fallback])
 
     return "\n".join(lines).rstrip() + "\n"
 
