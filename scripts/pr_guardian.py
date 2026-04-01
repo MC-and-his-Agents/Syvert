@@ -33,6 +33,7 @@ REVIEW_EXECUTION_RULES = (
 )
 REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
+    "Issue 摘要": "issue_summary",
     "关联事项": "item_context",
     "风险级别": "risk",
     "变更文件": "changed_files",
@@ -387,7 +388,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         issue_number = int(str(item_context.get("issue", "")).strip())
     except ValueError:
         issue_number = 0
-    needs_issue_context = bool(issue_number) and (not sections.get("summary") or bool(context_notes))
+    needs_issue_context = bool(issue_number) and not sections.get("issue_summary") and (not sections.get("summary") or bool(context_notes))
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))
@@ -495,11 +496,12 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
 
-    if context["issue_context"]["identity"] or context["issue_context"]["summary"]:
+    issue_summary = sections.get("issue_summary", "").strip()
+    if context["issue_context"]["identity"] or context["issue_context"]["summary"] or issue_summary:
         lines[lines.index("结构化事项上下文："):lines.index("结构化事项上下文：")] = [
             "Issue 摘要：",
-            *context["issue_context"]["identity"],
-            str(context["issue_context"]["summary"]),
+            *(context["issue_context"]["identity"] or []),
+            issue_summary or str(context["issue_context"]["summary"]),
             "",
         ]
 

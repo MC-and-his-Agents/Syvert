@@ -146,10 +146,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "pr_identity": ["- PR: #24", "- 标题: 治理: 精简 guardian review context"],
                 "issue_context": {
                     "identity": ["- Issue: #24", "- 标题: governance: lean guardian review context"],
-                    "summary": "## Goal\n\n- 精简 review context",
+                    "summary": "",
                 },
                 "item_context": {"issue": "24", "item_key": "GOV-0024-guardian-review-context"},
                 "raw_sections": {
+                    "Issue 摘要": "## Goal\n\n- 精简 review context",
                     "摘要": "- 变更目的：精简 prompt",
                     "关联事项": "- Issue: #24\n- Closing: Fixes #24",
                     "风险级别": "- `medium`",
@@ -158,6 +159,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "检查清单": "- [x] 已填写 Closing",
                 },
                 "pr_sections": {
+                    "issue_summary": "## Goal\n\n- 精简 review context",
                     "item_context": "- Issue: #24\n- Closing: Fixes #24",
                     "summary": "- 变更目的：精简 prompt",
                     "risk": "- `medium`",
@@ -293,7 +295,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "baseRefName": "main",
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
-            "body": "",
+            "body": "## Issue 摘要\n\n- Goal: 精简\n- Scope: 收敛 guardian review context\n",
         }
         worktree_dir = Path("/tmp/pr-worktree")
 
@@ -302,14 +304,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "scripts.pr_guardian.build_item_context_summary",
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ) as build_item_context_summary_mock:
-                with patch(
-                    "scripts.pr_guardian.fetch_issue_context",
-                    return_value={"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
-                ) as fetch_issue_context_mock:
+                with patch("scripts.pr_guardian.fetch_issue_context") as fetch_issue_context_mock:
                     payload = build_review_context(meta, worktree_dir)
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
-        fetch_issue_context_mock.assert_called_once_with(24)
+        fetch_issue_context_mock.assert_not_called()
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
     def test_extract_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
