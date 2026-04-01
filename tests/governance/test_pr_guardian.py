@@ -13,7 +13,6 @@ from scripts.pr_guardian import (
     extract_reviewer_rubric_excerpt,
     find_latest_guardian_result,
     load_guardian_state,
-    load_worktree_binding,
     merge_if_safe,
     review_once,
     run_codex_review,
@@ -315,16 +314,6 @@ class CodexReviewExecutionTests(unittest.TestCase):
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
         fetch_issue_context_mock.assert_called_once_with(24)
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
-
-    def test_load_worktree_binding_tolerates_invalid_json(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            state_path = Path(temp_dir) / "worktrees.json"
-            state_path.write_text("{invalid-json", encoding="utf-8")
-
-            matches, note = load_worktree_binding("feature/x", path=state_path)
-
-        self.assertEqual(matches, [])
-        self.assertIn("损坏", note)
 
     def test_extract_reviewer_rubric_excerpt_excludes_merge_gate_sections(self) -> None:
         excerpt = extract_reviewer_rubric_excerpt(

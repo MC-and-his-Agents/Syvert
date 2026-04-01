@@ -16,7 +16,7 @@
 
 - 让 guardian reviewer prompt 优先消费结构化 review context，而不是整份 `code_review.md` 与原样 PR 模板正文。
 - 拆开 reviewer rubric 与 merge gate 的消费位置，保持现有 guardian 输出 schema、head 绑定和受控 merge 安全性不变。
-- 降低 review agent 重复读取治理文档、重复定位 `exec-plan` / decision / worktree / checks 的成本。
+- 降低 review agent 重复读取治理文档、重复定位 `exec-plan` / decision / Issue / PR 摘要的成本。
 
 ## 范围
 

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, format_changed_files, load_json, require_cli, run
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
-from scripts.state_paths import guardian_legacy_state_path, guardian_state_path, worktrees_state_path
+from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
 SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
@@ -300,40 +300,6 @@ def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]
     return changed_files, stat_text or "无 diff stat。"
 
 
-def fetch_checks_summary(pr_number: int) -> list[str]:
-    completed = run(
-        ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket,state"],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if completed.returncode != 0:
-        return ["- checks 状态暂不可用"]
-    payload = json.loads(completed.stdout or "[]")
-    if not payload:
-        return ["- 暂无 checks 结果"]
-    return [
-        f"- {item.get('name', 'unknown')}: bucket={item.get('bucket', '')}, state={item.get('state', '')}"
-        for item in payload
-    ]
-
-
-def load_worktree_binding(branch: str, *, path: Path = worktrees_state_path()) -> tuple[list[dict], str | None]:
-    if not path.exists():
-        return [], "worktree 状态文件缺失。"
-    try:
-        state = load_json(path)
-    except Exception:
-        return [], "worktree 状态文件损坏，已跳过绑定信息。"
-    if not isinstance(state, dict):
-        return [], "worktree 状态文件结构异常，已跳过绑定信息。"
-    matches = [item for item in (state.get("worktrees") or {}).values() if item.get("branch") == branch]
-    if not matches:
-        return [], "未找到当前分支的 worktree 绑定。"
-    if len(matches) > 1:
-        return matches, "当前分支命中多个 worktree 绑定。"
-    return matches, None
-
-
 def extract_related_links_from_exec_plan(exec_plan_path: Path) -> list[str]:
     links = [exec_plan_path.as_posix()]
     patterns = (
@@ -456,12 +422,6 @@ def render_bullet_dict(payload: dict[str, str]) -> list[str]:
     if not payload:
         return ["- 无可确认的结构化事项上下文"]
     return [f"- {key}: {value}" for key, value in payload.items()]
-
-
-def render_worktree_binding(matches: list[dict]) -> list[str]:
-    if not matches:
-        return ["- 无可确认的 worktree 绑定"]
-    return [f"- {item.get('key', '')}: {item.get('path', '')}" for item in matches]
 
 
 def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str:
