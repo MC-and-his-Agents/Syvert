@@ -388,7 +388,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         issue_number = int(str(item_context.get("issue", "")).strip())
     except ValueError:
         issue_number = 0
-    needs_issue_context = bool(issue_number) and not sections.get("issue_summary") and (not sections.get("summary") or bool(context_notes))
+    needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))

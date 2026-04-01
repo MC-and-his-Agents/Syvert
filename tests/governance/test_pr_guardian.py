@@ -368,6 +368,29 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("仅使用 worktree 内文件", excerpt)
         run_mock.assert_called_once()
 
+    @patch(
+        "scripts.pr_guardian.run",
+        return_value=subprocess.CompletedProcess(
+            args=["git"],
+            returncode=0,
+            stdout="## Review Rubric\n\n- 使用基线 rubric\n",
+            stderr="",
+        ),
+    )
+    def test_load_reviewer_rubric_excerpt_prefers_base_snapshot_over_worktree_file(self, run_mock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            worktree_dir = Path(temp_dir)
+            (worktree_dir / "code_review.md").write_text(
+                "## Review Rubric\n\n- 使用 PR worktree 内容\n",
+                encoding="utf-8",
+            )
+
+            excerpt = load_reviewer_rubric_excerpt(worktree_dir, "main")
+
+        self.assertIn("使用基线 rubric", excerpt)
+        self.assertNotIn("使用 PR worktree 内容", excerpt)
+        run_mock.assert_called_once()
+
     def test_build_item_context_summary_keeps_related_paths_on_metadata_mismatch(self) -> None:
         meta = {
             "body": "\n".join(
