@@ -78,5 +78,9 @@
 ## 门禁关系
 
 - 本地 hook：早反馈，不替代 CI
-- CI：仓库门禁，不替代 guardian
-- guardian：merge gate，不替代方向判断
+- reviewer：按 `spec_review.md` / `code_review.md` 的 rubric 做实质审查，不由 CI 或 guardian 代替
+- CI：仓库自动化门禁，不替代 reviewer 的语义审查，也不替代 guardian 的合并前门禁
+- guardian：基于当前 PR head 与最小必要上下文执行 merge gate 审查，不替代 reviewer 的 rubric 判断
+- `merge_pr`：受控合并入口，消费 guardian + checks + head 一致性结果，不替代 reviewer / guardian / CI 任何一方
+- review rubric != merge gate；前者判断质量与阻断项，后者判断当前 head 是否允许受控合并
+- review / guardian 输入优先采用最小必要上下文，避免与当前事项无关的重复探索
