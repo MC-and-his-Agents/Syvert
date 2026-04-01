@@ -24,11 +24,10 @@
 
 ## 当前停点
 
-- `spec_review.md` 与 `code_review.md` 已完成 rubric 增强和章节拆分，当前停在提交前自检完成、准备生成提交与 PR 描述。
+- `spec_review.md` 与 `code_review.md` 已完成 rubric 增强和章节拆分，并已提交为 checkpoint `c5b85cf34a5b440e03b231bd95cfb4764189b79a`；当前停在推送分支与创建 PR 前的元数据收口。
 
 ## 下一步动作
 
-- 复核最终 diff 与范围边界，确认未触及 #23 / #24 / #25。
 - 生成中文 Conventional Commit，推送分支并创建仅针对 Issue `#22` 的 governance PR。
 - 在 PR 描述中明确本次仅增强 review rubric，不涉及自动化和 guardian prompt 瘦身。
 
@@ -66,4 +65,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2f4d1258076c3507d0d331ed29047dda9ba41c55`
+- `c5b85cf34a5b440e03b231bd95cfb4764189b79a`
