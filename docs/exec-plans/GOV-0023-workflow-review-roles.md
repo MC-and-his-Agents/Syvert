@@ -9,7 +9,7 @@
 - sprint：`2026-S14`
 - 关联 spec：无（治理文档事项）
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待补充
+- 关联 PR：`#27`
 - active 收口事项：`GOV-0023-workflow-review-roles`
 
 ## 目标
@@ -25,11 +25,12 @@
 
 ## 当前停点
 
-- 已完成 `WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md` 的最小范围改动，并通过治理文档最小验证；当前停在生成提交、推送分支与创建 Issue `#23` 专属 PR 前。
+- PR `#27` 已绑定 Issue `#23` 打开；当前文档改动与职责边界口径已落盘，停在等待 checks 全绿、guardian 审查与受控 merge。
 
 ## 下一步动作
 
-- 生成中文 Conventional Commit，推送 issue-23 分支并创建只关联 Issue `#23` 的 governance PR。
+- 补齐 PR 摘要中的验证与范围说明，确保审查输入围绕当前 diff 的最小必要上下文。
+- 等待 GitHub checks 全绿后执行 guardian 审查。
 - 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -63,6 +64,9 @@
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/context_guard.py`
+- `python3 scripts/open_pr.py --class governance --issue 23 --item-key GOV-0023-workflow-review-roles --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "docs(governance): 对齐 reviewer guardian 与 CI 职责边界" --dry-run`
+- 已确认 PR：`#27 https://github.com/MC-and-his-Agents/Syvert/pull/27`
+- 已确认 checks：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Spec Review Boundaries` 通过，`Validate Governance Tooling` 处理中
 - 已用关键词检索复核 `WORKFLOW.md` / `docs/AGENTS.md` / `docs/process/delivery-funnel.md` 与 `spec_review.md` / `code_review.md` 的职责边界口径一致
 
 ## 未决风险
@@ -77,4 +81,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `6d1b4fdfa32fc718a1fcfc4601c0b6dcdca0b3ba`
+- `dc4a0fbbc507b977d3e50e61233e350358a20ef9`
