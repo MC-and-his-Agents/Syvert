@@ -25,12 +25,13 @@
 
 ## 当前停点
 
-- PR `#27` 已绑定 Issue `#23` 打开；当前文档改动与职责边界口径已落盘，停在等待 checks 全绿、guardian 审查与受控 merge。
+- PR `#27` 已绑定 Issue `#23` 打开，GitHub checks 已全绿。
+- 第一轮 guardian 审查指出两类问题：`delivery-funnel` 仍把 reviewer 前置与 merge gate 混写，且 reviewer 仍被摆在“自动化门禁”段落中；当前停在按最小范围修正文档后重跑 guardian。
 
 ## 下一步动作
 
-- 补齐 PR 摘要中的验证与范围说明，确保审查输入围绕当前 diff 的最小必要上下文。
-- 等待 GitHub checks 全绿后执行 guardian 审查。
+- 将 `docs/process/delivery-funnel.md` 的 `squash merge` 表述改成“reviewer 前置 + merge gate”分层，并移除 reviewer 在自动化门禁段落中的位置。
+- 基于最新 `head SHA` 重跑 guardian 审查，并确认 checks / guardian / merge 使用同一 head。
 - 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -66,8 +67,9 @@
 - `python3 scripts/context_guard.py`
 - `python3 scripts/open_pr.py --class governance --issue 23 --item-key GOV-0023-workflow-review-roles --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "docs(governance): 对齐 reviewer guardian 与 CI 职责边界" --dry-run`
 - 已确认 PR：`#27 https://github.com/MC-and-his-Agents/Syvert/pull/27`
-- 已确认 checks：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Spec Review Boundaries` 通过，`Validate Governance Tooling` 处理中
+- 已确认 checks：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Spec Review Boundaries` / `Validate Governance Tooling` 全部通过
 - 已用关键词检索复核 `WORKFLOW.md` / `docs/AGENTS.md` / `docs/process/delivery-funnel.md` 与 `spec_review.md` / `code_review.md` 的职责边界口径一致
+- 已读取首轮 guardian 结论并收敛为文档表述修正，不扩展到 #24 / #25
 
 ## 未决风险
 

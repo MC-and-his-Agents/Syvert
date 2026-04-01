@@ -27,6 +27,8 @@ Syvert 的唯一默认交付路径如下：
    - reviewer 根据 [code_review.md](../../code_review.md) 的 rubric 判断阻断项、风险、验证充分性与是否达到 `merge-ready` 质量
    - review 输入优先采用当前事项所需的最小必要上下文，不默认要求审查器重复探索整仓历史
 8. `squash merge`
+   - reviewer 必须先按适用 rubric 完成当前事项所需的实质审查；该前置条件不等于 merge gate
+   - merge gate 只回答“当前 PR 是否允许进入受控合并”，不替代 reviewer 的实质判断
    - 只有满足 [code_review.md](../../code_review.md) 定义的 merge gate，并通过受控入口校验后，才可 Squash Merge
    - 合并后若源分支不再承担活跃事项，应进入分支归档/退役流程
 
@@ -57,7 +59,6 @@ Syvert 的唯一默认交付路径如下：
 - `spec-guard`：保证正式规约区结构与边界不漂移
 - `workflow-guard`：保证 `WORKFLOW.md` 与必需流程文档结构合法
 - `governance-gate`：保证治理脚本、测试和 workflow 本身可回归
-- reviewer：根据 rubric 判断实现或规约是否存在阻断问题
 - `pr_guardian`：针对当前 PR head 执行合并前审查，产出 `verdict` 与 `safe_to_merge`
 - `merge_pr`：消费 guardian 结论、checks 与 head 一致性，执行受控 merge
 
