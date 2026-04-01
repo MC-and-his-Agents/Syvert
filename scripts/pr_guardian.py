@@ -46,6 +46,7 @@ REVIEW_GUIDE_HEADINGS = (
     "## 事项分级视角",
     "## 职责边界说明",
 )
+ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -207,6 +208,58 @@ def load_reviewer_rubric_excerpt(repo_root: Path) -> str:
     return "未能从 `code_review.md` 提取 reviewer rubric 节选，请围绕当前 diff、工件完整性与职责边界执行审查。"
 
 
+def extract_named_markdown_sections(body: str, headings: tuple[str, ...]) -> dict[str, str]:
+    selected = set(headings)
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip()
+            current = heading if heading in selected else None
+            if current:
+                sections.setdefault(current, [])
+            continue
+        if current:
+            sections[current].append(line.rstrip())
+
+    return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
+
+
+def fetch_issue_context(issue_number: int) -> dict[str, object]:
+    completed = run(
+        ["gh", "issue", "view", str(issue_number), "--json", "number,title,body,url"],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return {
+            "identity": [f"- Issue: #{issue_number}", "- issue 上下文暂不可用"],
+            "summary": "issue 内容暂不可用。",
+        }
+
+    payload = json.loads(completed.stdout or "{}")
+    body = str(payload.get("body") or "").strip()
+    identity = [
+        f"- Issue: #{payload.get('number', issue_number)}",
+        f"- 标题: {payload.get('title', '')}",
+        f"- 链接: {payload.get('url', '')}",
+    ]
+    sections = extract_named_markdown_sections(body, ISSUE_CONTEXT_HEADINGS)
+    if sections:
+        summary_parts: list[str] = []
+        for heading in ISSUE_CONTEXT_HEADINGS:
+            content = sections.get(heading)
+            if not content:
+                continue
+            summary_parts.extend([f"## {heading}", content, ""])
+        summary = "\n".join(summary_parts).strip()
+    else:
+        summary = body or "无 issue 正文。"
+    return {"identity": identity, "summary": summary}
+
+
 def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]:
     changed = run(
         ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"],
@@ -348,6 +401,11 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     changed_files, diff_stat = fetch_diff_stats(worktree_dir, base_ref)
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
+    issue_number = 0
+    try:
+        issue_number = int(str(item_context.get("issue", "")).strip())
+    except ValueError:
+        issue_number = 0
     worktree_matches, worktree_note = load_worktree_binding(meta.get("headRefName", ""))
     if worktree_note:
         context_notes.append(worktree_note)
@@ -365,6 +423,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             f"- 头部提交: {meta['headRefOid']}",
             f"- 头部分支: {meta.get('headRefName', '')}",
         ],
+        "issue_context": fetch_issue_context(issue_number) if issue_number else {"identity": ["- 无可确认的 Issue 上下文"], "summary": "无 issue 摘要。"},
         "item_context": item_context,
         "pr_sections": sections,
         "checks": fetch_checks_summary(meta["number"]),
@@ -410,6 +469,10 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "",
         "PR 基本信息：",
         *context["pr_identity"],
+        "",
+        "Issue 摘要：",
+        *context["issue_context"]["identity"],
+        str(context["issue_context"]["summary"]),
         "",
         "结构化事项上下文：",
         *render_bullet_dict(context["item_context"]),

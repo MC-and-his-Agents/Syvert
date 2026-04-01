@@ -144,6 +144,10 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "scripts.pr_guardian.build_review_context",
             return_value={
                 "pr_identity": ["- PR: #24", "- 标题: 治理: 精简 guardian review context"],
+                "issue_context": {
+                    "identity": ["- Issue: #24", "- 标题: governance: lean guardian review context"],
+                    "summary": "## Goal\n\n- 精简 review context",
+                },
                 "item_context": {"issue": "24", "item_key": "GOV-0024-guardian-review-context"},
                 "pr_sections": {
                     "summary": "- 变更目的：精简 prompt",
@@ -163,6 +167,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 prompt = build_prompt(meta, Path("/tmp/worktree"))
 
         self.assertIn("结构化事项上下文：", prompt)
+        self.assertIn("Issue 摘要：", prompt)
+        self.assertIn("## Goal", prompt)
         self.assertIn("GOV-0024-guardian-review-context", prompt)
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
@@ -247,13 +253,18 @@ class CodexReviewExecutionTests(unittest.TestCase):
         with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
             with patch(
                 "scripts.pr_guardian.build_item_context_summary",
-                return_value=({"item_key": "GOV-0024-guardian-review-context"}, [], []),
+                return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ) as build_item_context_summary_mock:
                 with patch("scripts.pr_guardian.load_worktree_binding", return_value=([], None)):
                     with patch("scripts.pr_guardian.fetch_checks_summary", return_value=["- checks ok"]):
-                        payload = build_review_context(meta, worktree_dir)
+                        with patch(
+                            "scripts.pr_guardian.fetch_issue_context",
+                            return_value={"identity": ["- Issue: #24"], "summary": "## Goal\n- 精简"},
+                        ) as fetch_issue_context_mock:
+                            payload = build_review_context(meta, worktree_dir)
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
+        fetch_issue_context_mock.assert_called_once_with(24)
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
     def test_load_worktree_binding_tolerates_invalid_json(self) -> None:
