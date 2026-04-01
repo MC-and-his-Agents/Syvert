@@ -9,7 +9,7 @@
 - sprint：`2026-S14`
 - 关联 spec：无（治理脚本事项）
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待补充
+- 关联 PR：`#28`
 - active 收口事项：`GOV-0024-guardian-review-context`
 
 ## 目标
@@ -25,13 +25,13 @@
 
 ## 当前停点
 
-- `scripts/pr_guardian.py` 已完成结构化 review context 重构并通过本地治理验证；当前停在回写 checkpoint、推送分支与创建仅针对 Issue `#24` 的 governance PR 前。
+- PR `#28` 已绑定 Issue `#24` 打开；当前代码与 PR 描述已落盘，停在等待 GitHub checks、guardian 审查与受控 merge。
 
 ## 下一步动作
 
-- 推送 issue-24 分支，并通过受控入口创建只针对 `#24` 的 governance PR。
-- 在 PR 描述中补齐本次仅做 guardian review context 瘦身、不触及 #25 模板/自动化入口的边界说明。
-- 持续推进 checks、guardian、merge gate、squash merge 与分支/worktree 清理。
+- 等待 GitHub checks 全绿，并复核 guardian prompt/context 重构没有削弱 merge gate 安全性。
+- 执行 guardian 审查与 `merge_pr` 受控合并，必要时仅在本事项范围内修复阻塞。
+- 合并后按分支退役协议清理本地/远端分支、worktree 与 stale state。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -65,6 +65,8 @@
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/open_pr.py --class governance --issue 24 --item-key GOV-0024-guardian-review-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "refactor(governance): 精简 guardian review 上下文注入" --dry-run`
+- 已确认 PR：`#28 https://github.com/MC-and-his-Agents/Syvert/pull/28`
+- 已补齐 PR 描述中的范围、风险、验证、回滚与 #25 非目标说明
 
 ## 未决风险
 
