@@ -19,7 +19,7 @@
 
 ## 范围
 
-- 本次纳入：`vision.md`、`docs/roadmap-v0-to-v1.md`、`docs/exec-plans/CHORE-0032-vision-roadmap-boundary.md` 回滚，以及当前回合 `exec-plan` 建立。
+- 本次纳入：`vision.md`、`docs/roadmap-v0-to-v1.md` 的回滚，以及当前回合 `exec-plan` 建立。
 - 本次不纳入：新的产品或实现改动；重写治理协议。
 
 ## 当前停点
