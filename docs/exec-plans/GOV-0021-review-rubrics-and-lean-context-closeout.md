@@ -25,7 +25,7 @@
 
 ## 当前停点
 
-- 已完成 `code_review.md` 的“最小必要审查输入”收紧、guardian rubric 节选范围收紧与对应测试；当前停在提 PR 前的最后自检。
+- 已完成 `code_review.md` 的“最小必要审查输入”收紧，并在 guardian prompt 中移除重复事项补充；当前停在通过受控入口 dry-run 后准备提交。
 
 ## 下一步动作
 
@@ -54,8 +54,9 @@
 - 已更新：`code_review.md`
 - 已更新：`scripts/pr_guardian.py`
 - 已更新：`tests/governance/test_pr_guardian.py`
-- 已新增：`docs/exec-plans/GOV-0021-review-rubrics-and-lean-context-closeout.md`
+- 已更新：`docs/exec-plans/GOV-0021-review-rubrics-and-lean-context-closeout.md`
 - `python3 -m unittest tests.governance.test_pr_guardian`
+- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian tests.governance.test_governance_status tests.governance.test_cli_smoke`
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/docs_guard.py --mode ci`
 

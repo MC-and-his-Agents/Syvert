@@ -15,6 +15,7 @@ from scripts.pr_guardian import (
     load_guardian_state,
     load_reviewer_rubric_excerpt,
     merge_if_safe,
+    render_item_context_supplement,
     review_once,
     run_codex_review,
     save_guardian_result,
@@ -182,6 +183,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("## Goal", prompt)
         self.assertIn("GOV-0024-guardian-review-context", prompt)
         self.assertIn("Fixes #24", prompt)
+        self.assertIn("PR 关联事项补充：\n- Closing: Fixes #24", prompt)
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
@@ -473,6 +475,10 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 [
                     "# 审查标准",
                     "",
+                    "## 审查输入",
+                    "",
+                    "- 不应出现在 reviewer excerpt",
+                    "",
                     "## 工件完整性检查",
                     "",
                     "- 输入必须完整",
@@ -492,10 +498,30 @@ class CodexReviewExecutionTests(unittest.TestCase):
             )
         )
 
+        self.assertNotIn("## 审查输入", excerpt)
         self.assertIn("## 工件完整性检查", excerpt)
         self.assertIn("## Review Rubric", excerpt)
         self.assertIn("## 职责边界说明", excerpt)
         self.assertNotIn("## 合并门禁", excerpt)
+
+    def test_render_item_context_supplement_keeps_only_non_redundant_lines(self) -> None:
+        supplement = render_item_context_supplement(
+            "\n".join(
+                [
+                    "- Issue: 25",
+                    "- item_key: GOV-0025-review-template-lean-context",
+                    "- item_type: GOV",
+                    "- release: v0.1.0",
+                    "- sprint: 2026-S14",
+                    "- Closing: Fixes #25",
+                    "- 需要 reviewer 关注模板兼容性",
+                ]
+            )
+        )
+
+        self.assertNotIn("item_key", supplement)
+        self.assertIn("Fixes #25", supplement)
+        self.assertIn("模板兼容性", supplement)
 
     @patch(
         "scripts.pr_guardian.run",

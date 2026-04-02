@@ -13,7 +13,7 @@
 - 与当前改动直接相关的治理或流程文档
 - 当前 diff、受影响文件与必要的调用链 / contract 边界
 
-仅在当前阻断项需要更多证据时，再补充：
+仅在当前阻断项需要更多证据、或上述输入无法支撑结论时，再补充：
 
 - [AGENTS.md](./AGENTS.md)
 - [WORKFLOW.md](./WORKFLOW.md)
@@ -22,7 +22,7 @@
 - [docs/process/agent-loop.md](./docs/process/agent-loop.md)
 - [docs/process/worktree-lifecycle.md](./docs/process/worktree-lifecycle.md)
 
-若现有输入已足以判断，不应把上述文档清单整段视为每次审查都必须重新阅读的固定前置步骤。
+若现有输入已足以判断，不应把上述文档清单整段视为每次审查都必须重新阅读的固定前置步骤，也不应把它们整段再次注入 reviewer prompt。
 
 ## 工件完整性检查
 

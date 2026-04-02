@@ -437,6 +437,27 @@ def render_bullet_dict(payload: dict[str, str]) -> list[str]:
     return [f"- {key}: {value}" for key, value in payload.items()]
 
 
+def render_item_context_supplement(section: str) -> str:
+    if not section.strip():
+        return "无额外事项补充。"
+
+    redundant_prefixes = (
+        "- Issue:",
+        "- item_key:",
+        "- item_type:",
+        "- release:",
+        "- sprint:",
+    )
+    retained = [
+        line
+        for line in section.splitlines()
+        if line.strip() and not any(line.strip().startswith(prefix) for prefix in redundant_prefixes)
+    ]
+    if not retained:
+        return "无额外事项补充。"
+    return "\n".join(retained)
+
+
 def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str:
     if not raw_body:
         return ""
@@ -493,7 +514,7 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         *render_bullet_dict(context["item_context"]),
         "",
         "PR 关联事项补充：",
-        sections.get("item_context", "无结构化关联事项补充。"),
+        render_item_context_supplement(sections.get("item_context", "")),
         "",
         "PR 摘要：",
         sections.get("summary", summary_fallback),
