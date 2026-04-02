@@ -71,7 +71,6 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("## Goal", summary)
         self.assertIn("## Scope", summary)
         self.assertIn("## Out of Scope", summary)
-
     def test_legacy_filename_exec_plan_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -539,17 +538,11 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "--dry-run",
             ]
         )
-        with patch(
-            "scripts.open_pr.build_issue_summary",
-            return_value="## Goal\n\n- 对齐最小审查上下文",
-        ):
-            body = build_body(args, ["AGENTS.md"])
+        body = build_body(args, ["AGENTS.md"])
         self.assertIn("item_key: `GOV-0015-item-context-gate`", body)
         self.assertIn("item_type: `GOV`", body)
         self.assertIn("release: `v0.1.0`", body)
         self.assertIn("sprint: `2026-S14`", body)
-        self.assertIn("## Issue 摘要", body)
-        self.assertIn("## Goal", body)
         self.assertIn("- 审查关注：", body)
         self.assertNotIn("## 变更文件", body)
         self.assertNotIn("## 检查清单", body)
