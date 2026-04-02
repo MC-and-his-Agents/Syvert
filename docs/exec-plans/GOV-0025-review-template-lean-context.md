@@ -25,11 +25,11 @@
 
 ## 当前停点
 
-- 已完成 `.github/PULL_REQUEST_TEMPLATE.md` 与 `open_pr` 的最小对齐改动，并确认 guardian 继续沿用 #24 的 lean review context builder；当前停在提交、推送、创建 PR 前。
+- 已完成模板、`open_pr`、guardian prompt、测试与本事项 `exec-plan` 的最小对齐改动，并通过本地验证；当前停在推送分支、创建 PR 与后续 guardian / merge gate 前。
 
 ## 下一步动作
 
-- 以中文 Conventional Commits 提交当前改动并推送 issue-25 分支。
+- 推送 issue-25 分支并创建仅针对 Issue `#25` 的 governance PR。
 - 通过受控入口创建仅针对 Issue `#25` 的 governance PR。
 - 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
 
@@ -63,14 +63,19 @@
 - 已阅读：`tests/governance/test_governance_status.py`
 - 已完成最小改动文件：`.github/PULL_REQUEST_TEMPLATE.md`
 - 已完成最小改动文件：`scripts/open_pr.py`
+- 已完成最小改动文件：`scripts/pr_guardian.py`
 - 已完成最小改动文件：`tests/governance/test_open_pr.py`
-- 已确认 `scripts/pr_guardian.py` 无需额外改动即可继续消费 `Issue 摘要 / 关联事项 / 风险 / 验证 / 回滚` 结构
-- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian tests.governance.test_governance_status`
-- `python3 -m unittest tests.governance.test_cli_smoke`
-- `python3 scripts/context_guard.py`
+- 已完成最小改动文件：`tests/governance/test_pr_guardian.py`
+- 已完成最小改动文件：`docs/exec-plans/GOV-0025-review-template-lean-context.md`
+- `git commit -m "fix(governance): 对齐 review 模板与 lean context 入口"`
+- `git commit -m "refactor(governance): 对齐审查模板与精简上下文入口"`
+- `git commit -m "fix(governance): 收紧审查模板最小输入"`
+- `git commit -m "test(governance): 补齐风险区块模板兼容覆盖"`
+- `git commit -m "test(governance): 清理 open_pr 模板旧用例"`
+- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian tests.governance.test_governance_status tests.governance.test_cli_smoke`
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/docs_guard.py --mode ci`
-- `python3 scripts/open_pr.py --class governance --issue 25 --item-key GOV-0025-review-template-lean-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "refactor(governance): 对齐审查模板与精简上下文入口" --dry-run`
+- `python3 scripts/open_pr.py --class governance --issue 25 --item-key GOV-0025-review-template-lean-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "chore(governance): 对齐 review 模板与 lean context 入口" --dry-run`
 
 ## 未决风险
 
@@ -84,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5b4c220d8983ccd452f44596099384af3b99696e`
+- `b7949daebc6f342008971d08dcf07ee93ec055aa`
