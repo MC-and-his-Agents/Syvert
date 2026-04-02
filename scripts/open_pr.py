@@ -36,6 +36,8 @@ from scripts.pr_scope_guard import build_report
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
+ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -73,11 +75,50 @@ def risk_reason_for_class(pr_class: str) -> str:
     return reasons[pr_class]
 
 
-def closing_line(issue: int | None, mode: str) -> str:
-    if not issue or mode == "none":
-        return "无"
-    prefix = "Fixes" if mode == "fixes" else "Refs"
-    return f"{prefix} #{issue}"
+def build_issue_summary(issue: int | None) -> str:
+    if issue is None:
+        return ""
+
+    require_cli("gh")
+    completed = run(
+        ["gh", "issue", "view", str(issue), "--json", "body"],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return ""
+
+    payload = json.loads(completed.stdout or "{}")
+    sections = extract_issue_summary_sections(str(payload.get("body") or ""))
+    if not sections:
+        return ""
+
+    lines: list[str] = []
+    for heading in ISSUE_SUMMARY_HEADINGS:
+        content = sections.get(heading)
+        if not content:
+            continue
+        lines.extend([f"## {heading}", "", content, ""])
+    return "\n".join(lines).strip()
+
+
+def extract_issue_summary_sections(body: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    selected = set(ISSUE_SUMMARY_HEADINGS)
+
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip()
+            current = heading if heading in selected else None
+            if current:
+                sections.setdefault(current, [])
+            continue
+        if current:
+            sections[current].append(line.rstrip())
+
+    return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
 
 
 def has_bootstrap_contract(repo_root: Path) -> bool:
@@ -129,6 +170,59 @@ def issue_requires_formal_input(issue: int) -> bool:
         if isinstance(item, dict)
     }
     return "FR-" in title.upper() or any(label in {"core", "governance", "spec"} or label.startswith("fr-") for label in labels)
+
+
+def closing_line(issue: int | None, mode: str) -> str:
+    if not issue or mode == "none":
+        return "无"
+    prefix = "Fixes" if mode == "fixes" else "Refs"
+    return f"{prefix} #{issue}"
+
+
+def extract_issue_summary_sections(body: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    selected = set(ISSUE_SUMMARY_HEADINGS)
+
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip()
+            current = heading if heading in selected else None
+            if current:
+                sections.setdefault(current, [])
+            continue
+        if current:
+            sections[current].append(line.rstrip())
+
+    return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
+
+
+def build_issue_summary(issue: int | None) -> str:
+    if issue is None:
+        return ""
+
+    require_cli("gh")
+    completed = run(
+        ["gh", "issue", "view", str(issue), "--json", "body"],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return ""
+
+    payload = json.loads(completed.stdout or "{}")
+    sections = extract_issue_summary_sections(str(payload.get("body") or ""))
+    if not sections:
+        return ""
+
+    lines: list[str] = []
+    for heading in ISSUE_SUMMARY_HEADINGS:
+        content = sections.get(heading)
+        if not content:
+            continue
+        lines.extend([f"## {heading}", "", content, ""])
+    return "\n".join(lines).strip()
 
 
 def load_worktree_binding_for_branch(branch: str, path: Path = WORKTREE_STATE_FILE) -> dict[str, object]:
@@ -292,6 +386,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     body = TEMPLATE_PATH.read_text(encoding="utf-8")
     replacements = {
         "{{PR_CLASS}}": args.pr_class,
+        "{{ISSUE_SUMMARY}}": build_issue_summary(args.issue),
         "{{ISSUE}}": f"#{args.issue}" if args.issue else "无",
         "{{ITEM_KEY}}": args.item_key or "未填写",
         "{{ITEM_TYPE}}": args.item_type or "未填写",
