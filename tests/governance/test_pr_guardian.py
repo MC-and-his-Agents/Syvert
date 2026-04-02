@@ -255,6 +255,42 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("PR 正文 fallback：", prompt)
         self.assertIn("## 自定义说明", prompt)
 
+    def test_build_prompt_omits_empty_optional_sections(self) -> None:
+        meta = {
+            "number": 30,
+            "title": "治理: 收口 review 治理主题剩余优化",
+            "url": "https://example.test/pr/30",
+            "baseRefName": "main",
+            "headRefOid": "sha-30",
+            "headRefName": "issue-30-branch",
+            "body": "## 摘要\n\n- 变更目的：收口\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #30"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "30", "item_key": "GOV-0030-closeout"},
+                "raw_sections": {"摘要": "- 变更目的：收口"},
+                "pr_sections": {"summary": "- 变更目的：收口"},
+                "changed_files": ["code_review.md"],
+                "diff_stat": "1 file changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- 行为正确性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("PR 摘要：", prompt)
+        self.assertNotIn("PR 关联事项补充：", prompt)
+        self.assertNotIn("风险摘要：", prompt)
+        self.assertNotIn("验证摘要：", prompt)
+        self.assertNotIn("回滚摘要：", prompt)
+        self.assertNotIn("相关工件路径：", prompt)
+        self.assertNotIn("Context Notes：", prompt)
+
     def test_build_prompt_filters_deprecated_template_noise_from_raw_fallback(self) -> None:
         meta = {
             "number": 25,

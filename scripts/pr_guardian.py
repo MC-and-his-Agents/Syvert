@@ -439,7 +439,7 @@ def render_bullet_dict(payload: dict[str, str]) -> list[str]:
 
 def render_item_context_supplement(section: str) -> str:
     if not section.strip():
-        return "无额外事项补充。"
+        return ""
 
     redundant_prefixes = (
         "- Issue:",
@@ -454,8 +454,15 @@ def render_item_context_supplement(section: str) -> str:
         if line.strip() and not any(line.strip().startswith(prefix) for prefix in redundant_prefixes)
     ]
     if not retained:
-        return "无额外事项补充。"
+        return ""
     return "\n".join(retained)
+
+
+def append_optional_section(lines: list[str], title: str, content: str) -> None:
+    content = content.strip()
+    if not content:
+        return
+    lines.extend(["", title, content])
 
 
 def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str:
@@ -509,46 +516,45 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "",
         "PR 基本信息：",
         *context["pr_identity"],
-        "",
-        "结构化事项上下文：",
-        *render_bullet_dict(context["item_context"]),
-        "",
-        "PR 关联事项补充：",
-        render_item_context_supplement(sections.get("item_context", "")),
-        "",
-        "PR 摘要：",
-        sections.get("summary", summary_fallback),
-        "",
-        "风险摘要：",
-        sections.get("risk", "无结构化风险摘要。"),
-        "",
-        "验证摘要：",
-        sections.get("validation", "无结构化验证摘要。"),
-        "",
-        "回滚摘要：",
-        sections.get("rollback", "无结构化回滚摘要。"),
-        "",
-        "变更文件：",
-        format_changed_files(context["changed_files"]),
-        "",
-        "Diff Stat：",
-        str(context["diff_stat"]),
-        "",
-        "相关工件路径：",
-        *([f"- `{path}`" for path in context["related_paths"]] or ["- 无直接定位到的 spec / exec-plan / decision 工件"]),
-        "",
-        "Context Notes：",
-        *([f"- {note}" for note in context["context_notes"]] or ["- 无"]),
     ]
 
     issue_summary = sections.get("issue_summary", "").strip()
+    item_context_supplement = render_item_context_supplement(sections.get("item_context", ""))
     if context["issue_context"]["identity"] or context["issue_context"]["summary"] or issue_summary:
-        lines[lines.index("结构化事项上下文："):lines.index("结构化事项上下文：")] = [
-            "Issue 摘要：",
-            *(context["issue_context"]["identity"] or []),
-            issue_summary or str(context["issue_context"]["summary"]),
+        lines.extend(
+            [
+                "",
+                "Issue 摘要：",
+                *(context["issue_context"]["identity"] or []),
+                issue_summary or str(context["issue_context"]["summary"]),
+            ]
+        )
+
+    lines.extend(
+        [
             "",
+            "结构化事项上下文：",
+            *render_bullet_dict(context["item_context"]),
+            "",
+            "PR 摘要：",
+            sections.get("summary", summary_fallback),
+            "",
+            "变更文件：",
+            format_changed_files(context["changed_files"]),
+            "",
+            "Diff Stat：",
+            str(context["diff_stat"]),
         ]
+    )
+
+    append_optional_section(lines, "PR 关联事项补充：", item_context_supplement)
+    append_optional_section(lines, "风险摘要：", sections.get("risk", ""))
+    append_optional_section(lines, "验证摘要：", sections.get("validation", ""))
+    append_optional_section(lines, "回滚摘要：", sections.get("rollback", ""))
+    if context["related_paths"]:
+        lines.extend(["", "相关工件路径：", *[f"- `{path}`" for path in context["related_paths"]]])
+    if context["context_notes"]:
+        lines.extend(["", "Context Notes：", *[f"- {note}" for note in context["context_notes"]]])
 
     if raw_body_fallback:
         lines.extend(["", "PR 正文 fallback：", raw_body_fallback])
