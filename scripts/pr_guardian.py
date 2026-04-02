@@ -35,12 +35,12 @@ REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
     "Issue 摘要": "issue_summary",
     "关联事项": "item_context",
+    "风险": "risk",
     "风险级别": "risk",
-    "变更文件": "changed_files",
     "验证": "validation",
     "回滚": "rollback",
-    "检查清单": "checklist",
 }
+RAW_BODY_NOISE_HEADINGS = {"变更文件", "检查清单"}
 REVIEW_GUIDE_HEADINGS = (
     "## 审查输入",
     "## 工件完整性检查",
@@ -445,7 +445,11 @@ def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str
         return raw_body
 
     preamble = raw_sections.get("__preamble__", "").strip()
-    extra_headings = [heading for heading in raw_sections if heading not in REVIEW_SECTION_ALIASES]
+    extra_headings = [
+        heading
+        for heading in raw_sections
+        if heading not in REVIEW_SECTION_ALIASES and heading not in RAW_BODY_NOISE_HEADINGS
+    ]
     if not extra_headings and not preamble:
         return ""
 
@@ -503,9 +507,6 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "",
         "回滚摘要：",
         sections.get("rollback", "无结构化回滚摘要。"),
-        "",
-        "检查清单：",
-        sections.get("checklist", "无结构化检查清单。"),
         "",
         "变更文件：",
         format_changed_files(context["changed_files"]),

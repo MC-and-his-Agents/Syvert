@@ -165,7 +165,6 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "risk": "- `medium`",
                     "validation": "- python3 -m unittest",
                     "rollback": "- revert PR",
-                    "checklist": "- [x] 已填写 Closing",
                 },
                 "checks": ["- governance: bucket=pass, state=SUCCESS"],
                 "worktree_binding": [{"key": "issue-24", "path": "/tmp/issue-24"}],
@@ -183,13 +182,13 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("## Goal", prompt)
         self.assertIn("GOV-0024-guardian-review-context", prompt)
         self.assertIn("Fixes #24", prompt)
-        self.assertIn("检查清单：", prompt)
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
         self.assertNotIn("PR 正文 fallback：", prompt)
         self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)
         self.assertNotIn("默认 Squash Merge", prompt)
+        self.assertNotIn("检查清单：", prompt)
 
     def test_build_prompt_uses_raw_body_only_when_structured_sections_are_incomplete(self) -> None:
         meta = {
@@ -228,6 +227,99 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertIn("PR 正文 fallback：", prompt)
         self.assertIn("## 自定义说明", prompt)
+
+    def test_build_prompt_filters_deprecated_template_noise_from_raw_fallback(self) -> None:
+        meta = {
+            "number": 25,
+            "title": "治理: 对齐 review template",
+            "url": "https://example.test/pr/25",
+            "baseRefName": "main",
+            "headRefOid": "sha-25",
+            "headRefName": "issue-25-branch",
+            "body": "\n".join(
+                [
+                    "## 摘要",
+                    "",
+                    "- 变更目的：精简模板",
+                    "",
+                    "## 检查清单",
+                    "",
+                    "- [x] 旧模板字段",
+                    "",
+                    "## 自定义说明",
+                    "",
+                    "- 只保留 reviewer 需要的补充说明",
+                ]
+            ),
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #25"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "25"},
+                "raw_sections": {
+                    "摘要": "- 变更目的：精简模板",
+                    "检查清单": "- [x] 旧模板字段",
+                    "自定义说明": "- 只保留 reviewer 需要的补充说明",
+                },
+                "pr_sections": {
+                    "summary": "- 变更目的：精简模板",
+                },
+                "changed_files": ["scripts/pr_guardian.py"],
+                "diff_stat": "1 file changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("PR 正文 fallback：", prompt)
+        self.assertIn("## 自定义说明", prompt)
+        self.assertNotIn("## 检查清单", prompt)
+
+    def test_build_prompt_accepts_new_risk_heading(self) -> None:
+        meta = {
+            "number": 25,
+            "title": "治理: 对齐 review template",
+            "url": "https://example.test/pr/25",
+            "baseRefName": "main",
+            "headRefOid": "sha-25",
+            "headRefName": "issue-25-branch",
+            "body": "## 摘要\n\n- 变更目的：精简模板\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #25"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "25", "item_key": "GOV-0025-review-template-lean-context"},
+                "raw_sections": {
+                    "摘要": "- 变更目的：精简模板",
+                    "风险": "- 风险级别：`medium`\n- 审查关注：guardian 入口不要回退到模板噪音",
+                    "验证": "- python3 -m unittest",
+                    "回滚": "- revert PR",
+                },
+                "pr_sections": {
+                    "summary": "- 变更目的：精简模板",
+                    "risk": "- 风险级别：`medium`\n- 审查关注：guardian 入口不要回退到模板噪音",
+                    "validation": "- python3 -m unittest",
+                    "rollback": "- revert PR",
+                },
+                "changed_files": ["scripts/open_pr.py", ".github/PULL_REQUEST_TEMPLATE.md"],
+                "diff_stat": "2 files changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("风险摘要：", prompt)
+        self.assertIn("审查关注：guardian 入口不要回退到模板噪音", prompt)
 
     def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
         meta = {

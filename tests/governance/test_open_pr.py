@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.common import CommandError
-from scripts.open_pr import build_body, parse_args, validate_current_worktree_binding, validate_pr_preflight
+from scripts.open_pr import build_body, build_issue_summary, parse_args, validate_current_worktree_binding, validate_pr_preflight
 
 
 def write_exec_plan(
@@ -43,6 +43,34 @@ def write_exec_plan(
 
 
 class OpenPrPreflightTests(unittest.TestCase):
+    def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
+        payload = {
+            "body": "\n".join(
+                [
+                    "## Goal",
+                    "",
+                    "- 对齐模板",
+                    "",
+                    "## Scope",
+                    "",
+                    "- 调整 open_pr 和 guardian",
+                    "",
+                    "## Out of Scope",
+                    "",
+                    "- 不改 merge_pr",
+                ]
+            )
+        }
+
+        with patch(
+            "scripts.open_pr.run",
+            return_value=type("Completed", (), {"returncode": 0, "stdout": __import__("json").dumps(payload)})(),
+        ):
+            summary = build_issue_summary(25)
+
+        self.assertIn("## Goal", summary)
+        self.assertIn("## Scope", summary)
+        self.assertIn("## Out of Scope", summary)
     def test_legacy_filename_exec_plan_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -515,6 +543,9 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("item_type: `GOV`", body)
         self.assertIn("release: `v0.1.0`", body)
         self.assertIn("sprint: `2026-S14`", body)
+        self.assertIn("- 审查关注：", body)
+        self.assertNotIn("## 变更文件", body)
+        self.assertNotIn("## 检查清单", body)
 
 
 if __name__ == "__main__":
