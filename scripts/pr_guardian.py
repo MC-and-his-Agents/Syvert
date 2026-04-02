@@ -548,11 +548,13 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
     )
 
     append_optional_section(lines, "PR 关联事项补充：", item_context_supplement)
-    append_optional_section(lines, "风险摘要：", sections.get("risk", ""))
-    append_optional_section(lines, "验证摘要：", sections.get("validation", ""))
-    append_optional_section(lines, "回滚摘要：", sections.get("rollback", ""))
+    lines.extend(["", "风险摘要：", sections.get("risk", "未提供结构化风险摘要。")])
+    lines.extend(["", "验证摘要：", sections.get("validation", "未提供结构化验证摘要。")])
+    lines.extend(["", "回滚摘要：", sections.get("rollback", "未提供结构化回滚摘要。")])
     if context["related_paths"]:
         lines.extend(["", "相关工件路径：", *[f"- `{path}`" for path in context["related_paths"]]])
+    else:
+        lines.extend(["", "相关工件路径：", "- 未直接定位到相关 spec / exec-plan / decision 工件。"])
     if context["context_notes"]:
         lines.extend(["", "Context Notes：", *[f"- {note}" for note in context["context_notes"]]])
 

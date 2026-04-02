@@ -255,7 +255,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("PR 正文 fallback：", prompt)
         self.assertIn("## 自定义说明", prompt)
 
-    def test_build_prompt_omits_empty_optional_sections(self) -> None:
+    def test_build_prompt_omits_only_nonessential_empty_sections(self) -> None:
         meta = {
             "number": 30,
             "title": "治理: 收口 review 治理主题剩余优化",
@@ -285,10 +285,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertIn("PR 摘要：", prompt)
         self.assertNotIn("PR 关联事项补充：", prompt)
-        self.assertNotIn("风险摘要：", prompt)
-        self.assertNotIn("验证摘要：", prompt)
-        self.assertNotIn("回滚摘要：", prompt)
-        self.assertNotIn("相关工件路径：", prompt)
+        self.assertIn("风险摘要：", prompt)
+        self.assertIn("未提供结构化风险摘要。", prompt)
+        self.assertIn("验证摘要：", prompt)
+        self.assertIn("未提供结构化验证摘要。", prompt)
+        self.assertIn("回滚摘要：", prompt)
+        self.assertIn("未提供结构化回滚摘要。", prompt)
+        self.assertIn("相关工件路径：", prompt)
+        self.assertIn("未直接定位到相关 spec / exec-plan / decision 工件。", prompt)
         self.assertNotIn("Context Notes：", prompt)
 
     def test_build_prompt_filters_deprecated_template_noise_from_raw_fallback(self) -> None:
