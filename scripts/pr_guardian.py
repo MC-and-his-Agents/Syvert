@@ -35,6 +35,7 @@ REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
     "Issue 摘要": "issue_summary",
     "关联事项": "item_context",
+    "风险": "risk",
     "风险级别": "risk",
     "验证": "validation",
     "回滚": "rollback",

@@ -280,6 +280,47 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("## 自定义说明", prompt)
         self.assertNotIn("## 检查清单", prompt)
 
+    def test_build_prompt_accepts_new_risk_heading(self) -> None:
+        meta = {
+            "number": 25,
+            "title": "治理: 对齐 review template",
+            "url": "https://example.test/pr/25",
+            "baseRefName": "main",
+            "headRefOid": "sha-25",
+            "headRefName": "issue-25-branch",
+            "body": "## 摘要\n\n- 变更目的：精简模板\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #25"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "25", "item_key": "GOV-0025-review-template-lean-context"},
+                "raw_sections": {
+                    "摘要": "- 变更目的：精简模板",
+                    "风险": "- 风险级别：`medium`\n- 审查关注：guardian 入口不要回退到模板噪音",
+                    "验证": "- python3 -m unittest",
+                    "回滚": "- revert PR",
+                },
+                "pr_sections": {
+                    "summary": "- 变更目的：精简模板",
+                    "risk": "- 风险级别：`medium`\n- 审查关注：guardian 入口不要回退到模板噪音",
+                    "validation": "- python3 -m unittest",
+                    "rollback": "- revert PR",
+                },
+                "changed_files": ["scripts/open_pr.py", ".github/PULL_REQUEST_TEMPLATE.md"],
+                "diff_stat": "2 files changed",
+                "related_paths": [],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("风险摘要：", prompt)
+        self.assertIn("审查关注：guardian 入口不要回退到模板噪音", prompt)
+
     def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
         meta = {
             "body": "\n".join(
