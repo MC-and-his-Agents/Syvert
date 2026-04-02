@@ -17,10 +17,10 @@
 - sprint: `{{SPRINT}}`
 - Closing: {{CLOSING}}
 
-## 风险级别
+## 风险
 
-- `{{RISK_LEVEL}}`
-- 判断依据：{{RISK_REASON}}
+- 风险级别：`{{RISK_LEVEL}}`
+- 审查关注：
 
 ## 验证
 

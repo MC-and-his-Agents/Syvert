@@ -492,7 +492,8 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("必须包含正式规约区变更" in error for error in errors))
 
-    def test_build_body_contains_item_context(self) -> None:
+    @patch("scripts.open_pr.build_issue_summary", return_value="## Goal\n\n- 冻结 issue 摘要")
+    def test_build_body_contains_item_context(self, build_issue_summary_mock) -> None:
         args = parse_args(
             [
                 "--class",
@@ -511,11 +512,14 @@ class OpenPrPreflightTests(unittest.TestCase):
             ]
         )
         body = build_body(args, ["AGENTS.md"])
+        build_issue_summary_mock.assert_called_once_with(19)
         self.assertIn("item_key: `GOV-0015-item-context-gate`", body)
         self.assertIn("item_type: `GOV`", body)
         self.assertIn("release: `v0.1.0`", body)
         self.assertIn("sprint: `2026-S14`", body)
-        self.assertIn("- 审查关注：", body)
+        self.assertIn("## Issue 摘要", body)
+        self.assertIn("## Goal", body)
+        self.assertIn("- 主要改动：", body)
         self.assertNotIn("## 变更文件", body)
         self.assertNotIn("## 检查清单", body)
 

@@ -15,7 +15,7 @@
 ## 目标
 
 - 让 `.github/PULL_REQUEST_TEMPLATE.md` 只保留 reviewer / guardian 真正消费的高价值输入。
-- 让 `open_pr` 自动冻结最小 Issue 摘要，避免继续依赖冗余模板正文或 reviewer 二次读取远端 Issue。
+- 让 `open_pr`、guardian prompt 与相关状态面继续消费最小必要字段，而不是整段模板噪音。
 - 让 guardian prompt 与新的 lean review context 模型保持一致，不削弱既有 merge gate、安全性与 head 绑定逻辑。
 
 ## 范围
@@ -25,13 +25,13 @@
 
 ## 当前停点
 
-- 已确认本地 `main` 原先与 `origin/main` 分叉；现已先对齐到包含 #24 的主线提交 `6fd5b55b8d8bc69e1eb573c522f9f77faeedf5b4`，并复用 issue-25 独立 worktree。当前停在模板/自动化偏差收敛与最小改动落地前。
+- 已完成 `.github/PULL_REQUEST_TEMPLATE.md` 与 `open_pr` 的最小对齐改动，并确认 guardian 继续沿用 #24 的 lean review context builder；当前停在提交、推送、创建 PR 前。
 
 ## 下一步动作
 
-- 收缩 PR 模板，去掉 `变更文件` / 检查清单等冗余正文输入。
-- 让 `open_pr` 自动填充最小 Issue 摘要，并更新 guardian prompt 与测试。
-- 跑最小必要验证、开 PR、推进 guardian / checks / merge，最后清理分支与 worktree。
+- 以中文 Conventional Commits 提交当前改动并推送 issue-25 分支。
+- 通过受控入口创建仅针对 Issue `#25` 的 governance PR。
+- 继续推进 checks、guardian、受控 merge 与分支/worktree 清理。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -45,13 +45,13 @@
 ## 已验证项
 
 - `gh issue view 25 --repo MC-and-his-Agents/Syvert`
-- `git fetch origin main`
-- 已确认本地 `main` 与 `origin/main` 已同步到 `6fd5b55b8d8bc69e1eb573c522f9f77faeedf5b4`
-- `python3 scripts/create_worktree.py --issue 25 --class governance --dry-run`
-- 已复用 worktree：`/Users/claw/code/worktrees/syvert/issue-25-governance-align-review-templates-and-automation-with-lean-context-model`
+- `gh pr view 28 --repo MC-and-his-Agents/Syvert --json number,title,mergeCommit,state,url`
+- `python3 scripts/create_worktree.py --issue 25 --class governance`
+- 已创建 worktree：`/Users/claw/code/worktrees/syvert/issue-25-governance-align-review-templates-and-automation-with-lean-context-model`
 - 已阅读：`AGENTS.md`
 - 已阅读：`WORKFLOW.md`
 - 已阅读：`code_review.md`
+- 已阅读：`docs/process/agent-loop.md`
 - 已阅读：`docs/process/worktree-lifecycle.md`
 - 已阅读：`docs/process/branch-retirement.md`
 - 已阅读：`scripts/pr_guardian.py`
@@ -61,11 +61,21 @@
 - 已阅读：`tests/governance/test_open_pr.py`
 - 已阅读：`tests/governance/test_pr_guardian.py`
 - 已阅读：`tests/governance/test_governance_status.py`
+- 已完成最小改动文件：`.github/PULL_REQUEST_TEMPLATE.md`
+- 已完成最小改动文件：`scripts/open_pr.py`
+- 已完成最小改动文件：`tests/governance/test_open_pr.py`
+- 已确认 `scripts/pr_guardian.py` 无需额外改动即可继续消费 `Issue 摘要 / 关联事项 / 风险 / 验证 / 回滚` 结构
+- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian tests.governance.test_governance_status`
+- `python3 -m unittest tests.governance.test_cli_smoke`
+- `python3 scripts/context_guard.py`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/open_pr.py --class governance --issue 25 --item-key GOV-0025-review-template-lean-context --item-type GOV --release v0.1.0 --sprint 2026-S14 --title "refactor(governance): 对齐审查模板与精简上下文入口" --dry-run`
 
 ## 未决风险
 
 - 若把 PR 模板继续设计成冗长 checklist，会直接抵消 #24 的 guardian context 瘦身收益。
-- 若 `open_pr` 自动冻结的 Issue 摘要过宽，会重新把相邻事项噪音注入审查上下文。
+- 若 guardian raw-body fallback 仍把旧模板的 `检查清单` / `变更文件` 重新注入 prompt，会让 lean context 在提示层面回退。
 - 若改动触碰 `merge_pr` 或 guardian verdict schema，会越界并削弱现有 merge gate 闭环。
 
 ## 回滚方式
@@ -74,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `6fd5b55b8d8bc69e1eb573c522f9f77faeedf5b4`
+- `5b4c220d8983ccd452f44596099384af3b99696e`
