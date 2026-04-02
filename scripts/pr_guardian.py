@@ -42,7 +42,6 @@ REVIEW_SECTION_ALIASES = {
 }
 RAW_BODY_NOISE_HEADINGS = {"变更文件", "检查清单"}
 REVIEW_GUIDE_HEADINGS = (
-    "## 审查输入",
     "## 工件完整性检查",
     "## Review Rubric",
     "## 事项分级视角",

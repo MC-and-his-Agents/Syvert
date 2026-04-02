@@ -4,7 +4,16 @@
 
 ## 审查输入
 
-审查时至少对齐以下输入：
+审查输入遵循“最小必要上下文”原则：只对齐支撑当前事项、当前 diff、当前 `head SHA` 判断所必需的输入类别，不默认要求 reviewer 重复探索整仓历史。
+
+默认优先对齐：
+
+- 当前 PR 的标题、描述、风险、验证、回滚与事项上下文
+- 与当前事项直接相关的 `spec` / `plan` / `TODO` / bootstrap contract / `exec-plan`
+- 与当前改动直接相关的治理或流程文档
+- 当前 diff、受影响文件与必要的调用链 / contract 边界
+
+仅在当前阻断项需要更多证据时，再补充：
 
 - [AGENTS.md](./AGENTS.md)
 - [WORKFLOW.md](./WORKFLOW.md)
@@ -12,9 +21,8 @@
 - [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
 - [docs/process/agent-loop.md](./docs/process/agent-loop.md)
 - [docs/process/worktree-lifecycle.md](./docs/process/worktree-lifecycle.md)
-- 相关 `spec` / `plan` / `TODO`（如有）
-- 对治理 bootstrap 项，补充对应 Issue、`docs/decisions/**` 与 `docs/exec-plans/**`
-- 对应 Issue / PR 描述与验收口径
+
+若现有输入已足以判断，不应把上述文档清单整段视为每次审查都必须重新阅读的固定前置步骤。
 
 ## 工件完整性检查
 

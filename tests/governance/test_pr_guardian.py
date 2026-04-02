@@ -186,9 +186,34 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
         self.assertNotIn("PR 正文 fallback：", prompt)
+        self.assertNotIn("审查输入", prompt)
         self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)
         self.assertNotIn("默认 Squash Merge", prompt)
         self.assertNotIn("检查清单：", prompt)
+
+    def test_extract_reviewer_rubric_excerpt_excludes_review_inputs_section(self) -> None:
+        excerpt = extract_reviewer_rubric_excerpt(
+            "\n".join(
+                [
+                    "## 审查输入",
+                    "- 当前 PR",
+                    "",
+                    "## 工件完整性检查",
+                    "- 输入齐备",
+                    "",
+                    "## Review Rubric",
+                    "- 行为正确性",
+                    "",
+                    "## 职责边界说明",
+                    "- guardian 负责 merge gate",
+                ]
+            )
+        )
+
+        self.assertNotIn("## 审查输入", excerpt)
+        self.assertIn("## 工件完整性检查", excerpt)
+        self.assertIn("## Review Rubric", excerpt)
+        self.assertIn("## 职责边界说明", excerpt)
 
     def test_build_prompt_uses_raw_body_only_when_structured_sections_are_incomplete(self) -> None:
         meta = {
