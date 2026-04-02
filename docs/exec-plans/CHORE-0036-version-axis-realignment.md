@@ -9,7 +9,7 @@
 - sprint：`2026-S14`
 - 关联 spec：无（文档收口事项）
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待创建
+- 关联 PR：`https://github.com/MC-and-his-Agents/Syvert/pull/37`
 - active 收口事项：`CHORE-0036-version-axis-realignment`
 
 ## 目标
@@ -24,13 +24,13 @@
 
 ## 当前停点
 
-- 已恢复目标文档到 `97cd992` 对应文本，正在补齐当前事项上下文并准备通过受控入口创建 PR。
+- 已创建受控 PR `#37`，当前变更内容已恢复到 `97cd992` 对应文本，正在等待 CI 与 guardian 审查。
 
 ## 下一步动作
 
-- 校验文档与当前事项工件。
-- 推送 `issue-36-docs` 分支。
-- 通过 `open_pr.py` 创建 docs 类 PR，随后回写 PR 链接与验证证据。
+- 等待 CI 全绿。
+- 基于当前 head 的验证证据发起 guardian 审查。
+- 通过 `merge_pr` 受控入口执行 squash merge。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -45,6 +45,9 @@
 
 - `git show 97cd992:vision.md`
 - `git show 97cd992:docs/roadmap-v0-to-v1.md`
+- `git diff --exit-code 97cd992 -- vision.md docs/roadmap-v0-to-v1.md`
+- `python3 scripts/docs_guard.py --mode ci`
+- `gh pr checks 37`
 - 当前恢复目标：仅 `vision.md` 与 `docs/roadmap-v0-to-v1.md`
 
 ## 未决风险
