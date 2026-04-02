@@ -63,6 +63,16 @@ def latest_commit_subject() -> str:
     return run(["git", "log", "-1", "--pretty=%s"], cwd=REPO_ROOT).stdout.strip()
 
 
+def risk_reason_for_class(pr_class: str) -> str:
+    reasons = {
+        "governance": "涉及治理基线、门禁机制或工作流入口。",
+        "spec": "涉及正式规约区，必须先收口契约边界。",
+        "implementation": "涉及实现或测试改动，需要验证行为变化。",
+        "docs": "仅包含文档层改动，不应混入治理或实现行为变化。",
+    }
+    return reasons[pr_class]
+
+
 def closing_line(issue: int | None, mode: str) -> str:
     if not issue or mode == "none":
         return "无"

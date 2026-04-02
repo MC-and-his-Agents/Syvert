@@ -2,11 +2,7 @@
 
 - PR Class: `{{PR_CLASS}}`
 - 变更目的：
-- 主要改动：
-
-## Issue 摘要
-
-{{ISSUE_SUMMARY}}
+- 审查关注：
 
 ## 关联事项
 
@@ -17,10 +13,10 @@
 - sprint: `{{SPRINT}}`
 - Closing: {{CLOSING}}
 
-## 风险
+## 风险级别
 
-- 风险级别：`{{RISK_LEVEL}}`
-- 审查关注：
+- `{{RISK_LEVEL}}`
+- 判断依据：{{RISK_REASON}}
 
 ## 验证
 
