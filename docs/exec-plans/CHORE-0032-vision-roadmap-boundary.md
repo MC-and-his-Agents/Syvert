@@ -8,7 +8,7 @@
 - release：`v0.1.0`
 - sprint：`2026-S14`
 - 关联 spec：无（文档收口事项）
-- 关联 decision：无
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
 - 关联 PR：待补充
 - active 收口事项：`CHORE-0032-vision-roadmap-boundary`
 
@@ -58,4 +58,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `4901f52`
+- `4901f523dbf8a3b816de9ef206fc9515d6bd685b`
