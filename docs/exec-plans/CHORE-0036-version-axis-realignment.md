@@ -61,7 +61,8 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `vision.md`、`docs/roadmap-v0-to-v1.md` 与当前 `exec-plan` 的增量修改。
 
-## 最近一次 checkpoint 对应的 head 绑定方式
+## 最近一次 checkpoint 对应的 head SHA
 
-- 本文件记录 checkpoint 与验证规则。
-- 当前审查回合实际绑定的 head SHA 以 PR `#37` 正文中的验证区块为准，并在每次元数据提交后同步刷新。
+- `68a2404dd95cabdb5a42c316681215d062c8aea8`
+- 上述 SHA 对应最近一次在仓内工件中完成 checkpoint 收口的 head。
+- 若当前审查回合仅追加 `exec-plan` / PR 正文等元数据补件提交，则实际用于 guardian 审查的当前 head SHA 以 PR `#37` 正文验证区块为准，并在每次补件后同步刷新。
