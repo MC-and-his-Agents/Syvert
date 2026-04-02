@@ -515,6 +515,9 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("item_type: `GOV`", body)
         self.assertIn("release: `v0.1.0`", body)
         self.assertIn("sprint: `2026-S14`", body)
+        self.assertIn("- 审查关注：", body)
+        self.assertNotIn("## 变更文件", body)
+        self.assertNotIn("## 检查清单", body)
 
 
 if __name__ == "__main__":

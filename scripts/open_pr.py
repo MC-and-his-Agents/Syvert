@@ -22,7 +22,6 @@ from scripts.item_context import (
 from scripts.common import (
     CommandError,
     REPO_ROOT,
-    format_changed_files,
     git_changed_files,
     git_current_branch,
     git_fetch_branch,
@@ -301,7 +300,6 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
         "{{CLOSING}}": closing_line(args.issue, args.closing),
         "{{RISK_LEVEL}}": risk_level(args.pr_class),
         "{{RISK_REASON}}": risk_reason_for_class(args.pr_class),
-        "{{CHANGED_FILES}}": format_changed_files(changed_files),
         "{{VALIDATION_SUGGESTION}}": "- 已执行：\n- 未执行：",
         "{{ROLLBACK}}": "如需回滚，使用独立 revert PR 撤销本次变更。",
     }
