@@ -24,12 +24,14 @@
 
 ## 当前停点
 
-- 已创建受控 PR `#37`，当前变更内容已恢复到 `97cd992` 对应文本，正在等待 CI 与 guardian 审查。
+- 已创建受控 PR `#37`，当前变更内容已恢复到 `97cd992` 对应文本。
+- guardian 已指出 `exec-plan` 的 checkpoint SHA 过期，当前回合正在补齐与 PR head 绑定的验证证据后重新发起审查。
 
 ## 下一步动作
 
+- 基于当前 head 重新绑定验证证据。
 - 等待 CI 全绿。
-- 基于当前 head 的验证证据发起 guardian 审查。
+- 重新发起 guardian 审查。
 - 通过 `merge_pr` 受控入口执行 squash merge。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -59,6 +61,7 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `vision.md`、`docs/roadmap-v0-to-v1.md` 与当前 `exec-plan` 的增量修改。
 
-## 最近一次 checkpoint 对应的 head SHA
+## 最近一次 checkpoint 对应的 head 绑定方式
 
-- `81b94c2d5a6ae3acb28ef3c3d38213dabd09ad80`
+- 本文件记录 checkpoint 与验证规则。
+- 当前审查回合实际绑定的 head SHA 以 PR `#37` 正文中的验证区块为准，并在每次元数据提交后同步刷新。
