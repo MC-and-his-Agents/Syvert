@@ -9,7 +9,7 @@
 - sprint：`2026-S14`
 - 关联 spec：无（文档回滚与流程恢复事项）
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待补充
+- 关联 PR：`https://github.com/MC-and-his-Agents/Syvert/pull/35`
 - active 收口事项：`CHORE-0034-review-recovery`
 
 ## 目标
@@ -19,18 +19,18 @@
 
 ## 范围
 
-- 本次纳入：`vision.md` 与 `docs/roadmap-v0-to-v1.md` 回滚、`CHORE-0032` 历史 exec-plan 清理、本回合 `exec-plan` 建立。
+- 本次纳入：`vision.md` 与 `docs/roadmap-v0-to-v1.md` 回滚、`CHORE-0032` 历史 exec-plan 保留、本回合 `exec-plan` 建立。
 - 本次不纳入：新增文档策略内容、实现代码修改、治理协议重写。
 
 ## 当前停点
 
-- 已完成回滚提交，正在补齐受控入口所需事项上下文并准备创建 PR。
+- 已完成受控回滚 PR `#35` 创建并通过 CI 门禁，当前处于 guardian 审查与合并前收口阶段。
 
 ## 下一步动作
 
-- 运行文档门禁校验。
-- 推送 `issue-34-docs-pr33` 分支。
-- 通过 `open_pr.py` 创建 docs 类受控 PR 并关联 Issue `#34`。
+- 依据 guardian 审查意见补齐证据或上下文（若有）。
+- 通过 `merge_pr` 受控入口执行 squash merge。
+- 回滚完成后在新回合重新提交原文档调整并等待完整审查。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -45,6 +45,10 @@
 
 - `git revert --no-commit 97cd992cca67369667842b602de94a4c290641c9`
 - `git commit -m "revert(docs): 回滚 PR33 以恢复受控审查前状态"`
+- `git diff --exit-code 30bc127683b8905c4c2a2115213d61e308b29742 -- vision.md docs/roadmap-v0-to-v1.md`
+- `git diff --name-only origin/main...HEAD`
+- `python3 scripts/docs_guard.py --mode ci`
+- `gh pr checks 35`
 - `git rev-parse HEAD`
 
 ## 未决风险
