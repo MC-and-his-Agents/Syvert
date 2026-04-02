@@ -37,7 +37,6 @@ from scripts.pr_scope_guard import build_report
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
-ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -63,62 +62,6 @@ def ensure_not_main(branch: str) -> None:
 
 def latest_commit_subject() -> str:
     return run(["git", "log", "-1", "--pretty=%s"], cwd=REPO_ROOT).stdout.strip()
-
-
-def risk_reason_for_class(pr_class: str) -> str:
-    reasons = {
-        "governance": "涉及治理基线、门禁机制或工作流入口。",
-        "spec": "涉及正式规约区，必须先收口契约边界。",
-        "implementation": "涉及实现或测试改动，需要验证行为变化。",
-        "docs": "仅包含文档层改动，不应混入治理或实现行为变化。",
-    }
-    return reasons[pr_class]
-
-
-def build_issue_summary(issue: int | None) -> str:
-    if issue is None:
-        return ""
-
-    require_cli("gh")
-    completed = run(
-        ["gh", "issue", "view", str(issue), "--json", "body"],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if completed.returncode != 0:
-        return ""
-
-    payload = json.loads(completed.stdout or "{}")
-    sections = extract_issue_summary_sections(str(payload.get("body") or ""))
-    if not sections:
-        return ""
-
-    lines: list[str] = []
-    for heading in ISSUE_SUMMARY_HEADINGS:
-        content = sections.get(heading)
-        if not content:
-            continue
-        lines.extend([f"## {heading}", "", content, ""])
-    return "\n".join(lines).strip()
-
-
-def extract_issue_summary_sections(body: str) -> dict[str, str]:
-    sections: dict[str, list[str]] = {}
-    current: str | None = None
-    selected = set(ISSUE_SUMMARY_HEADINGS)
-
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip()
-            current = heading if heading in selected else None
-            if current:
-                sections.setdefault(current, [])
-            continue
-        if current:
-            sections[current].append(line.rstrip())
-
-    return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
 
 
 def has_bootstrap_contract(repo_root: Path) -> bool:
@@ -394,7 +337,6 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
         "{{SPRINT}}": args.sprint or "未填写",
         "{{CLOSING}}": closing_line(args.issue, args.closing),
         "{{RISK_LEVEL}}": risk_level(args.pr_class),
-        "{{RISK_REASON}}": risk_reason_for_class(args.pr_class),
         "{{VALIDATION_SUGGESTION}}": "- 已执行：\n- 未执行：",
         "{{ROLLBACK}}": "如需回滚，使用独立 revert PR 撤销本次变更。",
     }
