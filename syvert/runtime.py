@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import re
 from typing import Any, Callable, Mapping
 from uuid import uuid4
@@ -158,7 +159,7 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
             )
 
     published_at = normalized.get("published_at")
-    if published_at is not None and (not isinstance(published_at, str) or not RFC3339_UTC_RE.fullmatch(published_at)):
+    if published_at is not None and (not isinstance(published_at, str) or not is_valid_rfc3339_utc(published_at)):
         return runtime_contract_error(
             "invalid_adapter_success_payload",
             "normalized.published_at 必须为 RFC3339 UTC 或 null",
@@ -175,6 +176,27 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
     author = normalized["author"]
     stats = normalized["stats"]
     media = normalized["media"]
+
+    for field in ("author_id", "display_name", "avatar_url"):
+        if field not in author:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"normalized.author.{field} 不得缺失",
+            )
+
+    for field in ("like_count", "comment_count", "share_count", "collect_count"):
+        if field not in stats:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"normalized.stats.{field} 不得缺失",
+            )
+
+    for field in ("cover_url", "video_url", "image_urls"):
+        if field not in media:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"normalized.media.{field} 不得缺失",
+            )
 
     avatar_url = author.get("avatar_url")
     if avatar_url is not None and not isinstance(avatar_url, str):
@@ -207,6 +229,16 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
         )
 
     return None
+
+
+def is_valid_rfc3339_utc(value: str) -> bool:
+    if not RFC3339_UTC_RE.fullmatch(value):
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo == timezone.utc
 
 
 def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Mapping[str, Any]) -> dict[str, Any]:

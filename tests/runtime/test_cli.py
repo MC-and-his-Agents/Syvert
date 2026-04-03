@@ -61,6 +61,34 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("usage:", result.stdout)
 
+    def test_cli_module_path_can_load_adapter_source(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:build_adapters",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["adapter_key"], "stub")
+
     def test_main_writes_success_envelope_to_stdout(self) -> None:
         stdout = io.StringIO()
         stderr = io.StringIO()
