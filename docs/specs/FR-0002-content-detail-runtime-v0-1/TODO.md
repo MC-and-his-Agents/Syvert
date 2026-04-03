@@ -14,7 +14,6 @@
 - 当前成熟度：`spec-ready`
 - 当前阻塞：
   - 尚未完成 `spec review`
-  - 平台 detail 研究结论仍需收敛为 formal spec 输入
 
 ## 实施清单
 
@@ -38,7 +37,7 @@
 
 ## 会话恢复信息
 
-- 当前停点：已完成 `FR-0002` formal spec 套件初稿、`release` / `sprint` / `exec-plan` 聚合入口，以及本轮文档门禁验证。
+- 当前停点：已完成 `FR-0002` formal spec 套件初稿、补齐 envelope 与 `normalized` 语义，并完成 `release` / `sprint` / `exec-plan` 聚合入口与本轮文档门禁验证。
 - 下一步动作：
   - 复核 contract 字段与边界语义
   - 发起 `spec review`

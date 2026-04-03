@@ -17,15 +17,29 @@
   - `task_id`
   - `adapter_key`
   - `capability`
-  - `status`
+  - `status` = `success`
   - `raw`
   - `normalized`
 - 失败态最小 envelope：
   - `task_id`
   - `adapter_key`
   - `capability`
-  - `status`
+  - `status` = `failed`
   - `error`
+- `error` 最小字段：
+  - `category`：`runtime_contract` 或 `platform`
+  - `code`
+  - `message`
+  - `details`
+- `normalized` 最小结构要求：
+  - 顶层必须包含 `platform`、`content_id`、`content_type`、`canonical_url`、`title`、`body_text`、`published_at`、`author`、`stats`、`media`
+  - `author`、`stats`、`media` 三个对象必须始终存在，即使内部字段为空或 `null`
+  - `platform`、`content_id`、`content_type`、`canonical_url` 必须为非空字符串
+  - `content_type` 允许值：`video`、`image_post`、`mixed_media`、`unknown`
+  - `canonical_url` 优先使用稳定用户态 URL；若无法构造稳定 URL，则回填 `input.url`
+  - `title`、`body_text` 必须存在，可为空字符串
+  - `published_at` 必须是 RFC 3339 UTC 时间字符串，或 `null`
+  - `author.author_id`、`author.display_name` 在平台可提供时应为非空字符串，否则返回 `null`
 
 ## 错误与边界行为
 
