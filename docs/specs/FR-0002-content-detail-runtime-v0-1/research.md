@@ -6,6 +6,12 @@
 - 参考来源仅用于提炼平台事实与能力映射，不作为可直接迁移实现。
 - 账号池、代理池、checkpoint、平台存储、评论/搜索/创作者能力不进入本轮研究范围。
 
+## 研究入口
+
+- 小红书平台事实：[`docs/research/platforms/xhs-content-detail.md`](../../research/platforms/xhs-content-detail.md)
+- 抖音平台事实：[`docs/research/platforms/douyin-content-detail.md`](../../research/platforms/douyin-content-detail.md)
+- 跨平台对比与适配器输入：[`docs/research/platforms/content-detail-adapter-inputs.md`](../../research/platforms/content-detail-adapter-inputs.md)
+
 ## 来源约束
 
 - 参考仓 `/Users/claw/dev/reference/MediaCrawlerPro/Python-main` 使用非商业学习许可，应作为研究输入而不是直接复用实现。
@@ -18,19 +24,16 @@
 - 两个平台都存在“拿到原始响应后再做 extractor 映射”的处理链路，这与 Syvert 的 `raw + normalized` 结果契约方向一致。
 - 参考仓中的账号、代理、存储与 checkpoint 是成品系统能力，不应反向塑造 `v0.1.0` Core 设计。
 
-## 小红书 detail 事实
+## 平台摘要
 
-- detail 场景依赖 detail URL，而不是仅靠裸 `note_id`；URL 里常携带 `xsec_token` 与 `xsec_source`。
-- 参考实现使用 detail 请求链路获取 note 内容，并在异常场景下从 HTML `window.__INITIAL_STATE__` 回退提取。
-- 小红书签名结果至少包含 `x_s`、`x_t`、`x_s_common`、`x_b3_traceid`，说明签名服务是 Adapter 侧依赖，而不是 Core 依赖。
-- 小红书可从响应中提炼出 `note_id`、`type`、`title/desc`、发布时间、作者、统计、图片/视频 URL、IP 属地等字段。
-
-## 抖音 detail 事实
-
-- 参考实现的 detail 流程偏 `aweme_id` 驱动，说明 Syvert 需要自行定义“URL-first 输入如何转为 adapter 内部 detail 调用”的规则。
-- 抖音 detail 请求存在 `ms_token`、`webid`、`verify_fp`、`a_bogus` 等前置，属于 Adapter 内部的 URL 解析与签名准备责任。
-- 抖音 extractor 可提炼出 `aweme_id`、`aweme_type`、`title/desc`、发布时间、作者、统计、封面/视频地址等字段。
-- 抖音的内容类型、媒体地址与用户标识字段命名与小红书明显不同，因此 `normalized` 只能冻结最小公共字段，平台特有字段保留在 `raw`。
+- 小红书：
+  - 主路径可走 detail API，异常时可由 HTML `window.__INITIAL_STATE__` 回退。
+  - URL 内部常包含 `note_id`、`xsec_token`、`xsec_source`，解析责任属于 adapter。
+  - 签名服务与浏览器风格 headers 属于 adapter 内部运行前置。
+- 抖音：
+  - 主路径可走 `aweme_id` 驱动的 detail API，异常时可由页面全局状态或 intercepted payload 回退。
+  - `verifyFp`、`msToken`、`webid`、`a_bogus` 都属于 adapter 内部实现环境。
+  - URL-first 输入需要在 adapter 内部转成 API-ready 的 detail 调用。
 
 ## 对 FR-0002 契约的直接影响
 
