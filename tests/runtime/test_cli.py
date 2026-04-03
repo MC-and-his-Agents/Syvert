@@ -62,6 +62,31 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("usage:", result.stdout)
 
+    def test_cli_fails_closed_for_missing_required_arguments(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter",
+                "stub",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
+
     def test_cli_module_path_can_load_adapter_source(self) -> None:
         env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
         result = subprocess.run(

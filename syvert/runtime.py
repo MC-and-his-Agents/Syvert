@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Any, Callable, Mapping
 from uuid import uuid4
@@ -9,7 +9,7 @@ from uuid import uuid4
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
-RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 MISSING = object()
 
 
@@ -377,7 +377,7 @@ def is_valid_rfc3339_utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return parsed.tzinfo == timezone.utc
+    return parsed.tzinfo is not None and parsed.utcoffset() == timedelta(0)
 
 
 def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Mapping[str, Any]) -> dict[str, Any]:

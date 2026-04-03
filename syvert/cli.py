@@ -9,8 +9,17 @@ from typing import Any, Callable, Mapping, TextIO
 from syvert.runtime import TaskInput, TaskRequest, execute_task, failure_envelope, resolve_task_id
 
 
+class CliArgumentError(ValueError):
+    pass
+
+
+class FailClosedArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise CliArgumentError(message)
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="运行 Syvert v0.1.0 本地单进程任务。")
+    parser = FailClosedArgumentParser(description="运行 Syvert v0.1.0 本地单进程任务。")
     parser.add_argument("--adapter", required=True, help="目标 adapter_key")
     parser.add_argument("--capability", required=True, help="任务 capability")
     parser.add_argument("--url", required=True, help="目标内容 URL")
@@ -29,9 +38,22 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    args = parse_args(argv)
     out = stdout or sys.stdout
     err = stderr or sys.stderr
+    try:
+        args = parse_args(argv)
+    except CliArgumentError as error:
+        task_id, task_id_error = resolve_task_id(task_id_factory)
+        adapter_key, capability = extract_cli_context(argv)
+        envelope_error = task_id_error or {
+            "category": "runtime_contract",
+            "code": "invalid_cli_arguments",
+            "message": str(error),
+            "details": {},
+        }
+        envelope = failure_envelope(task_id, adapter_key, capability, envelope_error)
+        err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+        return 1
     request = TaskRequest(
         adapter_key=args.adapter,
         capability=args.capability,
@@ -106,6 +128,24 @@ def load_adapters(spec: str | None) -> Mapping[str, Any]:
     if not isinstance(resolved, Mapping):
         raise ValueError("`--adapter-module` 解析结果必须是 mapping。")
     return resolved
+
+
+def extract_cli_context(argv: list[str] | None) -> tuple[str, str]:
+    args = list(argv) if argv is not None else sys.argv[1:]
+    adapter_key = extract_cli_option(args, "--adapter")
+    capability = extract_cli_option(args, "--capability")
+    return adapter_key, capability
+
+
+def extract_cli_option(argv: list[str], option: str) -> str:
+    try:
+        index = argv.index(option)
+    except ValueError:
+        return ""
+    if index + 1 >= len(argv):
+        return ""
+    value = argv[index + 1]
+    return value if isinstance(value, str) else ""
 
 
 if __name__ == "__main__":
