@@ -28,7 +28,8 @@
 
 - `FR-0002` formal spec 已合入 `main`。
 - `#41` 的实现工作在分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 推进。
-- 最近一次实现 checkpoint 已推进到 `6bced5bc18048593830858105315467a8571c1ad`，已收口 `task_id_factory` 异常 fail-closed、严格任务输入形状校验与回滚说明。
+- 最近一次实现 checkpoint 已推进到 `edb25f353b8237fd0c001a7d7c855b8377680df9`，已收口扩展 `TaskRequest` 顶层形状拒绝、CLI JSON 序列化 fail-closed 与对应回归测试。
+- 当前受审 head 由 PR `#44` 正文验证区块绑定；若本轮仅追加 `exec-plan` / PR 正文等审查态元数据补件，不单独前推实现 checkpoint。
 - 下一步进入审查态补件：刷新 PR `#44` 正文验证区块，并在当前 head 上重新执行 guardian。
 
 ## 下一步动作
@@ -49,14 +50,12 @@
 
 ## 已验证项
 
-- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.governance.test_cli_smoke -v`
+- 在仓库根目录执行：`PYTHONPATH=. python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.governance.test_cli_smoke -v`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/governance_gate.py --mode ci --base-sha 3046b9a955b295c76665e2ed5e5dccf9bf58574b --head-ref HEAD`
 - `python3 scripts/pr_guardian.py review 44 --post-review`（最近一次结论：`REQUEST_CHANGES`）
-- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_cli.CliTests.test_loader_failure_uses_injected_task_id_factory -v`
-- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli -v`
-- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.governance.test_cli_smoke -v`
+- 上述命令已在实现 checkpoint `edb25f353b8237fd0c001a7d7c855b8377680df9` 对应工作树执行；当前受审 head 需在 PR `#44` 正文验证区块同步记录
 
 ## 未决风险
 
@@ -69,6 +68,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `6bced5bc18048593830858105315467a8571c1ad`
-- 上述 SHA 对应最近一次完成实现侧收口并通过局部测试的代码 checkpoint。
-- 若当前审查回合仅追加 `exec-plan` / PR 正文等元数据补件提交，则实际用于 guardian 审查的当前 head SHA 以 PR `#44` 正文验证区块为准，并在每次补件后同步刷新。
+- 实现 checkpoint：`edb25f353b8237fd0c001a7d7c855b8377680df9`
+- 当前受审 head：以 PR `#44` 正文验证区块记录的 head SHA 为准
+- 前者用于恢复最近一次实现收口停点，后者用于绑定本轮 guardian / merge gate 的实际受审状态。
+- 若当前审查回合继续追加 `exec-plan` / PR 正文等元数据补件提交，必须同步刷新“当前受审 head”与 PR 正文验证区块，避免审查绑定失配。
