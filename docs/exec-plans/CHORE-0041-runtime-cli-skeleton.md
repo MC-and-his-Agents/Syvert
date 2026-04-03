@@ -26,7 +26,7 @@
 ## 当前停点
 
 - `FR-0002` formal spec 已合入 `main`。
-- `#41` 的实现工作已在独立分支推进，当前实现 head 为 `dff73c5f4ffecae7626ef3a8b54f7109c9664420`。
+- `#41` 的实现工作已在独立分支推进，当前实现 head 为 `dff73c56d8d4319b9f0db051b4fd735c6650d2c7`。
 - 当前缺少可供受控审查链路引用的 active `exec-plan`。
 
 ## 下一步动作
@@ -50,7 +50,7 @@
 - `gh issue view 41`
 - 已核对 `docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md`
 - 已核对 `docs/releases/v0.1.0.md`
-- 已核对实现分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 的当前 head：`dff73c5f4ffecae7626ef3a8b54f7109c9664420`
+- 已核对实现分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 的当前 head：`dff73c56d8d4319b9f0db051b4fd735c6650d2c7`
 
 ## 未决风险
 
@@ -62,4 +62,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `dff73c5f4ffecae7626ef3a8b54f7109c9664420`
+- `dff73c56d8d4319b9f0db051b4fd735c6650d2c7`
