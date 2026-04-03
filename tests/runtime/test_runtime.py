@@ -159,6 +159,18 @@ class NonStringCapabilitiesAdapter:
         raise AssertionError("execute should not be called")
 
 
+class MissingCapabilitiesAdapter:
+    adapter_key = "stub"
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class ExplodingRequestMapping(dict):
+    def get(self, key, default=None):
+        raise RuntimeError("boom")
+
+
 class RuntimeExecutionTests(unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
@@ -432,6 +444,18 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
+    def test_execute_task_fails_closed_for_request_mapping_that_raises_on_get(self) -> None:
+        envelope = execute_task(
+            ExplodingRequestMapping(),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-exploding-request",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["task_id"], "task-exploding-request")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
     def test_execute_task_fails_closed_for_none_supported_capabilities(self) -> None:
         request = TaskRequest(
             adapter_key="stub",
@@ -443,6 +467,23 @@ class RuntimeExecutionTests(unittest.TestCase):
             request,
             adapters={"stub": NoneCapabilitiesAdapter()},
             task_id_factory=lambda: "task-none-caps",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_missing_supported_capabilities(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingCapabilitiesAdapter()},
+            task_id_factory=lambda: "task-missing-caps",
         )
 
         self.assertEqual(envelope["status"], "failed")

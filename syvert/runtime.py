@@ -10,6 +10,7 @@ from uuid import uuid4
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+MISSING = object()
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,7 @@ def execute_task(
         )
 
     supported_capabilities, capability_error = validate_supported_capabilities(
-        getattr(adapter, "supported_capabilities", frozenset())
+        get_adapter_supported_capabilities(adapter)
     )
     if capability_error is not None:
         return failure_envelope(task_id, adapter_key, capability, capability_error)
@@ -144,17 +145,44 @@ def validate_request(request: Any) -> dict[str, Any] | None:
 
 def extract_request_context(request: Any) -> tuple[str, str]:
     if isinstance(request, Mapping):
-        adapter_key = request.get("adapter_key")
-        capability = request.get("capability")
+        try:
+            adapter_key = request.get("adapter_key")
+        except Exception:
+            adapter_key = ""
+        try:
+            capability = request.get("capability")
+        except Exception:
+            capability = ""
     else:
-        adapter_key = getattr(request, "adapter_key", "")
-        capability = getattr(request, "capability", "")
+        try:
+            adapter_key = getattr(request, "adapter_key", "")
+        except Exception:
+            adapter_key = ""
+        try:
+            capability = getattr(request, "capability", "")
+        except Exception:
+            capability = ""
     safe_adapter_key = adapter_key if isinstance(adapter_key, str) else ""
     safe_capability = capability if isinstance(capability, str) else ""
     return safe_adapter_key, safe_capability
 
 
+def get_adapter_supported_capabilities(adapter: Any) -> Any:
+    try:
+        return getattr(adapter, "supported_capabilities")
+    except AttributeError:
+        return MISSING
+    except Exception:
+        return MISSING
+
+
 def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
+    if raw_capabilities is MISSING:
+        return frozenset(), runtime_contract_error(
+            "invalid_adapter_capabilities",
+            "supported_capabilities 必须为字符串集合",
+            details={"reason": "missing"},
+        )
     if raw_capabilities is None:
         return frozenset(), runtime_contract_error(
             "invalid_adapter_capabilities",
