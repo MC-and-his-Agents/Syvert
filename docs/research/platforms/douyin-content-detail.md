@@ -8,17 +8,17 @@
 
 ## 参考来源
 
-- API 采集路线：[`/Users/claw/dev/reference/MediaCrawlerPro/Python-main`](/Users/claw/dev/reference/MediaCrawlerPro/Python-main)
+- API 采集路线：`/Users/claw/dev/reference/MediaCrawlerPro/Python-main`
   - 重点文件：
-    - [`/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/client.py`](/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/client.py)
-    - [`/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/extractor.py`](/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/extractor.py)
-    - [`/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/help.py`](/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/help.py)
-- 插件 / 浏览器内路线：[`/Users/claw/dev/hotcp`](/Users/claw/dev/hotcp)
+    - `/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/client.py`
+    - `/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/extractor.py`
+    - `/Users/claw/dev/reference/MediaCrawlerPro/Python-main/media_platform/douyin/help.py`
+- 插件 / 浏览器内路线：`/Users/claw/dev/hotcp`
   - 重点文件：
-    - [`/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin.ts`](/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin.ts)
-    - [`/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin_interceptor.ts`](/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin_interceptor.ts)
-    - [`/Users/claw/dev/hotcp/src/shared/parsers/dy/parser.ts`](/Users/claw/dev/hotcp/src/shared/parsers/dy/parser.ts)
-    - [`/Users/claw/dev/hotcp/docs/research/douyin/api_inventory.md`](/Users/claw/dev/hotcp/docs/research/douyin/api_inventory.md)
+    - `/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin.ts`
+    - `/Users/claw/dev/hotcp/src/app/extension/entrypoints/injected/platforms/douyin_interceptor.ts`
+    - `/Users/claw/dev/hotcp/src/shared/parsers/dy/parser.ts`
+    - `/Users/claw/dev/hotcp/docs/research/douyin/api_inventory.md`
 
 ## 采集主路径
 
