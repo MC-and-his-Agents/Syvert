@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import unittest
 
 from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
+
+
+@dataclass(frozen=True)
+class ExtendedTaskInput(TaskInput):
+    platform_hint: str
 
 
 class SuccessfulAdapter:
@@ -323,6 +329,45 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertTrue(envelope["task_id"])
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_task_id")
+
+    def test_execute_task_fails_closed_when_task_id_factory_raises(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertIsInstance(envelope["task_id"], str)
+        self.assertTrue(envelope["task_id"])
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_id")
+
+    def test_execute_task_rejects_extended_task_input_shape(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=ExtendedTaskInput(
+                url="https://example.com/posts/1",
+                platform_hint="xhs",
+            ),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-extra-shape",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
 
 if __name__ == "__main__":

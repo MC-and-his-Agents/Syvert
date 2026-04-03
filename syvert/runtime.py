@@ -128,7 +128,7 @@ def validate_request(request: TaskRequest) -> dict[str, Any] | None:
             "invalid_capability",
             f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
         )
-    if not isinstance(request.input, TaskInput):
+    if type(request.input) is not TaskInput:
         return runtime_contract_error("invalid_task_request", "input 必须为对象")
     if not isinstance(request.input.url, str) or not request.input.url:
         return runtime_contract_error("invalid_task_request", "input.url 不能为空")
@@ -136,7 +136,18 @@ def validate_request(request: TaskRequest) -> dict[str, Any] | None:
 
 
 def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dict[str, Any] | None]:
-    generated = (task_id_factory or default_task_id_factory)()
+    try:
+        generated = (task_id_factory or default_task_id_factory)()
+    except Exception as error:
+        fallback = default_task_id_factory()
+        return (
+            fallback,
+            runtime_contract_error(
+                "invalid_task_id",
+                "task_id 必须为非空字符串",
+                details={"reason": "task_id_factory_raised", "error_type": error.__class__.__name__},
+            ),
+        )
     if isinstance(generated, str) and generated:
         return generated, None
     fallback = default_task_id_factory()

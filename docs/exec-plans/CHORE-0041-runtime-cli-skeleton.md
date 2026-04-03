@@ -64,7 +64,7 @@
 
 ## 回滚方式
 
-- 如需回滚，使用独立 revert PR 删除本文件。
+- 如需回滚，使用独立 revert PR 撤销本事项对 `syvert/runtime.py`、`syvert/cli.py`、`tests/runtime/` 与本文件的增量修改。
 
 ## 最近一次 checkpoint 对应的 head SHA
 

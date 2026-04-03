@@ -197,6 +197,35 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["code"], "adapter_loader_error")
 
+    def test_loader_failure_fails_closed_when_task_id_factory_raises(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        exit_code = main(
+            [
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:missing_builder",
+            ],
+            stdout=stdout,
+            stderr=stderr,
+            task_id_factory=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertIsInstance(payload["task_id"], str)
+        self.assertTrue(payload["task_id"])
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "invalid_task_id")
+
 
 if __name__ == "__main__":
     unittest.main()
