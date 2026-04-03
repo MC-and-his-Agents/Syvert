@@ -44,38 +44,43 @@ def execute_task(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
+    adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
     if task_id_error is not None:
-        return failure_envelope(task_id, request.adapter_key, request.capability, task_id_error)
+        return failure_envelope(task_id, adapter_key, capability, task_id_error)
 
     contract_error = validate_request(request)
     if contract_error is not None:
-        return failure_envelope(task_id, request.adapter_key, request.capability, contract_error)
+        return failure_envelope(task_id, adapter_key, capability, contract_error)
 
-    adapter = adapters.get(request.adapter_key)
+    adapter = adapters.get(adapter_key)
     if adapter is None:
         return failure_envelope(
             task_id,
-            request.adapter_key,
-            request.capability,
+            adapter_key,
+            capability,
             {
                 "category": "runtime_contract",
                 "code": "adapter_not_found",
-                "message": f"adapter `{request.adapter_key}` 不存在",
+                "message": f"adapter `{adapter_key}` 不存在",
                 "details": {},
             },
         )
 
-    supported_capabilities = getattr(adapter, "supported_capabilities", frozenset())
-    if request.capability not in supported_capabilities:
+    supported_capabilities, capability_error = validate_supported_capabilities(
+        getattr(adapter, "supported_capabilities", frozenset())
+    )
+    if capability_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, capability_error)
+    if capability not in supported_capabilities:
         return failure_envelope(
             task_id,
-            request.adapter_key,
-            request.capability,
+            adapter_key,
+            capability,
             {
                 "category": "runtime_contract",
                 "code": "capability_not_supported",
-                "message": f"adapter `{request.adapter_key}` 不支持 `{request.capability}`",
+                "message": f"adapter `{adapter_key}` 不支持 `{capability}`",
                 "details": {
                     "supported_capabilities": sorted(supported_capabilities),
                 },
@@ -86,12 +91,12 @@ def execute_task(
         payload = adapter.execute(request)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
-            return failure_envelope(task_id, request.adapter_key, request.capability, payload_error)
+            return failure_envelope(task_id, adapter_key, capability, payload_error)
     except PlatformAdapterError as error:
         return failure_envelope(
             task_id,
-            request.adapter_key,
-            request.capability,
+            adapter_key,
+            capability,
             {
                 "category": "platform",
                 "code": error.code,
@@ -102,8 +107,8 @@ def execute_task(
     except Exception as error:
         return failure_envelope(
             task_id,
-            request.adapter_key,
-            request.capability,
+            adapter_key,
+            capability,
             runtime_contract_error(
                 "adapter_execution_error",
                 str(error) or error.__class__.__name__,
@@ -112,18 +117,18 @@ def execute_task(
 
     return {
         "task_id": task_id,
-        "adapter_key": request.adapter_key,
-        "capability": request.capability,
+        "adapter_key": adapter_key,
+        "capability": capability,
         "status": "success",
         "raw": payload["raw"],
         "normalized": payload["normalized"],
     }
 
 
-def validate_request(request: TaskRequest) -> dict[str, Any] | None:
+def validate_request(request: Any) -> dict[str, Any] | None:
     if type(request) is not TaskRequest:
         return runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法")
-    if not request.adapter_key:
+    if not isinstance(request.adapter_key, str) or not request.adapter_key:
         return runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
     if request.capability != CONTENT_DETAIL_BY_URL:
         return runtime_contract_error(
@@ -135,6 +140,51 @@ def validate_request(request: TaskRequest) -> dict[str, Any] | None:
     if not isinstance(request.input.url, str) or not request.input.url:
         return runtime_contract_error("invalid_task_request", "input.url 不能为空")
     return None
+
+
+def extract_request_context(request: Any) -> tuple[str, str]:
+    if isinstance(request, Mapping):
+        adapter_key = request.get("adapter_key")
+        capability = request.get("capability")
+    else:
+        adapter_key = getattr(request, "adapter_key", "")
+        capability = getattr(request, "capability", "")
+    safe_adapter_key = adapter_key if isinstance(adapter_key, str) else ""
+    safe_capability = capability if isinstance(capability, str) else ""
+    return safe_adapter_key, safe_capability
+
+
+def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
+    if raw_capabilities is None:
+        return frozenset(), runtime_contract_error(
+            "invalid_adapter_capabilities",
+            "supported_capabilities 必须为字符串集合",
+            details={"actual_type": "NoneType"},
+        )
+    if isinstance(raw_capabilities, (str, bytes)):
+        return frozenset(), runtime_contract_error(
+            "invalid_adapter_capabilities",
+            "supported_capabilities 必须为字符串集合",
+            details={"actual_type": type(raw_capabilities).__name__},
+        )
+    try:
+        iterator = iter(raw_capabilities)
+    except TypeError:
+        return frozenset(), runtime_contract_error(
+            "invalid_adapter_capabilities",
+            "supported_capabilities 必须为字符串集合",
+            details={"actual_type": type(raw_capabilities).__name__},
+        )
+    validated: list[str] = []
+    for value in iterator:
+        if not isinstance(value, str):
+            return frozenset(), runtime_contract_error(
+                "invalid_adapter_capabilities",
+                "supported_capabilities 必须为字符串集合",
+                details={"invalid_value_type": type(value).__name__},
+            )
+        validated.append(value)
+    return frozenset(validated), None
 
 
 def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dict[str, Any] | None]:

@@ -135,6 +135,30 @@ class PlatformFailureAdapter:
         )
 
 
+class NoneCapabilitiesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = None
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class NonContainerCapabilitiesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = 123
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class NonStringCapabilitiesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = ("content_detail_by_url", 1)
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
 class RuntimeExecutionTests(unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
@@ -391,6 +415,73 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_fails_closed_for_malformed_request_mapping(self) -> None:
+        envelope = execute_task(
+            {
+                "adapter_key": "stub",
+                "capability": "content_detail_by_url",
+                "input": {"url": "https://example.com/posts/1"},
+            },  # type: ignore[arg-type]
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-malformed-request",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["task_id"], "task-malformed-request")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_fails_closed_for_none_supported_capabilities(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": NoneCapabilitiesAdapter()},
+            task_id_factory=lambda: "task-none-caps",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_non_container_supported_capabilities(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": NonContainerCapabilitiesAdapter()},
+            task_id_factory=lambda: "task-non-container-caps",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_non_string_supported_capability(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": NonStringCapabilitiesAdapter()},
+            task_id_factory=lambda: "task-non-string-caps",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
 
 
 if __name__ == "__main__":

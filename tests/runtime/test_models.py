@@ -27,6 +27,18 @@ class TaskRequestValidationTests(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertEqual(error["code"], "invalid_task_request")
 
+    def test_rejects_non_string_adapter_key(self) -> None:
+        request = TaskRequest(
+            adapter_key=1,  # type: ignore[arg-type]
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://www.xiaohongshu.com/explore/abc123"),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
+
     def test_rejects_unsupported_capability(self) -> None:
         request = TaskRequest(
             adapter_key="xhs",
