@@ -34,15 +34,14 @@
 - `CHORE-0039` 已沉淀小红书平台事实，当前回合聚焦把研究结论落入参考适配器实现路径。
 - 当前事项以小红书单适配器先行，不在本轮宣称“双适配器已交付”；双适配器验证仍以 release 判据与后续事项收口为准。
 - `syvert/adapters/xhs.py` 与 `tests/runtime/test_xhs_adapter.py` 已落地，当前自动化验证已覆盖 URL 解析、session/sign/detail 失败语义、`raw + normalized` 映射，以及 `--adapter-module syvert.adapters.xhs:build_adapters` 的共享 Core 路径加载。
-- 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
+- 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、成功态 `raw` 保留平台原始 success wrapper、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
 - 默认会话文件 `$HOME/.config/syvert/xhs.session.json` 在当前环境缺失，因此“至少一条真实小红书 URL 手动验证”仍被环境前置阻塞，需在 PR 风险区显式记录。
 - 最近一次 checkpoint SHA：`64d082184c9c39f087c48a0983971c4fa138cdee`。
 
 ## 下一步动作
 
-- 在 `#47` 当前实现分支补齐 `input.url` 解析与小红书 detail API 调用链。
-- 完成小红书响应到 `raw + normalized` 的最小字段映射，并对齐 `FR-0002` contract。
-- 以最新受审 head 重新执行 guardian / governance gates，并在 PR 正文与本 exec-plan 同步 checkpoint 与验证记录。
+- 将本轮 raw wrapper 修复对应的实现 checkpoint 与受审 head 同步到 PR `#48` 和本 exec-plan。
+- 以最新受审 head 重新执行 guardian / governance gates，并在 PR 正文同步验证记录。
 - 审查结论满足 merge gate 后走受控 `merge_pr` 合入。
 
 ## 当前 checkpoint 推进的 release 目标

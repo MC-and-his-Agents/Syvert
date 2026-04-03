@@ -92,40 +92,43 @@ class XhsAdapterTests(unittest.TestCase):
                     }
                 )
                 return {
-                    "items": [
-                        {
-                            "note_card": {
-                                "note_id": "66fad51c000000001b0224b8",
-                                "type": "video",
-                                "title": "测试标题",
-                                "desc": "测试正文",
-                                "time": 1712304300,
-                                "user": {
-                                    "user_id": "user-1",
-                                    "nickname": "作者甲",
-                                    "avatar": "https://cdn.example/avatar.jpg",
-                                },
-                                "interact_info": {
-                                    "liked_count": "11",
-                                    "comment_count": "12",
-                                    "share_count": "13",
-                                    "collected_count": "14",
-                                },
-                                "image_list": [
-                                    {"url_default": "https://cdn.example/image-1.jpg"},
-                                    {"url_default": "https://cdn.example/image-2.jpg"},
-                                ],
-                                "video": {
-                                    "consumer": {
-                                        "origin_video_key": "video-key-1",
-                                    }
-                                },
-                                "cover": {
-                                    "url_default": "https://cdn.example/cover.jpg",
-                                },
+                    "success": True,
+                    "data": {
+                        "items": [
+                            {
+                                "note_card": {
+                                    "note_id": "66fad51c000000001b0224b8",
+                                    "type": "video",
+                                    "title": "测试标题",
+                                    "desc": "测试正文",
+                                    "time": 1712304300,
+                                    "user": {
+                                        "user_id": "user-1",
+                                        "nickname": "作者甲",
+                                        "avatar": "https://cdn.example/avatar.jpg",
+                                    },
+                                    "interact_info": {
+                                        "liked_count": "11",
+                                        "comment_count": "12",
+                                        "share_count": "13",
+                                        "collected_count": "14",
+                                    },
+                                    "image_list": [
+                                        {"url_default": "https://cdn.example/image-1.jpg"},
+                                        {"url_default": "https://cdn.example/image-2.jpg"},
+                                    ],
+                                    "video": {
+                                        "consumer": {
+                                            "origin_video_key": "video-key-1",
+                                        }
+                                    },
+                                    "cover": {
+                                        "url_default": "https://cdn.example/cover.jpg",
+                                    },
+                                }
                             }
-                        }
-                    ]
+                        ]
+                    },
                 }
 
             adapter = XhsAdapter(
@@ -163,7 +166,8 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(detail_requests[0]["headers"]["x-s-common"], "signed-x-s-common")
         self.assertEqual(detail_requests[0]["headers"]["X-B3-Traceid"], "trace-1")
         self.assertEqual(detail_requests[0]["headers"]["cookie"], "a=1; b=2")
-        self.assertEqual(payload["raw"]["items"][0]["note_card"]["note_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["raw"]["success"], True)
+        self.assertEqual(payload["raw"]["data"]["items"][0]["note_card"]["note_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["platform"], "xhs")
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["content_type"], "video")
@@ -657,6 +661,11 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["content_type"], "image_post")
         self.assertEqual(payload["normalized"]["canonical_url"], "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8")
+        self.assertEqual(payload["raw"]["success"], True)
+        self.assertEqual(
+            payload["raw"]["data"]["items"][0]["note_card"]["note_id"],
+            "66fad51c000000001b0224b8",
+        )
         self.assertEqual(payload["normalized"]["media"]["image_urls"], ["https://cdn.example/cli-image-1.jpg"])
         self.assertEqual(payload["normalized"]["media"]["video_url"], None)
         self.assertEqual(len(handler_state["sign_calls"]), 1)

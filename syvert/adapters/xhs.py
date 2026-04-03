@@ -62,10 +62,11 @@ class XhsAdapter:
         session = self._session_provider(self._session_path)
         body = build_detail_body(url_info)
         headers = self._build_headers(session, body)
-        detail_response = self._fetch_detail(session, headers, body)
+        raw_response = self._fetch_detail(session, headers, body)
+        detail_response = normalize_detail_response(raw_response)
         note_card = extract_note_card(detail_response)
         normalized = normalize_note_card(note_card, request.input.url)
-        return {"raw": detail_response, "normalized": normalized}
+        return {"raw": raw_response, "normalized": normalized}
 
     def _build_headers(self, session: XhsSessionConfig, body: dict[str, Any]) -> dict[str, str]:
         if not session.sign_base_url:
@@ -140,7 +141,7 @@ class XhsAdapter:
                 message="小红书 detail 响应不是对象",
                 details={},
             )
-        return normalize_detail_response(response)
+        return response
 
 
 def build_adapters() -> dict[str, object]:
