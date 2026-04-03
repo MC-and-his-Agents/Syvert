@@ -35,9 +35,10 @@
 - 当前事项以小红书单适配器先行，不在本轮宣称“双适配器已交付”；双适配器验证仍以 release 判据与后续事项收口为准。
 - `syvert/adapters/xhs.py` 与 `tests/runtime/test_xhs_adapter.py` 已落地，当前自动化验证已覆盖 URL 解析、session/sign/detail 失败语义、`raw + normalized` 映射，以及 `--adapter-module syvert.adapters.xhs:build_adapters` 的共享 Core 路径加载。
 - 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、成功态 `raw` 保留平台原始 success wrapper、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
+- 最新一轮 guardian 阻断已进一步收口：detail 返回多 item 时按 `source_note_id` 选中目标 note，不再盲取 `items[0]`；`nullable_int` 对 `inf` / `nan` fail-close 为 `null`；并补了 `default_sign_transport`、`post_json` 与 malformed success wrapper 的定点回归测试。
 - 默认会话文件 `$HOME/.config/syvert/xhs.session.json` 在当前环境缺失，因此“至少一条真实小红书 URL 手动验证”仍被环境前置阻塞，需在 PR 风险区显式记录。
 - 当前 PR 仅声称交付“实现切片 + 自动化验证证据”；Issue `#47` 的 real URL 手动验证闭环仍待运行前置满足后继续推进。
-- 最近一次 checkpoint SHA：`d751b9ba24971f029db11ed804884aefde8b7ca2`。
+- 最近一次 checkpoint SHA：`31e06224fc4c72f769d43a7f315b9d3d3105c45a`。
 
 ## 下一步动作
 
@@ -63,6 +64,7 @@
 - 已核对 `docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md` 的 `content_detail_by_url` contract 边界。
 - 已核对 `docs/research/platforms/xhs-content-detail.md` 的小红书 URL 解析、detail API 与失败语义。
 - `python3 -m unittest tests.runtime.test_xhs_adapter -v`
+- `python3 -m unittest tests.runtime.test_xhs_adapter.XhsAdapterTests.test_xhs_adapter_selects_matching_note_card_when_detail_returns_multiple_items tests.runtime.test_xhs_adapter.XhsAdapterTests.test_xhs_adapter_coerces_non_finite_float_stats_to_null tests.runtime.test_xhs_adapter.XhsAdapterTests.test_default_sign_transport_rejects_failed_sign_payload tests.runtime.test_xhs_adapter.XhsAdapterTests.test_default_sign_transport_rejects_missing_data_mapping tests.runtime.test_xhs_adapter.XhsAdapterTests.test_post_json_rejects_invalid_json_detail_response tests.runtime.test_xhs_adapter.XhsAdapterTests.test_post_json_rejects_non_object_sign_response tests.runtime.test_xhs_adapter.XhsAdapterTests.test_normalize_detail_response_rejects_success_without_mapping_data -v`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_xhs_adapter -v`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -83,5 +85,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`d751b9ba24971f029db11ed804884aefde8b7ca2`
+- 实现 checkpoint：`31e06224fc4c72f769d43a7f315b9d3d3105c45a`
 - 当前受审 head：以 PR `#48` 的最新 `headRefOid` 为准
