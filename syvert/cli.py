@@ -69,7 +69,28 @@ def main(
         task_id_factory=task_id_factory,
     )
     stream = out if envelope["status"] == "success" else err
-    stream.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+    try:
+        payload = json.dumps(envelope, ensure_ascii=False)
+    except (TypeError, ValueError) as error:
+        fallback_task_id = envelope.get("task_id")
+        if not isinstance(fallback_task_id, str) or not fallback_task_id:
+            fallback_task_id, _ = resolve_task_id(None)
+        envelope = failure_envelope(
+            fallback_task_id,
+            request.adapter_key,
+            request.capability,
+            {
+                "category": "runtime_contract",
+                "code": "envelope_not_json_serializable",
+                "message": "CLI 输出结果无法序列化为 JSON",
+                "details": {
+                    "error_type": error.__class__.__name__,
+                },
+            },
+        )
+        payload = json.dumps(envelope, ensure_ascii=False)
+        stream = err
+    stream.write(payload + "\n")
     return 0 if envelope["status"] == "success" else 1
 
 

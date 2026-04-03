@@ -121,6 +121,8 @@ def execute_task(
 
 
 def validate_request(request: TaskRequest) -> dict[str, Any] | None:
+    if type(request) is not TaskRequest:
+        return runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法")
     if not request.adapter_key:
         return runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
     if request.capability != CONTENT_DETAIL_BY_URL:

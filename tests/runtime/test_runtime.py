@@ -11,6 +11,11 @@ class ExtendedTaskInput(TaskInput):
     platform_hint: str
 
 
+@dataclass(frozen=True)
+class ExtendedTaskRequest(TaskRequest):
+    extra: str
+
+
 class SuccessfulAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
@@ -363,6 +368,24 @@ class RuntimeExecutionTests(unittest.TestCase):
             request,
             adapters={"stub": SuccessfulAdapter()},
             task_id_factory=lambda: "task-extra-shape",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_extended_task_request_shape(self) -> None:
+        request = ExtendedTaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+            extra="leaks",
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-extra-request-shape",
         )
 
         self.assertEqual(envelope["status"], "failed")

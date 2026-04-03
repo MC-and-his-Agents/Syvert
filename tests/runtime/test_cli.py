@@ -226,6 +226,36 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["category"], "runtime_contract")
         self.assertEqual(payload["error"]["code"], "invalid_task_id")
 
+    def test_cli_fails_closed_when_success_envelope_is_not_json_serializable(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:build_unserializable_adapters",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "envelope_not_json_serializable")
+
 
 if __name__ == "__main__":
     unittest.main()
