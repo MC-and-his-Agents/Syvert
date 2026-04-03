@@ -28,7 +28,7 @@
 
 - `FR-0002` formal spec 已合入 `main`。
 - `#41` 的实现工作在分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 推进。
-- 最近一次实现 checkpoint 已推进到 `4da84267e24c858bea15b83031d47dc164b98c1c`，已统一 request/context 归一化、畸形 request fail-closed 与 adapter 元数据 fail-closed。
+- 最近一次实现 checkpoint 已推进到 `e557c3667317663115ae4d544b264112c8850265`，已收口缺失 `supported_capabilities`、异常 request context 提取与相关 fail-closed 回归。
 - 当前受审 head 由 PR `#44` 正文验证区块中的 `headRefOid` 绑定；本文件只维护当前实现 checkpoint 与审查追溯入口。
 - 当前回合处于 guardian 阻断收口阶段，本文件与 sprint 索引同步维护实现回合的恢复入口。
 
@@ -55,7 +55,7 @@
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/governance_gate.py --mode ci --base-sha 3046b9a955b295c76665e2ed5e5dccf9bf58574b --head-ref HEAD`
 - `python3 scripts/pr_guardian.py review 44 --post-review`（审查结论以 PR `#44` review 记录与正文验证区块为准）
-- 上述命令已在实现 checkpoint `4da84267e24c858bea15b83031d47dc164b98c1c` 对应工作树执行；当前受审 head 由 PR `#44` 正文验证区块同步记录
+- 上述命令已在实现 checkpoint `e557c3667317663115ae4d544b264112c8850265` 对应工作树执行；当前受审 head 由 PR `#44` 正文验证区块同步记录
 
 ## 未决风险
 
@@ -68,7 +68,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`4da84267e24c858bea15b83031d47dc164b98c1c`
+- 实现 checkpoint：`e557c3667317663115ae4d544b264112c8850265`
 - 当前受审 head：以 PR `#44` 正文验证区块中的 `headRefOid` 为准
 - 前者用于恢复最近一次实现收口停点，后者用于绑定本轮 guardian / merge gate 的实际受审状态。
 - 若当前审查回合继续追加 `exec-plan` / PR 正文等元数据补件提交，必须同步刷新“当前受审 head”与 PR 正文验证区块，避免审查绑定失配。
