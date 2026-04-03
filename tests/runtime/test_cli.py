@@ -51,7 +51,7 @@ class SuccessfulAdapter:
 class CliTests(unittest.TestCase):
     def test_cli_wrapper_help_exits_zero(self) -> None:
         result = subprocess.run(
-            [sys.executable, "scripts/syvert_cli.py", "--help"],
+            [sys.executable, "scripts/run_content_detail.py", "--help"],
             cwd=REPO_ROOT,
             text=True,
             capture_output=True,

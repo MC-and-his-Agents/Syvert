@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
@@ -14,6 +14,16 @@ class TaskRequest:
     adapter_key: str
     capability: str
     input_url: str
+
+
+@dataclass
+class PlatformAdapterError(Exception):
+    code: str
+    message: str
+    details: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        super().__init__(self.message)
 
 
 def default_task_id_factory() -> str:
@@ -61,10 +71,23 @@ def execute_task(
             },
         )
 
-    payload = adapter.execute(request)
-    payload_error = validate_success_payload(payload)
-    if payload_error is not None:
-        return failure_envelope(task_id, request.adapter_key, request.capability, payload_error)
+    try:
+        payload = adapter.execute(request)
+        payload_error = validate_success_payload(payload)
+        if payload_error is not None:
+            return failure_envelope(task_id, request.adapter_key, request.capability, payload_error)
+    except PlatformAdapterError as error:
+        return failure_envelope(
+            task_id,
+            request.adapter_key,
+            request.capability,
+            {
+                "category": "platform",
+                "code": error.code,
+                "message": error.message,
+                "details": error.details,
+            },
+        )
 
     return {
         "task_id": task_id,
