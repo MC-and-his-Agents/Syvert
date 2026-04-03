@@ -54,7 +54,9 @@ def execute_task(
     if contract_error is not None:
         return failure_envelope(task_id, adapter_key, capability, contract_error)
 
-    adapter = adapters.get(adapter_key)
+    adapter, adapter_error = get_adapter(adapters, adapter_key)
+    if adapter_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, adapter_error)
     if adapter is None:
         return failure_envelope(
             task_id,
@@ -167,6 +169,30 @@ def extract_request_context(request: Any) -> tuple[str, str]:
     return safe_adapter_key, safe_capability
 
 
+def get_adapter(adapters: Mapping[str, Any], adapter_key: str) -> tuple[Any, dict[str, Any] | None]:
+    try:
+        getter = getattr(adapters, "get")
+    except Exception as error:
+        return None, runtime_contract_error(
+            "invalid_adapter_registry",
+            "adapters 必须是支持 get() 的映射对象",
+            details={"error_type": error.__class__.__name__},
+        )
+    if not callable(getter):
+        return None, runtime_contract_error(
+            "invalid_adapter_registry",
+            "adapters 必须是支持 get() 的映射对象",
+        )
+    try:
+        return getter(adapter_key), None
+    except Exception as error:
+        return None, runtime_contract_error(
+            "invalid_adapter_registry",
+            "adapters.get() 执行失败",
+            details={"error_type": error.__class__.__name__},
+        )
+
+
 def get_adapter_supported_capabilities(adapter: Any) -> Any:
     try:
         return getattr(adapter, "supported_capabilities")
@@ -204,14 +230,21 @@ def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[st
             details={"actual_type": type(raw_capabilities).__name__},
         )
     validated: list[str] = []
-    for value in iterator:
-        if not isinstance(value, str):
-            return frozenset(), runtime_contract_error(
-                "invalid_adapter_capabilities",
-                "supported_capabilities 必须为字符串集合",
-                details={"invalid_value_type": type(value).__name__},
-            )
-        validated.append(value)
+    try:
+        for value in iterator:
+            if not isinstance(value, str):
+                return frozenset(), runtime_contract_error(
+                    "invalid_adapter_capabilities",
+                    "supported_capabilities 必须为字符串集合",
+                    details={"invalid_value_type": type(value).__name__},
+                )
+            validated.append(value)
+    except Exception as error:
+        return frozenset(), runtime_contract_error(
+            "invalid_adapter_capabilities",
+            "supported_capabilities 必须为字符串集合",
+            details={"error_type": error.__class__.__name__},
+        )
     return frozenset(validated), None
 
 

@@ -166,6 +166,25 @@ class MissingCapabilitiesAdapter:
         raise AssertionError("execute should not be called")
 
 
+class BrokenCapabilitiesIterable:
+    def __iter__(self):
+        yield "content_detail_by_url"
+        raise RuntimeError("broken-iterator")
+
+
+class BrokenIterableCapabilitiesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = BrokenCapabilitiesIterable()
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class ExplodingAdapterRegistry(dict):
+    def get(self, key, default=None):
+        raise RuntimeError("boom")
+
+
 class ExplodingRequestMapping(dict):
     def get(self, key, default=None):
         raise RuntimeError("boom")
@@ -490,6 +509,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
 
+    def test_execute_task_fails_closed_for_adapter_registry_that_raises_on_get(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters=ExplodingAdapterRegistry(),
+            task_id_factory=lambda: "task-exploding-registry",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_registry")
+
     def test_execute_task_fails_closed_for_non_container_supported_capabilities(self) -> None:
         request = TaskRequest(
             adapter_key="stub",
@@ -518,6 +554,23 @@ class RuntimeExecutionTests(unittest.TestCase):
             request,
             adapters={"stub": NonStringCapabilitiesAdapter()},
             task_id_factory=lambda: "task-non-string-caps",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_broken_supported_capabilities_iterable(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": BrokenIterableCapabilitiesAdapter()},
+            task_id_factory=lambda: "task-broken-caps",
         )
 
         self.assertEqual(envelope["status"], "failed")

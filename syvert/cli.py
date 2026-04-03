@@ -60,7 +60,7 @@ def main(
         input=TaskInput(url=args.url),
     )
     try:
-        resolved_adapters = adapters or load_adapters(args.adapter_module)
+        resolved_adapters = adapters if adapters is not None else load_adapters(args.adapter_module)
     except Exception as error:
         task_id, task_id_error = resolve_task_id(task_id_factory)
         if task_id_error is not None:
@@ -138,14 +138,19 @@ def extract_cli_context(argv: list[str] | None) -> tuple[str, str]:
 
 
 def extract_cli_option(argv: list[str], option: str) -> str:
-    try:
-        index = argv.index(option)
-    except ValueError:
-        return ""
-    if index + 1 >= len(argv):
-        return ""
-    value = argv[index + 1]
-    return value if isinstance(value, str) else ""
+    equals_prefix = f"{option}="
+    for index, token in enumerate(argv):
+        if token == option:
+            if index + 1 >= len(argv):
+                return ""
+            value = argv[index + 1]
+            if not isinstance(value, str) or value.startswith("--"):
+                return ""
+            return value
+        if isinstance(token, str) and token.startswith(equals_prefix):
+            value = token[len(equals_prefix) :]
+            return value if isinstance(value, str) else ""
+    return ""
 
 
 if __name__ == "__main__":

@@ -87,6 +87,55 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["category"], "runtime_contract")
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
+    def test_cli_parse_failure_preserves_adapter_key_from_equals_syntax(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter=stub",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
+
+    def test_cli_parse_failure_does_not_consume_next_flag_as_adapter_value(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter",
+                "--capability",
+                "content_detail_by_url",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["adapter_key"], "")
+        self.assertEqual(payload["capability"], "content_detail_by_url")
+        self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
+
     def test_cli_module_path_can_load_adapter_source(self) -> None:
         env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
         result = subprocess.run(
@@ -165,6 +214,32 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stderr.getvalue())
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["category"], "runtime_contract")
+
+    def test_injected_empty_adapter_registry_is_authoritative(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        exit_code = main(
+            [
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:build_adapters",
+            ],
+            adapters={},
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"]["code"], "adapter_not_found")
 
     def test_cli_loader_failure_returns_machine_readable_failure(self) -> None:
         env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
