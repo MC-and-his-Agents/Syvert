@@ -31,13 +31,13 @@
 
 - 已创建 GitHub 上位业务 FR `#38` 与 supporting backlog issues `#39` - `#42`。
 - 已建立 formal spec、research、risks、contracts 与 release/sprint 聚合入口。
-- 当前停在 spec draft 自检完成，准备进入 spec review。
+- 当前 formal spec 已完成 `spec review`，并达到 `implementation-ready`。
 
 ## 下一步动作
 
-- 发起 spec review。
-- 根据 review 结论收口 `implementation-ready` 前提。
-- 若 review 通过，再拆 implementation 回合。
+- 等待 guardian 与 merge gate 收口当前 spec PR。
+- 通过受控 merge 合入 formal spec。
+- 基于 `FR-0002` 已冻结 contract 启动 implementation 回合。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -47,7 +47,7 @@
 
 - 角色：业务主线 spec kickoff 事项。
 - 阻塞：
-  - 等待 `spec review` 对当前 formal spec draft 给出结论。
+  - 无。
 
 ## 已验证项
 
@@ -61,6 +61,8 @@
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/governance_gate.py --mode ci --base-sha 9e44783ab67e7b2d0753b3ee3320b922f2e3f471 --head-ref HEAD`
+- formal `spec review` 结论：`APPROVE`
+- `implementation-ready` 判定：`是`
 
 ## 未决风险
 

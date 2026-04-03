@@ -11,9 +11,9 @@
 
 ## 状态
 
-- 当前成熟度：`spec-ready`
+- 当前成熟度：`implementation-ready`
 - 当前阻塞：
-  - 尚未完成 `spec review`
+  - 无
 
 ## 实施清单
 
@@ -25,20 +25,20 @@
 - [x] 产出 `research.md`
 - [x] 产出 `risks.md`
 - [x] 产出 `contracts/README.md`
-- [ ] 完成 `spec review`
+- [x] 完成 `spec review`
 
 ## 验证清单
 
 - [x] `docs-guard` 通过
 - [x] `spec-guard` 通过
 - [x] formal spec 工件完整性通过
-- [ ] `spec review` 结论为通过
-- [ ] 进入实现前条件全部满足
+- [x] `spec review` 结论为通过
+- [x] 进入实现前条件全部满足
 
 ## 会话恢复信息
 
-- 当前停点：已完成 `FR-0002` formal spec 套件初稿、补齐 envelope 与 `normalized` 语义，并完成 `release` / `sprint` / `exec-plan` 聚合入口与本轮文档门禁验证。
+- 当前停点：`FR-0002` 已完成 `spec review` 并达到 `implementation-ready`，当前停在等待 guardian 与受控 merge 收口本轮 formal spec PR。
 - 下一步动作：
-  - 复核 contract 字段与边界语义
-  - 发起 `spec review`
-  - 根据 review 结论决定是否进入 `implementation-ready`
+  - 等待 guardian 与 merge gate 收口当前 spec PR
+  - 通过受控 merge 合入 formal spec
+  - 基于已冻结 spec 启动 implementation 回合
