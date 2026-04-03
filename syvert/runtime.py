@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
+RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,12 @@ def validate_request(request: TaskRequest) -> dict[str, Any] | None:
 
 
 def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(payload, Mapping):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "adapter 成功结果必须是对象",
+        )
+
     if "raw" not in payload or "normalized" not in payload:
         return runtime_contract_error(
             "invalid_adapter_success_payload",
@@ -149,6 +157,13 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
                 f"normalized.{field} 必须存在且为字符串",
             )
 
+    published_at = normalized.get("published_at")
+    if published_at is not None and (not isinstance(published_at, str) or not RFC3339_UTC_RE.fullmatch(published_at)):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "normalized.published_at 必须为 RFC3339 UTC 或 null",
+        )
+
     for field in ("author", "stats", "media"):
         value = normalized.get(field)
         if not isinstance(value, Mapping):
@@ -157,7 +172,34 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
                 f"normalized.{field} 必须存在且为对象",
             )
 
-    image_urls = normalized["media"].get("image_urls")
+    author = normalized["author"]
+    stats = normalized["stats"]
+    media = normalized["media"]
+
+    avatar_url = author.get("avatar_url")
+    if avatar_url is not None and not isinstance(avatar_url, str):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "normalized.author.avatar_url 必须为字符串或 null",
+        )
+
+    for field in ("like_count", "comment_count", "share_count", "collect_count"):
+        value = stats.get(field)
+        if value is not None and not isinstance(value, int):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"normalized.stats.{field} 必须为整数或 null",
+            )
+
+    for field in ("cover_url", "video_url"):
+        value = media.get(field)
+        if value is not None and not isinstance(value, str):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"normalized.media.{field} 必须为字符串或 null",
+            )
+
+    image_urls = media.get("image_urls")
     if not isinstance(image_urls, list) or not all(isinstance(item, str) for item in image_urls):
         return runtime_contract_error(
             "invalid_adapter_success_payload",
