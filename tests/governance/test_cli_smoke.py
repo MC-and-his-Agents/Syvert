@@ -37,7 +37,6 @@ class CliSmokeTests(unittest.TestCase):
             "scripts/sync_repo_settings.py",
             "scripts/spec_issue_sync.py",
             "scripts/start_sprint.py",
-            "scripts/run_content_detail.py",
         ]
         for command in commands:
             with self.subTest(command=command):
