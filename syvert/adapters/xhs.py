@@ -265,7 +265,12 @@ def coerce_timeout_seconds(value: Any) -> int:
     if isinstance(value, bool):
         return DEFAULT_TIMEOUT_SECONDS
     if isinstance(value, (int, float)):
-        numeric = int(value)
+        if isinstance(value, float) and not math.isfinite(value):
+            return DEFAULT_TIMEOUT_SECONDS
+        try:
+            numeric = int(value)
+        except (OverflowError, ValueError):
+            return DEFAULT_TIMEOUT_SECONDS
         return numeric if numeric > 0 else DEFAULT_TIMEOUT_SECONDS
     if isinstance(value, str) and value.isdigit():
         numeric = int(value)

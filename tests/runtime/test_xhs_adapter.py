@@ -460,6 +460,73 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(payload["normalized"]["stats"]["like_count"], None)
         self.assertEqual(payload["normalized"]["stats"]["comment_count"], 2)
 
+    def test_xhs_adapter_defaults_timeout_when_session_timeout_is_not_finite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                        "timeout_seconds": 1e309,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            timeouts_seen: list[int] = []
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: (
+                    timeouts_seen.append(kwargs["timeout_seconds"]) or {
+                        "items": [
+                            {
+                                "note_card": {
+                                    "note_id": "66fad51c000000001b0224b8",
+                                    "type": "normal",
+                                    "title": "Timeout 标题",
+                                    "desc": "Timeout 正文",
+                                    "time": 1712304300,
+                                    "user": {
+                                        "user_id": "user-timeout",
+                                        "nickname": "作者丁",
+                                        "avatar": "https://cdn.example/avatar-timeout.jpg",
+                                    },
+                                    "interact_info": {
+                                        "liked_count": "1",
+                                        "comment_count": "2",
+                                        "share_count": "3",
+                                        "collected_count": "4",
+                                    },
+                                    "image_list": [
+                                        {"url_default": "https://cdn.example/timeout-cover.jpg"}
+                                    ],
+                                }
+                            }
+                        ]
+                    }
+                ),
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(timeouts_seen, [10])
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+
     def test_execute_task_returns_platform_failure_envelope_for_xhs_platform_errors(self) -> None:
         adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))
         request = TaskRequest(
