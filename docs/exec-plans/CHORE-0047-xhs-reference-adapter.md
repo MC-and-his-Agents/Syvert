@@ -34,8 +34,9 @@
 - `CHORE-0039` 已沉淀小红书平台事实，当前回合聚焦把研究结论落入参考适配器实现路径。
 - 当前事项以小红书单适配器先行，不在本轮宣称“双适配器已交付”；双适配器验证仍以 release 判据与后续事项收口为准。
 - `syvert/adapters/xhs.py` 与 `tests/runtime/test_xhs_adapter.py` 已落地，当前自动化验证已覆盖 URL 解析、session/sign/detail 失败语义、`raw + normalized` 映射，以及 `--adapter-module syvert.adapters.xhs:build_adapters` 的共享 Core 路径加载。
+- 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
 - 默认会话文件 `$HOME/.config/syvert/xhs.session.json` 在当前环境缺失，因此“至少一条真实小红书 URL 手动验证”仍被环境前置阻塞，需在 PR 风险区显式记录。
-- 最近一次 checkpoint SHA：`b885999abfecb390a387816dc6f38c4086d7d853`。
+- 最近一次 checkpoint SHA：`64d082184c9c39f087c48a0983971c4fa138cdee`。
 
 ## 下一步动作
 
@@ -81,5 +82,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`b885999abfecb390a387816dc6f38c4086d7d853`
-- 当前受审 head：`9879964093ec887db40e53f6118de11b5fcd14e7`
+- 实现 checkpoint：`64d082184c9c39f087c48a0983971c4fa138cdee`
+- 当前受审 head：以 PR `#48` 的最新 `headRefOid` 为准
