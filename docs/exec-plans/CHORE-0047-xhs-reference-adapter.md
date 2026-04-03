@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md`
 - active 收口事项：`CHORE-0047-xhs-reference-adapter`
-- 关联 PR：
+- 关联 PR：`#48`
 
 ## 目标
 
@@ -82,4 +82,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 实现 checkpoint：`b885999abfecb390a387816dc6f38c4086d7d853`
-- 当前受审 head：待 PR 创建后以最新 `headRefOid` 为准
+- 当前受审 head：`9879964093ec887db40e53f6118de11b5fcd14e7`
