@@ -13,7 +13,27 @@ from unittest import mock
 from syvert.cli import main
 from syvert.runtime import TaskInput, TaskRequest, execute_task
 
-from syvert.adapters.xhs import XhsAdapter, parse_xhs_detail_url
+from syvert.adapters.xhs import (
+    XhsAdapter,
+    default_sign_transport,
+    normalize_detail_response,
+    parse_xhs_detail_url,
+    post_json,
+)
+
+
+class FakeHttpResponse:
+    def __init__(self, body: str) -> None:
+        self._body = body.encode("utf-8")
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "FakeHttpResponse":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        return False
 
 
 class XhsAdapterTests(unittest.TestCase):
@@ -42,6 +62,11 @@ class XhsAdapterTests(unittest.TestCase):
     def test_parse_xhs_detail_url_rejects_non_xhs_url(self) -> None:
         with self.assertRaises(Exception) as raised:
             parse_xhs_detail_url("https://example.com/posts/1")
+        self.assertEqual(raised.exception.code, "invalid_xhs_url")
+
+    def test_parse_xhs_detail_url_rejects_non_detail_discovery_path(self) -> None:
+        with self.assertRaises(Exception) as raised:
+            parse_xhs_detail_url("https://www.xiaohongshu.com/discovery/search")
         self.assertEqual(raised.exception.code, "invalid_xhs_url")
 
     def test_xhs_adapter_execute_builds_success_payload_from_api_responses(self) -> None:
@@ -198,6 +223,89 @@ class XhsAdapterTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("xsec_token", payload["raw"])
+
+    def test_xhs_adapter_selects_matching_note_card_when_detail_returns_multiple_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "success": True,
+                    "data": {
+                        "items": [
+                            {
+                                "note_card": {
+                                    "note_id": "wrong-note-id",
+                                    "type": "normal",
+                                    "title": "错误内容",
+                                    "desc": "错误正文",
+                                    "time": 1712304300,
+                                    "user": {
+                                        "user_id": "wrong-user",
+                                        "nickname": "错误作者",
+                                        "avatar": "https://cdn.example/wrong-avatar.jpg",
+                                    },
+                                    "interact_info": {},
+                                    "image_list": [],
+                                }
+                            },
+                            {
+                                "note_card": {
+                                    "note_id": "66fad51c000000001b0224b8",
+                                    "type": "normal",
+                                    "title": "目标内容",
+                                    "desc": "目标正文",
+                                    "time": 1712304300,
+                                    "user": {
+                                        "user_id": "target-user",
+                                        "nickname": "目标作者",
+                                        "avatar": "https://cdn.example/target-avatar.jpg",
+                                    },
+                                    "interact_info": {
+                                        "liked_count": "2",
+                                        "comment_count": "3",
+                                        "share_count": "4",
+                                        "collected_count": "5",
+                                    },
+                                    "image_list": [
+                                        {"url_default": "https://cdn.example/target-image.jpg"}
+                                    ],
+                                }
+                            },
+                        ]
+                    },
+                },
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["title"], "目标内容")
+        self.assertEqual(payload["raw"]["data"]["items"][0]["note_card"]["note_id"], "wrong-note-id")
 
     def test_xhs_adapter_maps_structured_detail_failure_to_platform_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -460,6 +568,71 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(payload["normalized"]["stats"]["like_count"], None)
         self.assertEqual(payload["normalized"]["stats"]["comment_count"], 2)
 
+    def test_xhs_adapter_coerces_non_finite_float_stats_to_null(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "items": [
+                        {
+                            "note_card": {
+                                "note_id": "66fad51c000000001b0224b8",
+                                "type": "normal",
+                                "title": "浮点异常标题",
+                                "desc": "浮点异常正文",
+                                "time": 1712304300,
+                                "user": {
+                                    "user_id": "user-float-overflow",
+                                    "nickname": "作者戊",
+                                    "avatar": "https://cdn.example/avatar-float.jpg",
+                                },
+                                "interact_info": {
+                                    "liked_count": float("inf"),
+                                    "comment_count": float("nan"),
+                                    "share_count": 3.0,
+                                    "collected_count": 4,
+                                },
+                                "image_list": [
+                                    {"url_default": "https://cdn.example/float-cover.jpg"}
+                                ],
+                            }
+                        }
+                    ]
+                },
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["normalized"]["stats"]["like_count"], None)
+        self.assertEqual(payload["normalized"]["stats"]["comment_count"], None)
+        self.assertEqual(payload["normalized"]["stats"]["share_count"], 3)
+        self.assertEqual(payload["normalized"]["stats"]["collect_count"], 4)
+
     def test_xhs_adapter_defaults_timeout_when_session_timeout_is_not_finite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
@@ -526,6 +699,63 @@ class XhsAdapterTests(unittest.TestCase):
 
         self.assertEqual(timeouts_seen, [10])
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+
+    def test_default_sign_transport_rejects_failed_sign_payload(self) -> None:
+        with mock.patch(
+            "syvert.adapters.xhs.post_json",
+            return_value={"isok": False, "msg": "sign failed"},
+        ):
+            with self.assertRaises(Exception) as raised:
+                default_sign_transport("http://127.0.0.1:8000", {"uri": "/feed"}, 5)
+
+        self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+        self.assertEqual(raised.exception.details["response"]["msg"], "sign failed")
+
+    def test_default_sign_transport_rejects_missing_data_mapping(self) -> None:
+        with mock.patch(
+            "syvert.adapters.xhs.post_json",
+            return_value={"isok": True, "data": []},
+        ):
+            with self.assertRaises(Exception) as raised:
+                default_sign_transport("http://127.0.0.1:8000", {"uri": "/feed"}, 5)
+
+        self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+
+    def test_post_json_rejects_invalid_json_detail_response(self) -> None:
+        with mock.patch(
+            "syvert.adapters.xhs.request.urlopen",
+            return_value=FakeHttpResponse("not-json"),
+        ):
+            with self.assertRaises(Exception) as raised:
+                post_json(
+                    "https://edith.xiaohongshu.com/api/sns/web/v1/feed",
+                    {"source_note_id": "66fad51c000000001b0224b8"},
+                    headers={"content-type": "application/json"},
+                    timeout_seconds=5,
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
+
+    def test_post_json_rejects_non_object_sign_response(self) -> None:
+        with mock.patch(
+            "syvert.adapters.xhs.request.urlopen",
+            return_value=FakeHttpResponse('["not","object"]'),
+        ):
+            with self.assertRaises(Exception) as raised:
+                post_json(
+                    "http://127.0.0.1:8000/signsrv/v1/xhs/sign",
+                    {"uri": "/feed"},
+                    headers={"content-type": "application/json"},
+                    timeout_seconds=5,
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+
+    def test_normalize_detail_response_rejects_success_without_mapping_data(self) -> None:
+        with self.assertRaises(Exception) as raised:
+            normalize_detail_response({"success": True, "data": []})
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
     def test_execute_task_returns_platform_failure_envelope_for_xhs_platform_errors(self) -> None:
         adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))

@@ -64,7 +64,7 @@ class XhsAdapter:
         headers = self._build_headers(session, body)
         raw_response = self._fetch_detail(session, headers, body)
         detail_response = normalize_detail_response(raw_response)
-        note_card = extract_note_card(detail_response)
+        note_card = extract_note_card(detail_response, source_note_id=url_info.note_id)
         normalized = normalize_note_card(note_card, request.input.url)
         return {"raw": raw_response, "normalized": normalized}
 
@@ -160,8 +160,8 @@ def parse_xhs_detail_url(url: str) -> XhsUrlInfo:
 
     path_parts = [part for part in parsed.path.split("/") if part]
     note_id = ""
-    if len(path_parts) >= 2 and path_parts[0] in {"explore", "discovery"}:
-        note_id = path_parts[-1]
+    if len(path_parts) == 2 and path_parts[0] == "explore":
+        note_id = path_parts[1]
     if not note_id:
         raise PlatformAdapterError(
             code="invalid_xhs_url",
@@ -356,7 +356,11 @@ def post_json(
     return parsed
 
 
-def extract_note_card(detail_response: Mapping[str, Any]) -> Mapping[str, Any]:
+def extract_note_card(
+    detail_response: Mapping[str, Any],
+    *,
+    source_note_id: str | None = None,
+) -> Mapping[str, Any]:
     items = detail_response.get("items")
     if not isinstance(items, list) or not items:
         raise PlatformAdapterError(
@@ -364,21 +368,41 @@ def extract_note_card(detail_response: Mapping[str, Any]) -> Mapping[str, Any]:
             message="小红书 detail 未返回内容",
             details={},
         )
-    first = items[0]
-    if not isinstance(first, Mapping):
+    first_valid_note_card: Mapping[str, Any] | None = None
+    saw_invalid_item = False
+    for item in items:
+        if not isinstance(item, Mapping):
+            saw_invalid_item = True
+            continue
+        note_card = item.get("note_card")
+        if not isinstance(note_card, Mapping) or not note_card:
+            continue
+        if first_valid_note_card is None:
+            first_valid_note_card = note_card
+        if source_note_id:
+            note_id = non_empty_string(note_card.get("note_id"))
+            if note_id == source_note_id:
+                return note_card
+
+    if first_valid_note_card is not None and not source_note_id:
+        return first_valid_note_card
+    if first_valid_note_card is not None and source_note_id:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书 detail 未返回目标内容",
+            details={"source_note_id": source_note_id},
+        )
+    if saw_invalid_item:
         raise PlatformAdapterError(
             code="xhs_detail_request_failed",
             message="小红书 detail item 形状不合法",
             details={},
         )
-    note_card = first.get("note_card")
-    if not isinstance(note_card, Mapping) or not note_card:
-        raise PlatformAdapterError(
-            code="xhs_content_not_found",
-            message="小红书 detail note_card 缺失",
-            details={},
-        )
-    return note_card
+    raise PlatformAdapterError(
+        code="xhs_content_not_found",
+        message="小红书 detail note_card 缺失",
+        details={},
+    )
 
 
 def normalize_note_card(note_card: Mapping[str, Any], input_url: str) -> dict[str, Any]:
@@ -532,15 +556,20 @@ def nullable_int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
         return int(value)
     if isinstance(value, str):
         stripped = value.strip()
         if not stripped:
             return None
         try:
-            return int(float(stripped))
+            numeric = float(stripped)
         except (ValueError, OverflowError):
             return None
+        if not math.isfinite(numeric):
+            return None
+        return int(numeric)
     return None
 
 
