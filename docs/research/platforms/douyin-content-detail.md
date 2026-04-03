@@ -58,30 +58,36 @@
 
 建议进入 Syvert `normalized` 的最小公共字段：
 
+- `platform`
 - `content_id`
 - `content_type`
-- `title`
-- `desc`
 - `canonical_url`
-- `author.id`
-- `author.name`
+- `title`
+- `body_text`
 - `published_at`
-- `stats.likes`
-- `stats.comments`
-- `stats.collects`
-- `stats.shares`
-- `media.images`
-- `media.video`
+- `author.author_id`
+- `author.display_name`
+- `author.avatar_url`
+- `stats.like_count`
+- `stats.comment_count`
+- `stats.collect_count`
+- `stats.share_count`
+- `media.cover_url`
+- `media.video_url`
+- `media.image_urls`
 
 建议只保留在 `raw` 的平台特有字段：
+
+- 多码率视频流与水印相关底层字段
+- `music`、`keywords`、`relatedQueries`、商业化标识等 richer payload
+- 各类页面态包装字段，如 `SSR_RENDER_DATA` / `SIGI_STATE`
+
+不应被提升进结果契约的 adapter 内部前置 / 派生值：
 
 - `verifyFp`
 - `msToken`
 - `webid`
 - `a_bogus`
-- 多码率视频流与水印相关底层字段
-- `music`、`keywords`、`relatedQueries`、商业化标识等 richer payload
-- 各类页面态包装字段，如 `SSR_RENDER_DATA` / `SIGI_STATE`
 
 ## 失败语义
 

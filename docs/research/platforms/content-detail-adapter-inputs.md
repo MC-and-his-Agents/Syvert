@@ -9,7 +9,7 @@
 
 | 维度 | 小红书 | 抖音 | 对 Syvert 的含义 |
 | --- | --- | --- | --- |
-| 用户输入 | 用户态详情 URL | 用户态详情 URL | Core 统一只接收 `input.url` |
+| 用户输入 | 用户态详情 URL | 用户态详情 URL | Core 最小任务输入固定为 `adapter_key`、`capability`、`input.url` |
 | adapter 内部主 ID | `note_id` | `aweme_id` | URL 解析必须属于 adapter |
 | 主采集路径 | detail API `/api/sns/web/v1/feed` | detail API `/aweme/v1/web/aweme/detail/` | 两者都可走 API，但前置完全平台化 |
 | fallback | HTML / `window.__INITIAL_STATE__` | SSR / `RENDER_DATA` / `SIGI_STATE` / intercepted payload | fallback 只能在 adapter 内部切换 |
@@ -34,21 +34,29 @@
 
 ## `raw` / `normalized` 切分原则
 
-- `normalized` 只保留双平台共同消费所必需的最小字段：
+- `normalized` 只保留 `FR-0002` 已冻结的最小字段：
+  - `platform`
   - `content_id`
   - `content_type`
-  - `title`
-  - `desc`
   - `canonical_url`
-  - `author`
-  - `stats`
+  - `title`
+  - `body_text`
   - `published_at`
-  - `media`
+  - `author.author_id`
+  - `author.display_name`
+  - `author.avatar_url`
+  - `stats.like_count`
+  - `stats.comment_count`
+  - `stats.share_count`
+  - `stats.collect_count`
+  - `media.cover_url`
+  - `media.video_url`
+  - `media.image_urls`
 - `raw` 保留平台原始结构和调试需要的信息：
-  - 请求前置衍生参数
   - rich media 底层流信息
   - 页面全局状态包装结构
   - 平台特有业务字段
+- `xsec_token`、`verifyFp`、`msToken`、`webid`、`a_bogus` 这类 URL 派生值或请求前置参数属于 adapter 内部上下文，不应为了调试便利被强行塞入 `raw` 结果契约。
 - 若 adapter 只能得到 `raw` 而无法构造完整 `normalized`，任务必须失败，不应返回成功态。
 
 ## 适配器实现前置清单

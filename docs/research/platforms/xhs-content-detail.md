@@ -32,7 +32,7 @@
 ### HTML / 页面状态兜底
 
 - 当 API 路线出现验证或不稳定时，MediaCrawlerPro 会回退到详情页 HTML，并从 `window.__INITIAL_STATE__` 中提取 note 数据。
-- `hotcp` 研究与实现都表明，详情页与 SPA 路由切换后的数据会落在 `window.__INITIAL_STATE__.note.noteDetailMap[noteId].note`，这是插件侧最稳的页面态来源。
+- `hotcp` 研究与实现都表明，详情页与 SPA 路由切换后的数据会落在 `window.__INITIAL_STATE__.note.noteDetailMap[noteId].note`，这是当前已观察到的插件侧页面态来源之一。
 
 ### hotcp 插件 / 浏览器内路线
 
@@ -66,28 +66,34 @@
 
 建议进入 Syvert `normalized` 的最小公共字段：
 
+- `platform`
 - `content_id`
 - `content_type`
-- `title`
-- `desc`
 - `canonical_url`
-- `author.id`
-- `author.name`
+- `title`
+- `body_text`
 - `published_at`
-- `stats.likes`
-- `stats.comments`
-- `stats.collects`
-- `stats.shares`
-- `media.images`
-- `media.video`
+- `author.author_id`
+- `author.display_name`
+- `author.avatar_url`
+- `stats.like_count`
+- `stats.comment_count`
+- `stats.collect_count`
+- `stats.share_count`
+- `media.cover_url`
+- `media.video_url`
+- `media.image_urls`
 
 建议只保留在 `raw` 的平台特有字段：
 
-- `xsec_token`
-- `xsec_source`
 - 小红书特有的图片 `infoList` / `stream` 结构
 - live photo / video multi-stream 的底层格式字段
 - 页面态特有包装结构，如 `noteDetailMap`
+
+不应被提升进结果契约的 adapter 内部前置 / 派生值：
+
+- `xsec_token`
+- `xsec_source`
 
 ## 失败语义
 
