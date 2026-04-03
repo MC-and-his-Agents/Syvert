@@ -12,28 +12,30 @@
 
 ## 目标
 
-- 为 `FR-0002` 之后的首个实现切片提供 active `exec-plan` 绑定，使 `#41` 的实现回合在 PR 审查、风险、验证与回滚语义上具备可追溯上下文。
+- 推进 `#41` 的 runtime / CLI skeleton 到可受控合并状态，并将本文件作为 `#44` 当前实现轮次的 active 审查追溯入口。
 
 ## 范围
 
 - 本次纳入：
-  - 为 `CHORE-0041-runtime-cli-skeleton` 建立独立 active `exec-plan`
+  - 本地单进程 `runtime + CLI` 最小执行骨架
+  - 统一成功/失败 envelope 与 fail-closed 约束
+  - `guardian` 阻断项的实现侧收口（含 CLI loader failure 的 `task_id_factory` 一致性）
 - 本次不纳入：
-  - 任何实现代码
-  - release / sprint 聚合索引更新
   - 真实 adapter 联调
+  - HTTP API / 队列 / 多进程 / 调度能力
 
 ## 当前停点
 
 - `FR-0002` formal spec 已合入 `main`。
-- `#41` 的实现工作已在独立分支推进，当前实现 head 为 `dff73c56d8d4319b9f0db051b4fd735c6650d2c7`。
-- 当前缺少可供受控审查链路引用的 active `exec-plan`。
+- `#41` 的实现工作在分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 推进。
+- 最近一次实现 checkpoint 已推进到 `83e4c7c4ecd8759d86255e57859a76537dda0fac`，已收口 runtime 输入结构与 `task_id` 严格校验。
+- 下一步进入审查态补件：刷新 PR `#44` 正文验证区块，并在当前 head 上重新执行 guardian。
 
 ## 下一步动作
 
-- 在实现分支继续推进 runtime / CLI skeleton。
-- 由 guardian / merge gate 使用本文件作为当前回合的追溯入口。
-- 当实现分支继续前进时，同步刷新本文件中的 checkpoint SHA 与验证信息。
+- 刷新 PR `#44` 正文中的验证与 head SHA。
+- 在当前 head 上执行新一轮 `pr_guardian review`。
+- guardian 结论为 `APPROVE` 后走受控 `merge_pr`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -41,20 +43,24 @@
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
-- 角色：`#41` 的执行回合追溯工件。
+- 角色：`#41` 的实现主事项（v0.1.0 首个 runtime/CLI 切片）。
 - 阻塞：
-  - 无。
+  - 需要完成 `#44` 的 guardian 阻断收口后才能进入合并。
 
 ## 已验证项
 
-- `gh issue view 41`
-- 已核对 `docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md`
-- 已核对 `docs/releases/v0.1.0.md`
-- 已核对实现分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 的当前 head：`dff73c56d8d4319b9f0db051b4fd735c6650d2c7`
+- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.governance.test_cli_smoke -v`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/spec_guard.py --mode ci --all`
+- `python3 scripts/governance_gate.py --mode ci --base-sha 3046b9a955b295c76665e2ed5e5dccf9bf58574b --head-ref HEAD`
+- `python3 scripts/pr_guardian.py review 44 --post-review`（最近一次结论：`REQUEST_CHANGES`）
+- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_cli.CliTests.test_loader_failure_uses_injected_task_id_factory -v`
+- `PYTHONPATH=/Users/claw/code/worktrees/syvert/issue-41-runtime-local-single-process-executor-and-cli-skeleton python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli -v`
 
 ## 未决风险
 
-- 若实现回合不再复用本 `item_key`，需要同步调整 active `exec-plan` 绑定。
+- 若当前审查回合继续追加补件提交，PR 正文中的当前 head SHA 与验证信息必须同步刷新，否则 guardian 绑定会再次失配。
+- 真实参考 adapter 尚未进入本 PR 范围；当前仅覆盖 runtime / CLI skeleton。
 
 ## 回滚方式
 
@@ -62,4 +68,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `dff73c56d8d4319b9f0db051b4fd735c6650d2c7`
+- `83e4c7c4ecd8759d86255e57859a76537dda0fac`
+- 上述 SHA 对应最近一次完成实现侧收口并通过局部测试的代码 checkpoint。
+- 若当前审查回合仅追加 `exec-plan` / PR 正文等元数据补件提交，则实际用于 guardian 审查的当前 head SHA 以 PR `#44` 正文验证区块为准，并在每次补件后同步刷新。
