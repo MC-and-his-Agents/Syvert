@@ -32,6 +32,7 @@
 - 已创建 GitHub 上位业务 FR `#38` 与 supporting backlog issues `#39` - `#42`。
 - 已建立 formal spec、research、risks、contracts 与 release/sprint 聚合入口。
 - 当前 formal spec 已完成 `spec review`，并达到 `implementation-ready`。
+- `spec review` 结论与当前受审 head 的绑定以 PR `#43` 的审查记录与 guardian 工件为准；本次状态同步属于审查态元数据补充，不单独刷新最近一次 checkpoint head。
 
 ## 下一步动作
 
