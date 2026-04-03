@@ -6,7 +6,7 @@ import json
 import sys
 from typing import Any, Callable, Mapping, TextIO
 
-from syvert.runtime import TaskRequest, execute_task
+from syvert.runtime import CONTENT_DETAIL_BY_URL, TaskRequest, default_task_id_factory, execute_task, failure_envelope
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -32,13 +32,29 @@ def main(
     args = parse_args(argv)
     out = stdout or sys.stdout
     err = stderr or sys.stderr
-    resolved_adapters = adapters or load_adapters(args.adapter_module)
+    request = TaskRequest(
+        adapter_key=args.adapter,
+        capability=args.capability,
+        input_url=args.url,
+    )
+    try:
+        resolved_adapters = adapters or load_adapters(args.adapter_module)
+    except Exception as error:
+        envelope = failure_envelope(
+            default_task_id_factory(),
+            request.adapter_key,
+            request.capability,
+            {
+                "category": "runtime_contract",
+                "code": "adapter_loader_error",
+                "message": str(error) or error.__class__.__name__,
+                "details": {},
+            },
+        )
+        err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+        return 1
     envelope = execute_task(
-        TaskRequest(
-            adapter_key=args.adapter,
-            capability=args.capability,
-            input_url=args.url,
-        ),
+        request,
         adapters=resolved_adapters,
         task_id_factory=task_id_factory,
     )
@@ -52,12 +68,12 @@ def load_adapters(spec: str | None) -> Mapping[str, Any]:
         return {}
     module_name, _, attr_name = spec.partition(":")
     if not module_name or not attr_name:
-        raise SystemExit("`--adapter-module` 必须采用 `module:attr` 格式。")
+        raise ValueError("`--adapter-module` 必须采用 `module:attr` 格式。")
     module = importlib.import_module(module_name)
     source = getattr(module, attr_name)
     resolved = source() if callable(source) else source
     if not isinstance(resolved, Mapping):
-        raise SystemExit("`--adapter-module` 解析结果必须是 mapping。")
+        raise ValueError("`--adapter-module` 解析结果必须是 mapping。")
     return resolved
 
 

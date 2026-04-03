@@ -91,6 +91,16 @@ def execute_task(
                 "details": error.details,
             },
         )
+    except Exception as error:
+        return failure_envelope(
+            task_id,
+            request.adapter_key,
+            request.capability,
+            runtime_contract_error(
+                "adapter_execution_error",
+                str(error) or error.__class__.__name__,
+            ),
+        )
 
     return {
         "task_id": task_id,
@@ -199,6 +209,19 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
             )
 
     avatar_url = author.get("avatar_url")
+    author_id = author.get("author_id")
+    display_name = author.get("display_name")
+
+    if author_id is not None and (not isinstance(author_id, str) or not author_id):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "normalized.author.author_id 必须为非空字符串或 null",
+        )
+    if display_name is not None and (not isinstance(display_name, str) or not display_name):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "normalized.author.display_name 必须为非空字符串或 null",
+        )
     if avatar_url is not None and not isinstance(avatar_url, str):
         return runtime_contract_error(
             "invalid_adapter_success_payload",
@@ -207,7 +230,7 @@ def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | Non
 
     for field in ("like_count", "comment_count", "share_count", "collect_count"):
         value = stats.get(field)
-        if value is not None and not isinstance(value, int):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
                 f"normalized.stats.{field} 必须为整数或 null",
@@ -242,6 +265,9 @@ def is_valid_rfc3339_utc(value: str) -> bool:
 
 
 def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Mapping[str, Any]) -> dict[str, Any]:
+    details = error.get("details", {})
+    if not isinstance(details, Mapping):
+        details = {}
     return {
         "task_id": task_id,
         "adapter_key": adapter_key,
@@ -251,7 +277,7 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
             "category": error["category"],
             "code": error["code"],
             "message": error["message"],
-            "details": dict(error.get("details", {})),
+            "details": dict(details),
         },
     }
 

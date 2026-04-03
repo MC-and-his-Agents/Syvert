@@ -94,6 +94,24 @@ class ListPayloadAdapter:
         return []
 
 
+class CrashingAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail_by_url"})
+
+    def execute(self, request: TaskRequest):
+        raise RuntimeError("boom")
+
+
+class PlatformErrorWithBadDetailsAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail_by_url"})
+
+    def execute(self, request: TaskRequest):
+        from syvert.runtime import PlatformAdapterError
+
+        raise PlatformAdapterError(code="platform_broken", message="bad details", details=None)
+
+
 class PlatformFailureAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
@@ -214,6 +232,41 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_success_payload")
+
+    def test_execute_task_fails_closed_when_adapter_raises_generic_exception(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input_url="https://example.com/posts/1",
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": CrashingAdapter()},
+            task_id_factory=lambda: "task-006",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "adapter_execution_error")
+
+    def test_execute_task_handles_platform_error_with_non_mapping_details(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input_url="https://example.com/posts/1",
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": PlatformErrorWithBadDetailsAdapter()},
+            task_id_factory=lambda: "task-007",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "platform")
+        self.assertEqual(envelope["error"]["code"], "platform_broken")
+        self.assertEqual(envelope["error"]["details"], {})
 
     def test_execute_task_wraps_platform_error(self) -> None:
         request = TaskRequest(

@@ -140,6 +140,35 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["category"], "runtime_contract")
 
+    def test_cli_loader_failure_returns_machine_readable_failure(self) -> None:
+        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "syvert.cli",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:missing_builder",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        payload = json.loads(result.stderr)
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "adapter_loader_error")
+
 
 if __name__ == "__main__":
     unittest.main()
