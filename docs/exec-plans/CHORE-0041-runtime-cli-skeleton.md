@@ -28,7 +28,7 @@
 
 - `FR-0002` formal spec 已合入 `main`。
 - `#41` 的实现工作在分支 `issue-41-runtime-local-single-process-executor-and-cli-skeleton` 推进。
-- 最近一次实现 checkpoint 已推进到 `ebd0741c3b07d8c37d0d1487514649688b2460c9`，已收口 runtime 输入结构与 `task_id` 严格校验。
+- 最近一次实现 checkpoint 已推进到 `ebd07417a914b312509d7be719baa3a232be066d`，已收口 runtime 输入结构与 `task_id` 严格校验。
 - 下一步进入审查态补件：刷新 PR `#44` 正文验证区块，并在当前 head 上重新执行 guardian。
 
 ## 下一步动作
@@ -68,6 +68,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ebd0741c3b07d8c37d0d1487514649688b2460c9`
+- `ebd07417a914b312509d7be719baa3a232be066d`
 - 上述 SHA 对应最近一次完成实现侧收口并通过局部测试的代码 checkpoint。
 - 若当前审查回合仅追加 `exec-plan` / PR 正文等元数据补件提交，则实际用于 guardian 审查的当前 head SHA 以 PR `#44` 正文验证区块为准，并在每次补件后同步刷新。
