@@ -34,6 +34,11 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(parsed.xsec_token, "")
         self.assertEqual(parsed.xsec_source, "")
 
+    def test_parse_xhs_detail_url_rejects_xhslink_until_short_link_resolution_exists(self) -> None:
+        with self.assertRaises(Exception) as raised:
+            parse_xhs_detail_url("https://www.xhslink.com/explore/66fad51c000000001b0224b8")
+        self.assertEqual(raised.exception.code, "invalid_xhs_url")
+
     def test_parse_xhs_detail_url_rejects_non_xhs_url(self) -> None:
         with self.assertRaises(Exception) as raised:
             parse_xhs_detail_url("https://example.com/posts/1")
@@ -179,7 +184,7 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(payload["normalized"]["media"]["cover_url"], "https://cdn.example/cover.jpg")
         self.assertEqual(
             payload["normalized"]["media"]["video_url"],
-            "http://sns-video-bd.xhscdn.com/video-key-1",
+            "https://sns-video-bd.xhscdn.com/video-key-1",
         )
         self.assertEqual(
             payload["normalized"]["media"]["image_urls"],
@@ -189,6 +194,51 @@ class XhsAdapterTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("xsec_token", payload["raw"])
+
+    def test_xhs_adapter_maps_structured_detail_failure_to_platform_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "success": False,
+                    "code": 300013,
+                    "msg": "登录失效",
+                    "data": {},
+                },
+            )
+
+            with self.assertRaises(Exception) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
+        self.assertIn("platform_code", raised.exception.details)
+        self.assertEqual(raised.exception.details["platform_code"], 300013)
+        self.assertEqual(raised.exception.details["platform_message"], "登录失效")
 
     def test_xhs_adapter_raises_platform_error_when_session_file_is_missing(self) -> None:
         adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))
@@ -264,6 +314,147 @@ class XhsAdapterTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(raised.exception.code, "xhs_content_not_found")
+
+    def test_xhs_adapter_normalizes_live_photo_as_mixed_media(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "items": [
+                        {
+                            "note_card": {
+                                "note_id": "66fad51c000000001b0224b8",
+                                "type": "normal",
+                                "title": "Live Photo 标题",
+                                "desc": "Live Photo 正文",
+                                "time": 1712304300,
+                                "user": {
+                                    "user_id": "user-live-photo",
+                                    "nickname": "作者乙",
+                                    "avatar": "https://cdn.example/avatar-live.jpg",
+                                },
+                                "interact_info": {
+                                    "liked_count": "1",
+                                    "comment_count": "2",
+                                    "share_count": "3",
+                                    "collected_count": "4",
+                                },
+                                "image_list": [
+                                    {
+                                        "url_default": "https://cdn.example/live-photo-cover.jpg",
+                                        "live_photo": True,
+                                        "stream": {
+                                            "h264": [
+                                                {
+                                                    "master_url": "https://cdn.example/live-photo.mp4",
+                                                }
+                                            ]
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["normalized"]["content_type"], "mixed_media")
+        self.assertEqual(payload["normalized"]["media"]["video_url"], "https://cdn.example/live-photo.mp4")
+        self.assertEqual(
+            payload["normalized"]["media"]["image_urls"],
+            ["https://cdn.example/live-photo-cover.jpg"],
+        )
+
+    def test_xhs_adapter_coerces_invalid_numeric_fields_to_null(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "items": [
+                        {
+                            "note_card": {
+                                "note_id": "66fad51c000000001b0224b8",
+                                "type": "normal",
+                                "title": "异常数值标题",
+                                "desc": "异常数值正文",
+                                "time": "999999999999999999999999999",
+                                "user": {
+                                    "user_id": "user-overflow",
+                                    "nickname": "作者丙",
+                                    "avatar": "https://cdn.example/avatar-overflow.jpg",
+                                },
+                                "interact_info": {
+                                    "liked_count": "1e309",
+                                    "comment_count": "2",
+                                    "share_count": "3",
+                                    "collected_count": "4",
+                                },
+                                "image_list": [
+                                    {"url_default": "https://cdn.example/overflow-cover.jpg"}
+                                ],
+                            }
+                        }
+                    ]
+                },
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["normalized"]["published_at"], None)
+        self.assertEqual(payload["normalized"]["stats"]["like_count"], None)
+        self.assertEqual(payload["normalized"]["stats"]["comment_count"], 2)
 
     def test_execute_task_returns_platform_failure_envelope_for_xhs_platform_errors(self) -> None:
         adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
@@ -18,8 +19,6 @@ VALID_XHS_HOSTS = frozenset(
     {
         "www.xiaohongshu.com",
         "xiaohongshu.com",
-        "www.xhslink.com",
-        "xhslink.com",
     }
 )
 @dataclass(frozen=True)
@@ -141,7 +140,7 @@ class XhsAdapter:
                 message="小红书 detail 响应不是对象",
                 details={},
             )
-        return response
+        return normalize_detail_response(response)
 
 
 def build_adapters() -> dict[str, object]:
@@ -303,14 +302,7 @@ def default_detail_transport(
     body: dict[str, Any],
     timeout_seconds: int,
 ) -> Mapping[str, Any]:
-    response = post_json(url, body, headers=headers, timeout_seconds=timeout_seconds)
-    if response.get("success") is True:
-        data = response.get("data")
-        if isinstance(data, Mapping):
-            return data
-    if isinstance(response.get("data"), Mapping):
-        return response["data"]
-    return response
+    return post_json(url, body, headers=headers, timeout_seconds=timeout_seconds)
 
 
 def post_json(
@@ -406,7 +398,7 @@ def normalize_note_card(note_card: Mapping[str, Any], input_url: str) -> dict[st
 
     canonical_url = f"https://www.xiaohongshu.com/explore/{note_id}" or input_url
     image_urls = extract_image_urls(image_items)
-    video_url = extract_video_url(video_mapping)
+    video_url = extract_video_url(video_mapping, image_items)
     cover_url = first_non_empty_string(
         cover_mapping.get("url_default"),
         cover_mapping.get("url"),
@@ -469,7 +461,7 @@ def extract_image_urls(image_items: list[Any]) -> list[str]:
     return urls
 
 
-def extract_video_url(video_mapping: Mapping[str, Any]) -> str | None:
+def extract_video_url(video_mapping: Mapping[str, Any], image_items: list[Any]) -> str | None:
     consumer = video_mapping.get("consumer")
     if isinstance(consumer, Mapping):
         origin_video_key = first_non_empty_string(
@@ -477,20 +469,23 @@ def extract_video_url(video_mapping: Mapping[str, Any]) -> str | None:
             consumer.get("originVideoKey"),
         )
         if origin_video_key:
-            return f"http://sns-video-bd.xhscdn.com/{origin_video_key}"
+            return f"https://sns-video-bd.xhscdn.com/{origin_video_key}"
 
-    media = video_mapping.get("media")
-    if isinstance(media, Mapping):
-        stream = media.get("stream")
-        if isinstance(stream, Mapping):
-            h264 = stream.get("h264")
-            if isinstance(h264, list):
-                for item in h264:
-                    if not isinstance(item, Mapping):
-                        continue
-                    master_url = non_empty_string(item.get("master_url"))
-                    if master_url:
-                        return master_url
+    video_stream_url = extract_stream_video_url(video_mapping)
+    if video_stream_url:
+        return video_stream_url
+
+    for image in image_items:
+        if not isinstance(image, Mapping):
+            continue
+        image_stream_url = extract_stream_video_url(image)
+        if image_stream_url:
+            return image_stream_url
+        live_photo = image.get("live_photo")
+        if isinstance(live_photo, Mapping):
+            live_photo_url = extract_stream_video_url(live_photo)
+            if live_photo_url:
+                return live_photo_url
     return None
 
 
@@ -509,8 +504,18 @@ def normalize_published_at(value: Any) -> str | None:
                 numeric = None
     if numeric is None:
         return None
+    if not math.isfinite(numeric):
+        return None
     seconds = numeric / 1000 if numeric >= 100_000_000_000 else numeric
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        return (
+            datetime.fromtimestamp(seconds, tz=timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def nullable_int(value: Any) -> int | None:
@@ -528,8 +533,73 @@ def nullable_int(value: Any) -> int | None:
             return None
         try:
             return int(float(stripped))
-        except ValueError:
+        except (ValueError, OverflowError):
             return None
+    return None
+
+
+def normalize_detail_response(response: Mapping[str, Any]) -> Mapping[str, Any]:
+    items = response.get("items")
+    if isinstance(items, list):
+        return response
+
+    success = response.get("success")
+    if success is True:
+        data = response.get("data")
+        if isinstance(data, Mapping):
+            return data
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="小红书 detail 成功响应缺少 data",
+            details={},
+        )
+
+    if success is False or "code" in response or "msg" in response:
+        details: dict[str, Any] = {}
+        if "code" in response:
+            details["platform_code"] = response.get("code")
+        platform_message = non_empty_string(response.get("msg"))
+        if platform_message:
+            details["platform_message"] = platform_message
+        data = response.get("data")
+        if isinstance(data, Mapping) and data:
+            details["platform_data"] = dict(data)
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message=platform_message or "小红书 detail 请求失败",
+            details=details,
+        )
+
+    return response
+
+
+def extract_stream_video_url(container: Mapping[str, Any]) -> str | None:
+    stream = container.get("stream")
+    if isinstance(stream, Mapping):
+        stream_url = extract_h264_master_url(stream)
+        if stream_url:
+            return stream_url
+
+    media = container.get("media")
+    if isinstance(media, Mapping):
+        media_stream = media.get("stream")
+        if isinstance(media_stream, Mapping):
+            media_stream_url = extract_h264_master_url(media_stream)
+            if media_stream_url:
+                return media_stream_url
+
+    return None
+
+
+def extract_h264_master_url(stream: Mapping[str, Any]) -> str | None:
+    h264 = stream.get("h264")
+    if isinstance(h264, list):
+        for item in h264:
+            if not isinstance(item, Mapping):
+                continue
+            master_url = non_empty_string(item.get("master_url"))
+            if master_url:
+                return master_url
     return None
 
 
