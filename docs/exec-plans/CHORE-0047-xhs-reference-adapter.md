@@ -37,12 +37,12 @@
 - 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、成功态 `raw` 保留平台原始 success wrapper、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
 - 默认会话文件 `$HOME/.config/syvert/xhs.session.json` 在当前环境缺失，因此“至少一条真实小红书 URL 手动验证”仍被环境前置阻塞，需在 PR 风险区显式记录。
 - 当前 PR 仅声称交付“实现切片 + 自动化验证证据”；Issue `#47` 的 real URL 手动验证闭环仍待运行前置满足后继续推进。
-- 最近一次 checkpoint SHA：`d8f08d71fc442c11038b27000f9b745bed74645f`。
+- 最近一次 checkpoint SHA：`d751b9ba24971f029db11ed804884aefde8b7ca2`。
 
 ## 下一步动作
 
 - 在具备小红书 session / sign 运行前置后，补至少一条真实 `content_detail_by_url` 手动验证记录，再决定是否关闭 Issue `#47`。
-- 将本轮 raw wrapper 修复对应的实现 checkpoint 与受审 head 同步到 PR `#48` 和本 exec-plan。
+- 将当前实现 checkpoint、PR 正文与 guardian 审查输入持续同步到最新受审 head。
 - 以最新受审 head 重新执行 guardian / governance gates，并在 PR 正文同步验证记录。
 - 审查结论满足 merge gate 后走受控 `merge_pr` 合入。
 
@@ -83,5 +83,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`d8f08d71fc442c11038b27000f9b745bed74645f`
+- 实现 checkpoint：`d751b9ba24971f029db11ed804884aefde8b7ca2`
 - 当前受审 head：以 PR `#48` 的最新 `headRefOid` 为准
