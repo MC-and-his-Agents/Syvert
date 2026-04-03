@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from syvert.runtime import TaskRequest, validate_request, validate_success_payload
+from syvert.runtime import TaskInput, TaskRequest, validate_request, validate_success_payload
 
 
 class TaskRequestValidationTests(unittest.TestCase):
@@ -10,7 +10,7 @@ class TaskRequestValidationTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
-            input_url="https://www.xiaohongshu.com/explore/abc123",
+            input=TaskInput(url="https://www.xiaohongshu.com/explore/abc123"),
         )
 
         self.assertIsNone(validate_request(request))
@@ -19,7 +19,7 @@ class TaskRequestValidationTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="",
             capability="content_detail_by_url",
-            input_url="https://www.xiaohongshu.com/explore/abc123",
+            input=TaskInput(url="https://www.xiaohongshu.com/explore/abc123"),
         )
 
         error = validate_request(request)
@@ -31,13 +31,25 @@ class TaskRequestValidationTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="xhs",
             capability="search",
-            input_url="https://www.xiaohongshu.com/explore/abc123",
+            input=TaskInput(url="https://www.xiaohongshu.com/explore/abc123"),
         )
 
         error = validate_request(request)
 
         self.assertIsNotNone(error)
         self.assertEqual(error["code"], "invalid_capability")
+
+    def test_rejects_missing_input_url(self) -> None:
+        request = TaskRequest(
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            input=TaskInput(url=""),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
 
 
 class NormalizedPayloadValidationTests(unittest.TestCase):

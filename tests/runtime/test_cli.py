@@ -18,13 +18,14 @@ class SuccessfulAdapter:
     supported_capabilities = frozenset({"content_detail_by_url"})
 
     def execute(self, request):
+        url = request.input.url
         return {
-            "raw": {"id": "raw-cli-1", "url": request.input_url},
+            "raw": {"id": "raw-cli-1", "url": url},
             "normalized": {
                 "platform": "stub",
                 "content_id": "content-cli-1",
                 "content_type": "unknown",
-                "canonical_url": request.input_url,
+                "canonical_url": url,
                 "title": "",
                 "body_text": "",
                 "published_at": None,
@@ -167,6 +168,33 @@ class CliTests(unittest.TestCase):
         payload = json.loads(result.stderr)
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "adapter_loader_error")
+
+    def test_loader_failure_uses_injected_task_id_factory(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        exit_code = main(
+            [
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/1",
+                "--adapter-module",
+                "tests.runtime.adapter_fixtures:missing_builder",
+            ],
+            stdout=stdout,
+            stderr=stderr,
+            task_id_factory=lambda: "task-cli-loader-failure",
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["task_id"], "task-cli-loader-failure")
+        self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["error"]["code"], "adapter_loader_error")
 
 

@@ -9,12 +9,12 @@ class SuccessfulAdapter:
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         return {
-            "raw": {"id": "raw-cli-module-1", "url": request.input_url},
+            "raw": {"id": "raw-cli-module-1", "url": request.input.url},
             "normalized": {
                 "platform": "stub",
                 "content_id": "content-cli-module-1",
                 "content_type": "unknown",
-                "canonical_url": request.input_url,
+                "canonical_url": request.input.url,
                 "title": "",
                 "body_text": "",
                 "published_at": None,

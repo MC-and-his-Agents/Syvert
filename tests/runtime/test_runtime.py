@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from syvert.runtime import PlatformAdapterError, TaskRequest, execute_task
+from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
 
 
 class SuccessfulAdapter:
@@ -14,13 +14,13 @@ class SuccessfulAdapter:
         return {
             "raw": {
                 "id": "raw-1",
-                "url": request.input_url,
+                "url": request.input.url,
             },
             "normalized": {
                 "platform": "stub",
                 "content_id": "content-1",
                 "content_type": "unknown",
-                "canonical_url": request.input_url,
+                "canonical_url": request.input.url,
                 "title": "",
                 "body_text": "",
                 "published_at": None,
@@ -54,7 +54,7 @@ class MissingRawAdapter:
                 "platform": "stub",
                 "content_id": "content-1",
                 "content_type": "unknown",
-                "canonical_url": request.input_url,
+                "canonical_url": request.input.url,
                 "title": "",
                 "body_text": "",
                 "published_at": None,
@@ -130,7 +130,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -144,14 +144,14 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["capability"], "content_detail_by_url")
         self.assertEqual(envelope["status"], "success")
         self.assertIn("raw", envelope)
-        self.assertEqual(envelope["normalized"]["canonical_url"], request.input_url)
-        self.assertEqual(adapter.last_request.input_url, request.input_url)
+        self.assertEqual(envelope["normalized"]["canonical_url"], request.input.url)
+        self.assertEqual(adapter.last_request.input.url, request.input.url)
 
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(
             adapter_key="missing",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -169,7 +169,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="search",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -186,7 +186,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -203,7 +203,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -220,7 +220,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -237,7 +237,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -254,7 +254,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -272,7 +272,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
-            input_url="https://example.com/posts/1",
+            input=TaskInput(url="https://example.com/posts/1"),
         )
 
         envelope = execute_task(
@@ -285,6 +285,44 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "platform")
         self.assertEqual(envelope["error"]["code"], "content_not_found")
         self.assertEqual(envelope["error"]["details"]["reason"], "missing")
+
+    def test_execute_task_rejects_empty_task_id_from_factory(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertIsInstance(envelope["task_id"], str)
+        self.assertTrue(envelope["task_id"])
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_id")
+
+    def test_execute_task_rejects_non_string_task_id_from_factory(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: 123,  # type: ignore[return-value]
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertIsInstance(envelope["task_id"], str)
+        self.assertTrue(envelope["task_id"])
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_id")
 
 
 if __name__ == "__main__":

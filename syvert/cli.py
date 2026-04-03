@@ -6,7 +6,7 @@ import json
 import sys
 from typing import Any, Callable, Mapping, TextIO
 
-from syvert.runtime import CONTENT_DETAIL_BY_URL, TaskRequest, default_task_id_factory, execute_task, failure_envelope
+from syvert.runtime import TaskInput, TaskRequest, execute_task, failure_envelope, resolve_task_id
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -35,13 +35,23 @@ def main(
     request = TaskRequest(
         adapter_key=args.adapter,
         capability=args.capability,
-        input_url=args.url,
+        input=TaskInput(url=args.url),
     )
     try:
         resolved_adapters = adapters or load_adapters(args.adapter_module)
     except Exception as error:
+        task_id, task_id_error = resolve_task_id(task_id_factory)
+        if task_id_error is not None:
+            envelope = failure_envelope(
+                task_id,
+                request.adapter_key,
+                request.capability,
+                task_id_error,
+            )
+            err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+            return 1
         envelope = failure_envelope(
-            default_task_id_factory(),
+            task_id,
             request.adapter_key,
             request.capability,
             {

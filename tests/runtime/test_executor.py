@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from syvert.runtime import TaskRequest, execute_task
+from syvert.runtime import TaskInput, TaskRequest, execute_task
 
 
 class SuccessfulAdapter:
@@ -16,7 +16,7 @@ class SuccessfulAdapter:
                 "platform": "xhs",
                 "content_id": "abc123",
                 "content_type": "image_post",
-                "canonical_url": request.input_url,
+                "canonical_url": request.input.url,
                 "title": "",
                 "body_text": "hello",
                 "published_at": None,
@@ -53,7 +53,7 @@ class ExecutorTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="missing",
             capability="content_detail_by_url",
-            input_url="https://example.com/post/1",
+            input=TaskInput(url="https://example.com/post/1"),
         )
 
         result = execute_task(request, adapters={})
@@ -66,7 +66,7 @@ class ExecutorTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
-            input_url="https://example.com/post/1",
+            input=TaskInput(url="https://example.com/post/1"),
         )
 
         result = execute_task(request, adapters={"xhs": UnsupportedCapabilityAdapter()})
@@ -79,7 +79,7 @@ class ExecutorTests(unittest.TestCase):
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
-            input_url="https://example.com/post/1",
+            input=TaskInput(url="https://example.com/post/1"),
         )
 
         result = execute_task(request, adapters={"xhs": SuccessfulAdapter()})

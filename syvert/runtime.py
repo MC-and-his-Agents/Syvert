@@ -16,7 +16,12 @@ RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 class TaskRequest:
     adapter_key: str
     capability: str
-    input_url: str
+    input: "TaskInput"
+
+
+@dataclass(frozen=True)
+class TaskInput:
+    url: str
 
 
 @dataclass
@@ -39,7 +44,10 @@ def execute_task(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
-    task_id = (task_id_factory or default_task_id_factory)()
+    task_id, task_id_error = resolve_task_id(task_id_factory)
+    if task_id_error is not None:
+        return failure_envelope(task_id, request.adapter_key, request.capability, task_id_error)
+
     contract_error = validate_request(request)
     if contract_error is not None:
         return failure_envelope(task_id, request.adapter_key, request.capability, contract_error)
@@ -120,9 +128,26 @@ def validate_request(request: TaskRequest) -> dict[str, Any] | None:
             "invalid_capability",
             f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
         )
-    if not request.input_url:
+    if not isinstance(request.input, TaskInput):
+        return runtime_contract_error("invalid_task_request", "input 必须为对象")
+    if not isinstance(request.input.url, str) or not request.input.url:
         return runtime_contract_error("invalid_task_request", "input.url 不能为空")
     return None
+
+
+def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dict[str, Any] | None]:
+    generated = (task_id_factory or default_task_id_factory)()
+    if isinstance(generated, str) and generated:
+        return generated, None
+    fallback = default_task_id_factory()
+    return (
+        fallback,
+        runtime_contract_error(
+            "invalid_task_id",
+            "task_id 必须为非空字符串",
+            details={"actual_type": type(generated).__name__},
+        ),
+    )
 
 
 def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | None:
