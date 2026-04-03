@@ -40,6 +40,10 @@
   - `title`、`body_text` 必须存在，可为空字符串
   - `published_at` 必须是 RFC 3339 UTC 时间字符串，或 `null`
   - `author.author_id`、`author.display_name` 在平台可提供时应为非空字符串，否则返回 `null`
+  - `author.avatar_url` 类型固定为字符串或 `null`
+  - `stats.like_count`、`stats.comment_count`、`stats.share_count`、`stats.collect_count` 类型固定为整数或 `null`
+  - `media.cover_url`、`media.video_url` 类型固定为字符串或 `null`
+  - `media.image_urls` 类型固定为字符串数组；缺失时返回空数组
 
 ## 错误与边界行为
 

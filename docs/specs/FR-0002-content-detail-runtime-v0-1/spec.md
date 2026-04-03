@@ -53,9 +53,9 @@
   - `title` 与 `body_text` 两个字段必须始终存在；若平台没有独立标题或正文，可返回空字符串，但不得缺席。
   - `published_at` 必须为 RFC 3339 UTC 时间字符串，若平台无法稳定提供发布时间则返回 `null`。
   - `author`、`stats`、`media` 三个对象在成功结果中必须始终存在，不允许缺席。
-  - `author` 最小字段固定为：`author_id`、`display_name`、`avatar_url`；`author_id` 与 `display_name` 在平台可提供时应为非空字符串，否则返回 `null`。
-  - `stats` 最小字段固定为：`like_count`、`comment_count`、`share_count`、`collect_count`，缺失值允许为 `null`。
-  - `media` 最小字段固定为：`cover_url`、`video_url`、`image_urls`，缺失值允许为空或 `null`。
+  - `author` 最小字段固定为：`author_id`、`display_name`、`avatar_url`；`author_id` 与 `display_name` 在平台可提供时应为非空字符串，否则返回 `null`；`avatar_url` 类型固定为字符串或 `null`。
+  - `stats` 最小字段固定为：`like_count`、`comment_count`、`share_count`、`collect_count`；四个字段的类型固定为整数或 `null`。
+  - `media` 最小字段固定为：`cover_url`、`video_url`、`image_urls`；`cover_url` 与 `video_url` 类型固定为字符串或 `null`，`image_urls` 类型固定为字符串数组，缺失时返回空数组。
   - 对于成功任务，`raw` 与 `normalized` 任一缺失都视为契约不成立。
   - 对于失败任务，Core 只承载统一失败 envelope，不解释平台内部错误语义；平台特定错误细节由 adapter 通过结构化 `error.details` 附带。
 - 非功能需求：
