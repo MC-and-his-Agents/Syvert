@@ -13,6 +13,10 @@
 
 ## 输出结构
 
+- `task_id`
+  - 由 Core 在接收任务输入后、进入 adapter 执行前生成
+  - 类型固定为非空字符串
+  - 在成功态与失败态 envelope 中始终存在
 - 成功态最小 envelope：
   - `task_id`
   - `adapter_key`

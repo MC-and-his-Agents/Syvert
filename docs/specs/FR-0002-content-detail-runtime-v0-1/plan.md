@@ -70,8 +70,8 @@
 
 ## 进入实现前条件
 
-- [ ] `spec review` 已通过
-- [ ] 关键风险已记录并有缓解策略
-- [ ] 关键依赖可用
-- [ ] 小红书与抖音 detail 能力研究结论已入库，并已收口为不阻塞 contract 的实现环境前提
-- [ ] `content_detail_by_url` 的最小 contract 已冻结
+- [x] `spec review` 已通过
+- [x] 关键风险已记录并有缓解策略
+- [x] 关键依赖可用
+- [x] 小红书与抖音 detail 能力研究结论已入库，并已收口为不阻塞 contract 的实现环境前提
+- [x] `content_detail_by_url` 的最小 contract 已冻结

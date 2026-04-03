@@ -43,6 +43,7 @@
 - 契约需求：
   - 任务输入最小字段固定为：`adapter_key`、`capability`、`input.url`。
   - `capability` 在 `v0.1.0` 固定为 `content_detail_by_url`。
+  - `task_id` 由 Core 在接收任务输入后、进入 adapter 执行前生成；类型固定为非空字符串，并在成功态与失败态 envelope 中始终存在。
   - 成功结果 envelope 最小字段固定为：`task_id`、`adapter_key`、`capability`、`status`、`raw`、`normalized`，其中 `status` 固定为 `success`。
   - 失败结果 envelope 最小字段固定为：`task_id`、`adapter_key`、`capability`、`status`、`error`，其中 `status` 固定为 `failed`。
   - `error` 最小字段固定为：`category`、`code`、`message`、`details`；`details` 允许为空对象，`category` 仅允许 `runtime_contract` 或 `platform`。
