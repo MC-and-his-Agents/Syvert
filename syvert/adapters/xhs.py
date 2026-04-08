@@ -4,10 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import math
-import os
 from pathlib import Path
 import re
-import subprocess
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
@@ -19,8 +17,6 @@ XHS_API_BASE_URL = "https://edith.xiaohongshu.com"
 XHS_DETAIL_URI = "/api/sns/web/v1/feed"
 DEFAULT_TIMEOUT_SECONDS = 10
 DEFAULT_XHS_SESSION_PATH = Path.home() / ".config" / "syvert" / "xhs.session.json"
-DEFAULT_XHS_CDP_BASE_URL = "http://127.0.0.1:9222"
-XHS_CDP_STATE_SCRIPT_PATH = Path(__file__).with_name("xhs_cdp_state.mjs")
 VALID_XHS_HOSTS = frozenset(
     {
         "www.xiaohongshu.com",
@@ -416,90 +412,11 @@ def default_page_state_transport(
     cookies: str = "",
     user_agent: str = "",
 ) -> Mapping[str, Any]:
-    browser_error: PlatformAdapterError | None = None
-    try:
-        return XhsAuthenticatedBrowserBridge().extract_page_state(
-            target_url=url,
-            source_note_id=source_note_id,
-        )
-    except PlatformAdapterError as exc:
-        browser_error = exc
-
-    command = [
-        "node",
-        str(XHS_CDP_STATE_SCRIPT_PATH),
-        url,
-        str(max(timeout_seconds * 1000, 20000)),
-        DEFAULT_XHS_CDP_BASE_URL,
-        source_note_id,
-    ]
-    env = dict(os.environ)
-    env["SYVERT_XHS_COOKIE_HEADER"] = cookies
-    env["SYVERT_XHS_USER_AGENT"] = user_agent
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=max(timeout_seconds, 1) + 20,
-            env=env,
-        )
-    except FileNotFoundError as exc:
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 不可用",
-            details={"reason": "node_not_found"},
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 超时",
-            details={"url": url},
-        ) from exc
-
-    if completed.returncode != 0:
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 失败",
-            details={"stderr": completed.stderr.strip()[:500], "url": url},
-        )
-
-    stdout = completed.stdout.strip()
-    if not stdout:
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 未返回状态",
-            details={"url": url},
-        )
-
-    try:
-        parsed = json.loads(stdout)
-    except json.JSONDecodeError as exc:
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 返回不是合法 JSON",
-            details={"url": url},
-        ) from exc
-    if not isinstance(parsed, Mapping):
-        if browser_error is not None:
-            raise browser_error
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器页面态 fallback 顶层必须是对象",
-            details={"url": url},
-        )
-    return parsed
+    del timeout_seconds, cookies, user_agent
+    return XhsAuthenticatedBrowserBridge().extract_page_state(
+        target_url=url,
+        source_note_id=source_note_id,
+    )
 
 
 def post_json(

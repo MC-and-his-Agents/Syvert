@@ -94,24 +94,21 @@ class XhsAdapterTests(unittest.TestCase):
         fake_bridge.extract_page_state.return_value = raw_state
 
         with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge):
-            with mock.patch("syvert.adapters.xhs.subprocess.run") as mocked_run:
-                state = default_page_state_transport(
-                    url=(
-                        "https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3"
-                        "?xsec_token=token-1&xsec_source="
-                    ),
-                    timeout_seconds=10,
-                    source_note_id=note_id,
-                    cookies="a=1; b=2",
-                    user_agent="Mozilla/5.0 TestAgent",
-                )
+            state = default_page_state_transport(
+                url=(
+                    "https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3"
+                    "?xsec_token=token-1&xsec_source="
+                ),
+                timeout_seconds=10,
+                source_note_id=note_id,
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+            )
 
         self.assertEqual(state, raw_state)
         fake_bridge.extract_page_state.assert_called_once()
-        mocked_run.assert_not_called()
 
-    def test_default_page_state_transport_falls_back_to_cdp_when_browser_bridge_fails(self) -> None:
-        note_id = "69d33f6a000000001f0078b3"
+    def test_default_page_state_transport_surfaces_browser_error_when_bridge_fails(self) -> None:
         fake_bridge = mock.Mock()
         fake_bridge.extract_page_state.side_effect = PlatformAdapterError(
             code="xhs_browser_target_tab_missing",
@@ -119,30 +116,16 @@ class XhsAdapterTests(unittest.TestCase):
         )
 
         with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge):
-            with mock.patch(
-                "syvert.adapters.xhs.subprocess.run",
-                return_value=mock.Mock(
-                    returncode=0,
-                    stdout=json.dumps(build_xhs_page_state({"note": {"noteId": note_id}})),
-                    stderr="",
-                ),
-            ) as mocked_run:
-                state = default_page_state_transport(
+            with self.assertRaises(PlatformAdapterError) as raised:
+                default_page_state_transport(
                     url="https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3",
                     timeout_seconds=10,
-                    source_note_id=note_id,
+                    source_note_id="69d33f6a000000001f0078b3",
                     cookies="a=1; b=2",
                     user_agent="Mozilla/5.0 TestAgent",
                 )
 
-        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["noteId"], note_id)
-        mocked_run.assert_called_once()
-        command = mocked_run.call_args.kwargs["args"] if "args" in mocked_run.call_args.kwargs else mocked_run.call_args.args[0]
-        self.assertNotIn("a=1; b=2", command)
-        self.assertNotIn("Mozilla/5.0 TestAgent", command)
-        env = mocked_run.call_args.kwargs["env"]
-        self.assertEqual(env["SYVERT_XHS_COOKIE_HEADER"], "a=1; b=2")
-        self.assertEqual(env["SYVERT_XHS_USER_AGENT"], "Mozilla/5.0 TestAgent")
+        self.assertEqual(raised.exception.code, "xhs_browser_target_tab_missing")
 
     def test_xhs_adapter_surfaces_browser_fallback_error_instead_of_original_sign_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -963,6 +946,18 @@ class XhsAdapterTests(unittest.TestCase):
                     "msg": "登录失效",
                     "data": {},
                 },
+                page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="html fallback unavailable",
+                    )
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_target_tab_missing",
+                        message="未找到目标小红书详情标签页",
+                    )
+                ),
             )
 
             with self.assertRaises(Exception) as raised:
@@ -1006,7 +1001,21 @@ class XhsAdapterTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            adapter = XhsAdapter(session_path=session_path)
+            adapter = XhsAdapter(
+                session_path=session_path,
+                page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="html fallback unavailable",
+                    )
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_target_tab_missing",
+                        message="未找到目标小红书详情标签页",
+                    )
+                ),
+            )
 
             with self.assertRaises(Exception) as raised:
                 adapter.execute(
@@ -1042,6 +1051,18 @@ class XhsAdapterTests(unittest.TestCase):
                     "x_b3_traceid": "trace-1",
                 },
                 detail_transport=lambda **kwargs: {"items": []},
+                page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="html fallback unavailable",
+                    )
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_target_tab_missing",
+                        message="未找到目标小红书详情标签页",
+                    )
+                ),
             )
 
             with self.assertRaises(Exception) as raised:
