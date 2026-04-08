@@ -40,7 +40,7 @@
 - 当前实现目标仍是 `API-first` 主路径；browser bridge 只作为 adapter 内部 fallback，用于在真实环境里补足平台阻断下的可达性验证，不改变 `FR-0002` 的 Core 输入和结果 envelope。
 - 最近一次手动验证使用的 detail URL 为：
   - `https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=`
-- 最近一次 checkpoint SHA：以当前 worktree HEAD 为准。
+- 最近一次 checkpoint SHA：`0f7e9b0b11c9bdb87438f6df9b9d4c435267d650`。
 
 ## 下一步动作
 
@@ -92,5 +92,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：以当前 worktree `HEAD` 为准
-- 当前受审 head：以 PR `#48` 的最新 `headRefOid` 为准
+- 实现 checkpoint：`0f7e9b0b11c9bdb87438f6df9b9d4c435267d650`
+- 当前受审 head：`0f7e9b0b11c9bdb87438f6df9b9d4c435267d650`
