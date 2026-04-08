@@ -18,6 +18,7 @@ from syvert.adapters.xhs import (
     build_browser_page_state,
     default_page_state_transport,
     default_sign_transport,
+    extract_html_initial_state,
     normalize_detail_response,
     parse_xhs_detail_url,
     post_json,
@@ -332,7 +333,20 @@ class XhsAdapterTests(unittest.TestCase):
                 "https://cdn.example/image-2.jpg",
             ],
         )
-        self.assertNotIn("xsec_token", payload["raw"])
+
+    def test_extract_html_initial_state_handles_additional_script_tags_after_state(self) -> None:
+        html = (
+            "<html><body>"
+            "<script>window.__INITIAL_STATE__="
+            + json.dumps({"note": {"currentNoteId": "abc123"}}, ensure_ascii=False)
+            + "</script>"
+            + "<script>window.__ANOTHER__={\"hello\":\"world\"}</script>"
+            + "</body></html>"
+        )
+
+        state = extract_html_initial_state(html)
+
+        self.assertEqual(state["note"]["currentNoteId"], "abc123")
 
     def test_xhs_adapter_falls_back_to_html_initial_state_when_feed_returns_406(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

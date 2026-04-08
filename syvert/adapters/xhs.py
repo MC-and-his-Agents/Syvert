@@ -650,7 +650,7 @@ def extract_note_card_from_page_state(
 
 
 def extract_html_initial_state(html: str) -> Mapping[str, Any]:
-    match = re.search(r"window\.__INITIAL_STATE__=(.+)</script>", html, re.M)
+    match = re.search(r"window\.__INITIAL_STATE__=(.+?)</script>", html, re.S)
     if match is None:
         raise PlatformAdapterError(
             code="xhs_content_not_found",
