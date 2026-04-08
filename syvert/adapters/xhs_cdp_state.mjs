@@ -138,94 +138,16 @@ async function main() {
       'window.__INITIAL_STATE__ && window.__INITIAL_STATE__.note ? (window.__INITIAL_STATE__.note.firstNoteId || "") : ""',
     )) || "";
     const candidates = Array.from(new Set([sourceNoteId, currentNoteId, firstNoteId, ...keys].filter(Boolean)));
+    const selectedKey = candidates.find((key) => keys.includes(key));
 
-    for (const key of candidates) {
-      const note = await evaluateJson(`(() => {
-        const root = window.__INITIAL_STATE__;
-        const noteStore = root && root.note;
-        const map = noteStore && noteStore.noteDetailMap;
-        if (!map) return null;
-        const entry = map[${JSON.stringify(key)}];
-        if (!entry) return null;
-        const candidate =
-          (entry && entry.note) ||
-          (entry && entry.note_card) ||
-          (entry && entry.noteCard) ||
-          entry;
-        if (!candidate || !(candidate.noteId || candidate.note_id)) return null;
-        const sanitizeStreamEntries = (entries) => Array.isArray(entries)
-          ? entries.map((item) => ({
-              masterUrl: item && (item.masterUrl || item.master_url || ""),
-              master_url: item && (item.master_url || item.masterUrl || ""),
-            }))
-          : [];
-        const sanitizeStreamGroup = (stream) => ({
-          h264: sanitizeStreamEntries(stream && stream.h264),
-          h265: sanitizeStreamEntries(stream && stream.h265),
-          av1: sanitizeStreamEntries(stream && stream.av1),
-        });
-        const sanitizeImage = (image) => ({
-          urlDefault: image && (image.urlDefault || image.url_default || image.url || ""),
-          url: image && (image.url || image.urlPre || ""),
-          livePhoto: Boolean(image && image.livePhoto),
-          stream: sanitizeStreamGroup(image && image.stream),
-        });
-        const sanitized = {
-          noteId: candidate.noteId || candidate.note_id || "",
-          type: candidate.type || "",
-          title: candidate.title || "",
-          desc: candidate.desc || "",
-          time: candidate.time || null,
-          user: {
-            userId: candidate.user && (candidate.user.userId || candidate.user.user_id || ""),
-            nickname: candidate.user && candidate.user.nickname || "",
-            avatar: candidate.user && (candidate.user.avatar || candidate.user.avatarUrl || candidate.user.image || ""),
-            avatarUrl: candidate.user && (candidate.user.avatarUrl || candidate.user.avatar || candidate.user.image || ""),
-            image: candidate.user && (candidate.user.image || candidate.user.avatar || candidate.user.avatarUrl || ""),
-          },
-          interactInfo: {
-            likedCount: candidate.interactInfo && candidate.interactInfo.likedCount,
-            commentCount: candidate.interactInfo && candidate.interactInfo.commentCount,
-            shareCount: candidate.interactInfo && candidate.interactInfo.shareCount,
-            collectedCount: candidate.interactInfo && candidate.interactInfo.collectedCount,
-          },
-          imageList: Array.isArray(candidate.imageList) ? candidate.imageList.map(sanitizeImage) : [],
-          video: {
-            consumer: {
-              originVideoKey: candidate.video && candidate.video.consumer && (candidate.video.consumer.originVideoKey || candidate.video.consumer.origin_video_key || ""),
-              origin_video_key: candidate.video && candidate.video.consumer && (candidate.video.consumer.origin_video_key || candidate.video.consumer.originVideoKey || ""),
-            },
-            media: {
-              stream: sanitizeStreamGroup(candidate.video && candidate.video.media && candidate.video.media.stream),
-            },
-            cover: {
-              urlDefault: candidate.video && candidate.video.cover && (candidate.video.cover.urlDefault || candidate.video.cover.url_default || candidate.video.cover.url || ""),
-              url: candidate.video && candidate.video.cover && (candidate.video.cover.url || candidate.video.cover.urlDefault || candidate.video.cover.url_default || ""),
-            },
-          },
-          cover: {
-            urlDefault: candidate.cover && (candidate.cover.urlDefault || candidate.cover.url_default || candidate.cover.url || ""),
-            url: candidate.cover && (candidate.cover.url || candidate.cover.urlDefault || candidate.cover.url_default || ""),
-          },
-        };
-        return JSON.stringify(sanitized);
-      })()`);
-      if (!note || typeof note !== "object") {
-        continue;
-      }
-
-      process.stdout.write(
-        JSON.stringify({
-          note: {
-            currentNoteId,
-            firstNoteId,
-            noteDetailMap: {
-              [key]: { note },
-            },
-          },
-        }),
+    if (selectedKey) {
+      const root = await evaluateJson(
+        'window.__INITIAL_STATE__ ? JSON.stringify(window.__INITIAL_STATE__) : null',
       );
-      return;
+      if (root && typeof root === "object") {
+        process.stdout.write(JSON.stringify(root));
+        return;
+      }
     }
 
     throw new Error(`note_entry_not_ready:${JSON.stringify({ keys, currentNoteId, firstNoteId })}`);

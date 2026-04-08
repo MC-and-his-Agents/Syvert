@@ -15,7 +15,6 @@ from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute
 
 from syvert.adapters.xhs import (
     XhsAdapter,
-    build_browser_page_state,
     default_page_state_transport,
     default_sign_transport,
     extract_html_initial_state,
@@ -69,18 +68,30 @@ class FakeHttpResponse:
 
 
 class XhsAdapterTests(unittest.TestCase):
-    def test_default_page_state_transport_wraps_browser_bridge_note_payload(self) -> None:
+    def test_default_page_state_transport_returns_browser_bridge_page_state_without_rewrapping(self) -> None:
         note_id = "69d33f6a000000001f0078b3"
-        fake_bridge = mock.Mock()
-        fake_bridge.extract_note_payload.return_value = {
-            "noteId": note_id,
-            "title": "桥接标题",
-            "desc": "桥接正文",
-            "type": "normal",
-            "user": {"userId": "user-1", "nickname": "作者"},
-            "interactInfo": {},
-            "imageList": [],
+        raw_state = {
+            "note": {
+                "currentNoteId": note_id,
+                "firstNoteId": note_id,
+                "noteDetailMap": {
+                    note_id: {
+                        "note": {
+                            "noteId": note_id,
+                            "title": "桥接标题",
+                            "desc": "桥接正文",
+                            "type": "normal",
+                            "user": {"userId": "user-1", "nickname": "作者"},
+                            "interactInfo": {},
+                            "imageList": [],
+                        }
+                    }
+                },
+            },
+            "extra": {"trace": "keep-me"},
         }
+        fake_bridge = mock.Mock()
+        fake_bridge.extract_page_state.return_value = raw_state
 
         with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge):
             with mock.patch("syvert.adapters.xhs.subprocess.run") as mocked_run:
@@ -95,18 +106,15 @@ class XhsAdapterTests(unittest.TestCase):
                     user_agent="Mozilla/5.0 TestAgent",
                 )
 
-        self.assertEqual(state["note"]["currentNoteId"], note_id)
-        self.assertEqual(state["note"]["firstNoteId"], note_id)
-        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["noteId"], note_id)
-        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["title"], "桥接标题")
-        fake_bridge.extract_note_payload.assert_called_once()
+        self.assertEqual(state, raw_state)
+        fake_bridge.extract_page_state.assert_called_once()
         mocked_run.assert_not_called()
 
     def test_default_page_state_transport_falls_back_to_cdp_when_browser_bridge_fails(self) -> None:
         note_id = "69d33f6a000000001f0078b3"
         fake_bridge = mock.Mock()
-        fake_bridge.extract_note_payload.side_effect = PlatformAdapterError(
-            code="xhs_browser_tab_missing",
+        fake_bridge.extract_page_state.side_effect = PlatformAdapterError(
+            code="xhs_browser_target_tab_missing",
             message="未找到已打开的小红书浏览器标签页",
         )
 
@@ -136,17 +144,52 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(env["SYVERT_XHS_COOKIE_HEADER"], "a=1; b=2")
         self.assertEqual(env["SYVERT_XHS_USER_AGENT"], "Mozilla/5.0 TestAgent")
 
-    def test_build_browser_page_state_rejects_payload_without_real_note_id(self) -> None:
-        with self.assertRaises(PlatformAdapterError) as raised:
-            build_browser_page_state(
-                {
-                    "title": "没有 note id",
-                    "desc": "不应该被伪造成目标内容",
-                },
-                source_note_id="69d33f6a000000001f0078b3",
+    def test_xhs_adapter_surfaces_browser_fallback_error_instead_of_original_sign_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_sign_unavailable",
+                        message="签名服务不可用",
+                        details={"base_url": base_url},
+                    )
+                ),
+                page_transport=lambda **kwargs: (
+                    "<html><body><script>window.__INITIAL_STATE__="
+                    f"{json.dumps({'global': {}, 'feed': {}}, ensure_ascii=False)}</script></body></html>"
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_javascript_disabled",
+                        message="Chrome 未启用 AppleScript JavaScript 执行能力",
+                    )
+                ),
             )
 
-        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
+            with self.assertRaises(PlatformAdapterError) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_browser_javascript_disabled")
 
     def test_parse_xhs_detail_url_extracts_note_id_and_xsec_values(self) -> None:
         parsed = parse_xhs_detail_url(

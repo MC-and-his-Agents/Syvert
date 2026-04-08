@@ -196,8 +196,10 @@ class XhsAdapter:
                 page_state,
                 source_note_id=source_note_id,
             )
-        except PlatformAdapterError:
-            raise original_error
+        except PlatformAdapterError as exc:
+            if exc.code == "xhs_browser_target_tab_missing":
+                raise original_error
+            raise exc
 
     def _fetch_html_page(self, session: XhsSessionConfig, input_url: str) -> str:
         return self._page_transport(
@@ -416,11 +418,10 @@ def default_page_state_transport(
 ) -> Mapping[str, Any]:
     browser_error: PlatformAdapterError | None = None
     try:
-        note_payload = XhsAuthenticatedBrowserBridge().extract_note_payload(
+        return XhsAuthenticatedBrowserBridge().extract_page_state(
             target_url=url,
             source_note_id=source_note_id,
         )
-        return build_browser_page_state(note_payload, source_note_id=source_note_id)
     except PlatformAdapterError as exc:
         browser_error = exc
 
@@ -499,34 +500,6 @@ def default_page_state_transport(
             details={"url": url},
         )
     return parsed
-
-
-def build_browser_page_state(
-    note_payload: Mapping[str, Any],
-    *,
-    source_note_id: str = "",
-) -> Mapping[str, Any]:
-    note_id = first_non_empty_string(
-        note_payload.get("noteId"),
-        note_payload.get("note_id"),
-    )
-    if not note_id:
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="浏览器 bridge 未返回有效 note_id",
-            details={},
-        )
-    return {
-        "note": {
-            "currentNoteId": note_id,
-            "firstNoteId": note_id,
-            "noteDetailMap": {
-                note_id: {
-                    "note": dict(note_payload),
-                }
-            },
-        }
-    }
 
 
 def post_json(

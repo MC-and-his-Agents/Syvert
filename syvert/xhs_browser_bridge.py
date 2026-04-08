@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import subprocess
+from urllib import parse
 
 from syvert.runtime import PlatformAdapterError
 
@@ -32,8 +33,20 @@ def parse_chrome_tab_listing(text: str) -> list[ChromeTab]:
 
 
 def select_xhs_tab(tabs: list[ChromeTab], *, target_url: str) -> ChromeTab:
+    target_note_id = extract_xhs_note_id_from_url(target_url)
+    target_path = canonicalize_xhs_url_path(target_url)
     for tab in tabs:
         if tab.url == target_url:
+            return tab
+    for tab in tabs:
+        if not is_xhs_url(tab.url):
+            continue
+        if target_note_id and extract_xhs_note_id_from_url(tab.url) == target_note_id:
+            return tab
+    for tab in tabs:
+        if not is_xhs_url(tab.url):
+            continue
+        if target_path and canonicalize_xhs_url_path(tab.url) == target_path:
             return tab
     raise PlatformAdapterError(
         code="xhs_browser_target_tab_missing",
@@ -44,6 +57,29 @@ def select_xhs_tab(tabs: list[ChromeTab], *, target_url: str) -> ChromeTab:
 
 def is_xhs_url(url: str) -> bool:
     return "xiaohongshu.com" in url
+
+
+def extract_xhs_note_id_from_url(url: str) -> str:
+    try:
+        parsed = parse.urlparse(url)
+    except ValueError:
+        return ""
+    if parsed.netloc not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
+        return ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) >= 2 and parts[0] in {"explore", "discovery"}:
+        return parts[-1]
+    return ""
+
+
+def canonicalize_xhs_url_path(url: str) -> str:
+    try:
+        parsed = parse.urlparse(url)
+    except ValueError:
+        return ""
+    if parsed.netloc not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
+        return ""
+    return parsed.path.rstrip("/")
 
 
 def default_run_applescript(script: str) -> str:
@@ -65,9 +101,9 @@ class XhsAuthenticatedBrowserBridge:
         output = self._run_script(self._build_list_tabs_script())
         return parse_chrome_tab_listing(output)
 
-    def extract_note_payload(self, *, target_url: str, source_note_id: str) -> dict[str, object]:
+    def extract_page_state(self, *, target_url: str, source_note_id: str) -> dict[str, object]:
         tab = select_xhs_tab(self.list_tabs(), target_url=target_url)
-        script = self._build_extract_note_script(tab=tab, source_note_id=source_note_id)
+        script = self._build_extract_page_state_script(tab=tab, source_note_id=source_note_id)
         raw_payload = self._run_script(script).strip()
         try:
             payload = json.loads(raw_payload)
@@ -80,22 +116,9 @@ class XhsAuthenticatedBrowserBridge:
         if not isinstance(payload, dict):
             raise PlatformAdapterError(
                 code="xhs_browser_payload_invalid",
-                message="浏览器桥接返回的 note payload 形状不合法",
+                message="浏览器桥接返回的页面态形状不合法",
             )
-        note_id = payload.get("note_id")
-        if not isinstance(note_id, str) or not note_id:
-            note_id = payload.get("noteId")
-        if not isinstance(note_id, str) or not note_id:
-            raise PlatformAdapterError(
-                code="xhs_browser_payload_invalid",
-                message="浏览器桥接返回的 note payload 缺少真实 note_id",
-            )
-        if note_id != source_note_id:
-            raise PlatformAdapterError(
-                code="xhs_browser_note_mismatch",
-                message="浏览器标签页返回的 note_id 与目标不一致",
-                details={"expected_note_id": source_note_id, "actual_note_id": note_id},
-            )
+        self._ensure_page_state_matches_target(payload, source_note_id=source_note_id)
         return payload
 
     def _run_script(self, script: str) -> str:
@@ -112,6 +135,12 @@ class XhsAuthenticatedBrowserBridge:
                 code="xhs_browser_command_failed",
                 message="执行浏览器桥接脚本失败",
                 details={"stderr": stderr, "returncode": error.returncode},
+            ) from error
+        except OSError as error:
+            raise PlatformAdapterError(
+                code="xhs_browser_command_failed",
+                message="执行浏览器桥接脚本失败",
+                details={"error_type": error.__class__.__name__},
             ) from error
 
     def _build_list_tabs_script(self) -> str:
@@ -131,7 +160,7 @@ tell application "Google Chrome"
 end tell
 """.strip()
 
-    def _build_extract_note_script(self, *, tab: ChromeTab, source_note_id: str) -> str:
+    def _build_extract_page_state_script(self, *, tab: ChromeTab, source_note_id: str) -> str:
         js = json.dumps(self._build_in_page_javascript(source_note_id=source_note_id))
         return f"""
 tell application "Google Chrome"
@@ -166,6 +195,47 @@ end tell
   if (!candidate) {{
     throw new Error("xhs note payload missing");
   }}
-  return JSON.stringify(candidate);
+  return JSON.stringify(root);
 }})();
 """.strip()
+
+    def _ensure_page_state_matches_target(self, payload: dict[str, object], *, source_note_id: str) -> None:
+        note_root = payload.get("note")
+        if not isinstance(note_root, dict):
+            raise PlatformAdapterError(
+                code="xhs_browser_payload_invalid",
+                message="浏览器桥接返回的页面态缺少 note",
+            )
+        detail_map = note_root.get("noteDetailMap")
+        if not isinstance(detail_map, dict):
+            raise PlatformAdapterError(
+                code="xhs_browser_payload_invalid",
+                message="浏览器桥接返回的页面态缺少 noteDetailMap",
+            )
+        target_entry = detail_map.get(source_note_id)
+        if not isinstance(target_entry, dict):
+            raise PlatformAdapterError(
+                code="xhs_browser_note_mismatch",
+                message="浏览器标签页返回的 note_id 与目标不一致",
+                details={"expected_note_id": source_note_id},
+            )
+        note = target_entry.get("note")
+        if not isinstance(note, dict):
+            raise PlatformAdapterError(
+                code="xhs_browser_payload_invalid",
+                message="浏览器桥接返回的页面态缺少 note",
+            )
+        note_id = note.get("note_id")
+        if not isinstance(note_id, str) or not note_id:
+            note_id = note.get("noteId")
+        if not isinstance(note_id, str) or not note_id:
+            raise PlatformAdapterError(
+                code="xhs_browser_payload_invalid",
+                message="浏览器桥接返回的页面态缺少真实 note_id",
+            )
+        if note_id != source_note_id:
+            raise PlatformAdapterError(
+                code="xhs_browser_note_mismatch",
+                message="浏览器标签页返回的 note_id 与目标不一致",
+                details={"expected_note_id": source_note_id, "actual_note_id": note_id},
+            )
