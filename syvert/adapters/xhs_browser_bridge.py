@@ -196,6 +196,7 @@ end tell
         return f"""
 (function() {{
   const sourceNoteId = {serialized_note_id};
+  const marker = "window.__INITIAL_STATE__=";
   const sanitizeInlineState = (rawState) => {{
     if (!rawState) {{
       return "";
@@ -206,24 +207,32 @@ end tell
     }}
     return sanitized;
   }};
+  const pickCandidate = (root) => {{
+    const noteRoot = root && root.note;
+    const detailMap = noteRoot && noteRoot.noteDetailMap;
+    const firstDetail = detailMap && Object.values(detailMap).find(Boolean);
+    return (
+      (detailMap && detailMap[sourceNoteId] && detailMap[sourceNoteId].note) ||
+      (firstDetail && firstDetail.note) ||
+      null
+    );
+  }};
   const inlineStateScript = Array.from(document.scripts)
     .map((script) => script.textContent || "")
-    .find((text) => text.includes("window.__INITIAL_STATE__=")) || "";
-  const rawState = inlineStateScript.startsWith("window.__INITIAL_STATE__=")
-    ? inlineStateScript.slice("window.__INITIAL_STATE__=".length)
+    .find((text) => text.includes(marker)) || "";
+  const markerIndex = inlineStateScript.indexOf(marker);
+  const rawState = markerIndex >= 0
+    ? inlineStateScript.slice(markerIndex + marker.length)
     : "";
   const sanitizedState = sanitizeInlineState(rawState);
-  const root = window.__INITIAL_STATE__ || (sanitizedState ? Function('return (' + sanitizedState + ');')() : null);
-  const noteRoot = root && root.note;
-  const detailMap = noteRoot && noteRoot.noteDetailMap;
-  const candidate =
-    (detailMap && detailMap[sourceNoteId] && detailMap[sourceNoteId].note) ||
-    (detailMap && Object.values(detailMap).find(Boolean) && Object.values(detailMap).find(Boolean).note) ||
-    null;
+  const parsedInlineRoot = sanitizedState ? Function('return (' + sanitizedState + ');')() : null;
+  const runtimeRoot = window.__INITIAL_STATE__ || null;
+  const root = pickCandidate(runtimeRoot) ? runtimeRoot : (parsedInlineRoot || runtimeRoot);
+  const candidate = pickCandidate(root);
   if (!candidate) {{
     throw new Error("xhs note payload missing");
   }}
-  return JSON.stringify(root);
+  return JSON.stringify(root, (_key, value) => value === undefined ? null : value);
 }})();
 """.strip()
 

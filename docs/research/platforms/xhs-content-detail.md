@@ -104,7 +104,7 @@
 ## Raw payload 来源
 
 - API 成功态：`/api/sns/web/v1/feed` 返回的平台 detail success wrapper。
-- HTML / 浏览器页面态 fallback 成功态：页面原始 state 对象，通常来自 `window.__INITIAL_STATE__` 及其 `noteDetailMap`。
+- HTML / 浏览器页面态 fallback 成功态：页面 state 对象，通常来自 `window.__INITIAL_STATE__` 及其 `noteDetailMap`；为保证 JSON 传输稳定，JS `undefined` 字段会在 adapter 内部归一化为 `null`。
 - 插件拦截包体：浏览器内拦截到的 detail / comment 相关响应，仅作为平台事实来源，不直接构成当前参考适配器对外 `raw` contract。
 
 ## Normalized 候选字段

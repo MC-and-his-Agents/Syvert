@@ -301,6 +301,106 @@ process.stdout.write(result);
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["noteId"], "abcd1234")
 
+    def test_build_in_page_javascript_falls_back_to_inline_when_window_state_incomplete(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        inline_state = (
+            'window.__INITIAL_STATE__={"note":{"noteDetailMap":{"abcd1234":{"note":{"noteId":"abcd1234","title":"inline 回退"}}}}};'
+        )
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{
+  __INITIAL_STATE__: {{
+    note: {{
+      noteDetailMap: {{}}
+    }}
+  }}
+}};
+global.document = {{
+  scripts: [{{textContent: {json.dumps(inline_state)}}}]
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["title"], "inline 回退")
+
+    def test_build_in_page_javascript_accepts_marker_with_leading_preamble(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        inline_state = (
+            '/* comment */\\nwindow.prefetch = true;\\nwindow.__INITIAL_STATE__={"note":{"noteDetailMap":{"abcd1234":{"note":{"noteId":"abcd1234"}}}}};'
+        )
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{}};
+global.document = {{
+  scripts: [{{textContent: {json.dumps(inline_state)}}}]
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["noteId"], "abcd1234")
+
+    def test_build_in_page_javascript_normalizes_undefined_object_field_to_null(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{
+  __INITIAL_STATE__: {{
+    note: {{
+      noteDetailMap: {{
+        abcd1234: {{
+          note: {{
+            noteId: "abcd1234"
+          }}
+        }}
+      }}
+    }},
+    extra: {{
+      marker: undefined
+    }}
+  }}
+}};
+global.document = {{
+  scripts: []
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertIn("marker", payload["extra"])
+        self.assertIsNone(payload["extra"]["marker"])
+
     def test_build_in_page_javascript_preserves_literal_undefined_text(self) -> None:
         from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
