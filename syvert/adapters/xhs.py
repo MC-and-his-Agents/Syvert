@@ -195,7 +195,6 @@ class XhsAdapter:
             return extract_note_card_from_page_state(
                 page_state,
                 source_note_id=source_note_id,
-                source="browser_state",
             )
         except PlatformAdapterError:
             raise original_error
@@ -584,7 +583,6 @@ def extract_note_card_from_html_page(
     return extract_note_card_from_page_state(
         state,
         source_note_id=source_note_id,
-        source="html",
     )
 
 
@@ -592,7 +590,6 @@ def extract_note_card_from_page_state(
     state: Mapping[str, Any],
     *,
     source_note_id: str | None = None,
-    source: str,
 ) -> tuple[dict[str, Any], Mapping[str, Any]]:
     note_state = state.get("note")
     if not isinstance(note_state, Mapping):
@@ -637,16 +634,7 @@ def extract_note_card_from_page_state(
             details={"note_key": selected_key},
         )
 
-    return (
-        {
-            "source": source,
-            "current_note_id": current_note_id or note_id,
-            "note_detail_map": {
-                selected_key: dict(selected_entry),
-            },
-        },
-        note_card,
-    )
+    return dict(state), note_card
 
 
 def extract_html_initial_state(html: str) -> Mapping[str, Any]:
@@ -658,7 +646,7 @@ def extract_html_initial_state(html: str) -> Mapping[str, Any]:
             details={},
         )
 
-    state_text = match.group(1).replace(":undefined", ":null").replace("undefined", "null")
+    state_text = replace_javascript_undefined_tokens(match.group(1))
     try:
         parsed = json.loads(state_text)
     except json.JSONDecodeError as exc:
@@ -674,6 +662,46 @@ def extract_html_initial_state(html: str) -> Mapping[str, Any]:
             details={},
         )
     return parsed
+
+
+def replace_javascript_undefined_tokens(text: str) -> str:
+    result: list[str] = []
+    string_delimiter = ""
+    escaping = False
+    identifier_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$")
+    token = "undefined"
+    token_length = len(token)
+    index = 0
+
+    while index < len(text):
+        char = text[index]
+        if string_delimiter:
+            result.append(char)
+            if escaping:
+                escaping = False
+            elif char == "\\":
+                escaping = True
+            elif char == string_delimiter:
+                string_delimiter = ""
+            index += 1
+            continue
+        if char in {'"', "'"}:
+            string_delimiter = char
+            result.append(char)
+            index += 1
+            continue
+        if text.startswith(token, index):
+            prev_char = text[index - 1] if index > 0 else ""
+            next_index = index + token_length
+            next_char = text[next_index] if next_index < len(text) else ""
+            if prev_char not in identifier_chars and next_char not in identifier_chars:
+                result.append("null")
+                index += token_length
+                continue
+        result.append(char)
+        index += 1
+
+    return "".join(result)
 
 
 def select_html_note_entry(

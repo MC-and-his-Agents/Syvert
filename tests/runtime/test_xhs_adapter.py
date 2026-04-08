@@ -348,6 +348,19 @@ class XhsAdapterTests(unittest.TestCase):
 
         self.assertEqual(state["note"]["currentNoteId"], "abc123")
 
+    def test_extract_html_initial_state_replaces_only_bare_undefined_tokens(self) -> None:
+        html = (
+            "<html><body><script>window.__INITIAL_STATE__="
+            '{"note":{"currentNoteId":"abc123","description":"literal undefined text","optional":undefined}}'
+            "</script></body></html>"
+        )
+
+        state = extract_html_initial_state(html)
+
+        self.assertEqual(state["note"]["currentNoteId"], "abc123")
+        self.assertEqual(state["note"]["description"], "literal undefined text")
+        self.assertIsNone(state["note"]["optional"])
+
     def test_xhs_adapter_falls_back_to_html_initial_state_when_feed_returns_406(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
@@ -445,8 +458,8 @@ class XhsAdapterTests(unittest.TestCase):
             "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
         )
         self.assertEqual(page_requests[0]["headers"]["cookie"], "a=1; b=2")
-        self.assertEqual(payload["raw"]["source"], "html")
-        self.assertEqual(payload["raw"]["current_note_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["raw"]["note"]["currentNoteId"], "66fad51c000000001b0224b8")
+        self.assertIn("66fad51c000000001b0224b8", payload["raw"]["note"]["noteDetailMap"])
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["title"], "页面态标题")
         self.assertEqual(payload["normalized"]["body_text"], "页面态正文")
@@ -543,7 +556,7 @@ class XhsAdapterTests(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(payload["raw"]["source"], "browser_state")
+        self.assertEqual(payload["raw"]["note"]["currentNoteId"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["title"], "浏览器态标题")
         self.assertEqual(payload["normalized"]["body_text"], "浏览器态正文")
@@ -611,7 +624,7 @@ class XhsAdapterTests(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(payload["raw"]["source"], "browser_state")
+        self.assertEqual(payload["raw"]["note"]["currentNoteId"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
         self.assertEqual(payload["normalized"]["title"], "浏览器兜底标题")
 
