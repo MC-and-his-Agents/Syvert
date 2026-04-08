@@ -70,6 +70,22 @@ class XhsBrowserBridgeTests(unittest.TestCase):
 
         self.assertEqual(tab.tab_id, "1")
 
+    def test_select_xhs_tab_accepts_mixed_case_target_host_for_same_note_id(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
+
+        tab = select_xhs_tab(
+            [
+                ChromeTab(
+                    tab_id="1",
+                    title="小红书详情",
+                    url="https://www.xiaohongshu.com/explore/abcd1234",
+                )
+            ],
+            target_url="https://WWW.XIAOHONGSHU.COM/explore/abcd1234?xsec_token=token&xsec_source=",
+        )
+
+        self.assertEqual(tab.tab_id, "1")
+
     def test_select_xhs_tab_accepts_canonical_url_for_same_note_id(self) -> None:
         from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
 

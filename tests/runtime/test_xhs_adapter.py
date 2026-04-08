@@ -191,7 +191,7 @@ class XhsAdapterTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "xhs_browser_javascript_disabled")
 
-    def test_xhs_adapter_preserves_original_error_when_browser_tab_is_missing(self) -> None:
+    def test_xhs_adapter_preserves_html_missing_note_error_when_browser_tab_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
             session_path.write_text(
@@ -236,7 +236,7 @@ class XhsAdapterTests(unittest.TestCase):
                     )
                 )
 
-        self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+        self.assertEqual(raised.exception.code, "xhs_content_not_found")
 
     def test_xhs_adapter_preserves_html_failure_over_original_error_when_browser_tab_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1121,6 +1121,63 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(raised.exception.details["platform_code"], 300013)
         self.assertEqual(raised.exception.details["platform_message"], "登录失效")
 
+    def test_xhs_adapter_preserves_structured_detail_failure_even_when_response_contains_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: {
+                    "success": False,
+                    "code": 300013,
+                    "msg": "登录失效",
+                    "data": {"items": []},
+                    "items": [],
+                },
+                page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="html fallback unavailable",
+                    )
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_target_tab_missing",
+                        message="未找到目标小红书详情标签页",
+                    )
+                ),
+            )
+
+            with self.assertRaises(Exception) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
+        self.assertEqual(raised.exception.details["platform_code"], 300013)
+        self.assertEqual(raised.exception.details["platform_message"], "登录失效")
+
     def test_xhs_adapter_raises_platform_error_when_session_file_is_missing(self) -> None:
         adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))
 
@@ -1134,7 +1191,7 @@ class XhsAdapterTests(unittest.TestCase):
             )
         self.assertEqual(raised.exception.code, "xhs_session_missing")
 
-    def test_xhs_adapter_raises_sign_unavailable_when_sign_base_url_is_missing(self) -> None:
+    def test_xhs_adapter_preserves_html_fetch_failure_when_sign_base_url_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
             session_path.write_text(
@@ -1172,7 +1229,7 @@ class XhsAdapterTests(unittest.TestCase):
                         ),
                     )
                 )
-            self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+            self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
     def test_xhs_adapter_raises_content_not_found_for_empty_detail_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

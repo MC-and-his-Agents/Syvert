@@ -174,18 +174,16 @@ class XhsAdapter:
         }:
             raise original_error
 
-        html_parse_error: PlatformAdapterError | None = None
+        html_error: PlatformAdapterError | None = None
         try:
             html = self._fetch_html_page(session, input_url)
         except PlatformAdapterError as exc:
-            html_fetch_error = exc
+            html_error = exc
         else:
             try:
                 return extract_note_card_from_html_page(html, source_note_id=source_note_id)
             except PlatformAdapterError as exc:
-                if should_prefer_html_parse_error(exc):
-                    html_parse_error = exc
-            html_fetch_error = None
+                html_error = exc
 
         try:
             page_state = self._page_state_transport(
@@ -201,10 +199,9 @@ class XhsAdapter:
             )
         except PlatformAdapterError as exc:
             if exc.code == "xhs_browser_target_tab_missing":
-                if html_parse_error is not None:
-                    raise html_parse_error
-                if should_prefer_html_fetch_error(original_error, html_fetch_error):
-                    raise html_fetch_error
+                preferred_error = choose_preferred_html_error(original_error, html_error)
+                if preferred_error is not None:
+                    raise preferred_error
                 raise original_error
             raise exc
 
@@ -430,20 +427,27 @@ def default_page_state_transport(
     )
 
 
-def should_prefer_html_fetch_error(
+def choose_preferred_html_error(
     original_error: PlatformAdapterError,
-    html_fetch_error: PlatformAdapterError | None,
-) -> bool:
-    del original_error
-    if html_fetch_error is None:
-        return False
-    return html_fetch_error.code == "xhs_content_not_found"
+    html_error: PlatformAdapterError | None,
+) -> PlatformAdapterError | None:
+    if html_error is None:
+        return None
+    if is_structured_platform_error(original_error):
+        return None
+    if html_error.code == "xhs_content_not_found":
+        return html_error
+    if html_error.code == "xhs_detail_request_failed" and original_error.code != "xhs_content_not_found":
+        return html_error
+    if html_error.code == "xhs_sign_unavailable" and original_error.code == "xhs_sign_unavailable":
+        return html_error
+    return None
 
 
-def should_prefer_html_parse_error(html_parse_error: PlatformAdapterError) -> bool:
-    if html_parse_error.code != "xhs_content_not_found":
-        return False
-    return bool(html_parse_error.details)
+def is_structured_platform_error(error: PlatformAdapterError) -> bool:
+    return error.code == "xhs_detail_request_failed" and any(
+        key in error.details for key in ("platform_code", "platform_message", "platform_data")
+    )
 
 
 def post_json(
@@ -939,21 +943,7 @@ def nullable_int(value: Any) -> int | None:
 
 
 def normalize_detail_response(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    items = response.get("items")
-    if isinstance(items, list):
-        return response
-
     success = response.get("success")
-    if success is True:
-        data = response.get("data")
-        if isinstance(data, Mapping):
-            return data
-        raise PlatformAdapterError(
-            code="xhs_detail_request_failed",
-            message="小红书 detail 成功响应缺少 data",
-            details={},
-        )
-
     if success is False or "code" in response or "msg" in response:
         details: dict[str, Any] = {}
         if "code" in response:
@@ -969,6 +959,20 @@ def normalize_detail_response(response: Mapping[str, Any]) -> Mapping[str, Any]:
             message=platform_message or "小红书 detail 请求失败",
             details=details,
         )
+
+    if success is True:
+        data = response.get("data")
+        if isinstance(data, Mapping):
+            return data
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="小红书 detail 成功响应缺少 data",
+            details={},
+        )
+
+    items = response.get("items")
+    if isinstance(items, list):
+        return response
 
     return response
 

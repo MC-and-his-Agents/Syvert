@@ -65,7 +65,8 @@ def extract_xhs_note_id_from_url(url: str) -> str:
         parsed = parse.urlparse(url)
     except ValueError:
         return ""
-    if parsed.netloc not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
+    host = parsed.netloc.lower()
+    if host not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
         return ""
     parts = [part for part in parsed.path.split("/") if part]
     if len(parts) >= 2 and parts[0] in {"explore", "discovery"}:
@@ -78,7 +79,8 @@ def canonicalize_xhs_url_path(url: str) -> str:
         parsed = parse.urlparse(url)
     except ValueError:
         return ""
-    if parsed.netloc not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
+    host = parsed.netloc.lower()
+    if host not in {"www.xiaohongshu.com", "xiaohongshu.com"}:
         return ""
     return parsed.path.rstrip("/")
 
