@@ -38,15 +38,15 @@
 - 最新一轮 guardian 阻断已进一步收口：detail 返回多 item 时按 `source_note_id` 选中目标 note，不再盲取 `items[0]`；`nullable_int` 对 `inf` / `nan` fail-close 为 `null`；并补了 `default_sign_transport`、`post_json` 与 malformed success wrapper 的定点回归测试。
 - 当前实现已接入 `#49` 的 Chrome browser bridge，但该路径只存在于 xhs adapter 私有 fallback 中，不向 Core 暴露任何浏览器资源提供方、资源调度器或新增运行时输入。
 - 当前实现目标仍是 `API-first` 主路径；browser bridge 只作为 adapter 内部 fallback，用于在真实环境里补足平台阻断下的可达性验证，不改变 `FR-0002` 的 Core 输入和结果 envelope。
-- 当前实现 checkpoint `5f13dfd1215c31dd0d721be95ba40a40d84ec82d` 已进一步收口本轮 guardian findings：browser bridge / CDP fallback 统一返回页面原始 `note` 状态对象而不是 adapter 合成 note payload；`xhs_browser_javascript_disabled` 等 fallback 自身故障不再被原始 API/sign 错误完全覆盖；`xhs_browser_target_tab_missing` 仅作为 fallback 不可用信号保留原始顶层错误；browser tab 匹配按 `note_id` / canonical URL 做稳健匹配。
+- 当前实现 checkpoint `fa0b5a0c4c0722134cec9e87d6625198af3e7332` 已进一步收口本轮 guardian findings：browser bridge / CDP fallback 统一返回页面原始 `note` 状态对象而不是 adapter 合成 note payload；`xhs_browser_javascript_disabled` 等 fallback 自身故障不再被原始 API/sign 错误完全覆盖；`xhs_browser_target_tab_missing` 仅作为 fallback 不可用信号保留原始顶层错误；browser tab 匹配按 `note_id` / canonical URL 做稳健匹配；页面态 fallback 现在会校验命中的真实 `note_id` 必须等于目标 `source_note_id`，不再因 `noteDetailMap` key 命中而误归一化错误内容。
 - 最近一次手动验证使用的 detail URL 为：
   - `https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=`
 - 当前受审 diff 基线：`origin/main@4edce18ae5f416e453eeca8dada9122c8b613f1a`
-- 最近一次实现 checkpoint SHA：`5f13dfd1215c31dd0d721be95ba40a40d84ec82d`
+- 最近一次实现 checkpoint SHA：`fa0b5a0c4c0722134cec9e87d6625198af3e7332`
 
 ## 下一步动作
 
-- 将 PR `#48` 的审查输入同步到实现 checkpoint `5f13dfd1215c31dd0d721be95ba40a40d84ec82d`，并在 PR 正文显式写明 browser-state fallback 前置、验证入口和最新验证摘要。
+- 将 PR `#48` 的审查输入同步到实现 checkpoint `fa0b5a0c4c0722134cec9e87d6625198af3e7332`，并在 PR 正文显式写明 browser-state fallback 前置、验证入口和最新验证摘要。
 - 基于当前分支最新 head 重新执行完整验证与 guardian / governance gates。
 - 审查结论满足 merge gate 后走受控 `merge_pr` 合入。
 
@@ -59,7 +59,7 @@
 - 角色：`FR-0002` implementation 阶段的小红书参考适配器主实现事项。
 - 阻塞：
 - 需要以当前受审 head 通过 guardian / governance gate 后方可进入合并。
-- 当前实现侧 blocker 已收口到 checkpoint `5f13dfd1215c31dd0d721be95ba40a40d84ec82d`；剩余阻塞只在审查输入同步与 guardian merge gate。
+- 当前实现侧 blocker 已收口到 checkpoint `fa0b5a0c4c0722134cec9e87d6625198af3e7332`；剩余阻塞只在审查输入同步与 guardian merge gate。
 
 ## 已验证项
 
@@ -93,4 +93,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 受审 diff 基线：`4edce18ae5f416e453eeca8dada9122c8b613f1a`
-- 实现 checkpoint：`5f13dfd1215c31dd0d721be95ba40a40d84ec82d`
+- 实现 checkpoint：`fa0b5a0c4c0722134cec9e87d6625198af3e7332`
