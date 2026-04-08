@@ -38,11 +38,11 @@
 - 最新一轮 guardian 阻断已进一步收口：detail 返回多 item 时按 `source_note_id` 选中目标 note，不再盲取 `items[0]`；`nullable_int` 对 `inf` / `nan` fail-close 为 `null`；并补了 `default_sign_transport`、`post_json` 与 malformed success wrapper 的定点回归测试。
 - 当前实现已接入 `#49` 的 Chrome browser bridge，但该路径只存在于 xhs adapter 私有 fallback 中，不向 Core 暴露任何浏览器资源提供方、资源调度器或新增运行时输入。
 - 当前实现目标仍是 `API-first` 主路径；browser bridge 只作为 adapter 内部 fallback，用于在真实环境里补足平台阻断下的可达性验证，不改变 `FR-0002` 的 Core 输入和结果 envelope。
-- 当前受审实现以 pushed review head `d0df3d7bbf901ba7f289431332e3df84e122e551` 为准；其中 implementation checkpoint 固定为 `eb9f89da6c2f91ee89d601f3ad779046423af10f`，用于绑定已验证的 browser bridge contract 收口。当前 head 已维持以下一致性：API 成功态 `raw` 保留平台 detail success wrapper；HTML / browser-state fallback 成功态 `raw` 保留页面原始 state 对象；browser bridge 模块位于 `syvert/adapters/xhs_browser_bridge.py` 且继续保持 adapter 私有边界；页面态恢复路径仅保留 HTML / 浏览器页面态 fallback。
+- 当前受审实现以 pushed review head `8dd73095b57ebe0bb209882d81cd0890651cf05d` 为准；其中 implementation checkpoint 固定为 `eb9f89da6c2f91ee89d601f3ad779046423af10f`，用于绑定已验证的 browser bridge contract 收口。当前 head 已维持以下一致性：API 成功态 `raw` 保留平台 detail success wrapper；HTML / browser-state fallback 成功态 `raw` 保留页面原始 state 对象；browser bridge 模块位于 `syvert/adapters/xhs_browser_bridge.py` 且继续保持 adapter 私有边界；页面态恢复路径仅保留 HTML / 浏览器页面态 fallback。
 - 最近一次手动验证使用的 detail URL 为：
   - `https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=`
 - 当前受审 diff 基线：`origin/main@4edce18ae5f416e453eeca8dada9122c8b613f1a`
-- 当前 pushed review head：`d0df3d7bbf901ba7f289431332e3df84e122e551`
+- 当前 pushed review head：`8dd73095b57ebe0bb209882d81cd0890651cf05d`
 - implementation checkpoint SHA：`eb9f89da6c2f91ee89d601f3ad779046423af10f`
 
 ## 下一步动作
@@ -59,7 +59,7 @@
 - 角色：`FR-0002` implementation 阶段的小红书参考适配器主实现事项。
 - 阻塞：
 - 需要以当前受审 head 通过 guardian / governance gate 后方可进入合并。
-- 当前实现侧 blocker 已收口到 implementation checkpoint `eb9f89da6c2f91ee89d601f3ad779046423af10f`，并由 pushed review head `d0df3d7bbf901ba7f289431332e3df84e122e551` 承载最新审查输入；剩余阻塞只在 guardian merge gate。
+- 当前实现侧 blocker 已收口到 implementation checkpoint `eb9f89da6c2f91ee89d601f3ad779046423af10f`，并由 pushed review head `8dd73095b57ebe0bb209882d81cd0890651cf05d` 承载最新审查输入；剩余阻塞只在 guardian merge gate。
 
 ## 已验证项
 
@@ -93,5 +93,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 受审 diff 基线：`4edce18ae5f416e453eeca8dada9122c8b613f1a`
-- pushed review head：`d0df3d7bbf901ba7f289431332e3df84e122e551`
+- pushed review head：`8dd73095b57ebe0bb209882d81cd0890651cf05d`
 - implementation checkpoint：`eb9f89da6c2f91ee89d601f3ad779046423af10f`
