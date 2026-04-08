@@ -56,6 +56,29 @@
 - 插件路线：依赖浏览器注入、页面脚本读取权限和网络拦截能力。
 - 上述依赖都属于 adapter 内部实现前提，不属于 Core 统一运行时语义。
 
+### 当前参考适配器的运行时 contract
+
+- 默认会话文件路径：`$HOME/.config/syvert/xhs.session.json`
+- 会话文件 JSON 字段要求：
+  - `cookies`：必填字符串；当前实现把完整 cookie 串直接透传给 detail 请求与签名请求
+  - `user_agent`：必填字符串；当前实现写入 `user-agent` 请求头
+  - `sign_base_url`：必填字符串；当前实现会向该地址发起签名请求
+  - `timeout_seconds`：可选正整数；缺省时回落到 `10`
+- 当前签名服务 contract：
+  - 健康检查：`GET {sign_base_url}/signsrv/pong`
+  - 签名入口：`POST {sign_base_url}/signsrv/v1/xhs/sign`
+  - 请求 JSON：
+    - `uri`
+    - `data`
+    - `cookies`
+  - 成功响应 JSON：
+    - `isok=true`
+    - `data.x_s`
+    - `data.x_t`
+    - `data.x_s_common`
+    - `data.x_b3_traceid`
+- 这些文件路径、JSON 字段和签名服务字段都是 adapter 运行前置 contract，必须进入审查工件，不能只留在代码中。
+
 ## Raw payload 来源
 
 - API detail 响应：`/api/sns/web/v1/feed` 返回的 note detail 包体。

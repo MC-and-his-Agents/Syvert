@@ -36,15 +36,16 @@
 - `syvert/adapters/xhs.py` 与 `tests/runtime/test_xhs_adapter.py` 已落地，当前自动化验证已覆盖 URL 解析、session/sign/detail 失败语义、`raw + normalized` 映射，以及 `--adapter-module syvert.adapters.xhs:build_adapters` 的共享 Core 路径加载。
 - 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、成功态 `raw` 保留平台原始 success wrapper、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
 - 最新一轮 guardian 阻断已进一步收口：detail 返回多 item 时按 `source_note_id` 选中目标 note，不再盲取 `items[0]`；`nullable_int` 对 `inf` / `nan` fail-close 为 `null`；并补了 `default_sign_transport`、`post_json` 与 malformed success wrapper 的定点回归测试。
-- 默认会话文件 `$HOME/.config/syvert/xhs.session.json` 在当前环境缺失，因此“至少一条真实小红书 URL 手动验证”仍被环境前置阻塞，需在 PR 风险区显式记录。
-- 当前 PR 仅声称交付“实现切片 + 自动化验证证据”；Issue `#47` 的 real URL 手动验证闭环仍待运行前置满足后继续推进。
-- 最近一次 checkpoint SHA：`31e06224fc4c72f769d43a7f315b9d3d3105c45a`。
+- 当前实现已接入 `#49` 的 Chrome browser bridge：`default_page_state_transport` 现在优先使用已登录浏览器页内状态，CDP 仅保留为兜底。
+- 当前真实现场下，即便 sign 服务不可用或 detail API 返回 `HTTP 406`，xhs adapter 也能通过同一共享 Core 主路径成功返回 `raw + normalized`。
+- 最新真实验证使用的 detail URL 为：
+  - `https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=`
+- 最近一次 checkpoint SHA：以当前 worktree HEAD 为准。
 
 ## 下一步动作
 
-- 在具备小红书 session / sign 运行前置后，补至少一条真实 `content_detail_by_url` 手动验证记录，再决定是否关闭 Issue `#47`。
-- 将当前实现 checkpoint、PR 正文与 guardian 审查输入持续同步到最新受审 head。
-- 以最新受审 head 重新执行 guardian / governance gates，并在 PR 正文同步验证记录。
+- 将当前实现 checkpoint、PR 正文与 guardian 审查输入同步到最新受审 head。
+- 以最新受审 head 重新执行 guardian / governance gates，并在 PR 正文同步自动化 + 真实浏览器验证记录。
 - 审查结论满足 merge gate 后走受控 `merge_pr` 合入。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -55,8 +56,8 @@
 
 - 角色：`FR-0002` implementation 阶段的小红书参考适配器主实现事项。
 - 阻塞：
-  - 需要以当前受审 head 通过 guardian / governance gate 后方可进入合并。
-  - 若小红书签名或登录态前置失效，可能导致 API-first 链路验证受阻。
+- 需要以当前受审 head 通过 guardian / governance gate 后方可进入合并。
+- 当前代码阻塞已解除；剩余阻塞仅在受控审查与合并链路。
 
 ## 已验证项
 
@@ -69,13 +70,19 @@
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
-- 默认会话文件探测：`$HOME/.config/syvert/xhs.session.json` 当前不存在，因此未执行真实 URL 手动验证命令。
+- 默认会话文件探测：`$HOME/.config/syvert/xhs.session.json` 当前存在，字段包含 `cookies` / `user_agent` / `sign_base_url` / `timeout_seconds`。
+- 签名服务健康检查：`GET http://127.0.0.1:8989/signsrv/pong` 返回 `200` 且 `isok=true`。
+- 真实浏览器验证成功：
+  - 先从已登录小红书首页抓取带完整 `xsec_token` 参数的 detail URL
+  - 再执行 `python3 -m syvert.cli --adapter xhs --capability content_detail_by_url --url 'https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=' --adapter-module syvert.adapters.xhs:build_adapters`
+  - 返回 `status=success`
+  - `normalized.content_id=69d33f6a000000001f0078b3`
+  - `normalized.title=小红书新规！碰这8条红线全完⚠️`
 - 当前回合 checkpoint 与 guardian 结论以受审 PR 正文验证区块、review 记录与状态面工件为准。
 
 ## 未决风险
 
-- 小红书 detail API 依赖 `x-s`、`x-t`、`x-s-common`、`X-B3-Traceid` 与有效登录态，环境前置不稳定会影响回归一致性。
-- 当前机器缺少默认小红书会话文件，导致真实 URL 手动验证尚未完成；若 PR 合并前仍无运行前置，只能以自动化 stub 验证作为当前证据上限。
+- 小红书 detail API 与签名服务仍然不稳定；当前实现已通过 browser bridge 解除这一路径对手动验证的阻塞，但 API-first 主路径在别的环境里仍可能受风控影响。
 - 若把 `xsec_token` / `xsec_source` 等平台前置误提升到 Core 输入，可能破坏 `FR-0002` 的 Core/Adapter 边界。
 - 若 `normalized` 字段映射超出双平台公共最小集合，可能在本轮过早固化平台特有语义。
 

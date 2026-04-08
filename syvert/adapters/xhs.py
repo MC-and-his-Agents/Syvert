@@ -5,16 +5,21 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import re
+import subprocess
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
 from syvert.runtime import CONTENT_DETAIL_BY_URL, PlatformAdapterError, TaskRequest
+from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
 
 XHS_API_BASE_URL = "https://edith.xiaohongshu.com"
 XHS_DETAIL_URI = "/api/sns/web/v1/feed"
 DEFAULT_TIMEOUT_SECONDS = 10
 DEFAULT_XHS_SESSION_PATH = Path.home() / ".config" / "syvert" / "xhs.session.json"
+DEFAULT_XHS_CDP_BASE_URL = "http://127.0.0.1:9222"
+XHS_CDP_STATE_SCRIPT_PATH = Path(__file__).with_name("xhs_cdp_state.mjs")
 VALID_XHS_HOSTS = frozenset(
     {
         "www.xiaohongshu.com",
@@ -38,6 +43,8 @@ class XhsSessionConfig:
 
 SignTransport = Callable[[str, dict[str, Any], int], Mapping[str, Any]]
 DetailTransport = Callable[..., Mapping[str, Any]]
+PageTransport = Callable[..., str]
+PageStateTransport = Callable[..., Mapping[str, Any]]
 
 
 class XhsAdapter:
@@ -51,20 +58,32 @@ class XhsAdapter:
         session_provider: Callable[[Path], XhsSessionConfig] | None = None,
         sign_transport: SignTransport | None = None,
         detail_transport: DetailTransport | None = None,
+        page_transport: PageTransport | None = None,
+        page_state_transport: PageStateTransport | None = None,
     ) -> None:
         self._session_path = session_path or DEFAULT_XHS_SESSION_PATH
         self._session_provider = session_provider or load_session_config
         self._sign_transport = sign_transport or default_sign_transport
         self._detail_transport = detail_transport or default_detail_transport
+        self._page_transport = page_transport or default_page_transport
+        self._page_state_transport = page_state_transport or default_page_state_transport
 
     def execute(self, request: TaskRequest) -> dict[str, Any]:
         url_info = parse_xhs_detail_url(request.input.url)
         session = self._session_provider(self._session_path)
         body = build_detail_body(url_info)
-        headers = self._build_headers(session, body)
-        raw_response = self._fetch_detail(session, headers, body)
-        detail_response = normalize_detail_response(raw_response)
-        note_card = extract_note_card(detail_response, source_note_id=url_info.note_id)
+        try:
+            headers = self._build_headers(session, body)
+            raw_response = self._fetch_detail(session, headers, body)
+            detail_response = normalize_detail_response(raw_response)
+            note_card = extract_note_card(detail_response, source_note_id=url_info.note_id)
+        except PlatformAdapterError as exc:
+            raw_response, note_card = self._recover_note_card_from_html(
+                exc,
+                session=session,
+                input_url=request.input.url,
+                source_note_id=url_info.note_id,
+            )
         normalized = normalize_note_card(note_card, request.input.url)
         return {"raw": raw_response, "normalized": normalized}
 
@@ -142,6 +161,55 @@ class XhsAdapter:
                 details={},
             )
         return response
+
+    def _recover_note_card_from_html(
+        self,
+        original_error: PlatformAdapterError,
+        *,
+        session: XhsSessionConfig,
+        input_url: str,
+        source_note_id: str,
+    ) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+        if original_error.code not in {
+            "xhs_detail_request_failed",
+            "xhs_content_not_found",
+            "xhs_sign_unavailable",
+        }:
+            raise original_error
+
+        try:
+            html = self._fetch_html_page(session, input_url)
+            return extract_note_card_from_html_page(html, source_note_id=source_note_id)
+        except PlatformAdapterError:
+            pass
+
+        try:
+            page_state = self._page_state_transport(
+                url=input_url,
+                timeout_seconds=session.timeout_seconds,
+                source_note_id=source_note_id,
+                cookies=session.cookies,
+                user_agent=session.user_agent,
+            )
+            return extract_note_card_from_page_state(
+                page_state,
+                source_note_id=source_note_id,
+                source="browser_state",
+            )
+        except PlatformAdapterError:
+            raise original_error
+
+    def _fetch_html_page(self, session: XhsSessionConfig, input_url: str) -> str:
+        return self._page_transport(
+            url=input_url,
+            headers={
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "referer": "https://www.xiaohongshu.com/",
+                "user-agent": session.user_agent,
+                "cookie": session.cookies,
+            },
+            timeout_seconds=session.timeout_seconds,
+        )
 
 
 def build_adapters() -> dict[str, object]:
@@ -311,6 +379,155 @@ def default_detail_transport(
     return post_json(url, body, headers=headers, timeout_seconds=timeout_seconds)
 
 
+def default_page_transport(
+    *,
+    url: str,
+    headers: dict[str, str],
+    timeout_seconds: int,
+) -> str:
+    req = request.Request(url, method="GET")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    try:
+        with request.urlopen(req, timeout=timeout_seconds) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except error.HTTPError as exc:
+        body_text = exc.read().decode("utf-8", errors="replace")
+        raise PlatformAdapterError(
+            code="xhs_content_not_found" if exc.code == 404 else "xhs_detail_request_failed",
+            message=f"HTTP {exc.code}",
+            details={"url": url, "response_body": body_text[:500]},
+        ) from exc
+    except error.URLError as exc:
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="页面请求失败",
+            details={"url": url, "reason": str(exc.reason)},
+        ) from exc
+
+
+def default_page_state_transport(
+    *,
+    url: str,
+    timeout_seconds: int,
+    source_note_id: str = "",
+    cookies: str = "",
+    user_agent: str = "",
+) -> Mapping[str, Any]:
+    browser_error: PlatformAdapterError | None = None
+    try:
+        note_payload = XhsAuthenticatedBrowserBridge().extract_note_payload(
+            target_url=url,
+            source_note_id=source_note_id,
+        )
+        return build_browser_page_state(note_payload, source_note_id=source_note_id)
+    except PlatformAdapterError as exc:
+        browser_error = exc
+
+    command = [
+        "node",
+        str(XHS_CDP_STATE_SCRIPT_PATH),
+        url,
+        str(max(timeout_seconds * 1000, 20000)),
+        DEFAULT_XHS_CDP_BASE_URL,
+        source_note_id,
+        cookies,
+        user_agent,
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=max(timeout_seconds, 1) + 20,
+        )
+    except FileNotFoundError as exc:
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 不可用",
+            details={"reason": "node_not_found"},
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 超时",
+            details={"url": url},
+        ) from exc
+
+    if completed.returncode != 0:
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 失败",
+            details={"stderr": completed.stderr.strip()[:500], "url": url},
+        )
+
+    stdout = completed.stdout.strip()
+    if not stdout:
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 未返回状态",
+            details={"url": url},
+        )
+
+    try:
+        parsed = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 返回不是合法 JSON",
+            details={"url": url},
+        ) from exc
+    if not isinstance(parsed, Mapping):
+        if browser_error is not None:
+            raise browser_error
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器页面态 fallback 顶层必须是对象",
+            details={"url": url},
+        )
+    return parsed
+
+
+def build_browser_page_state(
+    note_payload: Mapping[str, Any],
+    *,
+    source_note_id: str = "",
+) -> Mapping[str, Any]:
+    note_id = first_non_empty_string(
+        note_payload.get("noteId"),
+        note_payload.get("note_id"),
+        source_note_id,
+    )
+    if not note_id:
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="浏览器 bridge 未返回有效 note_id",
+            details={},
+        )
+    return {
+        "note": {
+            "currentNoteId": note_id,
+            "firstNoteId": note_id,
+            "noteDetailMap": {
+                note_id: {
+                    "note": dict(note_payload),
+                }
+            },
+        }
+    }
+
+
 def post_json(
     url: str,
     body: Mapping[str, Any],
@@ -354,6 +571,199 @@ def post_json(
             details={"url": url},
         )
     return parsed
+
+
+def extract_note_card_from_html_page(
+    html: str,
+    *,
+    source_note_id: str | None = None,
+) -> tuple[dict[str, Any], Mapping[str, Any]]:
+    state = extract_html_initial_state(html)
+    return extract_note_card_from_page_state(
+        state,
+        source_note_id=source_note_id,
+        source="html",
+    )
+
+
+def extract_note_card_from_page_state(
+    state: Mapping[str, Any],
+    *,
+    source_note_id: str | None = None,
+    source: str,
+) -> tuple[dict[str, Any], Mapping[str, Any]]:
+    note_state = state.get("note")
+    if not isinstance(note_state, Mapping):
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面缺少 note 状态",
+            details={},
+        )
+
+    note_detail_map = note_state.get("noteDetailMap")
+    if not isinstance(note_detail_map, Mapping) or not note_detail_map:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面缺少 noteDetailMap",
+            details={},
+        )
+
+    current_note_id = first_non_empty_string(
+        note_state.get("currentNoteId"),
+        note_state.get("firstNoteId"),
+        source_note_id,
+    )
+    selected_key, selected_entry = select_html_note_entry(
+        note_detail_map,
+        source_note_id=source_note_id,
+        current_note_id=current_note_id,
+    )
+    note = selected_entry.get("note")
+    if not isinstance(note, Mapping) or not note:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面未返回 note 数据",
+            details={"note_key": selected_key},
+        )
+
+    note_card = coerce_html_note_to_note_card(note)
+    note_id = non_empty_string(note_card.get("note_id"))
+    if not note_id:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面未返回有效 note_id",
+            details={"note_key": selected_key},
+        )
+
+    return (
+        {
+            "source": source,
+            "current_note_id": current_note_id or note_id,
+            "note_detail_map": {
+                selected_key: dict(selected_entry),
+            },
+        },
+        note_card,
+    )
+
+
+def extract_html_initial_state(html: str) -> Mapping[str, Any]:
+    match = re.search(r"window\.__INITIAL_STATE__=(.+)</script>", html, re.M)
+    if match is None:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面缺少 __INITIAL_STATE__",
+            details={},
+        )
+
+    state_text = match.group(1).replace(":undefined", ":null").replace("undefined", "null")
+    try:
+        parsed = json.loads(state_text)
+    except json.JSONDecodeError as exc:
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="小红书页面状态不是合法 JSON",
+            details={},
+        ) from exc
+    if not isinstance(parsed, Mapping):
+        raise PlatformAdapterError(
+            code="xhs_detail_request_failed",
+            message="小红书页面状态顶层必须是对象",
+            details={},
+        )
+    return parsed
+
+
+def select_html_note_entry(
+    note_detail_map: Mapping[str, Any],
+    *,
+    source_note_id: str | None = None,
+    current_note_id: str | None = None,
+) -> tuple[str, Mapping[str, Any]]:
+    if source_note_id:
+        entry = note_detail_map.get(source_note_id)
+        if isinstance(entry, Mapping):
+            return source_note_id, entry
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面未返回目标 note",
+            details={"source_note_id": source_note_id},
+        )
+
+    if current_note_id:
+        entry = note_detail_map.get(current_note_id)
+        if isinstance(entry, Mapping):
+            return current_note_id, entry
+
+    for key, entry in note_detail_map.items():
+        if not isinstance(entry, Mapping):
+            continue
+        note = entry.get("note")
+        if isinstance(note, Mapping) and note:
+            return str(key), entry
+
+    raise PlatformAdapterError(
+        code="xhs_content_not_found",
+        message="小红书页面未返回目标 note",
+        details={},
+    )
+
+
+def coerce_html_note_to_note_card(note: Mapping[str, Any]) -> dict[str, Any]:
+    user = note.get("user")
+    interact_info = note.get("interactInfo")
+    image_list = note.get("imageList")
+    video = note.get("video")
+    cover = note.get("cover")
+
+    user_mapping = user if isinstance(user, Mapping) else {}
+    interact_mapping = interact_info if isinstance(interact_info, Mapping) else {}
+    image_items = image_list if isinstance(image_list, list) else []
+    video_mapping = video if isinstance(video, Mapping) else {}
+    cover_mapping = cover if isinstance(cover, Mapping) else {}
+
+    return {
+        "note_id": first_non_empty_string(note.get("noteId"), note.get("note_id")) or "",
+        "type": first_non_empty_string(note.get("type")) or "",
+        "title": string_value(note.get("title")) or "",
+        "desc": string_value(note.get("desc")) or "",
+        "time": note.get("time"),
+        "user": {
+            "user_id": first_non_empty_string(user_mapping.get("userId"), user_mapping.get("user_id")),
+            "nickname": first_non_empty_string(user_mapping.get("nickname")),
+            "avatar": first_non_empty_string(
+                user_mapping.get("avatar"),
+                user_mapping.get("avatarUrl"),
+                user_mapping.get("image"),
+            ),
+        },
+        "interact_info": {
+            "liked_count": interact_mapping.get("likedCount"),
+            "comment_count": interact_mapping.get("commentCount"),
+            "share_count": interact_mapping.get("shareCount"),
+            "collected_count": interact_mapping.get("collectedCount"),
+        },
+        "image_list": [
+            coerce_html_image_item(image)
+            for image in image_items
+            if isinstance(image, Mapping)
+        ],
+        "video": video_mapping,
+        "cover": cover_mapping,
+    }
+
+
+def coerce_html_image_item(image: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "url_default": first_non_empty_string(
+            image.get("urlDefault"),
+            image.get("url_default"),
+            image.get("url"),
+        ),
+        "url": first_non_empty_string(image.get("url"), image.get("urlPre")),
+        "stream": image.get("stream") if isinstance(image.get("stream"), Mapping) else {},
+        "live_photo": image.get("livePhoto"),
+    }
 
 
 def extract_note_card(
@@ -632,7 +1042,7 @@ def extract_h264_master_url(stream: Mapping[str, Any]) -> str | None:
         for item in h264:
             if not isinstance(item, Mapping):
                 continue
-            master_url = non_empty_string(item.get("master_url"))
+            master_url = first_non_empty_string(item.get("master_url"), item.get("masterUrl"))
             if master_url:
                 return master_url
     return None

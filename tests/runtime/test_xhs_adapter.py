@@ -11,15 +11,45 @@ import unittest
 from unittest import mock
 
 from syvert.cli import main
-from syvert.runtime import TaskInput, TaskRequest, execute_task
+from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
 
 from syvert.adapters.xhs import (
     XhsAdapter,
+    default_page_state_transport,
     default_sign_transport,
     normalize_detail_response,
     parse_xhs_detail_url,
     post_json,
 )
+
+
+def build_xhs_html_page(note_state: dict[str, Any]) -> str:
+    state = {
+        "note": {
+            "currentNoteId": note_state["note"]["noteId"],
+            "firstNoteId": note_state["note"]["noteId"],
+            "noteDetailMap": {
+                note_state["note"]["noteId"]: note_state,
+            },
+        }
+    }
+    return (
+        "<html><head></head><body>"
+        f"<script>window.__INITIAL_STATE__={json.dumps(state, ensure_ascii=False)}</script>"
+        "</body></html>"
+    )
+
+
+def build_xhs_page_state(note_state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "note": {
+            "currentNoteId": note_state["note"]["noteId"],
+            "firstNoteId": note_state["note"]["noteId"],
+            "noteDetailMap": {
+                note_state["note"]["noteId"]: note_state,
+            },
+        }
+    }
 
 
 class FakeHttpResponse:
@@ -37,6 +67,67 @@ class FakeHttpResponse:
 
 
 class XhsAdapterTests(unittest.TestCase):
+    def test_default_page_state_transport_wraps_browser_bridge_note_payload(self) -> None:
+        note_id = "69d33f6a000000001f0078b3"
+        fake_bridge = mock.Mock()
+        fake_bridge.extract_note_payload.return_value = {
+            "noteId": note_id,
+            "title": "桥接标题",
+            "desc": "桥接正文",
+            "type": "normal",
+            "user": {"userId": "user-1", "nickname": "作者"},
+            "interactInfo": {},
+            "imageList": [],
+        }
+
+        with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge):
+            with mock.patch("syvert.adapters.xhs.subprocess.run") as mocked_run:
+                state = default_page_state_transport(
+                    url=(
+                        "https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3"
+                        "?xsec_token=token-1&xsec_source="
+                    ),
+                    timeout_seconds=10,
+                    source_note_id=note_id,
+                    cookies="a=1; b=2",
+                    user_agent="Mozilla/5.0 TestAgent",
+                )
+
+        self.assertEqual(state["note"]["currentNoteId"], note_id)
+        self.assertEqual(state["note"]["firstNoteId"], note_id)
+        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["noteId"], note_id)
+        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["title"], "桥接标题")
+        fake_bridge.extract_note_payload.assert_called_once()
+        mocked_run.assert_not_called()
+
+    def test_default_page_state_transport_falls_back_to_cdp_when_browser_bridge_fails(self) -> None:
+        note_id = "69d33f6a000000001f0078b3"
+        fake_bridge = mock.Mock()
+        fake_bridge.extract_note_payload.side_effect = PlatformAdapterError(
+            code="xhs_browser_tab_missing",
+            message="未找到已打开的小红书浏览器标签页",
+        )
+
+        with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge):
+            with mock.patch(
+                "syvert.adapters.xhs.subprocess.run",
+                return_value=mock.Mock(
+                    returncode=0,
+                    stdout=json.dumps(build_xhs_page_state({"note": {"noteId": note_id}})),
+                    stderr="",
+                ),
+            ) as mocked_run:
+                state = default_page_state_transport(
+                    url="https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3",
+                    timeout_seconds=10,
+                    source_note_id=note_id,
+                    cookies="a=1; b=2",
+                    user_agent="Mozilla/5.0 TestAgent",
+                )
+
+        self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["noteId"], note_id)
+        mocked_run.assert_called_once()
+
     def test_parse_xhs_detail_url_extracts_note_id_and_xsec_values(self) -> None:
         parsed = parse_xhs_detail_url(
             "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
@@ -223,6 +314,332 @@ class XhsAdapterTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("xsec_token", payload["raw"])
+
+    def test_xhs_adapter_falls_back_to_html_initial_state_when_feed_returns_406(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            note_state = {
+                "note": {
+                    "noteId": "66fad51c000000001b0224b8",
+                    "type": "normal",
+                    "title": "页面态标题",
+                    "desc": "页面态正文",
+                    "time": 1712304300000,
+                    "user": {
+                        "userId": "user-html-1",
+                        "nickname": "页面作者",
+                        "avatar": "https://cdn.example/html-avatar.jpg",
+                    },
+                    "interactInfo": {
+                        "likedCount": "21",
+                        "commentCount": "22",
+                        "shareCount": "23",
+                        "collectedCount": "24",
+                    },
+                    "imageList": [
+                        {
+                            "urlDefault": "https://cdn.example/html-image.jpg",
+                            "stream": {},
+                            "livePhoto": False,
+                        }
+                    ],
+                    "video": {
+                        "media": {
+                            "stream": {
+                                "h264": [
+                                    {
+                                        "masterUrl": "https://cdn.example/html-video.mp4",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                }
+            }
+            page_requests: list[dict[str, Any]] = []
+
+            def page_transport(*, url: str, headers: dict[str, str], timeout_seconds: int) -> str:
+                page_requests.append(
+                    {
+                        "url": url,
+                        "headers": headers,
+                        "timeout_seconds": timeout_seconds,
+                    }
+                )
+                return build_xhs_html_page(note_state)
+
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="HTTP 406",
+                        details={"url": kwargs["url"]},
+                    )
+                ),
+                page_transport=page_transport,
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(len(page_requests), 1)
+        self.assertEqual(
+            page_requests[0]["url"],
+            "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+        )
+        self.assertEqual(page_requests[0]["headers"]["cookie"], "a=1; b=2")
+        self.assertEqual(payload["raw"]["source"], "html")
+        self.assertEqual(payload["raw"]["current_note_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["title"], "页面态标题")
+        self.assertEqual(payload["normalized"]["body_text"], "页面态正文")
+        self.assertEqual(payload["normalized"]["published_at"], "2024-04-05T08:05:00Z")
+        self.assertEqual(payload["normalized"]["author"]["author_id"], "user-html-1")
+        self.assertEqual(payload["normalized"]["stats"]["like_count"], 21)
+        self.assertEqual(payload["normalized"]["stats"]["comment_count"], 22)
+        self.assertEqual(payload["normalized"]["stats"]["share_count"], 23)
+        self.assertEqual(payload["normalized"]["stats"]["collect_count"], 24)
+        self.assertEqual(payload["normalized"]["content_type"], "mixed_media")
+        self.assertEqual(payload["normalized"]["media"]["cover_url"], "https://cdn.example/html-image.jpg")
+        self.assertEqual(payload["normalized"]["media"]["video_url"], "https://cdn.example/html-video.mp4")
+
+    def test_xhs_adapter_falls_back_to_browser_page_state_when_html_shell_lacks_note_store(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            note_state = {
+                "note": {
+                    "noteId": "66fad51c000000001b0224b8",
+                    "type": "video",
+                    "title": "浏览器态标题",
+                    "desc": "浏览器态正文",
+                    "time": 1712304300000,
+                    "user": {
+                        "userId": "user-browser-1",
+                        "nickname": "浏览器作者",
+                        "avatar": "https://cdn.example/browser-avatar.jpg",
+                    },
+                    "interactInfo": {
+                        "likedCount": "31",
+                        "commentCount": "32",
+                        "shareCount": "33",
+                        "collectedCount": "34",
+                    },
+                    "imageList": [
+                        {
+                            "urlDefault": "https://cdn.example/browser-image.jpg",
+                            "stream": {},
+                            "livePhoto": False,
+                        }
+                    ],
+                    "video": {
+                        "media": {
+                            "stream": {
+                                "h264": [
+                                    {
+                                        "masterUrl": "https://cdn.example/browser-video.mp4",
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                }
+            }
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="HTTP 406",
+                        details={"url": kwargs["url"]},
+                    )
+                ),
+                page_transport=lambda **kwargs: (
+                    "<html><body><script>window.__INITIAL_STATE__="
+                    f"{json.dumps({'global': {}, 'feed': {}}, ensure_ascii=False)}</script></body></html>"
+                ),
+                page_state_transport=lambda **kwargs: build_xhs_page_state(note_state),
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["raw"]["source"], "browser_state")
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["title"], "浏览器态标题")
+        self.assertEqual(payload["normalized"]["body_text"], "浏览器态正文")
+        self.assertEqual(payload["normalized"]["published_at"], "2024-04-05T08:05:00Z")
+        self.assertEqual(payload["normalized"]["author"]["author_id"], "user-browser-1")
+        self.assertEqual(payload["normalized"]["stats"]["like_count"], 31)
+        self.assertEqual(payload["normalized"]["stats"]["comment_count"], 32)
+        self.assertEqual(payload["normalized"]["stats"]["share_count"], 33)
+        self.assertEqual(payload["normalized"]["stats"]["collect_count"], 34)
+        self.assertEqual(payload["normalized"]["content_type"], "video")
+        self.assertEqual(payload["normalized"]["media"]["cover_url"], "https://cdn.example/browser-image.jpg")
+        self.assertEqual(payload["normalized"]["media"]["video_url"], "https://cdn.example/browser-video.mp4")
+
+    def test_xhs_adapter_falls_back_to_browser_page_state_when_sign_service_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            note_state = {
+                "note": {
+                    "noteId": "66fad51c000000001b0224b8",
+                    "type": "normal",
+                    "title": "浏览器兜底标题",
+                    "desc": "浏览器兜底正文",
+                    "time": 1712304300000,
+                    "user": {
+                        "userId": "user-browser-2",
+                        "nickname": "浏览器作者乙",
+                    },
+                    "interactInfo": {},
+                    "imageList": [],
+                }
+            }
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_sign_unavailable",
+                        message="签名服务不可用",
+                        details={"base_url": base_url},
+                    )
+                ),
+                page_transport=lambda **kwargs: (
+                    "<html><body><script>window.__INITIAL_STATE__="
+                    f"{json.dumps({'global': {}, 'feed': {}}, ensure_ascii=False)}</script></body></html>"
+                ),
+                page_state_transport=lambda **kwargs: build_xhs_page_state(note_state),
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    input=TaskInput(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                    ),
+                )
+            )
+
+        self.assertEqual(payload["raw"]["source"], "browser_state")
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["title"], "浏览器兜底标题")
+
+    def test_xhs_adapter_rejects_html_fallback_when_page_state_does_not_contain_requested_note(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            wrong_note_state = {
+                "note": {
+                    "noteId": "other-note-id",
+                    "type": "normal",
+                    "title": "别的笔记",
+                    "desc": "不应该被当成目标结果",
+                    "time": 1712304300000,
+                    "user": {
+                        "userId": "user-other",
+                        "nickname": "别人",
+                    },
+                    "interactInfo": {},
+                    "imageList": [],
+                }
+            }
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: {
+                    "x_s": "signed-x-s",
+                    "x_t": "signed-x-t",
+                    "x_s_common": "signed-x-s-common",
+                    "x_b3_traceid": "trace-1",
+                },
+                detail_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_detail_request_failed",
+                        message="HTTP 406",
+                        details={"url": kwargs["url"]},
+                    )
+                ),
+                page_transport=lambda **kwargs: build_xhs_html_page(wrong_note_state),
+            )
+
+            with self.assertRaises(PlatformAdapterError) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
     def test_xhs_adapter_selects_matching_note_card_when_detail_returns_multiple_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
