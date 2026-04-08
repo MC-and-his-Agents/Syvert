@@ -47,6 +47,7 @@
   - `xsec_token`
   - `xsec_source`
 - `xsec_token` 并非所有请求都必需，但它与风控、详情访问和评论请求链路强相关，因此必须由 adapter 负责解析与使用，而不是提升到 Core 输入字段。
+- 当前参考适配器显式拒绝 `xhslink` 短链；在具备短链解析前，`https://www.xhslink.com/...` 会直接返回 `invalid_xhs_url`，不进入 detail 请求或 fallback 链路。
 
 ## 运行前置
 
@@ -56,11 +57,55 @@
 - 插件路线：依赖浏览器注入、页面脚本读取权限和网络拦截能力。
 - 上述依赖都属于 adapter 内部实现前提，不属于 Core 统一运行时语义。
 
+### 当前参考适配器的运行时 contract
+
+- 默认会话文件路径：`$HOME/.config/syvert/xhs.session.json`
+- 会话文件 JSON 字段要求：
+  - `cookies`：必填字符串；当前实现把完整 cookie 串直接透传给 detail 请求与签名请求
+  - `user_agent`：必填字符串；当前实现写入 `user-agent` 请求头
+  - `sign_base_url`：可选字符串；若存在则当前实现会向该地址发起签名请求，若缺失或签名服务不可用，adapter 允许继续尝试 HTML / browser-state fallback
+  - `timeout_seconds`：可选正整数；缺省时回落到 `10`
+- 当前签名服务 contract：
+  - 健康检查：`GET {sign_base_url}/signsrv/pong`
+  - 签名入口：`POST {sign_base_url}/signsrv/v1/xhs/sign`
+  - 请求 JSON：
+    - `uri`
+    - `data`
+    - `cookies`
+  - 成功响应 JSON：
+    - `isok=true`
+    - `data.x_s`
+    - `data.x_t`
+    - `data.x_s_common`
+    - `data.x_b3_traceid`
+- 这些文件路径、JSON 字段和签名服务字段都是 adapter 运行前置 contract，必须进入审查工件，不能只留在代码中。
+
+### 当前参考适配器的 browser-state fallback contract
+
+- 该路径是 xhs adapter 内部 fallback，不是 Core 级“浏览器资源提供方”或资源调度能力。
+- 触发时机：
+  - detail API 失败
+  - detail HTML 未返回可消费的 `noteDetailMap`
+  - 当前实现中，签名服务不可用也允许直接进入该 fallback
+- 首选运行前置：
+  - 本机 `Google Chrome`
+  - 用户真实已登录的小红书浏览器会话
+  - 目标 detail URL 对应的标签页已在当前 Chrome 会话中打开
+  - Chrome 菜单已启用“允许 Apple 事件中的 JavaScript”
+- adapter 内部行为：
+  - 优先从现有 Chrome 标签页读取页内状态
+  - 如果详情页运行时 `window.__INITIAL_STATE__` 不完整，则回退解析内嵌脚本文本中的 `window.__INITIAL_STATE__=` 对象字面量
+  - browser-state fallback 成功时，adapter 直接保留页面原始 state 对象作为 `raw`，再复用既有 extractor / normalized 映射链
+- 当前失败语义：
+  - `xhs_browser_javascript_disabled`：Chrome 未启用 Apple Events JavaScript
+  - `xhs_browser_target_tab_missing`：目标详情页标签未打开，adapter 不再接受任意小红书 tab 冒充目标页
+  - `xhs_browser_payload_invalid`：页内返回不是合法 note payload
+  - `xhs_browser_note_mismatch`：页内返回的内容与目标 `note_id` 不一致
 ## Raw payload 来源
 
-- API detail 响应：`/api/sns/web/v1/feed` 返回的 note detail 包体。
-- HTML / SSR 页面状态：`window.__INITIAL_STATE__` 中的 note detail map。
-- 插件拦截包体：浏览器内拦截到的 detail / comment 相关响应。
+- API 成功态：`/api/sns/web/v1/feed` 返回的平台 detail success wrapper。
+- HTML / 浏览器页面态 fallback 成功态：页面 state 对象，通常来自 `window.__INITIAL_STATE__` 及其 `noteDetailMap`；为保证 JSON 传输稳定，JS `undefined` 字段会在 adapter 内部归一化为 `null`。
+- 插件拦截包体：浏览器内拦截到的 detail / comment 相关响应，仅作为平台事实来源，不直接构成当前参考适配器对外 `raw` contract。
 
 ## Normalized 候选字段
 
@@ -106,6 +151,7 @@
 ## 对 Syvert 的直接设计结论
 
 - 小红书的 URL 解析、`xsec_token` 处理、签名准备、headers/Cookie 组织必须留在 adapter。
-- adapter 可以把“API 请求失败后读取 HTML `__INITIAL_STATE__`”作为内部 fallback，但 fallback 选择权不应泄漏到 Core。
-- Core 只消费统一的 `raw + normalized` 结果，不关心数据来自 API 响应还是页面状态。
+- adapter 可以把“API 请求失败后读取 HTML `__INITIAL_STATE__` / 浏览器页面态”作为内部 fallback，但 fallback 选择权不应泄漏到 Core。
+- Core 只消费统一的 `raw + normalized` 结果，不关心数据来自 API success wrapper 还是页面原始 state 对象。
+- 当 API 路线缺少 `sign_base_url` 或签名服务不可用时，是否还能成功取决于 HTML / browser-state fallback 是否可用；这仍然是 adapter 内部恢复策略，不是 Core contract。
 - `normalized` 只冻结双平台共同字段；小红书 richer media 信息保留在 `raw` 或 adapter 自定义扩展中。
