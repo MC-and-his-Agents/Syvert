@@ -36,7 +36,7 @@
 - `syvert/adapters/xhs.py` 与 `tests/runtime/test_xhs_adapter.py` 已落地，当前自动化验证已覆盖 URL 解析、session/sign/detail 失败语义、`raw + normalized` 映射，以及 `--adapter-module syvert.adapters.xhs:build_adapters` 的共享 Core 路径加载。
 - 最近一次实现收口已针对 reviewer findings 修复：detail 结构化失败保留为平台错误、成功态 `raw` 保留平台原始 success wrapper、Live Photo 归一化为 `mixed_media`、origin 视频 URL 改为 `https`、异常时间戳 / 计数字段降级为 `null`、`xhslink` 在当前阶段显式拒绝。
 - 最新一轮 guardian 阻断已进一步收口：detail 返回多 item 时按 `source_note_id` 选中目标 note，不再盲取 `items[0]`；`nullable_int` 对 `inf` / `nan` fail-close 为 `null`；并补了 `default_sign_transport`、`post_json` 与 malformed success wrapper 的定点回归测试。
-- 当前实现已接入 `#49` 的 Chrome browser bridge：`default_page_state_transport` 现在优先使用已登录浏览器页内状态，CDP 仅保留为兜底。
+- 当前实现已接入 `#49` 的 Chrome browser bridge，但该路径只存在于 xhs adapter 私有 fallback 中，不向 Core 暴露任何浏览器资源提供方、资源调度器或新增运行时输入。
 - 当前真实现场下，即便 sign 服务不可用或 detail API 返回 `HTTP 406`，xhs adapter 也能通过同一共享 Core 主路径成功返回 `raw + normalized`。
 - 最新真实验证使用的 detail URL 为：
   - `https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3?xsec_token=ABjzCcnPAF6N42MrShWFDtw9sYJB2IyR63WIic1pDjCO0=&xsec_source=`
@@ -78,6 +78,7 @@
   - 返回 `status=success`
   - `normalized.content_id=69d33f6a000000001f0078b3`
   - `normalized.title=小红书新规！碰这8条红线全完⚠️`
+  - 成功原因是 xhs adapter 在 API / HTML fallback 失败后，进入 adapter 内部 browser-state fallback；Core 输入、任务模型和结果 envelope 都没有变化
 - 当前回合 checkpoint 与 guardian 结论以受审 PR 正文验证区块、review 记录与状态面工件为准。
 
 ## 未决风险

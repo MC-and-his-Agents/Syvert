@@ -79,6 +79,30 @@
     - `data.x_b3_traceid`
 - 这些文件路径、JSON 字段和签名服务字段都是 adapter 运行前置 contract，必须进入审查工件，不能只留在代码中。
 
+### 当前参考适配器的 browser-state fallback contract
+
+- 该路径是 xhs adapter 内部 fallback，不是 Core 级“浏览器资源提供方”或资源调度能力。
+- 触发时机：
+  - detail API 失败
+  - detail HTML 未返回可消费的 `noteDetailMap`
+  - 当前实现中，签名服务不可用也允许直接进入该 fallback
+- 首选运行前置：
+  - 本机 `Google Chrome`
+  - 用户真实已登录的小红书浏览器会话
+  - Chrome 菜单已启用“允许 Apple 事件中的 JavaScript”
+- adapter 内部行为：
+  - 优先从现有 Chrome 标签页读取页内状态
+  - 如果详情页运行时 `window.__INITIAL_STATE__` 不完整，则回退解析内嵌脚本文本中的 `window.__INITIAL_STATE__=` 对象字面量
+  - 结果被 adapter 包装回 `note.noteDetailMap` 形状，再进入既有 extractor / normalized 映射链
+- 当前失败语义：
+  - `xhs_browser_javascript_disabled`：Chrome 未启用 Apple Events JavaScript
+  - `xhs_browser_tab_missing`：没有可用的小红书标签页
+  - `xhs_browser_payload_invalid`：页内返回不是合法 note payload
+  - `xhs_browser_note_mismatch`：页内返回的内容与目标 `note_id` 不一致
+- CDP 路径：
+  - 当前仍保留 `node + xhs_cdp_state.mjs + 127.0.0.1:9222` 作为 adapter 内部兜底，不上升为 Core contract
+  - 若 browser-state 路径成功，CDP 路径不参与主成功链
+
 ## Raw payload 来源
 
 - API detail 响应：`/api/sns/web/v1/feed` 返回的 note detail 包体。
