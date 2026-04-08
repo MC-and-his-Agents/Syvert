@@ -606,6 +606,12 @@ def extract_note_card_from_page_state(
             message="小红书页面未返回有效 note_id",
             details={"note_key": selected_key},
         )
+    if source_note_id and note_id != source_note_id:
+        raise PlatformAdapterError(
+            code="xhs_content_not_found",
+            message="小红书页面返回的 note_id 与目标不一致",
+            details={"source_note_id": source_note_id, "actual_note_id": note_id},
+        )
 
     return dict(state), note_card
 

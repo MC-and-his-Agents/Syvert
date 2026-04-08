@@ -730,6 +730,71 @@ class XhsAdapterTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
+    def test_xhs_adapter_rejects_page_state_when_selected_entry_note_id_mismatches_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mismatched_state = {
+                "note": {
+                    "currentNoteId": "66fad51c000000001b0224b8",
+                    "firstNoteId": "66fad51c000000001b0224b8",
+                    "noteDetailMap": {
+                        "66fad51c000000001b0224b8": {
+                            "note": {
+                                "noteId": "other-note-id",
+                                "type": "normal",
+                                "title": "别的笔记",
+                                "desc": "不应该被当成目标结果",
+                                "time": 1712304300000,
+                                "user": {
+                                    "userId": "user-other",
+                                    "nickname": "别人",
+                                },
+                                "interactInfo": {},
+                                "imageList": [],
+                            }
+                        }
+                    },
+                }
+            }
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_sign_unavailable",
+                        message="签名服务不可用",
+                        details={"base_url": base_url},
+                    )
+                ),
+                page_transport=lambda **kwargs: (
+                    "<html><body><script>window.__INITIAL_STATE__="
+                    f"{json.dumps({'global': {}, 'feed': {}}, ensure_ascii=False)}</script></body></html>"
+                ),
+                page_state_transport=lambda **kwargs: mismatched_state,
+            )
+
+            with self.assertRaises(PlatformAdapterError) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_content_not_found")
+
     def test_xhs_adapter_selects_matching_note_card_when_detail_returns_multiple_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
