@@ -108,6 +108,23 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(state, raw_state)
         fake_bridge.extract_page_state.assert_called_once()
 
+    def test_default_page_state_transport_threads_timeout_to_browser_bridge(self) -> None:
+        fake_bridge = mock.Mock()
+        fake_bridge.extract_page_state.return_value = build_xhs_page_state(
+            {"note": {"noteId": "69d33f6a000000001f0078b3"}}
+        )
+
+        with mock.patch("syvert.adapters.xhs.XhsAuthenticatedBrowserBridge", return_value=fake_bridge) as mocked_bridge:
+            default_page_state_transport(
+                url="https://www.xiaohongshu.com/explore/69d33f6a000000001f0078b3",
+                timeout_seconds=7,
+                source_note_id="69d33f6a000000001f0078b3",
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+            )
+
+        mocked_bridge.assert_called_once_with(timeout_seconds=7)
+
     def test_default_page_state_transport_surfaces_browser_error_when_bridge_fails(self) -> None:
         fake_bridge = mock.Mock()
         fake_bridge.extract_page_state.side_effect = PlatformAdapterError(
@@ -220,6 +237,55 @@ class XhsAdapterTests(unittest.TestCase):
                 )
 
         self.assertEqual(raised.exception.code, "xhs_sign_unavailable")
+
+    def test_xhs_adapter_preserves_html_failure_over_original_error_when_browser_tab_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "xhs.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            adapter = XhsAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_sign_unavailable",
+                        message="签名服务不可用",
+                        details={"base_url": base_url},
+                    )
+                ),
+                page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_content_not_found",
+                        message="html fallback missing note payload",
+                    )
+                ),
+                page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                    PlatformAdapterError(
+                        code="xhs_browser_target_tab_missing",
+                        message="未找到目标小红书详情标签页",
+                    )
+                ),
+            )
+
+            with self.assertRaises(PlatformAdapterError) as raised:
+                adapter.execute(
+                    TaskRequest(
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        input=TaskInput(
+                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        ),
+                    )
+                )
+
+        self.assertEqual(raised.exception.code, "xhs_content_not_found")
 
     def test_parse_xhs_detail_url_extracts_note_id_and_xsec_values(self) -> None:
         parsed = parse_xhs_detail_url(

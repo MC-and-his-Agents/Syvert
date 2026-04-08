@@ -181,6 +181,24 @@ class XhsBrowserBridgeTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "xhs_browser_javascript_disabled")
 
+    def test_list_tabs_maps_english_javascript_disabled_error(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+        from syvert.runtime import PlatformAdapterError
+
+        def raise_error(script: str, **_: object) -> str:
+            raise subprocess.CalledProcessError(
+                returncode=1,
+                cmd=["osascript"],
+                stderr="JavaScript from Apple Events is disabled.",
+            )
+
+        bridge = XhsAuthenticatedBrowserBridge(run_applescript=raise_error)
+
+        with self.assertRaises(PlatformAdapterError) as raised:
+            bridge.list_tabs()
+
+        self.assertEqual(raised.exception.code, "xhs_browser_javascript_disabled")
+
     def test_list_tabs_maps_generic_command_failure(self) -> None:
         from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
         from syvert.runtime import PlatformAdapterError
@@ -198,6 +216,21 @@ class XhsBrowserBridgeTests(unittest.TestCase):
             bridge.list_tabs()
 
         self.assertEqual(raised.exception.code, "xhs_browser_command_failed")
+
+    def test_list_tabs_maps_timeout_to_platform_error(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+        from syvert.runtime import PlatformAdapterError
+
+        def raise_error(script: str, **_: object) -> str:
+            raise subprocess.TimeoutExpired(cmd=["osascript"], timeout=7)
+
+        bridge = XhsAuthenticatedBrowserBridge(run_applescript=raise_error, timeout_seconds=7)
+
+        with self.assertRaises(PlatformAdapterError) as raised:
+            bridge.list_tabs()
+
+        self.assertEqual(raised.exception.code, "xhs_browser_command_failed")
+        self.assertEqual(raised.exception.details["timeout_seconds"], 7)
 
     def test_list_tabs_maps_oserror_to_platform_error(self) -> None:
         from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge

@@ -83,20 +83,22 @@ def canonicalize_xhs_url_path(url: str) -> str:
     return parsed.path.rstrip("/")
 
 
-def default_run_applescript(script: str) -> str:
+def default_run_applescript(script: str, *, timeout_seconds: int) -> str:
     completed = subprocess.run(
         ["osascript"],
         input=script,
         text=True,
         capture_output=True,
         check=True,
+        timeout=max(timeout_seconds, 1),
     )
     return completed.stdout
 
 
 class XhsAuthenticatedBrowserBridge:
-    def __init__(self, *, run_applescript=default_run_applescript) -> None:
+    def __init__(self, *, run_applescript=default_run_applescript, timeout_seconds: int = 10) -> None:
         self._run_applescript = run_applescript
+        self._timeout_seconds = max(timeout_seconds, 1)
 
     def list_tabs(self) -> list[ChromeTab]:
         output = self._run_script(self._build_list_tabs_script())
@@ -124,10 +126,16 @@ class XhsAuthenticatedBrowserBridge:
 
     def _run_script(self, script: str) -> str:
         try:
-            return self._run_applescript(script)
+            return self._invoke_run_applescript(script)
+        except subprocess.TimeoutExpired as error:
+            raise PlatformAdapterError(
+                code="xhs_browser_command_failed",
+                message="执行浏览器桥接脚本失败",
+                details={"timeout_seconds": self._timeout_seconds, "error_type": error.__class__.__name__},
+            ) from error
         except subprocess.CalledProcessError as error:
             stderr = error.stderr or ""
-            if CHROME_JS_DISABLED_SNIPPET in stderr:
+            if is_javascript_disabled_error(stderr):
                 raise PlatformAdapterError(
                     code="xhs_browser_javascript_disabled",
                     message="Chrome 未启用 AppleScript JavaScript 执行能力",
@@ -143,6 +151,14 @@ class XhsAuthenticatedBrowserBridge:
                 message="执行浏览器桥接脚本失败",
                 details={"error_type": error.__class__.__name__},
             ) from error
+
+    def _invoke_run_applescript(self, script: str) -> str:
+        try:
+            return self._run_applescript(script, timeout_seconds=self._timeout_seconds)
+        except TypeError as error:
+            if "timeout_seconds" not in str(error):
+                raise
+            return self._run_applescript(script)
 
     def _build_list_tabs_script(self) -> str:
         return """
@@ -251,3 +267,12 @@ end tell
                 message="浏览器标签页返回的 note_id 与目标不一致",
                 details={"expected_note_id": source_note_id, "actual_note_id": note_id},
             )
+
+
+def is_javascript_disabled_error(stderr: str) -> bool:
+    if CHROME_JS_DISABLED_SNIPPET in stderr:
+        return True
+    lowered = stderr.casefold()
+    if "javascript" not in lowered or "disable" not in lowered:
+        return False
+    return any(token in lowered for token in ("apple event", "apple events", "applescript"))

@@ -176,9 +176,14 @@ class XhsAdapter:
 
         try:
             html = self._fetch_html_page(session, input_url)
-            return extract_note_card_from_html_page(html, source_note_id=source_note_id)
-        except PlatformAdapterError:
-            pass
+        except PlatformAdapterError as exc:
+            html_fetch_error = exc
+        else:
+            try:
+                return extract_note_card_from_html_page(html, source_note_id=source_note_id)
+            except PlatformAdapterError:
+                pass
+            html_fetch_error = None
 
         try:
             page_state = self._page_state_transport(
@@ -194,6 +199,8 @@ class XhsAdapter:
             )
         except PlatformAdapterError as exc:
             if exc.code == "xhs_browser_target_tab_missing":
+                if should_prefer_html_fetch_error(original_error, html_fetch_error):
+                    raise html_fetch_error
                 raise original_error
             raise exc
 
@@ -412,11 +419,20 @@ def default_page_state_transport(
     cookies: str = "",
     user_agent: str = "",
 ) -> Mapping[str, Any]:
-    del timeout_seconds, cookies, user_agent
-    return XhsAuthenticatedBrowserBridge().extract_page_state(
+    del cookies, user_agent
+    return XhsAuthenticatedBrowserBridge(timeout_seconds=timeout_seconds).extract_page_state(
         target_url=url,
         source_note_id=source_note_id,
     )
+
+
+def should_prefer_html_fetch_error(
+    original_error: PlatformAdapterError,
+    html_fetch_error: PlatformAdapterError | None,
+) -> bool:
+    if html_fetch_error is None:
+        return False
+    return html_fetch_error.code == "xhs_content_not_found"
 
 
 def post_json(

@@ -95,21 +95,17 @@
 - adapter 内部行为：
   - 优先从现有 Chrome 标签页读取页内状态
   - 如果详情页运行时 `window.__INITIAL_STATE__` 不完整，则回退解析内嵌脚本文本中的 `window.__INITIAL_STATE__=` 对象字面量
-  - browser bridge / CDP 成功时，adapter 直接保留页面原始 state 对象作为 `raw`，再复用既有 extractor / normalized 映射链
+  - browser-state fallback 成功时，adapter 直接保留页面原始 state 对象作为 `raw`，再复用既有 extractor / normalized 映射链
 - 当前失败语义：
   - `xhs_browser_javascript_disabled`：Chrome 未启用 Apple Events JavaScript
   - `xhs_browser_target_tab_missing`：目标详情页标签未打开，adapter 不再接受任意小红书 tab 冒充目标页
   - `xhs_browser_payload_invalid`：页内返回不是合法 note payload
   - `xhs_browser_note_mismatch`：页内返回的内容与目标 `note_id` 不一致
-- CDP 路径：
-  - 当前仍保留 `node + xhs_cdp_state.mjs + 127.0.0.1:9222` 作为 adapter 内部兜底，不上升为 Core contract
-  - 若 browser-state 路径成功，CDP 路径不参与主成功链
-
 ## Raw payload 来源
 
-- API detail 响应：`/api/sns/web/v1/feed` 返回的 note detail 包体。
-- HTML / SSR 页面状态：`window.__INITIAL_STATE__` 中的 note detail map。
-- 插件拦截包体：浏览器内拦截到的 detail / comment 相关响应。
+- API 成功态：`/api/sns/web/v1/feed` 返回的平台 detail success wrapper。
+- HTML / 浏览器页面态 fallback 成功态：页面原始 state 对象，通常来自 `window.__INITIAL_STATE__` 及其 `noteDetailMap`。
+- 插件拦截包体：浏览器内拦截到的 detail / comment 相关响应，仅作为平台事实来源，不直接构成当前参考适配器对外 `raw` contract。
 
 ## Normalized 候选字段
 
@@ -155,7 +151,7 @@
 ## 对 Syvert 的直接设计结论
 
 - 小红书的 URL 解析、`xsec_token` 处理、签名准备、headers/Cookie 组织必须留在 adapter。
-- adapter 可以把“API 请求失败后读取 HTML `__INITIAL_STATE__`”作为内部 fallback，但 fallback 选择权不应泄漏到 Core。
-- Core 只消费统一的 `raw + normalized` 结果，不关心数据来自 API 响应还是页面状态。
+- adapter 可以把“API 请求失败后读取 HTML `__INITIAL_STATE__` / 浏览器页面态”作为内部 fallback，但 fallback 选择权不应泄漏到 Core。
+- Core 只消费统一的 `raw + normalized` 结果，不关心数据来自 API success wrapper 还是页面原始 state 对象。
 - 当 API 路线缺少 `sign_base_url` 或签名服务不可用时，是否还能成功取决于 HTML / browser-state fallback 是否可用；这仍然是 adapter 内部恢复策略，不是 Core contract。
 - `normalized` 只冻结双平台共同字段；小红书 richer media 信息保留在 `raw` 或 adapter 自定义扩展中。
