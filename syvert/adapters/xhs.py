@@ -11,8 +11,8 @@ import subprocess
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
+from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 from syvert.runtime import CONTENT_DETAIL_BY_URL, PlatformAdapterError, TaskRequest
-from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
 
 XHS_API_BASE_URL = "https://edith.xiaohongshu.com"

@@ -179,13 +179,24 @@ end tell
         return f"""
 (function() {{
   const sourceNoteId = {serialized_note_id};
+  const sanitizeInlineState = (rawState) => {{
+    if (!rawState) {{
+      return "";
+    }}
+    let sanitized = rawState.trim().replace(/\\bundefined\\b/g, "null");
+    if (sanitized.endsWith(";")) {{
+      sanitized = sanitized.slice(0, -1).trimEnd();
+    }}
+    return sanitized;
+  }};
   const inlineStateScript = Array.from(document.scripts)
     .map((script) => script.textContent || "")
     .find((text) => text.includes("window.__INITIAL_STATE__=")) || "";
   const rawState = inlineStateScript.startsWith("window.__INITIAL_STATE__=")
     ? inlineStateScript.slice("window.__INITIAL_STATE__=".length)
     : "";
-  const root = window.__INITIAL_STATE__ || (rawState ? Function('return (' + rawState + ');')() : null);
+  const sanitizedState = sanitizeInlineState(rawState);
+  const root = window.__INITIAL_STATE__ || (sanitizedState ? Function('return (' + sanitizedState + ');')() : null);
   const noteRoot = root && root.note;
   const detailMap = noteRoot && noteRoot.noteDetailMap;
   const candidate =

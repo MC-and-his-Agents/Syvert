@@ -7,7 +7,7 @@ import unittest
 
 class XhsBrowserBridgeTests(unittest.TestCase):
     def test_parse_chrome_tab_listing_parses_newline_delimited_rows(self) -> None:
-        from syvert.xhs_browser_bridge import parse_chrome_tab_listing
+        from syvert.adapters.xhs_browser_bridge import parse_chrome_tab_listing
 
         tabs = parse_chrome_tab_listing(
             "\n".join(
@@ -23,8 +23,8 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(tabs[1].url, "https://www.xiaohongshu.com/explore")
 
     def test_select_xhs_tab_requires_exact_target_url(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
         from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import ChromeTab, select_xhs_tab
 
         with self.assertRaises(PlatformAdapterError) as raised:
             select_xhs_tab(
@@ -41,7 +41,7 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_target_tab_missing")
 
     def test_select_xhs_tab_accepts_same_note_id_when_query_differs(self) -> None:
-        from syvert.xhs_browser_bridge import ChromeTab, select_xhs_tab
+        from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
 
         tab = select_xhs_tab(
             [
@@ -57,7 +57,7 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(tab.tab_id, "1")
 
     def test_select_xhs_tab_accepts_canonical_url_for_same_note_id(self) -> None:
-        from syvert.xhs_browser_bridge import ChromeTab, select_xhs_tab
+        from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
 
         tab = select_xhs_tab(
             [
@@ -73,8 +73,8 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(tab.tab_id, "1")
 
     def test_extract_page_state_rejects_invalid_json(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
         from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         outputs = iter(
             [
@@ -93,8 +93,8 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_payload_invalid")
 
     def test_extract_page_state_rejects_note_id_mismatch(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
         from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         outputs = iter(
             [
@@ -113,7 +113,7 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_note_mismatch")
 
     def test_extract_page_state_preserves_original_page_state_shape(self) -> None:
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         raw_state = {
             "note": {
@@ -147,11 +147,11 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(state, raw_state)
 
     def test_list_tabs_maps_javascript_disabled_error(self) -> None:
-        from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import (
+        from syvert.adapters.xhs_browser_bridge import (
             CHROME_JS_DISABLED_SNIPPET,
             XhsAuthenticatedBrowserBridge,
         )
+        from syvert.runtime import PlatformAdapterError
 
         def raise_error(script: str) -> str:
             raise subprocess.CalledProcessError(
@@ -168,8 +168,8 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_javascript_disabled")
 
     def test_list_tabs_maps_generic_command_failure(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
         from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         def raise_error(script: str) -> str:
             raise subprocess.CalledProcessError(
@@ -186,8 +186,8 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_command_failed")
 
     def test_list_tabs_maps_oserror_to_platform_error(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
         from syvert.runtime import PlatformAdapterError
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         def raise_error(script: str) -> str:
             raise FileNotFoundError("osascript missing")
@@ -200,7 +200,7 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_browser_command_failed")
 
     def test_build_in_page_javascript_extracts_note_from_inline_state(self) -> None:
-        from syvert.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 
         bridge = XhsAuthenticatedBrowserBridge()
         inline_state = (
@@ -226,3 +226,30 @@ process.stdout.write(result);
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["noteId"], "abcd1234")
         self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["title"], "页面标题")
+
+    def test_build_in_page_javascript_accepts_inline_state_trailing_semicolon(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        inline_state = (
+            'window.__INITIAL_STATE__={"note":{"noteDetailMap":{"abcd1234":{"note":{"noteId":"abcd1234","title":"页面标题"}}}}};'
+        )
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{}};
+global.document = {{
+  scripts: [{{textContent: {json.dumps(inline_state)}}}]
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["noteId"], "abcd1234")
