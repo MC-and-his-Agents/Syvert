@@ -625,7 +625,9 @@ def extract_html_initial_state(html: str) -> Mapping[str, Any]:
             details={},
         )
 
-    state_text = replace_javascript_undefined_tokens(match.group(1))
+    state_text = replace_javascript_undefined_tokens(match.group(1)).strip()
+    if state_text.endswith(";"):
+        state_text = state_text.rstrip(";").rstrip()
     try:
         parsed = json.loads(state_text)
     except json.JSONDecodeError as exc:

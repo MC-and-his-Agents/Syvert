@@ -404,6 +404,17 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(state["note"]["description"], "literal undefined text")
         self.assertIsNone(state["note"]["optional"])
 
+    def test_extract_html_initial_state_accepts_trailing_semicolon(self) -> None:
+        html = (
+            "<html><body><script>window.__INITIAL_STATE__="
+            '{"note":{"currentNoteId":"abc123"}};'
+            "</script></body></html>"
+        )
+
+        state = extract_html_initial_state(html)
+
+        self.assertEqual(state["note"]["currentNoteId"], "abc123")
+
     def test_xhs_adapter_falls_back_to_html_initial_state_when_feed_returns_406(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_path = Path(temp_dir) / "xhs.session.json"
