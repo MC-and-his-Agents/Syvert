@@ -57,7 +57,11 @@ def select_xhs_tab(tabs: list[ChromeTab], *, target_url: str) -> ChromeTab:
 
 
 def is_xhs_url(url: str) -> bool:
-    return "xiaohongshu.com" in url
+    try:
+        parsed = parse.urlparse(url)
+    except ValueError:
+        return False
+    return parsed.netloc.lower() in {"www.xiaohongshu.com", "xiaohongshu.com"}
 
 
 def extract_xhs_note_id_from_url(url: str) -> str:
