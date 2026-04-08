@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import math
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -431,9 +432,10 @@ def default_page_state_transport(
         str(max(timeout_seconds * 1000, 20000)),
         DEFAULT_XHS_CDP_BASE_URL,
         source_note_id,
-        cookies,
-        user_agent,
     ]
+    env = dict(os.environ)
+    env["SYVERT_XHS_COOKIE_HEADER"] = cookies
+    env["SYVERT_XHS_USER_AGENT"] = user_agent
     try:
         completed = subprocess.run(
             command,
@@ -441,6 +443,7 @@ def default_page_state_transport(
             capture_output=True,
             text=True,
             timeout=max(timeout_seconds, 1) + 20,
+            env=env,
         )
     except FileNotFoundError as exc:
         if browser_error is not None:
@@ -507,7 +510,6 @@ def build_browser_page_state(
     note_id = first_non_empty_string(
         note_payload.get("noteId"),
         note_payload.get("note_id"),
-        source_note_id,
     )
     if not note_id:
         raise PlatformAdapterError(

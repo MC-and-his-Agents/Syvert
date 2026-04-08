@@ -35,12 +35,10 @@ def select_xhs_tab(tabs: list[ChromeTab], *, target_url: str) -> ChromeTab:
     for tab in tabs:
         if tab.url == target_url:
             return tab
-    for tab in tabs:
-        if is_xhs_url(tab.url):
-            return tab
     raise PlatformAdapterError(
-        code="xhs_browser_tab_missing",
-        message="未找到已打开的小红书浏览器标签页",
+        code="xhs_browser_target_tab_missing",
+        message="未找到目标小红书详情标签页",
+        details={"target_url": target_url},
     )
 
 
@@ -87,7 +85,12 @@ class XhsAuthenticatedBrowserBridge:
         note_id = payload.get("note_id")
         if not isinstance(note_id, str) or not note_id:
             note_id = payload.get("noteId")
-        if isinstance(note_id, str) and note_id and note_id != source_note_id:
+        if not isinstance(note_id, str) or not note_id:
+            raise PlatformAdapterError(
+                code="xhs_browser_payload_invalid",
+                message="浏览器桥接返回的 note payload 缺少真实 note_id",
+            )
+        if note_id != source_note_id:
             raise PlatformAdapterError(
                 code="xhs_browser_note_mismatch",
                 message="浏览器标签页返回的 note_id 与目标不一致",

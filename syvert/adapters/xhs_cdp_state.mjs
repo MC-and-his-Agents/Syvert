@@ -1,4 +1,4 @@
-const [url, timeoutMsArg, cdpBaseUrlArg, sourceNoteIdArg, cookieHeaderArg, userAgentArg] = process.argv.slice(2);
+const [url, timeoutMsArg, cdpBaseUrlArg, sourceNoteIdArg] = process.argv.slice(2);
 
 if (!url) {
   console.error("missing url");
@@ -8,8 +8,8 @@ if (!url) {
 const timeoutMs = Number.parseInt(timeoutMsArg || "10000", 10);
 const cdpBaseUrl = (cdpBaseUrlArg || "http://127.0.0.1:9222").replace(/\/$/, "");
 const sourceNoteId = sourceNoteIdArg || "";
-const cookieHeader = cookieHeaderArg || "";
-const userAgent = userAgentArg || "";
+const cookieHeader = process.env.SYVERT_XHS_COOKIE_HEADER || "";
+const userAgent = process.env.SYVERT_XHS_USER_AGENT || "";
 const pollIntervalMs = 500;
 
 async function main() {

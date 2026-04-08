@@ -89,6 +89,7 @@
 - 首选运行前置：
   - 本机 `Google Chrome`
   - 用户真实已登录的小红书浏览器会话
+  - 目标 detail URL 对应的标签页已在当前 Chrome 会话中打开
   - Chrome 菜单已启用“允许 Apple 事件中的 JavaScript”
 - adapter 内部行为：
   - 优先从现有 Chrome 标签页读取页内状态
@@ -96,7 +97,7 @@
   - 结果被 adapter 包装回 `note.noteDetailMap` 形状，再进入既有 extractor / normalized 映射链
 - 当前失败语义：
   - `xhs_browser_javascript_disabled`：Chrome 未启用 Apple Events JavaScript
-  - `xhs_browser_tab_missing`：没有可用的小红书标签页
+  - `xhs_browser_target_tab_missing`：目标详情页标签未打开，adapter 不再接受任意小红书 tab 冒充目标页
   - `xhs_browser_payload_invalid`：页内返回不是合法 note payload
   - `xhs_browser_note_mismatch`：页内返回的内容与目标 `note_id` 不一致
 - CDP 路径：

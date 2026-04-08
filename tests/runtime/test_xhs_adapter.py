@@ -15,6 +15,7 @@ from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute
 
 from syvert.adapters.xhs import (
     XhsAdapter,
+    build_browser_page_state,
     default_page_state_transport,
     default_sign_transport,
     normalize_detail_response,
@@ -127,6 +128,24 @@ class XhsAdapterTests(unittest.TestCase):
 
         self.assertEqual(state["note"]["noteDetailMap"][note_id]["note"]["noteId"], note_id)
         mocked_run.assert_called_once()
+        command = mocked_run.call_args.kwargs["args"] if "args" in mocked_run.call_args.kwargs else mocked_run.call_args.args[0]
+        self.assertNotIn("a=1; b=2", command)
+        self.assertNotIn("Mozilla/5.0 TestAgent", command)
+        env = mocked_run.call_args.kwargs["env"]
+        self.assertEqual(env["SYVERT_XHS_COOKIE_HEADER"], "a=1; b=2")
+        self.assertEqual(env["SYVERT_XHS_USER_AGENT"], "Mozilla/5.0 TestAgent")
+
+    def test_build_browser_page_state_rejects_payload_without_real_note_id(self) -> None:
+        with self.assertRaises(PlatformAdapterError) as raised:
+            build_browser_page_state(
+                {
+                    "title": "没有 note id",
+                    "desc": "不应该被伪造成目标内容",
+                },
+                source_note_id="69d33f6a000000001f0078b3",
+            )
+
+        self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
     def test_parse_xhs_detail_url_extracts_note_id_and_xsec_values(self) -> None:
         parsed = parse_xhs_detail_url(
