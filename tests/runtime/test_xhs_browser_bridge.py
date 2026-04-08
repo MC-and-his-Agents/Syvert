@@ -22,6 +22,20 @@ class XhsBrowserBridgeTests(unittest.TestCase):
         self.assertEqual(tabs[0].tab_id, "101")
         self.assertEqual(tabs[1].url, "https://www.xiaohongshu.com/explore")
 
+    def test_parse_chrome_tab_listing_preserves_url_when_title_contains_pipe(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import parse_chrome_tab_listing
+
+        tabs = parse_chrome_tab_listing(
+            "101|标题A | 标题B|https://www.xiaohongshu.com/explore/abcd1234?xsec_token=token"
+        )
+
+        self.assertEqual(len(tabs), 1)
+        self.assertEqual(tabs[0].title, "标题A | 标题B")
+        self.assertEqual(
+            tabs[0].url,
+            "https://www.xiaohongshu.com/explore/abcd1234?xsec_token=token",
+        )
+
     def test_select_xhs_tab_requires_exact_target_url(self) -> None:
         from syvert.adapters.xhs_browser_bridge import ChromeTab, select_xhs_tab
         from syvert.runtime import PlatformAdapterError
@@ -253,3 +267,33 @@ process.stdout.write(result);
 
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["noteId"], "abcd1234")
+
+    def test_build_in_page_javascript_preserves_literal_undefined_text(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        inline_state = (
+            'window.__INITIAL_STATE__={"note":{"noteDetailMap":{"abcd1234":{"note":{"noteId":"abcd1234","title":"undefined 提示文本"}}}},"extra":{"marker":undefined}};'
+        )
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{}};
+global.document = {{
+  scripts: [{{textContent: {json.dumps(inline_state)}}}]
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(
+            payload["note"]["noteDetailMap"]["abcd1234"]["note"]["title"],
+            "undefined 提示文本",
+        )

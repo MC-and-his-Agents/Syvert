@@ -24,10 +24,11 @@ def parse_chrome_tab_listing(text: str) -> list[ChromeTab]:
         line = raw_line.strip()
         if not line:
             continue
-        parts = line.split("|", 2)
-        if len(parts) != 3:
+        try:
+            tab_id, remainder = line.split("|", 1)
+            title, url = remainder.rsplit("|", 1)
+        except ValueError:
             continue
-        tab_id, title, url = parts
         tabs.append(ChromeTab(tab_id=tab_id, title=title, url=url))
     return tabs
 
@@ -183,7 +184,7 @@ end tell
     if (!rawState) {{
       return "";
     }}
-    let sanitized = rawState.trim().replace(/\\bundefined\\b/g, "null");
+    let sanitized = rawState.trim();
     if (sanitized.endsWith(";")) {{
       sanitized = sanitized.slice(0, -1).trimEnd();
     }}
