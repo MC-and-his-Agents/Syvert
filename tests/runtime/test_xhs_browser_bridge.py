@@ -334,6 +334,46 @@ process.stdout.write(result);
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["title"], "inline 回退")
 
+    def test_build_in_page_javascript_prefers_inline_target_note_over_stale_runtime_note(self) -> None:
+        from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+
+        bridge = XhsAuthenticatedBrowserBridge()
+        inline_state = (
+            'window.__INITIAL_STATE__={"note":{"noteDetailMap":{"abcd1234":{"note":{"noteId":"abcd1234","title":"目标 inline note"}}}}};'
+        )
+        script = bridge._build_in_page_javascript(source_note_id="abcd1234")
+        node_script = f"""
+global.window = {{
+  __INITIAL_STATE__: {{
+    note: {{
+      noteDetailMap: {{
+        stale_note: {{
+          note: {{
+            noteId: "stale-note",
+            title: "旧 runtime note"
+          }}
+        }}
+      }}
+    }}
+  }}
+}};
+global.document = {{
+  scripts: [{{textContent: {json.dumps(inline_state)}}}]
+}};
+const result = {script};
+process.stdout.write(result);
+"""
+
+        completed = subprocess.run(
+            ["node", "-e", node_script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["note"]["noteDetailMap"]["abcd1234"]["note"]["title"], "目标 inline note")
+
     def test_build_in_page_javascript_accepts_marker_with_leading_preamble(self) -> None:
         from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 

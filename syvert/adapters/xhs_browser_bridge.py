@@ -217,6 +217,11 @@ end tell
       null
     );
   }};
+  const hasTargetCandidate = (root) => {{
+    const noteRoot = root && root.note;
+    const detailMap = noteRoot && noteRoot.noteDetailMap;
+    return Boolean(detailMap && detailMap[sourceNoteId] && detailMap[sourceNoteId].note);
+  }};
   const inlineStateScript = Array.from(document.scripts)
     .map((script) => script.textContent || "")
     .find((text) => text.includes(marker)) || "";
@@ -227,7 +232,9 @@ end tell
   const sanitizedState = sanitizeInlineState(rawState);
   const parsedInlineRoot = sanitizedState ? Function('return (' + sanitizedState + ');')() : null;
   const runtimeRoot = window.__INITIAL_STATE__ || null;
-  const root = pickCandidate(runtimeRoot) ? runtimeRoot : (parsedInlineRoot || runtimeRoot);
+  const root = hasTargetCandidate(runtimeRoot)
+    ? runtimeRoot
+    : (hasTargetCandidate(parsedInlineRoot) ? parsedInlineRoot : (parsedInlineRoot || runtimeRoot));
   const candidate = pickCandidate(root);
   if (!candidate) {{
     throw new Error("xhs note payload missing");
