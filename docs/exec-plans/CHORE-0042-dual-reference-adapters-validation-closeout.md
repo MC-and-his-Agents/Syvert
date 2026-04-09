@@ -60,10 +60,24 @@
 - 结果：`Ran 128 tests in 1.846s`，`OK`
 - `python3 scripts/open_pr.py --class docs --issue 42 --item-key CHORE-0042-dual-reference-adapters-validation-closeout --item-type CHORE --release v0.1.0 --sprint 2026-S15 --title "docs: 收口双参考适配器验证状态" --dry-run`
 - 结果：dry-run 通过，closing 语义为 `Fixes #42`
-- 双适配器共享 Core 路径 closeout 证据入口：
-  - `tests/runtime/test_xhs_adapter.py`
-  - `tests/runtime/test_douyin_adapter.py`
-  - `tests/runtime/test_cli.py`
+- `#42` 关闭条件 -> 验证证据映射：
+  - 条件：两个平台都能通过同一 Core 主路径执行 `content_detail_by_url`
+  - 自动化证据：
+    - `tests/runtime/test_xhs_adapter.py::test_cli_module_path_can_load_xhs_adapter_from_shared_registry`
+      - 结果摘要：通过 `--adapter-module syvert.adapters:build_adapters` 走共享 registry，返回 `status=success`、`adapter_key=xhs`
+    - `tests/runtime/test_cli.py::test_cli_module_path_can_load_shared_adapter_registry`
+      - 结果摘要：通过 `--adapter-module syvert.adapters:build_adapters` 走共享 registry，返回 `status=success`、`adapter_key=douyin`
+  - 手动验收记录：
+    - `docs/exec-plans/CHORE-0047-xhs-reference-adapter.md`
+      - 结果摘要：真实小红书 detail URL 返回 `status=success`，`normalized.content_id=69d33f6a000000001f0078b3`
+    - `docs/exec-plans/CHORE-0050-douyin-reference-adapter.md`
+      - 结果摘要：真实抖音 detail URL 返回 `status=success`，`normalized.content_id=7580570616932224282`
+  - 条件：若发生差异，能明确归因于平台适配器还是 Core 契约
+  - Core 契约证据：
+    - `tests/runtime/test_runtime.py::test_execute_task_builds_success_envelope_from_adapter_payload`
+      - 结果摘要：Core 统一组装 `task_id/adapter_key/capability/status/raw/normalized` 成功 envelope
+    - `python3 -m unittest discover -s tests -p 'test_*.py'`
+      - 结果摘要：`Ran 128 tests in 1.846s`，`OK`，覆盖 runtime / CLI / xhs / douyin 相关用例
 
 ## 未决风险
 
