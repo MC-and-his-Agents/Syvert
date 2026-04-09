@@ -75,7 +75,7 @@
 - `gh pr view 52`
   - 结果：`state=MERGED`，`mergeCommit=dca85ef22fa420ac420b893254449c658fd01b05`
 - `gh pr view 53`
-  - 结果：`state=OPEN`，`headRefOid=3aea852b2890ddff73a32545f3916254b77655b2`，当前为父事项 closeout PR
+  - 结果：`state=OPEN`，当前为父事项 closeout PR；当前受审 head 由 guardian state 绑定
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter -v`
   - 结果：`Ran 88 tests in 2.794s`，`OK`
 - `python3 -m unittest discover -s tests -p 'test_*.py'`
