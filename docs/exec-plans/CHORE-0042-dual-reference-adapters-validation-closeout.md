@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md`
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待补充
+- 关联 PR：`#52`
 - active 收口事项：`CHORE-0042-dual-reference-adapters-validation-closeout`
 
 ## 目标
@@ -28,6 +28,7 @@
 - `main@92a333309090a77ec7619ff70a66622977c03b96` 已包含 PR `#48` 与 PR `#51`，对应的小红书 / 抖音参考适配器实现都已合入主干。
 - Issue `#42` 仍处于 `OPEN`；当前回合聚焦把 closeout 工件与聚合入口补齐到版本控制。
 - 已完成本事项 worktree 创建：`/Users/claw/code/worktrees/syvert/issue-42-validation-dual-reference-adapters-on-shared-core-path`。
+- 当前受审 PR 为 `#52`；当前受审 head 以 PR 最新提交与 guardian state 绑定为准。
 
 ## 下一步动作
 
@@ -50,10 +51,19 @@
 - `gh issue view 47 --repo MC-and-his-Agents/Syvert --json number,title,state,url`
 - `gh issue view 50 --repo MC-and-his-Agents/Syvert --json number,title,state,url`
 - `gh pr view 48 --repo MC-and-his-Agents/Syvert --json number,state,mergedAt,mergeCommit,closingIssuesReferences,url`
+- 结果：`state=MERGED`，`mergeCommit=6d7e2be24b9e37860939c5ad598e1e76e093e3af`
 - `gh pr view 51 --repo MC-and-his-Agents/Syvert --json number,state,mergedAt,mergeCommit,closingIssuesReferences,url`
+- 结果：`state=MERGED`，`mergeCommit=92a333309090a77ec7619ff70a66622977c03b96`
 - `git rev-parse HEAD`
+- 结果：当前收口分支已推进到 `#52` 对应的受审 head；具体 SHA 以 PR 最新提交与 guardian state 绑定为准
 - `python3 -m unittest discover -s tests -p 'test_*.py'`
+- 结果：`Ran 128 tests in 1.846s`，`OK`
 - `python3 scripts/open_pr.py --class docs --issue 42 --item-key CHORE-0042-dual-reference-adapters-validation-closeout --item-type CHORE --release v0.1.0 --sprint 2026-S15 --title "docs: 收口双参考适配器验证状态" --dry-run`
+- 结果：dry-run 通过，closing 语义为 `Fixes #42`
+- 双适配器共享 Core 路径 closeout 证据入口：
+  - `tests/runtime/test_xhs_adapter.py`
+  - `tests/runtime/test_douyin_adapter.py`
+  - `tests/runtime/test_cli.py`
 
 ## 未决风险
 
@@ -66,4 +76,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `92a333309090a77ec7619ff70a66622977c03b96`
+- `33d12ef070e4aa45030df2713c532b1a92163412`
+- 说明：本次后续增量用于补齐 guardian 阻断与 PR 绑定信息，不单独刷新 checkpoint head。
