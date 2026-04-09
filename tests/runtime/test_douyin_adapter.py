@@ -79,7 +79,7 @@ class DouyinAdapterTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "invalid_douyin_url")
 
-    def test_load_session_config_requires_verify_fields(self) -> None:
+    def test_load_session_config_allows_missing_api_request_fields(self) -> None:
         from syvert.adapters.douyin import load_session_config
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -89,18 +89,18 @@ class DouyinAdapterTests(unittest.TestCase):
                     {
                         "cookies": "a=1",
                         "user_agent": "Mozilla/5.0",
-                        "ms_token": "ms-token",
-                        "webid": "webid-1",
                         "sign_base_url": "http://127.0.0.1:8000",
                     }
                 ),
                 encoding="utf-8",
             )
+            session = load_session_config(session_path)
 
-            with self.assertRaises(PlatformAdapterError) as raised:
-                load_session_config(session_path)
-
-        self.assertEqual(raised.exception.code, "douyin_session_missing")
+        self.assertEqual(session.cookies, "a=1")
+        self.assertEqual(session.user_agent, "Mozilla/5.0")
+        self.assertEqual(session.verify_fp, "")
+        self.assertEqual(session.ms_token, "")
+        self.assertEqual(session.webid, "")
 
     def test_default_sign_transport_rejects_failed_sign_payload(self) -> None:
         from syvert.adapters.douyin import default_sign_transport
@@ -313,7 +313,49 @@ class DouyinAdapterTests(unittest.TestCase):
             )
 
         self.assertEqual(payload["normalized"]["body_text"], "浏览器回退正文")
-        self.assertEqual(payload["raw"]["SSR_RENDER_DATA"]["aweme_detail"]["aweme_id"], "7580570616932224282")
+        self.assertEqual(payload["raw"]["status_code"], 0)
+        self.assertEqual(payload["raw"]["aweme_detail"]["aweme_id"], "7580570616932224282")
+        self.assertNotIn("SSR_RENDER_DATA", payload["raw"])
+
+    def test_douyin_adapter_falls_back_when_api_request_fields_are_missing(self) -> None:
+        from syvert.adapters.douyin import DouyinAdapter
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            session_path = Path(temp_dir) / "douyin.session.json"
+            session_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            sign_calls: list[dict[str, Any]] = []
+            adapter = DouyinAdapter(
+                session_path=session_path,
+                sign_transport=lambda base_url, payload, timeout_seconds: sign_calls.append(payload)
+                or {"a_bogus": "signed-1"},
+                page_state_transport=lambda **kwargs: {
+                    "SSR_RENDER_DATA": {
+                        "aweme_detail": build_douyin_aweme_detail(desc="缺少 API 字段时的浏览器回退正文")
+                    }
+                },
+            )
+
+            payload = adapter.execute(
+                TaskRequest(
+                    adapter_key="douyin",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
+                )
+            )
+
+        self.assertEqual(sign_calls, [])
+        self.assertEqual(payload["normalized"]["body_text"], "缺少 API 字段时的浏览器回退正文")
+        self.assertEqual(payload["raw"]["status_code"], 0)
+        self.assertEqual(payload["raw"]["aweme_detail"]["aweme_id"], "7580570616932224282")
 
     def test_douyin_adapter_preserves_original_error_when_browser_page_state_misses_target(self) -> None:
         from syvert.adapters.douyin import DouyinAdapter
@@ -406,6 +448,9 @@ class DouyinAdapterTests(unittest.TestCase):
             )
 
         self.assertEqual(payload["normalized"]["body_text"], "浏览器请求回退正文")
+        self.assertEqual(payload["raw"]["status_code"], 0)
+        self.assertEqual(payload["raw"]["aweme_detail"]["aweme_id"], "7580570616932224282")
+        self.assertNotIn("AWEME_DETAIL", payload["raw"])
 
     def test_execute_task_returns_platform_failure_envelope_for_douyin_platform_errors(self) -> None:
         from syvert.adapters.douyin import DouyinAdapter

@@ -168,7 +168,8 @@ class DouyinAdapter:
                 user_agent=session.user_agent,
                 sign_base_url=session.sign_base_url,
             )
-            return page_state, extract_aweme_detail_from_page_state(page_state, source_aweme_id=source_aweme_id)
+            aweme_detail = extract_aweme_detail_from_page_state(page_state, source_aweme_id=source_aweme_id)
+            return synthesize_detail_response(aweme_detail), aweme_detail
         except PlatformAdapterError as exc:
             if exc.code in {"douyin_browser_target_tab_missing", "douyin_content_not_found"}:
                 raise original_error
@@ -249,9 +250,9 @@ def load_session_config(path: Path) -> DouyinSessionConfig:
     return DouyinSessionConfig(
         cookies=require_string(data, "cookies", path),
         user_agent=require_string(data, "user_agent", path),
-        verify_fp=require_string(data, "verify_fp", path),
-        ms_token=require_string(data, "ms_token", path),
-        webid=require_string(data, "webid", path),
+        verify_fp=optional_string(data.get("verify_fp")),
+        ms_token=optional_string(data.get("ms_token")),
+        webid=optional_string(data.get("webid")),
         sign_base_url=optional_string(data.get("sign_base_url")),
         timeout_seconds=coerce_timeout_seconds(data.get("timeout_seconds")),
     )
@@ -299,6 +300,21 @@ def build_detail_headers(session: DouyinSessionConfig) -> dict[str, str]:
 
 
 def build_detail_params(session: DouyinSessionConfig, aweme_id: str) -> dict[str, Any]:
+    missing_fields = [
+        field
+        for field, value in (
+            ("verify_fp", session.verify_fp),
+            ("ms_token", session.ms_token),
+            ("webid", session.webid),
+        )
+        if not value
+    ]
+    if missing_fields:
+        raise PlatformAdapterError(
+            code="douyin_sign_unavailable",
+            message="抖音会话缺少 API 请求所需字段",
+            details={"missing_fields": missing_fields},
+        )
     params: dict[str, Any] = {
         "device_platform": "webapp",
         "aid": "6383",
@@ -323,6 +339,13 @@ def build_detail_params(session: DouyinSessionConfig, aweme_id: str) -> dict[str
         "webid": session.webid,
     }
     return params
+
+
+def synthesize_detail_response(aweme_detail: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "status_code": 0,
+        "aweme_detail": dict(aweme_detail),
+    }
 
 
 def default_sign_transport(base_url: str, payload: dict[str, Any], timeout_seconds: int) -> Mapping[str, Any]:
