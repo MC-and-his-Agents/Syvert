@@ -164,6 +164,103 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["status"], "success")
         self.assertEqual(payload["adapter_key"], "stub")
 
+    def test_cli_module_path_can_load_shared_adapter_registry(self) -> None:
+        import tempfile
+        from unittest import mock
+
+        from tests.runtime.test_douyin_adapter import build_douyin_aweme_detail
+
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from threading import Thread
+
+        handler_state: dict[str, list[dict[str, object]]] = {"sign_calls": [], "detail_calls": []}
+
+        class RequestHandler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+                if self.path == "/signsrv/v1/douyin/sign":
+                    handler_state["sign_calls"].append(payload)
+                    response = {"isok": True, "data": {"a_bogus": "signed-cli-1"}}
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode("utf-8"))
+
+            def do_GET(self) -> None:
+                if self.path.startswith("/aweme/v1/web/aweme/detail/"):
+                    handler_state["detail_calls"].append({"path": self.path})
+                    response = {"status_code": 0, "aweme_detail": build_douyin_aweme_detail()}
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode("utf-8"))
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), RequestHandler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as temp_home:
+                session_path = Path(temp_home) / "douyin.session.json"
+                session_path.write_text(
+                    json.dumps(
+                        {
+                            "cookies": "a=1; b=2",
+                            "user_agent": "Mozilla/5.0 TestAgent",
+                            "verify_fp": "verify-cli-1",
+                            "ms_token": "ms-token-cli-1",
+                            "webid": "webid-cli-1",
+                            "sign_base_url": f"http://127.0.0.1:{server.server_port}",
+                            "timeout_seconds": 5,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with mock.patch("syvert.adapters.douyin.DEFAULT_DOUYIN_SESSION_PATH", session_path), mock.patch(
+                    "syvert.adapters.douyin.DOUYIN_API_BASE_URL",
+                    f"http://127.0.0.1:{server.server_port}",
+                ):
+                    exit_code = main(
+                        [
+                            "--adapter",
+                            "douyin",
+                            "--capability",
+                            "content_detail_by_url",
+                            "--url",
+                            "https://www.douyin.com/video/7580570616932224282",
+                            "--adapter-module",
+                            "syvert.adapters:build_adapters",
+                        ],
+                        stdout=stdout,
+                        stderr=stderr,
+                    )
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+        self.assertEqual(exit_code, 0, stderr.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["adapter_key"], "douyin")
+        self.assertEqual(payload["normalized"]["platform"], "douyin")
+        self.assertEqual(payload["normalized"]["canonical_url"], "https://www.douyin.com/video/7580570616932224282")
+        self.assertEqual(len(handler_state["sign_calls"]), 1)
+        self.assertEqual(len(handler_state["detail_calls"]), 1)
+
     def test_main_writes_success_envelope_to_stdout(self) -> None:
         stdout = io.StringIO()
         stderr = io.StringIO()

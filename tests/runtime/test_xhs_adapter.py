@@ -1676,7 +1676,7 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_success_payload")
 
-    def test_cli_module_path_can_load_xhs_adapter_and_execute_shared_core_path(self) -> None:
+    def test_cli_module_path_can_load_xhs_adapter_from_shared_registry(self) -> None:
         handler_state: dict[str, Any] = {
             "sign_calls": [],
             "detail_calls": [],
@@ -1790,7 +1790,7 @@ class XhsAdapterTests(unittest.TestCase):
                                 "?xsec_token=token-1&xsec_source=pc_search"
                             ),
                             "--adapter-module",
-                            "syvert.adapters.xhs:build_adapters",
+                            "syvert.adapters:build_adapters",
                         ],
                         stdout=stdout,
                         stderr=stderr,
