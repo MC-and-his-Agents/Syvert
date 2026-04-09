@@ -34,13 +34,15 @@
 
 - `main@6d7e2be24b9e37860939c5ad598e1e76e093e3af` 已具备 `FR-0002` formal spec、runtime / CLI 宿主、小红书参考适配器与抖音平台研究输入。
 - 当前执行现场已通过 `python3 scripts/create_worktree.py --issue 50 --class implementation` 建立为独立 worktree：`issue-50-adapter-douyin-reference-adapter-on-shared-core-path`。
-- 抖音 adapter、browser bridge、共享 registry 与新增测试已在工作树落地，并已形成 implementation checkpoint commit `ed27159`；在该实现回合中已完成全量 runtime 测试、docs guard、spec guard、governance gate 与真实 CLI 验收。
-- 最新手动验收命令为 `python3 -m syvert.cli --adapter douyin --capability content_detail_by_url --url https://www.douyin.com/video/7580570616932224282 --adapter-module syvert.adapters:build_adapters`，结果 `status=success`，`normalized.content_id=7580570616932224282`，`normalized.canonical_url=https://www.douyin.com/video/7580570616932224282`，且 `raw` 同时含 `RENDER_DATA` 与 `AWEME_DETAIL`，当前证据归因为 adapter 私有 browser fallback 成功。
-- 下一步需在当前 implementation PR `#51` 上推进 reviewer / guardian / merge gate，直到满足 squash merge 条件。
+- 抖音 adapter、browser bridge、共享 registry 与新增测试已在工作树落地；guardian 首轮审查在 PR `#51` 上指出两个阻断项：缺少 API 专用 session 字段时 browser fallback 不可达，以及 fallback 成功时 `raw` 形状偏离 detail payload。
+- 最新实现 commit `3eb7b26` 已修复上述阻断项：`verify_fp` / `ms_token` / `webid` 改为 API 参数阶段延迟校验，fallback 成功态统一返回 `status_code + aweme_detail` 形状的 detail payload。
+- 最新真实 CLI 验收命令仍为 `python3 -m syvert.cli --adapter douyin --capability content_detail_by_url --url https://www.douyin.com/video/7580570616932224282 --adapter-module syvert.adapters:build_adapters`，标准 session 下结果 `status=success`，`normalized.content_id=7580570616932224282`，`normalized.canonical_url=https://www.douyin.com/video/7580570616932224282`，`raw` 键为 `aweme_detail,status_code`。
+- 另做一条强制 fallback 验收：临时移除 `~/.config/syvert/douyin.session.json` 中的 `verify_fp` / `ms_token` / `webid` 后执行同一条 CLI，结果仍为 `status=success`，当前证据归因为 adapter 私有 browser fallback 成功，执行后已恢复原 session 文件。
+- 下一步需在 PR `#51` 的最新 head 上重新完成 guardian 审查与 merge gate，确认阻断项已消除。
 
 ## 下一步动作
 
-- 推进 implementation PR `#51` 的 reviewer / guardian / merge gate。
+- 在 PR `#51` 的最新 head 上重新运行 guardian 审查，并确认 GitHub checks 仍通过。
 - 完成 squash merge，并核对 `Fixes #50` 已把 issue 状态自动收口。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -60,7 +62,7 @@
 - `python3 scripts/create_worktree.py --issue 50 --class implementation`
 - `git worktree list`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_xhs_adapter tests.runtime.test_xhs_browser_bridge tests.runtime.test_douyin_adapter tests.runtime.test_douyin_browser_bridge -v`
-  - 结果：`Ran 142 tests in 3.470s OK`
+  - 结果：`Ran 143 tests in 3.504s OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：`docs-guard 通过。`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -68,6 +70,11 @@
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：`governance-gate 通过。`
 - `python3 -m syvert.cli --adapter douyin --capability content_detail_by_url --url https://www.douyin.com/video/7580570616932224282 --adapter-module syvert.adapters:build_adapters`
+  - 结果：`status=success`
+  - `normalized.content_id`：`7580570616932224282`
+  - `normalized.canonical_url`：`https://www.douyin.com/video/7580570616932224282`
+  - `raw` 键：`aweme_detail,status_code`
+- 临时移除 `verify_fp` / `ms_token` / `webid` 后执行同一条 `python3 -m syvert.cli --adapter douyin --capability content_detail_by_url --url https://www.douyin.com/video/7580570616932224282 --adapter-module syvert.adapters:build_adapters`
   - 结果：`status=success`
   - 来源判断：`fallback`
   - `normalized.content_id`：`7580570616932224282`
@@ -86,4 +93,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 受审 diff 基线：`6d7e2be24b9e37860939c5ad598e1e76e093e3af`
-- implementation checkpoint：`ed271590c70608bba4c5bc6958cb69da242dcd4f`
+- implementation checkpoint：`3eb7b268ecb2f755fa69899dcdb81b20ade66d93`
