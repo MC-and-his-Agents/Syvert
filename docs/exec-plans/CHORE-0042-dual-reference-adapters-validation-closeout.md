@@ -15,7 +15,7 @@
 ## 目标
 
 - 收口 `#42`“dual reference adapters on shared core path”的剩余状态同步工作。
-- 让 release / sprint 聚合索引、`main` 当前事实与 GitHub Issue 状态保持一致。
+- 为 release / sprint 聚合索引补齐 `#42` 的工件入口与关联关系。
 - 把双适配器共享 Core 路径验证的最小 closeout 证据落入版本控制。
 
 ## 范围
@@ -26,12 +26,12 @@
 ## 当前停点
 
 - `main@92a333309090a77ec7619ff70a66622977c03b96` 已包含 PR `#48` 与 PR `#51`，对应的小红书 / 抖音参考适配器实现都已合入主干。
-- Issue `#42` 仍处于 `OPEN`，但其关闭条件已经满足；当前缺口是仓内聚合索引仍保留合并前口径，尚未把 closeout 证据写回版本控制。
+- Issue `#42` 仍处于 `OPEN`；当前回合聚焦把 closeout 工件与聚合入口补齐到版本控制。
 - 已完成本事项 worktree 创建：`/Users/claw/code/worktrees/syvert/issue-42-validation-dual-reference-adapters-on-shared-core-path`。
 
 ## 下一步动作
 
-- 更新 release / sprint 聚合索引中的双适配器状态描述。
+- 更新 release / sprint 聚合索引中的 `#42` 工件入口与关联 PR / Issue 索引。
 - 运行 docs / spec / unittest 验证，并通过受控入口创建 docs 类 PR。
 - 合并后用 GitHub 关闭 `#42`，让仓内文档与外部真相源同步收口。
 
