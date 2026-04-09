@@ -34,13 +34,12 @@
 
 - `main@6d7e2be24b9e37860939c5ad598e1e76e093e3af` 已具备 `FR-0002` formal spec、runtime / CLI 宿主、小红书参考适配器与抖音平台研究输入。
 - 当前执行现场已通过 `python3 scripts/create_worktree.py --issue 50 --class implementation` 建立为独立 worktree：`issue-50-adapter-douyin-reference-adapter-on-shared-core-path`。
-- 抖音 adapter、browser bridge、共享 registry 与新增测试已在工作树落地，并在当前未提交现场完成全量 runtime 测试、docs/spec/governance 门禁与真实 CLI 验收。
+- 抖音 adapter、browser bridge、共享 registry 与新增测试已在工作树落地，并已形成 implementation checkpoint commit `ed27159`；在该实现回合中已完成全量 runtime 测试、docs guard、spec guard、governance gate 与真实 CLI 验收。
 - 最新手动验收命令为 `python3 -m syvert.cli --adapter douyin --capability content_detail_by_url --url https://www.douyin.com/video/7580570616932224282 --adapter-module syvert.adapters:build_adapters`，结果 `status=success`，`normalized.content_id=7580570616932224282`，`normalized.canonical_url=https://www.douyin.com/video/7580570616932224282`，且 `raw` 同时含 `RENDER_DATA` 与 `AWEME_DETAIL`，当前证据归因为 adapter 私有 browser fallback 成功。
-- 下一步需把当前工作树收敛为新的 implementation checkpoint commit，随后创建 implementation PR 并进入 reviewer / guardian / merge gate。
+- 下一步需基于 `ed27159` 创建 implementation PR，并进入 reviewer / guardian / merge gate。
 
 ## 下一步动作
 
-- 创建包含实现、测试与 docs 索引的 implementation checkpoint commit。
 - 以 `implementation` PR 方式打开 `#50`，并把手动验收证据写入 PR 正文。
 - 推进 reviewer / guardian / merge gate，完成 squash merge 与 issue 状态收口。
 
@@ -87,4 +86,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 受审 diff 基线：`6d7e2be24b9e37860939c5ad598e1e76e093e3af`
-- implementation checkpoint：`待本轮实现提交生成`
+- implementation checkpoint：`ed271590c70608bba4c5bc6958cb69da242dcd4f`
