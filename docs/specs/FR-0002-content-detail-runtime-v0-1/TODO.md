@@ -11,9 +11,9 @@
 
 ## 状态
 
-- 当前成熟度：`merge-ready`
+- 当前成熟度：`implementation-ready`
 - 当前阻塞：
-  - 待完成父事项 closeout PR 的 guardian / merge gate 与受控 merge
+  - 待收口当前父事项 closeout PR 的 guardian findings，并在最新 head 上重新通过 merge gate
 
 ## 实施清单
 
@@ -47,8 +47,9 @@
 
 ## 会话恢复信息
 
-- 当前停点：`FR-0002` 已形成可关闭状态，当前停在等待 guardian 与受控 merge 收口本轮父事项 closeout PR。
+- 当前停点：`FR-0002` 已形成可关闭状态并已打开 PR `#53`，当前停在根据首轮 guardian findings 对齐成熟度、PR 绑定与 runtime 证据链。
 - 下一步动作：
+  - 收口当前 guardian findings 并重跑验证
   - 等待 guardian 与 merge gate 收口当前 closeout PR
   - 通过受控 merge 合入父事项 closeout 文档
   - 关闭 `#38` 并退役当前 branch / worktree

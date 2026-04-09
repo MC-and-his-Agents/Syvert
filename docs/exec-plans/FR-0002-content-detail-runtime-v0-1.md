@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0002-content-detail-runtime-v0-1/`
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：待补充
+- 关联 PR：`#53`
 - active 收口事项：`FR-0002-content-detail-runtime-v0-1`
 
 ## 目标
@@ -33,14 +33,14 @@
 ## 当前停点
 
 - `origin/main@dca85ef22fa420ac420b893254449c658fd01b05` 已包含 `FR-0002` 当前主线所需的关键前提：PR `#43`、`#44`、`#48`、`#51`、`#52`。
-- `docs/releases/v0.1.0.md` 与 `docs/sprints/2026-S15.md` 已吸收 `#42` 的 closeout 索引，但父事项 `#38` 对应的 `exec-plan` / `TODO.md` 仍停留在 formal spec 回合。
+- PR `#53` 已打开，当前受审 head 已把父事项 closeout 文档、release 完成依据与 sprint closeout 结果落入本轮 docs-only diff。
+- 首轮 guardian 已指出三处工件一致性问题：`TODO.md` 的成熟度过早推进到 `merge-ready`、active `exec-plan` 未绑定当前 PR、`#44` 的 runtime / CLI 证据链尚未回指 `CHORE-0041`。
 - 当前执行现场为独立 docs closeout worktree：`/Users/claw/code/worktrees/syvert/issue-38-fr-0002-content-detail-runtime-v0-1-fr-0002-v0-1-0-content-detail-runtime`。
-- 当前回合只补齐父事项收口证据、release 完成依据与 sprint closeout 结果，不改动 formal contract 或实现代码。
 
 ## 下一步动作
 
-- 完成父事项 closeout 文档同步并执行验证。
-- 通过受控入口为 `#38` 创建 docs PR，推进 guardian、merge gate 与受控 merge。
+- 收口 guardian 首轮 findings，并保持父事项 / release / sprint 工件一致。
+- 在 PR `#53` 的最新 head 上重跑验证、guardian 与 merge gate。
 - 合并后关闭 `#38`，并退役当前 branch / worktree。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -74,6 +74,8 @@
   - 结果：`state=MERGED`，`mergeCommit=92a333309090a77ec7619ff70a66622977c03b96`
 - `gh pr view 52`
   - 结果：`state=MERGED`，`mergeCommit=dca85ef22fa420ac420b893254449c658fd01b05`
+- `gh pr view 53`
+  - 结果：`state=OPEN`，`headRefOid=3aea852b2890ddff73a32545f3916254b77655b2`，当前为父事项 closeout PR
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter -v`
   - 结果：`Ran 88 tests in 2.794s`，`OK`
 - `python3 -m unittest discover -s tests -p 'test_*.py'`
@@ -86,7 +88,7 @@
   - 结果：通过
 - `#38` 关闭条件 -> 证据映射：
   - formal contract 已由 PR `#43` 入主干，对应 `docs/specs/FR-0002-content-detail-runtime-v0-1/`
-  - runtime / CLI 宿主已由 PR `#44` 入主干，对应 `tests.runtime.test_runtime`、`tests.runtime.test_cli`
+  - runtime / CLI 宿主已由 PR `#44` 入主干，对应 `docs/exec-plans/CHORE-0041-runtime-cli-skeleton.md`、`tests.runtime.test_runtime`、`tests.runtime.test_cli`
   - 小红书参考适配器已由 PR `#48` 入主干，对应 `docs/exec-plans/CHORE-0047-xhs-reference-adapter.md`
   - 抖音参考适配器已由 PR `#51` 入主干，对应 `docs/exec-plans/CHORE-0050-douyin-reference-adapter.md`
   - 双参考适配器共享 Core 路径验证已由 PR `#52` / `#42` closeout 入主干，对应 `docs/exec-plans/CHORE-0042-dual-reference-adapters-validation-closeout.md`
@@ -102,5 +104,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `dca85ef22fa420ac420b893254449c658fd01b05`
-- 说明：当前 docs closeout 回合在 `#52` 已合入的主干基线上推进；后续 guardian / merge gate 绑定以当前 closeout PR 的受审 head 为准。
+- `3aea852b2890ddff73a32545f3916254b77655b2`
+- 说明：后续如仅补充 guardian findings 收口与审查态元数据，可保留该 checkpoint，并由 guardian state 绑定当前受审 head。
