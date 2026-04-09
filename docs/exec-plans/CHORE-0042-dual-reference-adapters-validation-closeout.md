@@ -57,7 +57,8 @@
 - `git rev-parse HEAD`
 - 结果：当前收口分支受审 head 以 PR 最新提交与 guardian state 绑定为准；该绑定不在本工件内自举记录
 - `python3 -m unittest discover -s tests -p 'test_*.py'`
-- 结果：`Ran 128 tests in 1.846s`，`OK`
+- 结果：当前 closeout 回合在 `main` 基线与 `#52` docs diff 上返回 `Ran 128 tests in 1.846s`，`OK`
+- 说明：`docs/exec-plans/CHORE-0050-douyin-reference-adapter.md` 中的 `Ran 143 tests` 属于抖音事项分支 checkpoint 的历史验证，不作为本次 `#42` closeout 的直接依据
 - `python3 scripts/open_pr.py --class docs --issue 42 --item-key CHORE-0042-dual-reference-adapters-validation-closeout --item-type CHORE --release v0.1.0 --sprint 2026-S15 --title "docs: 收口双参考适配器验证状态" --dry-run`
 - 结果：dry-run 通过，closing 语义为 `Fixes #42`
 - `#42` 关闭条件 -> 验证证据映射：
