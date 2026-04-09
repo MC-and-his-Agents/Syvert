@@ -26,15 +26,15 @@
 ## 当前停点
 
 - `main@92a333309090a77ec7619ff70a66622977c03b96` 已包含 PR `#48` 与 PR `#51`，对应的小红书 / 抖音参考适配器实现都已合入主干。
-- Issue `#42` 仍处于 `OPEN`；当前回合聚焦把 closeout 工件与聚合入口补齐到版本控制。
+- `docs/releases/v0.1.0.md`、`docs/sprints/2026-S15.md` 与本事项 `exec-plan` 已补齐 `#42` 的索引入口与事项上下文。
 - 已完成本事项 worktree 创建：`/Users/claw/code/worktrees/syvert/issue-42-validation-dual-reference-adapters-on-shared-core-path`。
-- 当前受审 PR 为 `#52`；当前受审 head 以 PR 最新提交与 guardian state 绑定为准。
+- 当前受审 PR 为 `#52`；当前受审 head 以 PR 最新提交与 guardian state 绑定为准，本工件只记录最近一次显式 checkpoint SHA。
 
 ## 下一步动作
 
-- 更新 release / sprint 聚合索引中的 `#42` 工件入口与关联 PR / Issue 索引。
-- 运行 docs / spec / unittest 验证，并通过受控入口创建 docs 类 PR。
-- 合并后用 GitHub 关闭 `#42`，让仓内文档与外部真相源同步收口。
+- 等待 guardian 对 PR `#52` 的最新 head 给出可合并 verdict。
+- 通过受控 `merge_pr` 完成 squash merge。
+- 合并后核对 `Fixes #42` 已收口 GitHub Issue 状态。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -55,7 +55,7 @@
 - `gh pr view 51 --repo MC-and-his-Agents/Syvert --json number,state,mergedAt,mergeCommit,closingIssuesReferences,url`
 - 结果：`state=MERGED`，`mergeCommit=92a333309090a77ec7619ff70a66622977c03b96`
 - `git rev-parse HEAD`
-- 结果：当前收口分支已推进到 `#52` 对应的受审 head；具体 SHA 以 PR 最新提交与 guardian state 绑定为准
+- 结果：当前收口分支受审 head 以 PR 最新提交与 guardian state 绑定为准；该绑定不在本工件内自举记录
 - `python3 -m unittest discover -s tests -p 'test_*.py'`
 - 结果：`Ran 128 tests in 1.846s`，`OK`
 - `python3 scripts/open_pr.py --class docs --issue 42 --item-key CHORE-0042-dual-reference-adapters-validation-closeout --item-type CHORE --release v0.1.0 --sprint 2026-S15 --title "docs: 收口双参考适配器验证状态" --dry-run`
@@ -77,4 +77,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `33d12ef070e4aa45030df2713c532b1a92163412`
-- 说明：本次后续增量用于补齐 guardian 阻断与 PR 绑定信息，不单独刷新 checkpoint head。
+- 说明：后续增量仅用于补齐 guardian 阻断与 PR 绑定信息；当前受审 head 由 PR 最新提交与 guardian state 绑定，不单独在本工件内自举记录。
