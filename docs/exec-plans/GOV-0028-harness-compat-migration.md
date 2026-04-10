@@ -59,7 +59,7 @@
   - `FR-0003 plan.md` 的手动验证与 implementation-ready 叙述已切换到 `#57 / GOV-0028`
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
   - `FR-0003 spec.md` 已把当前执行映射刷新为 `#54 -> #55 -> #57`，不再把 `#56 / GOV-0027` 误写成当前 Work Item
-- 当前受审 head 仅补记 review / guardian 元数据与恢复证据，不推进新的实现 checkpoint；下一步是推送 PR `#60` 最新 head，并仅针对该最新 head 重跑 guardian / merge gate。
+- 当前受审 head 仅在上述 checkpoint 之后继续收口 guardian 文档反馈：`docs/AGENTS.md` 已把“新事项 / 存量事项”重新绑定到 active `exec-plan` 恢复入口，FR-0003 legacy `TODO.md` 不再提前宣告 `GOV-0028` 已完成。该 head 属于 review-state 文档同步，不推进新的实现 checkpoint。
 
 ## 下一步动作
 

@@ -22,8 +22,8 @@
 - 事项类型：`FR` / `HOTFIX` / `GOV` / `CHORE`
 - 事项术语：`轻量事项` / `中等事项` / `核心事项`
 - 执行术语：
-  - `新事项`：首次进入当前交付漏斗、且尚未形成仓库内恢复工件的事项
-  - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项
+  - `新事项`：首次进入当前交付漏斗、且尚未形成 active `exec-plan` 恢复工件的事项
+  - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项；若只保留 legacy `TODO.md` 而没有 active `exec-plan`，仍不得视为已具备当前执行回合恢复入口
   - `长任务`：需要 `checkpoint / resume / handoff` 恢复能力，并因此维护 `exec-plan` 的执行回合
 - GitHub 层次术语：`Phase` / `FR` / `Work Item`
 - 仓内语义术语：`formal spec` / `exec-plan` / `decision` / `release index` / `sprint index`

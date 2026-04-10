@@ -22,7 +22,7 @@
 
 - [x] 建立 `FR-0003` formal spec 套件并冻结治理目标与边界
 - [x] 通过 `GOV-0027` 收敛顶层治理文档、release/sprint 索引与 decision / exec-plan，并完成 PR `#59` closeout
-- [x] 历史记录：`GOV-0028` 已完成 harness 兼容迁移，并将 `TODO.md` 从 required file 降为 legacy optional；权威恢复入口已切到 active `exec-plan`
+- [x] 历史记录：`GOV-0028` 已完成主要 harness 兼容迁移改动，并将 `TODO.md` 从 required file 降为 legacy optional；最终完成判断仍以当前 PR、guardian、merge gate 与 active `exec-plan` 为准
 - [ ] 历史后续项：`GOV-0029` 仍保留为后续 legacy `TODO.md` 治理清理事项
 
 ## 历史验证备注
