@@ -12,7 +12,7 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def write_valid_template_docs(repo: Path) -> None:
+def write_valid_template_docs(repo: Path, *, include_todo: bool = True) -> None:
     write_file(
         repo / "docs" / "exec-plans" / "_template.md",
         """# ITEM-KEY 执行计划
@@ -54,9 +54,10 @@ def write_valid_template_docs(repo: Path) -> None:
 - sprint：
 """,
     )
-    write_file(
-        repo / "docs" / "specs" / "_template" / "TODO.md",
-        """# FR-XXXX TODO
+    if include_todo:
+        write_file(
+            repo / "docs" / "specs" / "_template" / "TODO.md",
+            """# FR-XXXX TODO
 
 ## 关联信息
 
@@ -67,7 +68,7 @@ def write_valid_template_docs(repo: Path) -> None:
 - sprint：
 - exec_plan：
 """,
-    )
+        )
     write_file(
         repo / "docs" / "releases" / "_template.md",
         """# Release vX.Y.Z
@@ -133,7 +134,7 @@ def write_valid_template_docs(repo: Path) -> None:
     )
 
 
-def write_valid_governance_docs(repo: Path) -> None:
+def write_valid_governance_docs(repo: Path, *, include_spec_todo: bool = True, include_template_todo: bool = True) -> None:
     write_file(
         repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md",
         """# GOV-0001 执行计划
@@ -245,9 +246,10 @@ Then
 - [ ] x
 """,
     )
-    write_file(
-        repo / "docs" / "specs" / "FR-0001-example" / "TODO.md",
-        """# FR-0001 TODO
+    if include_spec_todo:
+        write_file(
+            repo / "docs" / "specs" / "FR-0001-example" / "TODO.md",
+            """# FR-0001 TODO
 
 ## 关联信息
 
@@ -258,7 +260,7 @@ Then
 - sprint：`2026-S13`
 - exec_plan：`docs/exec-plans/GOV-0001-release-sprint-structure.md`
 """,
-    )
+        )
     write_file(
         repo / "docs" / "decisions" / "ADR-0001-example.md",
         "# ADR-0001\n",
@@ -336,7 +338,7 @@ Then
 """,
     )
     write_file(repo / "docs" / "roadmap-v0-to-v1.md", "# roadmap\n")
-    write_valid_template_docs(repo)
+    write_valid_template_docs(repo, include_todo=include_template_todo)
 
 
 class ContextGuardTests(unittest.TestCase):
@@ -344,6 +346,13 @@ class ContextGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
+            errors = validate_repository(repo)
+        self.assertEqual(errors, [])
+
+    def test_new_formal_spec_without_todo_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo, include_spec_todo=False, include_template_todo=False)
             errors = validate_repository(repo)
         self.assertEqual(errors, [])
 
@@ -435,7 +444,6 @@ class ContextGuardTests(unittest.TestCase):
             "docs/exec-plans/_template.md",
             "docs/specs/_template/spec.md",
             "docs/specs/_template/plan.md",
-            "docs/specs/_template/TODO.md",
             "docs/releases/_template.md",
             "docs/sprints/_template.md",
         )
@@ -450,6 +458,18 @@ class ContextGuardTests(unittest.TestCase):
                     any("缺少基线模板工件" in error and template_path in error for error in errors),
                     f"expected missing-template error for {template_path}, got: {errors}",
                 )
+
+    def test_legacy_todo_is_still_validated_when_touched(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            todo = repo / "docs" / "specs" / "FR-0001-example" / "TODO.md"
+            todo.write_text("# FR-0001 TODO\n", encoding="utf-8")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/TODO.md"],
+            )
+        self.assertTrue(any("Issue" in error for error in errors))
 
     def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

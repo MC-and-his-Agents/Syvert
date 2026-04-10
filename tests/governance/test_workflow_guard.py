@@ -33,7 +33,7 @@ text
 ## Stop Conditions
 text
 
-## 何时必须更新 exec-plan / TODO
+## 何时必须更新 exec-plan
 text
 
 ## 何时允许进入 open_pr / merge_pr

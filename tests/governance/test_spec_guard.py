@@ -66,7 +66,16 @@ GOOD_PLAN = """# Plan
 
 
 class SpecGuardTests(unittest.TestCase):
-    def test_valid_suite_passes(self) -> None:
+    def test_new_suite_without_todo_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fr_dir = Path(temp_dir) / "docs" / "specs" / "FR-0001-example"
+            fr_dir.mkdir(parents=True)
+            (fr_dir / "spec.md").write_text(GOOD_SPEC, encoding="utf-8")
+            (fr_dir / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
+            errors = validate_suite(fr_dir)
+        self.assertEqual(errors, [])
+
+    def test_legacy_suite_with_todo_still_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             fr_dir = Path(temp_dir) / "docs" / "specs" / "FR-0001-example"
             fr_dir.mkdir(parents=True)
