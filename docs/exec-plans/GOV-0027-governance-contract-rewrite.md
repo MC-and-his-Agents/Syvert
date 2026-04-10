@@ -39,7 +39,9 @@
 
 ## 当前停点
 
-- PR `#59` 已创建并绑定当前 Work Item；formal spec、decision、release/sprint 索引与顶层治理文档已入 PR，GitHub checks 已全绿，当前停在根据 guardian 审查结果收口最后的文档语义一致性问题。
+- 最近一次显式 checkpoint 对应提交 `87de5932a1094e1c09d3ea6340b47c3834f55567`，其内容已覆盖 formal spec、decision、release/sprint 索引、bootstrap 条件化与索引边界收口。
+- 当前 head 仅在该 checkpoint 之后继续补充 `spec review` 结论与 guardian 审查态元数据；这些信息用于当前 PR 审查与 merge gate，不单独推进新的 checkpoint。
+- PR `#59` 已创建并绑定当前 Work Item，当前停在等待 guardian 回到 `APPROVE + safe_to_merge=true` 后进入受控合并。
 
 ## 下一步动作
 
@@ -93,4 +95,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `23579948019abc069e2dc9976311f80f9b01369f`
+- `87de5932a1094e1c09d3ea6340b47c3834f55567`
