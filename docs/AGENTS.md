@@ -84,7 +84,7 @@
 - `docs/sprints/**`：sprint 协作主题、退出条件与工件入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
-- `TODO.md`：FR 级 formal spec 状态总表、当前 active Work Item 指针、执行停点与阻断项
+- `TODO.md`：当 FR formal spec 已存在时，作为 FR 级状态总表、当前 active Work Item 指针、执行停点与阻断项
 - `exec-plan`：长任务执行细节、事项上下文与恢复上下文
 - PR：仅绑定当前 Work Item 的变更范围、风险、验证证据、关闭语义，并显式引用上位 FR / Phase
 
