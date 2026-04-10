@@ -9,7 +9,7 @@
 1. 绑定当前 Work Item 的事项上下文：`Issue`、`item_key`、`item_type`、`release`、`sprint` 与上位 Phase / FR 边界。
 2. 确认当前独立现场与事项上下文匹配：worktree 仍由当前 Work Item 的 `Issue` 生成，事项上下文不改变现有现场模型。
 3. 确认输入工件：绑定 FR 的 formal spec，或治理 bootstrap 所需的 contract 工件。
-4. 初始化或更新当前 Work Item 的 `exec-plan` 与关联 `TODO.md`。
+4. 初始化或更新当前 Work Item 的 `exec-plan`，并在绑定 FR 的 `TODO.md` 中回写当前 active Work Item 指针与状态。
 
 ## checkpoint
 
@@ -53,5 +53,5 @@
 ## `exec-plan` 与 `TODO.md` 职责边界
 
 - `exec-plan`：当前 Work Item 的长任务执行细节、事项上下文与恢复上下文。
-- `TODO.md`：绑定 FR 的 formal spec 套件中的状态、检查清单、停点与下一步。
+- `TODO.md`：绑定 FR 的 formal spec 套件中的 FR 级状态总表、当前 active Work Item 指针、检查清单、停点与下一步。
 - `TODO.md` 不承载完整长会话细节。

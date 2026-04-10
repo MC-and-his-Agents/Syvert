@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
 - 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
-- 关联 PR：待创建
+- 关联 PR：`#59`
 - active 收口事项：`GOV-0027-governance-contract-rewrite`
 
 ## 目标
@@ -39,13 +39,13 @@
 
 ## 当前停点
 
-- 独立 worktree 已创建，`FR-0003` formal spec、`GOV-0027` exec-plan、顶层治理文档与 `v0.2.0` / `2026-S15` 索引已落盘；本地治理门禁与测试已通过，当前停在提交后重跑基于提交图的 preflight 并创建 PR。
+- PR `#59` 已创建并绑定当前 Work Item；formal spec、decision、release/sprint 索引与顶层治理文档已入 PR，GitHub checks 已全绿，当前停在根据 guardian 审查结果收口最后的文档语义一致性问题。
 
 ## 下一步动作
 
-- 提交当前治理改动并生成中文 Conventional Commit。
-- 运行 `pr_scope_guard`、`commit_check` 与 `open_pr --dry-run` 的提交图版本校验。
-- 开 PR、补齐 `refs #55` / `refs #54`，随后推进 review、guardian、checks 与 merge gate。
+- 按 guardian 反馈收口 `TODO.md` 绑定语义、active Work Item 状态回写与 sprint 索引表述。
+- 推送增量提交，确认 checks 继续全绿。
+- 重新运行 guardian；若 `APPROVE + safe_to_merge=true`，则通过 `merge_pr` 受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -72,14 +72,20 @@
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/spec_guard.py --base-ref origin/main --head-ref HEAD`
 - `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
-- 已确认 `pr_scope_guard` / `commit_check` 在未提交新增文件时不会看到当前 diff，需要在生成提交后按提交图重跑
+- `python3 scripts/pr_scope_guard.py --class governance --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+- 已创建 PR：`#59 https://github.com/MC-and-his-Agents/Syvert/pull/59`
+- 已补齐 PR 描述中的 `fixes #56`、`refs #55`、`refs #54`、scope / out-of-scope / risk / validation / rollback
+- 已确认 `governance_status.py --pr 59` 可正确回读当前 `item_context`
+- 已确认 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
 
 ## 未决风险
 
 - 若文档仍保留并行分层定义，会继续造成 formal spec、exec-plan、release/sprint 索引的归属歧义。
 - 若 `2026-S15` 的语义改写不够克制，可能误伤现有 `v0.1.0` 业务索引表达。
-- 若 PR 描述缺少 `refs #55` / `refs #54`，上位事项引用链会不完整。
+- 若 `TODO.md` 的 FR 级总表语义与 active Work Item 指针未收敛，后续 `#57`、`#58` 会继续出现绑定歧义。
 
 ## 回滚方式
 
