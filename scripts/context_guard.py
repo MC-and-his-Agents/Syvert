@@ -308,7 +308,7 @@ def collect_targets(
                         if candidate.exists():
                             spec_files.add(candidate)
                     todo_candidate = suite_dir / "TODO.md"
-                    if todo_candidate.exists() and is_todo_spec_file(path):
+                    if todo_candidate.exists():
                         spec_files.add(todo_candidate)
     else:
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
@@ -491,6 +491,10 @@ def validate_repository(repo_root: Path) -> list[str]:
             baseline_paths.append(relative)
         else:
             errors.append(f"{candidate}: 缺少基线模板工件 `{relative}`。")
+
+    optional_template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
+    if optional_template_todo.exists():
+        baseline_paths.append(optional_template_todo.relative_to(repo_root).as_posix())
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:
