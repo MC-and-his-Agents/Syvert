@@ -7,7 +7,7 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
+- 关联 exec-plan：`docs/exec-plans/GOV-0028-harness-compat-migration.md`
 
 ## 实施目标
 

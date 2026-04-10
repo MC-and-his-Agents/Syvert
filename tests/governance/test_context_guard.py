@@ -481,6 +481,17 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("Issue" in error for error in errors))
 
+    def test_deleted_legacy_todo_is_allowed_in_diff_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "specs" / "FR-0001-example" / "TODO.md").unlink()
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/TODO.md"],
+            )
+        self.assertEqual(errors, [])
+
     def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

@@ -9,7 +9,7 @@
 - item_type：
 - release：
 - sprint：
-- exec_plan：`docs/exec-plans/<item_key>.md`
+- exec_plan：`docs/exec-plans/<active_work_item>.md`
 
 ## 状态
 

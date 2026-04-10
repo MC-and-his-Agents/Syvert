@@ -368,6 +368,8 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                 continue
             target = repo_root / path
             if not target.exists():
+                if is_todo_spec_file(path):
+                    continue
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
     # Governance bootstrap contract requires decision + exec-plan to co-exist.
