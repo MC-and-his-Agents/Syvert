@@ -14,7 +14,7 @@ REQUIRED_BODY_HEADINGS = (
     ("## worktree / bootstrap 规则", "## Worktree / Bootstrap 规则"),
     ("## checkpoint / resume / compact 规则", "## Checkpoint / Resume / Compact 规则"),
     ("## stop conditions", "## Stop Conditions"),
-    ("## 何时必须更新 `exec-plan` / `TODO`", "## 何时必须更新 exec-plan / TODO"),
+    ("## 何时必须更新 `exec-plan`", "## 何时必须更新 exec-plan", "## 何时必须更新 `exec-plan` / `TODO`", "## 何时必须更新 exec-plan / TODO"),
     ("## 何时允许进入 `open_pr` / `merge_pr`", "## 何时允许进入 open_pr / merge_pr"),
 )
 

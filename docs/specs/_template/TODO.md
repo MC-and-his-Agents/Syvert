@@ -1,4 +1,6 @@
-# FR-XXXX TODO
+# FR-XXXX Legacy TODO
+
+> legacy optional: 仅供已存在该文件的历史事项继续沿用。新事项默认不创建 `TODO.md`，恢复主入口统一使用 active `exec-plan`。
 
 ## 关联信息
 

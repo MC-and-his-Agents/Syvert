@@ -104,6 +104,13 @@ def is_spec_suite_file(path: Path) -> bool:
     return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan|TODO)\.md$", value) is not None
 
 
+def is_todo_spec_file(path: Path) -> bool:
+    value = path.as_posix()
+    if re.search(r"(^|/)docs/specs/_template/TODO\.md$", value):
+        return True
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/TODO\.md$", value) is not None
+
+
 def should_skip_reference(value: str) -> bool:
     if not value:
         return True
@@ -296,10 +303,13 @@ def collect_targets(
                     spec_files.add(repo_root / path)
                 else:
                     suite_dir = repo_root / "docs" / "specs" / path_parts[2]
-                    for name in ("spec.md", "plan.md", "TODO.md"):
+                    for name in ("spec.md", "plan.md"):
                         candidate = suite_dir / name
                         if candidate.exists():
                             spec_files.add(candidate)
+                    todo_candidate = suite_dir / "TODO.md"
+                    if todo_candidate.exists() and is_todo_spec_file(path):
+                        spec_files.add(todo_candidate)
     else:
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
         release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
@@ -309,15 +319,24 @@ def collect_targets(
         for suite_dir in specs_root.glob("FR-*"):
             if not suite_dir.is_dir():
                 continue
-            for name in ("spec.md", "plan.md", "TODO.md"):
+            for name in ("spec.md", "plan.md"):
                 candidate = suite_dir / name
                 if candidate.exists():
                     spec_files.add(candidate)
+        for suite_dir in specs_root.glob("FR-*"):
+            if not suite_dir.is_dir():
+                continue
+            candidate = suite_dir / "TODO.md"
+            if candidate.exists():
+                spec_files.add(candidate)
         template_dir = specs_root / "_template"
-        for name in ("spec.md", "plan.md", "TODO.md"):
+        for name in ("spec.md", "plan.md"):
             candidate = template_dir / name
             if candidate.exists():
                 spec_files.add(candidate)
+        template_todo = template_dir / "TODO.md"
+        if template_todo.exists():
+            spec_files.add(template_todo)
 
     return (
         sorted(exec_plans),
@@ -461,7 +480,6 @@ def validate_repository(repo_root: Path) -> list[str]:
         repo_root / "docs" / "exec-plans" / "_template.md",
         repo_root / "docs" / "specs" / "_template" / "spec.md",
         repo_root / "docs" / "specs" / "_template" / "plan.md",
-        repo_root / "docs" / "specs" / "_template" / "TODO.md",
         repo_root / "docs" / "releases" / "_template.md",
         repo_root / "docs" / "sprints" / "_template.md",
     )

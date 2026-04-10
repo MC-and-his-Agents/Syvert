@@ -45,7 +45,7 @@
 ## 示例链路
 
 - formal spec：`docs/specs/FR-XXXX-<slug>/spec.md`
-- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
 - exec-plan：`docs/exec-plans/<item_key>.md`
+- legacy TODO（可选）：`docs/specs/FR-XXXX-<slug>/TODO.md`
 - 聚合键：同一个 `item_key`
 - 目标：通过统一 `item_key`、`Issue`、`release`、`sprint` 串起规约、恢复工件与 PR

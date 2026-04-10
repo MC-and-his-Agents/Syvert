@@ -68,11 +68,11 @@
 `docs/specs/` 只承载正式规约，不承载 backlog 草稿。
 
 - FR 目录命名：`FR-XXXX-<slug>`
-- 最小套件：`spec.md`、`plan.md`、`TODO.md`
-- `TODO.md` 可在实现 PR 回写进度，但不得修改正式契约语义
+- 最小套件：`spec.md`、`plan.md`
+- `TODO.md` 为 legacy optional 补充工件；若历史事项已存在该文件，可在实现 PR 按需回写进度，但不得修改正式契约语义
 - 正式规约与实现默认分 PR；例外按 [spec_review.md](../spec_review.md) 执行
 - formal spec 绑定到 GitHub FR；Work Item 只通过 `item_key`、exec-plan、PR 与该 formal spec 建立关联
-- `TODO.md` 继续作为 formal spec 套件的必需文件保留，不在本轮治理中删除
+- 本轮不删除已有 `TODO.md`，但新事项不再要求创建该文件
 
 ## 载体职责
 
@@ -84,8 +84,8 @@
 - `docs/sprints/**`：sprint 协作主题、退出条件与工件入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
-- `TODO.md`：当 FR formal spec 已存在时，作为 FR 级状态总表、当前 active Work Item 指针、执行停点与阻断项
-- `exec-plan`：长任务执行细节、事项上下文与恢复上下文
+- `TODO.md`：legacy optional 补充工件，仅在历史事项确有该文件且与当前判断直接相关时读取或回写
+- `exec-plan`：长任务执行细节、事项上下文、checkpoint 与恢复上下文；是默认恢复主入口
 - PR：仅绑定当前 Work Item 的变更范围、风险、验证证据、关闭语义，并显式引用上位 FR / Phase
 
 ## 聚合原则

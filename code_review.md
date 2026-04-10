@@ -9,9 +9,11 @@
 默认优先对齐：
 
 - 当前 PR 的标题、描述、风险、验证、回滚与事项上下文
-- 与当前事项直接相关的 `spec` / `plan` / `TODO` / bootstrap contract / `exec-plan`
+- 与当前事项直接相关的 `spec` / `plan` / bootstrap contract / `exec-plan`
 - 与当前改动直接相关的治理或流程文档
 - 当前 diff、受影响文件与必要的调用链 / contract 边界
+
+仅当历史事项确有 legacy `TODO.md`，且其中内容对当前风险、恢复或历史判断直接相关时，才补充该文件作为审查输入。
 
 仅在当前阻断项需要更多证据、或上述输入无法支撑结论时，再补充：
 
