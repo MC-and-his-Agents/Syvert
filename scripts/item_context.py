@@ -24,6 +24,7 @@ EXEC_PLAN_METADATA_KEYS = {
     "active 收口事项",
     "状态",
     "关联 spec",
+    "关联 decision",
 }
 EXEC_PLAN_METADATA_HEADERS = {"## 关联信息", "## 事项上下文"}
 

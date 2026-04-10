@@ -855,6 +855,24 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_touched_exec_plan_rejects_template_related_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "docs/specs/_template/",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("`关联 spec` 必须绑定到具体 FR formal spec 套件" in error for error in errors))
+
     def test_diff_mode_deleted_governance_doc_returns_error_instead_of_crash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

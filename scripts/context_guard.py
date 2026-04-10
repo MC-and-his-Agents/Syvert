@@ -183,8 +183,14 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
                 else:
                     if spec_candidate.is_file() and spec_candidate.name in {"spec.md", "plan.md"}:
                         spec_candidate = spec_candidate.parent
+                    relative_parts = spec_candidate.relative_to(repo_root.resolve()).parts
+                    if len(relative_parts) < 3 or relative_parts[0] != "docs" or relative_parts[1] != "specs" or not relative_parts[2].startswith("FR-"):
+                        errors.append(f"{path}: `关联 spec` 必须绑定到具体 FR formal spec 套件：`{related_spec}`。")
+                        spec_candidate = None
                     required_files = set(spec_suite_policy()["required_files"])
-                    if not spec_candidate.is_dir():
+                    if spec_candidate is None:
+                        pass
+                    elif not spec_candidate.is_dir():
                         errors.append(f"{path}: `关联 spec` 必须指向 formal spec 目录或 `spec.md`/`plan.md` 文件：`{related_spec}`。")
                     else:
                         child_names = {child.name for child in spec_candidate.iterdir()}

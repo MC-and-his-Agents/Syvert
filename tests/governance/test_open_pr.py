@@ -20,6 +20,7 @@ def write_exec_plan(
     sprint: str = "2026-S14",
     active_item_key: str = "GOV-0015-item-context-gate",
     related_spec: str | None = None,
+    related_decision: str | None = None,
 ) -> None:
     exec_plans = repo / "docs" / "exec-plans"
     exec_plans.mkdir(parents=True, exist_ok=True)
@@ -36,6 +37,7 @@ def write_exec_plan(
                 f"- release：`{release}`",
                 f"- sprint：`{sprint}`",
                 *( [f"- 关联 spec：`{related_spec}`"] if related_spec else [] ),
+                *( [f"- 关联 decision：`{related_decision}`"] if related_decision else [] ),
                 f"- active 收口事项：`{active_item_key}`",
                 "",
             ]
@@ -99,6 +101,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                         "- item_type：`FR`",
                         "- release：`v0.1.0`",
                         "- sprint：`2026-S13`",
+                        "- 关联 decision：`docs/decisions/ADR-0001.md`",
                         "",
                     ]
                 ),
@@ -160,7 +163,7 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_unrelated_duplicate_exec_plan_metadata_does_not_block_current_item(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            write_exec_plan(repo)
+            write_exec_plan(repo, related_decision="docs/decisions/ADR-0001.md")
             exec_plans = repo / "docs" / "exec-plans"
             (exec_plans / "broken-other.md").write_text(
                 "\n".join(
@@ -649,7 +652,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             repo = Path(temp_dir)
             (repo / "docs" / "decisions").mkdir(parents=True)
             (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
-            write_exec_plan(repo, issue="#5")
+            write_exec_plan(repo, issue="#5", related_decision="docs/decisions/ADR-0001.md")
             errors = validate_pr_preflight(
                 "governance",
                 5,
@@ -661,6 +664,31 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertEqual(errors, [])
+
+    def test_unrelated_repo_bootstrap_contract_cannot_replace_current_item_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            (repo / "docs" / "decisions").mkdir(parents=True)
+            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_exec_plan(repo, issue="#5")
+            write_exec_plan(
+                repo,
+                item_key="GOV-9999-unrelated-bootstrap",
+                issue="#9999",
+                active_item_key="GOV-9999-unrelated-bootstrap",
+                related_decision="docs/decisions/ADR-0001.md",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                5,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_spec_class_without_spec_changes_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
