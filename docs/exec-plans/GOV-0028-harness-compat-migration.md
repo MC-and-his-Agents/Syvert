@@ -52,6 +52,7 @@
 ## 当前停点
 
 - 最近一次显式实现 checkpoint 对应提交 `0c8d05bc197d2ea01e265da32d26fc9242198c08`，其内容继续收紧了 decision 反向绑定契约：`context_guard` 对 touched decision 仅在对应 exec-plan 处于 `bootstrap` 模式时要求 decision 元数据必填；`formal_spec` 模式只做路径与一致性校验。同时，`ADR-0003` 已补齐当前 `GOV-0028` 的事项上下文，历史 `GOV-0027` exec-plan 已显式降为 inactive，避免旧回合继续充当当前 decision 绑定入口。
+- 当前未推送 head 已完成最后一轮 review-state 收口：`scripts/item_context.py` 已把 `关联 spec：无（治理文档事项）` 识别为 bootstrap placeholder，而不是 formal spec 绑定；`docs/AGENTS.md` 已改为“按绑定关系逻辑聚合”；`FR-0003` legacy `TODO.md` 已改为“主要迁移改动已落盘、最终完成仍待当前 PR / guardian / merge gate 收口”的中性跟踪表述。
 - 当前已解决本轮全部已知阻断：
   - `context_guard` 不再把 bootstrap decision 完整性错误施加到所有 touched `exec-plan`
   - `open_pr` 的 bootstrap fallback 已收紧到“当前事项自己的 active exec-plan + 关联 decision”
@@ -59,11 +60,11 @@
   - `FR-0003 plan.md` 的手动验证与 implementation-ready 叙述已切换到 `#57 / GOV-0028`
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
   - `FR-0003 spec.md` 已把当前执行映射刷新为 `#54 -> #55 -> #57`，不再把 `#56 / GOV-0027` 误写成当前 Work Item
-- 当前受审 head 仅在上述 checkpoint 之后继续收口 guardian 文档反馈：`docs/AGENTS.md` 已把“新事项 / 存量事项”重新绑定到 active `exec-plan` 恢复入口，FR-0003 legacy `TODO.md` 不再提前宣告 `GOV-0028` 已完成。该 head 属于 review-state 文档同步，不推进新的实现 checkpoint。
+- 当前待办只剩将上述 head 提交、推送，并在该最新 head 上重新运行 guardian / merge gate。
 
 ## 下一步动作
 
-- 推送 PR `#60` 最新 head，并核对该 head 对应的 GitHub checks。
+- 提交并推送 PR `#60` 最新 head，并核对该 head 对应的 GitHub checks。
 - 运行 guardian / merge gate；若结论满足 `APPROVE + safe_to_merge=true` 且 checks 全绿，则通过受控入口合并。
 - 合并后按分支/worktree 退役协议收口当前现场。
 
@@ -91,6 +92,8 @@
 - `python3 scripts/workflow_guard.py`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
+- 已确认 legacy placeholder `关联 spec：无（治理文档事项）` 会继续走当前事项自己的 bootstrap contract，不再误判为 formal spec 绑定
+- 已确认 `FR-0003` legacy `TODO.md` 只保留历史跟踪语义，不再提前宣告 `GOV-0028` 已完成
 - 已创建 PR：`#60 https://github.com/MC-and-his-Agents/Syvert/pull/60`
 - 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
 - 已确认 `open_pr` 对当前事项优先消费 active `exec-plan` 的绑定输入：`formal_spec` 模式只认当前 `关联 spec`，`bootstrap` 模式只认当前 `关联 decision`

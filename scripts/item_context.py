@@ -35,6 +35,7 @@ BOUND_SPEC_FILE_NAMES = {"spec.md", "plan.md"}
 INPUT_MODE_FORMAL_SPEC = "formal_spec"
 INPUT_MODE_BOOTSTRAP = "bootstrap"
 INPUT_MODE_UNBOUND = "unbound"
+PLACEHOLDER_BINDING_PREFIXES = ("无", "none", "n/a", "na", "not applicable", "not-applicable")
 
 
 def normalize_value(value: str) -> str:
@@ -49,6 +50,14 @@ def normalize_issue(value: object) -> str:
     if text.startswith("#"):
         text = text[1:]
     return text
+
+
+def has_meaningful_binding(value: object) -> bool:
+    cleaned = normalize_value(str(value))
+    if not cleaned:
+        return False
+    lowered = cleaned.lower()
+    return not lowered.startswith(PLACEHOLDER_BINDING_PREFIXES)
 
 
 def valid_item_key(item_key: str, item_type: str | None = None) -> bool:
@@ -126,7 +135,7 @@ def parse_decision_metadata(path: Path) -> dict[str, str]:
 
 
 def classify_exec_plan_input_mode(payload: Mapping[str, str]) -> str:
-    if str(payload.get("关联 spec", "")).strip():
+    if has_meaningful_binding(payload.get("关联 spec", "")):
         return INPUT_MODE_FORMAL_SPEC
     if str(payload.get("item_type", "")).strip() == "GOV":
         return INPUT_MODE_BOOTSTRAP

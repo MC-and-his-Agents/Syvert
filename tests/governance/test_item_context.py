@@ -33,6 +33,10 @@ class ItemContextTests(unittest.TestCase):
             classify_exec_plan_input_mode({"item_type": "FR"}),
             INPUT_MODE_UNBOUND,
         )
+        self.assertEqual(
+            classify_exec_plan_input_mode({"item_type": "GOV", "关联 spec": "无（治理文档事项）"}),
+            INPUT_MODE_BOOTSTRAP,
+        )
 
     def test_normalize_bound_spec_dir_accepts_directory_and_legacy_file_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

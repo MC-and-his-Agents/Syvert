@@ -91,7 +91,7 @@
 ## 聚合原则
 
 - 不采用“每个事项目录里混放 `spec`、`exec-plan`、`decision`”的物理嵌套方案。
-- 继续使用“按工件类型分区、按 `item_key` 逻辑聚合”的模型。
+- 继续使用“按工件类型分区、按绑定关系逻辑聚合”的模型：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`。
 - `docs/releases/` 与 `docs/sprints/` 是横向索引层，不是新的事实源，也不回写 GitHub backlog 状态。
 - 仓库内不得再引入与 GitHub `Phase / FR / Work Item` 并行的第二套调度层级。
 

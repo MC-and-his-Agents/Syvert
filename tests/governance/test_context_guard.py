@@ -870,6 +870,24 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_legacy_placeholder_related_spec_still_takes_bootstrap_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
+                    "- 关联 spec：`无（治理文档事项）`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertEqual(errors, [])
+
     def test_touched_exec_plan_rejects_missing_related_spec_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

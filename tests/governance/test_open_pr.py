@@ -795,6 +795,28 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_legacy_placeholder_related_spec_still_uses_bootstrap_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_decision(repo, "docs/decisions/ADR-0001.md", issue="#5", item_key="GOV-0015-item-context-gate")
+            write_exec_plan(
+                repo,
+                issue="#5",
+                related_spec="无（治理文档事项）",
+                related_decision="docs/decisions/ADR-0001.md",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                5,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_governance_formal_spec_mode_cannot_fallback_to_bootstrap_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
