@@ -45,9 +45,9 @@
 
 ## 当前停点
 
-- 最近一次显式 checkpoint 对应提交 `52de8f2ff49e1ec85995704cab8aefa61c82b953`，其内容已覆盖治理测试、policy、guard、workflow contract、legacy TODO 模板语义、FR-0003 formal spec / decision 绑定，以及 `open_pr` 对当前事项 formal spec 的绑定收紧。
-- 当前 head 之后尚无额外 follow-up commit；PR `#60` 已更新到该 checkpoint 对应 head。
-- 当前停在等待最新一轮 GitHub checks、guardian 与 merge gate 收口。
+- 最近一次显式 checkpoint 对应提交 `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd`，其内容在 `52de8f2ff49e1ec85995704cab8aefa61c82b953` 的基础上，补齐了 legacy `关联 spec` 文件路径兼容与对应治理测试，使 `open_pr` 能继续消费历史 exec-plan 里的 `docs/specs/**/spec.md` 绑定。
+- PR `#60` 当前受审 head 与该 checkpoint 一致；GitHub checks 已全绿，最新 guardian 仅要求把恢复入口中的 checkpoint 事实更新到当前 head。
+- 当前停在根据 guardian 结论同步 exec-plan / legacy TODO 语义，并准备再次进入 merge gate。
 
 ## 下一步动作
 
@@ -95,4 +95,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `52de8f2ff49e1ec85995704cab8aefa61c82b953`
+- `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd`
