@@ -45,13 +45,13 @@
 
 ## 当前停点
 
-- 最近一次显式 checkpoint 对应提交 `0417d437ee8dcc880f8e544019400af6714d6d85`，其内容已覆盖治理测试、policy、guard、workflow contract、formal spec/agent-loop/review 文档收口。
-- 当前 head 仅继续补充 `GOV-0028` 的 active `exec-plan` 与 PR 关联元数据，不单独推进新的 checkpoint。
-- PR `#60` 已创建，当前停在等待 GitHub checks、guardian 与 merge gate 收口。
+- 最近一次显式 checkpoint 对应提交 `52de8f2ff49e1ec85995704cab8aefa61c82b953`，其内容已覆盖治理测试、policy、guard、workflow contract、legacy TODO 模板语义、FR-0003 formal spec / decision 绑定，以及 `open_pr` 对当前事项 formal spec 的绑定收紧。
+- 当前 head 之后尚无额外 follow-up commit；PR `#60` 已更新到该 checkpoint 对应 head。
+- 当前停在等待最新一轮 GitHub checks、guardian 与 merge gate 收口。
 
 ## 下一步动作
 
-- 等待并核对 PR `#60` 的 GitHub checks。
+- 等待并核对 PR `#60` 针对当前 head 的 GitHub checks。
 - 运行 guardian / merge gate；若结论满足 `APPROVE + safe_to_merge=true` 且 checks 全绿，则通过受控入口合并。
 - 合并后按分支/worktree 退役协议收口当前现场。
 
@@ -78,12 +78,15 @@
 - `python3 scripts/spec_guard.py --all`
 - `python3 scripts/context_guard.py`
 - `python3 scripts/workflow_guard.py`
+- `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 - 已创建 PR：`#60 https://github.com/MC-and-his-Agents/Syvert/pull/60`
 - 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
+- 已确认 `open_pr` 对当前事项优先消费 active `exec-plan` 的 `关联 spec`
+- 已确认 legacy `TODO.md` 满足“存在即继续校验、不存在不阻塞、删除可接受、模板存在则仓库模式持续 lint”
 
 ## 未决风险
 
-- 若 review / guardian 仍隐式依赖历史 `TODO.md` 叙事，可能需要在 PR 描述中更明确地强调“默认输入已切换到 spec / plan / bootstrap contract / exec-plan”。
+- 若 review / guardian 仍隐式依赖历史 `TODO.md` 叙事，可能仍需在 PR 描述或评审评论中更明确地强调“默认输入已切换到 spec / plan / bootstrap contract / exec-plan”。
 - 若后续 `#58` 清理 PR 没有延续本轮的 legacy 兼容边界，可能误删仍被历史事项使用的 `TODO.md`。
 
 ## 回滚方式
@@ -92,4 +95,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0417d437ee8dcc880f8e544019400af6714d6d85`
+- `52de8f2ff49e1ec85995704cab8aefa61c82b953`
