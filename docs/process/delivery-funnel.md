@@ -2,31 +2,34 @@
 
 Syvert 的唯一默认交付路径如下：
 
-`Roadmap / 阶段目标 -> GitHub backlog -> 候选项 -> spec / contract -> spec review -> implementation PR -> PR review -> squash merge`
+`Roadmap / 阶段目标 -> GitHub Phase -> GitHub FR -> GitHub Work Item -> spec / contract -> spec review -> implementation PR -> PR review -> squash merge`
 
 ## 阶段解释
 
 1. `Roadmap / 阶段目标`
    - 先确认事项是否属于当前阶段边界
-   - 确认事项服务的 `release` 目标
-2. `GitHub backlog`
-   - 在 GitHub Issues / Projects 中确认事项本体、状态和优先级
+   - 确认 Phase 所服务的版本目标
+2. `GitHub Phase`
+   - 承载阶段目标、上位边界与关闭语义
+   - 不直接承载执行 PR
+3. `GitHub FR`
+   - 承载 canonical requirement
+   - formal spec 绑定到 FR，而不是绑定到 Phase 或 Work Item
+4. `GitHub Work Item`
+   - 作为唯一执行入口进入 worktree、exec-plan、PR 与 closeout
    - `release` 与 `sprint` 语义来自执行绑定，不在仓库内维护状态镜像
-3. `候选项`
-   - 明确事项属于轻量事项、中等事项或核心事项
-   - 明确事项在当前 `sprint` 中的角色：阻塞项、并行项或收尾项
-4. `spec / contract`
+5. `spec / contract`
    - 核心事项必须先形成正式规约或等价契约工件
    - 若事项本身是在 `main` 首次建立治理/规约基础设施，可暂以 `Issue + decision + exec-plan` 形成 bootstrap contract
-5. `spec review`
+6. `spec review`
    - reviewer 根据 [spec_review.md](../../spec_review.md) 的 rubric 收口边界、风险、验收与进入实现前条件
    - review 输入优先采用当前事项所需的最小必要上下文，不默认要求审查器重复探索整仓历史
-6. `implementation PR`
+7. `implementation PR`
    - 在独立分支上推进实现，不直推 `main`
-7. `PR review`
+8. `PR review`
    - reviewer 根据 [code_review.md](../../code_review.md) 的 rubric 判断阻断项、风险、验证充分性与是否达到 `merge-ready` 质量
    - review 输入优先采用当前事项所需的最小必要上下文，不默认要求审查器重复探索整仓历史
-8. `squash merge`
+9. `squash merge`
    - 只有满足 [code_review.md](../../code_review.md) 定义的 merge gate，并通过受控入口校验后，才可 Squash Merge
    - 合并后若源分支不再承担活跃事项，应进入分支归档/退役流程
 
@@ -41,11 +44,18 @@ Syvert 的唯一默认交付路径如下：
   - 必须先建立正式 `spec` 套件并完成 `spec review`
   - 默认与实现 PR 分离
   - 治理 bootstrap 例外：在正式规约机制尚未落地前，可先按 bootstrap contract 进入 `governance` PR；PR 不得混入业务实现代码
+- Phase
+  - 只做阶段目标容器，不进入执行回合
+- FR
+  - 只做 requirement 容器，formal spec 绑定到 FR
+- Work Item
+  - 是唯一执行入口；只有 Work Item 可以建 worktree、开 PR、进入执行回合
 
 ## 事项上下文绑定
 
 - 每个进入执行回合的事项必须绑定：`Issue`、`item_key`、`item_type`、`release`、`sprint`
 - `Issue` 仍是任务状态真相源的入口；`item_key`、`release`、`sprint` 只用于执行、恢复与交付映射
+- GitHub 是单一调度层；仓库只承载语义工件，不承载第二套状态真相源
 - 新事项与新长任务必须显式声明完整事项上下文；存量事项可在进入新的执行回合时补齐
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`
 - `item_key` 固定命名为 `<item_type>-<4-digit>-<slug>`

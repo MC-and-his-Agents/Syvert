@@ -25,17 +25,33 @@
   - `新事项`：首次进入当前交付漏斗、且尚未形成仓库内恢复工件的事项
   - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项
   - `长任务`：需要 `checkpoint / resume / handoff` 恢复能力，并因此维护 `exec-plan` 的执行回合
-- 层次术语：`版本层` / `冲刺层` / `事项层`
+- GitHub 层次术语：`Phase` / `FR` / `Work Item`
+- 仓内语义术语：`formal spec` / `exec-plan` / `decision` / `release index` / `sprint index`
 - 成熟度术语：`spec-ready` / `implementation-ready` / `merge-ready`
 
 ## 层次职责
 
-- `版本层`
-  - 定义当前版本要证明的目标、边界与完成判据
-- `冲刺层`
-  - 定义当前执行轮次内事项的推进顺序、依赖关系与优先级
-- `事项层`
-  - 定义单事项的规约、执行上下文、恢复入口、验证与交付状态
+- `Phase`
+  - GitHub 单一调度层中的阶段目标容器
+  - 负责阶段边界、上位目标与关闭语义
+  - 不直接承载 formal spec、worktree 或执行 PR
+- `FR`
+  - GitHub 单一调度层中的 requirement 容器
+  - 是 canonical requirement 容器
+  - formal spec 绑定到 FR，不绑定到 Phase 或 Work Item
+- `Work Item`
+  - GitHub 单一调度层中的唯一执行入口
+  - 负责进入 worktree、执行回合、PR、review 与 closeout
+- `docs/releases/**`
+  - release 目标、完成判据与事项聚合索引
+  - 是仓内索引，不是 GitHub 状态真相源
+- `docs/sprints/**`
+  - sprint 执行轮次与工件入口索引
+  - 是仓内索引，不是 GitHub 状态真相源
+- `docs/specs/**`
+  - FR 对应的正式规约语义层
+- `docs/exec-plans/**`
+  - Work Item 对应的执行与恢复语义层
 
 ## 统一事项身份
 
@@ -55,25 +71,29 @@
 - 最小套件：`spec.md`、`plan.md`、`TODO.md`
 - `TODO.md` 可在实现 PR 回写进度，但不得修改正式契约语义
 - 正式规约与实现默认分 PR；例外按 [spec_review.md](../spec_review.md) 执行
-- `FR` 是事项类型之一；formal spec 可通过 `item_key` 与 `exec-plan`、decision、PR 关联
+- formal spec 绑定到 GitHub FR；Work Item 只通过 `item_key`、exec-plan、PR 与该 formal spec 建立关联
+- `TODO.md` 继续作为 formal spec 套件的必需文件保留，不在本轮治理中删除
 
 ## 载体职责
 
-- Issue：事项边界与关闭条件
-- Project：状态、优先级、排期
+- GitHub Phase：阶段目标与上位关闭条件
+- GitHub FR：canonical requirement、formal spec 绑定点与上位关闭条件
+- GitHub Work Item：执行入口、PR 关闭语义与回合级 closeout
+- GitHub Project / Sprint：状态、优先级、排期与执行轮次
 - `docs/releases/**`：release 目标、完成判据、事项聚合入口
 - `docs/sprints/**`：sprint 协作主题、退出条件与工件入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
-- `TODO.md`：事项级状态、执行停点、恢复入口、阻断项
+- `TODO.md`：当 FR formal spec 已存在时，作为 FR 级状态总表、当前 active Work Item 指针、执行停点与阻断项
 - `exec-plan`：长任务执行细节、事项上下文与恢复上下文
-- PR：变更范围、风险、验证证据、关闭语义，并显式映射回事项上下文
+- PR：仅绑定当前 Work Item 的变更范围、风险、验证证据、关闭语义，并显式引用上位 FR / Phase
 
 ## 聚合原则
 
 - 不采用“每个事项目录里混放 `spec`、`exec-plan`、`decision`”的物理嵌套方案。
 - 继续使用“按工件类型分区、按 `item_key` 逻辑聚合”的模型。
 - `docs/releases/` 与 `docs/sprints/` 是横向索引层，不是新的事实源，也不回写 GitHub backlog 状态。
+- 仓库内不得再引入与 GitHub `Phase / FR / Work Item` 并行的第二套调度层级。
 
 ## 门禁关系
 

@@ -13,10 +13,15 @@ Syvert 是任务驱动、适配器可插拔的采集底座。
 4. 禁止直推 `main`，所有变更必须经分支与 PR 合入。
 5. 合入 `main` 默认使用 Squash Merge。
 6. Commit Message 必须使用中文 Conventional Commits。
-7. GitHub Issues / Projects 是任务状态真相源，仓库内不保留 backlog 或 sprint 镜像。
-8. 正式规约区与实现区必须分离，正式 `spec` 变更不得与实现代码混入同一 PR。
-9. 每个活跃分支默认使用独立 worktree。
-10. 核心上下文必须进入版本控制，不得只留在会话里。
+7. GitHub 是单一调度层，负责 `Phase / FR / Work Item`、状态、优先级、依赖、关闭语义与 Sprint / Project 排期。
+8. 仓库是单一语义层，负责 formal spec、exec-plan、风险、验证证据、checkpoint 与恢复上下文。
+9. Work Item 是唯一执行入口；只有 Work Item 可以建 worktree、开 PR、进入执行回合。
+10. FR 是 canonical requirement 容器；formal spec 绑定到 FR，不绑定到 Phase 或 Work Item。
+11. Phase 只承载阶段目标，不直接承载执行 PR。
+12. release / sprint 只保留为执行上下文或仓内索引语义，不得退化为状态真相源。
+13. 正式规约区与实现区必须分离，正式 `spec` 变更不得与实现代码混入同一 PR。
+14. 每个活跃分支默认使用独立 worktree。
+15. 核心上下文必须进入版本控制，不得只留在会话里。
 
 ## 当前阶段
 
@@ -60,7 +65,7 @@ Syvert 是任务驱动、适配器可插拔的采集底座。
 
 唯一默认路径：
 
-`Roadmap / 阶段目标 -> GitHub backlog -> 候选项 -> spec / contract -> spec review -> implementation PR -> PR review -> squash merge`
+`Roadmap / 阶段目标 -> GitHub Phase -> GitHub FR -> GitHub Work Item -> spec / contract -> spec review -> implementation PR -> PR review -> squash merge`
 
 ## 文档索引
 
