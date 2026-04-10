@@ -91,7 +91,7 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 ## 依赖与外部前提
 
 - 外部依赖：
-  - GitHub 中已存在 `#54 -> #55 -> #56` 的事项树
+  - GitHub 中已存在 `#54 -> #55 -> #57` 的当前执行事项树；`#56 / GOV-0027` 已作为前一轮治理 Work Item 完成上游前提收口
 - 上下游影响：
   - 后续 `#57` 负责把 harness、guard、review 输入与恢复入口迁移到“`exec-plan` 为主入口、`TODO.md` 为 legacy optional”的治理契约。
   - 后续 `#58` 只负责在兼容路径稳定后处理 legacy `TODO.md` 的最终清理。

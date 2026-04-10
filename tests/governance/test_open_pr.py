@@ -54,10 +54,83 @@ def write_formal_spec_suite(
 ) -> None:
     fr_dir = repo / "docs" / "specs" / suite_name
     fr_dir.mkdir(parents=True, exist_ok=True)
-    (fr_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
-    (fr_dir / "plan.md").write_text("# plan\n", encoding="utf-8")
+    (fr_dir / "spec.md").write_text(
+        "\n".join(
+            [
+                "# spec",
+                "",
+                "## GWT 验收场景",
+                "",
+                "Given x",
+                "When y",
+                "Then z",
+                "",
+                "## 异常与边界场景",
+                "",
+                "- x",
+                "",
+                "## 验收标准",
+                "",
+                "- [ ] x",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (fr_dir / "plan.md").write_text(
+        "\n".join(
+            [
+                "# plan",
+                "",
+                "## 实施目标",
+                "",
+                "- x",
+                "",
+                "## 分阶段拆分",
+                "",
+                "- x",
+                "",
+                "## 实现约束",
+                "",
+                "- x",
+                "",
+                "## 测试与验证策略",
+                "",
+                "- x",
+                "",
+                "## TDD 范围",
+                "",
+                "- x",
+                "",
+                "## 并行 / 串行关系",
+                "",
+                "- x",
+                "",
+                "## 进入实现前条件",
+                "",
+                "- [ ] x",
+            ]
+        ),
+        encoding="utf-8",
+    )
     if with_todo:
         (fr_dir / "TODO.md").write_text("# todo\n", encoding="utf-8")
+
+
+def write_decision(repo: Path, path: str, *, issue: str, item_key: str) -> None:
+    decision_path = repo / path
+    decision_path.parent.mkdir(parents=True, exist_ok=True)
+    decision_path.write_text(
+        "\n".join(
+            [
+                "# ADR",
+                "",
+                f"- Issue：`{issue}`",
+                f"- item_key：`{item_key}`",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 class OpenPrPreflightTests(unittest.TestCase):
@@ -187,8 +260,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (repo / "docs" / "decisions").mkdir(parents=True)
-            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_decision(repo, "docs/decisions/ADR-0001.md", issue="#19", item_key="GOV-0015-item-context-gate")
             errors = validate_pr_preflight(
                 "governance",
                 19,
@@ -648,6 +720,35 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_bound_formal_spec_must_be_reviewable_not_just_present(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            suite_dir = repo / "docs" / "specs" / "FR-0001-governance-stack-v1"
+            suite_dir.mkdir(parents=True, exist_ok=True)
+            (suite_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
+            (suite_dir / "plan.md").write_text("# plan\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
     def test_template_spec_binding_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -680,8 +781,7 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_governance_with_bootstrap_contract_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            (repo / "docs" / "decisions").mkdir(parents=True)
-            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_decision(repo, "docs/decisions/ADR-0001.md", issue="#5", item_key="GOV-0015-item-context-gate")
             write_exec_plan(repo, issue="#5", related_decision="docs/decisions/ADR-0001.md")
             errors = validate_pr_preflight(
                 "governance",
@@ -698,8 +798,7 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_governance_formal_spec_mode_cannot_fallback_to_bootstrap_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            (repo / "docs" / "decisions").mkdir(parents=True)
-            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_decision(repo, "docs/decisions/ADR-0001.md", issue="#5", item_key="GOV-0015-item-context-gate")
             write_exec_plan(
                 repo,
                 issue="#5",
@@ -748,6 +847,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             ("missing", None),
             ("nonexistent", "docs/decisions/ADR-0001-missing.md"),
             ("out_of_repo", "../outside-decision.md"),
+            ("metadata_free", "docs/decisions/ADR-0002-empty.md"),
         )
         for label, related_decision in scenarios:
             with self.subTest(case=label):
@@ -755,6 +855,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                     repo = Path(temp_dir)
                     if related_decision and related_decision.startswith("docs/decisions/"):
                         (repo / "docs" / "decisions").mkdir(parents=True)
+                    if label == "metadata_free":
+                        (repo / "docs" / "decisions" / "ADR-0002-empty.md").write_text("# ADR\n", encoding="utf-8")
                     write_exec_plan(repo, issue="#5", related_decision=related_decision)
                     errors = validate_pr_preflight(
                         "governance",
@@ -771,8 +873,7 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_unrelated_repo_bootstrap_contract_cannot_replace_current_item_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            (repo / "docs" / "decisions").mkdir(parents=True)
-            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_decision(repo, "docs/decisions/ADR-0001.md", issue="#5", item_key="GOV-0015-item-context-gate")
             write_exec_plan(repo, issue="#5")
             write_exec_plan(
                 repo,
@@ -830,6 +931,28 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "v0.1.0",
                 "2026-S14",
                 ["docs/specs/FR-9999-unrelated/spec.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_implementation_pr_requires_local_formal_input_for_fr_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            errors = validate_pr_preflight(
+                "implementation",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["scripts/tool.py"],
                 repo_root=repo,
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))

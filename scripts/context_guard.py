@@ -15,6 +15,7 @@ from scripts.item_context import (
     INPUT_MODE_BOOTSTRAP,
     INPUT_MODE_FORMAL_SPEC,
     classify_exec_plan_input_mode,
+    is_eligible_active_exec_plan,
     parse_exec_plan_metadata,
     validate_bound_decision_contract,
     validate_bound_spec_contract,
@@ -260,6 +261,8 @@ def validate_decision(path: Path) -> list[str]:
 
 
 def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str, str]) -> bool:
+    if not is_eligible_active_exec_plan(fields):
+        return False
     if fields.get("item_type") != "GOV":
         return False
     issue = fields.get("Issue", "").strip()

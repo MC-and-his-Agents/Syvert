@@ -214,12 +214,16 @@ def validate_bound_decision_contract(
     errors: list[str] = []
     decision_issue = decision_fields.get("Issue", "")
     exec_issue = normalize_issue(payload.get("Issue", ""))
+    decision_item_key = decision_fields.get("item_key", "")
+    exec_item_key = str(payload.get("item_key", "")).strip()
+    if require_present and not decision_issue:
+        errors.append("`关联 decision` 缺少 `Issue` 字段，bootstrap contract 无法与当前事项建立对应关系。")
+    if require_present and not decision_item_key:
+        errors.append("`关联 decision` 缺少 `item_key` 字段，bootstrap contract 无法与当前事项建立对应关系。")
     if decision_issue and exec_issue and decision_issue != exec_issue:
         errors.append(
             f"`关联 decision` 的 `Issue` `{decision_issue}` 与当前 exec-plan 的 `Issue` `{exec_issue}` 不一致。"
         )
-    decision_item_key = decision_fields.get("item_key", "")
-    exec_item_key = str(payload.get("item_key", "")).strip()
     if decision_item_key and exec_item_key and decision_item_key != exec_item_key:
         errors.append(
             f"`关联 decision` 的 `item_key` `{decision_item_key}` 与当前 exec-plan 的 `item_key` `{exec_item_key}` 不一致。"

@@ -75,6 +75,20 @@ class ItemContextTests(unittest.TestCase):
             errors = validate_bound_decision_contract(repo, mismatched, require_present=True)
             self.assertTrue(any("Issue" in error and "不一致" in error for error in errors))
 
+    def test_bootstrap_decision_contract_requires_current_item_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision = repo / "docs" / "decisions" / "ADR-GOV-0001-example.md"
+            write_file(decision, "# ADR-GOV-0001\n")
+            payload = {
+                "Issue": "1",
+                "item_key": "GOV-0001-example",
+                "关联 decision": "docs/decisions/ADR-GOV-0001-example.md",
+            }
+            errors = validate_bound_decision_contract(repo, payload, require_present=True)
+        self.assertTrue(any("缺少 `Issue`" in error for error in errors))
+        self.assertTrue(any("缺少 `item_key`" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

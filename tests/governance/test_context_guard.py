@@ -264,7 +264,11 @@ Then
         )
     write_file(
         repo / "docs" / "decisions" / "ADR-0001-example.md",
-        "# ADR-0001\n",
+        """# ADR-0001
+
+- Issue：`#1`
+- item_key：`GOV-0001-release-sprint-structure`
+""",
     )
     write_file(
         repo / "docs" / "releases" / "v0.1.0.md",
@@ -661,6 +665,34 @@ class ContextGuardTests(unittest.TestCase):
                 changed_paths=["docs/decisions/ADR-0001-example.md"],
             )
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
+    def test_touched_governance_decision_rejects_inactive_or_stale_exec_plan_bindings(self) -> None:
+        scenarios = {
+            "inactive": lambda text: text.replace(
+                "- 关联 decision：`docs/decisions/ADR-0001-example.md`\n",
+                "- 关联 decision：`docs/decisions/ADR-0001-example.md`\n- 状态：`inactive for PR #18`\n",
+            ),
+            "active_item_mismatch": lambda text: text.replace(
+                "- 关联 decision：`docs/decisions/ADR-0001-example.md`\n",
+                "- 关联 decision：`docs/decisions/ADR-0001-example.md`\n- active 收口事项：`GOV-9999-other`\n",
+            ),
+            "duplicate_release": lambda text: text.replace(
+                "- release：`v0.1.0`\n",
+                "- release：`v0.1.0`\n- release：`v0.2.0`\n",
+            ),
+        }
+        for label, mutate in scenarios.items():
+            with self.subTest(case=label):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    repo = Path(temp_dir)
+                    write_valid_governance_docs(repo)
+                    plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+                    plan.write_text(mutate(plan.read_text(encoding="utf-8")), encoding="utf-8")
+                    errors = validate_context_rules(
+                        repo,
+                        changed_paths=["docs/decisions/ADR-0001-example.md"],
+                    )
+                self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
     def test_bootstrap_contract_requires_related_decision_for_touched_exec_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

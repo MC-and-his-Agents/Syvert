@@ -39,6 +39,7 @@ from scripts.common import (
 )
 from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
+from scripts.spec_guard import validate_suite
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
@@ -83,12 +84,18 @@ def has_bound_formal_spec_input(
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
     input_mode = classify_exec_plan_input_mode(exec_plan)
     if input_mode == INPUT_MODE_FORMAL_SPEC:
-        return not validate_bound_spec_contract(repo_root, exec_plan)
+        if validate_bound_spec_contract(repo_root, exec_plan):
+            return False
+        related_spec = str(exec_plan.get("关联 spec", "")).strip()
+        spec_dir = repo_root / related_spec.rstrip("/")
+        if spec_dir.is_file():
+            spec_dir = spec_dir.parent
+        return not validate_suite(spec_dir)
 
     if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"}:
         expected_dir = repo_root / "docs" / "specs" / item_key
         touched_spec_dirs = formal_spec_dirs(changed_files)
-        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir):
+        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
             return expected_dir.relative_to(repo_root) in touched_spec_dirs
 
     return False
@@ -103,31 +110,14 @@ def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
     return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
 
 
-def issue_requires_formal_input(issue: int) -> bool:
-    require_cli("gh")
-    completed = run(
-        [
-            "gh",
-            "issue",
-            "view",
-            str(issue),
-            "--json",
-            "title,labels",
-        ],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if completed.returncode != 0:
+def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type: str | None) -> bool:
+    if not item_key or not item_type:
         return False
-
-    payload = json.loads(completed.stdout or "{}")
-    title = str(payload.get("title") or "")
-    labels = {
-        str(item.get("name", "")).lower()
-        for item in payload.get("labels", [])
-        if isinstance(item, dict)
-    }
-    return "FR-" in title.upper() or any(label in {"core", "governance", "spec"} or label.startswith("fr-") for label in labels)
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode in {INPUT_MODE_FORMAL_SPEC, INPUT_MODE_BOOTSTRAP}:
+        return True
+    return item_type in {"FR", "HOTFIX"}
 
 
 def closing_line(issue: int | None, mode: str) -> str:
@@ -337,7 +327,7 @@ def validate_pr_preflight(
     ):
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
 
-    if pr_class == "implementation" and issue is not None and issue_requires_formal_input(issue):
+    if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
         if not (
             has_bound_formal_spec_input(repo_root, item_key, item_type, changed_files)
             or has_bound_bootstrap_contract(repo_root, item_key)
