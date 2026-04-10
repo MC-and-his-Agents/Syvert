@@ -8,7 +8,6 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
-- 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
 - 状态：`inactive after PR #59 merge`
 - 关联 PR：`#59`
 - active 收口事项：`GOV-0027-governance-contract-rewrite`
