@@ -46,8 +46,13 @@ def write_exec_plan(
     )
 
 
-def write_formal_spec_suite(repo: Path, *, with_todo: bool = False) -> None:
-    fr_dir = repo / "docs" / "specs" / "FR-0001-governance-stack-v1"
+def write_formal_spec_suite(
+    repo: Path,
+    *,
+    suite_name: str = "FR-0001-governance-stack-v1",
+    with_todo: bool = False,
+) -> None:
+    fr_dir = repo / "docs" / "specs" / suite_name
     fr_dir.mkdir(parents=True, exist_ok=True)
     (fr_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
     (fr_dir / "plan.md").write_text("# plan\n", encoding="utf-8")
@@ -101,14 +106,13 @@ class OpenPrPreflightTests(unittest.TestCase):
                         "- item_type：`FR`",
                         "- release：`v0.1.0`",
                         "- sprint：`2026-S13`",
-                        "- 关联 decision：`docs/decisions/ADR-0001.md`",
+                        "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`",
                         "",
                     ]
                 ),
                 encoding="utf-8",
             )
-            (repo / "docs" / "decisions").mkdir(parents=True)
-            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 6,
@@ -691,6 +695,79 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_governance_formal_spec_mode_cannot_fallback_to_bootstrap_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            (repo / "docs" / "decisions").mkdir(parents=True)
+            (repo / "docs" / "decisions" / "ADR-0001.md").write_text("# adr\n", encoding="utf-8")
+            write_exec_plan(
+                repo,
+                issue="#5",
+                related_spec="docs/specs/FR-9999-missing/",
+                related_decision="docs/decisions/ADR-0001.md",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                5,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_governance_with_unrelated_bootstrap_decision_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            (repo / "docs" / "decisions").mkdir(parents=True)
+            (repo / "docs" / "decisions" / "ADR-GOV-9999-unrelated.md").write_text(
+                """# ADR-GOV-9999
+
+- Issue：`#999`
+- item_key：`GOV-9999-unrelated`
+""",
+                encoding="utf-8",
+            )
+            write_exec_plan(repo, issue="#5", related_decision="docs/decisions/ADR-GOV-9999-unrelated.md")
+            errors = validate_pr_preflight(
+                "governance",
+                5,
+                "GOV-0015-item-context-gate",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_governance_bootstrap_contract_requires_valid_current_item_decision_binding(self) -> None:
+        scenarios = (
+            ("missing", None),
+            ("nonexistent", "docs/decisions/ADR-0001-missing.md"),
+            ("out_of_repo", "../outside-decision.md"),
+        )
+        for label, related_decision in scenarios:
+            with self.subTest(case=label):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    repo = Path(temp_dir)
+                    if related_decision and related_decision.startswith("docs/decisions/"):
+                        (repo / "docs" / "decisions").mkdir(parents=True)
+                    write_exec_plan(repo, issue="#5", related_decision=related_decision)
+                    errors = validate_pr_preflight(
+                        "governance",
+                        5,
+                        "GOV-0015-item-context-gate",
+                        "GOV",
+                        "v0.1.0",
+                        "2026-S14",
+                        ["AGENTS.md"],
+                        repo_root=repo,
+                    )
+                self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
     def test_unrelated_repo_bootstrap_contract_cannot_replace_current_item_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -733,6 +810,29 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertTrue(any("必须包含正式规约区变更" in error for error in errors))
+
+    def test_unbound_fr_item_requires_its_own_touched_formal_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-9999-unrelated/spec.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_build_body_contains_item_context(self) -> None:
         args = parse_args(

@@ -514,28 +514,59 @@ class ContextGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
         self.assertTrue(any(str(template_todo) in error and "Issue" in error for error in errors))
 
-    def test_bootstrap_contract_requires_decision_when_exec_plan_changes(self) -> None:
+    def test_bootstrap_exec_plan_missing_bound_decision_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace("- 关联 spec：`docs/specs/FR-0001-example/`\n", ""),
+                encoding="utf-8",
+            )
             decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
             decision.unlink()
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
             )
-        self.assertTrue(
-            any(
-                all(
-                    token in error
-                    for token in ("治理/exec-plan", "docs/decisions/**", "bootstrap contract", "不完整")
-                )
-                for error in errors
-            ),
-            f"expected semantic bootstrap-contract error for missing decision docs, got: {errors}",
-        )
+        self.assertTrue(any("`关联 decision`" in error and "不存在" in error for error in errors))
 
-    def test_bootstrap_contract_requires_exec_plan_when_decision_changes(self) -> None:
+    def test_non_governance_exec_plan_changes_do_not_require_decision_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            for item_type, item_key in (
+                ("FR", "FR-0001-example"),
+                ("HOTFIX", "HOTFIX-0001-example"),
+                ("CHORE", "CHORE-0001-example"),
+            ):
+                write_file(
+                    repo / "docs" / "exec-plans" / f"{item_key}.md",
+                    "\n".join(
+                        [
+                            f"# {item_key}",
+                            "",
+                            "## 关联信息",
+                            "",
+                            f"- item_key：`{item_key}`",
+                            "- Issue：`#1`",
+                            f"- item_type：`{item_type}`",
+                            "- release：`v0.1.0`",
+                            "- sprint：`2026-S13`",
+                            "",
+                            "## 最近一次 checkpoint 对应的 head SHA",
+                            "",
+                            "- `0123456789abcdef0123456789abcdef01234567`",
+                            "",
+                        ]
+                    ),
+                )
+                errors = validate_context_rules(
+                    repo,
+                    changed_paths=[f"docs/exec-plans/{item_key}.md"],
+                )
+                self.assertEqual(errors, [], f"{item_type} exec-plan should not require bootstrap decision docs: {errors}")
+
+    def test_governance_decision_without_bound_exec_plan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -545,16 +576,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-0001-example.md"],
             )
-        self.assertTrue(
-            any(
-                all(
-                    token in error
-                    for token in ("治理/decision", "docs/exec-plans/**", "bootstrap contract", "不完整")
-                )
-                for error in errors
-            ),
-            f"expected semantic bootstrap-contract error for missing exec-plan docs, got: {errors}",
-        )
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
     def test_bootstrap_contract_touched_related_decision_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -789,17 +811,20 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
-    def test_touched_exec_plan_requires_related_spec_binding(self) -> None:
+    def test_valid_governance_bootstrap_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
-            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
-            exec_plan.write_text(exec_plan.read_text(encoding="utf-8").replace("- 关联 spec：`docs/specs/FR-0001-example/`\n", ""), encoding="utf-8")
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace("- 关联 spec：`docs/specs/FR-0001-example/`\n", ""),
+                encoding="utf-8",
+            )
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
             )
-        self.assertTrue(any("缺少 `关联 spec`" in error for error in errors))
+        self.assertEqual(errors, [])
 
     def test_touched_exec_plan_rejects_missing_related_spec_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -14,8 +14,15 @@ import tempfile
 
 from scripts.item_context import (
     ITEM_TYPES,
+    INPUT_MODE_BOOTSTRAP,
+    INPUT_MODE_FORMAL_SPEC,
+    INPUT_MODE_UNBOUND,
     active_exec_plans_for_issue,
+    classify_exec_plan_input_mode,
     load_item_context_from_exec_plan,
+    spec_dir_has_minimum_suite,
+    validate_bound_decision_contract,
+    validate_bound_spec_contract,
     normalize_issue,
     valid_item_key,
 )
@@ -30,7 +37,7 @@ from scripts.common import (
     run,
     syvert_state_file,
 )
-from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level, spec_suite_policy
+from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
 
 
@@ -64,47 +71,26 @@ def latest_commit_subject() -> str:
     return run(["git", "log", "-1", "--pretty=%s"], cwd=REPO_ROOT).stdout.strip()
 
 
-def _spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
-    if not spec_dir.exists() or not spec_dir.is_dir():
-        return False
-    required_files = set(spec_suite_policy()["required_files"])
-    child_names = {child.name for child in spec_dir.iterdir()}
-    return required_files.issubset(child_names)
-
-
-def _normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None:
-    if not related_spec or not related_spec.startswith("docs/specs/"):
-        return None
-    candidate = (repo_root / related_spec.rstrip("/")).resolve()
-    try:
-        candidate.relative_to(repo_root.resolve())
-    except ValueError:
-        return None
-    if candidate.is_file() and candidate.name in {"spec.md", "plan.md"}:
-        return candidate.parent
-    parts = candidate.relative_to(repo_root.resolve()).parts if candidate.exists() else Path(related_spec.rstrip("/")).parts
-    if len(parts) < 3 or parts[0] != "docs" or parts[1] != "specs" or not parts[2].startswith("FR-"):
-        return None
-    return candidate
-
-
 def has_bound_formal_spec_input(
     repo_root: Path,
     item_key: str | None,
     item_type: str | None,
     changed_files: list[str],
 ) -> bool:
-    touched_spec_dirs = formal_spec_dirs(changed_files)
-    if item_key:
-        exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
-        related_spec = str(exec_plan.get("关联 spec", "")).strip()
-        spec_dir = _normalize_bound_spec_dir(repo_root, related_spec)
-        if spec_dir is not None:
-            return _spec_dir_has_minimum_suite(spec_dir)
-        if item_type in {"FR", "HOTFIX"}:
-            expected_dir = repo_root / "docs" / "specs" / item_key
-            if expected_dir.exists() and _spec_dir_has_minimum_suite(expected_dir):
-                return expected_dir.relative_to(repo_root) in touched_spec_dirs
+    if not item_key:
+        return False
+
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        return not validate_bound_spec_contract(repo_root, exec_plan)
+
+    if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"}:
+        expected_dir = repo_root / "docs" / "specs" / item_key
+        touched_spec_dirs = formal_spec_dirs(changed_files)
+        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir):
+            return expected_dir.relative_to(repo_root) in touched_spec_dirs
+
     return False
 
 
@@ -112,15 +98,9 @@ def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
     if not item_key:
         return False
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
-    related_decision = str(exec_plan.get("关联 decision", "")).strip()
-    if not related_decision:
+    if classify_exec_plan_input_mode(exec_plan) != INPUT_MODE_BOOTSTRAP:
         return False
-    decision_path = (repo_root / related_decision).resolve()
-    try:
-        decision_path.relative_to(repo_root.resolve())
-    except ValueError:
-        return False
-    return decision_path.exists() and decision_path.is_file()
+    return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
 
 
 def issue_requires_formal_input(issue: int) -> bool:

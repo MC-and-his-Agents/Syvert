@@ -40,7 +40,7 @@
   - 运行 `open_pr --dry-run`、`pr_scope_guard`、`governance_gate` 验证当前 Work Item 的受控入口链路
   - 验证新事项在无 `TODO.md` 时可通过 formal spec / guard 入口，旧事项带 `TODO.md` 时不发生兼容性断裂
 - 手动验证：
-  - 核对 GitHub `#54 / #55 / #56` 与仓内 `FR-0003 / GOV-0027 / v0.2.0 / 2026-S15` 的映射关系
+  - 核对 GitHub `#54 / #55 / #57` 与仓内 `FR-0003 / GOV-0028 / v0.2.0 / 2026-S15` 的映射关系
 
 ## TDD 范围
 
@@ -73,4 +73,4 @@
 
 - 结论：通过
 - 未决问题：无
-- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许由 `GOV-0027` 作为首个 Work Item 进入治理 PR 收口
+- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 已授权进入治理收口，当前执行回合已切换到 `GOV-0028` 负责 harness / guard / review 输入兼容迁移
