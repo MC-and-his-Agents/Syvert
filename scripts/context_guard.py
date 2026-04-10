@@ -416,9 +416,10 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             for exec_plan_path, exec_plan_fields in exec_plan_to_decision[normalized_target]:
                 payload = dict(exec_plan_fields)
                 payload["关联 decision"] = normalized_target
+                require_present = classify_exec_plan_input_mode(exec_plan_fields) == INPUT_MODE_BOOTSTRAP
                 errors.extend(
                     f"{target}: {error}"
-                    for error in validate_bound_decision_contract(repo_root, payload, require_present=True)
+                    for error in validate_bound_decision_contract(repo_root, payload, require_present=require_present)
                 )
 
     for path in exec_plans:

@@ -1,5 +1,13 @@
 # ADR-0003 GitHub delivery structure and repo semantic split
 
+## 关联信息
+
+- Issue：`#57`
+- item_key：`GOV-0028-harness-compat-migration`
+- item_type：`GOV`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+
 ## 背景
 
 Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktree 入口、formal spec 套件与 exec-plan 恢复协议，但治理文档仍同时使用“版本层 / 冲刺层 / 事项层”与 GitHub `Phase / FR / Work Item` 两套分层描述。
