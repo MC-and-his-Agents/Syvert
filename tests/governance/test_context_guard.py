@@ -356,6 +356,16 @@ class ContextGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
         self.assertEqual(errors, [])
 
+    def test_diff_mode_allows_touched_formal_spec_without_todo(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo, include_spec_todo=False, include_template_todo=False)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+            )
+        self.assertEqual(errors, [])
+
     def test_invalid_item_key_format_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

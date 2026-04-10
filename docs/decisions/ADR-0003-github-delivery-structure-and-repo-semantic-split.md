@@ -23,9 +23,8 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 
 ## 非目标
 
-- 不在本轮改造 harness 行为
-- 不删除 `TODO.md`
-- 不调整 formal spec 套件 required files
+- 不在本轮删除现有 `TODO.md`
+- 不在本轮之外引入无关 harness 改造
 - 不引入第二套仓内调度模型
 
 ## 影响
@@ -33,3 +32,5 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 - 后续治理与实现事项都应围绕 GitHub `Phase -> FR -> Work Item` 层级组织
 - formal spec 的主绑定点固定为 FR，执行回合的主绑定点固定为 Work Item
 - `docs/releases/**` 与 `docs/sprints/**` 保留为仓内索引，不再承担状态真相解释职责
+- `GOV-0028` 被授权把 harness、guard、template 与 review 输入迁移到新的治理契约，包括将 formal spec 最小套件收敛为 `spec.md + plan.md`，并把 `TODO.md` 从 required file 降为 legacy optional。
+- `GOV-0029` 仅在 `GOV-0028` 兼容路径稳定后，负责 legacy `TODO.md` 的最终删除清理。
