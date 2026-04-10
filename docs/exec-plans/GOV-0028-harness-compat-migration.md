@@ -53,7 +53,7 @@
 
 - 最近一次显式 checkpoint 对应提交 `7ccd556ec1ee7edcd436fbbe73f1277c73ab8d30`，其内容在 `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd` 的基础上，同步了 active `exec-plan` 的恢复证据，并把 FR-0003 legacy `TODO.md` 改写为明确的历史语义，避免 reviewer / guardian 将其误读为当前执行面。
 - 当前受审 head 已在该 checkpoint 之后继续收敛 formal-spec binding 契约：`open_pr` 不再允许无 `关联 spec` 的治理事项回退到 repo-wide FR suite，`context_guard` 开始校验 touched exec-plan 的 `关联 spec` 是否存在、留在仓内且指向满足最小套件的 formal spec。
-- 对应治理测试与 guard 已补齐到新契约：覆盖 missing binding / out-of-repo / nonexistent / legacy file-path 四类 `关联 spec` 情况，并重新验证 `context_guard`、`workflow_guard`、`open_pr --dry-run` 与相关治理单测。
+- 对应治理测试与 guard 已补齐到新契约：覆盖 missing binding / out-of-repo / nonexistent / legacy file-path / `_template` 误绑定 五类 `关联 spec` 情况，并恢复“legacy `TODO.md` 可继续读取与校验、但删除清理仍留给 `#58`”的边界；随后重新验证 `context_guard`、`workflow_guard`、`open_pr --dry-run` 与相关治理单测。
 - 当前停在提交上述系统性收口、推送 PR `#60` 新 head，并再次进入 guardian / merge gate。
 
 ## 下一步动作

@@ -494,7 +494,7 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("Issue" in error for error in errors))
 
-    def test_deleted_legacy_todo_is_allowed_in_diff_mode(self) -> None:
+    def test_deleted_legacy_todo_is_rejected_in_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -503,7 +503,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/TODO.md"],
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("变更目标不存在（可能已删除）" in error for error in errors))
 
     def test_existing_legacy_template_todo_is_validated_in_repository_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

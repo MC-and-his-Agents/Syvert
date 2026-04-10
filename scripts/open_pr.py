@@ -96,6 +96,9 @@ def _normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None
         return None
     if candidate.is_file() and candidate.name in {"spec.md", "plan.md"}:
         return candidate.parent
+    parts = candidate.relative_to(repo_root.resolve()).parts if candidate.exists() else Path(related_spec.rstrip("/")).parts
+    if len(parts) < 3 or parts[0] != "docs" or parts[1] != "specs" or not parts[2].startswith("FR-"):
+        return None
     return candidate
 
 

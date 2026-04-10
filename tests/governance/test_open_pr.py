@@ -615,6 +615,35 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_template_spec_binding_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/_template/",
+            )
+            template_dir = repo / "docs" / "specs" / "_template"
+            template_dir.mkdir(parents=True, exist_ok=True)
+            (template_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
+            (template_dir / "plan.md").write_text("# plan\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error or "formal spec 套件" in error for error in errors))
+
     def test_governance_with_bootstrap_contract_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
