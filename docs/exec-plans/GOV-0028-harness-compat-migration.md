@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
 - 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
-- 关联 PR：待创建
+- 关联 PR：`#60`
 - active 收口事项：`GOV-0028-harness-compat-migration`
 
 ## 目标
@@ -45,14 +45,15 @@
 
 ## 当前停点
 
-- 主体改动已完成：治理测试、policy、guard、workflow contract、formal spec/agent-loop/review 文档已收敛到“`exec-plan` 为主入口、`TODO.md` 为 legacy optional”。
-- 当前停在为本 Work Item 补齐 active `exec-plan` 与受控 PR 前置上下文，随后进入 `open_pr`、review、guardian 与 merge gate。
+- 最近一次显式 checkpoint 对应提交 `0417d437ee8dcc880f8e544019400af6714d6d85`，其内容已覆盖治理测试、policy、guard、workflow contract、formal spec/agent-loop/review 文档收口。
+- 当前 head 仅继续补充 `GOV-0028` 的 active `exec-plan` 与 PR 关联元数据，不单独推进新的 checkpoint。
+- PR `#60` 已创建，当前停在等待 GitHub checks、guardian 与 merge gate 收口。
 
 ## 下一步动作
 
-- 以当前 Work Item 上下文通过受控入口创建 governance PR，并补齐 `fixes #57`、`refs #55`、`refs #54`。
-- 推送分支，等待 GitHub checks 完成。
+- 等待并核对 PR `#60` 的 GitHub checks。
 - 运行 guardian / merge gate；若结论满足 `APPROVE + safe_to_merge=true` 且 checks 全绿，则通过受控入口合并。
+- 合并后按分支/worktree 退役协议收口当前现场。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -77,6 +78,8 @@
 - `python3 scripts/spec_guard.py --all`
 - `python3 scripts/context_guard.py`
 - `python3 scripts/workflow_guard.py`
+- 已创建 PR：`#60 https://github.com/MC-and-his-Agents/Syvert/pull/60`
+- 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
 
 ## 未决风险
 
