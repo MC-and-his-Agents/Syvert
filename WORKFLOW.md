@@ -19,6 +19,9 @@ codex:
 - 任务来源固定为当前仓库的 GitHub Issues / Projects。
 - 不从仓库内 Markdown 获取 backlog 或 sprint 状态，也不在仓库内维护 sprint 状态镜像。
 - 每次执行需绑定事项上下文，并在 PR 中显式关联。
+- GitHub 是单一调度层：负责 `Phase / FR / Work Item` 层级、状态、优先级、依赖、关闭语义与 Sprint / Project 排期。
+- 仓库是单一语义层：负责 formal spec、exec-plan、风险、验证证据、checkpoint 与恢复上下文。
+- 只有 GitHub Work Item 可以进入执行回合；Phase 与 FR 只作为上位容器，不直接创建 worktree 或承载执行 PR。
 - 事项上下文最少包含：
   - `Issue`
   - `item_key`
@@ -26,6 +29,8 @@ codex:
   - `release`
   - `sprint`
 - `Issue` 仍是任务状态真相源入口；`item_key`、`release`、`sprint` 是执行上下文字段，不替代 GitHub Issues / Projects。
+- `Phase` 只承载阶段目标；`FR` 是 canonical requirement 容器；Work Item 是唯一执行入口。
+- formal spec 默认绑定到 `FR`；`exec-plan` 默认绑定到当前 Work Item 执行回合。
 - `docs/releases/` 与 `docs/sprints/` 只承载仓内聚合索引，不替代 GitHub Issues / Projects 的状态真相源。
 - 新事项与存量事项在进入新的执行回合前都必须补齐完整事项上下文。
 - 术语约定：
@@ -39,11 +44,12 @@ codex:
 - 优先通过 `python3 scripts/create_worktree.py --issue <n> --class <class>` 创建或复用工作区。
 - 分支完成合入或确认被替代后，通过 `python3 scripts/retire_branch.py` 执行归档与退役。
 - worktree key 仍仅由 `Issue` 生成；`item_key`、`release`、`sprint` 不改变现有 worktree 生成与复用机制。
+- worktree 与执行分支只能绑定到当前 Work Item；不得直接为 Phase 或 FR 创建执行现场。
 - `item_type` 当前约定为：`FR` / `HOTFIX` / `GOV` / `CHORE`。
 - `item_key` 固定命名为 `<item_type>-<4-digit>-<slug>`，例如：`FR-0123-content-detail-runtime`、`GOV-0007-release-sprint-protocol`。
-- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次。
+- `release` 用于标识事项服务的版本目标；`sprint` 用于标识事项所在执行轮次或协作索引，不替代 GitHub 状态语义。
 - 治理基线自举允许 `Issue + decision + exec-plan` 作为 bootstrap contract。
-- 非治理基线事项进入实现前必须有 formal spec 输入。
+- 非治理基线事项进入实现前必须有 formal spec 输入；formal spec 绑定到上位 FR，而不是绑定到 Phase 或 Work Item。
 - 每个执行回合必须有且仅有一个 active `exec-plan` 与当前 `item_key` 一一对应；上位前提事项可在该工件中被引用，但不替代当前事项的 active 工件。
 
 ## checkpoint / resume / compact 规则
