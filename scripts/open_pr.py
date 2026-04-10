@@ -86,18 +86,27 @@ def _spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
     return required_files.issubset(child_names)
 
 
+def _normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None:
+    if not related_spec or not related_spec.startswith("docs/specs/"):
+        return None
+    candidate = (repo_root / related_spec.rstrip("/")).resolve()
+    try:
+        candidate.relative_to(repo_root.resolve())
+    except ValueError:
+        return None
+    if candidate.is_file() and candidate.name in {"spec.md", "plan.md"}:
+        return candidate.parent
+    return candidate
+
+
 def has_bound_formal_spec_input(repo_root: Path, item_key: str | None, changed_files: list[str]) -> bool:
     if has_formal_spec_input(repo_root, changed_files):
         return True
     if item_key:
         exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
         related_spec = str(exec_plan.get("关联 spec", "")).strip()
-        if related_spec and related_spec.startswith("docs/specs/"):
-            spec_dir = (repo_root / related_spec.rstrip("/")).resolve()
-            try:
-                spec_dir.relative_to(repo_root.resolve())
-            except ValueError:
-                return False
+        spec_dir = _normalize_bound_spec_dir(repo_root, related_spec)
+        if spec_dir is not None:
             return _spec_dir_has_minimum_suite(spec_dir)
     specs_root = repo_root / "docs" / "specs"
     if not specs_root.exists():
