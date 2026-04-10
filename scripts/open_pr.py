@@ -75,15 +75,37 @@ def has_bootstrap_contract(repo_root: Path) -> bool:
 def has_formal_spec_input(repo_root: Path, changed_files: list[str]) -> bool:
     if formal_spec_dirs(changed_files):
         return True
+    return False
+
+
+def _spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
+    if not spec_dir.exists() or not spec_dir.is_dir():
+        return False
+    required_files = set(spec_suite_policy()["required_files"])
+    child_names = {child.name for child in spec_dir.iterdir()}
+    return required_files.issubset(child_names)
+
+
+def has_bound_formal_spec_input(repo_root: Path, item_key: str | None, changed_files: list[str]) -> bool:
+    if has_formal_spec_input(repo_root, changed_files):
+        return True
+    if item_key:
+        exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+        related_spec = str(exec_plan.get("关联 spec", "")).strip()
+        if related_spec and related_spec.startswith("docs/specs/"):
+            spec_dir = (repo_root / related_spec.rstrip("/")).resolve()
+            try:
+                spec_dir.relative_to(repo_root.resolve())
+            except ValueError:
+                return False
+            return _spec_dir_has_minimum_suite(spec_dir)
     specs_root = repo_root / "docs" / "specs"
     if not specs_root.exists():
         return False
-    required_files = set(spec_suite_policy()["required_files"])
     for path in specs_root.iterdir():
         if not path.is_dir() or not path.name.startswith("FR-"):
             continue
-        child_names = {child.name for child in path.iterdir()}
-        if required_files.issubset(child_names):
+        if _spec_dir_has_minimum_suite(path):
             return True
     return False
 
@@ -310,14 +332,14 @@ def validate_pr_preflight(
         errors.append("`spec` 类 PR 必须包含正式规约区变更。")
 
     if pr_class in {"governance", "spec"}:
-        if not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
+        if not (has_bound_formal_spec_input(repo_root, item_key, changed_files) or has_bootstrap_contract(repo_root)):
             errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
 
-    if pr_class == "governance" and not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
+    if pr_class == "governance" and not (has_bound_formal_spec_input(repo_root, item_key, changed_files) or has_bootstrap_contract(repo_root)):
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
 
     if pr_class == "implementation" and issue is not None and issue_requires_formal_input(issue):
-        if not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
+        if not (has_bound_formal_spec_input(repo_root, item_key, changed_files) or has_bootstrap_contract(repo_root)):
             errors.append("绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract。")
 
     return errors

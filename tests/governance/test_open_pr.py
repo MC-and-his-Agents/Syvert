@@ -19,6 +19,7 @@ def write_exec_plan(
     release: str = "v0.1.0",
     sprint: str = "2026-S14",
     active_item_key: str = "GOV-0015-item-context-gate",
+    related_spec: str | None = None,
 ) -> None:
     exec_plans = repo / "docs" / "exec-plans"
     exec_plans.mkdir(parents=True, exist_ok=True)
@@ -34,6 +35,7 @@ def write_exec_plan(
                 f"- item_type：`{item_type}`",
                 f"- release：`{release}`",
                 f"- sprint：`{sprint}`",
+                *( [f"- 关联 spec：`{related_spec}`"] if related_spec else [] ),
                 f"- active 收口事项：`{active_item_key}`",
                 "",
             ]
@@ -513,7 +515,16 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_governance_repo_scan_accepts_minimal_formal_spec_without_todo(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            write_exec_plan(repo, item_key="GOV-0028-harness-compat-migration", issue="#57", item_type="GOV", release="v0.2.0", sprint="2026-S15", active_item_key="GOV-0028-harness-compat-migration")
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
             write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
@@ -526,6 +537,32 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertEqual(errors, [])
+
+    def test_unrelated_formal_spec_cannot_replace_bound_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-9999-missing/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error or "formal spec 套件" in error for error in errors))
 
     def test_governance_with_bootstrap_contract_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

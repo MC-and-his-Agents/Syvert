@@ -15,7 +15,16 @@ BODY_ITEM_CONTEXT_RE = {
     "issue": re.compile(r"Issue:\s*#?(\d+)", re.IGNORECASE),
 }
 REQUIRED_EXEC_PLAN_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
-EXEC_PLAN_METADATA_KEYS = {"item_key", "Issue", "item_type", "release", "sprint", "active 收口事项", "状态"}
+EXEC_PLAN_METADATA_KEYS = {
+    "item_key",
+    "Issue",
+    "item_type",
+    "release",
+    "sprint",
+    "active 收口事项",
+    "状态",
+    "关联 spec",
+}
 EXEC_PLAN_METADATA_HEADERS = {"## 关联信息", "## 事项上下文"}
 
 

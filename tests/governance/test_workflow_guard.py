@@ -92,6 +92,17 @@ class WorkflowGuardTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_legacy_exec_plan_todo_heading_no_longer_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_required_process_docs(repo)
+            legacy = valid_workflow_text().replace("## 何时必须更新 exec-plan", "## 何时必须更新 exec-plan / TODO")
+            (repo / "WORKFLOW.md").write_text(legacy, encoding="utf-8")
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("何时必须更新" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
