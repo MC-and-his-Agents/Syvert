@@ -11,6 +11,7 @@ import argparse
 import re
 
 from scripts.common import REPO_ROOT, git_changed_files
+from scripts.policy.policy import spec_suite_policy
 
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -167,6 +168,31 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
         if not template_mode and not SHA40_RE.search(text):
             errors.append(f"{path}: 缺少可解析的 40 位 checkpoint head SHA。")
     if not template_mode:
+        related_spec = fields.get("关联 spec", "")
+        if not related_spec:
+            errors.append(f"{path}: 缺少 `关联 spec`，无法绑定当前事项的 formal spec 输入。")
+        else:
+            spec_candidate = (repo_root / related_spec.rstrip("/")).resolve()
+            try:
+                spec_candidate.relative_to(repo_root.resolve())
+            except ValueError:
+                errors.append(f"{path}: `关联 spec` 指向仓库外路径：`{related_spec}`。")
+            else:
+                if not spec_candidate.exists():
+                    errors.append(f"{path}: `关联 spec` 指向的路径不存在：`{related_spec}`。")
+                else:
+                    if spec_candidate.is_file() and spec_candidate.name in {"spec.md", "plan.md"}:
+                        spec_candidate = spec_candidate.parent
+                    required_files = set(spec_suite_policy()["required_files"])
+                    if not spec_candidate.is_dir():
+                        errors.append(f"{path}: `关联 spec` 必须指向 formal spec 目录或 `spec.md`/`plan.md` 文件：`{related_spec}`。")
+                    else:
+                        child_names = {child.name for child in spec_candidate.iterdir()}
+                        missing = sorted(required_files - child_names)
+                        if missing:
+                            errors.append(
+                                f"{path}: `关联 spec` 指向的 formal spec 套件缺少最小必需文件：{', '.join(missing)}。"
+                            )
         related_decision = fields.get("关联 decision", "")
         if related_decision:
             decision_path = (repo_root / related_decision).resolve()

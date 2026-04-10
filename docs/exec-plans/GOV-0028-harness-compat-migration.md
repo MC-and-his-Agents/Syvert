@@ -23,9 +23,15 @@
 - 本次纳入：
   - `scripts/policy/policy.json`
   - `scripts/context_guard.py`
+  - `scripts/open_pr.py`
+  - `scripts/item_context.py`
   - `scripts/workflow_contract.py`
   - `WORKFLOW.md`
   - `docs/AGENTS.md`
+  - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md`
   - `docs/process/agent-loop.md`
   - `docs/specs/README.md`
   - `docs/specs/_template/TODO.md`
@@ -45,9 +51,10 @@
 
 ## 当前停点
 
-- 最近一次显式 checkpoint 对应提交 `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd`，其内容在 `52de8f2ff49e1ec85995704cab8aefa61c82b953` 的基础上，补齐了 legacy `关联 spec` 文件路径兼容与对应治理测试，使 `open_pr` 能继续消费历史 exec-plan 里的 `docs/specs/**/spec.md` 绑定。
-- PR `#60` 当前受审 head 与该 checkpoint 一致；GitHub checks 已全绿，最新 guardian 仅要求把恢复入口中的 checkpoint 事实更新到当前 head。
-- 当前停在根据 guardian 结论同步 exec-plan / legacy TODO 语义，并准备再次进入 merge gate。
+- 最近一次显式 checkpoint 对应提交 `7ccd556ec1ee7edcd436fbbe73f1277c73ab8d30`，其内容在 `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd` 的基础上，同步了 active `exec-plan` 的恢复证据，并把 FR-0003 legacy `TODO.md` 改写为明确的历史语义，避免 reviewer / guardian 将其误读为当前执行面。
+- 当前受审 head 已在该 checkpoint 之后继续收敛 formal-spec binding 契约：`open_pr` 不再允许无 `关联 spec` 的治理事项回退到 repo-wide FR suite，`context_guard` 开始校验 touched exec-plan 的 `关联 spec` 是否存在、留在仓内且指向满足最小套件的 formal spec。
+- 对应治理测试与 guard 已补齐到新契约：覆盖 missing binding / out-of-repo / nonexistent / legacy file-path 四类 `关联 spec` 情况，并重新验证 `context_guard`、`workflow_guard`、`open_pr --dry-run` 与相关治理单测。
+- 当前停在提交上述系统性收口、推送 PR `#60` 新 head，并再次进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -79,6 +86,7 @@
 - `python3 scripts/context_guard.py`
 - `python3 scripts/workflow_guard.py`
 - `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
+- `python3 -m unittest tests/governance/test_open_pr.py tests/governance/test_context_guard.py tests/governance/test_pr_guardian.py tests/governance/test_workflow_guard.py`
 - 已创建 PR：`#60 https://github.com/MC-and-his-Agents/Syvert/pull/60`
 - 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
 - 已确认 `open_pr` 对当前事项优先消费 active `exec-plan` 的 `关联 spec`
@@ -95,4 +103,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5d7cf9e09caf1aa7450dd10d6ea7fe924c9e32bd`
+- `7ccd556ec1ee7edcd436fbbe73f1277c73ab8d30`

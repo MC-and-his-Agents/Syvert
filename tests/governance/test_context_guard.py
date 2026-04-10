@@ -146,6 +146,7 @@ def write_valid_governance_docs(repo: Path, *, include_spec_todo: bool = True, i
 - item_type：`GOV`
 - release：`v0.1.0`
 - sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
 - 关联 decision：`docs/decisions/ADR-0001-example.md`
 
 ## 最近一次 checkpoint 对应的 head SHA
@@ -782,6 +783,72 @@ class ContextGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertEqual(errors, [])
+
+    def test_touched_exec_plan_requires_related_spec_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(exec_plan.read_text(encoding="utf-8").replace("- 关联 spec：`docs/specs/FR-0001-example/`\n", ""), encoding="utf-8")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("缺少 `关联 spec`" in error for error in errors))
+
+    def test_touched_exec_plan_rejects_missing_related_spec_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "docs/specs/FR-9999-missing/",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("`关联 spec` 指向的路径不存在" in error for error in errors))
+
+    def test_touched_exec_plan_rejects_out_of_repo_related_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "../outside-spec/",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("仓库外路径" in error for error in errors))
+
+    def test_touched_exec_plan_accepts_legacy_related_spec_file_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "docs/specs/FR-0001-example/spec.md",
+                ),
+                encoding="utf-8",
+            )
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],

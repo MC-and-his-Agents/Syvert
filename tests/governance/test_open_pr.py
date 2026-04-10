@@ -564,6 +564,31 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error or "formal spec 套件" in error for error in errors))
 
+    def test_governance_without_bound_spec_cannot_fallback_to_unrelated_repo_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error or "formal spec 套件" in error for error in errors))
+
     def test_legacy_bound_spec_file_path_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

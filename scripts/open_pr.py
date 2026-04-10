@@ -108,14 +108,6 @@ def has_bound_formal_spec_input(repo_root: Path, item_key: str | None, changed_f
         spec_dir = _normalize_bound_spec_dir(repo_root, related_spec)
         if spec_dir is not None:
             return _spec_dir_has_minimum_suite(spec_dir)
-    specs_root = repo_root / "docs" / "specs"
-    if not specs_root.exists():
-        return False
-    for path in specs_root.iterdir():
-        if not path.is_dir() or not path.name.startswith("FR-"):
-            continue
-        if _spec_dir_has_minimum_suite(path):
-            return True
     return False
 
 
