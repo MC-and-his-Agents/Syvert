@@ -51,14 +51,15 @@
 
 ## 当前停点
 
-- 最近一次显式实现 checkpoint 对应提交 `03449065f93a16dcb38674997d1c0a2f0a3cdbb8`，其内容在 `4973734d2bf190a9679951166916fceab9018f91` 的脚本/测试收口基础上，继续修正文档中把 FR key 与 Work Item key 混写为“同一个 item_key”的残留表述。
+- 最近一次显式实现 checkpoint 对应提交 `de283148cd02156cc862c3bff5456a94df0149d0`，其内容继续收紧了当前事项输入契约：bootstrap ADR 现在必须携带并匹配当前事项的 `Issue` / `item_key`，`implementation` formal-input 改为基于仓内 active `exec-plan` 语义判定，`open_pr` 会按 `spec_guard` 的最小 reviewable 套件校验 formal spec，`context_guard` 的 decision 反查只认 truly active 的 GOV `exec-plan`。
 - 当前已解决本轮全部已知阻断：
   - `context_guard` 不再把 bootstrap decision 完整性错误施加到所有 touched `exec-plan`
   - `open_pr` 的 bootstrap fallback 已收紧到“当前事项自己的 active exec-plan + 关联 decision”
   - `docs/specs/README.md` 不再把当前 Work Item 完整上下文写成 formal spec 必需输入
   - `FR-0003 plan.md` 的手动验证与 implementation-ready 叙述已切换到 `#57 / GOV-0028`
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
-- 当前 head 正在补记最新 checkpoint 元数据；下一步是推送 PR `#60` 最新 head，并仅针对该最新 head 重跑 guardian / merge gate。
+  - `FR-0003 spec.md` 已把当前执行映射刷新为 `#54 -> #55 -> #57`，不再把 `#56 / GOV-0027` 误写成当前 Work Item
+- 当前受审 head 仅补记 review / guardian 元数据与恢复证据，不推进新的实现 checkpoint；下一步是推送 PR `#60` 最新 head，并仅针对该最新 head 重跑 guardian / merge gate。
 
 ## 下一步动作
 
@@ -93,6 +94,7 @@
 - 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
 - 已确认 `open_pr` 对当前事项优先消费 active `exec-plan` 的绑定输入：`formal_spec` 模式只认当前 `关联 spec`，`bootstrap` 模式只认当前 `关联 decision`
 - 已确认 `context_guard` 对 touched `exec-plan` 按输入模式施加校验：非 `GOV` unbound 路径不再被 bootstrap contract 误伤
+- 已确认 bootstrap contract 不再接受 metadata-free ADR；`implementation` formal-input 不再依赖 GitHub title / label heuristics
 - 已确认 README 示例链路不再把 FR `item_key` 与 Work Item `item_key` 混写成同一个聚合键
 - 已确认新路径只要求 `spec.md + plan.md` 即可通过 formal spec / guard / `open_pr` 入口
 - 已确认 legacy `TODO.md` 仍保持“存在则继续读取与校验；缺失不阻塞新事项；touched 删除仍在 `GOV-0028` 拒绝，最终清理由 `#58 / GOV-0029` 负责”
@@ -108,4 +110,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `03449065f93a16dcb38674997d1c0a2f0a3cdbb8`
+- `de283148cd02156cc862c3bff5456a94df0149d0`
