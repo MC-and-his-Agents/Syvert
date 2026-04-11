@@ -9,6 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
+- 关联 PR：`#61`
 
 ## 目标
 
@@ -46,15 +47,14 @@
 
 ## 当前停点
 
-- `#57 / PR #60` 已完成 harness 兼容迁移，主干现状已把 `TODO.md` 降为 legacy optional，但 formal spec、policy、guard、模板与测试仍保留兼容分支。
-- 当前回合需要完成最终治理收敛：删除残留 `TODO.md` 工件、更新 formal spec 最小套件、阻断未来重新引入 `TODO.md` 的入口。
+- 已删除 `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md` 与 `docs/specs/_template/TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
+- 当前 head `8e856d0b7df9b6506102d8ab50619f07dca7d02a` 已通过治理单测、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`；PR `#61` 已创建，等待 GitHub checks 与 guardian 收口。
 
 ## 下一步动作
 
-- 新建 `GOV-0029` 执行工件并删除 legacy `TODO.md` 实体文件。
-- 同步收紧 formal spec / workflow / review 文档口径。
-- 更新 guard、policy 与治理测试，阻断 `TODO.md` 再次进入正式治理流。
-- 完成本地门禁、开 PR、跑 guardian、受控合并并确认 `#58` 自动关闭。
+- 观察 PR `#61` 的 GitHub checks，确认全部通过。
+- 在当前 PR head 上运行 guardian，确认拿到 `APPROVE + safe_to_merge=true`。
+- 使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,6 +69,14 @@
 
 - `#56 / PR #59` 已完成 GitHub 单一调度层与仓内单一语义层的契约收敛。
 - `#57 / PR #60` 已完成 harness 兼容迁移，允许在不破坏现有治理流的前提下清理 `TODO.md` 残留。
+- `python3 -m unittest tests.governance.test_spec_guard tests.governance.test_pr_scope_guard tests.governance.test_governance_gate tests.governance.test_context_guard tests.governance.test_item_context tests.governance.test_open_pr tests.governance.test_workflow_guard`
+- `python3 scripts/commit_check.py --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/docs_guard.py`
+- `python3 scripts/spec_guard.py --all`
+- `python3 scripts/context_guard.py`
+- `python3 scripts/workflow_guard.py`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-58-governance-remove-legacy-todo-md-from-the-formal-governance-flow`
+- `python3 scripts/open_pr.py --class governance --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 
 ## 未决风险
 
@@ -81,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ab694aa5fa0f59e0eca3d40d5f7efc46e6e0cf3a`
+- `8e856d0b7df9b6506102d8ab50619f07dca7d02a`
