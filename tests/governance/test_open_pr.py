@@ -1085,6 +1085,37 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_implementation_pr_accepts_legacy_metadata_free_adr_for_formal_spec_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0002-content-detail-runtime-v0-1",
+                issue="#38",
+                item_type="FR",
+                active_item_key="FR-0002-content-detail-runtime-v0-1",
+                related_spec="docs/specs/FR-0002-content-detail-runtime-v0-1/",
+                related_decision="docs/decisions/ADR-0001-governance-bootstrap-contract.md",
+            )
+            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
+            (repo / "docs" / "decisions").mkdir(parents=True, exist_ok=True)
+            (repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md").write_text(
+                "# ADR-0001 bootstrap\n",
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "implementation",
+                38,
+                "FR-0002-content-detail-runtime-v0-1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["scripts/tool.py"],
+                repo_root=repo,
+                validate_worktree_binding_check=False,
+            )
+        self.assertEqual(errors, [])
+
     def test_formal_spec_mode_rejects_inconsistent_optional_related_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

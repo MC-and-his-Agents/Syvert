@@ -81,6 +81,7 @@ def has_bound_formal_spec_input(
     changed_files: list[str],
     *,
     allow_unbound_local_fallback: bool,
+    require_bound_decision_contract: bool = True,
 ) -> bool:
     if not item_key:
         return False
@@ -96,7 +97,7 @@ def has_bound_formal_spec_input(
             return False
         if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
             return False
-        if exec_plan.get("关联 decision", "") and validate_bound_decision_contract(repo_root, exec_plan, require_present=True):
+        if require_bound_decision_contract and exec_plan.get("关联 decision", "") and validate_bound_decision_contract(repo_root, exec_plan, require_present=True):
             return False
         return not validate_suite(spec_dir)
 
@@ -360,6 +361,7 @@ def validate_pr_preflight(
                 item_type,
                 changed_files,
                 allow_unbound_local_fallback=True,
+                require_bound_decision_contract=False,
             )
             or has_bound_bootstrap_contract(repo_root, item_key)
         ):
