@@ -212,6 +212,25 @@ class ItemContextTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_validate_bound_formal_spec_scope_accepts_only_authorized_additional_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            first = repo / "docs" / "specs" / "FR-0001-example"
+            second = repo / "docs" / "specs" / "FR-0002-example"
+            write_file(first / "spec.md", "# spec\n")
+            write_file(first / "plan.md", "# plan\n")
+            write_file(second / "spec.md", "# spec\n")
+            write_file(second / "plan.md", "# plan\n")
+            errors = validate_bound_formal_spec_scope(
+                repo,
+                {
+                    "关联 spec": "docs/specs/FR-0001-example/",
+                    "额外关联 specs": "docs/specs/FR-0002-example/",
+                },
+                ["docs/specs/FR-0002-example/spec.md"],
+            )
+        self.assertEqual(errors, [])
+
 
 if __name__ == "__main__":
     unittest.main()

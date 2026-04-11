@@ -818,6 +818,41 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_bound_formal_spec_accepts_only_authorized_additional_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            plan = repo / "docs" / "exec-plans" / "GOV-0028-harness-compat-migration.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["docs/specs/FR-9999-unrelated/spec.md"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_bound_formal_spec_must_be_reviewable_not_just_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -1039,7 +1074,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("核心文件变更" in error or "正式规约区变更" in error for error in errors))
 
-    def test_spec_pr_rejects_todo_only_changes_without_spec_core_files(self) -> None:
+    def test_spec_pr_accepts_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_exec_plan(
@@ -1050,7 +1085,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
+            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "TODO.md").unlink()
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -1061,7 +1097,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/specs/FR-0001-governance-stack-v1/TODO.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("核心文件变更" in error for error in errors))
+        self.assertEqual(errors, [])
 
     def test_spec_pr_rejects_adjunct_only_suite_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

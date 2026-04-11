@@ -311,12 +311,12 @@ def validate_bound_formal_spec_scope(
     if spec_dir is None:
         return []
     bound_spec_dir = spec_dir.relative_to(repo_root.resolve())
-    if bound_spec_dir not in touched_spec_dirs:
-        return ["当前 diff 触碰的 formal spec 套件与 `关联 spec` 绑定不一致。"]
     additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, payload)
     if additional_errors:
         return additional_errors
     authorized_spec_dirs = {bound_spec_dir, *additional_spec_dirs}
+    if not any(path in authorized_spec_dirs for path in touched_spec_dirs):
+        return ["当前 diff 触碰的 formal spec 套件与 `关联 spec` / `额外关联 specs` 绑定不一致。"]
     foreign = sorted(path.as_posix() for path in touched_spec_dirs if path not in authorized_spec_dirs)
     if foreign:
         return [f"当前 diff 只能触碰当前绑定的 formal spec 套件，发现额外套件：{', '.join(foreign)}。"]
