@@ -47,7 +47,7 @@
 
 ## 当前停点
 
-- 已删除 `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md` 与 `docs/specs/_template/TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
+- 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
 - 当前 head `8e856d0b7df9b6506102d8ab50619f07dca7d02a` 已通过治理单测、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`；PR `#61` 已创建，等待 GitHub checks 与 guardian 收口。
 
 ## 下一步动作
