@@ -22,6 +22,7 @@ from scripts.item_context import (
     is_inactive_exec_plan,
     normalize_bound_spec_dir,
     parse_exec_plan_metadata,
+    strip_fenced_code_blocks,
     spec_dir_has_minimum_suite,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
@@ -69,7 +70,8 @@ def normalize_value(raw_value: str) -> str:
 
 def extract_fields(text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for match in FIELD_RE.finditer(text):
+    sanitized = strip_fenced_code_blocks(text)
+    for match in FIELD_RE.finditer(sanitized):
         key = match.group(1).strip()
         value = normalize_value(match.group(2))
         if key not in fields:

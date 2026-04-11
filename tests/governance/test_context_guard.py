@@ -1005,6 +1005,106 @@ class ContextGuardTests(unittest.TestCase):
         self.assertTrue(any("关联 spec" in error and "不存在" in error for error in errors))
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
+    def test_fenced_exec_plan_metadata_cannot_authorize_touched_formal_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md",
+                """# fenced exec-plan
+
+## 关联信息
+
+```md
+- item_key：`GOV-0001-release-sprint-structure`
+- Issue：`#1`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 关联 decision：`docs/decisions/ADR-0001-example.md`
+- active 收口事项：`GOV-0001-release-sprint-structure`
+```
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("缺少 active `exec-plan`" in error for error in errors))
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
+
+    def test_fenced_formal_spec_metadata_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            spec = repo / "docs" / "specs" / "FR-0001-example" / "spec.md"
+            spec.write_text(
+                """# FR-0001 Example
+
+## 关联信息
+
+```md
+- item_key：`FR-0001-example`
+- Issue：`#2`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+```
+
+## 背景与目标
+
+- 背景：x
+- 目标：x
+
+## 范围
+
+- 本次纳入：x
+- 本次不纳入：x
+
+## 需求说明
+
+- 功能需求：x
+- 契约需求：x
+- 非功能需求：x
+
+## 约束
+
+- 阶段约束：x
+- 架构约束：x
+
+## GWT 验收场景
+
+### 场景 1
+
+Given
+When
+Then
+
+## 异常与边界场景
+
+- 异常场景：x
+- 边界场景：x
+
+## 验收标准
+
+- [ ] x
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("缺少 `Issue` 字段" in error for error in errors))
+        self.assertTrue(any("缺少 `item_key` 字段" in error for error in errors))
+
     def test_unbound_fr_authorization_requires_complete_reviewable_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -1483,7 +1583,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
             )
-        self.assertTrue(any("`关联 spec` 必须绑定到具体 FR formal spec 套件" in error for error in errors))
+        self.assertTrue(any("FR formal spec 套件根目录" in error for error in errors))
 
     def test_diff_mode_deleted_governance_doc_returns_error_instead_of_crash(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

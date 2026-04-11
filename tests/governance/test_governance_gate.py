@@ -7,7 +7,7 @@ from unittest.mock import patch
 from scripts import governance_gate
 
 
-CLEAN_SCOPE_REPORT = {
+GOVERNANCE_SCOPE_REPORT = {
     "pr_class": "governance",
     "changed_paths": ["scripts/context_guard.py"],
     "categories": ["governance"],
@@ -15,10 +15,26 @@ CLEAN_SCOPE_REPORT = {
     "violations": [],
 }
 
+IMPLEMENTATION_SCOPE_REPORT = {
+    "pr_class": "implementation",
+    "changed_paths": ["src/app.py"],
+    "categories": ["implementation"],
+    "allowed_categories": ["docs", "implementation", "spec_todo"],
+    "violations": [],
+}
+
+SPEC_SCOPE_REPORT = {
+    "pr_class": "spec",
+    "changed_paths": ["docs/specs/FR-0001-example/spec.md"],
+    "categories": ["spec"],
+    "allowed_categories": ["docs", "spec"],
+    "violations": [],
+}
+
 
 class GovernanceGateTests(unittest.TestCase):
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={})
-    @patch("scripts.governance_gate.build_report", return_value=CLEAN_SCOPE_REPORT)
+    @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
     @patch("scripts.governance_gate.validate_context_repository", return_value=[])
     @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
@@ -46,7 +62,7 @@ class GovernanceGateTests(unittest.TestCase):
         matching_exec_plan_mock.assert_called_once()
 
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={})
-    @patch("scripts.governance_gate.build_report", return_value=CLEAN_SCOPE_REPORT)
+    @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
     @patch("scripts.governance_gate.validate_context_repository", return_value=[])
     @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
@@ -73,29 +89,57 @@ class GovernanceGateTests(unittest.TestCase):
         build_report_mock.assert_called_once_with("governance", ["scripts/context_guard.py"])
         matching_exec_plan_mock.assert_called_once()
 
+    @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={})
+    @patch("scripts.governance_gate.build_report", return_value=IMPLEMENTATION_SCOPE_REPORT)
+    @patch("scripts.governance_gate.validate_context_rules", return_value=[])
+    @patch("scripts.governance_gate.validate_context_repository", return_value=[])
+    @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
+    @patch("scripts.governance_gate.git_changed_files", return_value=["src/app.py"])
+    @patch("scripts.governance_gate.git_current_branch", return_value="issue-57-demo")
+    def test_implementation_diff_uses_implementation_scope_contract(
+        self,
+        current_branch_mock,
+        changed_files_mock,
+        workflow_repo_mock,
+        context_repo_mock,
+        context_rules_mock,
+        build_report_mock,
+        matching_exec_plan_mock,
+    ) -> None:
+        exit_code = governance_gate.main(["--mode", "ci", "--base-ref", "origin/main", "--head-ref", "HEAD"])
+
+        self.assertEqual(exit_code, 0)
+        current_branch_mock.assert_called_once()
+        changed_files_mock.assert_called_once()
+        workflow_repo_mock.assert_called_once()
+        context_repo_mock.assert_called_once()
+        context_rules_mock.assert_called_once()
+        build_report_mock.assert_called_once_with("implementation", ["src/app.py"])
+        matching_exec_plan_mock.assert_called_once()
+
     @patch("scripts.governance_gate.validate_pr_preflight")
     @patch(
         "scripts.governance_gate.build_report",
         return_value={
-            "pr_class": "governance",
+            "pr_class": "implementation",
             "changed_paths": ["src/app.py"],
             "categories": ["implementation"],
-            "allowed_categories": ["docs", "governance", "spec", "spec_todo"],
+            "allowed_categories": ["docs", "implementation", "spec_todo"],
             "violations": [{"path": "src/app.py", "category": "implementation"}],
         },
     )
     @patch("scripts.governance_gate.git_changed_files", return_value=["src/app.py"])
-    def test_reuses_governance_scope_report_in_ci(self, changed_files_mock, build_report_mock, validate_pr_preflight_mock) -> None:
+    def test_scope_report_violation_still_blocks_ci(self, changed_files_mock, build_report_mock, validate_pr_preflight_mock) -> None:
         exit_code = governance_gate.main(["--mode", "ci", "--base-ref", "origin/main", "--head-ref", "refs/heads/issue-57-demo"])
 
         self.assertEqual(exit_code, 1)
         changed_files_mock.assert_called_once()
-        build_report_mock.assert_called_once_with("governance", ["src/app.py"])
+        build_report_mock.assert_called_once_with("implementation", ["src/app.py"])
         validate_pr_preflight_mock.assert_not_called()
 
     @patch("scripts.governance_gate.validate_pr_preflight", return_value=["boom"])
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={"item_key": "FR-0001-example", "item_type": "FR", "release": "v0.1.0", "sprint": "2026-S13"})
-    @patch("scripts.governance_gate.build_report", return_value={**CLEAN_SCOPE_REPORT, "changed_paths": ["docs/specs/FR-0001-example/spec.md"], "categories": ["spec"]})
+    @patch("scripts.governance_gate.build_report", return_value=SPEC_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
     @patch("scripts.governance_gate.validate_context_repository", return_value=[])
     @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
@@ -120,12 +164,12 @@ class GovernanceGateTests(unittest.TestCase):
         workflow_repo_mock.assert_called_once()
         context_repo_mock.assert_called_once()
         context_rules_mock.assert_called_once()
-        build_report_mock.assert_called_once_with("governance", ["docs/specs/FR-0001-example/spec.md"])
+        build_report_mock.assert_called_once_with("spec", ["docs/specs/FR-0001-example/spec.md"])
         matching_exec_plan_mock.assert_called_once()
         validate_pr_preflight_mock.assert_called_once()
 
     @patch("scripts.governance_gate.matching_exec_plan_for_issue")
-    @patch("scripts.governance_gate.build_report", return_value=CLEAN_SCOPE_REPORT)
+    @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
     @patch("scripts.governance_gate.validate_context_repository", return_value=[])
     @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])

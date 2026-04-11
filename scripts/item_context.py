@@ -86,7 +86,7 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
     seen_keys: set[str] = set()
     in_metadata_section = False
 
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    for raw_line in strip_fenced_code_blocks(path.read_text(encoding="utf-8")).splitlines():
         stripped = raw_line.strip()
         if stripped.startswith("## "):
             in_metadata_section = stripped in EXEC_PLAN_METADATA_HEADERS
@@ -186,18 +186,32 @@ def classify_exec_plan_input_mode(payload: Mapping[str, str]) -> str:
     return INPUT_MODE_UNBOUND
 
 
+def normalize_bound_spec_parts(related_spec: str) -> tuple[str, ...] | None:
+    normalized = related_spec.rstrip("/")
+    if not normalized or not normalized.startswith("docs/specs/"):
+        return None
+    parts = Path(normalized).parts
+    if len(parts) == 3 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-"):
+        return parts
+    if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in BOUND_SPEC_FILE_NAMES:
+        return parts
+    return None
+
+
 def normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None:
-    if not related_spec or not related_spec.startswith("docs/specs/"):
+    parts = normalize_bound_spec_parts(related_spec)
+    if parts is None:
         return None
     candidate = (repo_root / related_spec.rstrip("/")).resolve()
     try:
         candidate.relative_to(repo_root.resolve())
     except ValueError:
         return None
-    if candidate.is_file() and candidate.name in BOUND_SPEC_FILE_NAMES:
+    if len(parts) == 4:
+        if candidate.exists() and not candidate.is_file():
+            return None
         return candidate.parent
-    parts = candidate.relative_to(repo_root.resolve()).parts if candidate.exists() else Path(related_spec.rstrip("/")).parts
-    if len(parts) < 3 or parts[0] != "docs" or parts[1] != "specs" or not parts[2].startswith("FR-"):
+    if candidate.exists() and not candidate.is_dir():
         return None
     return candidate
 
@@ -258,19 +272,22 @@ def validate_bound_spec_contract(repo_root: Path, payload: Mapping[str, str]) ->
     if not related_spec.startswith("docs/specs/"):
         return [f"`关联 spec` 必须绑定到具体 FR formal spec 套件：`{related_spec}`。"]
 
-    if candidate.is_file():
-        if candidate.name in BOUND_SPEC_FILE_NAMES:
-            candidate = candidate.parent
-        else:
-            return [f"`关联 spec` 必须指向 formal spec 目录或 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+    parts = normalize_bound_spec_parts(related_spec)
+    if parts is None:
+        return [f"`关联 spec` 必须绑定到 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
 
-    relative_parts = candidate.relative_to(repo_root.resolve()).parts if candidate.exists() else Path(related_spec.rstrip("/")).parts
-    if len(relative_parts) < 3 or relative_parts[0] != "docs" or relative_parts[1] != "specs" or not relative_parts[2].startswith("FR-"):
-        return [f"`关联 spec` 必须绑定到具体 FR formal spec 套件：`{related_spec}`。"]
-    if not candidate.exists():
-        return [f"`关联 spec` 指向的路径不存在：`{related_spec}`。"]
-    if not candidate.is_dir():
-        return [f"`关联 spec` 必须指向 formal spec 目录或 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+    if len(parts) == 4:
+        if not candidate.exists():
+            return [f"`关联 spec` 指向的路径不存在：`{related_spec}`。"]
+        if not candidate.is_file():
+            return [f"`关联 spec` 必须指向 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+        candidate = candidate.parent
+    else:
+        if not candidate.exists():
+            return [f"`关联 spec` 指向的路径不存在：`{related_spec}`。"]
+        if not candidate.is_dir():
+            return [f"`关联 spec` 必须指向 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+
     if not spec_dir_has_minimum_suite(candidate):
         required_files = set(spec_suite_policy()["required_files"])
         child_names = {child.name for child in candidate.iterdir()}

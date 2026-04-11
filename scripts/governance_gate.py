@@ -64,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     changed = git_changed_files(base_ref, head_ref, repo=repo_root)
-    report = build_report("governance", changed)
+    inferred_pr_class = infer_pr_class(changed)
+    report = build_report(inferred_pr_class, changed)
     if report["violations"]:
         print("治理基线改动不得超出 governance PR 允许范围。", file=sys.stderr)
         for item in report["violations"]:
@@ -83,7 +84,6 @@ def main(argv: list[str] | None = None) -> int:
         errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
         active_exec_plan = matching_exec_plan_for_issue(repo_root, current_issue)
         if active_exec_plan:
-            inferred_pr_class = infer_pr_class(changed)
             if inferred_pr_class in {"governance", "spec", "implementation"}:
                 errors.extend(
                     validate_pr_preflight(
