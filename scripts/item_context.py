@@ -37,6 +37,7 @@ INPUT_MODE_BOOTSTRAP = "bootstrap"
 INPUT_MODE_UNBOUND = "unbound"
 PLACEHOLDER_BINDING_PREFIXES = ("无", "none", "n/a", "na", "not applicable", "not-applicable")
 LEGACY_FORMAL_SPEC_DECISION_ITEM_TYPES = {"FR", "HOTFIX", "CHORE"}
+LEGACY_FORMAL_SPEC_DECISION_PATHS = {"docs/decisions/ADR-0001-governance-bootstrap-contract.md"}
 MISSING_BOUND_DECISION_METADATA_ERRORS = {
     "`关联 decision` 缺少 `Issue` 字段，bootstrap contract 无法与当前事项建立对应关系。",
     "`关联 decision` 缺少 `item_key` 字段，bootstrap contract 无法与当前事项建立对应关系。",
@@ -54,7 +55,8 @@ def allows_legacy_metadata_free_formal_spec_decision(
         return False
     if not has_meaningful_binding(related_spec):
         return False
-    if not related_decision or not Path(related_decision).name.startswith("ADR-0001"):
+    normalized_decision = Path(related_decision).as_posix()
+    if normalized_decision not in LEGACY_FORMAL_SPEC_DECISION_PATHS:
         return False
     return bool(errors) and set(errors).issubset(MISSING_BOUND_DECISION_METADATA_ERRORS)
 

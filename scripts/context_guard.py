@@ -345,7 +345,15 @@ def validate_formal_spec_authorization_contract(
     input_mode = classify_exec_plan_input_mode(fields)
 
     if input_mode == INPUT_MODE_FORMAL_SPEC:
-        errors.extend(validate_bound_spec_contract(repo_root, fields))
+        bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
+        errors.extend(bound_spec_errors)
+        if not bound_spec_errors:
+            spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+            if spec_dir is not None:
+                errors.extend(
+                    f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(spec_dir)
+                )
     elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
         expected_dir = repo_root / "docs" / "specs" / item_key
         if not expected_dir.exists():

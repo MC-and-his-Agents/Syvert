@@ -34,6 +34,7 @@
   - `scripts/governance_gate.py`
   - `scripts/item_context.py`
   - `scripts/open_pr.py`
+  - `scripts/policy/policy.json`
   - `scripts/workflow_contract.py`
   - `tests/governance/test_context_guard.py`
   - `tests/governance/test_item_context.py`
@@ -52,7 +53,7 @@
 - 当前收口边界已经明确：
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧；若无法从真实 git ref 推断当前事项，或同一 Issue 命中多个 active `exec-plan`，会直接 fail-closed。
   - `关联 spec` 只接受 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；任意嵌套子目录都不再视为合法绑定。
-  - 对仍绑定 metadata-free `ADR-0001` 的非 `GOV` formal-spec 实现事项，`implementation` 入口保留 compatibility；`governance` / `spec` 入口以及 touched decision 授权仍要求可校验的 decision 元数据。
+  - 对仍绑定 legacy `docs/decisions/ADR-0001-governance-bootstrap-contract.md` 的非 `GOV` formal-spec 事项，当前回合保留精确兼容；除此之外，`governance` / `spec` 入口与 touched decision 授权仍要求可校验的 decision 元数据。
   - `ADR-0003` 继续保留在 `FR-0003` 层作为上位治理决策，不作为 `GOV-0028` active `exec-plan` 的 machine-checkable `关联 decision` 输入；当前 Work Item 的可追溯闭环以 `关联 spec` + `关联 PR` 为准。
   - `governance_gate` 在 CI 场景按实际 diff 推断 PR class，再复用 `pr_scope_guard.build_report()` 与 `open_pr` preflight contract，不再把普通 implementation PR 误打成治理红灯。
 
