@@ -79,6 +79,8 @@ def has_bound_formal_spec_input(
     item_key: str | None,
     item_type: str | None,
     changed_files: list[str],
+    *,
+    allow_unbound_local_fallback: bool,
 ) -> bool:
     if not item_key:
         return False
@@ -94,11 +96,11 @@ def has_bound_formal_spec_input(
             return False
         if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
             return False
-        if exec_plan.get("关联 decision", "") and validate_bound_decision_contract(repo_root, exec_plan, require_present=False):
+        if exec_plan.get("关联 decision", "") and validate_bound_decision_contract(repo_root, exec_plan, require_present=True):
             return False
         return not validate_suite(spec_dir)
 
-    if input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
+    if allow_unbound_local_fallback and input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
         expected_dir = repo_root / "docs" / "specs" / item_key
         touched_spec_dirs = formal_spec_dirs(changed_files)
         if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
@@ -328,20 +330,38 @@ def validate_pr_preflight(
 
     if pr_class in {"governance", "spec"}:
         if not (
-            has_bound_formal_spec_input(repo_root, item_key, item_type, changed_files)
+            has_bound_formal_spec_input(
+                repo_root,
+                item_key,
+                item_type,
+                changed_files,
+                allow_unbound_local_fallback=False,
+            )
             or has_bound_bootstrap_contract(repo_root, item_key)
         ):
             errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
 
     if pr_class == "governance" and not (
-        has_bound_formal_spec_input(repo_root, item_key, item_type, changed_files)
+        has_bound_formal_spec_input(
+            repo_root,
+            item_key,
+            item_type,
+            changed_files,
+            allow_unbound_local_fallback=False,
+        )
         or has_bound_bootstrap_contract(repo_root, item_key)
     ):
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
 
     if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
         if not (
-            has_bound_formal_spec_input(repo_root, item_key, item_type, changed_files)
+            has_bound_formal_spec_input(
+                repo_root,
+                item_key,
+                item_type,
+                changed_files,
+                allow_unbound_local_fallback=True,
+            )
             or has_bound_bootstrap_contract(repo_root, item_key)
         ):
             errors.append("绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract。")

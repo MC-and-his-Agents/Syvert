@@ -36,7 +36,7 @@ HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 SHA40_RE = re.compile(r"\b[0-9a-f]{40}\b")
-ISSUE_REF_RE = re.compile(r"^issue-(\d+)(?:-|$)")
+ISSUE_REF_RE = re.compile(r"(?:^|/)issue-(\d+)(?:-|$)")
 
 SPEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
 EXEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
@@ -202,7 +202,7 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
             if fields.get("关联 decision", ""):
                 errors.extend(
                     f"{path}: {error}"
-                    for error in validate_bound_decision_contract(repo_root, fields, require_present=False)
+                    for error in validate_bound_decision_contract(repo_root, fields, require_present=True)
                 )
         elif input_mode == INPUT_MODE_BOOTSTRAP:
             errors.extend(
@@ -295,10 +295,19 @@ def infer_current_issue(*refs: str | None) -> int | None:
         normalized = str(ref or "").strip()
         if not normalized:
             continue
-        match = ISSUE_REF_RE.match(normalized)
+        match = ISSUE_REF_RE.search(normalized)
         if match:
             return int(match.group(1))
     return None
+
+
+def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tuple[list[str], list[dict[str, str]]]:
+    payloads = active_exec_plans_for_issue(repo_root, issue_number)
+    if not payloads:
+        return ([f"当前 `Issue` #{issue_number} 缺少 active `exec-plan`，无法确认唯一授权上下文。"], [])
+    if len(payloads) > 1:
+        return ([f"当前 `Issue` #{issue_number} 存在多个 active `exec-plan`，无法确认唯一授权上下文。"], [])
+    return ([], payloads)
 
 
 def eligible_governance_exec_plans(
@@ -307,7 +316,7 @@ def eligible_governance_exec_plans(
     current_issue: int | None,
 ) -> list[tuple[Path, dict[str, str]]]:
     if current_issue is not None:
-        payloads = active_exec_plans_for_issue(repo_root, current_issue)
+        _, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
     else:
         payloads = []
         for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
@@ -329,7 +338,8 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
     authorized: set[Path] = set()
     payloads: list[dict[str, str]] = []
     if current_issue is not None:
-        payloads.extend(active_exec_plans_for_issue(repo_root, current_issue))
+        _, current_payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
+        payloads.extend(current_payloads)
     else:
         for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
             if exec_plan.name in {"README.md", "_template.md"}:
@@ -452,6 +462,9 @@ def validate_context_rules(
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
+    if changed_paths is not None and current_issue is not None:
+        errors.extend(active_exec_plan_context_for_issue(repo_root, current_issue)[0])
+
     if changed_paths is not None:
         touched_spec_dirs = formal_spec_dirs(changed_paths)
         if touched_spec_dirs:
@@ -516,7 +529,7 @@ def validate_context_rules(
             for exec_plan_path, exec_plan_fields in exec_plan_to_decision[normalized_target]:
                 payload = dict(exec_plan_fields)
                 payload["关联 decision"] = normalized_target
-                require_present = classify_exec_plan_input_mode(exec_plan_fields) == INPUT_MODE_BOOTSTRAP
+                require_present = classify_exec_plan_input_mode(exec_plan_fields) in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC}
                 errors.extend(
                     f"{target}: {error}"
                     for error in validate_bound_decision_contract(repo_root, payload, require_present=require_present)
@@ -594,7 +607,10 @@ def main(argv: list[str] | None = None) -> int:
     if changed_paths is None:
         errors = validate_repository(repo_root)
     else:
-        errors = validate_context_rules(repo_root, changed_paths, current_issue=current_issue)
+        if current_issue is None:
+            errors = ["diff 模式无法从 `--current-issue` / `--head-ref` / 当前分支推断当前事项，已拒绝继续执行。"]
+        else:
+            errors = validate_context_rules(repo_root, changed_paths, current_issue=current_issue)
     if errors:
         for error in errors:
             print(error, file=sys.stderr)

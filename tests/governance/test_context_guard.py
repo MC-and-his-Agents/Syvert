@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
-from scripts.context_guard import validate_context_rules, validate_repository
+from unittest.mock import patch
+
+from scripts.context_guard import infer_current_issue, main as context_guard_main, validate_context_rules, validate_repository
 
 
 def write_file(path: Path, content: str) -> None:
@@ -587,6 +591,38 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
+    def test_infer_current_issue_accepts_common_git_ref_forms(self) -> None:
+        self.assertEqual(infer_current_issue("issue-57-demo"), 57)
+        self.assertEqual(infer_current_issue("refs/heads/issue-57-demo"), 57)
+        self.assertEqual(infer_current_issue("origin/issue-57-demo"), 57)
+        self.assertIsNone(infer_current_issue("refs/pull/60/head"))
+
+    @patch("scripts.context_guard.validate_context_rules", return_value=[])
+    @patch("scripts.context_guard.git_changed_files", return_value=["docs/exec-plans/GOV-0001-release-sprint-structure.md"])
+    @patch("scripts.context_guard.git_current_branch", return_value="HEAD")
+    def test_context_guard_main_rejects_diff_mode_without_issue_context(
+        self,
+        current_branch_mock,
+        changed_files_mock,
+        validate_context_rules_mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = context_guard_main([
+                    "--repo-root",
+                    temp_dir,
+                    "--base-ref",
+                    "origin/main",
+                    "--head-ref",
+                    "refs/pull/60/head",
+                ])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("无法从 `--current-issue` / `--head-ref` / 当前分支推断当前事项", stderr.getvalue())
+        changed_files_mock.assert_called_once()
+        current_branch_mock.assert_called_once()
+        validate_context_rules_mock.assert_not_called()
+
     def test_bootstrap_contract_touched_related_decision_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -597,7 +633,7 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
-    def test_touched_decision_linked_from_formal_spec_exec_plan_without_decision_metadata_passes(self) -> None:
+    def test_touched_decision_linked_from_formal_spec_exec_plan_without_decision_metadata_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -607,7 +643,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-0001-example.md"],
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("缺少 `Issue`" in error for error in errors))
 
     def test_bootstrap_contract_touched_unrelated_decision_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1089,6 +1125,99 @@ class ContextGuardTests(unittest.TestCase):
                 current_issue=1,
             )
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
+    def test_multiple_active_exec_plans_for_current_issue_reject_foreign_formal_spec_auth(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0002-other.md",
+                """# GOV-0002
+
+## 关联信息
+
+- item_key：`GOV-0002-other`
+- Issue：`#1`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-9999-unrelated/`
+- 关联 decision：`docs/decisions/ADR-0002-example.md`
+- active 收口事项：`GOV-0002-other`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0002-example.md",
+                """# ADR-0002
+
+- Issue：`#1`
+- item_key：`GOV-0002-other`
+""",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            write_file(repo / "docs" / "specs" / "FR-9999-unrelated" / "TODO.md", "# TODO\n")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-9999-unrelated/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("多个 active `exec-plan`" in error for error in errors))
+
+    def test_multiple_active_exec_plans_for_current_issue_reject_decision_auth(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0002-other.md",
+                """# GOV-0002
+
+## 关联信息
+
+- item_key：`GOV-0002-other`
+- Issue：`#1`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-9999-unrelated/`
+- 关联 decision：`docs/decisions/ADR-0002-example.md`
+- active 收口事项：`GOV-0002-other`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0002-example.md",
+                """# ADR-0002
+
+- Issue：`#1`
+- item_key：`GOV-0002-other`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("多个 active `exec-plan`" in error for error in errors))
 
     def test_touched_exec_plan_rejects_non_reviewable_bound_spec_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

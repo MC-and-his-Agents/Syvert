@@ -612,7 +612,14 @@ class OpenPrPreflightTests(unittest.TestCase):
     def test_core_item_with_valid_formal_spec_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            write_exec_plan(repo, item_key="FR-0001-governance-stack-v1", issue="#1", item_type="FR", active_item_key="FR-0001-governance-stack-v1")
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
             write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "spec",
@@ -1100,6 +1107,29 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "v0.1.0",
                 "2026-S14",
                 ["docs/specs/FR-0001-governance-stack-v1/spec.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_governance_pr_does_not_accept_unbound_fr_local_formal_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            errors = validate_pr_preflight(
+                "governance",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/AGENTS.md"],
                 repo_root=repo,
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))

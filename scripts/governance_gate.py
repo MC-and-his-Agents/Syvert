@@ -65,7 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     current_issue = infer_current_issue(args.head_ref)
     if current_issue is None:
         current_issue = infer_current_issue(git_current_branch(repo=repo_root))
-    errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
+    if current_issue is None:
+        errors.append("governance-gate 无法从 `--head-ref` 或当前分支推断当前事项，已拒绝继续执行。")
+    else:
+        errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
     for relative_path in REQUIRED_GOVERNANCE_FILES:
         if not (repo_root / relative_path).exists():
             errors.append(f"缺少治理栈 v2 必需工件: {repo_root / relative_path}")
