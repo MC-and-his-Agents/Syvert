@@ -1141,6 +1141,20 @@ Then
             )
         self.assertEqual(errors, [])
 
+    def test_touched_decision_rejects_non_reviewable_bound_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            spec = repo / "docs" / "specs" / "FR-0001-example" / "spec.md"
+            spec.write_text("# FR-0001 Example\n", encoding="utf-8")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("不可审查" in error for error in errors))
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
     def test_touched_spec_todo_allows_legacy_metadata_free_adr_for_current_issue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

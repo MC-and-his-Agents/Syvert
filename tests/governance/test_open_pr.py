@@ -1037,7 +1037,31 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["code_review.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("必须包含正式规约区变更" in error for error in errors))
+        self.assertTrue(any("核心文件变更" in error or "正式规约区变更" in error for error in errors))
+
+    def test_spec_pr_rejects_todo_only_changes_without_spec_core_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/TODO.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("核心文件变更" in error for error in errors))
 
     def test_unbound_fr_item_requires_its_own_touched_formal_spec_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

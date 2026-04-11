@@ -40,7 +40,7 @@ from scripts.common import (
     run,
     syvert_state_file,
 )
-from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level
+from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
 from scripts.spec_guard import validate_suite
 
@@ -334,8 +334,8 @@ def validate_pr_preflight(
     if validate_worktree_binding_check:
         errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
-    if pr_class == "spec" and not formal_spec_dirs(changed_files):
-        errors.append("`spec` 类 PR 必须包含正式规约区变更。")
+    if pr_class == "spec" and not any(item.category == "spec" for item in classify_paths(changed_files)):
+        errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
     if pr_class == "spec" and not has_bound_formal_spec_input(
         repo_root,
