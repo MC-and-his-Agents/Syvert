@@ -15,6 +15,7 @@ from scripts.item_context import (
     INPUT_MODE_BOOTSTRAP,
     INPUT_MODE_FORMAL_SPEC,
     INPUT_MODE_UNBOUND,
+    active_exec_plans_for_issue,
     classify_exec_plan_input_mode,
     is_eligible_active_exec_plan,
     normalize_bound_spec_dir,
@@ -24,6 +25,7 @@ from scripts.item_context import (
     validate_bound_spec_contract,
 )
 from scripts.policy.policy import formal_spec_dirs, spec_suite_policy
+from scripts.spec_guard import validate_suite
 
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -185,7 +187,15 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
     if not template_mode:
         input_mode = classify_exec_plan_input_mode(fields)
         if input_mode == INPUT_MODE_FORMAL_SPEC:
-            errors.extend(f"{path}: {error}" for error in validate_bound_spec_contract(repo_root, fields))
+            bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
+            errors.extend(f"{path}: {error}" for error in bound_spec_errors)
+            if not bound_spec_errors:
+                spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+                if spec_dir is not None:
+                    errors.extend(
+                        f"{path}: 绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
+                        for error in validate_suite(spec_dir)
+                    )
             if fields.get("关联 decision", ""):
                 errors.extend(
                     f"{path}: {error}"
@@ -277,14 +287,19 @@ def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str
     return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
 
 
-def authorized_formal_spec_dirs(repo_root: Path) -> set[Path]:
+def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -> set[Path]:
     authorized: set[Path] = set()
-    for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
-        if exec_plan.name in {"README.md", "_template.md"}:
-            continue
-        fields = parse_exec_plan_metadata(exec_plan)
-        if not is_eligible_active_exec_plan(fields):
-            continue
+    payloads: list[dict[str, str]] = []
+    if current_issue is not None:
+        payloads.extend(active_exec_plans_for_issue(repo_root, current_issue))
+    else:
+        for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
+            if exec_plan.name in {"README.md", "_template.md"}:
+                continue
+            fields = parse_exec_plan_metadata(exec_plan)
+            if is_eligible_active_exec_plan(fields):
+                payloads.append(fields)
+    for fields in payloads:
         item_key = fields.get("item_key", "").strip()
         item_type = fields.get("item_type", "").strip()
         input_mode = classify_exec_plan_input_mode(fields)
@@ -375,7 +390,12 @@ def collect_targets(
     )
 
 
-def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = None) -> list[str]:
+def validate_context_rules(
+    repo_root: Path,
+    changed_paths: list[str] | None = None,
+    *,
+    current_issue: int | None = None,
+) -> list[str]:
     errors: list[str] = []
     exec_plans, spec_files, release_files, sprint_files, decision_files = collect_targets(repo_root, changed_paths)
 
@@ -397,7 +417,7 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
     if changed_paths is not None:
         touched_spec_dirs = formal_spec_dirs(changed_paths)
         if touched_spec_dirs:
-            authorized_spec_dirs = authorized_formal_spec_dirs(repo_root)
+            authorized_spec_dirs = authorized_formal_spec_dirs(repo_root, current_issue=current_issue)
             for spec_dir in sorted(touched_spec_dirs):
                 if spec_dir not in authorized_spec_dirs:
                     errors.append(
@@ -500,9 +520,11 @@ def validate_repository(repo_root: Path) -> list[str]:
         else:
             errors.append(f"{candidate}: 缺少基线模板工件 `{relative}`。")
 
-    optional_template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
-    if optional_template_todo.exists():
-        baseline_paths.append(optional_template_todo.relative_to(repo_root).as_posix())
+    template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
+    if template_todo.exists():
+        baseline_paths.append(template_todo.relative_to(repo_root).as_posix())
+    else:
+        errors.append(f"{template_todo}: 缺少基线模板工件 `{template_todo.relative_to(repo_root).as_posix()}`。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:

@@ -206,6 +206,10 @@ Then
 """,
     )
     write_file(
+        repo / "docs" / "specs" / "FR-0001-example" / "contracts" / "README.md",
+        "# contracts\n",
+    )
+    write_file(
         repo / "docs" / "specs" / "FR-0001-example" / "plan.md",
         """# FR-0001 Plan
 
@@ -459,6 +463,7 @@ class ContextGuardTests(unittest.TestCase):
             "docs/exec-plans/_template.md",
             "docs/specs/_template/spec.md",
             "docs/specs/_template/plan.md",
+            "docs/specs/_template/TODO.md",
             "docs/releases/_template.md",
             "docs/sprints/_template.md",
         )
@@ -923,6 +928,72 @@ class ContextGuardTests(unittest.TestCase):
                 changed_paths=["docs/specs/FR-9999-unrelated/spec.md"],
             )
         self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
+
+    def test_formal_spec_diff_is_scoped_to_current_issue_instead_of_repo_wide_bindings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0002-other.md",
+                """# GOV-0002
+
+## 关联信息
+
+- item_key：`GOV-0002-other`
+- Issue：`#2`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-9999-unrelated/`
+- 关联 decision：`docs/decisions/ADR-0002-example.md`
+- active 收口事项：`GOV-0002-other`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0002-example.md",
+                """# ADR-0002
+
+- Issue：`#2`
+- item_key：`GOV-0002-other`
+""",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            write_file(repo / "docs" / "specs" / "FR-9999-unrelated" / "TODO.md", "# TODO\n")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-9999-unrelated/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
+
+    def test_touched_exec_plan_rejects_non_reviewable_bound_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            spec = repo / "docs" / "specs" / "FR-0001-example" / "spec.md"
+            spec.write_text("# FR-0001 Example\n", encoding="utf-8")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("不可审查" in error for error in errors))
 
     def test_valid_governance_bootstrap_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
