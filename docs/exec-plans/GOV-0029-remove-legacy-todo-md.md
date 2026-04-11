@@ -49,7 +49,8 @@
 ## 当前停点
 
 - 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
-- 本地治理单测、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run` 已通过；PR `#61` 已创建，等待把 formal spec / decision / exec-plan 真相进一步收拢后进入 guardian 收口。
+- 最近一次已推送 checkpoint 对应 head 为 `894fbf858dca6c4dc341510bc5447302ea0a9c24`；该 head 已完成 FR-0003 spec、ADR-0003 与 GOV-0029 exec-plan 的真相对齐，并通过本地治理门禁。
+- 当前工作树仅在上述 checkpoint 之上补充 guardian / merge gate 所需的审查态元数据。
 
 ## 下一步动作
 
@@ -91,4 +92,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8e856d0b7df9b6506102d8ab50619f07dca7d02a`
+- `894fbf858dca6c4dc341510bc5447302ea0a9c24`
