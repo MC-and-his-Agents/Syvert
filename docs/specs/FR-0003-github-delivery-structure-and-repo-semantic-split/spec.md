@@ -22,9 +22,10 @@
   - 规定 `FR` 是 canonical requirement 容器，formal spec 绑定到 FR
   - 规定 `release / sprint` 只保留为执行上下文或仓内索引语义
   - 收敛 legacy `TODO.md` 在 formal governance flow 中的地位
+  - 为落实上述收敛所必需的 formal spec 模板、governance guard、policy 与回归测试调整
 - 本次不纳入：
-  - `scripts/**` 的行为改造
-  - harness 自动化入口、guardian、merge gate 的运行时改造
+  - 与 legacy `TODO.md` 清理无关的 `scripts/**` 行为改造
+  - 与 legacy `TODO.md` 清理无关的 harness 自动化入口、guardian、merge gate 运行时改造
   - 与本事项无关的业务实现代码
   - 任何业务实现代码或业务 spec
 
@@ -39,6 +40,7 @@
   - `Phase` 必须被定义为阶段目标容器，不直接承载执行 PR。
   - `release / sprint` 必须被定义为执行上下文或仓内索引语义，不得退化为第二套状态真相源。
   - formal spec 最小套件、模板与治理 guard 不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
+  - governance guard 与 policy 必须把 legacy `TODO.md` 视为 inert 历史文件：允许未触碰时保留、允许通过删除完成清理、禁止新增或继续回写。
 - 非功能需求：
   - 所有相关治理文档口径必须一致，不能出现并行分层定义。
   - 本事项必须保持 governance-only 边界，不混入业务实现代码。
@@ -89,6 +91,7 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 - [ ] formal spec 明确绑定 FR，exec-plan 明确绑定 Work Item
 - [ ] release / sprint 被定义为执行上下文或索引，而不是状态真相源
 - [ ] formal spec 最小套件、模板与治理 guard 不再要求 `TODO.md`
+- [ ] governance guard / policy 对 legacy `TODO.md` 只允许未触碰保留或删除，不允许新增或继续回写
 
 ## 依赖与外部前提
 

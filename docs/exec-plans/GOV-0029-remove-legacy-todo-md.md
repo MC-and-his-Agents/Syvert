@@ -50,12 +50,12 @@
 
 - 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
 - 最近一次已推送 checkpoint 对应 head 为 `894fbf858dca6c4dc341510bc5447302ea0a9c24`；该 head 已完成 FR-0003 spec、ADR-0003 与 GOV-0029 exec-plan 的真相对齐，并通过本地治理门禁。
-- 当前工作树仅在上述 checkpoint 之上补充 guardian / merge gate 所需的审查态元数据。
+- 当前工作树正在根据 guardian 审查补齐两处 authoritative 残留：将 FR-0003 明确扩展到关闭 legacy `TODO.md` 所需的 guard / policy / regression 调整，并把 FR-0001 中仍允许维护 `TODO.md` 的正式规约文本改为 legacy-only。
 
 ## 下一步动作
 
-- 观察 PR `#61` 的 GitHub checks，确认全部通过。
-- 在当前 PR head 上运行 guardian，确认拿到 `APPROVE + safe_to_merge=true`。
+- 提交并推送本轮 guardian 驱动的 formal spec 收口补丁。
+- 在当前 PR head 上重新运行 guardian，确认拿到 `APPROVE + safe_to_merge=true`。
 - 使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
 
 ## 当前 checkpoint 推进的 release 目标

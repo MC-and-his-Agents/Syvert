@@ -73,7 +73,7 @@ Then 可得到统一 text/json 状态视图，且兼容 legacy 状态读取
   - `governance` 或 `spec` 事项缺少 formal spec 或 bootstrap contract 时，`open_pr` 必须拒绝。
   - guardian 未给出 `APPROVE` 或 `safe_to_merge=false` 时，`merge_pr` 必须拒绝。
 - 边界场景：
-  - `docs/specs/**/TODO.md` 可在实现 PR 回写进度，不得修改正式契约语义。
+  - `docs/specs/**/TODO.md` 仅作为 legacy 历史文件保留；不得新增、回写进度、承载恢复上下文或作为正式治理流入口。
   - v2 不引入 daemon，不引入仓库内 backlog/sprint 镜像。
 
 ## 验收标准

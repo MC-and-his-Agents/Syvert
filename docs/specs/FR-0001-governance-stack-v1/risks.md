@@ -12,7 +12,7 @@
 
 ### 2. checkpoint 不一致
 
-- 风险：`exec-plan`、`TODO.md` 与实际 head SHA 或验证结果不一致，导致恢复失败或误判。
+- 风险：`exec-plan` 与实际 head SHA 或验证结果不一致，导致恢复失败或误判；若误把 legacy `TODO.md` 当恢复入口，会重新引入并行状态面。
 - 缓解：
   - `agent-loop` 定义 checkpoint 最小频率与必填字段
   - 每次可验证改动后更新停点、下一步、已验证项、风险、head SHA
