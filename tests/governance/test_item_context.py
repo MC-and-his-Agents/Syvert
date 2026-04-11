@@ -180,11 +180,9 @@ class ItemContextTests(unittest.TestCase):
             suite_dir = repo / "docs" / "specs" / "FR-0001-example"
             write_file(suite_dir / "spec.md", "# spec\n")
             write_file(suite_dir / "plan.md", "# plan\n")
-            write_file(suite_dir / "TODO.md", "# todo\n")
             shadow_dir = suite_dir / "shadow"
             write_file(shadow_dir / "spec.md", "# shadow spec\n")
             write_file(shadow_dir / "plan.md", "# shadow plan\n")
-            write_file(shadow_dir / "TODO.md", "# shadow todo\n")
             errors = validate_bound_spec_contract(
                 repo,
                 {"关联 spec": "docs/specs/FR-0001-example/shadow/"},

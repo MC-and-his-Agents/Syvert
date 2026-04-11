@@ -72,7 +72,6 @@ class SpecGuardTests(unittest.TestCase):
             fr_dir.mkdir(parents=True)
             (fr_dir / "spec.md").write_text(GOOD_SPEC, encoding="utf-8")
             (fr_dir / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
-            (fr_dir / "TODO.md").write_text("# TODO\n", encoding="utf-8")
             errors = validate_suite(fr_dir)
         self.assertEqual(errors, [])
 
@@ -83,7 +82,6 @@ class SpecGuardTests(unittest.TestCase):
             fr_dir.mkdir(parents=True)
             (fr_dir / "spec.md").write_text(GOOD_SPEC, encoding="utf-8")
             (fr_dir / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
-            (fr_dir / "TODO.md").write_text("# TODO\n", encoding="utf-8")
             errors = validate_changed_paths(
                 repo,
                 [
@@ -92,6 +90,16 @@ class SpecGuardTests(unittest.TestCase):
                 ],
             )
         self.assertTrue(any("不得与实现代码混在同一 PR" in error for error in errors))
+
+    def test_rejects_legacy_todo_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fr_dir = Path(temp_dir) / "docs" / "specs" / "FR-0001-example"
+            fr_dir.mkdir(parents=True)
+            (fr_dir / "spec.md").write_text(GOOD_SPEC, encoding="utf-8")
+            (fr_dir / "plan.md").write_text(GOOD_PLAN, encoding="utf-8")
+            (fr_dir / "TODO.md").write_text("# TODO\n", encoding="utf-8")
+            errors = validate_suite(fr_dir)
+        self.assertTrue(any("退出正式治理流" in error for error in errors))
 
 
 if __name__ == "__main__":

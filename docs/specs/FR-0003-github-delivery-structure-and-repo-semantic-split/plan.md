@@ -26,8 +26,7 @@
 - 不允许触碰的边界：
   - 不修改 `scripts/**` 行为
   - 不修改 `tests/**` 的语义或大规模结构
-  - 不删除 `TODO.md`
-  - 不调整 formal spec 套件的 required files
+  - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码
 - 与上位文档的一致性约束：
   - 与 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md` 保持阶段边界一致

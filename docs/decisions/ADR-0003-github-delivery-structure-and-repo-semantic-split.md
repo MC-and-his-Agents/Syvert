@@ -20,12 +20,11 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 - `FR` 是 canonical requirement 容器；formal spec 绑定到 FR，而不是绑定到 Phase 或 Work Item
 - `Phase` 只承载阶段目标，不直接承载执行 PR
 - `release / sprint` 只保留为执行上下文或仓内索引语义，不得退化为状态真相源
+- legacy `TODO.md` 不再属于 formal governance flow，也不再作为 formal spec 套件必需工件
 
 ## 非目标
 
 - 不在本轮改造 harness 行为
-- 不删除 `TODO.md`
-- 不调整 formal spec 套件 required files
 - 不引入第二套仓内调度模型
 
 ## 影响

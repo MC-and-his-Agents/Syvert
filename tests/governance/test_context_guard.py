@@ -16,7 +16,7 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def write_valid_template_docs(repo: Path, *, include_todo: bool = True) -> None:
+def write_valid_template_docs(repo: Path, *, include_todo: bool = False) -> None:
     write_file(
         repo / "docs" / "exec-plans" / "_template.md",
         """# ITEM-KEY 执行计划
@@ -138,7 +138,7 @@ def write_valid_template_docs(repo: Path, *, include_todo: bool = True) -> None:
     )
 
 
-def write_valid_governance_docs(repo: Path, *, include_spec_todo: bool = True, include_template_todo: bool = True) -> None:
+def write_valid_governance_docs(repo: Path, *, include_spec_todo: bool = False, include_template_todo: bool = False) -> None:
     write_file(
         repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md",
         """# GOV-0001 执行计划
@@ -455,10 +455,6 @@ class ContextGuardTests(unittest.TestCase):
                 repo / "docs" / "specs" / "FR-0999-legacy" / "plan.md",
                 "# legacy plan\n",
             )
-            write_file(
-                repo / "docs" / "specs" / "FR-0999-legacy" / "TODO.md",
-                "# legacy todo\n",
-            )
             errors = validate_repository(repo)
         self.assertEqual(errors, [])
 
@@ -467,7 +463,6 @@ class ContextGuardTests(unittest.TestCase):
             "docs/exec-plans/_template.md",
             "docs/specs/_template/spec.md",
             "docs/specs/_template/plan.md",
-            "docs/specs/_template/TODO.md",
             "docs/releases/_template.md",
             "docs/sprints/_template.md",
         )
@@ -493,7 +488,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/TODO.md"],
             )
-        self.assertTrue(any("Issue" in error for error in errors))
+        self.assertTrue(any("退出正式治理流" in error for error in errors))
 
     def test_legacy_todo_is_still_validated_when_sibling_spec_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -505,18 +500,20 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/spec.md"],
             )
-        self.assertTrue(any("Issue" in error for error in errors))
+        self.assertTrue(any("退出正式治理流" in error for error in errors))
 
     def test_deleted_legacy_todo_is_rejected_in_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
-            (repo / "docs" / "specs" / "FR-0001-example" / "TODO.md").unlink()
+            todo = repo / "docs" / "specs" / "FR-0001-example" / "TODO.md"
+            todo.write_text("# legacy todo\n", encoding="utf-8")
+            todo.unlink()
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/TODO.md"],
             )
-        self.assertTrue(any("变更目标不存在（可能已删除）" in error for error in errors))
+        self.assertEqual(errors, [])
 
     def test_existing_legacy_template_todo_is_validated_in_repository_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -525,7 +522,7 @@ class ContextGuardTests(unittest.TestCase):
             template_todo = repo / "docs" / "specs" / "_template" / "TODO.md"
             template_todo.write_text("# FR-XXXX TODO\n", encoding="utf-8")
             errors = validate_repository(repo)
-        self.assertTrue(any(str(template_todo) in error and "Issue" in error for error in errors))
+        self.assertTrue(any(str(template_todo) in error and "退出正式治理流" in error for error in errors))
 
     def test_bootstrap_exec_plan_missing_bound_decision_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1277,7 +1274,7 @@ Then
         self.assertTrue(any("不可审查" in error for error in errors))
         self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
 
-    def test_touched_spec_todo_allows_legacy_metadata_free_adr_for_current_issue(self) -> None:
+    def test_touched_spec_todo_is_rejected_after_legacy_flow_removal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)

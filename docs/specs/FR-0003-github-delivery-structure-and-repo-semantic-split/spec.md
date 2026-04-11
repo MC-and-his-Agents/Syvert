@@ -24,7 +24,7 @@
 - 本次不纳入：
   - `scripts/**` 的行为改造
   - harness 自动化入口、guardian、merge gate 的运行时改造
-  - 删除 `TODO.md`
+  - 与本事项无关的业务实现代码
   - 调整正式规约套件的 `required_files`
   - 任何业务实现代码或业务 spec
 
@@ -77,7 +77,7 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
   - 若文档继续把 release / sprint 写成状态真相源，会与 GitHub 单一调度层冲突。
   - 若文档允许 Phase 或 FR 直接开 PR / 建 worktree，会破坏 Work Item 唯一执行入口约束。
 - 边界场景：
-  - `TODO.md` 继续保留为 formal spec 套件必需文件，本轮不得删除。
+  - legacy `TODO.md` 可以作为历史文件被清理，但不得再作为 formal governance flow 的必需工件或恢复入口。
   - `release / sprint` 允许继续作为仓内索引存在，但只能承担聚合与执行上下文职责。
 
 ## 验收标准
@@ -87,11 +87,11 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 - [ ] 文档明确写出 `Work Item` 是唯一执行入口
 - [ ] formal spec 明确绑定 FR，exec-plan 明确绑定 Work Item
 - [ ] release / sprint 被定义为执行上下文或索引，而不是状态真相源
-- [ ] 本事项不修改 harness 行为、不删除 `TODO.md`
+- [ ] formal spec 最小套件、模板与治理 guard 不再要求 `TODO.md`
 
 ## 依赖与外部前提
 
 - 外部依赖：
   - GitHub 中已存在 `#54 -> #55 -> #56` 的事项树
 - 上下游影响：
-  - 后续 `#57`、`#58` 需在此 formal spec 基础上分别处理 harness 兼容迁移与 `TODO.md` 清理
+  - `#57`、`#58` 在此 formal spec 基础上分别完成 harness 兼容迁移与 legacy `TODO.md` 清理
