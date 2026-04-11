@@ -8,6 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 额外关联 specs：`docs/specs/FR-0001-governance-stack-v1/`
 - 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
 - 关联 PR：`#61`

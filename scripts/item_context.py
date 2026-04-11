@@ -27,6 +27,7 @@ EXEC_PLAN_METADATA_KEYS = {
     "active 收口事项",
     "状态",
     "关联 spec",
+    "额外关联 specs",
     "关联 decision",
 }
 EXEC_PLAN_METADATA_HEADERS = {"## 关联信息", "## 事项上下文"}
@@ -263,6 +264,41 @@ def spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
     return required_files.issubset(child_names)
 
 
+def parse_additional_spec_bindings(raw_value: str) -> list[str]:
+    cleaned = normalize_value(raw_value)
+    if not cleaned:
+        return []
+    return [item.strip() for item in re.split(r"[，,]", cleaned) if item.strip()]
+
+
+def validate_additional_spec_contracts(
+    repo_root: Path,
+    payload: Mapping[str, str],
+) -> tuple[list[str], list[Path]]:
+    raw_value = str(payload.get("额外关联 specs", "")).strip()
+    if not has_meaningful_binding(raw_value):
+        return [], []
+
+    errors: list[str] = []
+    normalized_dirs: list[Path] = []
+    seen: set[Path] = set()
+    for raw_path in parse_additional_spec_bindings(raw_value):
+        binding_errors = validate_bound_spec_contract(repo_root, {"关联 spec": raw_path})
+        if binding_errors:
+            errors.extend(f"`额外关联 specs` 条目 `{raw_path}` 非法：{error}" for error in binding_errors)
+            continue
+        spec_dir = normalize_bound_spec_dir(repo_root, raw_path)
+        if spec_dir is None:
+            errors.append(f"`额外关联 specs` 条目 `{raw_path}` 无法解析为 formal spec 套件根目录。")
+            continue
+        relative = spec_dir.relative_to(repo_root.resolve())
+        if relative in seen:
+            continue
+        seen.add(relative)
+        normalized_dirs.append(relative)
+    return errors, normalized_dirs
+
+
 def validate_bound_formal_spec_scope(
     repo_root: Path,
     payload: Mapping[str, str],
@@ -277,7 +313,11 @@ def validate_bound_formal_spec_scope(
     bound_spec_dir = spec_dir.relative_to(repo_root.resolve())
     if bound_spec_dir not in touched_spec_dirs:
         return ["当前 diff 触碰的 formal spec 套件与 `关联 spec` 绑定不一致。"]
-    foreign = sorted(path.as_posix() for path in touched_spec_dirs if path != bound_spec_dir)
+    additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, payload)
+    if additional_errors:
+        return additional_errors
+    authorized_spec_dirs = {bound_spec_dir, *additional_spec_dirs}
+    foreign = sorted(path.as_posix() for path in touched_spec_dirs if path not in authorized_spec_dirs)
     if foreign:
         return [f"当前 diff 只能触碰当前绑定的 formal spec 套件，发现额外套件：{', '.join(foreign)}。"]
     return []

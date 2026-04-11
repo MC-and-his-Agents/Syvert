@@ -24,7 +24,7 @@
 ## 实现约束
 
 - 不允许触碰的边界：
-  - 只允许为关闭 legacy `TODO.md` 入口做最小必要的 `scripts/**`、`scripts/policy/**` 与 `tests/governance/**` 调整
+  - 只允许为关闭 legacy `TODO.md` 入口做最小必要的存量 formal spec、`scripts/**`、`scripts/policy/**` 与 `tests/governance/**` 调整
   - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码
 - 与上位文档的一致性约束：

@@ -22,7 +22,7 @@
   - 规定 `FR` 是 canonical requirement 容器，formal spec 绑定到 FR
   - 规定 `release / sprint` 只保留为执行上下文或仓内索引语义
   - 收敛 legacy `TODO.md` 在 formal governance flow 中的地位
-  - 为落实上述收敛所必需的 formal spec 模板、governance guard、policy 与回归测试调整
+  - 为落实上述收敛所必需的 formal spec 模板、存量 formal spec 套件、governance guard、policy 与回归测试调整
 - 本次不纳入：
   - 与 legacy `TODO.md` 清理无关的 `scripts/**` 行为改造
   - 与 legacy `TODO.md` 清理无关的 harness 自动化入口、guardian、merge gate 运行时改造

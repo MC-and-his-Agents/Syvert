@@ -25,6 +25,7 @@ from scripts.item_context import (
     parse_exec_plan_metadata,
     strip_fenced_code_blocks,
     spec_dir_has_minimum_suite,
+    validate_additional_spec_contracts,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
@@ -346,12 +347,24 @@ def validate_formal_spec_authorization_contract(
     if input_mode == INPUT_MODE_FORMAL_SPEC:
         bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
         errors.extend(bound_spec_errors)
+        bound_spec_relative: Path | None = None
         if not bound_spec_errors:
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
+                bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                     for error in validate_suite(spec_dir)
+                )
+        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+        errors.extend(additional_spec_errors)
+        if not additional_spec_errors:
+            for extra_spec_dir in additional_spec_dirs:
+                if extra_spec_dir == bound_spec_relative:
+                    continue
+                errors.extend(
+                    f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(repo_root / extra_spec_dir)
                 )
     elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
         expected_dir = repo_root / "docs" / "specs" / item_key
@@ -446,6 +459,9 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
                 authorized.add(spec_dir.relative_to(repo_root.resolve()))
+            additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+            if not additional_errors:
+                authorized.update(additional_spec_dirs)
             continue
         if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
             expected_dir = repo_root / "docs" / "specs" / item_key

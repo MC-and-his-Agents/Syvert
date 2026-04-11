@@ -1432,6 +1432,52 @@ Then
             )
         self.assertEqual(errors, [])
 
+    def test_formal_spec_exec_plan_accepts_authorized_additional_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ).replace(
+                    "Issue：`#2`",
+                    "Issue：`#9999`",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ).replace(
+                    "Issue：`#2`",
+                    "Issue：`#9999`",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "contracts" / "README.md",
+                "# contracts\n",
+            )
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=[
+                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                    "docs/specs/FR-0001-example/spec.md",
+                    "docs/specs/FR-9999-unrelated/spec.md",
+                ],
+            )
+        self.assertEqual(errors, [])
+
     def test_formal_spec_spec_only_smuggling_without_matching_active_exec_plan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
