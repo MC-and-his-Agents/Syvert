@@ -642,26 +642,6 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("缺少 `Issue`" in error for error in errors))
 
-    def test_touched_decision_linked_from_formal_spec_exec_plan_with_shared_fr_metadata_passes(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_valid_governance_docs(repo)
-            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
-            decision.write_text(
-                """# ADR-0001
-
-- Issue：`#2`
-- item_key：`FR-0001-example`
-- item_type：`FR`
-""",
-                encoding="utf-8",
-            )
-            errors = validate_context_rules(
-                repo,
-                changed_paths=["docs/decisions/ADR-0001-example.md"],
-            )
-        self.assertEqual(errors, [])
-
     def test_touched_decision_linked_from_formal_spec_fr_exec_plan_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -1497,6 +1477,24 @@ Then
                 ],
             )
         self.assertEqual(errors, [])
+
+    def test_exec_plan_rejects_invalid_additional_spec_binding_even_without_touched_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/_template/`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+            )
+        self.assertTrue(any("额外关联 specs" in error for error in errors))
 
     def test_formal_spec_spec_only_smuggling_without_matching_active_exec_plan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,19 +1,5 @@
 # ADR-0003 GitHub delivery structure and repo semantic split
 
-## 关联信息
-
-- Issue：`#55`
-- item_key：`FR-0003-github-delivery-structure-and-repo-semantic-split`
-- item_type：`FR`
-- release：`v0.2.0`
-- sprint：`2026-S15`
-
-## 关联工作项
-
-- `#56 / GOV-0027-governance-contract-rewrite`：完成单一调度层与单一语义层的契约落盘。
-- `#57 / GOV-0028-harness-compat-migration`：完成 harness 与 merge gate 的兼容迁移。
-- `#58 / GOV-0029-remove-legacy-todo-md`：在本 decision 基础上关闭 legacy `TODO.md` 的正式治理流入口。
-
 ## 背景
 
 Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktree 入口、formal spec 套件与 exec-plan 恢复协议，但治理文档仍同时使用“版本层 / 冲刺层 / 事项层”与 GitHub `Phase / FR / Work Item` 两套分层描述。
@@ -34,11 +20,12 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 - `FR` 是 canonical requirement 容器；formal spec 绑定到 FR，而不是绑定到 Phase 或 Work Item
 - `Phase` 只承载阶段目标，不直接承载执行 PR
 - `release / sprint` 只保留为执行上下文或仓内索引语义，不得退化为状态真相源
-- legacy `TODO.md` 不再属于 formal governance flow，也不再作为 formal spec 套件必需工件；formal spec 最小套件收敛为 `spec.md` + `plan.md`
 
 ## 非目标
 
-- 不在本轮改造与 `TODO.md` 清理无关的 harness 行为
+- 不在本轮改造 harness 行为
+- 不删除 `TODO.md`
+- 不调整 formal spec 套件 required files
 - 不引入第二套仓内调度模型
 
 ## 影响

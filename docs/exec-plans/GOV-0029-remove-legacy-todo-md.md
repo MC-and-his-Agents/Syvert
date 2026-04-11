@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
 - 额外关联 specs：`docs/specs/FR-0001-governance-stack-v1/`
-- 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
+- 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
 - 关联 PR：`#61`
 
@@ -33,7 +33,7 @@
   - `docs/specs/FR-0002-content-detail-runtime-v0-1/**`
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/**`
   - `docs/specs/_template/**`
-  - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
+  - `docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
   - `docs/releases/v0.2.0.md`
   - `docs/sprints/2026-S15.md`
   - `scripts/context_guard.py`
@@ -50,8 +50,8 @@
 ## 当前停点
 
 - 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
-- 最近一次已推送 checkpoint 对应 head 为 `894fbf858dca6c4dc341510bc5447302ea0a9c24`；该 head 已完成 FR-0003 spec、ADR-0003 与 GOV-0029 exec-plan 的真相对齐，并通过本地治理门禁。
-- 当前工作树正在根据 guardian 审查补齐三处 authoritative 残留：将 FR-0003 明确扩展到关闭 legacy `TODO.md` 所需的 guard / policy / regression 调整，把 FR-0001 中仍允许维护 `TODO.md` 的正式规约文本改为 legacy-only，并恢复 ADR-0003 的 FR 级 shared decision provenance。
+- 最近一次已推送 checkpoint 对应 head 为 `894fbf858dca6c4dc341510bc5447302ea0a9c24`；该 head 已完成 FR-0003 spec 与 GOV-0029 exec-plan 的主线对齐，并通过本地治理门禁。
+- 当前工作树正在根据 guardian 审查补齐三处 authoritative 残留：将 FR-0003 明确扩展到关闭 legacy `TODO.md` 所需的 guard / policy / regression 调整，把 FR-0001 中仍允许维护 `TODO.md` 的正式规约文本改为 legacy-only，并补入 GOV-0029 专用 decision 以承接当前 Work Item 的 machine-checkable 追溯。
 
 ## 下一步动作
 

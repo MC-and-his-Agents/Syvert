@@ -197,12 +197,24 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
         if input_mode == INPUT_MODE_FORMAL_SPEC:
             bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
             errors.extend(f"{path}: {error}" for error in bound_spec_errors)
+            bound_spec_relative: Path | None = None
             if not bound_spec_errors:
                 spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
                 if spec_dir is not None:
+                    bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                     errors.extend(
                         f"{path}: 绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                         for error in validate_suite(spec_dir)
+                    )
+            additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+            errors.extend(f"{path}: {error}" for error in additional_spec_errors)
+            if not additional_spec_errors:
+                for extra_spec_dir in additional_spec_dirs:
+                    if extra_spec_dir == bound_spec_relative:
+                        continue
+                    errors.extend(
+                        f"{path}: `额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                        for error in validate_suite(repo_root / extra_spec_dir)
                     )
             if fields.get("关联 decision", ""):
                 decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)

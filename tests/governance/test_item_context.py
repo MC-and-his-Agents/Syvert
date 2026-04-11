@@ -108,56 +108,6 @@ class ItemContextTests(unittest.TestCase):
             errors = validate_bound_decision_contract(repo, payload, require_present=True)
         self.assertTrue(any("docs/decisions/*.md" in error for error in errors))
 
-    def test_validate_bound_decision_contract_allows_shared_formal_spec_decision(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            spec_dir = repo / "docs" / "specs" / "FR-0001-example"
-            write_file(
-                spec_dir / "spec.md",
-                """# FR-0001 Example
-
-## 关联信息
-
-- item_key：`FR-0001-example`
-- Issue：`#2`
-- item_type：`FR`
-
-## GWT 验收场景
-
-Given
-When
-Then
-
-## 异常与边界场景
-
-- x
-
-## 验收标准
-
-- [ ] x
-""",
-            )
-            write_file(spec_dir / "plan.md", "# plan\n")
-            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
-            write_file(
-                decision,
-                """# ADR-0001
-
-- Issue：`#2`
-- item_key：`FR-0001-example`
-- item_type：`FR`
-""",
-            )
-            payload = {
-                "Issue": "1",
-                "item_key": "GOV-0001-example",
-                "item_type": "GOV",
-                "关联 spec": "docs/specs/FR-0001-example/",
-                "关联 decision": "docs/decisions/ADR-0001-example.md",
-            }
-            errors = validate_bound_decision_contract(repo, payload, require_present=True)
-        self.assertEqual(errors, [])
-
     def test_validate_bound_decision_contract_rejects_duplicate_metadata_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
