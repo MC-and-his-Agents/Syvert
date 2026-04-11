@@ -518,9 +518,6 @@ def validate_context_rules(
             target = repo_root / path
             if not (is_decision_file(path) and target.exists()):
                 continue
-            decision_item_type = decision_item_type_from_name(path)
-            if decision_item_type in {"FR", "HOTFIX", "CHORE"}:
-                continue
             normalized_target = target.resolve().relative_to(repo_root.resolve()).as_posix()
             if normalized_target not in exec_plan_to_decision:
                 errors.append(f"{target}: 当前 touched decision 未被任何 exec-plan 通过 `关联 decision` 关联。")

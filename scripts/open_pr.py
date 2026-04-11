@@ -131,7 +131,7 @@ def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type:
     input_mode = classify_exec_plan_input_mode(exec_plan)
     if input_mode in {INPUT_MODE_FORMAL_SPEC, INPUT_MODE_BOOTSTRAP}:
         return True
-    return item_type == "FR"
+    return item_type in {"FR", "HOTFIX", "CHORE"}
 
 
 def closing_line(issue: int | None, mode: str) -> str:

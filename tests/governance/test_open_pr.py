@@ -1156,7 +1156,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
 
-    def test_implementation_pr_does_not_require_unbound_formal_input_for_hotfix_items(self) -> None:
+    def test_implementation_pr_requires_formal_input_for_hotfix_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_exec_plan(
@@ -1176,7 +1176,29 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["scripts/tool.py"],
                 repo_root=repo,
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_implementation_pr_requires_formal_input_for_chore_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="CHORE-0001-doc-refresh",
+                issue="#1",
+                item_type="CHORE",
+                active_item_key="CHORE-0001-doc-refresh",
+            )
+            errors = validate_pr_preflight(
+                "implementation",
+                1,
+                "CHORE-0001-doc-refresh",
+                "CHORE",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_build_body_contains_item_context(self) -> None:
         args = parse_args(

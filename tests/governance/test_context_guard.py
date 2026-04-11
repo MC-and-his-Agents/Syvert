@@ -686,18 +686,47 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
-    def test_bootstrap_contract_touched_fr_decision_passes(self) -> None:
+    def test_touched_typed_fr_decision_passes_with_current_exec_plan_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
-            write_file(repo / "docs" / "decisions" / "ADR-FR-0001-example.md", "# ADR-FR-0001\n")
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "FR-0001-example.md",
+                """# FR-0001
+
+## 关联信息
+
+- item_key：`FR-0001-example`
+- Issue：`#2`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 关联 decision：`docs/decisions/ADR-FR-0001-example.md`
+- active 收口事项：`FR-0001-example`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-FR-0001-example.md",
+                """# ADR-FR-0001
+
+- Issue：`#2`
+- item_key：`FR-0001-example`
+""",
+            )
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/decisions/ADR-FR-0001-example.md"],
+                current_issue=2,
             )
         self.assertEqual(errors, [])
 
-    def test_bootstrap_contract_touched_hotfix_decision_passes(self) -> None:
+    def test_touched_typed_hotfix_decision_without_binding_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -706,9 +735,9 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-HOTFIX-0001-example.md"],
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
-    def test_bootstrap_contract_touched_chore_decision_passes(self) -> None:
+    def test_touched_typed_chore_decision_without_binding_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -717,7 +746,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-CHORE-0001-example.md"],
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
     def test_bootstrap_contract_touched_current_decision_with_only_legacy_exec_plan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
