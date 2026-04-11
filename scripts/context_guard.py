@@ -126,6 +126,12 @@ def is_spec_suite_file(path: Path) -> bool:
         return True
     return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan)\.md$", value) is not None
 
+def is_legacy_todo_file(path: Path) -> bool:
+    value = path.as_posix()
+    if re.search(r"(^|/)docs/specs/_template/TODO\.md$", value):
+        return True
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/TODO\.md$", value) is not None
+
 
 def should_skip_reference(value: str) -> bool:
     if not value:
@@ -520,6 +526,11 @@ def validate_context_rules(
     if changed_paths is not None:
         for raw_path in changed_paths:
             path = Path(raw_path)
+            target = repo_root / path
+            if is_legacy_todo_file(path):
+                if target.exists():
+                    errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
+                continue
             if not (
                 is_exec_plan_file(path)
                 or is_release_file(path)
@@ -528,7 +539,6 @@ def validate_context_rules(
                 or is_spec_suite_file(path)
             ):
                 continue
-            target = repo_root / path
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
@@ -646,9 +656,6 @@ def validate_repository(repo_root: Path) -> list[str]:
     template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
     if template_todo.exists():
         errors.append(f"{template_todo}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
-
-    for legacy_todo in sorted((repo_root / "docs" / "specs").glob("FR-*/TODO.md")):
-        errors.append(f"{legacy_todo}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:

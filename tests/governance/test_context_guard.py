@@ -500,7 +500,7 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/spec.md"],
             )
-        self.assertTrue(any("退出正式治理流" in error for error in errors))
+        self.assertEqual(errors, [])
 
     def test_deleted_legacy_todo_is_rejected_in_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -43,10 +43,6 @@ def validate_suite(fr_dir: Path) -> list[str]:
         if not target.read_text(encoding="utf-8").strip():
             errors.append(f"{fr_dir}: `{filename}` 不能为空")
 
-    legacy_todo = fr_dir / "TODO.md"
-    if legacy_todo.exists():
-        errors.append(f"{legacy_todo}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
-
     spec_path = fr_dir / "spec.md"
     plan_path = fr_dir / "plan.md"
     if not spec_path.exists() or not plan_path.exists():
@@ -82,6 +78,15 @@ def validate_suite(fr_dir: Path) -> list[str]:
 
 def validate_changed_paths(repo_root: Path, changed_paths: list[str]) -> list[str]:
     errors: list[str] = []
+
+    for raw_path in changed_paths:
+        path = Path(raw_path)
+        value = path.as_posix()
+        if re.search(r"(^|/)docs/specs/(?:_template|FR-[^/]+)/TODO\.md$", value):
+            target = repo_root / path
+            if target.exists():
+                errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
+
     classified = classify_paths(changed_paths)
     categories = {item.category for item in classified}
 
