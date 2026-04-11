@@ -1541,6 +1541,53 @@ Then
             )
         self.assertTrue(any("额外关联 specs" in error for error in errors))
 
+    def test_non_governance_exec_plan_rejects_additional_spec_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "- item_key：`GOV-0001-release-sprint-structure`\n- Issue：`#1`\n- item_type：`GOV`",
+                    "- item_key：`FR-0001-example`\n- Issue：`#2`\n- item_type：`FR`",
+                ).replace(
+                    "- active 收口事项：`GOV-0001-release-sprint-structure`",
+                    "- active 收口事项：`FR-0001-example`",
+                ).replace(
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
+                ),
+                encoding="utf-8",
+            )
+            exec_plan.rename(repo / "docs" / "exec-plans" / "FR-0001-example.md")
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ).replace(
+                    "Issue：`#2`",
+                    "Issue：`#9999`",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ).replace(
+                    "Issue：`#2`",
+                    "Issue：`#9999`",
+                ),
+            )
+            write_file(repo / "docs" / "specs" / "FR-9999-unrelated" / "contracts" / "README.md", "# contracts\n")
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/FR-0001-example.md"],
+                current_issue=2,
+            )
+        self.assertTrue(any("额外关联 specs" in error for error in errors))
+
     def test_formal_spec_spec_only_smuggling_without_matching_active_exec_plan_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

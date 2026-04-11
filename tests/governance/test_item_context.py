@@ -202,6 +202,7 @@ class ItemContextTests(unittest.TestCase):
             errors = validate_bound_formal_spec_scope(
                 repo,
                 {
+                    "item_type": "GOV",
                     "关联 spec": "docs/specs/FR-0001-example/",
                     "额外关联 specs": "docs/specs/FR-0002-example/",
                 },
@@ -224,6 +225,7 @@ class ItemContextTests(unittest.TestCase):
             errors = validate_bound_formal_spec_scope(
                 repo,
                 {
+                    "item_type": "GOV",
                     "关联 spec": "docs/specs/FR-0001-example/",
                     "额外关联 specs": "docs/specs/FR-0002-example/",
                 },

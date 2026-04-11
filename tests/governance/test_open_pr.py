@@ -853,6 +853,76 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_governance_pr_rejects_invalid_additional_spec_binding_on_docs_only_diff(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            plan = repo / "docs" / "exec-plans" / "GOV-0028-harness-compat-migration.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/_template/`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["AGENTS.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(errors)
+
+    def test_spec_pr_rejects_additional_spec_binding_for_non_governance_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            plan = repo / "docs" / "exec-plans" / "FR-0001-governance-stack-v1.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
+                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                [
+                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
+                    "docs/specs/FR-9999-unrelated/spec.md",
+                ],
+                repo_root=repo,
+            )
+        self.assertTrue(errors)
+
     def test_bound_formal_spec_must_be_reviewable_not_just_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

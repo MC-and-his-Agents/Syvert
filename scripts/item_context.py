@@ -279,6 +279,9 @@ def validate_additional_spec_contracts(
     if not has_meaningful_binding(raw_value):
         return [], []
 
+    if str(payload.get("item_type", "")).strip() != "GOV" or classify_exec_plan_input_mode(payload) != INPUT_MODE_FORMAL_SPEC:
+        return ["`额外关联 specs` 仅允许用于绑定 formal spec 的治理收敛事项。"], []
+
     errors: list[str] = []
     normalized_dirs: list[Path] = []
     seen: set[Path] = set()
