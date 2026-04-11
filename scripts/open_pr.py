@@ -319,27 +319,25 @@ def validate_pr_preflight(
     changed_files: list[str],
     *,
     repo_root: Path,
+    validate_worktree_binding_check: bool = True,
 ) -> list[str]:
     errors: list[str] = []
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
-    errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
+    if validate_worktree_binding_check:
+        errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
     if pr_class == "spec" and not formal_spec_dirs(changed_files):
         errors.append("`spec` 类 PR 必须包含正式规约区变更。")
 
-    if pr_class in {"governance", "spec"}:
-        if not (
-            has_bound_formal_spec_input(
-                repo_root,
-                item_key,
-                item_type,
-                changed_files,
-                allow_unbound_local_fallback=False,
-            )
-            or has_bound_bootstrap_contract(repo_root, item_key)
-        ):
-            errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
+    if pr_class == "spec" and not has_bound_formal_spec_input(
+        repo_root,
+        item_key,
+        item_type,
+        changed_files,
+        allow_unbound_local_fallback=False,
+    ):
+        errors.append("`spec` 类 PR 缺少绑定 formal spec 输入。")
 
     if pr_class == "governance" and not (
         has_bound_formal_spec_input(
@@ -351,6 +349,7 @@ def validate_pr_preflight(
         )
         or has_bound_bootstrap_contract(repo_root, item_key)
     ):
+        errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
 
     if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):

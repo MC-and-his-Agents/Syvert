@@ -916,7 +916,7 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
 
-    def test_bootstrap_contract_non_item_key_exec_plan_filename_cannot_bind_decision(self) -> None:
+    def test_bootstrap_contract_non_item_key_exec_plan_filename_can_bind_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
@@ -943,7 +943,55 @@ class ContextGuardTests(unittest.TestCase):
                 repo,
                 changed_paths=["docs/decisions/ADR-0001-example.md"],
             )
-        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+        self.assertEqual(errors, [])
+
+    def test_context_guard_main_rejects_head_sha_only_without_explicit_issue_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stderr = StringIO()
+            with patch("scripts.context_guard.git_changed_files", return_value=["docs/specs/FR-0001-example/spec.md"]):
+                with patch("scripts.context_guard.git_current_branch", return_value="issue-57-demo"):
+                    with patch("scripts.context_guard.validate_context_rules", return_value=[]):
+                        with redirect_stderr(stderr):
+                            exit_code = context_guard_main([
+                                "--repo-root",
+                                temp_dir,
+                                "--base-ref",
+                                "origin/main",
+                                "--head-sha",
+                                "deadbeef",
+                            ])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("无法从 `--current-issue` / `--head-ref` / 当前分支推断当前事项", stderr.getvalue())
+
+    def test_unbound_fr_authorization_requires_complete_reviewable_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "- item_key：`GOV-0001-release-sprint-structure`\n- Issue：`#1`\n- item_type：`GOV`",
+                    "- item_key：`FR-0001-example`\n- Issue：`#1`\n- item_type：`FR`",
+                ).replace(
+                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
+                    "",
+                ).replace(
+                    "- 关联 decision：`docs/decisions/ADR-0001-example.md`\n",
+                    "",
+                ).replace(
+                    "- active 收口事项：`GOV-0001-release-sprint-structure`",
+                    "- active 收口事项：`FR-0001-example`",
+                ),
+                encoding="utf-8",
+            )
+            exec_plan.rename(repo / "docs" / "exec-plans" / "FR-0001-example.md")
+            (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").unlink()
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
 
     def test_valid_governance_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -11,8 +11,21 @@ import argparse
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
 from scripts.context_guard import infer_current_issue, validate_context_rules, validate_repository as validate_context_repository
+from scripts.item_context import matching_exec_plan_for_issue
+from scripts.open_pr import validate_pr_preflight
 from scripts.policy.policy import classify_paths
 from scripts.workflow_guard import validate_repository as validate_workflow_repository
+
+
+def infer_pr_class(changed_paths: list[str]) -> str:
+    categories = {item.category for item in classify_paths(changed_paths)}
+    if "governance" in categories:
+        return "governance"
+    if any(path.startswith("docs/specs/") for path in changed_paths):
+        return "spec"
+    if categories <= {"docs"}:
+        return "docs"
+    return "implementation"
 
 
 REQUIRED_GOVERNANCE_FILES = (
@@ -69,6 +82,23 @@ def main(argv: list[str] | None = None) -> int:
         errors.append("governance-gate 无法从 `--head-ref` 或当前分支推断当前事项，已拒绝继续执行。")
     else:
         errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
+        active_exec_plan = matching_exec_plan_for_issue(repo_root, current_issue)
+        if active_exec_plan:
+            inferred_pr_class = infer_pr_class(changed)
+            if inferred_pr_class in {"governance", "spec", "implementation"}:
+                errors.extend(
+                    validate_pr_preflight(
+                        inferred_pr_class,
+                        current_issue,
+                        active_exec_plan.get("item_key"),
+                        active_exec_plan.get("item_type"),
+                        active_exec_plan.get("release"),
+                        active_exec_plan.get("sprint"),
+                        changed,
+                        repo_root=repo_root,
+                        validate_worktree_binding_check=False,
+                    )
+                )
     for relative_path in REQUIRED_GOVERNANCE_FILES:
         if not (repo_root / relative_path).exists():
             errors.append(f"缺少治理栈 v2 必需工件: {repo_root / relative_path}")

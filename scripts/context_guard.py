@@ -21,6 +21,7 @@ from scripts.item_context import (
     is_inactive_exec_plan,
     normalize_bound_spec_dir,
     parse_exec_plan_metadata,
+    spec_dir_has_minimum_suite,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
@@ -284,8 +285,6 @@ def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str
     item_key = fields.get("item_key", "").strip()
     if not issue or not item_key or not item_type:
         return False
-    if exec_plan_path.name != f"{item_key}.md":
-        return False
     return not validate_item_key(exec_plan_path, item_key, item_type, allow_empty=False)
 
 
@@ -360,7 +359,7 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
             continue
         if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
             expected_dir = repo_root / "docs" / "specs" / item_key
-            if expected_dir.exists():
+            if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
                 authorized.add(expected_dir.relative_to(repo_root))
     return authorized
 
@@ -594,10 +593,9 @@ def main(argv: list[str] | None = None) -> int:
     if base_ref:
         changed_paths = git_changed_files(base_ref, head_ref, repo=repo_root)
 
-    current_issue = args.current_issue
-    if current_issue is None:
-        current_issue = infer_current_issue(args.head_ref)
-    if current_issue is None:
+    head_ref_issue = infer_current_issue(args.head_ref)
+    current_issue = args.current_issue if args.current_issue is not None else head_ref_issue
+    if current_issue is None and args.head_sha is None:
         current_issue = infer_current_issue(git_current_branch(repo=repo_root))
 
     if changed_paths is None:

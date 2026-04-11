@@ -607,7 +607,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/process/delivery-funnel.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_core_item_with_valid_formal_spec_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -790,7 +790,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_bound_formal_spec_accepts_only_its_own_touched_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -845,7 +845,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_template_spec_binding_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -935,7 +935,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_governance_with_unrelated_bootstrap_decision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -960,7 +960,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_governance_bootstrap_contract_requires_valid_current_item_decision_binding(self) -> None:
         scenarios = (
@@ -995,7 +995,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                         ["AGENTS.md"],
                         repo_root=repo,
                     )
-                self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+                self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_unrelated_repo_bootstrap_contract_cannot_replace_current_item_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1019,7 +1019,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_spec_class_without_spec_changes_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1060,7 +1060,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/specs/FR-9999-unrelated/spec.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_legacy_implementation_pr_accepts_existing_local_formal_spec_suite_for_fr_item(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1109,7 +1109,39 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/specs/FR-0001-governance-stack-v1/spec.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_spec_pr_does_not_accept_bootstrap_contract_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_decision="docs/decisions/ADR-0003-example.md",
+            )
+            write_decision(
+                repo,
+                "docs/decisions/ADR-0003-example.md",
+                issue="#57",
+                item_key="GOV-0028-harness-compat-migration",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            errors = validate_pr_preflight(
+                "spec",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["docs/specs/FR-0001-governance-stack-v1/spec.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error for error in errors))
 
     def test_governance_pr_does_not_accept_unbound_fr_local_formal_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1132,7 +1164,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_implementation_pr_requires_local_formal_input_for_fr_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1154,7 +1186,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["scripts/tool.py"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_implementation_pr_requires_formal_input_for_hotfix_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1176,7 +1208,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["scripts/tool.py"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_implementation_pr_requires_formal_input_for_chore_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1198,7 +1230,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/AGENTS.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+        self.assertTrue(any("缺少绑定 formal spec 输入" in error or "formal spec 或 bootstrap contract" in error for error in errors))
 
     def test_build_body_contains_item_context(self) -> None:
         args = parse_args(
