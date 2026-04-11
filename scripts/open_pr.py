@@ -19,6 +19,7 @@ from scripts.item_context import (
     INPUT_MODE_UNBOUND,
     active_exec_plans_for_issue,
     allows_legacy_metadata_free_formal_spec_decision,
+    validate_additional_spec_contracts,
     classify_exec_plan_input_mode,
     load_item_context_from_exec_plan,
     spec_dir_has_minimum_suite,
@@ -118,6 +119,9 @@ def has_bound_formal_spec_input(
         spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
         if spec_dir is None:
             return False
+        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, exec_plan)
+        if additional_spec_errors:
+            return False
         if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
             return False
         if exec_plan.get("关联 decision", ""):
@@ -127,7 +131,14 @@ def has_bound_formal_spec_input(
                 and allows_legacy_metadata_free_formal_spec_decision(exec_plan, decision_errors)
             ):
                 return False
-        return not validate_suite(spec_dir)
+        if validate_suite(spec_dir):
+            return False
+        for extra_spec_dir in additional_spec_dirs:
+            if extra_spec_dir == spec_dir.relative_to(repo_root.resolve()):
+                continue
+            if validate_suite(repo_root / extra_spec_dir):
+                return False
+        return True
 
     if allow_unbound_local_fallback and input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
         expected_dir = repo_root / "docs" / "specs" / item_key

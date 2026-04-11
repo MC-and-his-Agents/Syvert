@@ -7,19 +7,19 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
+- 关联 exec-plan：`docs/exec-plans/GOV-0027-governance-contract-rewrite.md`、`docs/exec-plans/GOV-0028-harness-compat-migration.md`、`docs/exec-plans/GOV-0029-remove-legacy-todo-md.md`
 
 ## 实施目标
 
 - 为 `FR-0003` 建立正式规约入口，冻结 GitHub 调度层与仓内语义层的职责边界。
-- 通过 `GOV-0027` 对齐顶层治理文档、release/sprint 索引与 decision / exec-plan 工件链。
+- 通过 `GOV-0027`、`GOV-0028`、`GOV-0029` 分别完成治理契约落盘、harness 兼容迁移与 legacy `TODO.md` 退出 formal governance flow 的收口。
 - 让当前 Work Item 可以通过受控入口合法开 PR、通过审查并完成 closeout。
 
 ## 分阶段拆分
 
 - 阶段 1：建立 `FR-0003` formal spec 套件，冻结治理 requirement 与边界。
 - 阶段 2：更新顶层治理文档，消除“版本层 / 冲刺层 / 事项层”与 `Phase / FR / Work Item` 的冲突。
-- 阶段 3：补齐 `v0.2.0` / `2026-S15` 索引、`GOV-0027` exec-plan 与 decision，完成受控 PR 前置条件。
+- 阶段 3：补齐 `v0.2.0` / `2026-S15` 索引，以及 `GOV-0027`、`GOV-0028`、`GOV-0029` 的 exec-plan / decision 工件链，完成受控 PR 前置条件。
 
 ## 实现约束
 
@@ -38,7 +38,7 @@
 - 集成/契约测试：
   - 运行 `open_pr --dry-run`、`pr_scope_guard`、`governance_gate` 验证当前 Work Item 的受控入口链路
 - 手动验证：
-  - 核对 GitHub `#54 / #55 / #56` 与仓内 `FR-0003 / GOV-0027 / v0.2.0 / 2026-S15` 的映射关系
+  - 核对 GitHub `#54 / #55 / #56 / #57 / #58` 与仓内 `FR-0003 / GOV-0027 / GOV-0028 / GOV-0029 / v0.2.0 / 2026-S15` 的映射关系
 
 ## TDD 范围
 
@@ -54,7 +54,7 @@
   - 顶层治理文档口径收敛
   - release / sprint 索引与 decision / exec-plan 补齐
 - 串行依赖项：
-  - `GOV-0027` 开 PR 前，必须先完成 formal spec、exec-plan 与索引落盘
+  - `GOV-0027`、`GOV-0028`、`GOV-0029` 开 PR 前，必须先完成 formal spec、exec-plan 与索引落盘
   - merge 前，必须完成所有 governance guard、review、guardian 与 checks
 - 阻塞项：
   - 若 `release` / `sprint` 索引缺失或 active `exec-plan` 不合法，受控入口会直接拒绝
@@ -69,4 +69,4 @@
 
 - 结论：通过
 - 未决问题：无
-- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许由 `GOV-0027` 作为首个 Work Item 进入治理 PR 收口
+- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许 `GOV-0027`、`GOV-0028`、`GOV-0029` 按各自边界进入治理 PR 收口
