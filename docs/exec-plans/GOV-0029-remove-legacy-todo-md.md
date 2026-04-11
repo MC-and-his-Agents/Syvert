@@ -8,6 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
 - 关联 PR：`#61`
 
@@ -48,7 +49,7 @@
 ## 当前停点
 
 - 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
-- 当前 head `8e856d0b7df9b6506102d8ab50619f07dca7d02a` 已通过治理单测、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`；PR `#61` 已创建，等待 GitHub checks 与 guardian 收口。
+- 本地治理单测、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run` 已通过；PR `#61` 已创建，等待把 formal spec / decision / exec-plan 真相进一步收拢后进入 guardian 收口。
 
 ## 下一步动作
 
@@ -77,6 +78,7 @@
 - `python3 scripts/workflow_guard.py`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-58-governance-remove-legacy-todo-md-from-the-formal-governance-flow`
 - `python3 scripts/open_pr.py --class governance --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
+- `gh pr edit 61 --title ... --body-file ...`
 
 ## 未决风险
 

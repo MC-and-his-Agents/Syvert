@@ -21,11 +21,11 @@
   - 规定 `Work Item` 是唯一执行入口
   - 规定 `FR` 是 canonical requirement 容器，formal spec 绑定到 FR
   - 规定 `release / sprint` 只保留为执行上下文或仓内索引语义
+  - 收敛 legacy `TODO.md` 在 formal governance flow 中的地位
 - 本次不纳入：
   - `scripts/**` 的行为改造
   - harness 自动化入口、guardian、merge gate 的运行时改造
   - 与本事项无关的业务实现代码
-  - 调整正式规约套件的 `required_files`
   - 任何业务实现代码或业务 spec
 
 ## 需求说明
@@ -38,6 +38,7 @@
   - `FR` 必须被定义为 canonical requirement 容器，formal spec 绑定到 FR，而不是绑定到 Phase 或 Work Item。
   - `Phase` 必须被定义为阶段目标容器，不直接承载执行 PR。
   - `release / sprint` 必须被定义为执行上下文或仓内索引语义，不得退化为第二套状态真相源。
+  - formal spec 最小套件、模板与治理 guard 不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
 - 非功能需求：
   - 所有相关治理文档口径必须一致，不能出现并行分层定义。
   - 本事项必须保持 governance-only 边界，不混入业务实现代码。
