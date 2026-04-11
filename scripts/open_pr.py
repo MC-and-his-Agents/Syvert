@@ -90,6 +90,18 @@ def has_bound_formal_spec_input(
         spec_dir = repo_root / related_spec.rstrip("/")
         if spec_dir.is_file():
             spec_dir = spec_dir.parent
+        try:
+            bound_spec_dir = spec_dir.relative_to(repo_root)
+        except ValueError:
+            return False
+
+        touched_spec_dirs = formal_spec_dirs(changed_files)
+        if touched_spec_dirs:
+            if bound_spec_dir not in touched_spec_dirs:
+                return False
+            if any(path != bound_spec_dir for path in touched_spec_dirs):
+                return False
+
         return not validate_suite(spec_dir)
 
     if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"}:

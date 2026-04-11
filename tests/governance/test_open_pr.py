@@ -720,6 +720,62 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_bound_formal_spec_rejects_unrelated_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                [
+                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
+                    "docs/specs/FR-9999-unrelated/spec.md",
+                ],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_bound_formal_spec_accepts_only_its_own_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0028-harness-compat-migration",
+                issue="#57",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0028-harness-compat-migration",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            errors = validate_pr_preflight(
+                "governance",
+                57,
+                "GOV-0028-harness-compat-migration",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                ["docs/specs/FR-0001-governance-stack-v1/spec.md"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_bound_formal_spec_must_be_reviewable_not_just_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

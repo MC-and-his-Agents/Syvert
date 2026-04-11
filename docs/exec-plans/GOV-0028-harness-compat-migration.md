@@ -7,7 +7,7 @@
 - item_type：`GOV`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 关联 spec：`无（治理文档事项）`
 - 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
 - 关联 PR：`#60`
 - active 收口事项：`GOV-0028-harness-compat-migration`
@@ -30,8 +30,6 @@
   - `docs/AGENTS.md`
   - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
   - `docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
-  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
-  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md`
   - `docs/process/agent-loop.md`
   - `docs/specs/README.md`
@@ -54,15 +52,14 @@
 ## 当前停点
 
 - 最近一次显式实现 checkpoint 对应提交 `bfa8a327436f70f7b735922e324e3e51f76bb343`。该 checkpoint 在此前收口基础上继续完成了最后一个真实兼容缺口：`scripts/item_context.py` 已把 legacy 占位值 `关联 spec：无（治理文档事项）` 识别为 bootstrap placeholder，而不是 formal spec 绑定；配套回归测试已补到 `tests/governance/test_item_context.py`、`tests/governance/test_context_guard.py`、`tests/governance/test_open_pr.py`；同时，`docs/AGENTS.md` 与 `FR-0003` legacy `TODO.md` 已与当前绑定模型和完成状态口径对齐。
-- 当前工作树在上述 checkpoint 之后仅补做一项 review-state 同步：把 active `exec-plan` 的范围、停点、下一步与验证证据回写到与当前受审现实一致。该同步不再改变脚本、测试或治理契约，只修正恢复主入口的事实描述。
+- 当前工作树在上述 checkpoint 之后补做两项收口：一是补齐 `open_pr` 对 formal spec 绑定 suite 的范围校验与回归测试，防止无关 FR 套件搭车通过 preflight；二是把当前 PR 范围收敛回 bootstrap contract、harness / guard / template 兼容迁移与 legacy `TODO.md` 历史回写，不再混入 `FR-0003` formal spec 语义改写。
 - 当前已解决本轮全部已知阻断：
   - `context_guard` 不再把 bootstrap decision 完整性错误施加到所有 touched `exec-plan`
   - `open_pr` 的 bootstrap fallback 已收紧到“当前事项自己的 active exec-plan + 关联 decision”
+  - `open_pr` 的 formal-spec 绑定校验已收紧：一旦 PR 触碰 formal spec 目录，只允许命中当前绑定 suite，且不得混入其他 FR 套件
   - `docs/specs/README.md` 不再把当前 Work Item 完整上下文写成 formal spec 必需输入
-  - `FR-0003 plan.md` 的手动验证与 implementation-ready 叙述已切换到 `#57 / GOV-0028`
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
-  - `FR-0003 spec.md` 已把当前执行映射刷新为 `#54 -> #55 -> #57`，不再把 `#56 / GOV-0027` 误写成当前 Work Item
-- 当前待办只剩推送包含本次 exec-plan 对齐的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
+- 当前待办只剩推送包含本次 preflight 收紧与 PR 范围收敛的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
 
 ## 下一步动作
 
