@@ -94,6 +94,8 @@ def has_bound_formal_spec_input(
             return False
         if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
             return False
+        if exec_plan.get("关联 decision", "") and validate_bound_decision_contract(repo_root, exec_plan, require_present=False):
+            return False
         return not validate_suite(spec_dir)
 
     if input_mode == INPUT_MODE_UNBOUND and item_type == "FR":

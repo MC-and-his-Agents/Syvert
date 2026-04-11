@@ -1021,6 +1021,37 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("当前执行回合 `#1` 不一致" in error for error in errors))
 
+    def test_touched_inactive_cross_issue_exec_plan_is_allowed_for_retirement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0002-other.md",
+                """# GOV-0002
+
+## 关联信息
+
+- item_key：`GOV-0002-other`
+- Issue：`#2`
+- item_type：`GOV`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 状态：`inactive after PR #18 merge`
+- active 收口事项：`GOV-0002-other`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/GOV-0002-other.md"],
+                current_issue=1,
+            )
+        self.assertEqual(errors, [])
+
     def test_touched_decision_is_scoped_to_current_issue_instead_of_repo_wide_bindings(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

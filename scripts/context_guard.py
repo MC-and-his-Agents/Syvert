@@ -18,6 +18,7 @@ from scripts.item_context import (
     active_exec_plans_for_issue,
     classify_exec_plan_input_mode,
     is_eligible_active_exec_plan,
+    is_inactive_exec_plan,
     normalize_bound_spec_dir,
     parse_exec_plan_metadata,
     validate_bound_decision_contract,
@@ -469,7 +470,7 @@ def validate_context_rules(
                 continue
             fields = parse_exec_plan_metadata(target)
             exec_issue = fields.get("Issue", "").strip()
-            if current_issue is not None and exec_issue and exec_issue != str(current_issue):
+            if current_issue is not None and exec_issue and exec_issue != str(current_issue) and not is_inactive_exec_plan(fields):
                 errors.append(
                     f"{target}: 当前 touched exec-plan 的 `Issue` `{exec_issue}` 与当前执行回合 `#{current_issue}` 不一致。"
                 )

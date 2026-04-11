@@ -1078,6 +1078,32 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_formal_spec_mode_rejects_inconsistent_optional_related_decision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+                related_decision="docs/decisions/ADR-0003-shared.md",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            write_decision(repo, "docs/decisions/ADR-0003-shared.md", issue="#2", item_key="GOV-0002-other")
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/spec.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
     def test_implementation_pr_requires_local_formal_input_for_fr_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

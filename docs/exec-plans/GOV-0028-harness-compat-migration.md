@@ -26,6 +26,7 @@
   - `code_review.md`
   - `docs/AGENTS.md`
   - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
+  - `docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
   - `docs/exec-plans/GOV-0028-harness-compat-migration.md`
   - `docs/exec-plans/README.md`
   - `docs/process/agent-loop.md`
@@ -53,6 +54,7 @@
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧，避免仓库级 active `exec-plan` 误授权 cross-issue 变更。
   - `governance_gate` 在 CI 场景优先使用 PR `head-ref` 推断 issue，并把该 issue 显式传入 `context_guard`。
   - `open_pr` 与治理文档不再宣称不存在的 legacy `HOTFIX` unbound formal-input 兼容；当前无绑定 formal spec / decision 时，仅 legacy `FR` implementation PR 可回退到本地 formal spec 套件。
+  - 已将仍引用 `ADR-0003` 的 `GOV-0027` exec-plan 退役为 inactive，避免 shared decision 与当前 GOV-0028 bootstrap contract 发生双重绑定冲突。
   - `docs/specs/README.md` 与本 exec-plan 的范围、最小套件、待合入门槛同步回到当前 head 真相。
 
 ## 合入门槛
