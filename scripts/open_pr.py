@@ -23,8 +23,10 @@ from scripts.item_context import (
     spec_dir_has_minimum_suite,
     validate_bound_decision_contract,
     validate_bound_spec_contract,
+    normalize_bound_spec_dir,
     normalize_issue,
     valid_item_key,
+    validate_bound_formal_spec_scope,
 )
 from scripts.common import (
     CommandError,
@@ -87,28 +89,24 @@ def has_bound_formal_spec_input(
         if validate_bound_spec_contract(repo_root, exec_plan):
             return False
         related_spec = str(exec_plan.get("关联 spec", "")).strip()
-        spec_dir = repo_root / related_spec.rstrip("/")
-        if spec_dir.is_file():
-            spec_dir = spec_dir.parent
-        try:
-            bound_spec_dir = spec_dir.relative_to(repo_root)
-        except ValueError:
+        spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
+        if spec_dir is None:
             return False
-
-        touched_spec_dirs = formal_spec_dirs(changed_files)
-        if touched_spec_dirs:
-            if bound_spec_dir not in touched_spec_dirs:
-                return False
-            if any(path != bound_spec_dir for path in touched_spec_dirs):
-                return False
-
+        if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
+            return False
         return not validate_suite(spec_dir)
 
     if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"}:
         expected_dir = repo_root / "docs" / "specs" / item_key
         touched_spec_dirs = formal_spec_dirs(changed_files)
         if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
-            return expected_dir.relative_to(repo_root) in touched_spec_dirs
+            expected_rel = expected_dir.relative_to(repo_root)
+            if touched_spec_dirs:
+                if expected_rel not in touched_spec_dirs:
+                    return False
+                if any(path != expected_rel for path in touched_spec_dirs):
+                    return False
+            return True
 
     return False
 

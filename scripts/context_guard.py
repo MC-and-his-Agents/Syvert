@@ -18,6 +18,7 @@ from scripts.item_context import (
     is_eligible_active_exec_plan,
     parse_exec_plan_metadata,
     validate_bound_decision_contract,
+    validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
 )
 from scripts.policy.policy import spec_suite_policy
@@ -372,9 +373,15 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = parse_exec_plan_metadata(target)
+            input_mode = classify_exec_plan_input_mode(fields)
+            if input_mode == INPUT_MODE_FORMAL_SPEC:
+                errors.extend(
+                    f"{target}: {error}"
+                    for error in validate_bound_formal_spec_scope(repo_root, fields, changed_paths)
+                )
             if fields.get("item_type") != "GOV":
                 continue
-            if classify_exec_plan_input_mode(fields) != INPUT_MODE_BOOTSTRAP:
+            if input_mode != INPUT_MODE_BOOTSTRAP:
                 continue
             errors.extend(
                 f"{target}: {error}"

@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Mapping
 
-from scripts.policy.policy import spec_suite_policy
+from scripts.policy.policy import formal_spec_dirs, spec_suite_policy
 
 
 ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -114,14 +114,27 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
     return payload
 
 
-def parse_markdown_metadata(text: str, *, allowed_keys: set[str] | None = None) -> dict[str, str]:
+def parse_markdown_metadata(
+    text: str,
+    *,
+    allowed_keys: set[str] | None = None,
+    fail_on_duplicates: bool = False,
+) -> dict[str, str]:
     payload: dict[str, str] = {}
+    seen_keys: set[str] = set()
     for match in METADATA_RE.finditer(text):
         key = match.group(1).strip()
         if allowed_keys is not None and key not in allowed_keys:
             continue
-        if key in payload:
+        if key in seen_keys:
+            if fail_on_duplicates:
+                payload["conflict"] = "duplicate_metadata_keys"
+                payload["duplicate_key"] = key
+                if "Issue" in payload:
+                    payload["Issue"] = normalize_issue(payload["Issue"])
+                return payload
             continue
+        seen_keys.add(key)
         payload[key] = normalize_value(match.group(2))
     if "Issue" in payload:
         payload["Issue"] = normalize_issue(payload["Issue"])
@@ -131,7 +144,11 @@ def parse_markdown_metadata(text: str, *, allowed_keys: set[str] | None = None) 
 def parse_decision_metadata(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
-    return parse_markdown_metadata(path.read_text(encoding="utf-8"), allowed_keys=DECISION_METADATA_KEYS)
+    return parse_markdown_metadata(
+        path.read_text(encoding="utf-8"),
+        allowed_keys=DECISION_METADATA_KEYS,
+        fail_on_duplicates=True,
+    )
 
 
 def classify_exec_plan_input_mode(payload: Mapping[str, str]) -> str:
@@ -158,12 +175,48 @@ def normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None:
     return candidate
 
 
+def normalize_bound_decision_path(repo_root: Path, related_decision: str) -> Path | None:
+    if not related_decision or not related_decision.startswith("docs/decisions/"):
+        return None
+    candidate = (repo_root / related_decision.rstrip("/")).resolve()
+    try:
+        candidate.relative_to(repo_root.resolve())
+    except ValueError:
+        return None
+    parts = candidate.relative_to(repo_root.resolve()).parts if candidate.exists() else Path(related_decision.rstrip("/")).parts
+    if len(parts) != 3 or parts[0] != "docs" or parts[1] != "decisions" or not parts[2].endswith(".md"):
+        return None
+    if candidate.exists() and not candidate.is_file():
+        return None
+    return candidate
+
+
 def spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
     if not spec_dir.exists() or not spec_dir.is_dir():
         return False
     required_files = set(spec_suite_policy()["required_files"])
     child_names = {child.name for child in spec_dir.iterdir()}
     return required_files.issubset(child_names)
+
+
+def validate_bound_formal_spec_scope(
+    repo_root: Path,
+    payload: Mapping[str, str],
+    changed_files: list[str],
+) -> list[str]:
+    touched_spec_dirs = formal_spec_dirs(changed_files)
+    if not touched_spec_dirs:
+        return []
+    spec_dir = normalize_bound_spec_dir(repo_root, str(payload.get("关联 spec", "")).strip())
+    if spec_dir is None:
+        return []
+    bound_spec_dir = spec_dir.relative_to(repo_root.resolve())
+    if bound_spec_dir not in touched_spec_dirs:
+        return ["当前 diff 触碰的 formal spec 套件与 `关联 spec` 绑定不一致。"]
+    foreign = sorted(path.as_posix() for path in touched_spec_dirs if path != bound_spec_dir)
+    if foreign:
+        return [f"当前 diff 只能触碰当前绑定的 formal spec 套件，发现额外套件：{', '.join(foreign)}。"]
+    return []
 
 
 def validate_bound_spec_contract(repo_root: Path, payload: Mapping[str, str]) -> list[str]:
@@ -211,15 +264,23 @@ def validate_bound_decision_contract(
             return ["当前 exec-plan 缺少 `关联 decision`，bootstrap contract 无法与当前事项建立对应关系。"]
         return []
 
-    decision_path = (repo_root / related_decision).resolve()
+    decision_path = (repo_root / related_decision.rstrip("/")).resolve()
     try:
         decision_path.relative_to(repo_root.resolve())
     except ValueError:
         return [f"`关联 decision` 指向仓库外路径：`{related_decision}`。"]
+    if not related_decision.startswith("docs/decisions/"):
+        return [f"`关联 decision` 必须绑定到 `docs/decisions/*.md` 决策文档：`{related_decision}`。"]
+    if normalize_bound_decision_path(repo_root, related_decision) is None:
+        return [f"`关联 decision` 必须绑定到 `docs/decisions/*.md` 决策文档：`{related_decision}`。"]
     if not decision_path.exists():
         return [f"`关联 decision` 指向的路径不存在：`{related_decision}`。"]
 
     decision_fields = parse_decision_metadata(decision_path)
+    if decision_fields.get("conflict") == "duplicate_metadata_keys":
+        duplicate_key = decision_fields.get("duplicate_key", "unknown")
+        return [f"`关联 decision` 元数据区存在重复键 `{duplicate_key}`，bootstrap contract 无法确认唯一绑定。"]
+
     errors: list[str] = []
     decision_issue = decision_fields.get("Issue", "")
     exec_issue = normalize_issue(payload.get("Issue", ""))

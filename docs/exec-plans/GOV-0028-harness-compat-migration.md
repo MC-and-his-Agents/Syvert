@@ -51,15 +51,18 @@
 
 ## 当前停点
 
-- 最近一次显式实现 checkpoint 对应提交 `bfa8a327436f70f7b735922e324e3e51f76bb343`。该 checkpoint 在此前收口基础上继续完成了最后一个真实兼容缺口：`scripts/item_context.py` 已把 legacy 占位值 `关联 spec：无（治理文档事项）` 识别为 bootstrap placeholder，而不是 formal spec 绑定；配套回归测试已补到 `tests/governance/test_item_context.py`、`tests/governance/test_context_guard.py`、`tests/governance/test_open_pr.py`；同时，`docs/AGENTS.md` 与 `FR-0003` legacy `TODO.md` 已与当前绑定模型和完成状态口径对齐。
-- 当前工作树在上述 checkpoint 之后补做两项收口：一是补齐 `open_pr` 对 formal spec 绑定 suite 的范围校验与回归测试，防止无关 FR 套件搭车通过 preflight；二是把当前 PR 范围收敛回 bootstrap contract、harness / guard / template 兼容迁移与 legacy `TODO.md` 历史回写，不再混入 `FR-0003` formal spec 语义改写。
+- 最近一次显式实现 checkpoint 对应提交 `0ba5bf13e1af7893f45f112e08400aaac8ee48cd`。该 checkpoint 已完成第一轮收口：`open_pr` 不再允许无关 FR formal spec 套件搭车通过 preflight，`GOV-0028` 已切换到 bootstrap contract，且当前 PR 已把 `FR-0003/spec.md`、`plan.md` 从范围中移出，只保留 legacy `TODO.md` 历史回写。
+- 当前工作树在上述 checkpoint 之后补做第二轮 guardian 收口：一是把 bootstrap contract 收紧到真实 `docs/decisions/*.md` 决策文档，并让重复 decision metadata fail-closed；二是让 `context_guard` 与 `open_pr` 对 formal-spec suite 范围保持同一条 fail-closed 规则；三是恢复 legacy FR / HOTFIX 代码型实现 PR 的兼容路径，只要当前事项自己的 formal spec 套件已经存在且有效，就不再强迫当前 diff 触碰 spec 文件。
 - 当前已解决本轮全部已知阻断：
   - `context_guard` 不再把 bootstrap decision 完整性错误施加到所有 touched `exec-plan`
   - `open_pr` 的 bootstrap fallback 已收紧到“当前事项自己的 active exec-plan + 关联 decision”
   - `open_pr` 的 formal-spec 绑定校验已收紧：一旦 PR 触碰 formal spec 目录，只允许命中当前绑定 suite，且不得混入其他 FR 套件
+  - `bootstrap contract` 现在只接受真实 `docs/decisions/*.md` 决策文档，重复 decision metadata 会 fail-closed
+  - `context_guard` 已同步 enforce formal-spec suite scope：绑定 suite 与 touched suite 不一致时直接报错
+  - legacy FR / HOTFIX 的 code-only 实现 PR 已恢复兼容：已有且有效的本地 formal spec 套件可直接作为 formal input
   - `docs/specs/README.md` 不再把当前 Work Item 完整上下文写成 formal spec 必需输入
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
-- 当前待办只剩推送包含本次 preflight 收紧与 PR 范围收敛的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
+- 当前待办只剩推送包含第二轮 guardian 修复的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
 
 ## 下一步动作
 
@@ -113,4 +116,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `bfa8a327436f70f7b735922e324e3e51f76bb343`
+- `0ba5bf13e1af7893f45f112e08400aaac8ee48cd`

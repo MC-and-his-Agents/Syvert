@@ -855,6 +855,51 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
+    def test_formal_spec_exec_plan_rejects_unrelated_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8"),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "docs/specs/FR-9999-unrelated/",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=[
+                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                    "docs/specs/FR-0001-example/spec.md",
+                ],
+            )
+        self.assertTrue(any("formal spec 套件" in error or "关联 spec" in error for error in errors))
+
+    def test_formal_spec_exec_plan_accepts_its_own_touched_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            errors = validate_context_rules(
+                repo,
+                changed_paths=[
+                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                    "docs/specs/FR-0001-example/spec.md",
+                ],
+            )
+        self.assertEqual(errors, [])
+
     def test_valid_governance_bootstrap_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

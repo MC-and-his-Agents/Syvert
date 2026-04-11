@@ -93,6 +93,39 @@ class ItemContextTests(unittest.TestCase):
         self.assertTrue(any("缺少 `Issue`" in error for error in errors))
         self.assertTrue(any("缺少 `item_key`" in error for error in errors))
 
+    def test_validate_bound_decision_contract_requires_docs_decisions_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_file(repo / "docs" / "exec-plans" / "GOV-0001-example.md", "# exec-plan\n")
+            payload = {
+                "Issue": "1",
+                "item_key": "GOV-0001-example",
+                "关联 decision": "docs/exec-plans/GOV-0001-example.md",
+            }
+            errors = validate_bound_decision_contract(repo, payload, require_present=True)
+        self.assertTrue(any("docs/decisions/*.md" in error for error in errors))
+
+    def test_validate_bound_decision_contract_rejects_duplicate_metadata_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision = repo / "docs" / "decisions" / "ADR-GOV-0001-example.md"
+            write_file(
+                decision,
+                """# ADR-GOV-0001
+
+- Issue：`#1`
+- Issue：`#2`
+- item_key：`GOV-0001-example`
+""",
+            )
+            payload = {
+                "Issue": "1",
+                "item_key": "GOV-0001-example",
+                "关联 decision": "docs/decisions/ADR-GOV-0001-example.md",
+            }
+            errors = validate_bound_decision_contract(repo, payload, require_present=True)
+        self.assertTrue(any("重复键" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

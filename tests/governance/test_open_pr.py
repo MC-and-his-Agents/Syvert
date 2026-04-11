@@ -925,7 +925,9 @@ class OpenPrPreflightTests(unittest.TestCase):
             ("missing", None),
             ("nonexistent", "docs/decisions/ADR-0001-missing.md"),
             ("out_of_repo", "../outside-decision.md"),
+            ("wrong_dir", "docs/exec-plans/GOV-0015-item-context-gate.md"),
             ("metadata_free", "docs/decisions/ADR-0002-empty.md"),
+            ("duplicate_metadata", "docs/decisions/ADR-0003-duplicate.md"),
         )
         for label, related_decision in scenarios:
             with self.subTest(case=label):
@@ -935,6 +937,11 @@ class OpenPrPreflightTests(unittest.TestCase):
                         (repo / "docs" / "decisions").mkdir(parents=True)
                     if label == "metadata_free":
                         (repo / "docs" / "decisions" / "ADR-0002-empty.md").write_text("# ADR\n", encoding="utf-8")
+                    if label == "duplicate_metadata":
+                        (repo / "docs" / "decisions" / "ADR-0003-duplicate.md").write_text(
+                            """# ADR\n\n- Issue：`#5`\n- Issue：`#6`\n- item_key：`GOV-0015-item-context-gate`\n""",
+                            encoding="utf-8",
+                        )
                     write_exec_plan(repo, issue="#5", related_decision=related_decision)
                     errors = validate_pr_preflight(
                         "governance",
@@ -1012,6 +1019,29 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
+
+    def test_legacy_implementation_pr_accepts_existing_local_formal_spec_suite_for_fr_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            errors = validate_pr_preflight(
+                "implementation",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["scripts/tool.py"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
 
     def test_implementation_pr_requires_local_formal_input_for_fr_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
