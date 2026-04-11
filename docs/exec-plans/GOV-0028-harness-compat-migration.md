@@ -48,7 +48,7 @@
 
 ## 当前停点
 
-- 最近一次已推送 checkpoint 对应 head 为 `e66d09a0056c95bb20436f5ff8a4da4684d874fa`。该 head 已收口 issue-scope 授权、fenced-code metadata 伪造面、`spec_todo` 分类与 legacy `ADR-0001` 的 implementation compatibility；GitHub checks 通过后，剩余动作只剩 guardian 与受控合并闭环。
+- 最近一次已推送 checkpoint 对应 head 为 `cdf734ccbc9d5db011d15ad34b1ddce085baa0ae`。该 head 已收口 issue-scope 授权、fenced-code metadata 伪造面、`spec_todo` 分类、legacy `ADR-0001` 的 implementation compatibility 以及 review artifact 完整性；当前工作树只在该 checkpoint 之上做最后一次 exec-plan 一致性修正。
 - 当前收口边界已经明确：
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧；若无法从真实 git ref 推断当前事项，或同一 Issue 命中多个 active `exec-plan`，会直接 fail-closed。
   - `关联 spec` 只接受 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；任意嵌套子目录都不再视为合法绑定。
@@ -96,4 +96,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7d222e62587687b410d56ac28546273ddf6f2eb9`
+- `cdf734ccbc9d5db011d15ad34b1ddce085baa0ae`
