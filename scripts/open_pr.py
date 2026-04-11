@@ -48,6 +48,16 @@ from scripts.spec_guard import validate_suite
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+
+
+def has_formal_spec_core_file_changes(changed_files: list[str]) -> bool:
+    for path in changed_files:
+        normalized = Path(path)
+        parts = normalized.parts
+        if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in FORMAL_SPEC_CORE_FILES:
+            return True
+    return False
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -334,7 +344,7 @@ def validate_pr_preflight(
     if validate_worktree_binding_check:
         errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
-    if pr_class == "spec" and not any(item.category == "spec" for item in classify_paths(changed_files)):
+    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files):
         errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
     if pr_class == "spec" and not has_bound_formal_spec_input(

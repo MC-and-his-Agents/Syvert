@@ -1063,6 +1063,33 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("核心文件变更" in error for error in errors))
 
+    def test_spec_pr_rejects_adjunct_only_suite_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            adjunct = repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "contracts" / "README.md"
+            adjunct.parent.mkdir(parents=True, exist_ok=True)
+            adjunct.write_text("# contracts\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("核心文件变更" in error for error in errors))
+
     def test_unbound_fr_item_requires_its_own_touched_formal_spec_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
