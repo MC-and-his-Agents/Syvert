@@ -126,6 +126,29 @@ class ItemContextTests(unittest.TestCase):
             errors = validate_bound_decision_contract(repo, payload, require_present=True)
         self.assertTrue(any("重复键" in error for error in errors))
 
+    def test_validate_bound_decision_contract_ignores_metadata_inside_fenced_code_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision = repo / "docs" / "decisions" / "ADR-GOV-0001-example.md"
+            write_file(
+                decision,
+                """# ADR-GOV-0001
+
+```md
+- Issue：`#1`
+- item_key：`GOV-0001-example`
+```
+""",
+            )
+            payload = {
+                "Issue": "1",
+                "item_key": "GOV-0001-example",
+                "关联 decision": "docs/decisions/ADR-GOV-0001-example.md",
+            }
+            errors = validate_bound_decision_contract(repo, payload, require_present=True)
+        self.assertTrue(any("缺少 `Issue`" in error for error in errors))
+        self.assertTrue(any("缺少 `item_key`" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

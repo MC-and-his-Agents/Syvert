@@ -14,6 +14,7 @@ from scripts.context_guard import infer_current_issue, validate_context_rules, v
 from scripts.item_context import matching_exec_plan_for_issue
 from scripts.open_pr import validate_pr_preflight
 from scripts.policy.policy import classify_paths
+from scripts.pr_scope_guard import build_report
 from scripts.workflow_guard import validate_repository as validate_workflow_repository
 
 
@@ -21,9 +22,9 @@ def infer_pr_class(changed_paths: list[str]) -> str:
     categories = {item.category for item in classify_paths(changed_paths)}
     if "governance" in categories:
         return "governance"
-    if any(path.startswith("docs/specs/") for path in changed_paths):
+    if "spec" in categories:
         return "spec"
-    if categories <= {"docs"}:
+    if categories and categories <= {"docs"}:
         return "docs"
     return "implementation"
 
@@ -63,20 +64,18 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     changed = git_changed_files(base_ref, head_ref, repo=repo_root)
-    classified = classify_paths(changed)
-    categories = {item.category for item in classified}
-    if "governance" in categories and "implementation" in categories:
-        print("治理基线改动不得与实现代码混在同一 PR。", file=sys.stderr)
-        for item in classified:
-            if item.category == "implementation":
-                print(f"- {item.path}", file=sys.stderr)
+    report = build_report("governance", changed)
+    if report["violations"]:
+        print("治理基线改动不得超出 governance PR 允许范围。", file=sys.stderr)
+        for item in report["violations"]:
+            print(f"- {item['path']} ({item['category']})", file=sys.stderr)
         return 1
 
     errors: list[str] = []
     errors.extend(validate_workflow_repository(repo_root))
     errors.extend(validate_context_repository(repo_root))
     current_issue = infer_current_issue(args.head_ref)
-    if current_issue is None:
+    if current_issue is None and args.head_sha is None:
         current_issue = infer_current_issue(git_current_branch(repo=repo_root))
     if current_issue is None:
         errors.append("governance-gate 无法从 `--head-ref` 或当前分支推断当前事项，已拒绝继续执行。")

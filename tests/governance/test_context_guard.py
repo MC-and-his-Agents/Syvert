@@ -963,6 +963,48 @@ class ContextGuardTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("无法从 `--current-issue` / `--head-ref` / 当前分支推断当前事项", stderr.getvalue())
 
+    def test_invalid_related_decision_cannot_authorize_touched_formal_spec_for_current_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0001-example.md",
+                """# ADR-0001
+
+```md
+- Issue：`#1`
+- item_key：`GOV-0001-release-sprint-structure`
+```
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("关联 decision" in error and "缺少 `Issue`" in error for error in errors))
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
+
+    def test_invalid_related_spec_cannot_authorize_touched_decision_for_current_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "docs/specs/FR-0001-example/",
+                    "docs/specs/FR-9999-missing/",
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("关联 spec" in error and "不存在" in error for error in errors))
+        self.assertTrue(any("未被任何 exec-plan" in error for error in errors))
+
     def test_unbound_fr_authorization_requires_complete_reviewable_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

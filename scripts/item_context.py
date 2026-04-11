@@ -112,6 +112,37 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
     return payload
 
 
+def strip_fenced_code_blocks(text: str) -> str:
+    cleaned: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+
+    for line in text.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if not in_fence:
+            if stripped and stripped[0] in {"`", "~"}:
+                marker_len = 0
+                for char in stripped:
+                    if char == stripped[0]:
+                        marker_len += 1
+                        continue
+                    break
+                if marker_len >= 3:
+                    in_fence = True
+                    fence_char = stripped[0]
+                    fence_len = marker_len
+                    continue
+            cleaned.append(line)
+            continue
+
+        closing = stripped.strip()
+        if closing and len(closing) >= fence_len and all(char == fence_char for char in closing):
+            in_fence = False
+
+    return "".join(cleaned)
+
+
 def parse_markdown_metadata(
     text: str,
     *,
@@ -120,7 +151,8 @@ def parse_markdown_metadata(
 ) -> dict[str, str]:
     payload: dict[str, str] = {}
     seen_keys: set[str] = set()
-    for match in METADATA_RE.finditer(text):
+    metadata_text = strip_fenced_code_blocks(text)
+    for match in METADATA_RE.finditer(metadata_text):
         key = match.group(1).strip()
         if allowed_keys is not None and key not in allowed_keys:
             continue
