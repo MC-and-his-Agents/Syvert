@@ -53,6 +53,7 @@
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧；若无法从真实 git ref 推断当前事项，或同一 Issue 命中多个 active `exec-plan`，会直接 fail-closed。
   - `关联 spec` 只接受 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；任意嵌套子目录都不再视为合法绑定。
   - 对仍绑定 metadata-free `ADR-0001` 的非 `GOV` formal-spec 实现事项，`implementation` 入口保留 compatibility；`governance` / `spec` 入口以及 touched decision 授权仍要求可校验的 decision 元数据。
+  - `ADR-0003` 继续保留在 `FR-0003` 层作为上位治理决策，不作为 `GOV-0028` active `exec-plan` 的 machine-checkable `关联 decision` 输入；当前 Work Item 的可追溯闭环以 `关联 spec` + `关联 PR` 为准。
   - `governance_gate` 在 CI 场景按实际 diff 推断 PR class，再复用 `pr_scope_guard.build_report()` 与 `open_pr` preflight contract，不再把普通 implementation PR 误打成治理红灯。
 
 ## 下一步动作
@@ -81,7 +82,7 @@
 - `python3 scripts/spec_guard.py --all`
 - `python3 scripts/context_guard.py`
 - `python3 scripts/workflow_guard.py`
-- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/governance_gate.py --mode ci --base-sha 8bae3fd6ceb5822d8c5c9d1be593ed45808de4b5 --head-sha HEAD --head-ref issue-57-governance-migrate-harness-for-delivery-structure-compatibility`
 - `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 - `SYVERT_GUARDIAN_TIMEOUT_SECONDS=3600 python3 scripts/pr_guardian.py review 60 --json-output /tmp/pr60-guardian-<head>.json`
 
