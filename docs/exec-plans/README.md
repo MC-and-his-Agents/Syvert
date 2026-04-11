@@ -39,13 +39,13 @@
 ## 聚合而不嵌套
 
 - 不采用“每个事项目录中混放 `spec`、`exec-plan`、`decision`”的物理嵌套方案。
-- 继续使用“按工件类型分区、按 `item_key` 逻辑聚合”的模型。
+- 继续使用“按工件类型分区、按绑定关系逻辑聚合”的模型：formal spec 使用 FR `item_key`，active `exec-plan` 使用当前 Work Item `item_key`。
 - `docs/releases/` 与 `docs/sprints/` 只作为横向索引层，不替代 GitHub Issues / Projects。
 
 ## 示例链路
 
 - formal spec：`docs/specs/FR-XXXX-<slug>/spec.md`
-- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
 - exec-plan：`docs/exec-plans/<item_key>.md`
-- 聚合键：同一个 `item_key`
-- 目标：通过统一 `item_key`、`Issue`、`release`、`sprint` 串起规约、恢复工件与 PR
+- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
+- 绑定关系：formal spec 绑定 FR `item_key`，exec-plan 绑定当前 Work Item `item_key`
+- 目标：通过 FR / Work Item 绑定关系，以及 `Issue`、`release`、`sprint` 串起规约、恢复工件与 PR

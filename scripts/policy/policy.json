@@ -33,7 +33,8 @@
     ],
     "spec": [
       "spec",
-      "docs"
+      "docs",
+      "spec_todo"
     ]
   },
   "path_categories": [

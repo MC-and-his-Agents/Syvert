@@ -14,7 +14,7 @@ REQUIRED_BODY_HEADINGS = (
     ("## worktree / bootstrap 规则", "## Worktree / Bootstrap 规则"),
     ("## checkpoint / resume / compact 规则", "## Checkpoint / Resume / Compact 规则"),
     ("## stop conditions", "## Stop Conditions"),
-    ("## 何时必须更新 `exec-plan` / `TODO`", "## 何时必须更新 exec-plan / TODO"),
+    ("## 何时必须更新 `exec-plan`", "## 何时必须更新 exec-plan"),
     ("## 何时允许进入 `open_pr` / `merge_pr`", "## 何时允许进入 open_pr / merge_pr"),
 )
 
@@ -85,6 +85,11 @@ def load_workflow_contract(path: Path = WORKFLOW_PATH) -> tuple[dict, str]:
 
 def validate_workflow_contract(contract: dict, body: str) -> list[str]:
     errors: list[str] = []
+    body_headings = {
+        line.strip()
+        for line in body.splitlines()
+        if line.strip().startswith("## ")
+    }
 
     for key in REQUIRED_TOP_LEVEL_KEYS:
         if key not in contract:
@@ -126,7 +131,7 @@ def validate_workflow_contract(contract: dict, body: str) -> list[str]:
             errors.append("`codex.approval_policy` 必须是非空字符串。")
 
     for heading_group in REQUIRED_BODY_HEADINGS:
-        if not any(heading in body for heading in heading_group):
+        if not any(heading in body_headings for heading in heading_group):
             errors.append(f"正文缺少必需段落 `{' / '.join(heading_group)}`")
 
     return errors

@@ -14,10 +14,20 @@ import tempfile
 
 from scripts.item_context import (
     ITEM_TYPES,
+    INPUT_MODE_BOOTSTRAP,
+    INPUT_MODE_FORMAL_SPEC,
+    INPUT_MODE_UNBOUND,
     active_exec_plans_for_issue,
+    allows_legacy_metadata_free_formal_spec_decision,
+    classify_exec_plan_input_mode,
     load_item_context_from_exec_plan,
+    spec_dir_has_minimum_suite,
+    validate_bound_decision_contract,
+    validate_bound_spec_contract,
+    normalize_bound_spec_dir,
     normalize_issue,
     valid_item_key,
+    validate_bound_formal_spec_scope,
 )
 from scripts.common import (
     CommandError,
@@ -30,13 +40,24 @@ from scripts.common import (
     run,
     syvert_state_file,
 )
-from scripts.policy.policy import formal_spec_dirs, get_policy, risk_level, spec_suite_policy
+from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
+from scripts.spec_guard import validate_suite
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+
+
+def has_formal_spec_core_file_changes(changed_files: list[str]) -> bool:
+    for path in changed_files:
+        normalized = Path(path)
+        parts = normalized.parts
+        if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in FORMAL_SPEC_CORE_FILES:
+            return True
+    return False
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -64,55 +85,70 @@ def latest_commit_subject() -> str:
     return run(["git", "log", "-1", "--pretty=%s"], cwd=REPO_ROOT).stdout.strip()
 
 
-def has_bootstrap_contract(repo_root: Path) -> bool:
-    decisions_dir = repo_root / "docs" / "decisions"
-    exec_plans_dir = repo_root / "docs" / "exec-plans"
-    decision_files = [path for path in decisions_dir.glob("*.md") if path.name != "README.md"] if decisions_dir.exists() else []
-    exec_plan_files = [path for path in exec_plans_dir.glob("*.md") if path.name != "README.md"] if exec_plans_dir.exists() else []
-    return bool(decision_files and exec_plan_files)
-
-
-def has_formal_spec_input(repo_root: Path, changed_files: list[str]) -> bool:
-    if formal_spec_dirs(changed_files):
-        return True
-    specs_root = repo_root / "docs" / "specs"
-    if not specs_root.exists():
+def has_bound_formal_spec_input(
+    repo_root: Path,
+    item_key: str | None,
+    item_type: str | None,
+    changed_files: list[str],
+    *,
+    allow_unbound_local_fallback: bool,
+    allow_legacy_metadata_free_decision_compat: bool = False,
+) -> bool:
+    if not item_key:
         return False
-    required_files = set(spec_suite_policy()["required_files"])
-    for path in specs_root.iterdir():
-        if not path.is_dir() or not path.name.startswith("FR-"):
-            continue
-        child_names = {child.name for child in path.iterdir()}
-        if required_files.issubset(child_names):
+
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        if validate_bound_spec_contract(repo_root, exec_plan):
+            return False
+        related_spec = str(exec_plan.get("关联 spec", "")).strip()
+        spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
+        if spec_dir is None:
+            return False
+        if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
+            return False
+        if exec_plan.get("关联 decision", ""):
+            decision_errors = validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
+            if decision_errors and not (
+                allow_legacy_metadata_free_decision_compat
+                and allows_legacy_metadata_free_formal_spec_decision(exec_plan, decision_errors)
+            ):
+                return False
+        return not validate_suite(spec_dir)
+
+    if allow_unbound_local_fallback and input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
+        expected_dir = repo_root / "docs" / "specs" / item_key
+        touched_spec_dirs = formal_spec_dirs(changed_files)
+        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
+            expected_rel = expected_dir.relative_to(repo_root)
+            if touched_spec_dirs:
+                if expected_rel not in touched_spec_dirs:
+                    return False
+                if any(path != expected_rel for path in touched_spec_dirs):
+                    return False
             return True
+
     return False
 
 
-def issue_requires_formal_input(issue: int) -> bool:
-    require_cli("gh")
-    completed = run(
-        [
-            "gh",
-            "issue",
-            "view",
-            str(issue),
-            "--json",
-            "title,labels",
-        ],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if completed.returncode != 0:
+def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
+    if not item_key:
         return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    if classify_exec_plan_input_mode(exec_plan) != INPUT_MODE_BOOTSTRAP:
+        return False
+    return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
 
-    payload = json.loads(completed.stdout or "{}")
-    title = str(payload.get("title") or "")
-    labels = {
-        str(item.get("name", "")).lower()
-        for item in payload.get("labels", [])
-        if isinstance(item, dict)
-    }
-    return "FR-" in title.upper() or any(label in {"core", "governance", "spec"} or label.startswith("fr-") for label in labels)
+
+def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type: str | None) -> bool:
+    if not item_key or not item_type:
+        return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode in {INPUT_MODE_FORMAL_SPEC, INPUT_MODE_BOOTSTRAP}:
+        return True
+    return item_type in {"FR", "HOTFIX", "CHORE"}
 
 
 def closing_line(issue: int | None, mode: str) -> str:
@@ -300,24 +336,51 @@ def validate_pr_preflight(
     changed_files: list[str],
     *,
     repo_root: Path,
+    validate_worktree_binding_check: bool = True,
 ) -> list[str]:
     errors: list[str] = []
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
-    errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
+    if validate_worktree_binding_check:
+        errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
-    if pr_class == "spec" and not formal_spec_dirs(changed_files):
-        errors.append("`spec` 类 PR 必须包含正式规约区变更。")
+    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files):
+        errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
-    if pr_class in {"governance", "spec"}:
-        if not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
-            errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
+    if pr_class == "spec" and not has_bound_formal_spec_input(
+        repo_root,
+        item_key,
+        item_type,
+        changed_files,
+        allow_unbound_local_fallback=False,
+    ):
+        errors.append("`spec` 类 PR 缺少绑定 formal spec 输入。")
 
-    if pr_class == "governance" and not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
+    if pr_class == "governance" and not (
+        has_bound_formal_spec_input(
+            repo_root,
+            item_key,
+            item_type,
+            changed_files,
+            allow_unbound_local_fallback=False,
+        )
+        or has_bound_bootstrap_contract(repo_root, item_key)
+    ):
+        errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
 
-    if pr_class == "implementation" and issue is not None and issue_requires_formal_input(issue):
-        if not (has_formal_spec_input(repo_root, changed_files) or has_bootstrap_contract(repo_root)):
+    if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
+        if not (
+            has_bound_formal_spec_input(
+                repo_root,
+                item_key,
+                item_type,
+                changed_files,
+                allow_unbound_local_fallback=True,
+                allow_legacy_metadata_free_decision_compat=True,
+            )
+            or has_bound_bootstrap_contract(repo_root, item_key)
+        ):
             errors.append("绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract。")
 
     return errors

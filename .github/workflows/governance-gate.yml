@@ -25,13 +25,14 @@ jobs:
           python-version: "3.11"
 
       - name: Run governance gate
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
           python3 scripts/workflow_guard.py --mode ci
-          python3 scripts/governance_gate.py \
-            --mode ci \
-            --base-sha "${{ github.event.pull_request.base.sha }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}"
+          python3 scripts/governance_gate.py             --mode ci             --base-sha "$PR_BASE_SHA"             --head-sha "$PR_HEAD_SHA"             --head-ref "$PR_HEAD_REF"
 
       - name: Run governance tests
         run: |

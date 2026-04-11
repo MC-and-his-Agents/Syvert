@@ -34,7 +34,7 @@ codex:
 - `docs/releases/` 与 `docs/sprints/` 只承载仓内聚合索引，不替代 GitHub Issues / Projects 的状态真相源。
 - 新事项与存量事项在进入新的执行回合前都必须补齐完整事项上下文。
 - 术语约定：
-  - `新事项`：首次进入当前交付漏斗、且尚未在仓库内形成 `exec-plan` / `TODO.md` 恢复工件的事项
+  - `新事项`：首次进入当前交付漏斗、且尚未在仓库内形成 active `exec-plan` 恢复工件的事项
   - `存量事项`：在本协议升级前已存在仓库内恢复工件，但尚未补齐事项上下文的事项
   - `长任务`：需要 `checkpoint -> resume -> handoff` 恢复能力，并因此必须维护 `exec-plan` 的执行回合
 
@@ -59,7 +59,8 @@ codex:
 - `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
 - 仅当执行回合显式推进新的 checkpoint 时，才刷新 `exec-plan` 中记录的 checkpoint head。
 - review 结论、GitHub checks、PR 关联、索引入口等审查态信息的更新，不自动构成新的 checkpoint。
-- checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 `exec-plan` 与 `TODO.md`，再继续执行。
+- checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 active `exec-plan`，再继续执行。
+- `TODO.md` 仍作为正式规约套件的一部分保留；若其中信息与当前恢复判断直接相关，需与 active `exec-plan` 一并同步，但不替代 active `exec-plan` 的恢复主入口。
 - checkpoint 必须说明当前改动推进了哪个 `release` 目标，以及该事项在当前 `sprint` 中的角色或位置。
 - `compact` 仅压缩已入库且可复验的信息，不得压缩未落盘前提。
 - `compact` 不得压缩未落盘的事项上下文判断，包括 `release`、`sprint` 绑定与事项角色判定。
@@ -90,7 +91,7 @@ codex:
 - 关键门禁失败且无法在当前回合消除。
 - guardian 结果不是 `APPROVE` 或 `safe_to_merge=false`。
 
-## 何时必须更新 `exec-plan` / `TODO`
+## 何时必须更新 `exec-plan`
 
 - 完成一组可验证改动后必须更新一次 checkpoint。
 - 变更停点、风险、验证结论或形成新的 checkpoint 时必须更新。
@@ -98,6 +99,7 @@ codex:
 - 若仅补充 review / merge gate 元数据，而未显式推进新的执行停点，不要求刷新 checkpoint head。
 - 变更 `item_key`、`item_type`、`release`、`sprint` 或事项在当前轮次中的定位时必须更新。
 - 进入 review、进入 merge gate 前必须更新到最新状态。
+- legacy `TODO.md` 若存在，且其检查清单或历史停点仍服务当前判断，可按需同步；否则不构成必需更新项。
 
 ## 何时允许进入 `open_pr` / `merge_pr`
 

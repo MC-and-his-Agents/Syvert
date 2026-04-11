@@ -10,7 +10,27 @@ if __package__ in {None, ""}:
 import argparse
 import re
 
-from scripts.common import REPO_ROOT, git_changed_files
+from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
+from scripts.item_context import (
+    INPUT_MODE_BOOTSTRAP,
+    INPUT_MODE_FORMAL_SPEC,
+    INPUT_MODE_UNBOUND,
+    active_exec_plans_for_issue,
+    allows_legacy_metadata_free_formal_spec_decision,
+    classify_exec_plan_input_mode,
+    has_meaningful_binding,
+    is_eligible_active_exec_plan,
+    is_inactive_exec_plan,
+    normalize_bound_spec_dir,
+    parse_exec_plan_metadata,
+    strip_fenced_code_blocks,
+    spec_dir_has_minimum_suite,
+    validate_bound_decision_contract,
+    validate_bound_formal_spec_scope,
+    validate_bound_spec_contract,
+)
+from scripts.policy.policy import formal_spec_dirs, spec_suite_policy
+from scripts.spec_guard import validate_suite
 
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -20,6 +40,7 @@ HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 SHA40_RE = re.compile(r"\b[0-9a-f]{40}\b")
+ISSUE_REF_RE = re.compile(r"(?:^|/)issue-(\d+)(?:-|$)")
 
 SPEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
 EXEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
@@ -33,6 +54,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--base-sha")
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--head-sha")
+    parser.add_argument("--current-issue", type=int)
     return parser.parse_args(argv)
 
 
@@ -49,7 +71,8 @@ def normalize_value(raw_value: str) -> str:
 
 def extract_fields(text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for match in FIELD_RE.finditer(text):
+    sanitized = strip_fenced_code_blocks(text)
+    for match in FIELD_RE.finditer(sanitized):
         key = match.group(1).strip()
         value = normalize_value(match.group(2))
         if key not in fields:
@@ -104,6 +127,13 @@ def is_spec_suite_file(path: Path) -> bool:
     return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan|TODO)\.md$", value) is not None
 
 
+def is_todo_spec_file(path: Path) -> bool:
+    value = path.as_posix()
+    if re.search(r"(^|/)docs/specs/_template/TODO\.md$", value):
+        return True
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/TODO\.md$", value) is not None
+
+
 def should_skip_reference(value: str) -> bool:
     if not value:
         return True
@@ -149,8 +179,11 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
     if not path.exists():
         return [f"{path}: exec-plan 文件不存在（可能已删除）。"]
     text = path.read_text(encoding="utf-8")
-    fields = extract_fields(text)
+    fields = parse_exec_plan_metadata(path)
     template_mode = is_template(path)
+    if fields.get("conflict") == "duplicate_metadata_keys":
+        duplicate_key = fields.get("duplicate_key", "unknown")
+        return [f"{path}: exec-plan 元数据区存在重复键 `{duplicate_key}`。"]
     errors = validate_context_fields(path, fields, EXEC_CONTEXT_FIELDS, allow_empty=template_mode)
 
     checkpoint_heading = "最近一次 checkpoint 对应的 head SHA"
@@ -160,16 +193,31 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
         if not template_mode and not SHA40_RE.search(text):
             errors.append(f"{path}: 缺少可解析的 40 位 checkpoint head SHA。")
     if not template_mode:
-        related_decision = fields.get("关联 decision", "")
-        if related_decision:
-            decision_path = (repo_root / related_decision).resolve()
-            try:
-                decision_path.relative_to(repo_root.resolve())
-            except ValueError:
-                errors.append(f"{path}: `关联 decision` 指向仓库外路径：`{related_decision}`。")
-            else:
-                if not decision_path.exists():
-                    errors.append(f"{path}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
+        input_mode = classify_exec_plan_input_mode(fields)
+        if input_mode == INPUT_MODE_FORMAL_SPEC:
+            bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
+            errors.extend(f"{path}: {error}" for error in bound_spec_errors)
+            if not bound_spec_errors:
+                spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+                if spec_dir is not None:
+                    errors.extend(
+                        f"{path}: 绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
+                        for error in validate_suite(spec_dir)
+                    )
+            if fields.get("关联 decision", ""):
+                decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+                if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+                    errors.extend(f"{path}: {error}" for error in decision_errors)
+        elif input_mode == INPUT_MODE_BOOTSTRAP:
+            errors.extend(
+                f"{path}: {error}"
+                for error in validate_bound_decision_contract(repo_root, fields, require_present=True)
+            )
+        elif fields.get("关联 decision", ""):
+            errors.extend(
+                f"{path}: {error}"
+                for error in validate_bound_decision_contract(repo_root, fields, require_present=False)
+            )
     return errors
 
 
@@ -232,40 +280,179 @@ def validate_decision(path: Path) -> list[str]:
     return []
 
 
-def validate_bootstrap_binding_consistency(
-    *,
-    decision_path: Path,
-    decision_fields: dict[str, str],
-    exec_plan_path: Path,
-    exec_plan_fields: dict[str, str],
-) -> list[str]:
-    errors: list[str] = []
-    decision_issue = decision_fields.get("Issue", "")
-    exec_issue = exec_plan_fields.get("Issue", "")
-    if decision_issue and exec_issue and decision_issue != exec_issue:
-        errors.append(
-            f"{decision_path}: `Issue` `{decision_issue}` 与关联 exec-plan `{exec_plan_path}` 的 `Issue` `{exec_issue}` 不一致。"
-        )
-
-    decision_item_key = decision_fields.get("item_key", "")
-    exec_item_key = exec_plan_fields.get("item_key", "")
-    if decision_item_key and exec_item_key and decision_item_key != exec_item_key:
-        errors.append(
-            f"{decision_path}: `item_key` `{decision_item_key}` 与关联 exec-plan `{exec_plan_path}` 的 `item_key` `{exec_item_key}` 不一致。"
-        )
-    return errors
-
-
-def is_valid_strict_bootstrap_exec_plan(exec_plan_path: Path, fields: dict[str, str]) -> bool:
-    if fields.get("item_type") != "GOV":
+def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str, str]) -> bool:
+    if not is_eligible_active_exec_plan(fields):
         return False
+    item_type = fields.get("item_type", "").strip()
     issue = fields.get("Issue", "").strip()
     item_key = fields.get("item_key", "").strip()
-    if not issue or not item_key:
+    if not issue or not item_key or not item_type:
         return False
-    if exec_plan_path.name != f"{item_key}.md":
-        return False
-    return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
+    return not validate_item_key(exec_plan_path, item_key, item_type, allow_empty=False)
+
+
+def infer_current_issue(*refs: str | None) -> int | None:
+    for ref in refs:
+        normalized = str(ref or "").strip()
+        if not normalized:
+            continue
+        match = ISSUE_REF_RE.search(normalized)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tuple[list[str], list[dict[str, str]]]:
+    payloads = active_exec_plans_for_issue(repo_root, issue_number)
+    if not payloads:
+        return ([f"当前 `Issue` #{issue_number} 缺少 active `exec-plan`，无法确认唯一授权上下文。"], [])
+    if len(payloads) > 1:
+        return ([f"当前 `Issue` #{issue_number} 存在多个 active `exec-plan`，无法确认唯一授权上下文。"], [])
+    return ([], payloads)
+
+
+def missing_spec_suite_files(spec_dir: Path) -> list[str]:
+    required_files = set(spec_suite_policy()["required_files"])
+    child_names = {child.name for child in spec_dir.iterdir()} if spec_dir.exists() and spec_dir.is_dir() else set()
+    return sorted(required_files - child_names)
+
+
+def authorization_exec_plan_payloads(repo_root: Path, *, current_issue: int | None) -> list[dict[str, str]]:
+    if current_issue is not None:
+        context_errors, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
+        if context_errors:
+            return []
+        return payloads
+
+    payloads: list[dict[str, str]] = []
+    for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
+        if exec_plan.name in {"README.md", "_template.md"}:
+            continue
+        fields = parse_exec_plan_metadata(exec_plan)
+        if is_eligible_active_exec_plan(fields):
+            payloads.append(fields)
+    return payloads
+
+
+def validate_formal_spec_authorization_contract(
+    exec_plan_path: Path,
+    repo_root: Path,
+    fields: dict[str, str],
+) -> list[str]:
+    errors: list[str] = []
+    item_key = fields.get("item_key", "").strip()
+    item_type = fields.get("item_type", "").strip()
+    input_mode = classify_exec_plan_input_mode(fields)
+
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
+        errors.extend(bound_spec_errors)
+        if not bound_spec_errors:
+            spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+            if spec_dir is not None:
+                errors.extend(
+                    f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(spec_dir)
+                )
+    elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
+        expected_dir = repo_root / "docs" / "specs" / item_key
+        if not expected_dir.exists():
+            errors.append(f"当前 item_key 对应的 formal spec 套件不存在：`docs/specs/{item_key}/`。")
+        elif not spec_dir_has_minimum_suite(expected_dir):
+            errors.append(
+                f"当前 item_key 对应的 formal spec 套件缺少最小必需文件：{', '.join(missing_spec_suite_files(expected_dir))}。"
+            )
+        else:
+            errors.extend(
+                f"当前 item_key 对应的 formal spec 套件不可审查：{error}"
+                for error in validate_suite(expected_dir)
+            )
+
+    if has_meaningful_binding(fields.get("关联 decision", "")):
+        decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+        if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+            errors.extend(decision_errors)
+
+    return [f"{exec_plan_path}: {error}" for error in errors]
+
+
+def validate_decision_authorization_contract(
+    exec_plan_path: Path,
+    repo_root: Path,
+    fields: dict[str, str],
+) -> list[str]:
+    errors: list[str] = []
+    input_mode = classify_exec_plan_input_mode(fields)
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
+        errors.extend(bound_spec_errors)
+        if not bound_spec_errors:
+            spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+            if spec_dir is not None:
+                errors.extend(
+                    f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(spec_dir)
+                )
+
+    require_present = input_mode in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC} or has_meaningful_binding(
+        fields.get("关联 decision", "")
+    )
+    if require_present:
+        decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+        if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+            errors.extend(decision_errors)
+
+    return [f"{exec_plan_path}: {error}" for error in errors]
+
+
+def authorized_decision_exec_plans(
+    repo_root: Path,
+    *,
+    current_issue: int | None,
+) -> tuple[list[str], list[tuple[Path, dict[str, str]]]]:
+    matches: list[tuple[Path, dict[str, str]]] = []
+    errors: list[str] = []
+    for fields in authorization_exec_plan_payloads(repo_root, current_issue=current_issue):
+        exec_plan_path = Path(str(fields.get("exec_plan", "")).strip())
+        if not exec_plan_path.exists():
+            continue
+        if not is_valid_governance_exec_plan_binding(exec_plan_path, fields):
+            continue
+        contract_errors = validate_decision_authorization_contract(exec_plan_path, repo_root, fields)
+        if contract_errors:
+            errors.extend(contract_errors)
+            continue
+        matches.append((exec_plan_path, fields))
+    return errors, matches
+
+
+def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -> tuple[list[str], set[Path]]:
+    authorized: set[Path] = set()
+    errors: list[str] = []
+    for fields in authorization_exec_plan_payloads(repo_root, current_issue=current_issue):
+        exec_plan_path = Path(str(fields.get("exec_plan", "")).strip())
+        if not exec_plan_path.exists():
+            continue
+        if not is_valid_governance_exec_plan_binding(exec_plan_path, fields):
+            continue
+        contract_errors = validate_formal_spec_authorization_contract(exec_plan_path, repo_root, fields)
+        if contract_errors:
+            errors.extend(contract_errors)
+            continue
+
+        item_key = fields.get("item_key", "").strip()
+        item_type = fields.get("item_type", "").strip()
+        input_mode = classify_exec_plan_input_mode(fields)
+        if input_mode == INPUT_MODE_FORMAL_SPEC:
+            spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+            if spec_dir is not None:
+                authorized.add(spec_dir.relative_to(repo_root.resolve()))
+            continue
+        if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
+            expected_dir = repo_root / "docs" / "specs" / item_key
+            if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
+                authorized.add(expected_dir.relative_to(repo_root))
+    return errors, authorized
 
 
 def collect_targets(
@@ -296,10 +483,13 @@ def collect_targets(
                     spec_files.add(repo_root / path)
                 else:
                     suite_dir = repo_root / "docs" / "specs" / path_parts[2]
-                    for name in ("spec.md", "plan.md", "TODO.md"):
+                    for name in ("spec.md", "plan.md"):
                         candidate = suite_dir / name
                         if candidate.exists():
                             spec_files.add(candidate)
+                    todo_candidate = suite_dir / "TODO.md"
+                    if todo_candidate.exists():
+                        spec_files.add(todo_candidate)
     else:
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
         release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
@@ -309,15 +499,24 @@ def collect_targets(
         for suite_dir in specs_root.glob("FR-*"):
             if not suite_dir.is_dir():
                 continue
-            for name in ("spec.md", "plan.md", "TODO.md"):
+            for name in ("spec.md", "plan.md"):
                 candidate = suite_dir / name
                 if candidate.exists():
                     spec_files.add(candidate)
+        for suite_dir in specs_root.glob("FR-*"):
+            if not suite_dir.is_dir():
+                continue
+            candidate = suite_dir / "TODO.md"
+            if candidate.exists():
+                spec_files.add(candidate)
         template_dir = specs_root / "_template"
-        for name in ("spec.md", "plan.md", "TODO.md"):
+        for name in ("spec.md", "plan.md"):
             candidate = template_dir / name
             if candidate.exists():
                 spec_files.add(candidate)
+        template_todo = template_dir / "TODO.md"
+        if template_todo.exists():
+            spec_files.add(template_todo)
 
     return (
         sorted(exec_plans),
@@ -328,13 +527,14 @@ def collect_targets(
     )
 
 
-def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = None) -> list[str]:
+def validate_context_rules(
+    repo_root: Path,
+    changed_paths: list[str] | None = None,
+    *,
+    current_issue: int | None = None,
+) -> list[str]:
     errors: list[str] = []
     exec_plans, spec_files, release_files, sprint_files, decision_files = collect_targets(repo_root, changed_paths)
-    touched_exec_plan = bool(changed_paths) and any(
-        is_exec_plan_file(Path(raw_path)) and not is_template(Path(raw_path)) for raw_path in changed_paths
-    )
-    touched_decision = bool(changed_paths) and any(is_decision_file(Path(raw_path)) for raw_path in changed_paths)
 
     if changed_paths is not None:
         for raw_path in changed_paths:
@@ -351,60 +551,57 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
-    # Governance bootstrap contract requires decision + exec-plan to co-exist.
-    # This check is only enforced in diff mode to avoid forcing full-repo legacy migration.
-    if changed_paths is not None and (touched_exec_plan or touched_decision):
-        all_decisions = [path for path in (repo_root / "docs" / "decisions").glob("*.md") if path.name != "README.md"]
-        all_exec_plans = [
-            path
-            for path in (repo_root / "docs" / "exec-plans").glob("*.md")
-            if path.name not in {"README.md", "_template.md"}
-        ]
-        if not all_decisions:
-            errors.append("治理/exec-plan 变更缺少 `docs/decisions/**` 工件，bootstrap contract 不完整。")
-        if not all_exec_plans:
-            errors.append("治理/decision 变更缺少 `docs/exec-plans/**` 工件，bootstrap contract 不完整。")
+    if changed_paths is not None and current_issue is not None:
+        errors.extend(active_exec_plan_context_for_issue(repo_root, current_issue)[0])
+
+    if changed_paths is not None:
+        touched_spec_dirs = formal_spec_dirs(changed_paths)
+        if touched_spec_dirs:
+            authorization_errors, authorized_spec_dirs = authorized_formal_spec_dirs(repo_root, current_issue=current_issue)
+            errors.extend(authorization_errors)
+            for spec_dir in sorted(touched_spec_dirs):
+                if spec_dir not in authorized_spec_dirs:
+                    errors.append(
+                        f"{repo_root / spec_dir}: 当前 touched formal spec 套件未被任何 active exec-plan 绑定。"
+                    )
+
+    if changed_paths is not None:
         for raw_path in changed_paths:
             path = Path(raw_path)
             target = repo_root / path
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
-            fields = extract_fields(target.read_text(encoding="utf-8"))
+            fields = parse_exec_plan_metadata(target)
+            exec_issue = fields.get("Issue", "").strip()
+            if current_issue is not None and exec_issue and exec_issue != str(current_issue) and not is_inactive_exec_plan(fields):
+                errors.append(
+                    f"{target}: 当前 touched exec-plan 的 `Issue` `{exec_issue}` 与当前执行回合 `#{current_issue}` 不一致。"
+                )
+            input_mode = classify_exec_plan_input_mode(fields)
+            if input_mode == INPUT_MODE_FORMAL_SPEC:
+                errors.extend(
+                    f"{target}: {error}"
+                    for error in validate_bound_formal_spec_scope(repo_root, fields, changed_paths)
+                )
             if fields.get("item_type") != "GOV":
                 continue
-            related_decision = fields.get("关联 decision", "")
-            if not related_decision:
-                errors.append(f"{target}: 当前 exec-plan 缺少 `关联 decision`，bootstrap contract 无法与当前事项建立对应关系。")
+            if input_mode != INPUT_MODE_BOOTSTRAP:
                 continue
-            decision_path = (repo_root / related_decision).resolve()
-            try:
-                decision_path.relative_to(repo_root.resolve())
-            except ValueError:
-                errors.append(f"{target}: `关联 decision` 指向仓库外路径：`{related_decision}`。")
-                continue
-            if not decision_path.exists():
-                errors.append(f"{target}: `关联 decision` 指向的路径不存在：`{related_decision}`。")
-                continue
-
-            decision_item_type = decision_item_type_from_name(Path(related_decision))
-            if decision_item_type in {"FR", "HOTFIX", "CHORE"}:
-                continue
-            decision_fields = extract_fields(decision_path.read_text(encoding="utf-8"))
             errors.extend(
-                validate_bootstrap_binding_consistency(
-                    decision_path=decision_path,
-                    decision_fields=decision_fields,
-                    exec_plan_path=target,
-                    exec_plan_fields=fields,
-                )
+                f"{target}: {error}"
+                for error in validate_bound_decision_contract(repo_root, fields, require_present=True)
             )
 
-        if touched_decision:
+        touched_decision_paths = [
+            Path(raw_path)
+            for raw_path in changed_paths
+            if is_decision_file(Path(raw_path)) and (repo_root / Path(raw_path)).exists()
+        ]
+        if touched_decision_paths:
             exec_plan_to_decision: dict[str, list[tuple[Path, dict[str, str]]]] = {}
-            for exec_plan in all_exec_plans:
-                fields = extract_fields(exec_plan.read_text(encoding="utf-8"))
-                if not is_valid_strict_bootstrap_exec_plan(exec_plan, fields):
-                    continue
+            decision_auth_errors, decision_exec_plans = authorized_decision_exec_plans(repo_root, current_issue=current_issue)
+            errors.extend(decision_auth_errors)
+            for exec_plan, fields in decision_exec_plans:
                 related_decision = fields.get("关联 decision", "")
                 if not related_decision:
                     continue
@@ -415,28 +612,22 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
                     continue
                 exec_plan_to_decision.setdefault(normalized, []).append((exec_plan, fields))
 
-            for raw_path in changed_paths:
-                path = Path(raw_path)
+            for path in touched_decision_paths:
                 target = repo_root / path
-                if not (is_decision_file(path) and target.exists()):
-                    continue
-                decision_item_type = decision_item_type_from_name(path)
-                if decision_item_type in {"FR", "HOTFIX", "CHORE"}:
-                    continue
                 normalized_target = target.resolve().relative_to(repo_root.resolve()).as_posix()
                 if normalized_target not in exec_plan_to_decision:
                     errors.append(f"{target}: 当前 touched decision 未被任何 exec-plan 通过 `关联 decision` 关联。")
                     continue
-                decision_fields = extract_fields(target.read_text(encoding="utf-8"))
                 for exec_plan_path, exec_plan_fields in exec_plan_to_decision[normalized_target]:
-                    errors.extend(
-                        validate_bootstrap_binding_consistency(
-                            decision_path=target,
-                            decision_fields=decision_fields,
-                            exec_plan_path=exec_plan_path,
-                            exec_plan_fields=exec_plan_fields,
+                    payload = dict(exec_plan_fields)
+                    payload["关联 decision"] = normalized_target
+                    require_present = classify_exec_plan_input_mode(exec_plan_fields) in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC}
+                    decision_errors = validate_bound_decision_contract(repo_root, payload, require_present=require_present)
+                    if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(payload, decision_errors):
+                        errors.extend(
+                            f"{target}: {error}"
+                            for error in decision_errors
                         )
-                    )
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path, repo_root=repo_root))
@@ -461,7 +652,6 @@ def validate_repository(repo_root: Path) -> list[str]:
         repo_root / "docs" / "exec-plans" / "_template.md",
         repo_root / "docs" / "specs" / "_template" / "spec.md",
         repo_root / "docs" / "specs" / "_template" / "plan.md",
-        repo_root / "docs" / "specs" / "_template" / "TODO.md",
         repo_root / "docs" / "releases" / "_template.md",
         repo_root / "docs" / "sprints" / "_template.md",
     )
@@ -471,6 +661,12 @@ def validate_repository(repo_root: Path) -> list[str]:
             baseline_paths.append(relative)
         else:
             errors.append(f"{candidate}: 缺少基线模板工件 `{relative}`。")
+
+    template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
+    if template_todo.exists():
+        baseline_paths.append(template_todo.relative_to(repo_root).as_posix())
+    else:
+        errors.append(f"{template_todo}: 缺少基线模板工件 `{template_todo.relative_to(repo_root).as_posix()}`。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:
@@ -496,10 +692,18 @@ def main(argv: list[str] | None = None) -> int:
     if base_ref:
         changed_paths = git_changed_files(base_ref, head_ref, repo=repo_root)
 
+    head_ref_issue = infer_current_issue(args.head_ref)
+    current_issue = args.current_issue if args.current_issue is not None else head_ref_issue
+    if current_issue is None and args.head_sha is None:
+        current_issue = infer_current_issue(git_current_branch(repo=repo_root))
+
     if changed_paths is None:
         errors = validate_repository(repo_root)
     else:
-        errors = validate_context_rules(repo_root, changed_paths)
+        if current_issue is None:
+            errors = ["diff 模式无法从 `--current-issue` / `--head-ref` / 当前分支推断当前事项，已拒绝继续执行。"]
+        else:
+            errors = validate_context_rules(repo_root, changed_paths, current_issue=current_issue)
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
