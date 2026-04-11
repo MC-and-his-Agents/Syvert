@@ -7,25 +7,24 @@
 - item_type：`GOV`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 spec：`无（治理文档事项）`
-- 关联 decision：`docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
+- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
 - 关联 PR：`#60`
 - active 收口事项：`GOV-0028-harness-compat-migration`
 
 ## 目标
 
 - 让 repo harness、guard、template 与 review 输入适配新的 `Phase -> FR -> Work Item` 治理契约。
-- 让 harness、guard、template 与 review 输入优先消费 active `exec-plan`、bootstrap contract 与当前 Work Item 上下文，而不是继续混写到 GitHub 调度层。
+- 让 harness、guard、template 与 review 输入优先消费 active `exec-plan`、绑定的 `FR-0003` formal spec 与当前 Work Item 上下文，而不是继续混写到 GitHub 调度层。
 - 在不改动 `FR-0003` formal spec 套件契约的前提下，收敛当前 PR 的治理实现范围，并保留对既有 `TODO.md` 的读取兼容。
 
 ## 范围
 
 - 本次纳入：
   - `.github/workflows/governance-gate.yml`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
   - `WORKFLOW.md`
   - `code_review.md`
   - `docs/AGENTS.md`
-  - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
   - `docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
   - `docs/exec-plans/GOV-0028-harness-compat-migration.md`
   - `docs/exec-plans/README.md`
@@ -52,10 +51,10 @@
 - 最近一次已推送 checkpoint 对应 head 为 `7d222e62587687b410d56ac28546273ddf6f2eb9`。该 head 的 GitHub checks 已全绿，但 guardian 仍指出 6 个收口问题：`context_guard` 仍允许 cross-issue touched `exec-plan` / `decision`、CLI diff 模式未传入 `current_issue`、`governance_gate` 仍依赖本地分支推断 issue、legacy `HOTFIX` formal-input 兼容声明失真、`docs/specs/README.md` 最小套件表述矛盾、以及本 exec-plan 范围与停点描述已过期。
 - 当前工作树正在同一事项内完成最后一轮一致性收口：
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧；若无法从真实 git ref 推断当前事项，或同一 Issue 命中多个 active `exec-plan`，会直接 fail-closed。
-  - formal-spec 模式下，只要声明了 `关联 decision`，就必须提供可校验的 `Issue` / `item_key` 元数据，不再接受 metadata-free / legacy decision 混入当前绑定。
+  - formal-spec 模式下，只要声明了 `关联 decision`，就必须提供可校验的 `Issue` / `item_key` 元数据，不再接受 metadata-free / legacy decision 混入当前绑定；当前 `GOV-0028` 不再把 `ADR-0003` 作为本事项 bootstrap 输入。
   - `governance_gate` 在 CI 场景优先使用 PR `head-ref` 推断 issue，并通过 workflow step `env` 安全传入 `context_guard`。
   - `open_pr` 与治理文档不再宣称不存在的 legacy `HOTFIX` unbound formal-input 兼容；未绑定 `FR` 的本地 formal spec 套件只允许被 `implementation` 入口复用，`governance` / `spec` 不再走该回退。
-  - 已将仍引用 `ADR-0003` 的 `GOV-0027` exec-plan 退役为 inactive，避免 shared decision 与当前 GOV-0028 bootstrap contract 发生双重绑定冲突。
+  - 已将仍引用 `ADR-0003` 的 `GOV-0027` exec-plan 退役为 inactive，并把 `GOV-0028` 重新绑定到 `FR-0003` formal spec；`ADR-0003` 恢复为 `FR-0003` 的稳定上位治理决策，而不是当前 Work Item 的 bootstrap artifact。
   - `docs/specs/README.md` 与本 exec-plan 的范围、最小套件、待合入门槛同步回到当前 head 真相。
 
 ## 合入门槛

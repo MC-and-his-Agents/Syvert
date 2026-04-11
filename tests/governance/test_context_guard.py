@@ -645,6 +645,36 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("缺少 `Issue`" in error for error in errors))
 
+    def test_touched_decision_linked_from_formal_spec_fr_exec_plan_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            exec_plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            exec_plan.write_text(
+                exec_plan.read_text(encoding="utf-8").replace(
+                    "- item_key：`GOV-0001-release-sprint-structure`\n- Issue：`#1`\n- item_type：`GOV`",
+                    "- item_key：`FR-0001-example`\n- Issue：`#2`\n- item_type：`FR`",
+                ),
+                encoding="utf-8",
+            )
+            renamed_plan = repo / "docs" / "exec-plans" / "FR-0001-example.md"
+            exec_plan.rename(renamed_plan)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.write_text(
+                """# ADR-0001
+
+- Issue：`#2`
+- item_key：`FR-0001-example`
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+                current_issue=2,
+            )
+        self.assertEqual(errors, [])
+
     def test_bootstrap_contract_touched_unrelated_decision_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

@@ -1,13 +1,5 @@
 # ADR-0003 GitHub delivery structure and repo semantic split
 
-## 关联信息
-
-- Issue：`#57`
-- item_key：`GOV-0028-harness-compat-migration`
-- item_type：`GOV`
-- release：`v0.2.0`
-- sprint：`2026-S15`
-
 ## 背景
 
 Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktree 入口、formal spec 套件与 exec-plan 恢复协议，但治理文档仍同时使用“版本层 / 冲刺层 / 事项层”与 GitHub `Phase / FR / Work Item` 两套分层描述。
@@ -31,8 +23,9 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 
 ## 非目标
 
-- 不在本轮删除现有 `TODO.md`
-- 不在本轮之外引入无关 harness 改造
+- 不在本轮改造 harness 行为
+- 不删除 `TODO.md`
+- 不调整 formal spec 套件 required files
 - 不引入第二套仓内调度模型
 
 ## 影响
@@ -40,5 +33,3 @@ Syvert 已经有 `Issue / item_key / release / sprint` 事项上下文、worktre
 - 后续治理与实现事项都应围绕 GitHub `Phase -> FR -> Work Item` 层级组织
 - formal spec 的主绑定点固定为 FR，执行回合的主绑定点固定为 Work Item
 - `docs/releases/**` 与 `docs/sprints/**` 保留为仓内索引，不再承担状态真相解释职责
-- `GOV-0028` 被授权把 harness、guard、template 与 review 输入迁移到新的治理契约，但不改动 `FR-0003` formal spec 套件的最小 contract。
-- `GOV-0029` 仅在 `GOV-0028` 兼容路径稳定后，负责 legacy `TODO.md` 的最终删除清理。

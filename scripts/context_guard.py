@@ -279,15 +279,14 @@ def validate_decision(path: Path) -> list[str]:
 def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str, str]) -> bool:
     if not is_eligible_active_exec_plan(fields):
         return False
-    if fields.get("item_type") != "GOV":
-        return False
+    item_type = fields.get("item_type", "").strip()
     issue = fields.get("Issue", "").strip()
     item_key = fields.get("item_key", "").strip()
-    if not issue or not item_key:
+    if not issue or not item_key or not item_type:
         return False
     if exec_plan_path.name != f"{item_key}.md":
         return False
-    return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
+    return not validate_item_key(exec_plan_path, item_key, item_type, allow_empty=False)
 
 
 def infer_current_issue(*refs: str | None) -> int | None:
@@ -310,7 +309,7 @@ def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tu
     return ([], payloads)
 
 
-def eligible_governance_exec_plans(
+def authorized_decision_exec_plans(
     repo_root: Path,
     *,
     current_issue: int | None,
@@ -503,7 +502,7 @@ def validate_context_rules(
             )
 
         exec_plan_to_decision: dict[str, list[tuple[Path, dict[str, str]]]] = {}
-        for exec_plan, fields in eligible_governance_exec_plans(repo_root, current_issue=current_issue):
+        for exec_plan, fields in authorized_decision_exec_plans(repo_root, current_issue=current_issue):
             related_decision = fields.get("关联 decision", "")
             if not related_decision:
                 continue
