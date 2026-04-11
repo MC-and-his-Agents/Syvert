@@ -46,6 +46,6 @@
 
 - formal spec：`docs/specs/FR-XXXX-<slug>/spec.md`
 - exec-plan：`docs/exec-plans/<item_key>.md`
-- legacy TODO（可选）：`docs/specs/FR-XXXX-<slug>/TODO.md`
+- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
 - 绑定关系：formal spec 绑定 FR `item_key`，exec-plan 绑定当前 Work Item `item_key`
 - 目标：通过 FR / Work Item 绑定关系，以及 `Issue`、`release`、`sprint` 串起规约、恢复工件与 PR

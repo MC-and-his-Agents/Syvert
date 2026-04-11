@@ -37,9 +37,9 @@
 - `docs/specs/` 中的 formal spec 默认使用对应 FR 的 `item_key` 作为聚合键。
 - FR 目录命名固定为：`FR-XXXX-<slug>`
 - `XXXX` 为四位数字，`slug` 使用短横线英文短语
-- 新事项在进入新的执行回合前，必须在 active `exec-plan` 与 PR 描述中显式声明完整事项上下文，至少包含：`Issue`、`item_key`、`item_type`、`release`、`sprint`
+- 新事项与存量事项在进入新的执行回合前，都必须在 formal spec、`TODO.md`、active `exec-plan`、PR 描述中显式声明完整事项上下文，至少包含：`Issue`、`item_key`、`item_type`、`release`、`sprint`
 - formal spec 只承载绑定 FR 的需求、边界与验证语义；当前 Work Item 的执行上下文由 active `exec-plan` 与 PR 元数据承载
-- 历史事项若仍保留 `TODO.md`，且其内容与当前判断直接相关，可继续在该文件中补充检查清单或历史停点参考；否则不构成新事项前置条件
+- `TODO.md` 继续承载 formal spec 补充清单与历史停点，但当前 Work Item 的执行上下文仍以 active `exec-plan` 与 PR 元数据为准
 - 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 通过 FR `item_key` 与上位 FR 保持一致，并通过 active `exec-plan` 的 `关联 spec`、decision、PR 追溯到当前 Work Item
 - `HOTFIX`、`GOV`、`CHORE` 仍使用统一 `item_key` 参与仓内聚合，但不在 `docs/specs/` 中引入非 `FR-*` 目录命名规则

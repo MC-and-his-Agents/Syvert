@@ -357,14 +357,14 @@ class ContextGuardTests(unittest.TestCase):
     def test_new_formal_spec_without_todo_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            write_valid_governance_docs(repo, include_spec_todo=False, include_template_todo=False)
+            write_valid_governance_docs(repo)
             errors = validate_repository(repo)
         self.assertEqual(errors, [])
 
-    def test_diff_mode_allows_touched_formal_spec_without_todo(self) -> None:
+    def test_diff_mode_allows_touched_bound_formal_spec_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            write_valid_governance_docs(repo, include_spec_todo=False, include_template_todo=False)
+            write_valid_governance_docs(repo)
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/spec.md"],
@@ -899,6 +899,30 @@ class ContextGuardTests(unittest.TestCase):
                 ],
             )
         self.assertEqual(errors, [])
+
+    def test_formal_spec_spec_only_smuggling_without_matching_active_exec_plan_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
+                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
+                    "FR-0001-example",
+                    "FR-9999-unrelated",
+                ),
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-9999-unrelated/spec.md"],
+            )
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
 
     def test_valid_governance_bootstrap_exec_plan_with_related_decision_passes_diff_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

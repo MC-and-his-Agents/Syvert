@@ -15,8 +15,8 @@
 ## 目标
 
 - 让 repo harness、guard、template 与 review 输入适配新的 `Phase -> FR -> Work Item` 治理契约。
-- 让新 formal spec suite 只要求 `spec.md + plan.md`，不再把 `TODO.md` 当作新事项硬依赖。
-- 保留 legacy `TODO.md` 的兼容读取与回写路径，但不提前做最终删除清理。
+- 让 harness、guard、template 与 review 输入优先消费 active `exec-plan`、bootstrap contract 与当前 Work Item 上下文，而不是继续混写到 GitHub 调度层。
+- 在不改动 `FR-0003` formal spec 套件契约的前提下，收敛当前 PR 的治理实现范围，并保留对既有 `TODO.md` 的读取 / 回写兼容。
 
 ## 范围
 
@@ -30,10 +30,8 @@
   - `docs/AGENTS.md`
   - `docs/decisions/ADR-0003-github-delivery-structure-and-repo-semantic-split.md`
   - `docs/exec-plans/GOV-0027-governance-contract-rewrite.md`
-  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md`
   - `docs/process/agent-loop.md`
   - `docs/specs/README.md`
-  - `docs/specs/_template/TODO.md`
   - `docs/exec-plans/README.md`
   - `spec_review.md`
   - `code_review.md`
@@ -51,8 +49,8 @@
 
 ## 当前停点
 
-- 最近一次显式实现 checkpoint 对应提交 `0ba5bf13e1af7893f45f112e08400aaac8ee48cd`。该 checkpoint 已完成第一轮收口：`open_pr` 不再允许无关 FR formal spec 套件搭车通过 preflight，`GOV-0028` 已切换到 bootstrap contract，且当前 PR 已把 `FR-0003/spec.md`、`plan.md` 从范围中移出，只保留 legacy `TODO.md` 历史回写。
-- 当前工作树在上述 checkpoint 之后补做第二轮 guardian 收口：一是把 bootstrap contract 收紧到真实 `docs/decisions/*.md` 决策文档，并让重复 decision metadata fail-closed；二是让 `context_guard` 与 `open_pr` 对 formal-spec suite 范围保持同一条 fail-closed 规则；三是恢复 legacy FR / HOTFIX 代码型实现 PR 的兼容路径，只要当前事项自己的 formal spec 套件已经存在且有效，就不再强迫当前 diff 触碰 spec 文件。
+- 最近一次显式实现 checkpoint 对应提交 `f5848d04e09f6bae4a709243ab56849698c7f5e3`。该 checkpoint 已完成第二轮 guardian 收口：bootstrap contract 只接受真实 `docs/decisions/*.md` 决策文档，重复 decision metadata fail-closed，`context_guard` / `open_pr` 对 formal-spec suite scope 使用同一条 fail-closed 规则，且 legacy FR / HOTFIX code-only 实现 PR 已恢复 formal-input 兼容路径。
+- 当前工作树在上述 checkpoint 之后补做最终范围收敛：一是撤回本 PR 对 formal spec 最小套件与 `TODO.md` required/optional 语义的改写；二是把 `FR-0003/TODO.md` 与模板 `TODO.md` 的变更从当前 diff 中移出，避免再碰 canonical formal-spec 套件；三是把 `context_guard` 的 formal-spec 授权检查升级为 diff 级校验，阻止在 PR 创建后再夹带无关 FR 套件。
 - 当前已解决本轮全部已知阻断：
   - `context_guard` 不再把 bootstrap decision 完整性错误施加到所有 touched `exec-plan`
   - `open_pr` 的 bootstrap fallback 已收紧到“当前事项自己的 active exec-plan + 关联 decision”
@@ -62,7 +60,7 @@
   - legacy FR / HOTFIX 的 code-only 实现 PR 已恢复兼容：已有且有效的本地 formal spec 套件可直接作为 formal input
   - `docs/specs/README.md` 不再把当前 Work Item 完整上下文写成 formal spec 必需输入
   - `docs/specs/README.md` 与 `docs/exec-plans/README.md` 已明确：formal spec 绑定 FR `item_key`，active `exec-plan` 绑定当前 Work Item `item_key`
-- 当前待办只剩推送包含第二轮 guardian 修复的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
+- 当前待办只剩推送包含最终范围收敛与 diff 级 formal-spec 校验的当前 head，并在该同一 head 上重新运行 guardian / merge gate。
 
 ## 下一步动作
 
@@ -95,19 +93,16 @@
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 - 已确认 legacy placeholder `关联 spec：无（治理文档事项）` 会继续走当前事项自己的 bootstrap contract，不再误判为 formal spec 绑定
-- 已确认 `FR-0003` legacy `TODO.md` 只保留历史跟踪语义，不再提前宣告 `GOV-0028` 已完成
 - 已创建 PR：`#60 https://github.com/MC-and-his-Agents/Syvert/pull/60`
 - 已补齐 PR 描述中的 `fixes #57`、`refs #55`、`refs #54`、风险与验证说明
 - 已确认 `open_pr` 对当前事项优先消费 active `exec-plan` 的绑定输入：`formal_spec` 模式只认当前 `关联 spec`，`bootstrap` 模式只认当前 `关联 decision`
 - 已确认 `context_guard` 对 touched `exec-plan` 按输入模式施加校验：非 `GOV` unbound 路径不再被 bootstrap contract 误伤
 - 已确认 bootstrap contract 不再接受 metadata-free ADR；`implementation` formal-input 不再依赖 GitHub title / label heuristics
 - 已确认 README 示例链路不再把 FR `item_key` 与 Work Item `item_key` 混写成同一个聚合键
-- 已确认新路径只要求 `spec.md + plan.md` 即可通过 formal spec / guard / `open_pr` 入口
-- 已确认 legacy `TODO.md` 仍保持“存在则继续读取与校验；缺失不阻塞新事项；touched 删除仍在 `GOV-0028` 拒绝，最终清理由 `#58 / GOV-0029` 负责”
 
 ## 未决风险
 
-- 若 review / guardian 仍隐式依赖历史 `TODO.md` 叙事，可能仍需在 PR 描述或评审评论中更明确地强调“默认输入已切换到 spec / plan / bootstrap contract / exec-plan”。
+- 若 review / guardian 仍把 formal spec 套件 contract 与执行回合 contract 混成一层，仍可能要求补充“当前 PR 不改 `required_files` / 不改 `FR-0003` formal-spec 套件”的显式说明。
 - 若后续 `#58` 清理 PR 没有延续本轮的 legacy 兼容边界，可能误删仍被历史事项使用的 `TODO.md`。
 
 ## 回滚方式
@@ -116,4 +111,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0ba5bf13e1af7893f45f112e08400aaac8ee48cd`
+- `f5848d04e09f6bae4a709243ab56849698c7f5e3`

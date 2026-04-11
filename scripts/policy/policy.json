@@ -88,7 +88,8 @@
   "spec_suite": {
     "required_files": [
       "spec.md",
-      "plan.md"
+      "plan.md",
+      "TODO.md"
     ],
     "spec_required_headings": [
       "## GWT 验收场景",

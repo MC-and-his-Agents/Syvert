@@ -14,14 +14,16 @@ from scripts.common import REPO_ROOT, git_changed_files
 from scripts.item_context import (
     INPUT_MODE_BOOTSTRAP,
     INPUT_MODE_FORMAL_SPEC,
+    INPUT_MODE_UNBOUND,
     classify_exec_plan_input_mode,
     is_eligible_active_exec_plan,
+    normalize_bound_spec_dir,
     parse_exec_plan_metadata,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
 )
-from scripts.policy.policy import spec_suite_policy
+from scripts.policy.policy import formal_spec_dirs, spec_suite_policy
 
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -275,6 +277,32 @@ def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str
     return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
 
 
+def authorized_formal_spec_dirs(repo_root: Path) -> set[Path]:
+    authorized: set[Path] = set()
+    for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
+        if exec_plan.name in {"README.md", "_template.md"}:
+            continue
+        fields = parse_exec_plan_metadata(exec_plan)
+        if not is_eligible_active_exec_plan(fields):
+            continue
+        item_key = fields.get("item_key", "").strip()
+        item_type = fields.get("item_type", "").strip()
+        input_mode = classify_exec_plan_input_mode(fields)
+        if input_mode == INPUT_MODE_FORMAL_SPEC:
+            if validate_bound_spec_contract(repo_root, fields):
+                continue
+            spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
+            if spec_dir is None:
+                continue
+            authorized.add(spec_dir.relative_to(repo_root.resolve()))
+            continue
+        if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"} and item_key:
+            expected_dir = repo_root / "docs" / "specs" / item_key
+            if expected_dir.exists():
+                authorized.add(expected_dir.relative_to(repo_root))
+    return authorized
+
+
 def collect_targets(
     repo_root: Path,
     changed_paths: list[str] | None,
@@ -365,6 +393,16 @@ def validate_context_rules(repo_root: Path, changed_paths: list[str] | None = No
             target = repo_root / path
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
+
+    if changed_paths is not None:
+        touched_spec_dirs = formal_spec_dirs(changed_paths)
+        if touched_spec_dirs:
+            authorized_spec_dirs = authorized_formal_spec_dirs(repo_root)
+            for spec_dir in sorted(touched_spec_dirs):
+                if spec_dir not in authorized_spec_dirs:
+                    errors.append(
+                        f"{repo_root / spec_dir}: 当前 touched formal spec 套件未被任何 active exec-plan 绑定。"
+                    )
 
     if changed_paths is not None:
         for raw_path in changed_paths:
