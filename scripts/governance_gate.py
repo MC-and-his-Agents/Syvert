@@ -84,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
         active_exec_plan = matching_exec_plan_for_issue(repo_root, current_issue)
         if active_exec_plan:
-            if inferred_pr_class in {"governance", "spec", "implementation"}:
+            if inferred_pr_class in {"governance", "spec", "implementation", "docs"}:
                 errors.extend(
                     validate_pr_preflight(
                         inferred_pr_class,

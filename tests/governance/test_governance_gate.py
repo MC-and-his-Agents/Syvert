@@ -168,6 +168,37 @@ class GovernanceGateTests(unittest.TestCase):
         matching_exec_plan_mock.assert_called_once()
         validate_pr_preflight_mock.assert_called_once()
 
+    @patch("scripts.governance_gate.validate_pr_preflight", return_value=["boom"])
+    @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={"item_key": "GOV-0028-harness-compat-migration", "item_type": "GOV", "release": "v0.2.0", "sprint": "2026-S15"})
+    @patch("scripts.governance_gate.build_report", return_value={"pr_class": "docs", "changed_paths": ["vision.md"], "categories": ["docs"], "allowed_categories": ["docs"], "violations": []})
+    @patch("scripts.governance_gate.validate_context_rules", return_value=[])
+    @patch("scripts.governance_gate.validate_context_repository", return_value=[])
+    @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
+    @patch("scripts.governance_gate.git_changed_files", return_value=["vision.md"])
+    @patch("scripts.governance_gate.git_current_branch", return_value="issue-57-demo")
+    def test_docs_pr_still_reuses_open_pr_preflight_contract(
+        self,
+        current_branch_mock,
+        changed_files_mock,
+        workflow_repo_mock,
+        context_repo_mock,
+        context_rules_mock,
+        build_report_mock,
+        matching_exec_plan_mock,
+        validate_pr_preflight_mock,
+    ) -> None:
+        exit_code = governance_gate.main(["--mode", "ci", "--base-ref", "origin/main", "--head-ref", "HEAD"])
+
+        self.assertEqual(exit_code, 1)
+        current_branch_mock.assert_called_once()
+        changed_files_mock.assert_called_once()
+        workflow_repo_mock.assert_called_once()
+        context_repo_mock.assert_called_once()
+        context_rules_mock.assert_called_once()
+        build_report_mock.assert_called_once_with("docs", ["vision.md"])
+        matching_exec_plan_mock.assert_called_once()
+        validate_pr_preflight_mock.assert_called_once()
+
     @patch("scripts.governance_gate.matching_exec_plan_for_issue")
     @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
@@ -201,6 +232,14 @@ class GovernanceGateTests(unittest.TestCase):
             governance_gate.infer_pr_class(["docs/specs/FR-0001-example/TODO.md"]),
             "implementation",
         )
+
+    def test_spec_scope_accepts_required_todo_updates(self) -> None:
+        changed = [
+            "docs/specs/FR-0001-example/spec.md",
+            "docs/specs/FR-0001-example/TODO.md",
+        ]
+        self.assertEqual(governance_gate.infer_pr_class(changed), "spec")
+        self.assertEqual(governance_gate.build_report("spec", changed)["violations"], [])
 
 
 if __name__ == "__main__":
