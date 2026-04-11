@@ -16,6 +16,7 @@ from scripts.item_context import (
     INPUT_MODE_FORMAL_SPEC,
     INPUT_MODE_UNBOUND,
     active_exec_plans_for_issue,
+    allows_legacy_metadata_free_formal_spec_decision,
     classify_exec_plan_input_mode,
     has_meaningful_binding,
     is_eligible_active_exec_plan,
@@ -204,10 +205,9 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
                         for error in validate_suite(spec_dir)
                     )
             if fields.get("关联 decision", ""):
-                errors.extend(
-                    f"{path}: {error}"
-                    for error in validate_bound_decision_contract(repo_root, fields, require_present=True)
-                )
+                decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+                if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+                    errors.extend(f"{path}: {error}" for error in decision_errors)
         elif input_mode == INPUT_MODE_BOOTSTRAP:
             errors.extend(
                 f"{path}: {error}"
@@ -361,7 +361,9 @@ def validate_formal_spec_authorization_contract(
             )
 
     if has_meaningful_binding(fields.get("关联 decision", "")):
-        errors.extend(validate_bound_decision_contract(repo_root, fields, require_present=True))
+        decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+        if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+            errors.extend(decision_errors)
 
     return [f"{exec_plan_path}: {error}" for error in errors]
 

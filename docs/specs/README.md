@@ -43,6 +43,7 @@
 - `TODO.md` 继续承载 formal spec 补充清单与历史停点，但不替代 active `exec-plan` 对当前执行回合的恢复入口职责
 - 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 通过 FR `item_key` 与上位 FR 保持一致，并通过 active `exec-plan` 的 `关联 spec`、decision、PR 追溯到当前 Work Item
+- active `exec-plan` 的 `关联 spec` 只能绑定到 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；不得指向任意嵌套子目录
 - `HOTFIX`、`GOV`、`CHORE` 仍使用统一 `item_key` 参与仓内聚合，但不在 `docs/specs/` 中引入非 `FR-*` 目录命名规则
 
 ## 聚合而不嵌套

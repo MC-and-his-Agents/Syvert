@@ -1105,6 +1105,78 @@ Then
         self.assertTrue(any("缺少 `Issue` 字段" in error for error in errors))
         self.assertTrue(any("缺少 `item_key` 字段" in error for error in errors))
 
+    def test_touched_exec_plan_allows_legacy_metadata_free_adr_for_formal_spec_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "FR-0001-example.md",
+                """# FR-0001 exec-plan
+
+## 关联信息
+
+- item_key：`FR-0001-example`
+- Issue：`#1`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- active 收口事项：`FR-0001-example`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md",
+                "# ADR-0001 bootstrap\n",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/exec-plans/FR-0001-example.md"],
+                current_issue=1,
+            )
+        self.assertEqual(errors, [])
+
+    def test_touched_spec_todo_allows_legacy_metadata_free_adr_for_current_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "FR-0001-example.md",
+                """# FR-0001 exec-plan
+
+## 关联信息
+
+- item_key：`FR-0001-example`
+- Issue：`#1`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- active 收口事项：`FR-0001-example`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md",
+                "# ADR-0001 bootstrap\n",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/TODO.md"],
+                current_issue=1,
+            )
+        self.assertEqual(errors, [])
+
     def test_unbound_fr_authorization_requires_complete_reviewable_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

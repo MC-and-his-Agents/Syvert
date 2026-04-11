@@ -36,6 +36,27 @@ INPUT_MODE_FORMAL_SPEC = "formal_spec"
 INPUT_MODE_BOOTSTRAP = "bootstrap"
 INPUT_MODE_UNBOUND = "unbound"
 PLACEHOLDER_BINDING_PREFIXES = ("无", "none", "n/a", "na", "not applicable", "not-applicable")
+LEGACY_FORMAL_SPEC_DECISION_ITEM_TYPES = {"FR", "HOTFIX", "CHORE"}
+MISSING_BOUND_DECISION_METADATA_ERRORS = {
+    "`关联 decision` 缺少 `Issue` 字段，bootstrap contract 无法与当前事项建立对应关系。",
+    "`关联 decision` 缺少 `item_key` 字段，bootstrap contract 无法与当前事项建立对应关系。",
+}
+
+
+def allows_legacy_metadata_free_formal_spec_decision(
+    payload: Mapping[str, str],
+    errors: list[str],
+) -> bool:
+    item_type = str(payload.get("item_type", "")).strip()
+    related_spec = str(payload.get("关联 spec", "")).strip()
+    related_decision = str(payload.get("关联 decision", "")).strip()
+    if item_type not in LEGACY_FORMAL_SPEC_DECISION_ITEM_TYPES:
+        return False
+    if not has_meaningful_binding(related_spec):
+        return False
+    if not related_decision or not Path(related_decision).name.startswith("ADR-0001"):
+        return False
+    return bool(errors) and set(errors).issubset(MISSING_BOUND_DECISION_METADATA_ERRORS)
 
 
 def normalize_value(value: str) -> str:

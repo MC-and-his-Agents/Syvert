@@ -48,14 +48,17 @@
 
 ## 当前停点
 
-- 最近一次已推送 checkpoint 对应 head 为 `7d222e62587687b410d56ac28546273ddf6f2eb9`。该 head 的 GitHub checks 已全绿，但 guardian 仍指出 6 个收口问题：`context_guard` 仍允许 cross-issue touched `exec-plan` / `decision`、CLI diff 模式未传入 `current_issue`、`governance_gate` 仍依赖本地分支推断 issue、legacy `HOTFIX` formal-input 兼容声明失真、`docs/specs/README.md` 最小套件表述矛盾、以及本 exec-plan 范围与停点描述已过期。
-- 当前工作树正在同一事项内完成最后一轮一致性收口：
+- 最近一次已推送 checkpoint 对应 head 为 `e66d09a0056c95bb20436f5ff8a4da4684d874fa`。该 head 已收口 issue-scope 授权、fenced-code metadata 伪造面、`spec_todo` 分类与 legacy `ADR-0001` 的 implementation compatibility；GitHub checks 通过后，剩余动作只剩 guardian 与受控合并闭环。
+- 当前收口边界已经明确：
   - `context_guard` 对 touched formal spec、`exec-plan`、decision 全部按 `current_issue` 收紧；若无法从真实 git ref 推断当前事项，或同一 Issue 命中多个 active `exec-plan`，会直接 fail-closed。
-  - formal-spec 模式下，只要声明了 `关联 decision`，就必须提供可校验的 `Issue` / `item_key` 元数据，不再接受 metadata-free / legacy decision 混入当前绑定；当前 `GOV-0028` 不再把 `ADR-0003` 作为本事项 bootstrap 输入。
-  - `governance_gate` 在 CI 场景优先使用 PR `head-ref` 推断 issue，并通过 workflow step `env` 安全传入 `context_guard`。
-  - `open_pr` 与治理文档不再宣称不存在的 legacy `HOTFIX` unbound formal-input 兼容；未绑定 `FR` 的本地 formal spec 套件只允许被 `implementation` 入口复用，`governance` / `spec` 不再走该回退。
-  - 已将仍引用 `ADR-0003` 的 `GOV-0027` exec-plan 退役为 inactive，并把 `GOV-0028` 重新绑定到 `FR-0003` formal spec；`ADR-0003` 恢复为 `FR-0003` 的稳定上位治理决策，而不是当前 Work Item 的 bootstrap artifact。
-  - `docs/specs/README.md` 与本 exec-plan 的范围、最小套件、待合入门槛同步回到当前 head 真相。
+  - `关联 spec` 只接受 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；任意嵌套子目录都不再视为合法绑定。
+  - 对仍绑定 metadata-free `ADR-0001` 的非 `GOV` formal-spec 实现事项，`implementation` 入口保留 compatibility；`governance` / `spec` 入口以及 touched decision 授权仍要求可校验的 decision 元数据。
+  - `governance_gate` 在 CI 场景按实际 diff 推断 PR class，再复用 `pr_scope_guard.build_report()` 与 `open_pr` preflight contract，不再把普通 implementation PR 误打成治理红灯。
+
+## 下一步动作
+
+- 等当前 head 的 GitHub checks 全绿后，重新运行 guardian，确认拿到 `APPROVE + safe_to_merge=true`。
+- guardian 通过后，使用受控入口执行 `python3 scripts/merge_pr.py 60 --delete-branch`，并核对 `#57` 自动关闭。
 
 ## 合入门槛
 
@@ -80,7 +83,7 @@
 - `python3 scripts/workflow_guard.py`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class governance --issue 57 --item-key GOV-0028-harness-compat-migration --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
-- `SYVERT_GUARDIAN_TIMEOUT_SECONDS=900 python3 scripts/pr_guardian.py review 60 --json-output /tmp/pr60-guardian-<head>.json`
+- `SYVERT_GUARDIAN_TIMEOUT_SECONDS=3600 python3 scripts/pr_guardian.py review 60 --json-output /tmp/pr60-guardian-<head>.json`
 
 ## 未决风险
 
