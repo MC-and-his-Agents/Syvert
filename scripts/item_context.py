@@ -359,6 +359,39 @@ def validate_bound_spec_contract(repo_root: Path, payload: Mapping[str, str]) ->
     return []
 
 
+def allows_shared_formal_spec_decision_binding(
+    repo_root: Path,
+    payload: Mapping[str, str],
+    decision_fields: Mapping[str, str],
+) -> bool:
+    if classify_exec_plan_input_mode(payload) != INPUT_MODE_FORMAL_SPEC:
+        return False
+    spec_dir = normalize_bound_spec_dir(repo_root, str(payload.get("关联 spec", "")).strip())
+    if spec_dir is None:
+        return False
+    spec_path = spec_dir / "spec.md"
+    if not spec_path.exists():
+        return False
+    spec_fields = parse_markdown_metadata(
+        spec_path.read_text(encoding="utf-8"),
+        allowed_keys=DECISION_METADATA_KEYS,
+        fail_on_duplicates=False,
+    )
+    spec_issue = spec_fields.get("Issue", "")
+    spec_item_key = spec_fields.get("item_key", "")
+    decision_issue = decision_fields.get("Issue", "")
+    decision_item_key = decision_fields.get("item_key", "")
+    if not spec_issue or not spec_item_key or not decision_issue or not decision_item_key:
+        return False
+    if decision_issue != spec_issue or decision_item_key != spec_item_key:
+        return False
+    spec_item_type = spec_fields.get("item_type", "")
+    decision_item_type = decision_fields.get("item_type", "")
+    if spec_item_type and decision_item_type and spec_item_type != decision_item_type:
+        return False
+    return True
+
+
 def validate_bound_decision_contract(
     repo_root: Path,
     payload: Mapping[str, str],
@@ -393,15 +426,16 @@ def validate_bound_decision_contract(
     exec_issue = normalize_issue(payload.get("Issue", ""))
     decision_item_key = decision_fields.get("item_key", "")
     exec_item_key = str(payload.get("item_key", "")).strip()
+    shared_formal_spec_binding = allows_shared_formal_spec_decision_binding(repo_root, payload, decision_fields)
     if require_present and not decision_issue:
         errors.append("`关联 decision` 缺少 `Issue` 字段，bootstrap contract 无法与当前事项建立对应关系。")
     if require_present and not decision_item_key:
         errors.append("`关联 decision` 缺少 `item_key` 字段，bootstrap contract 无法与当前事项建立对应关系。")
-    if decision_issue and exec_issue and decision_issue != exec_issue:
+    if decision_issue and exec_issue and decision_issue != exec_issue and not shared_formal_spec_binding:
         errors.append(
             f"`关联 decision` 的 `Issue` `{decision_issue}` 与当前 exec-plan 的 `Issue` `{exec_issue}` 不一致。"
         )
-    if decision_item_key and exec_item_key and decision_item_key != exec_item_key:
+    if decision_item_key and exec_item_key and decision_item_key != exec_item_key and not shared_formal_spec_binding:
         errors.append(
             f"`关联 decision` 的 `item_key` `{decision_item_key}` 与当前 exec-plan 的 `item_key` `{exec_item_key}` 不一致。"
         )

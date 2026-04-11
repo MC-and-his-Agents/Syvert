@@ -642,6 +642,26 @@ class ContextGuardTests(unittest.TestCase):
             )
         self.assertTrue(any("缺少 `Issue`" in error for error in errors))
 
+    def test_touched_decision_linked_from_formal_spec_exec_plan_with_shared_fr_metadata_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            decision = repo / "docs" / "decisions" / "ADR-0001-example.md"
+            decision.write_text(
+                """# ADR-0001
+
+- Issue：`#2`
+- item_key：`FR-0001-example`
+- item_type：`FR`
+""",
+                encoding="utf-8",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-example.md"],
+            )
+        self.assertEqual(errors, [])
+
     def test_touched_decision_linked_from_formal_spec_fr_exec_plan_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

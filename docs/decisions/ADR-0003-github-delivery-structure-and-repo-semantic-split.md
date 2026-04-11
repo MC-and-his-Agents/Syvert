@@ -2,11 +2,17 @@
 
 ## 关联信息
 
-- Issue：`#58`
-- item_key：`GOV-0029-remove-legacy-todo-md`
-- item_type：`GOV`
+- Issue：`#55`
+- item_key：`FR-0003-github-delivery-structure-and-repo-semantic-split`
+- item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
+
+## 关联工作项
+
+- `#56 / GOV-0027-governance-contract-rewrite`：完成单一调度层与单一语义层的契约落盘。
+- `#57 / GOV-0028-harness-compat-migration`：完成 harness 与 merge gate 的兼容迁移。
+- `#58 / GOV-0029-remove-legacy-todo-md`：在本 decision 基础上关闭 legacy `TODO.md` 的正式治理流入口。
 
 ## 背景
 
