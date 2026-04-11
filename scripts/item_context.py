@@ -101,11 +101,9 @@ def parse_exec_plan_metadata(path: Path) -> dict[str, str]:
         if key not in EXEC_PLAN_METADATA_KEYS:
             continue
         if key in seen_keys:
-            payload["conflict"] = "duplicate_metadata_keys"
-            payload["duplicate_key"] = key
-            if "Issue" in payload:
-                payload["Issue"] = normalize_issue(payload["Issue"])
-            return payload
+            payload.setdefault("conflict", "duplicate_metadata_keys")
+            payload.setdefault("duplicate_key", key)
+            continue
         seen_keys.add(key)
         payload[key] = value
 
@@ -128,11 +126,8 @@ def parse_markdown_metadata(
             continue
         if key in seen_keys:
             if fail_on_duplicates:
-                payload["conflict"] = "duplicate_metadata_keys"
-                payload["duplicate_key"] = key
-                if "Issue" in payload:
-                    payload["Issue"] = normalize_issue(payload["Issue"])
-                return payload
+                payload.setdefault("conflict", "duplicate_metadata_keys")
+                payload.setdefault("duplicate_key", key)
             continue
         seen_keys.add(key)
         payload[key] = normalize_value(match.group(2))

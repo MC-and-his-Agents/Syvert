@@ -17,7 +17,7 @@
 
 模板见 [./_template](./_template)。
 
-`TODO.md` 为 legacy optional 补充工件：历史事项若已存在该文件可继续保留、读取与按需回写；新事项目录不要求创建 `TODO.md`。
+`TODO.md` 仍作为 formal spec 最小套件的一部分保留；若当前判断直接依赖其检查清单或历史停点，应与 `spec.md`、`plan.md` 一并维护。
 
 ## 可选增强（按触发条件）
 
