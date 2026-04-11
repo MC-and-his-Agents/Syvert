@@ -8,10 +8,9 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
-import re
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
-from scripts.context_guard import validate_context_rules, validate_repository as validate_context_repository
+from scripts.context_guard import infer_current_issue, validate_context_rules, validate_repository as validate_context_repository
 from scripts.policy.policy import classify_paths
 from scripts.workflow_guard import validate_repository as validate_workflow_repository
 
@@ -63,11 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     errors: list[str] = []
     errors.extend(validate_workflow_repository(repo_root))
     errors.extend(validate_context_repository(repo_root))
-    current_issue = None
-    branch = git_current_branch(repo=repo_root)
-    match = re.match(r"^issue-(\d+)(?:-|$)", branch)
-    if match:
-        current_issue = int(match.group(1))
+    current_issue = infer_current_issue(args.head_ref)
+    if current_issue is None:
+        current_issue = infer_current_issue(git_current_branch(repo=repo_root))
     errors.extend(validate_context_rules(repo_root, changed, current_issue=current_issue))
     for relative_path in REQUIRED_GOVERNANCE_FILES:
         if not (repo_root / relative_path).exists():

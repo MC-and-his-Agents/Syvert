@@ -14,10 +14,11 @@
 
 - `spec.md`
 - `plan.md`
+- `TODO.md`
 
 模板见 [./_template](./_template)。
 
-`TODO.md` 仍作为 formal spec 最小套件的一部分保留；若当前判断直接依赖其检查清单或历史停点，应与 `spec.md`、`plan.md` 一并维护。
+`TODO.md` 用于承载 formal spec 补充清单与历史停点，应与 `spec.md`、`plan.md` 一并维护。
 
 ## 可选增强（按触发条件）
 

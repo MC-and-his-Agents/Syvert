@@ -10,7 +10,7 @@ if __package__ in {None, ""}:
 import argparse
 import re
 
-from scripts.common import REPO_ROOT, git_changed_files
+from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
 from scripts.item_context import (
     INPUT_MODE_BOOTSTRAP,
     INPUT_MODE_FORMAL_SPEC,
@@ -35,6 +35,7 @@ HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 SHA40_RE = re.compile(r"\b[0-9a-f]{40}\b")
+ISSUE_REF_RE = re.compile(r"^issue-(\d+)(?:-|$)")
 
 SPEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
 EXEC_CONTEXT_FIELDS = ("Issue", "item_key", "item_type", "release", "sprint")
@@ -48,6 +49,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--base-sha")
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--head-sha")
+    parser.add_argument("--current-issue", type=int)
     return parser.parse_args(argv)
 
 
@@ -287,6 +289,41 @@ def is_valid_governance_exec_plan_binding(exec_plan_path: Path, fields: dict[str
     return not validate_item_key(exec_plan_path, item_key, "GOV", allow_empty=False)
 
 
+def infer_current_issue(*refs: str | None) -> int | None:
+    for ref in refs:
+        normalized = str(ref or "").strip()
+        if not normalized:
+            continue
+        match = ISSUE_REF_RE.match(normalized)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def eligible_governance_exec_plans(
+    repo_root: Path,
+    *,
+    current_issue: int | None,
+) -> list[tuple[Path, dict[str, str]]]:
+    if current_issue is not None:
+        payloads = active_exec_plans_for_issue(repo_root, current_issue)
+    else:
+        payloads = []
+        for exec_plan in (repo_root / "docs" / "exec-plans").glob("*.md"):
+            if exec_plan.name in {"README.md", "_template.md"}:
+                continue
+            payloads.append(parse_exec_plan_metadata(exec_plan))
+
+    matches: list[tuple[Path, dict[str, str]]] = []
+    for fields in payloads:
+        exec_plan_path = Path(str(fields.get("exec_plan", "")).strip())
+        if not exec_plan_path.exists():
+            continue
+        if is_valid_governance_exec_plan_binding(exec_plan_path, fields):
+            matches.append((exec_plan_path, fields))
+    return matches
+
+
 def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -> set[Path]:
     authorized: set[Path] = set()
     payloads: list[dict[str, str]] = []
@@ -311,7 +348,7 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
                 continue
             authorized.add(spec_dir.relative_to(repo_root.resolve()))
             continue
-        if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"} and item_key:
+        if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
             expected_dir = repo_root / "docs" / "specs" / item_key
             if expected_dir.exists():
                 authorized.add(expected_dir.relative_to(repo_root))
@@ -431,6 +468,11 @@ def validate_context_rules(
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = parse_exec_plan_metadata(target)
+            exec_issue = fields.get("Issue", "").strip()
+            if current_issue is not None and exec_issue and exec_issue != str(current_issue):
+                errors.append(
+                    f"{target}: 当前 touched exec-plan 的 `Issue` `{exec_issue}` 与当前执行回合 `#{current_issue}` 不一致。"
+                )
             input_mode = classify_exec_plan_input_mode(fields)
             if input_mode == INPUT_MODE_FORMAL_SPEC:
                 errors.extend(
@@ -447,15 +489,7 @@ def validate_context_rules(
             )
 
         exec_plan_to_decision: dict[str, list[tuple[Path, dict[str, str]]]] = {}
-        all_exec_plans = [
-            path
-            for path in (repo_root / "docs" / "exec-plans").glob("*.md")
-            if path.name not in {"README.md", "_template.md"}
-        ]
-        for exec_plan in all_exec_plans:
-            fields = parse_exec_plan_metadata(exec_plan)
-            if not is_valid_governance_exec_plan_binding(exec_plan, fields):
-                continue
+        for exec_plan, fields in eligible_governance_exec_plans(repo_root, current_issue=current_issue):
             related_decision = fields.get("关联 decision", "")
             if not related_decision:
                 continue
@@ -550,10 +584,16 @@ def main(argv: list[str] | None = None) -> int:
     if base_ref:
         changed_paths = git_changed_files(base_ref, head_ref, repo=repo_root)
 
+    current_issue = args.current_issue
+    if current_issue is None:
+        current_issue = infer_current_issue(args.head_ref)
+    if current_issue is None:
+        current_issue = infer_current_issue(git_current_branch(repo=repo_root))
+
     if changed_paths is None:
         errors = validate_repository(repo_root)
     else:
-        errors = validate_context_rules(repo_root, changed_paths)
+        errors = validate_context_rules(repo_root, changed_paths, current_issue=current_issue)
     if errors:
         for error in errors:
             print(error, file=sys.stderr)

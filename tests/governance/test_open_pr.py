@@ -1100,6 +1100,28 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("formal spec 或 bootstrap contract" in error for error in errors))
 
+    def test_implementation_pr_does_not_require_unbound_formal_input_for_hotfix_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="HOTFIX-0001-critical-patch",
+                issue="#1",
+                item_type="HOTFIX",
+                active_item_key="HOTFIX-0001-critical-patch",
+            )
+            errors = validate_pr_preflight(
+                "implementation",
+                1,
+                "HOTFIX-0001-critical-patch",
+                "HOTFIX",
+                "v0.1.0",
+                "2026-S14",
+                ["scripts/tool.py"],
+                repo_root=repo,
+            )
+        self.assertEqual(errors, [])
+
     def test_build_body_contains_item_context(self) -> None:
         args = parse_args(
             [

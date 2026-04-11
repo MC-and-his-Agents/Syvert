@@ -96,7 +96,7 @@ def has_bound_formal_spec_input(
             return False
         return not validate_suite(spec_dir)
 
-    if input_mode == INPUT_MODE_UNBOUND and item_type in {"FR", "HOTFIX"}:
+    if input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
         expected_dir = repo_root / "docs" / "specs" / item_key
         touched_spec_dirs = formal_spec_dirs(changed_files)
         if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
@@ -127,7 +127,7 @@ def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type:
     input_mode = classify_exec_plan_input_mode(exec_plan)
     if input_mode in {INPUT_MODE_FORMAL_SPEC, INPUT_MODE_BOOTSTRAP}:
         return True
-    return item_type in {"FR", "HOTFIX"}
+    return item_type == "FR"
 
 
 def closing_line(issue: int | None, mode: str) -> str:
