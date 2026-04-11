@@ -985,6 +985,40 @@ class ContextGuardTests(unittest.TestCase):
         self.assertTrue(any("关联 decision" in error and "缺少 `Issue`" in error for error in errors))
         self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
 
+
+    def test_invalid_active_exec_plan_binding_cannot_authorize_touched_formal_spec_for_current_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- item_key：`GOV-0001-release-sprint-structure`\n- Issue：`#1`\n- item_type：`GOV`",
+                    "- item_key：`invalid-item-key`\n- Issue：`#1`\n- item_type：`GOV`",
+                ).replace(
+                    "- 关联 decision：`docs/decisions/ADR-0001-example.md`",
+                    "- 关联 decision：`docs/decisions/ADR-0001-invalid.md`",
+                ).replace(
+                    "- active 收口事项：`GOV-0001-release-sprint-structure`",
+                    "- active 收口事项：`invalid-item-key`",
+                ),
+                encoding="utf-8",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0001-invalid.md",
+                """# ADR-0001 invalid
+
+- Issue：`#1`
+- item_key：`invalid-item-key`
+""",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/specs/FR-0001-example/spec.md"],
+                current_issue=1,
+            )
+        self.assertTrue(any("未被任何 active exec-plan 绑定" in error for error in errors))
+
     def test_invalid_related_spec_cannot_authorize_touched_decision_for_current_issue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -1137,6 +1171,42 @@ Then
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/exec-plans/FR-0001-example.md"],
+                current_issue=1,
+            )
+        self.assertEqual(errors, [])
+
+    def test_touched_decision_allows_legacy_metadata_free_adr_for_formal_spec_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_governance_docs(repo)
+            (repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md").unlink()
+            write_file(
+                repo / "docs" / "exec-plans" / "FR-0001-example.md",
+                """# FR-0001 exec-plan
+
+## 关联信息
+
+- item_key：`FR-0001-example`
+- Issue：`#1`
+- item_type：`FR`
+- release：`v0.1.0`
+- sprint：`2026-S13`
+- 关联 spec：`docs/specs/FR-0001-example/`
+- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- active 收口事项：`FR-0001-example`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md",
+                "# ADR-0001 bootstrap\n",
+            )
+            errors = validate_context_rules(
+                repo,
+                changed_paths=["docs/decisions/ADR-0001-governance-bootstrap-contract.md"],
                 current_issue=1,
             )
         self.assertEqual(errors, [])

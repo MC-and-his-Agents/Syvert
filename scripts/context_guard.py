@@ -390,7 +390,9 @@ def validate_decision_authorization_contract(
         fields.get("关联 decision", "")
     )
     if require_present:
-        errors.extend(validate_bound_decision_contract(repo_root, fields, require_present=True))
+        decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
+        if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(fields, decision_errors):
+            errors.extend(decision_errors)
 
     return [f"{exec_plan_path}: {error}" for error in errors]
 
@@ -422,6 +424,8 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
     for fields in authorization_exec_plan_payloads(repo_root, current_issue=current_issue):
         exec_plan_path = Path(str(fields.get("exec_plan", "")).strip())
         if not exec_plan_path.exists():
+            continue
+        if not is_valid_governance_exec_plan_binding(exec_plan_path, fields):
             continue
         contract_errors = validate_formal_spec_authorization_contract(exec_plan_path, repo_root, fields)
         if contract_errors:
@@ -610,10 +614,12 @@ def validate_context_rules(
                     payload = dict(exec_plan_fields)
                     payload["关联 decision"] = normalized_target
                     require_present = classify_exec_plan_input_mode(exec_plan_fields) in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC}
-                    errors.extend(
-                        f"{target}: {error}"
-                        for error in validate_bound_decision_contract(repo_root, payload, require_present=require_present)
-                    )
+                    decision_errors = validate_bound_decision_contract(repo_root, payload, require_present=require_present)
+                    if decision_errors and not allows_legacy_metadata_free_formal_spec_decision(payload, decision_errors):
+                        errors.extend(
+                            f"{target}: {error}"
+                            for error in decision_errors
+                        )
 
     for path in exec_plans:
         errors.extend(validate_exec_plan(path, repo_root=repo_root))
