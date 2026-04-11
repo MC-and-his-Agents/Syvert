@@ -11,7 +11,7 @@ GOVERNANCE_SCOPE_REPORT = {
     "pr_class": "governance",
     "changed_paths": ["scripts/context_guard.py"],
     "categories": ["governance"],
-    "allowed_categories": ["docs", "governance", "spec", "spec_todo"],
+    "allowed_categories": ["docs", "governance", "spec"],
     "violations": [],
 }
 
@@ -19,7 +19,7 @@ IMPLEMENTATION_SCOPE_REPORT = {
     "pr_class": "implementation",
     "changed_paths": ["src/app.py"],
     "categories": ["implementation"],
-    "allowed_categories": ["docs", "implementation", "spec_todo"],
+    "allowed_categories": ["docs", "implementation"],
     "violations": [],
 }
 
@@ -124,7 +124,7 @@ class GovernanceGateTests(unittest.TestCase):
             "pr_class": "implementation",
             "changed_paths": ["src/app.py"],
             "categories": ["implementation"],
-            "allowed_categories": ["docs", "implementation", "spec_todo"],
+            "allowed_categories": ["docs", "implementation"],
             "violations": [{"path": "src/app.py", "category": "implementation"}],
         },
     )
@@ -201,7 +201,7 @@ class GovernanceGateTests(unittest.TestCase):
 
     @patch("scripts.governance_gate.validate_pr_preflight", return_value=["boom"])
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={"item_key": "FR-0001-example", "item_type": "FR", "release": "v0.1.0", "sprint": "2026-S13"})
-    @patch("scripts.governance_gate.build_report", return_value={"pr_class": "spec", "changed_paths": ["docs/specs/FR-0001-example/contracts/README.md"], "categories": ["spec"], "allowed_categories": ["docs", "spec", "spec_todo"], "violations": []})
+    @patch("scripts.governance_gate.build_report", return_value={"pr_class": "spec", "changed_paths": ["docs/specs/FR-0001-example/contracts/README.md"], "categories": ["spec"], "allowed_categories": ["docs", "spec"], "violations": []})
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
     @patch("scripts.governance_gate.validate_context_repository", return_value=[])
     @patch("scripts.governance_gate.validate_workflow_repository", return_value=[])
@@ -258,10 +258,10 @@ class GovernanceGateTests(unittest.TestCase):
         build_report_mock.assert_called_once_with("governance", ["scripts/context_guard.py"])
         matching_exec_plan_mock.assert_not_called()
 
-    def test_infer_pr_class_treats_spec_todo_as_implementation(self) -> None:
+    def test_infer_pr_class_treats_legacy_todo_path_as_spec_scope(self) -> None:
         self.assertEqual(
             governance_gate.infer_pr_class(["docs/specs/FR-0001-example/TODO.md"]),
-            "implementation",
+            "spec",
         )
 
     def test_spec_scope_accepts_required_todo_updates(self) -> None:

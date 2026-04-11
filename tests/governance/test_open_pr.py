@@ -50,7 +50,7 @@ def write_formal_spec_suite(
     repo: Path,
     *,
     suite_name: str = "FR-0001-governance-stack-v1",
-    with_todo: bool = True,
+    with_todo: bool = False,
 ) -> None:
     fr_dir = repo / "docs" / "specs" / suite_name
     fr_dir.mkdir(parents=True, exist_ok=True)
@@ -185,7 +185,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 6,
@@ -620,7 +620,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -646,7 +646,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -672,7 +672,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-9999-missing/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -698,7 +698,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-9999-missing/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -723,7 +723,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 sprint="2026-S15",
                 active_item_key="GOV-0028-harness-compat-migration",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -749,7 +749,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/spec.md",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -775,8 +775,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -805,7 +805,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -1050,7 +1050,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -1074,7 +1074,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             adjunct = repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "contracts" / "README.md"
             adjunct.parent.mkdir(parents=True, exist_ok=True)
             adjunct.write_text("# contracts\n", encoding="utf-8")
@@ -1100,7 +1100,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=True)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -1123,7 +1123,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "implementation",
                 1,
@@ -1148,7 +1148,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 related_spec="docs/specs/FR-0002-content-detail-runtime-v0-1/",
                 related_decision="docs/decisions/ADR-0001-governance-bootstrap-contract.md",
             )
-            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
+            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=False)
             (repo / "docs" / "decisions").mkdir(parents=True, exist_ok=True)
             (repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md").write_text(
                 "# ADR-0001 bootstrap\n",
@@ -1179,7 +1179,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
                 related_decision="docs/decisions/ADR-0003-shared.md",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             write_decision(repo, "docs/decisions/ADR-0003-shared.md", issue="#2", item_key="GOV-0002-other")
             errors = validate_pr_preflight(
                 "spec",
@@ -1212,7 +1212,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 issue="#57",
                 item_key="GOV-0028-harness-compat-migration",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "spec",
                 57,
@@ -1235,7 +1235,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, with_todo=False)
             errors = validate_pr_preflight(
                 "governance",
                 1,

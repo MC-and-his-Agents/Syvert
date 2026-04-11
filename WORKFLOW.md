@@ -60,7 +60,6 @@ codex:
 - 仅当执行回合显式推进新的 checkpoint 时，才刷新 `exec-plan` 中记录的 checkpoint head。
 - review 结论、GitHub checks、PR 关联、索引入口等审查态信息的更新，不自动构成新的 checkpoint。
 - checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 active `exec-plan`，再继续执行。
-- `TODO.md` 仍作为正式规约套件的一部分保留；若其中信息与当前恢复判断直接相关，需与 active `exec-plan` 一并同步，但不替代 active `exec-plan` 的恢复主入口。
 - checkpoint 必须说明当前改动推进了哪个 `release` 目标，以及该事项在当前 `sprint` 中的角色或位置。
 - `compact` 仅压缩已入库且可复验的信息，不得压缩未落盘前提。
 - `compact` 不得压缩未落盘的事项上下文判断，包括 `release`、`sprint` 绑定与事项角色判定。
@@ -99,7 +98,6 @@ codex:
 - 若仅补充 review / merge gate 元数据，而未显式推进新的执行停点，不要求刷新 checkpoint head。
 - 变更 `item_key`、`item_type`、`release`、`sprint` 或事项在当前轮次中的定位时必须更新。
 - 进入 review、进入 merge gate 前必须更新到最新状态。
-- legacy `TODO.md` 若存在，且其检查清单或历史停点仍服务当前判断，可按需同步；否则不构成必需更新项。
 
 ## 何时允许进入 `open_pr` / `merge_pr`
 

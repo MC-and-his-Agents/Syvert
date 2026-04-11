@@ -12,6 +12,7 @@ from scripts.item_context import (
     normalize_bound_spec_dir,
     parse_exec_plan_metadata,
     validate_bound_decision_contract,
+    validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
 )
 
@@ -180,16 +181,36 @@ class ItemContextTests(unittest.TestCase):
             suite_dir = repo / "docs" / "specs" / "FR-0001-example"
             write_file(suite_dir / "spec.md", "# spec\n")
             write_file(suite_dir / "plan.md", "# plan\n")
-            write_file(suite_dir / "TODO.md", "# todo\n")
             shadow_dir = suite_dir / "shadow"
             write_file(shadow_dir / "spec.md", "# shadow spec\n")
             write_file(shadow_dir / "plan.md", "# shadow plan\n")
-            write_file(shadow_dir / "TODO.md", "# shadow todo\n")
             errors = validate_bound_spec_contract(
                 repo,
                 {"关联 spec": "docs/specs/FR-0001-example/shadow/"},
             )
         self.assertTrue(any("FR formal spec 套件根目录" in error for error in errors))
+
+    def test_validate_bound_formal_spec_scope_accepts_authorized_additional_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            first = repo / "docs" / "specs" / "FR-0001-example"
+            second = repo / "docs" / "specs" / "FR-0002-example"
+            write_file(first / "spec.md", "# spec\n")
+            write_file(first / "plan.md", "# plan\n")
+            write_file(second / "spec.md", "# spec\n")
+            write_file(second / "plan.md", "# plan\n")
+            errors = validate_bound_formal_spec_scope(
+                repo,
+                {
+                    "关联 spec": "docs/specs/FR-0001-example/",
+                    "额外关联 specs": "docs/specs/FR-0002-example/",
+                },
+                [
+                    "docs/specs/FR-0001-example/spec.md",
+                    "docs/specs/FR-0002-example/spec.md",
+                ],
+            )
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

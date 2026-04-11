@@ -25,6 +25,7 @@ from scripts.item_context import (
     parse_exec_plan_metadata,
     strip_fenced_code_blocks,
     spec_dir_has_minimum_suite,
+    validate_additional_spec_contracts,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
@@ -122,12 +123,11 @@ def decision_item_type_from_name(path: Path) -> str | None:
 
 def is_spec_suite_file(path: Path) -> bool:
     value = path.as_posix()
-    if re.search(r"(^|/)docs/specs/_template/(spec|plan|TODO)\.md$", value):
+    if re.search(r"(^|/)docs/specs/_template/(spec|plan)\.md$", value):
         return True
-    return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan|TODO)\.md$", value) is not None
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan)\.md$", value) is not None
 
-
-def is_todo_spec_file(path: Path) -> bool:
+def is_legacy_todo_file(path: Path) -> bool:
     value = path.as_posix()
     if re.search(r"(^|/)docs/specs/_template/TODO\.md$", value):
         return True
@@ -347,12 +347,24 @@ def validate_formal_spec_authorization_contract(
     if input_mode == INPUT_MODE_FORMAL_SPEC:
         bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
         errors.extend(bound_spec_errors)
+        bound_spec_relative: Path | None = None
         if not bound_spec_errors:
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
+                bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                     for error in validate_suite(spec_dir)
+                )
+        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+        errors.extend(additional_spec_errors)
+        if not additional_spec_errors:
+            for extra_spec_dir in additional_spec_dirs:
+                if extra_spec_dir == bound_spec_relative:
+                    continue
+                errors.extend(
+                    f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(repo_root / extra_spec_dir)
                 )
     elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
         expected_dir = repo_root / "docs" / "specs" / item_key
@@ -447,6 +459,9 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
                 authorized.add(spec_dir.relative_to(repo_root.resolve()))
+            additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+            if not additional_errors:
+                authorized.update(additional_spec_dirs)
             continue
         if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
             expected_dir = repo_root / "docs" / "specs" / item_key
@@ -487,9 +502,6 @@ def collect_targets(
                         candidate = suite_dir / name
                         if candidate.exists():
                             spec_files.add(candidate)
-                    todo_candidate = suite_dir / "TODO.md"
-                    if todo_candidate.exists():
-                        spec_files.add(todo_candidate)
     else:
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
         release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
@@ -503,20 +515,11 @@ def collect_targets(
                 candidate = suite_dir / name
                 if candidate.exists():
                     spec_files.add(candidate)
-        for suite_dir in specs_root.glob("FR-*"):
-            if not suite_dir.is_dir():
-                continue
-            candidate = suite_dir / "TODO.md"
-            if candidate.exists():
-                spec_files.add(candidate)
         template_dir = specs_root / "_template"
         for name in ("spec.md", "plan.md"):
             candidate = template_dir / name
             if candidate.exists():
                 spec_files.add(candidate)
-        template_todo = template_dir / "TODO.md"
-        if template_todo.exists():
-            spec_files.add(template_todo)
 
     return (
         sorted(exec_plans),
@@ -539,6 +542,11 @@ def validate_context_rules(
     if changed_paths is not None:
         for raw_path in changed_paths:
             path = Path(raw_path)
+            target = repo_root / path
+            if is_legacy_todo_file(path):
+                if target.exists():
+                    errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
+                continue
             if not (
                 is_exec_plan_file(path)
                 or is_release_file(path)
@@ -547,7 +555,6 @@ def validate_context_rules(
                 or is_spec_suite_file(path)
             ):
                 continue
-            target = repo_root / path
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
@@ -664,9 +671,7 @@ def validate_repository(repo_root: Path) -> list[str]:
 
     template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
     if template_todo.exists():
-        baseline_paths.append(template_todo.relative_to(repo_root).as_posix())
-    else:
-        errors.append(f"{template_todo}: 缺少基线模板工件 `{template_todo.relative_to(repo_root).as_posix()}`。")
+        errors.append(f"{template_todo}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:

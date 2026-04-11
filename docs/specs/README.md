@@ -14,11 +14,8 @@
 
 - `spec.md`
 - `plan.md`
-- `TODO.md`
 
 模板见 [./_template](./_template)。
-
-`TODO.md` 用于承载 formal spec 补充清单与历史停点，应与 `spec.md`、`plan.md` 一并维护。
 
 ## 可选增强（按触发条件）
 
@@ -38,9 +35,9 @@
 - `docs/specs/` 中的 formal spec 默认使用对应 FR 的 `item_key` 作为聚合键。
 - FR 目录命名固定为：`FR-XXXX-<slug>`
 - `XXXX` 为四位数字，`slug` 使用短横线英文短语
-- formal spec 与 `TODO.md` 中的上下文字段用于声明绑定 FR 自身的 `Issue`、`item_key`、`item_type`、`release`、`sprint`，而不是当前 Work Item 的执行轮次
+- formal spec 中的上下文字段用于声明绑定 FR 自身的 `Issue`、`item_key`、`item_type`、`release`、`sprint`，而不是当前 Work Item 的执行轮次
 - formal spec 只承载绑定 FR 的需求、边界与验证语义；当前 Work Item 的执行上下文由 active `exec-plan` 与 PR 元数据承载
-- `TODO.md` 继续承载 formal spec 补充清单与历史停点，但不替代 active `exec-plan` 对当前执行回合的恢复入口职责
+- legacy `TODO.md` 已退出正式治理流，不再作为 formal spec 必需工件、状态镜像或恢复入口
 - 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 通过 FR `item_key` 与上位 FR 保持一致，并通过 active `exec-plan` 的 `关联 spec`、可选的 `关联 decision` 与 PR 追溯到当前 Work Item
 - active `exec-plan` 的 `关联 spec` 只能绑定到 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；不得指向任意嵌套子目录

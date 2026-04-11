@@ -24,10 +24,8 @@
 ## 实现约束
 
 - 不允许触碰的边界：
-  - 不修改 `scripts/**` 行为
-  - 不修改 `tests/**` 的语义或大规模结构
-  - 不删除 `TODO.md`
-  - 不调整 formal spec 套件的 required files
+  - 只允许为关闭 legacy `TODO.md` 入口做最小必要的存量 formal spec、`scripts/**`、`scripts/policy/**` 与 `tests/governance/**` 调整
+  - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码
 - 与上位文档的一致性约束：
   - 与 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md` 保持阶段边界一致
@@ -45,9 +43,9 @@
 ## TDD 范围
 
 - 先写测试的模块：
-  - 无。本事项不改脚本行为，以现有治理 guard 与测试作为回归证据
+  - 与 legacy `TODO.md` 生命周期相关的 governance guard / policy 回归场景
 - 暂不纳入 TDD 的模块与理由：
-  - 纯文档与规约收敛项，不新增运行时行为
+  - 纯文档口径收敛部分不新增独立运行时入口，以现有治理门禁作为回归证据
 
 ## 并行 / 串行关系
 
