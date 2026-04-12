@@ -26,7 +26,7 @@
 ## 实现约束
 
 - 不允许触碰的边界：
-  - 当前 formal spec / governance contract PR 只允许修改 `FR-0003` formal spec 套件、当前事项 decision / exec-plan、release / sprint 索引，以及使 TODO-exit 语义成为权威口径所必需的治理文档与模板
+  - 当前 formal spec / governance contract PR 只允许修改 `FR-0003` formal spec 套件、当前事项 decision / exec-plan、release / sprint 索引，以及使 TODO-exit 语义成为权威口径所必需的治理文档
   - `GOV-0029` 对 `scripts/**`、`scripts/policy/**`、`tests/governance/**`、`open_pr` 行为与存量 suite 清理必须放在后续独立 governance 实现 PR
   - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码

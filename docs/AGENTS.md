@@ -68,7 +68,7 @@
 `docs/specs/` 只承载正式规约，不承载 backlog 草稿。
 
 - FR 目录命名：`FR-XXXX-<slug>`
-- 最小套件：`spec.md`、`plan.md`
+- 当前 live 最小套件：`spec.md`、`plan.md`、`TODO.md`（legacy 兼容）；待 `GOV-0029` 的后续独立 governance 实现 PR 合入后，再收敛为 `spec.md`、`plan.md`
 - 正式规约与实现默认分 PR；例外按 [spec_review.md](../spec_review.md) 执行
 - formal spec 绑定到 GitHub FR；Work Item 只通过 `item_key`、exec-plan、PR 与该 formal spec 建立关联
 
