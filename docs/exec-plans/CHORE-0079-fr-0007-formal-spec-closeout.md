@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：
+- 关联 PR：`#80`
 - active 收口事项：`CHORE-0079-fr-0007-formal-spec-closeout`
 
 ## 目标
@@ -33,14 +33,14 @@
 ## 当前停点
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
-- 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约；当前回合正把执行上下文重绑到 `#79`。
-- 下一步是在当前分支完成 exec-plan / 索引重绑后，重新通过受控入口打开新的 spec PR。
+- 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，已关闭并由当前 PR `#80` 接续。
+- 当前 PR `#80` 的 GitHub checks 已通过；最新 guardian 阻断集中在 active `exec-plan` 审查态信息回写与 release 索引范围收窄。
 
 ## 下一步动作
 
-- 删除旧的 FR-bound active `exec-plan`，改为 `#79` 绑定的 Work Item active `exec-plan`。
-- 重新运行 formal spec 门禁与 `open_pr --dry-run`。
-- 创建新的 spec PR，等待 checks / guardian，通过后受控合并并关闭 `#79` 与 `#67`。
+- 回写当前 `exec-plan` 与 release 索引到最新 guardian 指出的阻断。
+- 推送当前 head，确认 PR `#80` checks 继续全绿。
+- 重跑 guardian；通过后受控合并 PR `#80`，并关闭 `#79` 与 `#67`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -64,6 +64,14 @@
 - `sed -n '1,260p' spec_review.md`
 - `python3 scripts/pr_guardian.py review 73`
   - 结果：guardian 要求把 formal spec 执行回合从 FR 重新绑定到真实 Work Item，并避免把未实现的依赖写成 spec 仍不可进入实现
+- `python3 scripts/spec_guard.py --all`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/open_pr.py --class spec --issue 79 --item-key CHORE-0079-fr-0007-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title "spec: 收口 FR-0007 的 formal spec" --closing fixes --dry-run`
+- `gh pr checks 80`
+  - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
+- `python3 scripts/pr_guardian.py review 80`
+  - 结果：最新 guardian 要求同步当前 active `exec-plan` 审查态，并收窄 `docs/releases/v0.2.0.md` 到 FR-0007 所需的最小索引更新
 
 ## 未决风险
 
@@ -76,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `749b334c4a3cb0e0b60fd7993cd21b90278f33d7`
+- `c3fb529cf0ca4cbb5f9a411b4fb1adfd27d44939`
