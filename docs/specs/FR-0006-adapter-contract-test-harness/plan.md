@@ -7,7 +7,7 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`无（当前 formal spec PR 直接绑定 FR）`
+- 关联 exec-plan：`docs/exec-plans/CHORE-0051-fr-0006-formal-spec-closeout.md`
 
 ## 实施目标
 
@@ -70,17 +70,14 @@
 
 ## 进入实现前条件
 
-- [x] `spec review` 已通过
-- [x] 关键风险已记录并有缓解策略
-- [x] 关键依赖可用
-- [x] harness、fake adapter、验证工具与真实平台回归的边界已冻结
-- [x] 后续实现 PR 的范围已限制在 contract harness 基座，不要求同轮处理版本 gate 或双参考适配器回归
+- [ ] `spec review` 已通过
+- [ ] 关键风险已记录并有缓解策略
+- [ ] 关键依赖可用
+- [ ] harness、fake adapter、验证工具与真实平台回归的边界已冻结
+- [ ] 后续实现 PR 的范围已限制在 contract harness 基座，不要求同轮处理版本 gate 或双参考适配器回归
 
-## spec review 结论
+## spec review 通过后进入实现的方式
 
-- 结论：通过
-- 未决问题与风险：
-  - 需要在实现阶段继续防止 fake adapter 语义膨胀成影子平台适配器
-  - 需要确保 harness 判定 contract violation 时不偷偷重写上位 contract 语义
-- implementation-ready 判定：
-  - 当前 formal spec 已把 contract harness 的职责、fake adapter 的角色、可验证保证级别与边界约束冻结到足以进入实现；后续应以独立 implementation PR 落地最小宿主、样例与自动化验证
+- `FR-0006` formal spec 审查通过后，后续实现必须以独立 Work Item 和独立 implementation PR 进入执行漏斗。
+- 后续实现 PR 只允许落地 fake adapter、contract harness 宿主、验证工具与最小自动化验证，不得在同一 PR 中扩展真实平台回归或版本 gate 编排。
+- 若实现阶段发现现有上位 contract 存在缺口，必须先回到 formal spec 审查链路，再继续 implementation PR。
