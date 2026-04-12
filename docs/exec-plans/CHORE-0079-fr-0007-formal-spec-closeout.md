@@ -34,8 +34,8 @@
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree，key 为 `issue-79-fr-0007-formal-spec`。
 - 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，随后由 `#80` 接续。
-- 当前实质 checkpoint 已推进到 `16d36bd895fedbc746a042541ccae80808911190`，该提交对齐了 `FR-0007` 在 `v0.2.0` 范围内的双参考适配器冻结口径，并闭合了 `spec.md` 与 `contracts/README.md` 的 formal spec 叙述。
-- 相对最近一次实质 checkpoint（`16d36bd895fedbc746a042541ccae80808911190`）之后的跟进提交，当前受审 head 仅补充 exec-plan 证据、guardian closeout 与风险核对等审查态工件，不改变 `FR-0007` 已冻结的 requirement truth；相对 `origin/main`，本 PR 负责把 `FR-0007` formal spec 套件、active exec-plan 与 release/sprint 索引首次落盘为主干候选。
+- 当前实质 checkpoint 已推进到 `674fed9e210edca0bcb5cb29879bca05c75c8a10`，该提交冻结了 `FR-0007` 的最小双参考回归矩阵与平台泄漏允许区/禁止区边界，使当前 PR 的 requirement truth 达到可审查终态。
+- 相对最近一次实质 checkpoint（`674fed9e210edca0bcb5cb29879bca05c75c8a10`）之后的跟进提交，当前受审 head 仅补充 exec-plan 证据、guardian closeout 与收尾叙述，不改变 `FR-0007` 已冻结的 requirement truth；相对 `origin/main`，本 PR 负责把 `FR-0007` formal spec 套件、active exec-plan 与 release/sprint 索引首次落盘为主干候选。
 - 当前活跃 PR 已切换为 `#84`，用于恢复 GitHub `pull_request` checks；formal spec 内容与 Work Item 绑定保持不变。
 
 ## 下一步动作
@@ -107,5 +107,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `16d36bd895fedbc746a042541ccae80808911190`
-- 说明：该 checkpoint 完成了 `FR-0007` 双参考适配器冻结口径的 formal spec 对齐；当前受审 head 只承载 exec-plan / 风险核对等 metadata-only 收口，不改变 requirement truth，并需单独补齐当前 head 的 guardian 与 checks 结果。
+- `674fed9e210edca0bcb5cb29879bca05c75c8a10`
+- 说明：该 checkpoint 完成了 `FR-0007` 最小双参考回归矩阵与平台泄漏边界的 formal spec 冻结；其后的提交只承载 exec-plan 证据刷新与 guardian closeout 收尾，不再改写 requirement truth，并需继续以当前受审 head 复核 guardian 与 checks 结果。
