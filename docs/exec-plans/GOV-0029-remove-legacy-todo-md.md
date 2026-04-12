@@ -52,7 +52,8 @@
 - 已删除 `FR-0001` / `FR-0002` 的 live legacy `TODO.md`，并把 `FR-0002` exec-plan 中仍把 `TODO.md` 当范围/回滚入口的引用移除。
 - 已把 `额外关联 specs` 收紧为仅 `GOV-0029` 可用，且每个额外 suite 都必须伴随对应 `TODO.md` 删除，并受最小文件集合约束。
 - 已把 `FR-0002` foreign exec-plan 例外锁定为“同 diff 删除对应 TODO + 文件内容匹配批准的最小终态”，并补齐 exec-plan-only / arbitrary rewrite 的负向回归测试。
-- 最近一次 checkpoint 对应实质变更 head 为 `2b78bc3838650ed3ad43a819f3a18d7271d94033`；该 head 已通过本地治理回归、`commit_check`、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`。
+- 已对齐 `open_pr` preflight 与新的 legacy `TODO.md` 合同，并修复 `test_touched_spec_todo_is_rejected_after_legacy_flow_removal` 的失真覆盖。
+- 最近一次 checkpoint 对应实质变更 head 为 `599febd478e027ec736eca125a007887261d4068`；该 head 已通过本地治理回归、`commit_check`、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`。
 
 ## 下一步动作
 
@@ -94,4 +95,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2b78bc3838650ed3ad43a819f3a18d7271d94033`
+- `599febd478e027ec736eca125a007887261d4068`
