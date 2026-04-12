@@ -36,11 +36,11 @@
   - `InputTarget` 只描述“采什么”，不得混入资源分配、平台签名或执行调度细节。
   - `CollectionPolicy` 只描述“在什么约束下采”，不得退化为平台请求构造脚本或 adapter 内部状态机。
   - adapter 必须显式声明自己支持的 `target_type` 集合与 `collection_mode` 集合；不支持的轴值必须在进入平台执行前被拒绝。
-  - Core 必须把结构化 `InputTarget` 与 `CollectionPolicy` 传入 adapter 契约，而不是把平台派生字段提前展开到 Core 层。
+  - Core 必须以 `InputTarget` 与 `CollectionPolicy` 作为共享输入层受理请求，并在进入 adapter 前把它们投影到 adapter-facing contract；不得把平台派生字段提前展开到 Core 层。
 - 契约需求：
   - `InputTarget` 的最小字段固定为：`adapter_key`、`capability`、`target_type`、`target_value`。
-  - `adapter_key` 表示本次采集绑定的 adapter 标识，类型固定为非空字符串。
-  - `capability` 表示本次采集请求的能力标识，类型固定为非空字符串；能力目录本身不在本 FR 中冻结。
+  - `adapter_key` 表示本次采集绑定的 adapter 路由标识，类型固定为非空字符串；它属于 Core 侧路由输入，不要求作为 adapter-facing request 的必需字段进入 `AdapterRequest`。
+  - `capability` 表示本次采集请求的调用侧 operation 标识，类型固定为非空字符串；能力目录本身不在本 FR 中冻结。
   - `target_type` 表示 `target_value` 的解释方式，当前最小允许值固定为：`url`、`content_id`、`creator_id`、`keyword`。
   - `target_value` 类型固定为非空字符串；Core 只负责空值、基本类型与显式组合合法性校验，不负责解释平台语义。
   - `CollectionPolicy` 的最小字段固定为：`collection_mode`。
@@ -51,9 +51,11 @@
   - `InputTarget` 与 `CollectionPolicy` 的最小模型都必须保持单目标语义；批量输入、分页、游标、时间窗、多目标聚合不在本 FR 中定义。
   - 当 `target_type` 不在目标 adapter 的 `supported_targets` 中，或 `collection_mode` 不在其 `supported_collection_modes` 中时，失败必须归因为 Core / Adapter 共享契约不匹配，而不是平台运行时错误。
   - 本 FR 不冻结 `target_type x collection_mode` 的非笛卡尔积支持矩阵；若后续需要表达“某个 target_type 只支持某个 collection_mode 子集”，必须在后续 formal spec 中显式扩展 adapter 声明模型与迁移边界。
+  - `InputTarget.capability` 与 SDK 中的 adapter-facing capability family 可以不是同一命名层级；若调用侧 operation 比 adapter-facing family 更具体，Core 必须在进入 adapter 前完成投影。
   - URL 派生值、平台主 ID、签名参数、页面全局变量、HTML fallback 线索等平台语义必须保留在 adapter 内部解析，不得提升为 `InputTarget` 必填字段。
   - `InputTarget` 必须允许表达 `FR-0002` 的既有 URL 输入语义：`adapter_key + capability + input.url` 必须可以无损投影为 `adapter_key + capability + target_type=url + target_value=input.url`。
   - 对 `FR-0002` 既有 `content_detail_by_url` 请求，若原始输入中未显式携带 `CollectionPolicy`，兼容投影必须固定为 `collection_mode=hybrid`；理由是 `FR-0002` 只冻结了单目标 URL 输入与统一结果 envelope，并未冻结“必须公开”或“必须认证”的策略轴，`hybrid` 是唯一不会把旧请求收窄为更严格策略的共享默认值。
+  - 对 `FR-0002` 的 `capability=content_detail_by_url`，兼容投影必须解释为“调用侧 operation id=`content_detail_by_url` 映射到 adapter-facing capability family=`content_detail`，同时 `target_type=url`”；本 FR 不要求修改 `adapter-sdk.md` 中既有 capability family 的命名。
   - 本 FR 只冻结模型语义与边界，不声明现有 `main` 运行时已经完成对这两个模型的实现接入。
 - 非功能需求：
   - Core 与 Adapter 的责任边界必须可由 formal spec 直接判定，不依赖 reviewer 脑补。
@@ -68,6 +70,7 @@
   - 本事项不得吞并 `v0.2.0` 中错误模型、adapter registry、fake adapter、adapter harness、version gate 或平台泄漏检查 gate 的 formal spec。
 - 架构约束：
   - Core 负责任务输入受理、共享契约校验、资源可用性前置校验与 adapter 调度语义；Adapter 负责平台输入解析、平台请求构造、平台响应处理与平台错误映射。
+  - `adapter_key` 属于 Core 侧路由字段；adapter-facing request 至少需要保留由 Core 投影后的 capability family、target 语义与 collection policy 语义，但不要求重复携带 `adapter_key`。
   - Core 不得根据 `target_type=url` 推断平台主 ID、签名参数、认证 cookie、headers、指纹或 fallback 路径。
   - Adapter 不得自行篡改 `InputTarget` 的上游业务语义；若需要平台派生字段，必须从 `target_value` 与 `collection_mode` 出发在 adapter 内部解析。
   - 若后续 FR 需要新增共享字段、批量输入、游标、结果范围、错误语义或 registry 行为，必须重新进入 formal spec 审查链路。

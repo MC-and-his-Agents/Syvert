@@ -11,8 +11,8 @@
   - `target_type`
   - `target_value`
 - 共享语义：
-  - `adapter_key` 绑定目标 adapter
-  - `capability` 绑定请求的共享能力
+  - `adapter_key` 绑定目标 adapter 的 Core 侧路由输入
+  - `capability` 绑定调用侧 operation 标识
   - `target_type` 说明 `target_value` 的解释方式
   - `target_value` 只承载调用方显式提供的目标值
 - 不属于本模型的内容：
@@ -39,12 +39,22 @@
 - `adapter_key + capability + input.url`
 - 等价映射为：
   - `adapter_key`
-  - `capability`
+  - `capability=content_detail_by_url`
   - `target_type=url`
   - `target_value=input.url`
   - `collection_mode=hybrid`
 
 之所以固定为 `hybrid`，是因为 `FR-0002` 没有把“必须公开”或“必须认证”冻结为旧请求的一部分；若在兼容投影时擅自改成 `public` 或 `authenticated`，都会把既有单目标 URL 请求收窄为更强约束。
+
+## 与 Adapter SDK 的关系
+
+- `InputTarget` 与 `CollectionPolicy` 属于 Core 侧共享输入层。
+- `adapter_key` 只承担 Core 路由语义，不要求进入 adapter-facing `AdapterRequest`。
+- 对 `FR-0002` 的 `content_detail_by_url`，Core 在进入 adapter 前应完成如下投影：
+  - 调用侧 operation id：`content_detail_by_url`
+  - adapter-facing capability family：`content_detail`
+  - `target_type=url`
+  - `collection_mode=hybrid`
 
 ## 后续 FR 的使用边界
 
