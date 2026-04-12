@@ -71,7 +71,7 @@
   - 本事项服务于 `v0.2.0` 的“契约可验证 Core”目标，只冻结共享输入模型与采集策略模型。
   - 本事项不得吞并 `v0.2.0` 中错误模型、adapter registry、fake adapter、adapter harness、version gate 或平台泄漏检查 gate 的 formal spec。
 - 架构约束：
-  - Core 负责任务输入受理、共享契约校验、资源可用性前置校验与 adapter 调度语义；Adapter 负责平台输入解析、平台请求构造、平台响应处理与平台错误映射。
+  - Core 负责任务输入受理、共享契约校验、adapter 路由与策略投影；Adapter 负责平台输入解析、认证路径 admission、平台请求构造、平台响应处理与平台错误映射。
   - `adapter_key` 属于 Core 侧路由字段；adapter-facing request 至少需要保留由 Core 投影后的 capability family、target 语义与 collection policy 语义，但不要求重复携带 `adapter_key`。
   - Core 不得根据 `target_type=url` 推断平台主 ID、签名参数、认证 cookie、headers、指纹或 fallback 路径。
   - Adapter 不得自行篡改 `InputTarget` 的上游业务语义；若需要平台派生字段，必须从 `target_value` 与 `collection_mode` 出发在 adapter 内部解析。
@@ -107,7 +107,7 @@ Then 该既有 URL 输入必须能无损映射为 `target_type=url`、`target_va
 
 - 异常场景：
   - 若调用方提交空的 `target_value`、未知的 `target_type` 或未知的 `collection_mode`，请求必须在共享契约层被拒绝。
-  - 若 `collection_mode=authenticated`，但后续实现阶段的资源 / auth contract 无法满足该策略要求，请求必须失败；本 FR 不冻结该失败发生在 Core 资源绑定阶段还是 adapter admission 阶段，也不定义统一错误模型字段。
+  - 若 `collection_mode=authenticated`，但 adapter 在拿到 Core 投影后的策略请求与运行时上下文后仍无法满足认证路径要求，请求必须在 adapter admission / 执行起点失败；本 FR 不定义统一错误模型字段。
   - 若 adapter 需要从 URL 推导平台主 ID 但推导失败，该失败属于 adapter 平台输入解析失败，不得倒逼 Core 新增平台字段。
 - 边界场景：
   - `InputTarget` 当前只承载单一目标，不支持 URL 列表、关键词列表、分页游标、时间区间或结果条数策略。
@@ -119,7 +119,7 @@ Then 该既有 URL 输入必须能无损映射为 `target_type=url`、`target_va
 
 - [ ] `InputTarget` 的最小字段、取值域与职责边界已被冻结为 formal spec
 - [ ] `CollectionPolicy` 的最小字段、取值域与执行前语义已被冻结为 formal spec
-- [ ] 已明确 Core / Adapter 对结构校验、资源前置校验、平台解析与平台请求构造的职责边界
+- [ ] 已明确 Core / Adapter 对结构校验、策略投影、认证路径 admission、平台解析与平台请求构造的职责边界
 - [ ] 已明确 `FR-0002` 既有 URL 输入与 `InputTarget` 模型之间的兼容关系
 - [ ] 已明确不在本 FR 中解决的事项，且未吞并错误模型、registry、harness、version gate 或平台泄漏检查 gate
 - [ ] 已明确 URL 派生值、平台主 ID、签名参数等平台语义不得提升为 Core 共享字段
@@ -132,5 +132,5 @@ Then 该既有 URL 输入必须能无损映射为 `target_type=url`、`target_va
   - GitHub Work Item `#68` 已作为本次 spec PR 的执行入口建立
   - `adapter-sdk.md`、`framework-positioning.md` 与 `FR-0002` formal spec 提供现有 Core / Adapter 契约背景
 - 上下游影响：
-  - 后续实现回合必须围绕本 FR 把调用输入、adapter 声明、资源前置校验与运行时请求对象收口一致
+  - 后续实现回合必须围绕本 FR 把调用输入、adapter 声明、策略投影与运行时请求对象收口一致
   - 后续错误模型、adapter registry、fake adapter、adapter harness、version gate 与平台泄漏检查 gate 的 formal spec 都必须复用本 FR 的共享模型边界，而不是重写它
