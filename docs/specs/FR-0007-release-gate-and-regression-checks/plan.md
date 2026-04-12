@@ -67,11 +67,11 @@
 
 - [ ] `spec review` 已通过
 - [x] 关键风险已记录并有缓解策略
-- [x] 关键依赖可用
+- [ ] 关键依赖可用
 - [x] `FR-0007` 已明确区分版本 gate 与 harness 基座职责
 
 ## spec review 结论
 
-- 结论：当前 PR 的目标是把 `FR-0007` 从“issue 意图”推进到 `implementation-ready` 的 formal spec 基线。
-- 未决问题：需确认平台泄漏检查边界没有越权替代实现设计，也未遗漏与 `FR-0006`、registry、错误模型的依赖语义。
-- implementation-ready 判定：待当前 formal spec PR 通过审查并合入后，后续 Work Item 才可在不改写 requirement 的前提下实现版本 gate。
+- 结论：当前 PR 的目标是把 `FR-0007` 从“issue 意图”推进到可审查、可追溯的 formal spec 基线。
+- 未决问题：需确认平台泄漏检查边界没有越权替代实现设计，也未遗漏与 `FR-0006`、registry、错误模型的依赖语义；同时需等待 `FR-0004`、`FR-0005`、`FR-0006` formal spec 落盘后，再进入实现回合。
+- implementation-ready 判定：当前 PR 合入后，`FR-0007` 达到 `spec-ready`；待 `FR-0004`、`FR-0005`、`FR-0006` formal spec 落盘并满足依赖前提后，再进入 implementation-ready 判定。
