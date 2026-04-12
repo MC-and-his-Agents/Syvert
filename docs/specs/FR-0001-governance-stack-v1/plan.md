@@ -1,5 +1,13 @@
 # FR-0001 实施计划
 
+## 关联信息
+
+- item_key：`FR-0001-governance-stack-v1`
+- Issue：`#6`
+- item_type：`FR`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+
 ## 实施目标
 
 - 将治理栈从 v1 规则闭环升级到 v2 repo harness 闭环，并保持可执行、可恢复、可回归。

@@ -20,9 +20,8 @@
 
 - `spec.md`
 - `plan.md`
-- `TODO.md`（当前主干 live guard 仍要求；`GOV-0029` 仅批准其在后续独立 governance 实现 PR 中退出最小套件）
 
-模板路径见 [docs/specs/_template](./docs/specs/_template)。注意：其中的 `TODO.md` 当前仍作为 compat 过渡模板保留，以匹配现行 live guard；待 `GOV-0029` 的后续独立 governance 实现 PR 合入后，才会退出 formal spec 最小套件。
+模板路径见 [docs/specs/_template](./docs/specs/_template)。`GOV-0029` 合入后，legacy `TODO.md` 已退出 formal spec live 最小套件；模板目录不再保留 `TODO.md`。
 
 ### `spec.md` 必查项
 
