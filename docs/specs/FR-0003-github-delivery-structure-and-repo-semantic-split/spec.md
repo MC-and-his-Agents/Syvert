@@ -111,9 +111,8 @@ Then 必须另开独立 governance PR；若 PR 继续回写或新增 legacy `TOD
 - [ ] 文档明确写出 `Work Item` 是唯一执行入口
 - [ ] formal spec 明确绑定 FR，exec-plan 明确绑定 Work Item
 - [ ] release / sprint 被定义为执行上下文或索引，而不是状态真相源
-- [ ] `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md` 与 `docs/specs/_template/**` 不再把 `TODO.md` 视为 formal spec 必需项、正式恢复入口或必须同步维护的流程工件
-- [ ] formal spec 最小套件、模板与治理 guard 不再要求 `TODO.md`
-- [ ] governance guard / policy / `open_pr` / `tests/governance/**` 对 legacy `TODO.md` 只允许未触碰保留或删除，不允许新增、继续回写或把它当作 formal flow 必需输入
+- [ ] 当前 formal spec / governance contract PR 已让 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md` 与 `docs/process/agent-loop.md` 对 legacy `TODO.md` 的治理口径一致
+- [ ] 后续独立 governance PR 已让 `docs/specs/_template/**`、formal spec 最小套件、guard、policy、`open_pr` 与 `tests/governance/**` 对 legacy `TODO.md` 的处理收口一致，并完成存量 legacy `TODO.md` 清理
 
 ## 依赖与外部前提
 

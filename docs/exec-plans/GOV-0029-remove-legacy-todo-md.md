@@ -42,7 +42,7 @@
 ## 当前停点
 
 - 上一轮把 `FR-0003` formal spec 语义与治理实现代码放在同一 PR 中，guardian 因“formal spec / implementation 必须分离”给出 `REQUEST_CHANGES`。
-- 当前分支已回退为 spec-only 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan、release / sprint 索引，以及 `FR-0003/TODO.md` 为统一 active review truth 所需的一次受控过渡性回写；legacy `TODO.md` 的实体删除留在后续独立 governance PR。
+- 当前分支已回退为 governance contract 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan、release / sprint 索引，以及使 TODO-exit 语义成为仓内权威口径所必需的治理文档变更；legacy `TODO.md` 的文件删除与实现侧收口留在后续独立 governance PR。
 - 当前目标是先让 PR `#61` 作为独立 formal spec 审查入口合入 `main`，再基于已批准规约继续后续 governance 实现 PR。
 
 ## 下一步动作
@@ -67,8 +67,8 @@
 - `#57 / PR #60` 已完成 harness 兼容迁移，为 `TODO.md` 清理的后续实现侧收口提供兼容前提。
 - `python3 scripts/docs_guard.py`
 - `python3 scripts/spec_guard.py --all`
-- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
-- `python3 scripts/open_pr.py --class spec --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing refs --dry-run`
+- `python3 scripts/pr_scope_guard.py --class governance --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/open_pr.py --class governance --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing refs --dry-run`
 
 ## 未决风险
 

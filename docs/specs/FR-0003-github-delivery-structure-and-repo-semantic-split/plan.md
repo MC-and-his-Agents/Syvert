@@ -39,7 +39,7 @@
 - 单元测试：
   - formal spec PR 运行 `docs_guard` 与 `spec_guard --all`，确认 formal spec 套件与文档引用结构合法
 - 集成/契约测试：
-  - formal spec PR 运行 `open_pr --class spec --dry-run` 与 `pr_scope_guard --class spec`，确认当前事项可通过独立规约审查入口
+  - 当前 formal spec / governance contract PR 运行 `open_pr --class governance --dry-run` 与 `pr_scope_guard --class governance`，确认当前事项可通过治理规约审查入口
   - 后续独立 governance PR 再运行治理测试套件、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --class governance --dry-run`
 - 手动验证：
   - 核对 GitHub `#54 / #55 / #56 / #57 / #58` 与仓内 `FR-0003 / GOV-0027 / GOV-0028 / GOV-0029 / v0.2.0 / 2026-S15` 的映射关系
