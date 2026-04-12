@@ -85,6 +85,16 @@ def execute_task(
 
     adapter_key = normalized_request.target.adapter_key
     capability = normalized_request.target.capability
+    if type(request) is CoreTaskRequest:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "invalid_task_request",
+                "当前共享输入执行路径尚未完成 adapter admission 承接",
+            ),
+        )
 
     adapter, adapter_error = get_adapter(adapters, adapter_key)
     if adapter_error is not None:

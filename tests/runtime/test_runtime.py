@@ -221,8 +221,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["normalized"]["canonical_url"], request.input.url)
         self.assertEqual(adapter.last_request.input.url, request.input.url)
 
-    def test_execute_task_accepts_core_request_shape(self) -> None:
-        adapter = SuccessfulAdapter()
+    def test_execute_task_fails_closed_for_core_request_shape_before_shared_axis_admission(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(
                 adapter_key="stub",
@@ -235,15 +234,15 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         envelope = execute_task(
             request,
-            adapters={"stub": adapter},
+            adapters={"stub": SuccessfulAdapter()},
             task_id_factory=lambda: "task-001b",
         )
 
         self.assertEqual(envelope["task_id"], "task-001b")
-        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["adapter_key"], "stub")
-        self.assertEqual(envelope["normalized"]["canonical_url"], "https://example.com/posts/2")
-        self.assertEqual(adapter.last_request.input.url, "https://example.com/posts/2")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_unknown_target_type(self) -> None:
         request = CoreTaskRequest(
