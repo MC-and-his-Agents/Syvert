@@ -14,6 +14,8 @@
 - `unsupported` 表示请求合法，但当前 adapter / capability 集合不满足
 - `runtime_contract` 表示 registry、adapter 声明、成功 payload 或 host-side 运行时契约失配，必须 fail-closed
 - `platform` 表示 adapter 已进入平台语义边界，但被平台事实或平台资源条件阻断
+- adapter 已选中但仍处于真实平台调用前的输入失败，归入 `invalid_input`
+- adapter 抛出的未映射宿主异常，归入 `runtime_contract`
 - adapter registry 只冻结以下语义职责：
   - materialize 明确的 adapter 绑定集合
   - 以稳定 `adapter_key` 做唯一查找
@@ -24,3 +26,6 @@
   - registry 的类结构、方法名、缓存策略或实例化时机
   - fake adapter、harness、validator 或 gate 的目录和运行方式
 - capability discovery 的正式约束是 side-effect-free：不得依赖真实平台网络、登录态或浏览器执行
+- 与 `FR-0002` 的覆盖关系：
+  - `FR-0002` 继续保留 `v0.1.0` 的失败 envelope 顶层结构与历史语义
+  - 自 `v0.2.0+` 起，如 `FR-0002` 的历史 contract 入口与本目录对 `error.category` 的闭集或边界描述冲突，应以 `FR-0005` 为权威来源解释
