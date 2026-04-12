@@ -1,0 +1,37 @@
+# FR-0007 契约说明
+
+本事项不冻结具体脚本接口，但会冻结以下版本 gate 契约：
+
+1. 职责边界契约
+   - `FR-0006` 负责 contract harness、fake adapter 与验证基座
+   - `FR-0007` 负责版本 gate 对 harness 结果的消费，以及双参考适配器回归检查与平台泄漏检查的版本级叠加
+   - `FR-0006` 的结论不得单独替代 `FR-0007` 的版本完成判定
+
+2. 版本 gate 组成契约
+   - mandatory trigger：
+   - 结束当前版本回合前
+   - 进入下一版本前
+   - required gate conclusions：
+   - contract harness 结果消费结论
+   - 双参考适配器回归结论
+   - 平台泄漏检查结论
+
+3. gate 对象契约
+   - 双参考适配器集合在 `v0.2.0` 范围内固定为 adapter registry 中 `adapter_key=xhs` 与 `adapter_key=douyin` 的参考适配器
+   - 若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结
+   - gate 输入必须遵循共享输入模型
+   - gate 成功/失败判定必须兼容共享错误模型与 registry 语义
+   - `v0.2.0` 的最小回归矩阵固定覆盖 `content_detail_by_url` 共享 operation，或其经 `FR-0004` 批准的 `target_type=url` / `content_detail` 投影；每条 reference adapter 至少命中一条成功结果与一条按共享错误模型归类的真实失败结果（`invalid_input` 或 `platform`）
+   - harness 结论只有在 required sample set 覆盖完整，且各样例结果仅包含 `通过` 或与已批准 contract 对齐的 `合法失败` 时才可视为 gate pass；任一 `contract violation`、任一 `执行前置不满足`、缺失样例或无法归类结果都必须 fail-closed
+
+4. 失败语义契约
+   - 任一必选 gate 未执行、失败、结果不完整、结论不可信或不可追溯时，版本 gate 一律 fail-closed
+   - 最小完整性判据至少包括：当前版本标识明确、reference pair 覆盖证明完整、三类检查结论齐备且可追溯
+   - 失败来源至少能区分 harness、真实参考适配器回归、平台泄漏三类
+
+5. 平台泄漏边界契约
+   - 允许平台语义留在 adapter 私有实现与平台研究文档
+   - 允许已批准的共享字段继续承载跨平台共用语义，例如 `normalized.platform` 与统一 `error.details` 中的结构化平台细节
+   - 禁止平台专属、只服务单一平台或会导致共享层分叉的语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）与 gate 共享判定逻辑
+
+如需增加更细的 gate payload 结构、结果格式或执行协议，应在后续实现 Work Item 中补充独立契约文档，并保持与本 requirement 一致。
