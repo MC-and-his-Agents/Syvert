@@ -56,7 +56,7 @@
   - URL 派生值、平台主 ID、签名参数、页面全局变量、HTML fallback 线索等平台语义必须保留在 adapter 内部解析，不得提升为 `InputTarget` 必填字段。
   - `InputTarget` 必须允许表达 `FR-0002` 的既有 URL 输入语义：`adapter_key + capability + input.url` 必须可以无损投影为 `adapter_key + capability + target_type=url + target_value=input.url`。
   - 对 `FR-0002` 既有 `content_detail_by_url` 请求，若原始输入中未显式携带 `CollectionPolicy`，兼容投影必须固定为 `collection_mode=hybrid`；理由是 `FR-0002` 只冻结了单目标 URL 输入与统一结果 envelope，并未冻结“必须公开”或“必须认证”的策略轴，`hybrid` 是唯一不会把旧请求收窄为更严格策略的共享默认值。
-  - 对 `FR-0002` 兼容投影得到的 `collection_mode=hybrid`，Core admission 必须采用闭合的兼容归一化规则：若 adapter 仅声明 `public`，则在进入 adapter-facing request 前把该 legacy `hybrid` 归一化为 `public`；若 adapter 仅声明 `authenticated`，则归一化为 `authenticated`；只有 native `FR-0004` 调用方显式提交 `collection_mode=hybrid` 时，Core 才按 adapter 是否显式声明 `hybrid` 来执行常规 admission 规则。
+  - 对 `FR-0002` 兼容投影得到的 `collection_mode=hybrid`，Core admission 不再区分 legacy / native 来源；单一规则是：凡需要承接该 legacy 兼容流量的 adapter，必须显式把 `hybrid` 声明进 `supported_collection_modes`。adapter 在内部把 `hybrid` 进一步落到 `public`、`authenticated` 或两者并存的实现路径，属于实现细节，不改变 admission 语义。
   - 对 `FR-0002` 的 `capability=content_detail_by_url`，兼容投影必须解释为“调用侧 operation id=`content_detail_by_url` 映射到 adapter-facing capability family=`content_detail`，同时 `target_type=url`”；本 FR 不要求修改 `adapter-sdk.md` 中既有 capability family 的命名。
   - 本 FR 只冻结模型语义与边界，不声明现有 `main` 运行时已经完成对这两个模型的实现接入。
 - 非功能需求：

@@ -54,7 +54,10 @@
   - 调用侧 operation id：`content_detail_by_url`
   - adapter-facing capability family：`content_detail`
   - `target_type=url`
-  - `collection_mode=hybrid`；若目标 adapter 只声明单一模式，则在进入 adapter-facing request 前按其唯一声明模式归一化为 `public` 或 `authenticated`
+  - `collection_mode=hybrid`
+
+- 若 adapter 需要承接 `FR-0002` 的 legacy URL-detail 流量，必须在 `supported_collection_modes` 中显式声明 `hybrid`。
+- adapter 内部如何把 `hybrid` 落到 `public`、`authenticated` 或两者并存的实现路径，不属于本 formal spec 的共享 admission 语义。
 
 ## 后续 FR 的使用边界
 

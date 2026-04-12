@@ -53,5 +53,5 @@
 
 ### 兼容特例
 
-- 对上述 legacy `hybrid` 投影，若 adapter 只声明 `public` 或只声明 `authenticated`，Core 必须在进入 adapter-facing request 前把 legacy `hybrid` 归一化为该唯一声明模式。
-- 该归一化特例只服务 `FR-0002` 的兼容投影，不自动推广到 native `FR-0004` 调用方显式提交的 `hybrid` 请求。
+- 对上述 legacy `hybrid` 投影，Core admission 继续按统一的 `supported_collection_modes` 规则处理，不再区分 legacy / native 来源。
+- 若 adapter 需要承接 `FR-0002` 的 legacy URL-detail 流量，必须在 `supported_collection_modes` 中显式声明 `hybrid`。
