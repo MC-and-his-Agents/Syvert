@@ -31,12 +31,14 @@
   - `vision.md` 与 `docs/roadmap-v0-to-v1.md` 中 `v0.2.0` 的“可验证”目标必须保持不变
   - `FR-0002` 已冻结的统一 adapter contract 是本 FR 的上位输入；若需改写正式 contract，必须回到 spec review
   - formal spec 与实现默认分 PR；本轮 formal spec PR 只更新 spec 套件、当前 Work Item 所需的最小 active `exec-plan` 与最小 release / sprint 索引
+  - 后续 harness 实现若触及 repo harness 或验证工具接线，必须保持 `WORKFLOW.md`、`docs/process/agent-loop.md`、`docs/process/worktree-lifecycle.md` 与状态面聚合规则不变，不得把 adapter contract harness 退化为绕开受控入口的第二条执行链路
+  - 验证工具、harness 与其状态输出若需要进入治理状态面，只能作为现有 review / checks / guardian 证据的补充，不得改写 GitHub / release / sprint / exec-plan 的单一真相职责
 
 ## 测试与验证策略
 
 - 单元测试：
   - fake adapter 受控返回分支的样例装配
-  - harness 对 `contract violation`、合法失败与执行前置失败的判定
+  - harness 对 `contract violation`、合法失败与执行前置不满足的判定
   - 验证工具的结果分类与样例级归因
 - 集成/契约测试：
   - Core 通过标准 adapter 宿主路径加载 fake adapter 并执行契约样例
@@ -44,7 +46,7 @@
   - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“通过 / 合法失败 / contract violation / 执行前置不满足”四类结果不改写上位运行时错误语义
 - 手动验证：
   - 检查 harness 执行不要求真实网络、Cookie、签名或真实平台响应
-  - 检查验证输出能区分通过、contract violation、执行前置失败
+  - 检查验证输出能区分通过、合法失败、contract violation、执行前置不满足
 
 ## TDD 范围
 
