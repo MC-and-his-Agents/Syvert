@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#92`
 - active 收口事项：`CHORE-0088-fr-0004-fr-0002-compat-closeout`
 
 ## 目标
@@ -42,9 +42,9 @@
 
 ## 下一步动作
 
-- 为 legacy/native 等价性与统一 `hybrid` admission 失败补充回归测试。
-- 把 `#88` 作为 `v0.2.0 / 2026-S15` 的兼容证据入口登记到 release / sprint 索引。
-- 通过实现门禁后打开 PR，完成 guardian / merge / issue closeout。
+- 等待 PR `#92` 的 GitHub checks 全绿，并对当前 head 运行 guardian 审查。
+- 若 guardian `APPROVE` 且 `safe_to_merge=true`，通过受控入口合并 PR。
+- 合并后关闭 `#88`，并把 closeout 证据回链到 `#68 / #64` 聚合收口。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -74,6 +74,13 @@
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 2 条提交信息，全部通过
+- `python3 scripts/open_pr.py --class implementation --issue 88 --item-key CHORE-0088-fr-0004-fr-0002-compat-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'test(runtime): 补齐 FR-0004 的 FR-0002 兼容证据' --closing fixes --dry-run`
+  - 结果：通过
+- 已创建当前受审 PR：`#92 https://github.com/MC-and-his-Agents/Syvert/pull/92`
 
 ## 兼容 closeout 证据
 
