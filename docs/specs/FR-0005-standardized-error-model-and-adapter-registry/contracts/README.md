@@ -10,7 +10,8 @@
   - `unsupported`
   - `runtime_contract`
   - `platform`
-- `invalid_input` 表示请求未进入有效分发；`unsupported` 表示请求合法但当前 adapter / capability 集合不满足
+- `invalid_input` 表示请求形状或语义不合法；即使 adapter 已被成功选中，只要失败仍发生在任何真实平台调用之前，也属于 `invalid_input`
+- `unsupported` 表示请求合法，但当前 adapter / capability 集合不满足
 - `runtime_contract` 表示 registry、adapter 声明、成功 payload 或 host-side 运行时契约失配，必须 fail-closed
 - `platform` 表示 adapter 已进入平台语义边界，但被平台事实或平台资源条件阻断
 - adapter registry 只冻结以下语义职责：
