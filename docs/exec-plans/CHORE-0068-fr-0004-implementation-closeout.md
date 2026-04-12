@@ -10,6 +10,7 @@
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
 - 关联 PR：`#93`
+- 状态：`active`
 - active 收口事项：`CHORE-0068-fr-0004-implementation-closeout`
 
 ## 目标
@@ -19,6 +20,11 @@
 ## 范围
 
 - 本次纳入：
+  - `docs/exec-plans/FR-0004-input-target-and-collection-policy.md`
+  - `docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
+  - `docs/exec-plans/CHORE-0087-fr-0004-core-input-admission.md`
+  - `docs/exec-plans/CHORE-0089-fr-0004-core-adapter-projection.md`
+  - `docs/exec-plans/CHORE-0088-fr-0004-fr-0002-compat-closeout.md`
   - `docs/releases/v0.2.0.md`
   - `docs/sprints/2026-S15.md`
   - 本 exec-plan
