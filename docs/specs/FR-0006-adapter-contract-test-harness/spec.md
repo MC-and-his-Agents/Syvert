@@ -34,7 +34,7 @@
   - harness 必须允许把一个或多个 fake adapter 接入到 Core 的标准 adapter 宿主路径，而不是绕过 Core 直接断言内部函数。
   - fake adapter 必须能够声明自身支持的 capability，并以受控方式返回成功态或失败态结果，用于驱动 Core 契约分支验证。
   - 验证工具必须负责组织契约样例、触发 harness 执行并输出可判定的验证结果；它不直接定义 Core 契约语义。
-  - harness 必须能覆盖成功结果、契约级失败、adapter 返回非法结果三类最小分支。
+  - harness 与验证工具合起来必须覆盖四类最小结果：通过、合法失败、contract violation、执行前置不满足。
 - 契约需求：
   - harness 验证的对象固定为 Core 与 adapter 之间已经批准的统一运行时 contract，而不是某个平台的抓取正确性。
   - fake adapter 是契约测试替身，不是参考适配器、也不是平台模拟器；它只表达为验证 contract 所必需的最小行为。
@@ -98,7 +98,7 @@ Then 验证结果必须能观测到统一失败处理路径，并区分“合法
 
 - [ ] adapter contract test harness 的职责、纳入范围与排除范围已冻结
 - [ ] fake adapter 的语义定位已明确为 contract test double，而非参考适配器或平台模拟器
-- [ ] Core 在不依赖真实平台时可验证的 contract 面已明确，包括成功态、合法失败态与 contract violation 三类最小分支
+- [ ] Core 在不依赖真实平台时可验证的 contract 面已明确，包括通过、合法失败、contract violation、执行前置不满足四类最小结果
 - [ ] 验证工具、harness 与 fake adapter 的角色关系已明确，且已区分验证工具分类与运行时错误语义
 - [ ] harness 可提供的保证级别已明确，并与真实平台测试、参考适配器回归、版本门禁保持边界分离
 - [ ] formal spec 已限制后续实现 PR 的范围，不要求在同一轮引入真实平台回放、回归 gate 或相邻 FR 的语义扩张

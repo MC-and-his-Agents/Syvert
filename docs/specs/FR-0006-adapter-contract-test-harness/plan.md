@@ -30,7 +30,7 @@
 - 与上位文档的一致性约束：
   - `vision.md` 与 `docs/roadmap-v0-to-v1.md` 中 `v0.2.0` 的“可验证”目标必须保持不变
   - `FR-0002` 已冻结的统一 adapter contract 是本 FR 的上位输入；若需改写正式 contract，必须回到 spec review
-  - formal spec 与实现默认分 PR；本轮 formal spec PR 只更新 spec 套件与最小 release / sprint 索引
+  - formal spec 与实现默认分 PR；本轮 formal spec PR 只更新 spec 套件、当前 Work Item 所需的最小 active `exec-plan` 与最小 release / sprint 索引
 
 ## 测试与验证策略
 
@@ -41,7 +41,7 @@
 - 集成/契约测试：
   - Core 通过标准 adapter 宿主路径加载 fake adapter 并执行契约样例
   - success envelope、合法 failed envelope、非法结果 envelope 的最小 contract 验证
-  - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“验证工具分类”不改写上位运行时错误语义
+  - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“通过 / 合法失败 / contract violation / 执行前置不满足”四类结果不改写上位运行时错误语义
 - 手动验证：
   - 检查 harness 执行不要求真实网络、Cookie、签名或真实平台响应
   - 检查验证输出能区分通过、contract violation、执行前置失败
@@ -51,7 +51,7 @@
 - 先写测试的模块：
   - harness 对 contract 样例的执行与判定
   - fake adapter 样例装配接口
-  - 验证工具的结果分级、归因与合法失败/contract violation 映射
+  - 验证工具的结果分级、归因与四类最小结果映射
 - 暂不纳入 TDD 的模块与理由：
   - 真实平台回归流程、版本 gate 编排与 CI 拓扑不属于本 FR 主体，留给后续独立事项处理
 
