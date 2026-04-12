@@ -35,7 +35,7 @@
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
 - 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，随后由 `#80` 接续。
 - 当前实质 checkpoint 已推进到 `16d36bd895fedbc746a042541ccae80808911190`，该提交对齐了 `FR-0007` 在 `v0.2.0` 范围内的双参考适配器冻结口径，并闭合了 `spec.md` 与 `contracts/README.md` 的 formal spec 叙述。
-- 当前受审 head 仅补充 exec-plan 证据、guardian closeout 与风险核对等审查态工件，不改变 `FR-0007` formal spec requirement truth；最近一次实质 checkpoint 因此保持为 `16d36bd895fedbc746a042541ccae80808911190`。
+- 相对最近一次实质 checkpoint（`16d36bd895fedbc746a042541ccae80808911190`）之后的跟进提交，当前受审 head 仅补充 exec-plan 证据、guardian closeout 与风险核对等审查态工件，不改变 `FR-0007` 已冻结的 requirement truth；相对 `origin/main`，本 PR 负责把 `FR-0007` formal spec 套件、active exec-plan 与 release/sprint 索引首次落盘为主干候选。
 - 当前活跃 PR 已切换为 `#84`，用于恢复 GitHub `pull_request` checks；formal spec 内容与 Work Item 绑定保持不变。
 
 ## 下一步动作

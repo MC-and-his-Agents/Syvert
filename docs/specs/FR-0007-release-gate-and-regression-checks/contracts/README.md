@@ -3,9 +3,10 @@
 本事项不冻结具体脚本接口，但会冻结以下版本 gate 契约：
 
 1. 版本 gate 组成契约
-   - 每个 `v0.2.0+` 版本在以下两个不可互相替代的触发点都必须同时给出：
+   - mandatory trigger：
    - 结束当前版本回合前
    - 进入下一版本前
+   - required gate conclusions：
    - contract harness 结果消费结论
    - 双参考适配器回归结论
    - 平台泄漏检查结论
