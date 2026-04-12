@@ -20,6 +20,7 @@
 
 - 本次纳入：
   - `docs/specs/FR-0004-input-target-and-collection-policy/**`
+  - `docs/exec-plans/FR-0004-input-target-and-collection-policy.md`
   - `docs/releases/v0.2.0.md`
   - `docs/sprints/2026-S15.md`
   - 本 exec-plan

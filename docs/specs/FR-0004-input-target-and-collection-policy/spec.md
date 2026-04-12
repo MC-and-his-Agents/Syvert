@@ -46,15 +46,17 @@
   - `CollectionPolicy` 的最小字段固定为：`collection_mode`。
   - `collection_mode` 当前最小允许值固定为：`public`、`authenticated`、`hybrid`。
   - `collection_mode=public` 表示本次采集只能依赖公开访问路径；Core 不得把“需要认证资源”作为隐式前提塞入该请求。
-  - `collection_mode=authenticated` 表示本次采集必须依赖认证资源；若运行时无法提供符合要求的资源，必须在进入 adapter 平台执行前失败。
+  - `collection_mode=authenticated` 表示本次采集的合法执行路径必须是认证路径；本 FR 只冻结这一策略语义，不冻结资源对象形态、资源可用性判定算法或 Core 何时完成该判定。
   - `collection_mode=hybrid` 表示本次采集允许 adapter 在“公开路径”与“认证路径”之间选择合法方案，但 Core 不得据此推断任何平台特定请求参数。
   - `InputTarget` 与 `CollectionPolicy` 的最小模型都必须保持单目标语义；批量输入、分页、游标、时间窗、多目标聚合不在本 FR 中定义。
   - 当 `target_type` 不在目标 adapter 的 `supported_targets` 中，或 `collection_mode` 不在其 `supported_collection_modes` 中时，失败必须归因为 Core / Adapter 共享契约不匹配，而不是平台运行时错误。
+  - 本 FR 只冻结结构合法性、独立轴合法性与既有 operation -> capability family 的投影规则；不冻结所有 `capability -> target_type -> collection_mode` 组合矩阵。
   - 本 FR 不冻结 `target_type x collection_mode` 的非笛卡尔积支持矩阵；若后续需要表达“某个 target_type 只支持某个 collection_mode 子集”，必须在后续 formal spec 中显式扩展 adapter 声明模型与迁移边界。
   - `InputTarget.capability` 与 SDK 中的 adapter-facing capability family 可以不是同一命名层级；若调用侧 operation 比 adapter-facing family 更具体，Core 必须在进入 adapter 前完成投影。
   - URL 派生值、平台主 ID、签名参数、页面全局变量、HTML fallback 线索等平台语义必须保留在 adapter 内部解析，不得提升为 `InputTarget` 必填字段。
   - `InputTarget` 必须允许表达 `FR-0002` 的既有 URL 输入语义：`adapter_key + capability + input.url` 必须可以无损投影为 `adapter_key + capability + target_type=url + target_value=input.url`。
   - 对 `FR-0002` 既有 `content_detail_by_url` 请求，若原始输入中未显式携带 `CollectionPolicy`，兼容投影必须固定为 `collection_mode=hybrid`；理由是 `FR-0002` 只冻结了单目标 URL 输入与统一结果 envelope，并未冻结“必须公开”或“必须认证”的策略轴，`hybrid` 是唯一不会把旧请求收窄为更严格策略的共享默认值。
+  - 对 public-only adapter，`collection_mode=hybrid` 必须被视为兼容超集：若 adapter 只声明公开路径，它可以合法接受 `hybrid` 并以公开路径执行，而不必为了兼容 `FR-0002` 把自身声明为必须支持认证路径。
   - 对 `FR-0002` 的 `capability=content_detail_by_url`，兼容投影必须解释为“调用侧 operation id=`content_detail_by_url` 映射到 adapter-facing capability family=`content_detail`，同时 `target_type=url`”；本 FR 不要求修改 `adapter-sdk.md` 中既有 capability family 的命名。
   - 本 FR 只冻结模型语义与边界，不声明现有 `main` 运行时已经完成对这两个模型的实现接入。
 - 非功能需求：
@@ -105,7 +107,7 @@ Then 该既有 URL 输入必须能无损映射为 `target_type=url`、`target_va
 
 - 异常场景：
   - 若调用方提交空的 `target_value`、未知的 `target_type` 或未知的 `collection_mode`，请求必须在共享契约层被拒绝。
-  - 若 `collection_mode=authenticated`，但运行时没有可分配的认证资源，失败必须发生在进入平台执行前；本 FR 不定义统一错误模型字段。
+  - 若 `collection_mode=authenticated`，但后续实现阶段的资源 / auth contract 无法满足该策略要求，请求必须失败；本 FR 不冻结该失败发生在 Core 资源绑定阶段还是 adapter admission 阶段，也不定义统一错误模型字段。
   - 若 adapter 需要从 URL 推导平台主 ID 但推导失败，该失败属于 adapter 平台输入解析失败，不得倒逼 Core 新增平台字段。
 - 边界场景：
   - `InputTarget` 当前只承载单一目标，不支持 URL 列表、关键词列表、分页游标、时间区间或结果条数策略。
