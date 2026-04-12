@@ -347,12 +347,9 @@ def validate_additional_spec_diff_scope(
     if policy_item_key is None:
         return []
 
-    touched_spec_dirs = formal_spec_dirs(changed_files)
     allowed_spec_rules = LEGACY_TODO_CLEANUP_ADDITIONAL_SPEC_RULES[policy_item_key]
     errors: list[str] = []
     for spec_dir in additional_spec_dirs:
-        if spec_dir not in touched_spec_dirs:
-            continue
         suite_paths = diff_paths_for_spec_dir(changed_files, spec_dir)
         expected_todo = spec_dir / "TODO.md"
         allowed_paths = {spec_dir / name for name in allowed_spec_rules[spec_dir]}
@@ -397,8 +394,6 @@ def validate_bound_formal_spec_scope(
     changed_files: list[str],
 ) -> list[str]:
     touched_spec_dirs = formal_spec_dirs(changed_files)
-    if not touched_spec_dirs:
-        return []
     spec_dir = normalize_bound_spec_dir(repo_root, str(payload.get("关联 spec", "")).strip())
     if spec_dir is None:
         return []
@@ -406,15 +401,17 @@ def validate_bound_formal_spec_scope(
     additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, payload)
     if additional_errors:
         return additional_errors
+    diff_scope_errors = validate_additional_spec_diff_scope(repo_root, payload, changed_files, additional_spec_dirs)
+    if diff_scope_errors:
+        return diff_scope_errors
+    if not touched_spec_dirs:
+        return []
     authorized_spec_dirs = {bound_spec_dir, *additional_spec_dirs}
     if not any(path in authorized_spec_dirs for path in touched_spec_dirs):
         return ["当前 diff 触碰的 formal spec 套件与 `关联 spec` / `额外关联 specs` 绑定不一致。"]
     foreign = sorted(path.as_posix() for path in touched_spec_dirs if path not in authorized_spec_dirs)
     if foreign:
         return [f"当前 diff 只能触碰当前绑定的 formal spec 套件，发现额外套件：{', '.join(foreign)}。"]
-    diff_scope_errors = validate_additional_spec_diff_scope(repo_root, payload, changed_files, additional_spec_dirs)
-    if diff_scope_errors:
-        return diff_scope_errors
     return []
 
 

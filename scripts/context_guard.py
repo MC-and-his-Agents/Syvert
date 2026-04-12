@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import hashlib
 import re
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
@@ -39,9 +40,10 @@ ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
 ITEM_KEY_RE = re.compile(r"^(FR|HOTFIX|GOV|CHORE)-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES = {
     "GOV-0029-remove-legacy-todo-md": {
-        Path("docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md"): Path(
-            "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"
-        ),
+        Path("docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md"): {
+            "required_todo": Path("docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"),
+            "content_sha256": "c932056940f7d34eb9c53cd95bffd3087cddff2565016746ecad352e1ec4748a",
+        },
     }
 }
 FIELD_RE = re.compile(r"^- ([^：:\n]+)[：:][ \t]*(.*)$", re.MULTILINE)
@@ -331,27 +333,44 @@ def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tu
     return ([], payloads)
 
 
-def allows_legacy_todo_cleanup_foreign_exec_plan_touch(
+def legacy_todo_cleanup_foreign_exec_plan_rule(
+    repo_root: Path,
+    exec_plan_path: Path,
+    *,
+    current_issue: int | None,
+) -> dict[str, object] | None:
+    if current_issue is None:
+        return None
+    context_errors, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
+    if context_errors or not payloads:
+        return None
+    item_key = payloads[0].get("item_key", "").strip()
+    allowed_paths = LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES.get(item_key)
+    if not allowed_paths:
+        return None
+    relative_exec_plan = exec_plan_path.resolve().relative_to(repo_root.resolve())
+    return allowed_paths.get(relative_exec_plan)
+
+
+def validate_legacy_todo_cleanup_foreign_exec_plan_touch(
     repo_root: Path,
     exec_plan_path: Path,
     *,
     current_issue: int | None,
     changed_paths: list[str] | None,
-) -> bool:
-    if current_issue is None or not changed_paths:
-        return False
-    context_errors, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
-    if context_errors or not payloads:
-        return False
-    item_key = payloads[0].get("item_key", "").strip()
-    allowed_paths = LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES.get(item_key)
-    if not allowed_paths:
-        return False
-    relative_exec_plan = exec_plan_path.resolve().relative_to(repo_root.resolve())
-    required_todo = allowed_paths.get(relative_exec_plan)
-    if required_todo is None:
-        return False
-    return required_todo.as_posix() in changed_paths and not (repo_root / required_todo).exists()
+) -> list[str]:
+    rule = legacy_todo_cleanup_foreign_exec_plan_rule(repo_root, exec_plan_path, current_issue=current_issue)
+    if rule is None:
+        return []
+    if not changed_paths:
+        return ["缺少当前 diff，无法验证 foreign exec-plan 的收口约束。"]
+    required_todo = rule["required_todo"]
+    if required_todo.as_posix() not in changed_paths or (repo_root / required_todo).exists():
+        return [f"当前 foreign exec-plan 收口必须伴随 `{required_todo.as_posix()}` 的删除。"]
+    digest = hashlib.sha256(exec_plan_path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+    if digest != rule["content_sha256"]:
+        return ["当前 foreign exec-plan 仅允许收敛到已批准的最小终态，不允许额外改写。"]
+    return []
 
 
 def missing_spec_suite_files(spec_dir: Path) -> list[str]:
@@ -649,12 +668,16 @@ def validate_context_rules(
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = parse_exec_plan_metadata(target)
-            allow_foreign_exec_plan_touch = allows_legacy_todo_cleanup_foreign_exec_plan_touch(
+            foreign_exec_plan_errors = validate_legacy_todo_cleanup_foreign_exec_plan_touch(
                 repo_root,
                 target,
                 current_issue=current_issue,
                 changed_paths=changed_paths,
             )
+            allow_foreign_exec_plan_touch = bool(
+                legacy_todo_cleanup_foreign_exec_plan_rule(repo_root, target, current_issue=current_issue)
+            ) and not foreign_exec_plan_errors
+            errors.extend(f"{target}: {error}" for error in foreign_exec_plan_errors)
             exec_issue = fields.get("Issue", "").strip()
             if (
                 current_issue is not None
