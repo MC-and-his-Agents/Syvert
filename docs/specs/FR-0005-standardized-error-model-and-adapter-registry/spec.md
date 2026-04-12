@@ -140,6 +140,7 @@ Then Core 必须返回 `category=unsupported` 的失败 envelope，而不是让 
   - 本 FR 只冻结“discovery 的语义结果”，不规定后续 harness 如何调用这些结果。
   - 本 FR 不定义 fake adapter、harness、validator、版本 gate 的目录、脚本或测试形态。
   - `FR-0004` 负责冻结输入建模；`FR-0005` 只消费“已经合法进入分发”的请求与错误分类。
+  - `FR-0005` 自 `v0.2.0+` 起覆盖 `FR-0002` 中对 `error.category` 闭集的旧限制；`FR-0002` 继续保留失败 envelope 顶层结构与 `v0.1.0` 历史语义。
   - `FR-0006` 负责冻结 fake adapter / harness / validator 的验证基座；`FR-0005` 只提供其依赖的 error model 与 registry contract。
   - `FR-0007` 负责冻结 gate / regression / 平台泄漏检查流程；`FR-0005` 不直接定义这些门禁。
 

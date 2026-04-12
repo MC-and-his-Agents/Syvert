@@ -31,7 +31,9 @@
   - `status` = `failed`
   - `error`
 - `error` 最小字段：
-  - `category`：`runtime_contract` 或 `platform`
+  - `category`：
+    - 在 `v0.1.0` baseline 内为 `runtime_contract` 或 `platform`
+    - 自 `v0.2.0+` 起，其闭集与边界由 `FR-0005` 覆盖
   - `code`
   - `message`
   - `details`
@@ -59,3 +61,4 @@
 
 - 在 `v0.1.0` 范围内，`content_detail_by_url` 的最小输入字段和顶层结果 envelope 不得漂移。
 - 若需要新增 Core 必需字段或修改 `normalized` 最小字段语义，必须回到 formal spec 审查链路。
+- 若需要修改 `error.category` 的闭集或边界，`v0.2.0+` 起以 `FR-0005` 为权威来源。

@@ -46,7 +46,9 @@
   - `task_id` 由 Core 在接收任务输入后、进入 adapter 执行前生成；类型固定为非空字符串，并在成功态与失败态 envelope 中始终存在。
   - 成功结果 envelope 最小字段固定为：`task_id`、`adapter_key`、`capability`、`status`、`raw`、`normalized`，其中 `status` 固定为 `success`。
   - 失败结果 envelope 最小字段固定为：`task_id`、`adapter_key`、`capability`、`status`、`error`，其中 `status` 固定为 `failed`。
-  - `error` 最小字段固定为：`category`、`code`、`message`、`details`；`details` 允许为空对象，`category` 仅允许 `runtime_contract` 或 `platform`。
+- `error` 最小字段固定为：`category`、`code`、`message`、`details`；`details` 允许为空对象。
+  - 在 `v0.1.0` baseline 内，`category` 仅允许 `runtime_contract` 或 `platform`。
+  - 自 `v0.2.0+` 起，`error.category` 的闭集与边界由 `FR-0005` 覆盖；`FR-0002` 继续冻结失败 envelope 的顶层结构，但不再作为该字段枚举的上位来源。
   - `normalized` 最小公共字段固定为：`platform`、`content_id`、`content_type`、`canonical_url`、`title`、`body_text`、`published_at`、`author`、`stats`、`media`。
   - `platform`、`content_id`、`content_type`、`canonical_url` 四个字段在成功结果中必须为非空字符串。
   - `content_type` 允许值固定为：`video`、`image_post`、`mixed_media`、`unknown`。
