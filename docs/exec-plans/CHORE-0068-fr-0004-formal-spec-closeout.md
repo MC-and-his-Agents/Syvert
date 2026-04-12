@@ -65,7 +65,7 @@
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
-- `python3 scripts/open_pr.py --class spec --issue 68 --item-key FR-0004-input-target-and-collection-policy --item-type FR --release v0.2.0 --sprint 2026-S15 --title 'spec: 冻结 FR-0004 的 InputTarget 与 CollectionPolicy 模型' --closing refs --dry-run`
+- `python3 scripts/open_pr.py --class spec --issue 68 --item-key CHORE-0068-fr-0004-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'spec: 冻结 FR-0004 的 InputTarget 与 CollectionPolicy 模型' --closing refs --dry-run`
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
 - 已创建 PR：`#75 https://github.com/MC-and-his-Agents/Syvert/pull/75`
 - 已确认 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿

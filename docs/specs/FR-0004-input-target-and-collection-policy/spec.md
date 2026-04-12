@@ -35,7 +35,7 @@
   - Core 面向“发起一次采集”时，必须能够显式接收一个 `InputTarget` 与一个 `CollectionPolicy`。
   - `InputTarget` 只描述“采什么”，不得混入资源分配、平台签名或执行调度细节。
   - `CollectionPolicy` 只描述“在什么约束下采”，不得退化为平台请求构造脚本或 adapter 内部状态机。
-  - adapter 必须显式声明自己支持的 `target_type` 与 `collection_mode` 组合；不支持的组合必须在进入平台执行前被拒绝。
+  - adapter 必须显式声明自己支持的 `target_type` 集合与 `collection_mode` 集合；不支持的轴值必须在进入平台执行前被拒绝。
   - Core 必须把结构化 `InputTarget` 与 `CollectionPolicy` 传入 adapter 契约，而不是把平台派生字段提前展开到 Core 层。
 - 契约需求：
   - `InputTarget` 的最小字段固定为：`adapter_key`、`capability`、`target_type`、`target_value`。
@@ -49,7 +49,8 @@
   - `collection_mode=authenticated` 表示本次采集必须依赖认证资源；若运行时无法提供符合要求的资源，必须在进入 adapter 平台执行前失败。
   - `collection_mode=hybrid` 表示本次采集允许 adapter 在“公开路径”与“认证路径”之间选择合法方案，但 Core 不得据此推断任何平台特定请求参数。
   - `InputTarget` 与 `CollectionPolicy` 的最小模型都必须保持单目标语义；批量输入、分页、游标、时间窗、多目标聚合不在本 FR 中定义。
-  - 当 `adapter_key`、`capability`、`target_type`、`collection_mode` 的组合不被目标 adapter 支持时，失败必须归因为 Core / Adapter 共享契约不匹配，而不是平台运行时错误。
+  - 当 `target_type` 不在目标 adapter 的 `supported_targets` 中，或 `collection_mode` 不在其 `supported_collection_modes` 中时，失败必须归因为 Core / Adapter 共享契约不匹配，而不是平台运行时错误。
+  - 本 FR 不冻结 `target_type x collection_mode` 的非笛卡尔积支持矩阵；若后续需要表达“某个 target_type 只支持某个 collection_mode 子集”，必须在后续 formal spec 中显式扩展 adapter 声明模型与迁移边界。
   - URL 派生值、平台主 ID、签名参数、页面全局变量、HTML fallback 线索等平台语义必须保留在 adapter 内部解析，不得提升为 `InputTarget` 必填字段。
   - `InputTarget` 必须允许表达 `FR-0002` 的既有 URL 输入语义：`adapter_key + capability + input.url` 必须可以无损投影为 `adapter_key + capability + target_type=url + target_value=input.url`。
   - 对 `FR-0002` 既有 `content_detail_by_url` 请求，若原始输入中未显式携带 `CollectionPolicy`，兼容投影必须固定为 `collection_mode=hybrid`；理由是 `FR-0002` 只冻结了单目标 URL 输入与统一结果 envelope，并未冻结“必须公开”或“必须认证”的策略轴，`hybrid` 是唯一不会把旧请求收窄为更严格策略的共享默认值。
@@ -83,7 +84,7 @@ Then Core 只校验结构与共享组合合法性，不在 Core 层解析 `note_
 
 Given 某 adapter 仅声明支持 `target_type=url` 与 `collection_mode=public`  
 When 调用方向该 adapter 提交 `target_type=content_id` 或 `collection_mode=authenticated`  
-Then 请求必须在进入平台执行前被拒绝，并归因为共享契约组合不匹配
+Then 请求必须在进入平台执行前被拒绝，并归因为共享契约轴值不匹配
 
 ### 场景 3
 
