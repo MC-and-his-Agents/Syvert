@@ -33,12 +33,12 @@
 
 - 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
 - `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，受审 PR 为 `#75`。
-- 当前停在根据 guardian 最新阻断把 active `exec-plan` 改为绑定当前 Work Item 的独立 `item_key`，并同步回写 PR / 索引 / 验证轨迹。
+- 当前停在根据最新 guardian 结果同步 superseded stub 与 active `exec-plan` 的恢复语义，然后以最新 head 重新进入 guardian。
 
 ## 下一步动作
 
-- 修正当前 guardian 阻断涉及的 active `exec-plan` 绑定与 PR 正文不一致。
-- 重跑 `docs_guard`、`workflow_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard` 与 `open_pr --class spec --dry-run`。
+- 同步 superseded 历史 stub 与 active `exec-plan` 的元数据，确保当前受审状态可恢复。
+- 重跑 guardian；若通过，则直接进入受控 `merge_pr`。
 - guardian 通过后使用受控 `merge_pr` 合入，并回写 closeout 状态。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -70,6 +70,7 @@
 - 已创建 PR：`#75 https://github.com/MC-and-his-Agents/Syvert/pull/75`
 - 已确认 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
 - 已完成 guardian 第一轮审查，并收到需要收口兼容映射、checkpoint 与验证轨迹的一轮阻断
+- 已完成后续 guardian 审查，并按阻断收口了 `spec review` 口径、active `exec-plan` 绑定与 Adapter SDK 契约边界
 
 ## 未决风险
 
@@ -83,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3bab68d1fc837a64ea45142f5d5bf849fd392cb6`
+- `b040f3419961fcddc79ea44eeef97f2ea061dfc6`
