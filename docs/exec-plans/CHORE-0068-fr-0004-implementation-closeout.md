@@ -72,6 +72,12 @@
 - 已阅读：`spec_review.md`
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
+- `gh issue list --repo MC-and-his-Agents/Syvert --state all --search '工作项：FR-0004'`
+  - 结果：仅返回 `#87/#89/#88`，且均为 `CLOSED`
+- `gh issue list --repo MC-and-his-Agents/Syvert --state all --search '工作项：实现 InputTarget 与 CollectionPolicy'`
+  - 结果：返回 implementation 聚合入口 `#68`，当前为 `OPEN`
+- `gh issue view 85 --repo MC-and-his-Agents/Syvert --json number,state,title,body,url`
+  - 结果：`#85` 为 `spec_issue_sync.py` 自动维护的 spec 索引 issue，不承载 `#64` 下的 implementation closeout 语义
 - 已核对：`#87/#89/#88` 已关闭，`#68/#64` 仍为 `OPEN`
 - 已核对：GitHub 中当前可见的 `FR-0004` implementation Work Item 仅有 `#87/#89/#88`，未发现额外仍处于 `OPEN` 的 implementation 子事项；额外出现的 `#85` 为 `spec_issue_sync.py` 自动维护的 spec 索引 issue，不承载 `#64` 下的 implementation closeout 语义
 - 已核对：当前 `#68` worktree 基于 `origin/main@fe328a8dcb6228bf9d38b28b9c9c59ebf5cc34c2`
@@ -83,7 +89,7 @@
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：已校验 2 条提交信息，全部通过
+  - 结果：已校验当前 PR 的提交信息，全部通过
 - `python3 scripts/open_pr.py --class docs --issue 68 --item-key CHORE-0068-fr-0004-implementation-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 implementation 聚合事项' --closing fixes --dry-run`
   - 结果：通过
 - 已创建当前受审 PR：`#93 https://github.com/MC-and-his-Agents/Syvert/pull/93`
