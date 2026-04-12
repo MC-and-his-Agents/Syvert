@@ -14,8 +14,9 @@
 
 - `spec.md`
 - `plan.md`
+- `TODO.md`（当前主干 live guard 仍要求；`GOV-0029` 仅批准其在后续独立 governance 实现 PR 中退出最小套件）
 
-模板见 [./_template](./_template)。注意：`docs/specs/_template/TODO.md` 当前仅作为 legacy residual 保留，不再是新 formal spec 套件的权威输入。
+模板见 [./_template](./_template)。注意：`docs/specs/_template/TODO.md` 当前仍作为 compat 过渡模板保留，以匹配现行 live guard；待 `GOV-0029` 的后续独立 governance 实现 PR 合入后，才会退出 formal spec 最小套件。
 
 ## 可选增强（按触发条件）
 
