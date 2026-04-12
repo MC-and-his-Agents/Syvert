@@ -44,7 +44,7 @@
   - `#70` 后续覆盖 registry materialization、lookup、capability discovery 与 fail-closed 回归
 - 手动验证：
   - 核对 `#65`、`#69`、`#70` 与 `FR-0004`、`FR-0006`、`FR-0007` 的 GitHub 边界
-  - 核对 `docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 与 `docs/specs/FR-0005-*/` 的索引映射一致
+  - 核对 `docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 与 `docs/specs/FR-0005-standardized-error-model-and-adapter-registry/` 的索引映射一致
 
 ## TDD 范围
 
