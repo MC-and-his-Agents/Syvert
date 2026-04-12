@@ -13,7 +13,7 @@
 
 - 为 `v0.2.0` 冻结版本级 gate requirement，确保 contract harness、双参考适配器回归与平台泄漏检查在进入实现前具有统一验收面。
 - 明确 `FR-0007` 与 `FR-0006`、`FR-0004`、`FR-0005` 的职责边界与依赖关系，避免后续实现回合混淆。
-- 让当前 formal spec PR 可以通过受控入口、spec review、guardian 与 merge gate，成为主干上的 requirement truth。
+- 让当前 formal spec PR 可以通过受控入口、guardian 与 merge gate，把 `FR-0007` 收敛为主干上的 `spec-ready` requirement truth。
 
 ## 分阶段拆分
 
@@ -67,11 +67,11 @@
 
 - [x] `FR-0007` requirement 边界已冻结为可审查 formal spec
 - [x] 关键风险已记录并有缓解策略
-- [x] 关键依赖可用
+- [ ] 关键依赖可用
 - [x] `FR-0007` 已明确区分版本 gate 与 harness 基座职责
 
 ## spec review 结论
 
 - 结论：当前 PR 的目标是把 `FR-0007` 从“issue 意图”推进到可追溯、可复验的 formal spec 基线。
 - 未决问题：平台泄漏检查边界需继续保持对实现形式中立；后续 gate 实现 Work Item 仍需严格消费上游已批准契约，而不得自行重写共享输入、错误或 harness 语义。
-- implementation-ready 判定：当前 formal spec PR 合入后，`FR-0007` requirement 本身达到 implementation-ready；其后续实现回合以本 formal spec 为边界，并在实现时引用届时已批准的上游契约。
+- implementation-ready 判定：当前 formal spec PR 合入后，`FR-0007` 达到 `spec-ready` 并成为主干上的 requirement truth；待上游 formal spec / contract 基线补齐后，再进入 implementation-ready 判定。

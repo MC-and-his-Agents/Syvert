@@ -14,7 +14,7 @@
 ## 目标
 
 - 作为 `FR-0007` 下的真实 Work Item，完成版本门禁与回归检查 formal spec 的独立收口。
-- 通过独立 spec PR 完成 spec review / checks / guardian / merge gate / closeout，使 `FR-0007` 成为主干 formal spec truth。
+- 通过独立 spec PR 完成 checks / guardian / merge gate / closeout，使 `FR-0007` 形成主干上的 `spec-ready` formal spec truth。
 
 ## 范围
 
@@ -49,7 +49,7 @@
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
-- 角色：`FR-0007` 下的 spec-only closeout Work Item，负责让 formal spec 经由合法执行入口合入主干。
+- 角色：`FR-0007` 下的 spec-only closeout Work Item，负责让 formal spec 经由合法执行入口以 `spec-ready` 基线合入主干。
 - 阻塞：
   - 无外部阻塞；当前只需完成执行入口重绑、门禁、审查与合并收口。
 
@@ -72,7 +72,7 @@
 - `gh pr checks 80`
   - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
 - `python3 scripts/pr_guardian.py review 80`
-  - 结果：latest guardian 仅要求把 active `exec-plan` 刷新到当前受审 head；当前 diff 已完成对应回写
+  - 结果：latest guardian 继续要求 formal spec、exec-plan 与 PR 目标对 `spec-ready` / `implementation-ready` 的口径保持一致
 
 ## 未决风险
 
