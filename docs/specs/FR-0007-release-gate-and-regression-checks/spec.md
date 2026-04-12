@@ -46,6 +46,8 @@
     - 禁止平台语义渗入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、以及版本 gate 自身的共享判定逻辑
     - “平台语义”包括但不限于平台名硬编码分支、平台专属 URL/selector/签名细节、平台特定错误码解释、以及只能服务单一平台的共享字段或状态语义
   - 版本 gate 的失败语义必须固定为 fail-closed：任一必选 gate 未执行、执行失败、结果不完整或结论不可信时，当前版本都不得被声明为完成，也不得作为进入下一版本主线的已通过基线。
+    - “结果不完整”至少包括缺少版本标识、缺少 reference pair 覆盖证明、缺少 contract harness / real-adapter regression / platform leakage 三类检查中的任一结论。
+    - “结论不可信”至少包括无法追溯到当前版本目标、无法追溯到当前 reference pair 集合、或无法说明失败 / 通过依据来自哪一类 gate。
   - formal spec 必须只冻结“需要被验证的对象与结论语义”，不得把唯一合法实现形式绑定到某个脚本、某个 CI 文件或某条命令。
 - 非功能需求：
   - gate 定义必须保持实现无关，可同时支持本地执行、CI 执行或 release closeout 执行
