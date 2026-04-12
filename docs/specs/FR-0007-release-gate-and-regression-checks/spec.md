@@ -126,7 +126,7 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 
 - 外部依赖：
   - `#63` 作为 `v0.2.0` 当前 Phase 已建立
-  - `#64`、`#65`、`#66` 分别承载共享输入模型、错误模型/registry、contract harness 的上游 FR；这些 formal spec / contract 在当前审查输入中仍视为待落盘前置条件
+  - `#64`、`#65`、`#66` 分别承载共享输入模型、错误模型/registry、contract harness 的上游 FR；这些 formal spec / contract 已作为当前 `spec-ready` 审查输入的入库基线存在，并将作为后续实现 Work Item 的依赖前提被消费
 - 上下游影响：
   - 后续 `FR-0007` 下属 Work Item 需基于本 formal spec 实现 gate 编排、结果收口与 closeout
   - `FR-0006` 的实现必须提供可被版本 gate 消费的 contract harness 结论

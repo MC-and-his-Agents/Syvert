@@ -52,7 +52,8 @@
 
 - 角色：`FR-0007` 下的 spec-only closeout Work Item，负责让 formal spec 经由合法执行入口以 `spec-ready` 基线合入主干。
 - 阻塞：
-  - 无当前 PR 阻塞；`implementation-ready` 仍取决于上游 formal spec / contract 基线后续落盘。
+  - 当前 PR 仅剩 latest guardian 对当前受审 head 的文档口径收口；GitHub checks 与 mergeability 需继续以 PR `#84` 的当前 head 状态为准。
+  - `implementation-ready` 仍取决于后续实现 Work Item 对已入库上游 formal spec / contract 基线的消费与 gate 落地。
 
 ## 已验证项
 
@@ -74,22 +75,26 @@
   - 结果：当前受审 head 的 PR class 为 `spec`，变更类别为 `docs, spec`，scope 校验通过。
 - `python3 scripts/open_pr.py --class spec --issue 79 --item-key CHORE-0079-fr-0007-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title "spec: 收口 FR-0007 的 formal spec" --closing fixes --dry-run`
   - 结果：受控 open_pr 干跑通过，可生成合法 spec PR 输入。
-- `python3 scripts/commit_check.py --mode pr --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD)`
+- `gh pr view 84 --json url,headRefOid,mergeStateStatus,statusCheckRollup,reviews,reviewDecision`
+  - 结果：可直接复核 PR `#84` 的当前 head SHA、latest review 元数据、merge state 与 status rollup。
+- `gh pr checks 84`
+  - 结果：可直接复核 PR `#84` 当前 head 的 required checks 结果。
+- `python3 scripts/commit_check.py --mode pr --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD)`
   - 结果：当前受审 head 的提交信息校验通过。
-- `python3 scripts/spec_guard.py --mode ci --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD)`
+- `python3 scripts/spec_guard.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD)`
   - 结果：当前受审 head 通过。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前受审 head 通过。
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：当前受审 head 通过。
-- `python3 scripts/governance_gate.py --mode ci --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD) --head-ref issue-79-fr-0007-formal-spec`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-79-fr-0007-formal-spec`
   - 结果：当前受审 head 通过。
 - `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
   - 结果：执行 235 项治理测试，全部通过。
 - `python3 scripts/pr_guardian.py review 80`
   - 结果：latest guardian 继续要求 formal spec、exec-plan 与 PR 目标对 `spec-ready` / `implementation-ready` 的口径保持一致
 - `python3 scripts/pr_guardian.py review 84`
-  - 结果：以 PR `#84` 当前受审 head 的最新 guardian review 为准；本次 metadata-only 更新专用于闭合 guardian 指出的 checkpoint/head 绑定、当前 head 验证证据与风险口径一致性问题。
+  - 结果：以 PR `#84` 当前受审 head 的最新 guardian review 为准；当前剩余 closeout 仅允许围绕 latest guardian 指出的文档口径问题继续收口。
 
 ## 未决风险
 
