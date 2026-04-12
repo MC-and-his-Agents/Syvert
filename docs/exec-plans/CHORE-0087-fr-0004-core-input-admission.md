@@ -39,7 +39,7 @@
 - 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`；实现分支 `issue-87-fr-0004-core` 已推送远端，并打开 implementation PR `#90`。
 - 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。
 - 第二轮收口已把显式 `CoreTaskRequest` 的执行路径收紧为 fail-closed：`#87` 只负责 shared model 受理与校验，不提前开放 adapter admission / execution happy path；legacy `TaskRequest(input.url)` 仍保持可运行。
-- 当前停在基于 head `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2` 重新执行 guardian 复审与 merge gate。
+- 最近一次行为 checkpoint 固定为 `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2`；其后提交仅补充 PR 正文与 exec-plan 审查态元数据，不改写运行时行为。当前受审 head 以 PR `#90` 与 guardian state 绑定为准。
 
 ## 下一步动作
 
@@ -69,7 +69,8 @@
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
-  - 结果：在当前 head `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2` 上执行，`Ran 65 tests in 1.936s`，`OK`
+  - 结果：在最近一次行为 checkpoint `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2` 上执行，`Ran 65 tests in 1.936s`，`OK`
+  - 说明：其后提交仅同步 PR / exec-plan 审查态元数据，不改写运行时与测试行为
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
