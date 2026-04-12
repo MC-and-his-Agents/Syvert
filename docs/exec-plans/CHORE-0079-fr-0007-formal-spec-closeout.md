@@ -34,8 +34,8 @@
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
 - 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，随后由 `#80` 接续。
-- `#80` 已把 latest guardian 指出的 readiness、父 FR closeout 与 `CollectionPolicy` 依赖问题收口到最近一次实质 checkpoint。
-- 其后提交仅同步 guardian / review 元数据，不构成新的执行停点；当前受审 head 由 guardian state 绑定。
+- 当前实质 checkpoint 已推进到 `16d36bd895fedbc746a042541ccae80808911190`，该提交对齐了 `FR-0007` 在 `v0.2.0` 范围内的双参考适配器冻结口径，并闭合了 `spec.md` 与 `contracts/README.md` 的 formal spec 叙述。
+- 当前受审 head 仅补充 exec-plan 证据、guardian closeout 与风险核对等审查态工件，不改变 `FR-0007` formal spec requirement truth；最近一次实质 checkpoint 因此保持为 `16d36bd895fedbc746a042541ccae80808911190`。
 - 当前活跃 PR 已切换为 `#84`，用于恢复 GitHub `pull_request` checks；formal spec 内容与 Work Item 绑定保持不变。
 
 ## 下一步动作
@@ -67,13 +67,29 @@
 - `python3 scripts/pr_guardian.py review 73`
   - 结果：guardian 要求把 formal spec 执行回合从 FR 重新绑定到真实 Work Item，并避免把未实现的依赖写成 spec 仍不可进入实现
 - `python3 scripts/spec_guard.py --all`
+  - 结果：通过。
 - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：当前受审 head 通过。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：当前受审 head 的 PR class 为 `spec`，变更类别为 `docs, spec`，scope 校验通过。
 - `python3 scripts/open_pr.py --class spec --issue 79 --item-key CHORE-0079-fr-0007-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title "spec: 收口 FR-0007 的 formal spec" --closing fixes --dry-run`
-- `gh pr checks 84`
-  - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
+  - 结果：受控 open_pr 干跑通过，可生成合法 spec PR 输入。
+- `python3 scripts/commit_check.py --mode pr --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD)`
+  - 结果：当前受审 head 的提交信息校验通过。
+- `python3 scripts/spec_guard.py --mode ci --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD)`
+  - 结果：当前受审 head 通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：当前受审 head 通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：当前受审 head 通过。
+- `python3 scripts/governance_gate.py --mode ci --base-sha f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9 --head-sha $(git rev-parse HEAD) --head-ref issue-79-fr-0007-formal-spec`
+  - 结果：当前受审 head 通过。
+- `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
+  - 结果：执行 235 项治理测试，全部通过。
 - `python3 scripts/pr_guardian.py review 80`
   - 结果：latest guardian 继续要求 formal spec、exec-plan 与 PR 目标对 `spec-ready` / `implementation-ready` 的口径保持一致
+- `python3 scripts/pr_guardian.py review 84`
+  - 结果：以 PR `#84` 当前受审 head 的最新 guardian review 为准；本次 metadata-only 更新专用于闭合 guardian 指出的 checkpoint/head 绑定、当前 head 验证证据与风险口径一致性问题。
 
 ## 未决风险
 
@@ -86,5 +102,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `a0d2584487f357b023ecbaa5010ea9b1fc256a08`
-- 说明：后续提交只同步 review / guardian 元数据，未形成新的 checkpoint；当前受审 head 由 guardian state 绑定。
+- `16d36bd895fedbc746a042541ccae80808911190`
+- 说明：该 checkpoint 完成了 `FR-0007` 双参考适配器冻结口径的 formal spec 对齐；当前受审 head 只承载 exec-plan / 风险核对等 metadata-only 收口，不改变 requirement truth，并需单独补齐当前 head 的 guardian 与 checks 结果。
