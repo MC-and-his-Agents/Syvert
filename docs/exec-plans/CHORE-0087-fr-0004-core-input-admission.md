@@ -40,7 +40,8 @@
 - 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。
 - 第二轮收口已把显式 `CoreTaskRequest` 的执行路径收紧为 fail-closed：`#87` 只负责 shared model 受理与校验，不提前开放 adapter admission / execution happy path。
 - 第三轮实现收口已把 legacy `TaskRequest(input.url)` 路径纳入 shared-axis admission：adapter 现在必须显式声明 `supported_targets` 包含 `url` 且 `supported_collection_modes` 包含 `hybrid`，否则 legacy URL 流量在进入 adapter 前 fail-closed。
-- 最近一次行为 checkpoint 固定为 `3ff22df48d7a3f710c4eba67cf37437dd7f145e1`；其后若只追加 PR / exec-plan 审查态元数据，不改写运行时行为。当前受审 head 以 PR `#90` 与 guardian state 绑定为准。
+- 第四轮实现收口已把 native `CoreTaskRequest` 的 fail-closed 重新前置到 adapter lookup / shared-axis admission 之前，保持 `#87` 的边界为“显式受理 + 校验”，不提前吞并 `#89` 的 adapter admission 责任。
+- 最近一次行为 checkpoint 固定为 `3f8444d342298193c63518725edcb74ecdff1418`；其后若只追加 PR / exec-plan 审查态元数据，不改写运行时行为。当前受审 head 以 PR `#90` 与 guardian state 绑定为准。
 
 ## 下一步动作
 
@@ -70,7 +71,7 @@
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在最近一次行为 checkpoint `3ff22df48d7a3f710c4eba67cf37437dd7f145e1` 上执行，`Ran 120 tests in 3.877s`，`OK`
+  - 结果：在最近一次行为 checkpoint `3f8444d342298193c63518725edcb74ecdff1418` 上执行，`Ran 120 tests in 4.289s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -90,6 +91,9 @@
 - guardian 次轮审查：`REQUEST_CHANGES`
   - 阻断项：legacy URL 可执行路径仍绕过 shared-axis admission，且缺少对应回归测试
   - 收口结果：legacy `TaskRequest(input.url)` 现在也必须命中 `supported_targets=url` 与 `supported_collection_modes=hybrid` 检查；真实 adapter、test fixtures 与回归用例已同步补齐
+- guardian 三轮审查：`REQUEST_CHANGES`
+  - 阻断项：native `CoreTaskRequest` 在 fail-closed 前先触发了 adapter admission，越过了 `#87` 的边界
+  - 收口结果：native shared-input 现在在 adapter lookup / shared-axis admission 前直接 fail-close；legacy URL 路径继续承担本回合允许的最小可执行语义
 
 ## 未决风险
 
@@ -103,4 +107,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3ff22df48d7a3f710c4eba67cf37437dd7f145e1`
+- `3f8444d342298193c63518725edcb74ecdff1418`
