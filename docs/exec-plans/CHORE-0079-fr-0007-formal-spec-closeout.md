@@ -34,7 +34,8 @@
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
 - 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，已关闭并由当前 PR `#80` 接续。
-- 当前 PR `#80` 已把 latest guardian 指出的 readiness、父 FR closeout 与 `CollectionPolicy` 依赖问题收口到当前 head `a0d2584487f357b023ecbaa5010ea9b1fc256a08`。
+- 当前 PR `#80` 已把 latest guardian 指出的 readiness、父 FR closeout 与 `CollectionPolicy` 依赖问题收口到最近一次实质 checkpoint。
+- 其后提交仅同步 guardian / review 元数据，不构成新的执行停点；当前受审 head 由 guardian state 绑定。
 
 ## 下一步动作
 
@@ -85,3 +86,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `a0d2584487f357b023ecbaa5010ea9b1fc256a08`
+- 说明：后续提交只同步 review / guardian 元数据，未形成新的 checkpoint；当前受审 head 由 guardian state 绑定。
