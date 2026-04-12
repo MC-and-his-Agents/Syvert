@@ -8,8 +8,9 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 状态：`historical formal-spec planning record; formal spec merged via PR #82`
-- 当前 active exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
+- 当前 active exec-plan：`docs/exec-plans/FR-0004-input-target-and-collection-policy.md`
 - formal spec 历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
+- implementation 聚合历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
 
 ## 实施目标
 
@@ -77,4 +78,4 @@
 
 - 结论：`APPROVE`。`FR-0004` formal spec 已由 PR `#82` 合入主干。
 - 未决问题：无。formal spec 审查回合已完成；后续只允许在独立 implementation / closeout 回合中消费该 formal spec。
-- implementation-ready 判定：`是`。`#87/#89/#88` 已按 formal spec 边界完成 implementation 回合，并由 `#68` 继续承接 implementation 聚合 closeout。
+- implementation-ready 判定：`是`。`#87/#89/#88` 已按 formal spec 边界完成 implementation 回合，且 `#68` 已完成 implementation 聚合 closeout。
