@@ -1,0 +1,86 @@
+# FR-0006 实施计划
+
+## 关联信息
+
+- item_key：`FR-0006-adapter-contract-test-harness`
+- Issue：`#66`
+- item_type：`FR`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 exec-plan：`docs/exec-plans/CHORE-0051-fr-0006-formal-spec-closeout.md`
+
+## 实施目标
+
+- 为 `v0.2.0` 冻结 adapter contract test harness 的最小实施边界，使后续实现 PR 能在不触碰真实平台回归与版本 gate 的前提下，独立交付 fake adapter、验证工具和 Core contract 验证宿主。
+
+## 分阶段拆分
+
+- 阶段 1：冻结 harness、fake adapter、验证工具三者的职责边界，以及可验证 contract 面与排除范围。
+- 阶段 2：实现受控 fake adapter 与最小 harness 宿主，使 Core 能通过标准 adapter 路径执行契约样例。
+- 阶段 3：补齐验证工具、契约样例与最小自动化验证，覆盖通过、合法失败、contract violation 与执行前置不满足四类最小结果。
+- 阶段 4：在不引入真实平台依赖的前提下收口实现 PR 的审查证据，并为后续参考适配器回归事项提供稳定输入。
+
+## 实现约束
+
+- 不允许触碰的边界：
+  - 不在本事项实现中重新定义 `InputTarget`、`CollectionPolicy`、错误模型或 adapter registry 正式语义
+  - 不把真实平台测试、双参考适配器回归 gate、平台泄漏检查 gate 混入同一实现 PR
+  - 不为了 fake adapter 修改 Core 主路径中的平台边界或引入生产期假适配器依赖
+  - 不把 harness 实现耦合到唯一测试框架、唯一 CLI 入口或唯一目录结构
+- 与上位文档的一致性约束：
+  - `vision.md` 与 `docs/roadmap-v0-to-v1.md` 中 `v0.2.0` 的“可验证”目标必须保持不变
+  - `FR-0002` 已冻结的统一 adapter contract 是本 FR 的上位输入；若需改写正式 contract，必须回到 spec review
+  - `FR-0005` 已冻结的错误模型与 registry contract 是本 FR 对合法失败、capability 与 fail-closed 语义的上位输入；本 FR 只定义验证工具分类，不重新发明运行时错误分类
+  - formal spec 与实现默认分 PR；本轮 formal spec PR 只更新 spec 套件、当前 Work Item 所需的最小 active `exec-plan` 与最小 release / sprint 索引
+  - 后续 harness 实现若触及 repo harness 或验证工具接线，必须保持 `WORKFLOW.md`、`docs/process/agent-loop.md`、`docs/process/worktree-lifecycle.md` 与状态面聚合规则不变，不得把 adapter contract harness 退化为绕开受控入口的第二条执行链路
+  - 验证工具、harness 与其状态输出若需要进入治理状态面，只能作为现有 review / checks / guardian 证据的补充，不得改写 GitHub / release / sprint / exec-plan 的单一真相职责
+
+## 测试与验证策略
+
+- 单元测试：
+  - fake adapter 受控返回分支的样例装配
+  - harness 对 `contract violation`、合法失败与执行前置不满足的判定
+  - 验证工具的结果分类与样例级归因
+- 集成/契约测试：
+  - Core 通过标准 adapter 宿主路径加载 fake adapter 并执行契约样例
+  - success envelope、合法 failed envelope、非法结果 envelope 与执行前置不满足的最小 contract 验证
+  - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“通过 / 合法失败 / contract violation / 执行前置不满足”四类结果不改写上位运行时错误语义
+- 手动验证：
+  - 检查 harness 执行不要求真实网络、Cookie、签名或真实平台响应
+  - 检查验证输出能区分通过、合法失败、contract violation、执行前置不满足
+
+## TDD 范围
+
+- 先写测试的模块：
+  - harness 对 contract 样例的执行与判定
+  - fake adapter 样例装配接口
+  - 验证工具的结果分级、归因与四类最小结果映射
+- 暂不纳入 TDD 的模块与理由：
+  - 真实平台回归流程、版本 gate 编排与 CI 拓扑不属于本 FR 主体，留给后续独立事项处理
+
+## 并行 / 串行关系
+
+- 可并行项：
+  - fake adapter 样例设计
+  - harness 宿主接入
+  - 验证工具结果格式与断言组织
+- 串行依赖项：
+  - 必须先冻结本 FR formal spec，再进入 harness 实现 PR
+  - 必须先有 fake adapter + harness 的最小宿主，才能叠加更高层的验证工具与样例集
+  - 参考适配器回归与版本 gate 只能在本 FR 产出稳定后消费其结果
+- 阻塞项：
+  - 若 `FR-0002` 的上位 adapter contract 发生变更，本 FR 实现必须等待对应 formal spec 更新完成后再推进
+
+## 进入实现前条件
+
+- [ ] `spec review` 已通过
+- [ ] 关键风险已记录并有缓解策略
+- [ ] 关键依赖可用
+- [ ] harness、fake adapter、验证工具与真实平台回归的边界已冻结
+- [ ] 后续实现 PR 的范围已限制在 contract harness 基座，不要求同轮处理版本 gate 或双参考适配器回归
+
+## spec review 通过后进入实现的方式
+
+- `FR-0006` formal spec 审查通过后，后续实现必须以独立 Work Item 和独立 implementation PR 进入执行漏斗。
+- 后续实现 PR 只允许落地 fake adapter、contract harness 宿主、验证工具与最小自动化验证，不得在同一 PR 中扩展真实平台回归或版本 gate 编排。
+- 若实现阶段发现现有上位 contract 存在缺口，必须先回到 formal spec 审查链路，再继续 implementation PR。
