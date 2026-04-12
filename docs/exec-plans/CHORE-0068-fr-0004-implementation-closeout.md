@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#93`
 - active 收口事项：`CHORE-0068-fr-0004-implementation-closeout`
 
 ## 目标
@@ -41,8 +41,8 @@
 
 ## 下一步动作
 
-- 更新 release / sprint 索引，明确 `#68` 已完成的 implementation 聚合结果与三条子 PR。
-- 通过 docs-only 门禁并打开 closeout PR。
+- 等待 PR `#93` 的 GitHub checks 全绿，并对当前 head 运行 guardian 审查。
+- 若 guardian `APPROVE` 且 `safe_to_merge=true`，通过受控入口合并 PR。
 - 合并后在 GitHub `#68` 评论归档三条子事项与验证入口，随后关闭 `#68`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -71,6 +71,13 @@
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 2 条提交信息，全部通过
+- `python3 scripts/open_pr.py --class docs --issue 68 --item-key CHORE-0068-fr-0004-implementation-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 implementation 聚合事项' --closing fixes --dry-run`
+  - 结果：通过
+- 已创建当前受审 PR：`#93 https://github.com/MC-and-his-Agents/Syvert/pull/93`
 
 ## 未决风险
 
