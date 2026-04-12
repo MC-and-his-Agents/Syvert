@@ -30,6 +30,12 @@ from scripts.item_context import (
     valid_item_key,
     validate_bound_formal_spec_scope,
 )
+from scripts.context_guard import (
+    is_exec_plan_file,
+    is_legacy_todo_file,
+    validate_legacy_todo_cleanup_foreign_exec_plan_touch,
+)
+
 from scripts.common import (
     CommandError,
     REPO_ROOT,
@@ -366,6 +372,22 @@ def validate_pr_preflight(
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
     if validate_worktree_binding_check:
         errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
+
+    for raw_path in changed_files:
+        path = Path(raw_path)
+        target = repo_root / path
+        if is_legacy_todo_file(path) and target.exists():
+            errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
+        if issue is not None and is_exec_plan_file(path) and target.exists():
+            errors.extend(
+                f"{target}: {error}"
+                for error in validate_legacy_todo_cleanup_foreign_exec_plan_touch(
+                    repo_root,
+                    target,
+                    current_issue=issue,
+                    changed_paths=changed_files,
+                )
+            )
 
     if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files, repo_root=repo_root):
         errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")

@@ -1204,6 +1204,98 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("核心文件变更" in error or "正式规约区变更" in error for error in errors))
 
+    def test_spec_pr_rejects_live_legacy_todo_rewrite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+            )
+            write_formal_spec_suite(repo, with_todo=True)
+            errors = validate_pr_preflight(
+                "spec",
+                1,
+                "FR-0001-governance-stack-v1",
+                "FR",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/TODO.md"],
+                repo_root=repo,
+            )
+        self.assertTrue(any("请删除该文件" in error for error in errors))
+
+    def test_governance_pr_rejects_invalid_foreign_exec_plan_rewrite_even_with_todo_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="GOV-0029-remove-legacy-todo-md",
+                issue="#58",
+                item_type="GOV",
+                release="v0.2.0",
+                sprint="2026-S15",
+                active_item_key="GOV-0029-remove-legacy-todo-md",
+                related_spec="docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
+                related_decision="docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
+            )
+            write_formal_spec_suite(repo, suite_name="FR-0003-github-delivery-structure-and-repo-semantic-split", with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
+            write_decision(
+                repo,
+                "docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
+                issue="#58",
+                item_key="GOV-0029-remove-legacy-todo-md",
+            )
+            plan = repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md"
+            plan.write_text(
+                plan.read_text(encoding="utf-8").replace(
+                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n",
+                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n- 额外关联 specs：docs/specs/FR-0002-content-detail-runtime-v0-1/\n",
+                ),
+                encoding="utf-8",
+            )
+            write_decision(
+                repo,
+                "docs/decisions/ADR-0001-governance-bootstrap-contract.md",
+                issue="#38",
+                item_key="FR-0002-content-detail-runtime-v0-1",
+            )
+            write_exec_plan(
+                repo,
+                item_key="FR-0002-content-detail-runtime-v0-1",
+                issue="#38",
+                item_type="FR",
+                release="v0.1.0",
+                sprint="2026-S15",
+                active_item_key="FR-0002-content-detail-runtime-v0-1",
+                related_spec="docs/specs/FR-0002-content-detail-runtime-v0-1/",
+                related_decision="docs/decisions/ADR-0001-governance-bootstrap-contract.md",
+            )
+            foreign = repo / "docs" / "exec-plans" / "FR-0002-content-detail-runtime-v0-1.md"
+            foreign.write_text(
+                foreign.read_text(encoding="utf-8").replace("# plan", "# rewritten"),
+                encoding="utf-8",
+            )
+            (repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1" / "TODO.md").unlink()
+            errors = validate_pr_preflight(
+                "governance",
+                58,
+                "GOV-0029-remove-legacy-todo-md",
+                "GOV",
+                "v0.2.0",
+                "2026-S15",
+                [
+                    "docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md",
+                    "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md",
+                ],
+                repo_root=repo,
+            )
+        self.assertTrue(any("最小终态" in error for error in errors))
+
     def test_spec_pr_accepts_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

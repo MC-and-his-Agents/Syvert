@@ -1303,12 +1303,13 @@ Then
                 repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md",
                 "# ADR-0001 bootstrap\n",
             )
+            write_file(repo / "docs" / "specs" / "FR-0001-example" / "TODO.md", "# TODO\n")
             errors = validate_context_rules(
                 repo,
                 changed_paths=["docs/specs/FR-0001-example/TODO.md"],
                 current_issue=1,
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("请删除该文件" in error for error in errors))
 
     def test_touched_formal_spec_rejects_fake_legacy_adr_name_for_current_issue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
