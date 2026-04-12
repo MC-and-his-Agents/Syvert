@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
-- 关联 PR：`#75`
+- 关联 PR：`#82`
 - active 收口事项：`CHORE-0068-fr-0004-formal-spec-closeout`
 
 ## 目标
@@ -32,12 +32,12 @@
 ## 当前停点
 
 - 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
-- `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，受审 PR 为 `#75`。
-- 当前停在根据最新 guardian 结果同步 superseded stub 与 active `exec-plan` 的恢复语义，然后以最新 head 重新进入 guardian。
+- `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，当前受审 PR 为 `#82`。
+- 历史 PR `#75` 已因 GitHub checks 未绑定最新 head 而关闭；当前轮次由 PR `#82` 继续承接相同分支的最新 formal spec 审查。
+- 当前停在将 active `exec-plan` 的审查态、验证轨迹与 checkpoint 对齐到当前受审 head `e52b70dc910a4ef357f3b61a8248cb4a2831a320`，然后重入 guardian。
 
 ## 下一步动作
 
-- 同步 superseded 历史 stub 与 active `exec-plan` 的元数据，确保当前受审状态可恢复。
 - 重跑 guardian；若通过，则直接进入受控 `merge_pr`。
 - guardian 通过后使用受控 `merge_pr` 合入，并回写 closeout 状态。
 
@@ -67,10 +67,9 @@
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class spec --issue 68 --item-key CHORE-0068-fr-0004-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'spec: 冻结 FR-0004 的 InputTarget 与 CollectionPolicy 模型' --closing refs --dry-run`
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-- 已创建 PR：`#75 https://github.com/MC-and-his-Agents/Syvert/pull/75`
-- 已确认 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
-- 已完成 guardian 第一轮审查，并收到需要收口兼容映射、checkpoint 与验证轨迹的一轮阻断
-- 已完成后续 guardian 审查，并按阻断收口了 `spec review` 口径、active `exec-plan` 绑定与 Adapter SDK 契约边界
+- 已创建当前受审 PR：`#82 https://github.com/MC-and-his-Agents/Syvert/pull/82`
+- 已确认当前 head `e52b70dc910a4ef357f3b61a8248cb4a2831a320` 的 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
+- 已完成多轮 guardian 审查，并按阻断收口了兼容映射、`spec review` 口径、active `exec-plan` 绑定、Adapter SDK 契约边界与恢复工件一致性
 
 ## 未决风险
 
@@ -84,4 +83,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b040f3419961fcddc79ea44eeef97f2ea061dfc6`
+- `e52b70dc910a4ef357f3b61a8248cb4a2831a320`
