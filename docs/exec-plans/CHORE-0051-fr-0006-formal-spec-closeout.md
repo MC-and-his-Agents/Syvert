@@ -67,13 +67,13 @@
 - `python3 scripts/open_pr.py --class spec --issue 74 --item-key CHORE-0051-fr-0006-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --closing refs --title "spec: 收口 FR-0006 的适配器契约测试基座"`
   - 结果：成功创建 PR `#76`
 - `python3 scripts/docs_guard.py`
-  - 结果：通过（当前 head）
+  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
 - `python3 scripts/spec_guard.py --all`
-  - 结果：通过（当前 head）
+  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main --head-ref HEAD`
-  - 结果：通过（当前 head）
+  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
 - `gh pr checks 76`
-  - 结果：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Governance Tooling` / `Validate Spec Review Boundaries` 全部通过（当前 head）
+  - 结果：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Governance Tooling` / `Validate Spec Review Boundaries` 全部通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc` 对应的受审 head）
 - `git rev-parse HEAD`
   - 结果：`340d567e44dcce72957a07e343c8d50fc01bcedc`
 
