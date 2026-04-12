@@ -37,7 +37,7 @@
 - `XXXX` 为四位数字，`slug` 使用短横线英文短语
 - formal spec 中的上下文字段用于声明绑定 FR 自身的 `Issue`、`item_key`、`item_type`、`release`、`sprint`，而不是当前 Work Item 的执行轮次
 - formal spec 只承载绑定 FR 的需求、边界与验证语义；当前 Work Item 的执行上下文由 active `exec-plan` 与 PR 元数据承载
-- 未触碰的 legacy `TODO.md` 仅作为 inert legacy / compat residue 保留；不得再作为 formal spec 必需工件、状态镜像、恢复入口或要求同步维护的 live 工件
+- 在 `GOV-0029` 的后续独立 governance 实现 PR 合入前，legacy `TODO.md` 仍作为 compat 过渡态工件保留；其目标态是降为 inert legacy / compat residue，不再作为 formal spec 必需工件、状态镜像、恢复入口或要求同步维护的 live 工件
 - 历史事项允许沿用既有目录或文件名，不要求在 PR2 中全量迁移
 - formal spec 通过 FR `item_key` 与上位 FR 保持一致，并通过 active `exec-plan` 的 `关联 spec`、可选的 `关联 decision` 与 PR 追溯到当前 Work Item
 - active `exec-plan` 的 `关联 spec` 只能绑定到 FR formal spec 套件根目录，或根目录下的 `spec.md` / `plan.md` 文件；不得指向任意嵌套子目录
