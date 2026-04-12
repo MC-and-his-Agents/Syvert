@@ -45,8 +45,8 @@
 
 ## 下一步动作
 
-- 把 `FR-0004` requirement container、`#68` 历史 closeout 记录、release / sprint 索引与 spec plan 一并对齐到 `#95` 成为唯一 active closeout 入口后的主干真相。
-- 运行 `docs_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard` 与 `open_pr --dry-run`，然后创建当前 closeout PR。
+- 已把 `FR-0004` requirement container、`#68` 历史 closeout 记录、release / sprint 索引与 spec plan 对齐到 `#95` 成为唯一 active closeout 入口后的主干真相。
+- 当前 head 已完成 `docs_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard`、`open_pr --dry-run` 与受控 PR 创建。
 - 合并后修正 GitHub `#64` 正文、发布 `#64` closeout 评论，并关闭 `#64`；同时关闭 `#85` 以避免 `FR-0004` 留下第二个 open issue 镜像。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -95,6 +95,18 @@
   - 结果：`state=MERGED`
 - `gh pr view 93 --repo MC-and-his-Agents/Syvert --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=74f7407ac109d4ef8eeb86522ae5caf1a5804a38`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 95 --item-key CHORE-0095-fr-0004-parent-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 父事项' --closing refs --dry-run`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验当前 PR 的提交信息，全部通过
 - 已创建当前受审 PR：`#96 https://github.com/MC-and-his-Agents/Syvert/pull/96`
 
 ## closeout 证据
@@ -115,7 +127,12 @@
 
 ## 回滚方式
 
-- 如需回滚，使用独立 revert PR 撤销本事项对 `docs/exec-plans/FR-0004-input-target-and-collection-policy.md`、`docs/exec-plans/CHORE-0095-fr-0004-parent-closeout.md`、`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`、`docs/specs/FR-0004-input-target-and-collection-policy/plan.md`、`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
+- 仓内回滚：如需回滚，使用独立 revert PR 撤销本事项对 `docs/exec-plans/FR-0004-input-target-and-collection-policy.md`、`docs/exec-plans/CHORE-0095-fr-0004-parent-closeout.md`、`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`、`docs/specs/FR-0004-input-target-and-collection-policy/plan.md`、`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
+- GitHub 侧回滚：
+  - 若已编辑 `#64` 正文但 PR 未合入，恢复 `#64` 到 closeout 前正文，并保留 `#64`、`#85` 为 `OPEN`
+  - 若已发布 `#64` closeout 评论但发现仓内工件仍不一致，在 `#64` 追加纠正评论并停止关闭动作
+  - 若 `#85` 已关闭但 `#64` closeout 需要撤回，先重新打开 `#85` 并说明恢复原因为“FR-0004 父事项 closeout 回滚”
+  - 若 `#64` 已关闭后发现 closeout 事实错误，先重新打开 `#64`，再通过独立 revert PR 与新的 closeout 回合修复仓内 / GitHub 状态
 
 ## 最近一次 checkpoint 对应的 head SHA
 

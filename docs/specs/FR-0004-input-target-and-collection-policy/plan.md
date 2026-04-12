@@ -44,7 +44,7 @@
   - 运行 `docs_guard`、`workflow_guard`、`spec_guard`、`governance_gate`，确认 formal spec 套件、引用关系与治理入口不漂移
   - 运行 `open_pr --class spec --dry-run` 与 `pr_scope_guard --class spec`，确认当前事项能通过受控 PR 入口
 - 手动验证：
-  - 核对 GitHub `#63 / #64 / #68` 与仓内 `FR-0004 / v0.2.0 / 2026-S15 / active exec-plan` 的映射关系
+  - 核对 GitHub `#63 / #64 / #95` 与仓内 `FR-0004 / v0.2.0 / 2026-S15 / active exec-plan` 的映射关系，并确认 `#68` 已退化为历史 implementation closeout 记录
   - 对照 `adapter-sdk.md`、`framework-positioning.md` 与 `FR-0002`，确认 Core / Adapter 边界、兼容关系与非目标没有漂移
 
 ## TDD 范围
