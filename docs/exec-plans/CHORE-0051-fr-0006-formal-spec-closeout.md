@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 关联 PR：
+- 关联 PR：`#76`
 - active 收口事项：`CHORE-0051-fr-0006-formal-spec-closeout`
 
 ## 目标
@@ -32,11 +32,12 @@
 - 已在独立 worktree `issue-74-chore-0051-fr-0006-formal-spec-closeout` 中承接 `FR-0006` formal spec 文档增量，并把执行入口从 FR `#66` 纠正为当前 Work Item `#74`。
 - `docs_guard`、`spec_guard --all` 与 `governance_gate --mode local --base-ref origin/main --head-ref HEAD` 已在前一轮文档增量上通过。
 - guardian 首轮审查已指出 FR 不能直接作为执行入口；当前增量只修该阻断所要求的工件绑定与索引一致性。
+- superseded PR `#71` 已关闭，当前合法受审入口为 Work Item `#74` 对应的 PR `#76`。
 
 ## 下一步动作
 
 - 复跑 formal spec 门禁与受控 `open_pr`，确认当前 Work Item 绑定链路合法。
-- 关闭 superseded PR `#71`，并通过当前 Work Item 受控重开 spec PR。
+- 让 PR `#76` 的 checks 全绿，并在同一 head 上重跑 guardian。
 - 等待 checks 全绿后重跑 guardian，并在通过后执行受控合并与 closeout。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -61,6 +62,10 @@
   - 结果：已把 `FR-0006` formal spec 文档增量迁移到当前 Work Item 分支
 - `python3 scripts/pr_guardian.py review 71`
   - 结果：guardian 阻断，要求把执行入口从 FR `#66` 迁回真正的 Work Item，并补齐索引一致性
+- `gh pr close 71 --comment "...Superseded by #76..."`
+  - 结果：已关闭 superseded PR `#71`
+- `python3 scripts/open_pr.py --class spec --issue 74 --item-key CHORE-0051-fr-0006-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --closing refs --title "spec: 收口 FR-0006 的适配器契约测试基座"`
+  - 结果：成功创建 PR `#76`
 
 ## 未决风险
 
@@ -73,5 +78,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9775e70220dca7f13f948e42f4e423a8003ffbc1`
-- 说明：该 checkpoint 对应把 `FR-0006` formal spec 增量迁移到 `CHORE-0051` Work Item 分支后的当前 head；后续 guardian 与 merge gate 必须绑定此后续受审 head。
+- `04d675f7db500653a321e34f2633d227c72eb7ae`
+- 说明：该 checkpoint 对应修正 Work Item 绑定后的当前合法受审 head；后续 guardian 与 merge gate 必须绑定该 head 或其后续显式 checkpoint。
