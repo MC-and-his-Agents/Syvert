@@ -54,7 +54,7 @@
   - 调用侧 operation id：`content_detail_by_url`
   - adapter-facing capability family：`content_detail`
   - `target_type=url`
-  - `collection_mode=hybrid`
+  - `collection_mode=hybrid`；若目标 adapter 只声明单一模式，则在进入 adapter-facing request 前按其唯一声明模式归一化为 `public` 或 `authenticated`
 
 ## 后续 FR 的使用边界
 

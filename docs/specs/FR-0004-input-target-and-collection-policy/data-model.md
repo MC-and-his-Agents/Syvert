@@ -53,5 +53,5 @@
 
 ### 兼容特例
 
-- 对上述 legacy `hybrid` 投影，若 adapter 只声明 `public` 或只声明 `authenticated`，Core 仍可把该请求视为合法承接目标。
-- 该特例只服务 `FR-0002` 的兼容投影，不自动推广到 native `FR-0004` 调用方显式提交的 `hybrid` 请求。
+- 对上述 legacy `hybrid` 投影，若 adapter 只声明 `public` 或只声明 `authenticated`，Core 必须在进入 adapter-facing request 前把 legacy `hybrid` 归一化为该唯一声明模式。
+- 该归一化特例只服务 `FR-0002` 的兼容投影，不自动推广到 native `FR-0004` 调用方显式提交的 `hybrid` 请求。
