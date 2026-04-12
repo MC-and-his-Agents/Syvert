@@ -46,6 +46,8 @@ PageStateTransport = Callable[..., Mapping[str, Any]]
 class DouyinAdapter:
     adapter_key = "douyin"
     supported_capabilities = frozenset({CONTENT_DETAIL_BY_URL})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def __init__(
         self,

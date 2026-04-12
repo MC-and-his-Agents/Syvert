@@ -85,16 +85,6 @@ def execute_task(
 
     adapter_key = normalized_request.target.adapter_key
     capability = normalized_request.target.capability
-    if type(request) is CoreTaskRequest:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            runtime_contract_error(
-                "invalid_task_request",
-                "当前共享输入执行路径尚未完成 adapter admission 承接",
-            ),
-        )
 
     adapter, adapter_error = get_adapter(adapters, adapter_key)
     if adapter_error is not None:
@@ -130,6 +120,51 @@ def execute_task(
                     "supported_capabilities": sorted(supported_capabilities),
                 },
             },
+        )
+
+    supported_targets, targets_error = validate_supported_targets(get_adapter_supported_targets(adapter))
+    if targets_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, targets_error)
+    if normalized_request.target.target_type not in supported_targets:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            {
+                "category": "runtime_contract",
+                "code": "target_type_not_supported",
+                "message": f"adapter `{adapter_key}` 不支持 target_type `{normalized_request.target.target_type}`",
+                "details": {"supported_targets": sorted(supported_targets)},
+            },
+        )
+
+    supported_collection_modes, collection_modes_error = validate_supported_collection_modes(
+        get_adapter_supported_collection_modes(adapter)
+    )
+    if collection_modes_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, collection_modes_error)
+    if normalized_request.policy.collection_mode not in supported_collection_modes:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            {
+                "category": "runtime_contract",
+                "code": "collection_mode_not_supported",
+                "message": f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
+                "details": {"supported_collection_modes": sorted(supported_collection_modes)},
+            },
+        )
+
+    if type(request) is CoreTaskRequest:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "invalid_task_request",
+                "当前共享输入执行路径尚未完成 adapter admission 承接",
+            ),
         )
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request)
@@ -343,6 +378,24 @@ def get_adapter_supported_capabilities(adapter: Any) -> Any:
         return MISSING
 
 
+def get_adapter_supported_targets(adapter: Any) -> Any:
+    try:
+        return getattr(adapter, "supported_targets")
+    except AttributeError:
+        return MISSING
+    except Exception:
+        return MISSING
+
+
+def get_adapter_supported_collection_modes(adapter: Any) -> Any:
+    try:
+        return getattr(adapter, "supported_collection_modes")
+    except AttributeError:
+        return MISSING
+    except Exception:
+        return MISSING
+
+
 def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
     if raw_capabilities is MISSING:
         return frozenset(), runtime_contract_error(
@@ -384,6 +437,73 @@ def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[st
         return frozenset(), runtime_contract_error(
             "invalid_adapter_capabilities",
             "supported_capabilities 必须为字符串集合",
+            details={"error_type": error.__class__.__name__},
+        )
+    return frozenset(validated), None
+
+
+def validate_supported_targets(raw_targets: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
+    return validate_supported_axis(
+        raw_targets,
+        missing_code="invalid_adapter_targets",
+        message="supported_targets 必须为字符串集合",
+    )
+
+
+def validate_supported_collection_modes(raw_modes: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
+    return validate_supported_axis(
+        raw_modes,
+        missing_code="invalid_adapter_collection_modes",
+        message="supported_collection_modes 必须为字符串集合",
+    )
+
+
+def validate_supported_axis(
+    raw_values: Any,
+    *,
+    missing_code: str,
+    message: str,
+) -> tuple[frozenset[str], dict[str, Any] | None]:
+    if raw_values is MISSING:
+        return frozenset(), runtime_contract_error(
+            missing_code,
+            message,
+            details={"reason": "missing"},
+        )
+    if raw_values is None:
+        return frozenset(), runtime_contract_error(
+            missing_code,
+            message,
+            details={"actual_type": "NoneType"},
+        )
+    if isinstance(raw_values, (str, bytes)):
+        return frozenset(), runtime_contract_error(
+            missing_code,
+            message,
+            details={"actual_type": type(raw_values).__name__},
+        )
+    try:
+        iterator = iter(raw_values)
+    except TypeError:
+        return frozenset(), runtime_contract_error(
+            missing_code,
+            message,
+            details={"actual_type": type(raw_values).__name__},
+        )
+    validated: list[str] = []
+    try:
+        for value in iterator:
+            if not isinstance(value, str):
+                return frozenset(), runtime_contract_error(
+                    missing_code,
+                    message,
+                    details={"invalid_value_type": type(value).__name__},
+                )
+            validated.append(value)
+    except Exception as error:
+        return frozenset(), runtime_contract_error(
+            missing_code,
+            message,
             details={"error_type": error.__class__.__name__},
         )
     return frozenset(validated), None
