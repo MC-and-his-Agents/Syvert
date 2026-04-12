@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#96`
 - 状态：`active`
 - active 收口事项：`CHORE-0095-fr-0004-parent-closeout`
 
@@ -95,6 +95,7 @@
   - 结果：`state=MERGED`
 - `gh pr view 93 --repo MC-and-his-Agents/Syvert --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=74f7407ac109d4ef8eeb86522ae5caf1a5804a38`
+- 已创建当前受审 PR：`#96 https://github.com/MC-and-his-Agents/Syvert/pull/96`
 
 ## closeout 证据
 
