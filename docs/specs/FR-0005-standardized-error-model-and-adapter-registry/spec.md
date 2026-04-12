@@ -50,6 +50,7 @@
   - `runtime_contract` 与 `platform` 必须区分：
     - 前者表示 Core / registry / adapter contract 破损或未满足约定。
     - 后者表示 contract 有效，但平台执行失败。
+  - adapter 已被成功选中后，若在任何真实平台调用前发现输入无法被该 adapter 解析、归一或接受，则该失败固定归入 `invalid_input`，而不是 `platform` 或 `runtime_contract`。
   - adapter registry 的最小职责固定为：
     - 接收明确的 adapter 绑定集合并形成可查询视图
     - 以稳定 `adapter_key` 提供唯一查找结果
@@ -132,6 +133,7 @@ Then Core 必须返回 `category=unsupported` 的失败 envelope，而不是让 
 - 异常场景：
   - registry 为空本身不自动构成 `runtime_contract`；只有当请求需要的 adapter / capability 无法满足时，才返回 `unsupported`。
   - registry 形状非法、查找结果抛异常、capability 元数据不可判定、adapter 成功 payload 失配，都必须归入 `runtime_contract`。
+  - adapter 已被查找到、但在真实平台调用前判定“输入 URL 不属于该平台”“输入无法解析为当前 adapter 所需最小语义”或“adapter 前置输入约束不满足”时，必须返回 `invalid_input`。
   - adapter 抛出未映射到平台语义的宿主异常时，Core 不得直接把该异常冒泡到调用方，必须按统一错误模型处理。
 - 边界场景：
   - 本 FR 只冻结“registry 对 Core 的契约”，不规定 registry 如何从模块、配置或插件系统中构建。

@@ -7,7 +7,7 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`docs/exec-plans/FR-0005-standardized-error-model-and-adapter-registry.md`
+- 关联 exec-plan：`docs/exec-plans/CHORE-0051-fr-0005-formal-spec.md`
 
 ## 实施目标
 
