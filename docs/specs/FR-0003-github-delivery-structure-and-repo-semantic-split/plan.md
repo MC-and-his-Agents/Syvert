@@ -20,8 +20,8 @@
 - 阶段 1：建立 `FR-0003` formal spec 套件，冻结治理 requirement 与边界。
 - 阶段 2：更新顶层治理文档，消除“版本层 / 冲刺层 / 事项层”与 `Phase / FR / Work Item` 的冲突。
 - 阶段 3：补齐 `v0.2.0` / `2026-S15` 索引，以及 `GOV-0027`、`GOV-0028`、`GOV-0029` 的 exec-plan / decision 工件链，完成受控 PR 前置条件。
-- 阶段 4：由 `GOV-0029` 先完成独立 formal spec / governance contract 审查，收敛 `FR-0003` formal spec、本轮 decision / exec-plan、`WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md` 与 `docs/specs/_template/**` 的权威口径。
-- 阶段 5：在后续独立 governance PR 中落地 guard、policy、`open_pr`、回归测试与存量 legacy `TODO.md` 清理。
+- 阶段 4：由 `GOV-0029` 先完成独立 formal spec / governance contract 审查，收敛 `FR-0003` formal spec、本轮 decision / exec-plan、`WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md` 与 `docs/process/agent-loop.md` 的权威口径。
+- 阶段 5：在后续独立 governance PR 中落地 `docs/specs/_template/**`、guard、policy、`open_pr`、回归测试与存量 legacy `TODO.md` 清理。
 
 ## 实现约束
 

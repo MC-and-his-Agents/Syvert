@@ -26,7 +26,6 @@
   - `docs/process/agent-loop.md`
   - `spec_review.md`
   - `docs/specs/README.md`
-  - `docs/specs/_template/`（包含 legacy `TODO.md` 模板退出）
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
   - `docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
@@ -51,7 +50,7 @@
 - 推送当前分支并把 PR `#61` 的标题 / 描述改成 `spec` 审查语义，关闭自动 `Fixes #58`。
 - 在当前 PR head 上等待 GitHub checks 与 guardian 收敛，并确认 `APPROVE + safe_to_merge=true`。
 - 使用受控入口执行 squash merge，但保持 Issue `#58` 继续打开。
-- 基于合入后的 `main` 重建 `GOV-0029` 的独立 governance 实现 PR，完成 guard、policy、`open_pr`、测试与存量 legacy `TODO.md` 清理。
+- 基于合入后的 `main` 重建 `GOV-0029` 的独立 governance 实现 PR，完成 `docs/specs/_template/**`、guard、policy、`open_pr`、测试与存量 legacy `TODO.md` 清理。
 
 ## 当前 checkpoint 推进的 release 目标
 
