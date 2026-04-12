@@ -10,7 +10,7 @@ from urllib import error, parse, request
 
 from syvert.adapters.douyin_browser_bridge import extract_aweme_detail_from_page_state
 from syvert.adapters.douyin_browser_bridge import DouyinAuthenticatedBrowserBridge
-from syvert.runtime import CONTENT_DETAIL_BY_URL, PlatformAdapterError, TaskRequest
+from syvert.runtime import AdapterTaskRequest, CONTENT_DETAIL, PlatformAdapterError, TaskRequest
 
 
 DOUYIN_API_BASE_URL = "https://www.douyin.com"
@@ -45,7 +45,7 @@ PageStateTransport = Callable[..., Mapping[str, Any]]
 
 class DouyinAdapter:
     adapter_key = "douyin"
-    supported_capabilities = frozenset({CONTENT_DETAIL_BY_URL})
+    supported_capabilities = frozenset({CONTENT_DETAIL})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
@@ -64,8 +64,9 @@ class DouyinAdapter:
         self._detail_transport = detail_transport or default_detail_transport
         self._page_state_transport = page_state_transport or default_page_state_transport
 
-    def execute(self, request: TaskRequest) -> dict[str, Any]:
-        url_info = parse_douyin_detail_url(request.input.url)
+    def execute(self, request: TaskRequest | AdapterTaskRequest) -> dict[str, Any]:
+        input_url = resolve_input_url(request=request, adapter_key=self.adapter_key)
+        url_info = parse_douyin_detail_url(input_url)
         session = self._session_provider(self._session_path)
         try:
             params = self._build_detail_params(session, url_info)
@@ -75,7 +76,7 @@ class DouyinAdapter:
             raw_response, aweme_detail = self._recover_aweme_detail_from_page_state(
                 exc,
                 session=session,
-                input_url=request.input.url,
+                input_url=input_url,
                 source_aweme_id=url_info.aweme_id,
             )
         normalized = normalize_aweme_detail(aweme_detail, canonical_url=url_info.canonical_url)
@@ -180,6 +181,36 @@ class DouyinAdapter:
 
 def build_adapters() -> dict[str, object]:
     return {"douyin": DouyinAdapter()}
+
+
+def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest, adapter_key: str) -> str:
+    if type(request) is AdapterTaskRequest:
+        if request.capability != CONTENT_DETAIL:
+            raise PlatformAdapterError(
+                code="invalid_douyin_request",
+                message="douyin adapter 不支持该 capability family",
+                details={"capability": request.capability},
+            )
+        if request.target_type != "url":
+            raise PlatformAdapterError(
+                code="invalid_douyin_request",
+                message="douyin adapter 仅支持 target_type=url",
+                details={"target_type": request.target_type},
+            )
+        if request.collection_mode not in {"hybrid", "authenticated", "public"}:
+            raise PlatformAdapterError(
+                code="invalid_douyin_request",
+                message="douyin adapter 收到未知 collection_mode",
+                details={"collection_mode": request.collection_mode},
+            )
+        return request.target_value
+    if type(request) is TaskRequest:
+        return request.input.url
+    raise PlatformAdapterError(
+        code="invalid_douyin_request",
+        message="douyin adapter request 顶层形状不合法",
+        details={"request_type": type(request).__name__},
+    )
 
 
 def parse_douyin_detail_url(url: str) -> DouyinUrlInfo:

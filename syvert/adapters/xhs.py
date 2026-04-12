@@ -10,7 +10,7 @@ from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
 from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
-from syvert.runtime import CONTENT_DETAIL_BY_URL, PlatformAdapterError, TaskRequest
+from syvert.runtime import AdapterTaskRequest, CONTENT_DETAIL, PlatformAdapterError, TaskRequest
 
 
 XHS_API_BASE_URL = "https://edith.xiaohongshu.com"
@@ -46,7 +46,7 @@ PageStateTransport = Callable[..., Mapping[str, Any]]
 
 class XhsAdapter:
     adapter_key = "xhs"
-    supported_capabilities = frozenset({CONTENT_DETAIL_BY_URL})
+    supported_capabilities = frozenset({CONTENT_DETAIL})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
@@ -67,8 +67,9 @@ class XhsAdapter:
         self._page_transport = page_transport or default_page_transport
         self._page_state_transport = page_state_transport or default_page_state_transport
 
-    def execute(self, request: TaskRequest) -> dict[str, Any]:
-        url_info = parse_xhs_detail_url(request.input.url)
+    def execute(self, request: TaskRequest | AdapterTaskRequest) -> dict[str, Any]:
+        input_url = resolve_input_url(request=request, adapter_key=self.adapter_key)
+        url_info = parse_xhs_detail_url(input_url)
         session = self._session_provider(self._session_path)
         body = build_detail_body(url_info)
         try:
@@ -80,10 +81,10 @@ class XhsAdapter:
             raw_response, note_card = self._recover_note_card_from_html(
                 exc,
                 session=session,
-                input_url=request.input.url,
+                input_url=input_url,
                 source_note_id=url_info.note_id,
             )
-        normalized = normalize_note_card(note_card, request.input.url)
+        normalized = normalize_note_card(note_card, input_url)
         return {"raw": raw_response, "normalized": normalized}
 
     def _build_headers(self, session: XhsSessionConfig, body: dict[str, Any]) -> dict[str, str]:
@@ -222,6 +223,36 @@ class XhsAdapter:
 
 def build_adapters() -> dict[str, object]:
     return {"xhs": XhsAdapter()}
+
+
+def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest, adapter_key: str) -> str:
+    if type(request) is AdapterTaskRequest:
+        if request.capability != CONTENT_DETAIL:
+            raise PlatformAdapterError(
+                code="invalid_xhs_request",
+                message="xhs adapter 不支持该 capability family",
+                details={"capability": request.capability},
+            )
+        if request.target_type != "url":
+            raise PlatformAdapterError(
+                code="invalid_xhs_request",
+                message="xhs adapter 仅支持 target_type=url",
+                details={"target_type": request.target_type},
+            )
+        if request.collection_mode not in {"hybrid", "authenticated", "public"}:
+            raise PlatformAdapterError(
+                code="invalid_xhs_request",
+                message="xhs adapter 收到未知 collection_mode",
+                details={"collection_mode": request.collection_mode},
+            )
+        return request.target_value
+    if type(request) is TaskRequest:
+        return request.input.url
+    raise PlatformAdapterError(
+        code="invalid_xhs_request",
+        message="xhs adapter request 顶层形状不合法",
+        details={"request_type": type(request).__name__},
+    )
 
 
 def parse_xhs_detail_url(url: str) -> XhsUrlInfo:

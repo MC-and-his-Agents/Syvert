@@ -1631,7 +1631,7 @@ class XhsAdapterTests(unittest.TestCase):
     def test_runtime_rejects_incomplete_normalized_payload(self) -> None:
         class BrokenXhsAdapter:
             adapter_key = "xhs"
-            supported_capabilities = frozenset({"content_detail_by_url"})
+            supported_capabilities = frozenset({"content_detail"})
             supported_targets = frozenset({"url"})
             supported_collection_modes = frozenset({"hybrid"})
 

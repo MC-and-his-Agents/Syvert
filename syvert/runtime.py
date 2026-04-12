@@ -8,9 +8,11 @@ from uuid import uuid4
 
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
+CONTENT_DETAIL = "content_detail"
 LEGACY_COLLECTION_MODE = "hybrid"
 ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
 ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
+CAPABILITY_FAMILY_BY_OPERATION = {CONTENT_DETAIL_BY_URL: CONTENT_DETAIL}
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 MISSING = object()
@@ -45,6 +47,18 @@ class TaskRequest:
     adapter_key: str
     capability: str
     input: TaskInput
+
+
+@dataclass(frozen=True)
+class AdapterTaskRequest:
+    capability: str
+    target_type: str
+    target_value: str
+    collection_mode: str
+
+    @property
+    def input(self) -> TaskInput:
+        return TaskInput(url=self.target_value)
 
 
 @dataclass
@@ -85,15 +99,15 @@ def execute_task(
 
     adapter_key = normalized_request.target.adapter_key
     capability = normalized_request.target.capability
-    if type(request) is CoreTaskRequest:
+    capability_family, capability_family_error = resolve_capability_family(capability)
+    if capability_family_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, capability_family_error)
+    if capability_family is None:
         return failure_envelope(
             task_id,
             adapter_key,
             capability,
-            runtime_contract_error(
-                "invalid_task_request",
-                "当前共享输入执行路径尚未完成 adapter admission 承接",
-            ),
+            runtime_contract_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
         )
 
     adapter, adapter_error = get_adapter(adapters, adapter_key)
@@ -117,7 +131,7 @@ def execute_task(
     )
     if capability_error is not None:
         return failure_envelope(task_id, adapter_key, capability, capability_error)
-    if capability not in supported_capabilities:
+    if capability_family not in supported_capabilities:
         return failure_envelope(
             task_id,
             adapter_key,
@@ -125,9 +139,10 @@ def execute_task(
             {
                 "category": "runtime_contract",
                 "code": "capability_not_supported",
-                "message": f"adapter `{adapter_key}` 不支持 `{capability}`",
+                "message": f"adapter `{adapter_key}` 不支持 `{capability_family}`",
                 "details": {
                     "supported_capabilities": sorted(supported_capabilities),
+                    "capability_family": capability_family,
                 },
             },
         )
@@ -166,7 +181,7 @@ def execute_task(
             },
         )
 
-    adapter_request, projection_error = project_to_adapter_request(normalized_request)
+    adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
     if projection_error is not None:
         return failure_envelope(task_id, adapter_key, capability, projection_error)
 
@@ -263,28 +278,29 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
     return request, None
 
 
-def project_to_adapter_request(request: CoreTaskRequest) -> tuple[TaskRequest | None, dict[str, Any] | None]:
-    if request.target.target_type != "url":
+def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, Any] | None]:
+    mapped = CAPABILITY_FAMILY_BY_OPERATION.get(capability)
+    if mapped is None:
         return (
             None,
             runtime_contract_error(
-                "invalid_task_request",
-                "当前运行时过渡路径仅支持 target_type=url",
+                "invalid_capability",
+                f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
             ),
         )
-    if request.policy.collection_mode != LEGACY_COLLECTION_MODE:
-        return (
-            None,
-            runtime_contract_error(
-                "invalid_task_request",
-                "当前运行时过渡路径仅支持 collection_mode=hybrid",
-            ),
-        )
+    return mapped, None
+
+
+def project_to_adapter_request(
+    request: CoreTaskRequest,
+    capability_family: str,
+) -> tuple[AdapterTaskRequest | None, dict[str, Any] | None]:
     return (
-        TaskRequest(
-        adapter_key=request.target.adapter_key,
-        capability=request.target.capability,
-        input=TaskInput(url=request.target.target_value),
+        AdapterTaskRequest(
+            capability=capability_family,
+            target_type=request.target.target_type,
+            target_value=request.target.target_value,
+            collection_mode=request.policy.collection_mode,
         ),
         None,
     )

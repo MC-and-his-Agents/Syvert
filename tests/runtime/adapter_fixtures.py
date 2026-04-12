@@ -5,7 +5,7 @@ from syvert.runtime import TaskRequest
 
 class SuccessfulAdapter:
     adapter_key = "stub"
-    supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
@@ -42,7 +42,7 @@ class SuccessfulAdapter:
 
 class UnserializableSuccessAdapter:
     adapter_key = "stub"
-    supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
