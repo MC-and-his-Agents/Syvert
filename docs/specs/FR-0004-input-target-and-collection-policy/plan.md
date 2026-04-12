@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 状态：`historical formal-spec planning record; formal spec merged via PR #82`
-- 当前 active exec-plan：`docs/exec-plans/FR-0004-input-target-and-collection-policy.md`
+- 当前 active exec-plan：`docs/exec-plans/CHORE-0095-fr-0004-parent-closeout.md`
 - formal spec 历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
 - implementation 聚合历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
 

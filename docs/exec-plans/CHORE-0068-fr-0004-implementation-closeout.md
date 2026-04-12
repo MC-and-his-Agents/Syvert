@@ -48,7 +48,7 @@
 ## 下一步动作
 
 - 无 active 动作。
-- `FR-0004` 的后续 closeout 由 `docs/exec-plans/FR-0004-input-target-and-collection-policy.md` 继续承接；本文件仅保留为 implementation 聚合历史记录。
+- `FR-0004` 的后续 closeout 由 `docs/exec-plans/CHORE-0095-fr-0004-parent-closeout.md` 继续承接；本文件仅保留为 implementation 聚合历史记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
