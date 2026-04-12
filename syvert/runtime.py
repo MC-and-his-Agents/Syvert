@@ -228,6 +228,14 @@ def project_to_adapter_request(request: CoreTaskRequest) -> tuple[TaskRequest | 
                 "当前运行时过渡路径仅支持 target_type=url",
             ),
         )
+    if request.policy.collection_mode != LEGACY_COLLECTION_MODE:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_task_request",
+                "当前运行时过渡路径仅支持 collection_mode=hybrid",
+            ),
+        )
     return (
         TaskRequest(
         adapter_key=request.target.adapter_key,

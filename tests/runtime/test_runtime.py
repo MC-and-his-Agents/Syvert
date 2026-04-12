@@ -308,6 +308,48 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
+    def test_execute_task_rejects_public_collection_mode_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="public"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-public-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_authenticated_collection_mode_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="authenticated"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-authenticated-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(
             adapter_key="missing",

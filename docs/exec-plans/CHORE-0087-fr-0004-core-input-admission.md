@@ -37,12 +37,11 @@
 
 - `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 当前已完成 Core 共享输入模型接入、最小结构校验与对应测试补强。
 - 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`；实现分支 `issue-87-fr-0004-core` 已推送远端，并打开 implementation PR `#90`。
-- 当前停在 review / guardian / merge gate 前的最后一致性校对阶段；后续若仅补 PR 正文、review 元数据或 guardian 收口，不单独改写实现范围。
+- 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。当前已按“过渡路径只允许 `collection_mode=hybrid`，`public/authenticated` fail-closed”完成收口，等待第二轮 guardian 复审。
 
 ## 下一步动作
 
-- 完善 PR `#90` 的审查输入与验证摘要。
-- 基于当前 head 执行 guardian 审查与受控 merge。
+- 基于当前 head 重跑 guardian 审查与受控 merge。
 - 合并后关闭 `#87`，并退役当前 branch / worktree。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -68,7 +67,7 @@
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
-  - 结果：`Ran 63 tests in 1.913s`，`OK`
+  - 结果：`Ran 65 tests in 2.171s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -82,6 +81,9 @@
 - `python3 -m unittest tests.runtime.test_douyin_browser_bridge.DouyinBrowserBridgeTests.test_extract_page_state_falls_back_to_authenticated_detail_request_when_page_state_misses_target`
   - 结果：在当前分支与 `main` 基线均因本地签名服务未启动而失败，不作为本回合阻断性回归结论
 - 已创建当前受审 PR：`#90 https://github.com/MC-and-his-Agents/Syvert/pull/90`
+- guardian 首轮审查：`REQUEST_CHANGES`
+  - 阻断项：`CollectionPolicy` 在执行前被 legacy 投影静默丢弃
+  - 收口结果：当前运行时过渡路径仅允许 `collection_mode=hybrid`；`public` / `authenticated` 在进入 adapter 前 fail-closed，并已补定点回归测试
 
 ## 未决风险
 
@@ -95,4 +97,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `30ac9e5d1f7a05c316fd928c6ad689ff8ca56ea7`
+- `727cf564c58094b99d60d90bf739b39aaf368f6a`
