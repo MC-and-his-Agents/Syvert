@@ -120,6 +120,24 @@
 - release / sprint 证据：`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 已回链 `#64/#68/#87/#89/#88` 与 PR `#82/#90/#91/#92/#93`
 - GitHub closeout 证据：当前只剩父 FR `#64` 与 spec 索引 issue `#85` 需要在本回合同步收口
 
+## GitHub closeout 工件
+
+- `#64` 正文修正目标：
+  - 将过期字段 `formal spec：待创建` 改为 `formal spec：已由 PR #82 完成并合入主干`
+  - 在关闭条件下补明：implementation 已由 `#87/#89/#88` 与 `#68` 聚合 closeout 消费完成；父 FR closeout 由 `#95` / PR `#96` 承接
+  - 关系段保持：层级 `FR`、版本 `v0.2.0`、父阶段 `#63`、子 Work Item 包含 `#68` 与 `#95`
+- `#64` closeout 评论草案：
+  - `FR-0004` formal spec 已由 PR `#82` 合入主干，spec 真相位于 `docs/specs/FR-0004-input-target-and-collection-policy/`
+  - `#87` / PR `#90` 已完成 Core 显式接收 `InputTarget` 与 `CollectionPolicy` 以及最小结构校验
+  - `#89` / PR `#91` 已完成 Core 到 adapter-facing request 的共享投影与 admission 承接
+  - `#88` / PR `#92` 已完成 `FR-0002` legacy URL 到 `url + hybrid` 的兼容映射、反例与验证证据
+  - `#68` / PR `#93` 已完成 implementation 聚合 closeout，并统一 release / sprint / exec-plan 回链
+  - 当前父事项 closeout 已由 `#95` / PR `#96` 收口，`docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 与 active exec-plan 已与 GitHub 真相一致
+- `#85` 处理方案：
+  - 在关闭 `#64` 后，向 `#85` 发布说明评论：该 issue 仅为 `spec_issue_sync.py` 维护的 spec 索引镜像；`FR-0004` 的 canonical scheduling issue 为 `#64`，且已由 `#95` / PR `#96` 完成父事项 closeout
+  - 随后关闭 `#85`，避免 GitHub 上残留第二个 open FR-0004 issue 镜像
+  - 若后续需要恢复 `FR-0004` closeout，则按“GitHub 侧回滚”步骤先重新打开 `#85`
+
 ## 未决风险
 
 - 若 `#64` 关闭前不修正文中的 `formal spec：待创建`，会继续造成 GitHub issue 与主干事实失配。
