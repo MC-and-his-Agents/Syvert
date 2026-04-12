@@ -31,7 +31,8 @@
   - contract violation
   - 执行前置不满足
 - `contract violation` 是验证工具层分类，表示观测到的运行结果不满足已批准 contract；它不是新的运行时 `error.category`。
-- 对于已按上位 contract 返回的合法失败 envelope，验证工具必须归类为“合法失败”，而不是 `contract violation`。
+- 对于已按 `FR-0005` 上位 contract 返回的合法失败 envelope，验证工具必须归类为“合法失败”，而不是 `contract violation`。
+- `执行前置不满足` 只覆盖验证工具或 harness 在进入 Core 执行前即可判定的测试期前提缺失；它不是运行时 envelope，也不替代 `invalid_input`、`unsupported`、`runtime_contract` 或 `platform`。
 - 验证工具不重新定义 adapter contract 本身；它只消费已批准的 formal spec。
 
 ## 4. boundary contract

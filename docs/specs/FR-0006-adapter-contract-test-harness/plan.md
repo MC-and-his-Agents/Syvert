@@ -17,7 +17,7 @@
 
 - 阶段 1：冻结 harness、fake adapter、验证工具三者的职责边界，以及可验证 contract 面与排除范围。
 - 阶段 2：实现受控 fake adapter 与最小 harness 宿主，使 Core 能通过标准 adapter 路径执行契约样例。
-- 阶段 3：补齐验证工具、契约样例与最小自动化验证，覆盖成功态、合法失败态与 contract violation。
+- 阶段 3：补齐验证工具、契约样例与最小自动化验证，覆盖通过、合法失败、contract violation 与执行前置不满足四类最小结果。
 - 阶段 4：在不引入真实平台依赖的前提下收口实现 PR 的审查证据，并为后续参考适配器回归事项提供稳定输入。
 
 ## 实现约束
@@ -30,6 +30,7 @@
 - 与上位文档的一致性约束：
   - `vision.md` 与 `docs/roadmap-v0-to-v1.md` 中 `v0.2.0` 的“可验证”目标必须保持不变
   - `FR-0002` 已冻结的统一 adapter contract 是本 FR 的上位输入；若需改写正式 contract，必须回到 spec review
+  - `FR-0005` 已冻结的错误模型与 registry contract 是本 FR 对合法失败、capability 与 fail-closed 语义的上位输入；本 FR 只定义验证工具分类，不重新发明运行时错误分类
   - formal spec 与实现默认分 PR；本轮 formal spec PR 只更新 spec 套件、当前 Work Item 所需的最小 active `exec-plan` 与最小 release / sprint 索引
   - 后续 harness 实现若触及 repo harness 或验证工具接线，必须保持 `WORKFLOW.md`、`docs/process/agent-loop.md`、`docs/process/worktree-lifecycle.md` 与状态面聚合规则不变，不得把 adapter contract harness 退化为绕开受控入口的第二条执行链路
   - 验证工具、harness 与其状态输出若需要进入治理状态面，只能作为现有 review / checks / guardian 证据的补充，不得改写 GitHub / release / sprint / exec-plan 的单一真相职责
@@ -42,7 +43,7 @@
   - 验证工具的结果分类与样例级归因
 - 集成/契约测试：
   - Core 通过标准 adapter 宿主路径加载 fake adapter 并执行契约样例
-  - success envelope、合法 failed envelope、非法结果 envelope 的最小 contract 验证
+  - success envelope、合法 failed envelope、非法结果 envelope 与执行前置不满足的最小 contract 验证
   - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“通过 / 合法失败 / contract violation / 执行前置不满足”四类结果不改写上位运行时错误语义
 - 手动验证：
   - 检查 harness 执行不要求真实网络、Cookie、签名或真实平台响应
