@@ -41,6 +41,7 @@
   - `release / sprint` 必须被定义为执行上下文或仓内索引语义，不得退化为第二套状态真相源。
   - `GOV-0029` 批准的目标态 formal spec 最小套件定义为 `spec.md` + `plan.md`；在后续独立 governance 实现 PR 落地前，live 门禁仍可能保留 `TODO.md` 兼容要求，但 legacy `TODO.md` 的目标态是不再被视为必需工件、状态镜像或恢复入口，未触碰的历史文件仅以 inert legacy 形式留在仓库中。
   - governance guard 与 policy 必须把 legacy `TODO.md` 视为 inert 历史文件：允许未触碰时保留、允许通过删除完成清理、禁止新增或继续回写。
+  - 在 `TODO.md` 退出 formal governance flow 这一窄范围内，`GOV-0029` 批准的 `FR-0003` + ADR 基线优先于更早文档中的历史示例或旧表述；旧文本若尚未清理，只能按 superseded historical text 解释，不得继续作为 live 规则来源。
 - 非功能需求：
   - 所有相关治理文档口径必须一致，不能出现并行分层定义。
   - 本事项必须保持 governance-only 边界，不混入业务实现代码。

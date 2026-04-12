@@ -24,7 +24,7 @@
 - `GOV-0029` 分两步执行：先以独立 formal spec / governance contract PR 更新 `FR-0003` formal spec、当前事项工件，以及 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md` 与 `docs/process/agent-loop.md` 的权威口径；再以独立 governance 实现 PR 落地 `docs/specs/_template/**`、guard、policy、`open_pr`、回归测试与存量 legacy `TODO.md` 清理。
 - 对当前事项，`GOV-0029` 批准的目标态 formal spec 最小套件收敛为 `spec.md` + `plan.md`；workflow / review / template / guard / policy / `open_pr` / 测试工件在后续独立 governance 实现 PR 落地后，不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
 - 当前 formal spec / governance contract PR 会把 `FR-0003/TODO.md` 显式标记为 inert legacy / deprecated；当前事项仅允许在后续独立 governance 实现 PR 中把 `FR-0001` 与 `FR-0002` 作为额外 formal spec 套件纳入清理；每个套件都必须在当前 diff 中删除对应的 legacy `TODO.md`，并且只能触碰完成该清理所需的最小文件集合。
-- 本 decision 在 `TODO.md` 退出 formal governance flow 这一窄范围内，替代 `ADR-0003` 历史文本里关于“不删除 `TODO.md` / 不调整 formal spec required files”的旧非目标表述。
+- 本 decision 在 `TODO.md` 退出 formal governance flow 这一窄范围内，替代 `ADR-0003` 及更早治理文档历史文本里关于“不删除 `TODO.md`”“不调整 formal spec required files”“`TODO.md` 仍是 live 工件”的旧表述；这些旧文本在未被后续实现 PR 清理前，只能按 superseded historical text 解读。
 
 ## 影响
 
