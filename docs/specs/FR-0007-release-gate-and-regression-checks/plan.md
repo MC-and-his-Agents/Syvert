@@ -61,17 +61,17 @@
   - 必须先冻结 `FR-0007` formal spec，后续 Work Item 才能实现具体 gate
   - merge 前必须完成当前 PR 的 spec review、checks、guardian 与受控 merge
 - 阻塞项：
-  - 若 `FR-0004`、`FR-0005`、`FR-0006` 的上游 formal spec 未完成，`FR-0007` 只能停留在 requirement 依赖声明层，不能声称 gate 已实现
+  - 无当前 formal spec 阶段阻塞；后续 gate 实现 Work Item 必须消费届时已批准的 `FR-0004`、`FR-0005`、`FR-0006` 契约，而不得自行改写其上游语义
 
 ## 进入实现前条件
 
 - [x] `FR-0007` requirement 边界已冻结为可审查 formal spec
 - [x] 关键风险已记录并有缓解策略
-- [ ] 关键依赖可用
+- [x] 关键依赖可用
 - [x] `FR-0007` 已明确区分版本 gate 与 harness 基座职责
 
 ## spec review 结论
 
 - 结论：当前 PR 的目标是把 `FR-0007` 从“issue 意图”推进到可追溯、可复验的 formal spec 基线。
-- 未决问题：平台泄漏检查边界需继续保持对实现形式中立；同时 `FR-0004`、`FR-0005`、`FR-0006` 的 formal spec 尚未在仓库落盘，因此 `FR-0007` 的实现回合仍受这些上游 formal spec 前置约束。
-- implementation-ready 判定：当前 formal spec PR 合入后，`FR-0007` 达到 `spec-ready` 并成为主干上的 requirement truth；待 `FR-0004`、`FR-0005`、`FR-0006` formal spec 落盘后，再进入 implementation-ready 判定。
+- 未决问题：平台泄漏检查边界需继续保持对实现形式中立；后续 gate 实现 Work Item 仍需严格消费 `FR-0004`、`FR-0005`、`FR-0006` 的已批准契约，而不得自行重写上游语义。
+- implementation-ready 判定：当前 formal spec PR 合入后，`FR-0007` requirement 本身达到 implementation-ready；其后续实现回合以本 formal spec 为边界，并在实现时引用届时已批准的上游契约。
