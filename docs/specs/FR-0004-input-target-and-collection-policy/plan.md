@@ -66,13 +66,13 @@
 
 ## 进入实现前条件
 
-- [ ] `spec review` 已通过
+- [x] `spec review` 已通过
 - [x] 关键风险已记录并有缓解策略
 - [x] 关键依赖可用
 - [x] `InputTarget` 与 `CollectionPolicy` 的最小语义、边界与兼容关系已冻结
 
 ## spec review 结论
 
-- 结论：需修改。当前 formal spec 基线已经建立，但仍需以当前 PR 的最新 guardian / review 阻断为准完成最后一轮收口。
-- 未决问题：需确保 `FR-0002 -> FR-0004` 的兼容映射、active `exec-plan` checkpoint 与仓内验证轨迹一致。
-- implementation-ready 判定：待当前增量阻断消除并完成 guardian / merge gate 后再确认。
+- 结论：通过。`FR-0004` 已把共享输入模型与采集策略模型收口为可实现的 formal spec，且边界未越过到错误模型、registry、harness 或 version gate。
+- 未决问题：无新的 formal spec 阶段阻断；后续实现回合需把运行时输入、adapter 支持声明与资源前置校验映射到本 FR，而不是回写 formal spec 语义。
+- implementation-ready 判定：满足。后续 implementation work item 可以在不改写本 FR 语义的前提下推进运行时接入与验证设施。
