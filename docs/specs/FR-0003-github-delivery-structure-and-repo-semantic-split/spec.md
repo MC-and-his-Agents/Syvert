@@ -39,7 +39,7 @@
   - `FR` 必须被定义为 canonical requirement 容器，formal spec 绑定到 FR，而不是绑定到 Phase 或 Work Item。
   - `Phase` 必须被定义为阶段目标容器，不直接承载执行 PR。
   - `release / sprint` 必须被定义为执行上下文或仓内索引语义，不得退化为第二套状态真相源。
-  - formal spec 最小套件、模板与治理 guard 不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
+  - post-transition 的 formal spec 最小套件定义为 `spec.md` + `plan.md`；legacy `TODO.md` 不得再被视为必需工件、状态镜像或恢复入口，未触碰的历史文件只允许以 inert legacy 形式留在仓库中。
   - governance guard 与 policy 必须把 legacy `TODO.md` 视为 inert 历史文件：允许未触碰时保留、允许通过删除完成清理、禁止新增或继续回写。
 - 非功能需求：
   - 所有相关治理文档口径必须一致，不能出现并行分层定义。

@@ -21,7 +21,7 @@
 - `spec.md`
 - `plan.md`
 
-模板路径见 [docs/specs/_template](./docs/specs/_template)。
+模板路径见 [docs/specs/_template](./docs/specs/_template)。注意：其中的 `TODO.md` 当前仅作为 legacy residual 保留，不再是新 formal spec 套件的权威输入。
 
 ### `spec.md` 必查项
 

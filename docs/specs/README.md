@@ -15,7 +15,7 @@
 - `spec.md`
 - `plan.md`
 
-模板见 [./_template](./_template)。
+模板见 [./_template](./_template)。注意：`docs/specs/_template/TODO.md` 当前仅作为 legacy residual 保留，不再是新 formal spec 套件的权威输入。
 
 ## 可选增强（按触发条件）
 
