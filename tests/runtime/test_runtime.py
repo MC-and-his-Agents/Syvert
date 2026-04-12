@@ -299,6 +299,44 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(adapter.last_request.collection_mode, "hybrid")
         self.assertFalse(hasattr(adapter.last_request, "adapter_key"))
 
+    def test_execute_task_maps_legacy_and_native_requests_to_same_adapter_projection(self) -> None:
+        legacy_adapter = SuccessfulAdapter()
+        native_adapter = SuccessfulAdapter()
+        legacy_request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/legacy-native"),
+        )
+        native_request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/legacy-native",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        legacy_envelope = execute_task(
+            legacy_request,
+            adapters={"stub": legacy_adapter},
+            task_id_factory=lambda: "task-legacy-map",
+        )
+        native_envelope = execute_task(
+            native_request,
+            adapters={"stub": native_adapter},
+            task_id_factory=lambda: "task-native-map",
+        )
+
+        self.assertEqual(legacy_envelope["status"], "success")
+        self.assertEqual(native_envelope["status"], "success")
+        self.assertEqual(legacy_envelope["raw"], native_envelope["raw"])
+        self.assertEqual(legacy_envelope["normalized"], native_envelope["normalized"])
+        self.assertEqual(legacy_adapter.last_request, native_adapter.last_request)
+        self.assertEqual(legacy_adapter.last_request.target_type, "url")
+        self.assertEqual(legacy_adapter.last_request.target_value, legacy_request.input.url)
+        self.assertEqual(legacy_adapter.last_request.collection_mode, "hybrid")
+
     def test_execute_task_rejects_unknown_target_type(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(
@@ -455,6 +493,41 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+
+    def test_execute_task_rejects_legacy_and_native_requests_with_same_hybrid_admission_error(self) -> None:
+        legacy_request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/no-hybrid"),
+        )
+        native_request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/no-hybrid",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        legacy_envelope = execute_task(
+            legacy_request,
+            adapters={"stub": UnsupportedHybridCollectionModeAdapter()},
+            task_id_factory=lambda: "task-legacy-no-hybrid",
+        )
+        native_envelope = execute_task(
+            native_request,
+            adapters={"stub": UnsupportedHybridCollectionModeAdapter()},
+            task_id_factory=lambda: "task-native-no-hybrid",
+        )
+
+        self.assertEqual(legacy_envelope["status"], "failed")
+        self.assertEqual(native_envelope["status"], "failed")
+        self.assertEqual(legacy_envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(native_envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(legacy_envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(native_envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(legacy_envelope["error"]["details"], native_envelope["error"]["details"])
 
     def test_execute_task_rejects_unsupported_capability(self) -> None:
         request = TaskRequest(
