@@ -35,7 +35,7 @@
 - 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
 - `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，当前受审 PR 为 `#82`。
 - 历史 PR `#75` 已因 GitHub checks 未绑定最新 head 而关闭；当前轮次由 PR `#82` 继续承接相同分支的最新 formal spec 审查。
-- 最近一次显式 checkpoint 仍绑定 `e52b70dc910a4ef357f3b61a8248cb4a2831a320`；其后的提交仅用于同步当前 PR #82 的审查态元数据、恢复语义与 GitHub 状态面对齐，不单独形成新的实现停点。
+- 最近一次显式 checkpoint 绑定 `e600b4d26717227f2610c1434a39b350271c67ee`；其后的提交仅用于同步当前 PR #82 的审查态元数据、恢复语义与 GitHub 状态面对齐，不单独形成新的实现停点。
 - 当前停在等待 guardian 基于当前受审 head 重跑并给出最终 verdict。
 
 ## 下一步动作
@@ -85,4 +85,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e52b70dc910a4ef357f3b61a8248cb4a2831a320`
+- `e600b4d26717227f2610c1434a39b350271c67ee`
