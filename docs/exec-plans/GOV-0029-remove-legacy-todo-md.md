@@ -23,13 +23,14 @@
 - 本次纳入：
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/TODO.md`
   - `docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
   - `docs/exec-plans/GOV-0029-remove-legacy-todo-md.md`
   - `docs/releases/v0.2.0.md`
   - `docs/sprints/2026-S15.md`
 - 本次不纳入：
   - `FR-0001` / `FR-0002` 的 legacy `TODO.md` 实体清理
-  - formal spec 模板、治理 guard、policy、测试与 `open_pr` 的实现改造
+  - `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md`、`docs/specs/_template/**`、治理 guard、policy、`open_pr` 与测试的实现改造
   - `FR-0002` exec-plan 收口与其他存量文档引用修正
   - 与 `TODO.md` 清理无关的 harness 兼容改造
   - `v0.2.0` 业务实现
@@ -37,7 +38,7 @@
 ## 当前停点
 
 - 上一轮把 `FR-0003` formal spec 语义与治理实现代码放在同一 PR 中，guardian 因“formal spec / implementation 必须分离”给出 `REQUEST_CHANGES`。
-- 当前分支已回退为 spec-only 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan 与 release / sprint 索引的最小必要变更；legacy `TODO.md` 的实体删除留在后续独立 governance PR。
+- 当前分支已回退为 spec-only 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan、release / sprint 索引，以及 `FR-0003/TODO.md` 为统一 active review truth 所需的一次受控过渡性回写；legacy `TODO.md` 的实体删除留在后续独立 governance PR。
 - 当前目标是先让 PR `#61` 作为独立 formal spec 审查入口合入 `main`，再基于已批准规约继续后续 governance 实现 PR。
 
 ## 下一步动作
@@ -45,7 +46,7 @@
 - 推送当前分支并把 PR `#61` 的标题 / 描述改成 `spec` 审查语义，关闭自动 `Fixes #58`。
 - 在当前 PR head 上等待 GitHub checks 与 guardian 收敛，并确认 `APPROVE + safe_to_merge=true`。
 - 使用受控入口执行 squash merge，但保持 Issue `#58` 继续打开。
-- 基于合入后的 `main` 重建 `GOV-0029` 的独立 governance 实现 PR，完成模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
+- 基于合入后的 `main` 重建 `GOV-0029` 的独立 governance 实现 PR，完成 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md`、`docs/specs/_template/**`、guard、policy、`open_pr`、测试与存量 legacy `TODO.md` 清理。
 
 ## 当前 checkpoint 推进的 release 目标
 

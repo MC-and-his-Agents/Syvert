@@ -20,13 +20,13 @@
 - 阶段 1：建立 `FR-0003` formal spec 套件，冻结治理 requirement 与边界。
 - 阶段 2：更新顶层治理文档，消除“版本层 / 冲刺层 / 事项层”与 `Phase / FR / Work Item` 的冲突。
 - 阶段 3：补齐 `v0.2.0` / `2026-S15` 索引，以及 `GOV-0027`、`GOV-0028`、`GOV-0029` 的 exec-plan / decision 工件链，完成受控 PR 前置条件。
-- 阶段 4：由 `GOV-0029` 先完成独立 spec review，随后在独立 governance PR 中落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
+- 阶段 4：由 `GOV-0029` 先完成独立 spec review，随后在独立 governance PR 中对齐 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md`、`docs/specs/_template/**`、guard、policy、`open_pr`、回归测试与存量 legacy `TODO.md` 清理。
 
 ## 实现约束
 
 - 不允许触碰的边界：
   - formal spec PR 只允许修改 `FR-0003` formal spec 套件与当前事项所需的最小文档工件
-  - `GOV-0029` 的模板、`scripts/**`、`scripts/policy/**`、`tests/governance/**` 与存量 suite 清理必须放在独立 governance PR
+  - `GOV-0029` 对 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md`、`docs/specs/_template/**`、`scripts/**`、`scripts/policy/**`、`tests/governance/**` 与存量 suite 清理必须放在独立 governance PR
   - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码
 - 与上位文档的一致性约束：
