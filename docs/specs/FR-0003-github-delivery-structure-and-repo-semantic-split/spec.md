@@ -84,9 +84,9 @@ Then legacy `TODO.md` 可以作为未触碰的 inert 历史文件保留，但不
 
 ### 场景 5
 
-Given `GOV-0029` 的后续独立 governance PR 进入实现回合  
-When 当前 diff 对已授权套件删除 legacy `TODO.md` 或同步修改相关 workflow / review / template / guard / policy / test 工件  
-Then 删除必须被允许，且实现链路必须覆盖 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md`、`docs/specs/_template/**`、guard、policy、`open_pr` 与回归测试的对齐收口
+Given 当前 formal spec / governance contract PR 已把高优先级治理文档与模板口径收成一致  
+When `GOV-0029` 的后续独立 governance PR 对已授权套件删除 legacy `TODO.md` 并同步修改 guard / policy / `open_pr` / 回归测试  
+Then 删除必须被允许，且实现链路必须覆盖 guard、policy、`open_pr`、回归测试与存量 suite 清理的对齐收口
 
 ### 场景 6
 
@@ -101,8 +101,7 @@ Then 必须另开独立 governance PR；若 PR 继续回写或新增 legacy `TOD
   - 若文档允许 Phase 或 FR 直接开 PR / 建 worktree，会破坏 Work Item 唯一执行入口约束。
 - 边界场景：
   - legacy `TODO.md` 可以作为历史文件被清理，但不得再作为 formal governance flow 的必需工件或恢复入口。
-  - 当前 formal spec PR 可对仍属 formal spec 套件成员的 legacy `TODO.md` 做一次受控的过渡性状态回写，用于统一当前 active review truth；该 PR 不得删除文件本身，删除动作留给后续独立 governance PR。
-  - `release / sprint` 允许继续作为仓内索引存在，但只能承担聚合与执行上下文职责。
+    - `release / sprint` 允许继续作为仓内索引存在，但只能承担聚合与执行上下文职责。
   - `GOV-0029` 可在独立实现 PR 中清理存量 legacy `TODO.md`，但不得在 formal spec PR 中直接混入实现代码或测试改造。
 
 ## 验收标准

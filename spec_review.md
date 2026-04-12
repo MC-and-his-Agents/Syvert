@@ -20,7 +20,6 @@
 
 - `spec.md`
 - `plan.md`
-- `TODO.md`
 
 模板路径见 [docs/specs/_template](./docs/specs/_template)。
 
@@ -71,7 +70,6 @@
 ## 规约与实现分离规则
 
 - 正式规约变更默认不与实现代码混在同一 PR
-- 若实现 PR 仅回写 `TODO.md` 进度且不改变正式契约语义，可与实现同 PR
 - 一旦修改正式契约语义，应回到规约审查链路
 - 治理 bootstrap 例外仅允许 `governance` 类 PR 同时携带 bootstrap contract 或对应正式规约工件；不得混入业务实现代码
 
