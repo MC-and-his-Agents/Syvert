@@ -33,7 +33,7 @@
   - `v0.2.0` 起的每个版本都必须定义并执行版本级固定 gate；至少包含 contract harness 结果消费、双参考适配器回归检查、平台泄漏检查三类验证。
   - 版本 gate 的 mandatory trigger 至少包括：声明当前版本已完成并准备结束当前版本回合之前，以及声明可以进入下一版本主线之前。实现可以在 PR、nightly 或人工回归中更早执行，但不得替代这两个版本级必选触发点。
   - 双参考适配器回归检查在 `v0.2.0` 范围内必须固定覆盖小红书与抖音两个参考适配器，并验证它们继续通过同一套 Core 契约与共享主路径完成 `v0.2.0` 已批准能力的版本级回归；若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结。
-  - 平台泄漏检查必须固定覆盖 Core 主路径、共享 contract 与共享模型边界，判断是否把平台特定语义引入本应平台无关的层。
+  - 平台泄漏检查必须固定覆盖 Core 主路径、共享 contract、共享结果 contract 与共享模型边界，判断是否把平台特定语义引入本应平台无关的层。
 - 契约需求：
   - `FR-0006` 预期定义 contract test harness 与 fake adapter 的验证基座；`FR-0007` 定义的是版本级 gate 将来如何消费 harness 结论、如何叠加真实参考适配器回归与平台泄漏检查。二者不得互相替代。
   - 双参考适配器回归检查的 gate object 至少包括：
@@ -43,8 +43,8 @@
   - 本 FR 只要求版本 gate 在实现时消费上游已落盘并获批准的共享输入模型、错误模型、registry 与 harness 结论；不在此处冻结这些上游 contract 的字段、状态机或 payload 细节。
   - 平台泄漏检查的判定边界必须固定为：
     - 允许平台语义存在于 reference adapter、自身平台研究文档与 adapter 私有实现边界
-    - 禁止平台语义渗入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、以及版本 gate 自身的共享判定逻辑
-    - “平台语义”包括但不限于平台名硬编码分支、平台专属 URL/selector/签名细节、平台特定错误码解释、以及只能服务单一平台的共享字段或状态语义
+    - 禁止平台语义渗入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）、以及版本 gate 自身的共享判定逻辑
+    - “平台语义”包括但不限于平台名硬编码分支、平台专属 URL/selector/签名细节、平台特定错误码解释、以及只能服务单一平台的共享字段、`normalized` 结果字段或状态语义
   - 版本 gate 的失败语义必须固定为 fail-closed：任一必选 gate 未执行、执行失败、结果不完整或结论不可信时，当前版本都不得被声明为完成，也不得作为进入下一版本主线的已通过基线。
     - “结果不完整”至少包括缺少版本标识、缺少 reference pair 覆盖证明、缺少 contract harness / real-adapter regression / platform leakage 三类检查中的任一结论。
     - “结论不可信”至少包括无法追溯到当前版本目标、无法追溯到当前 reference pair 集合、或无法说明失败 / 通过依据来自哪一类 gate。
@@ -86,7 +86,7 @@ Then formal spec 必须要求两者都在共享 Core 契约下被验证，而不
 
 ### 场景 4
 
-Given Core 主路径或共享模型中出现平台名分支、平台专属 URL 规则或平台特定错误解释  
+Given Core 主路径、共享模型或共享结果 contract 中出现平台名分支、平台专属 URL 规则、平台特定错误解释或平台专属 `normalized` 字段  
 When 平台泄漏检查评估该改动  
 Then formal spec 必须把它判定为平台泄漏并使版本 gate fail-closed
 
@@ -117,7 +117,7 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 
 - [ ] formal spec 明确把 contract harness 结果消费、双参考适配器回归检查、平台泄漏检查定义为版本级固定 gate
 - [ ] formal spec 明确写出版本 gate 的 mandatory trigger、覆盖对象与 fail-closed 失败语义
-- [ ] formal spec 明确写出平台泄漏检查在 Syvert 中的允许边界与禁止边界
+- [ ] formal spec 明确写出平台泄漏检查在 Syvert 中的允许边界与禁止边界，且显式覆盖共享结果 contract
 - [ ] formal spec 明确区分 `FR-0006` 的 harness 基座职责与 `FR-0007` 的版本 gate 职责
 - [ ] formal spec 明确写出未来共享输入模型、错误模型、adapter registry 与 harness 结果对版本 gate 的依赖关系
 - [ ] formal spec 不把唯一实现形式绑定到某个脚本、CI 文件或命令行参数

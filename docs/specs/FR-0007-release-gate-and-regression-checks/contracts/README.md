@@ -29,6 +29,6 @@
 
 5. 平台泄漏边界契约
    - 允许平台语义留在 adapter 私有实现与平台研究文档
-   - 禁止平台语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约与 gate 共享判定逻辑
+   - 禁止平台语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）与 gate 共享判定逻辑
 
 如需增加更细的 gate payload 结构、结果格式或执行协议，应在后续实现 Work Item 中补充独立契约文档，并保持与本 requirement 一致。
