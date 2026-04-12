@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#78`
 - active 收口事项：`CHORE-0051-fr-0005-formal-spec`
 
 ## 目标
@@ -32,16 +32,16 @@
 
 ## 当前停点
 
-- `FR-0005` formal spec 套件已在当前分支落地，但首轮 PR `#72` 的 guardian 明确要求执行回合从 FR `#65` 迁移到独立 Work Item。
-- 当前已创建 Work Item `#77`，并在独立 worktree `issue-77-fr-0005-formal-spec` 上重绑 branch / worktree / exec-plan / PR 元数据。
-- 当前分支尚未以 `#77` 上下文重新开 PR；下一步是补齐 spec 边界、验证证据与受控 PR 元数据后重新进入审查。
+- `FR-0005` formal spec 套件已在当前分支落地，且已按 guardian 对 PR `#72` 的阻断要求，将执行回合从 FR `#65` 重绑到独立 Work Item `#77`。
+- 当前受审 PR 为 `#78`，绑定 `Issue #77` / `item_key=CHORE-0051-fr-0005-formal-spec`，远端 checks 已全绿。
+- 当前停在 guardian 前的最后审查补件：已补齐 adapter-side pre-platform 输入失败的分类语义、exec-plan 当前停点与本轮验证证据。
 
 ## 下一步动作
 
-- 补齐 `spec.md` 中 adapter 侧 pre-platform 输入失败的分类语义。
-- 记录 `docs_guard`、`spec_guard`、`context_guard`、`open_pr --class spec --dry-run` 的验证证据。
-- 以 `#77` 为当前 Work Item 重新打开受控 spec PR，并等待 checks / guardian。
-- 待新 PR 合并后关闭 superseded PR `#72`，同步 `#65` 与 `#77` 的 closeout 状态。
+- 对 PR `#78` 执行 guardian 审查。
+- 若 guardian 给出新的阻断，只修当前 head 的最新阻断。
+- guardian 通过后使用受控 `merge_pr` 合并。
+- 合并后同步 `#65` 的 formal spec 入口，并关闭 `#77`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -76,7 +76,11 @@
 - `python3 scripts/context_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `python3 scripts/open_pr.py --class spec --issue 77 --item-key CHORE-0051-fr-0005-formal-spec --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title "docs(spec): 冻结 FR-0005 错误模型与适配器注册表契约" --closing refs --dry-run`
-  - 结果：待本轮元数据重绑后重跑
+  - 结果：通过
+- `gh pr checks 78`
+  - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
+- `gh pr close 72 --comment "... Superseded by #78 ..."`
+  - 结果：PR `#72` 已关闭；当前有效审查入口为 PR `#78`
 
 ## 未决风险
 
@@ -89,5 +93,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8aaa7082a8ac9225c1db38e83f06190fa20ff22c`
-- 说明：当前 head 已包含 formal spec 套件与索引修正；下一次 checkpoint 将在 `#77` 受控 PR 与最新 guardian 结果对齐后刷新。
+- `80b2588fbdba7c2e286e598bb9c7e4b70eab8720`
+- 说明：该 checkpoint 已包含 Work Item 重绑与 spec 边界修正；当前 head 只补充 review / checks / PR 审查元数据，可由 guardian state 继续绑定当前受审 head。
