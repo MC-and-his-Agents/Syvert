@@ -8,8 +8,9 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 状态：`historical formal-spec planning record; formal spec merged via PR #82`
-- 当前 active exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
+- 当前 active exec-plan：`docs/exec-plans/CHORE-0095-fr-0004-parent-closeout.md`
 - formal spec 历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
+- implementation 聚合历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
 
 ## 实施目标
 
@@ -43,7 +44,7 @@
   - 运行 `docs_guard`、`workflow_guard`、`spec_guard`、`governance_gate`，确认 formal spec 套件、引用关系与治理入口不漂移
   - 运行 `open_pr --class spec --dry-run` 与 `pr_scope_guard --class spec`，确认当前事项能通过受控 PR 入口
 - 手动验证：
-  - 核对 GitHub `#63 / #64 / #68` 与仓内 `FR-0004 / v0.2.0 / 2026-S15 / active exec-plan` 的映射关系
+  - 核对 GitHub `#63 / #64 / #95` 与仓内 `FR-0004 / v0.2.0 / 2026-S15 / active exec-plan` 的映射关系，并确认 `#68` 已退化为历史 implementation closeout 记录
   - 对照 `adapter-sdk.md`、`framework-positioning.md` 与 `FR-0002`，确认 Core / Adapter 边界、兼容关系与非目标没有漂移
 
 ## TDD 范围
@@ -77,4 +78,4 @@
 
 - 结论：`APPROVE`。`FR-0004` formal spec 已由 PR `#82` 合入主干。
 - 未决问题：无。formal spec 审查回合已完成；后续只允许在独立 implementation / closeout 回合中消费该 formal spec。
-- implementation-ready 判定：`是`。`#87/#89/#88` 已按 formal spec 边界完成 implementation 回合，并由 `#68` 继续承接 implementation 聚合 closeout。
+- implementation-ready 判定：`是`。`#87/#89/#88` 已按 formal spec 边界完成 implementation 回合，且 `#68` 已完成 implementation 聚合 closeout。
