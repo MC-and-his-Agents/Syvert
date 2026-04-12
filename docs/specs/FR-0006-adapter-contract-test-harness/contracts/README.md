@@ -24,10 +24,13 @@
 ## 3. validation tool contract
 
 - 验证工具负责组织样例、触发 harness 执行并输出结果。
-- 验证工具至少输出三类可判定结果：
+- 验证工具至少输出四类可判定结果：
   - 通过
+  - 合法失败
   - contract violation
   - 执行前置不满足
+- `contract violation` 是验证工具层分类，表示观测到的运行结果不满足已批准 contract；它不是新的运行时 `error.category`。
+- 对于已按上位 contract 返回的合法失败 envelope，验证工具必须归类为“合法失败”，而不是 `contract violation`。
 - 验证工具不重新定义 adapter contract 本身；它只消费已批准的 formal spec。
 
 ## 4. boundary contract

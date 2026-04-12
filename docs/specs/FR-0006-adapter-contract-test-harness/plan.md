@@ -36,12 +36,12 @@
 
 - 单元测试：
   - fake adapter 受控返回分支的样例装配
-  - harness 对 contract violation 与合法失败的判定
+  - harness 对 `contract violation`、合法失败与执行前置失败的判定
   - 验证工具的结果分类与样例级归因
 - 集成/契约测试：
   - Core 通过标准 adapter 宿主路径加载 fake adapter 并执行契约样例
   - success envelope、合法 failed envelope、非法结果 envelope 的最小 contract 验证
-  - 在不访问真实平台的条件下复现稳定 contract 判定
+  - 在不访问真实平台的条件下复现稳定 contract 判定，并验证“验证工具分类”不改写上位运行时错误语义
 - 手动验证：
   - 检查 harness 执行不要求真实网络、Cookie、签名或真实平台响应
   - 检查验证输出能区分通过、contract violation、执行前置失败
@@ -51,7 +51,7 @@
 - 先写测试的模块：
   - harness 对 contract 样例的执行与判定
   - fake adapter 样例装配接口
-  - 验证工具的结果分级与归因
+  - 验证工具的结果分级、归因与合法失败/contract violation 映射
 - 暂不纳入 TDD 的模块与理由：
   - 真实平台回归流程、版本 gate 编排与 CI 拓扑不属于本 FR 主体，留给后续独立事项处理
 

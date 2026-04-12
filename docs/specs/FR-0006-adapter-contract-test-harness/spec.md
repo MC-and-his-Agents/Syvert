@@ -41,8 +41,9 @@
   - fake adapter 必须通过与真实 adapter 同类的注册/发现入口被 Core 调用；允许使用受控测试注册表，但不得要求 Core 为 fake adapter 引入平台特定分支。
   - harness 必须能验证 Core 对 adapter 成功返回的 envelope 约束，包括 `raw payload` 与 `normalized result` 同时存在这一统一 contract 前提。
   - harness 必须能验证 Core 对 adapter 失败返回的统一 envelope 处理语义，但不在本 FR 中重新定义错误分类枚举或错误对象字段。
-  - 当 fake adapter 返回缺失必填字段、结构非法或 capability 声明与实际行为不一致的结果时，harness 必须能证明 Core 将其判定为 contract violation，而不是误判为真实平台失败。
-  - 验证工具输出至少必须能区分：通过、contract violation、执行前置不满足三类结果，并能把失败归因到样例/断言级别。
+  - 当 fake adapter 返回缺失必填字段、结构非法或 capability 声明与实际行为不一致的结果时，harness 必须能证明该样例不满足已批准 contract；这里的 `contract violation` 是验证工具层的判定标签，不是新的运行时 `error.category`。
+  - 对于运行时已经按上位 contract 返回的合法失败 envelope，验证工具必须将其识别为“合法失败样例已按预期发生”，而不是 `contract violation`。
+  - 验证工具输出至少必须能区分：通过、合法失败、contract violation、执行前置不满足四类结果，并能把失败归因到样例/断言级别。
   - harness 的样例输入必须围绕已批准 capability 的最小公共 contract 组织，不得为方便测试而引入只服务 fake adapter 的生产字段。
   - harness 必须允许后续实现为同一 contract 复用多组 fake adapter 样例，但本 FR 不要求定义录制回放、随机数据生成或跨进程协议。
 - 非功能需求：
@@ -73,13 +74,13 @@ Then 结果必须被判定为通过，且验证结论能证明 Core 在不访问
 
 Given fake adapter 返回缺失 `raw` 或 `normalized` 的成功结果，或返回结构非法的结果 envelope  
 When harness 执行对应契约样例  
-Then 验证结论必须把该结果判定为 contract violation，而不是平台失败或未知错误
+Then 验证结论必须把该结果判定为验证工具层的 `contract violation`，并明确它不是新的运行时错误分类
 
 ### 场景 3
 
 Given fake adapter 明确返回受控失败结果，或声明的 capability 与收到的调用不匹配  
 When harness 通过 Core 执行该样例  
-Then 验证结果必须能观测到统一失败处理路径，并区分“合法失败 envelope”与“contract 不成立”两类结果
+Then 验证结果必须能观测到统一失败处理路径，并区分“合法失败 envelope”与“contract violation”两类结果
 
 ## 异常与边界场景
 
@@ -98,7 +99,7 @@ Then 验证结果必须能观测到统一失败处理路径，并区分“合法
 - [ ] adapter contract test harness 的职责、纳入范围与排除范围已冻结
 - [ ] fake adapter 的语义定位已明确为 contract test double，而非参考适配器或平台模拟器
 - [ ] Core 在不依赖真实平台时可验证的 contract 面已明确，包括成功态、合法失败态与 contract violation 三类最小分支
-- [ ] 验证工具、harness 与 fake adapter 的角色关系已明确，且未把工具实现选型写死
+- [ ] 验证工具、harness 与 fake adapter 的角色关系已明确，且已区分验证工具分类与运行时错误语义
 - [ ] harness 可提供的保证级别已明确，并与真实平台测试、参考适配器回归、版本门禁保持边界分离
 - [ ] formal spec 已限制后续实现 PR 的范围，不要求在同一轮引入真实平台回放、回归 gate 或相邻 FR 的语义扩张
 
