@@ -52,7 +52,7 @@
 
 - 角色：`FR-0007` 下的 spec-only closeout Work Item，负责让 formal spec 经由合法执行入口以 `spec-ready` 基线合入主干。
 - 阻塞：
-  - 无外部阻塞；当前只需完成执行入口重绑、门禁、审查与合并收口。
+  - 无当前 PR 阻塞；`implementation-ready` 仍取决于上游 formal spec / contract 基线后续落盘。
 
 ## 已验证项
 
