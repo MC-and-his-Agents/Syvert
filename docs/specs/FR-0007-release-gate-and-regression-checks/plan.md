@@ -61,7 +61,7 @@
   - 必须先冻结 `FR-0007` formal spec，后续 Work Item 才能实现具体 gate
   - 进入受控 merge 前，必须完成当前 PR 的 checks 与 guardian；受控 merge 本身是前述门禁通过后的收口动作
 - 阻塞项：
-  - 无当前 formal spec 阶段阻塞；后续 gate 实现 Work Item 必须消费届时已批准的共享输入模型、错误模型、registry 与 harness 契约
+  - 当前 formal spec closeout 仅剩 guardian / merge gate 对当前受审 head 的最终收口；后续 gate 实现 Work Item 仍必须消费已批准的共享输入模型、错误模型、registry 与 harness 契约
 
 ## 进入实现前条件
 
