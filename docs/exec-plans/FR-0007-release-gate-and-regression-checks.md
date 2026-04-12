@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：
+- 关联 PR：`#73`
 - active 收口事项：`FR-0007-release-gate-and-regression-checks`
 
 ## 目标
@@ -31,14 +31,15 @@
 
 ## 当前停点
 
-- `#67` 已作为 `#63` 下的 FR 建立，但 formal spec 目录尚未存在。
-- 当前执行回合已建立独立 worktree：`/Users/mc/code/worktrees/syvert/issue-67-fr-0007-v0-2-0`。
+- `FR-0007` formal spec 套件、最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引更新已落在当前 head，受审 PR 为 `#73`。
+- 本地门禁 `spec_guard`、`docs_guard`、`pr_scope_guard` 与 `open_pr --dry-run` 已通过；GitHub checks 已全绿。
+- 首轮 guardian 已指出 3 个阻断：`release-ready` 术语未在上位文档定义、上游依赖被过早标记为已就绪、active `exec-plan` 审查态信息滞后。当前回合正基于该最新阻断收口并准备重跑 guardian。
 
 ## 下一步动作
 
-- 起草 `FR-0007` formal spec 套件与最小索引更新。
-- 运行 formal spec 门禁与 `open_pr --dry-run`。
-- 创建独立 spec PR，等待 checks / guardian，通过后受控合并并关闭 `#67`。
+- 修正 guardian 最新阻断并更新当前 `exec-plan` / PR 正文的一致性。
+- 推送当前 head，确认 GitHub checks 继续全绿。
+- 重跑 guardian；通过后使用受控 merge 合并 PR `#73`，再关闭 `#67`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -63,6 +64,15 @@
 - `sed -n '1,260p' docs/AGENTS.md`
 - `sed -n '1,260p' spec_review.md`
 - `sed -n '1,260p' docs/releases/v0.2.0.md`
+- `python3 scripts/spec_guard.py --all`
+- `python3 scripts/spec_guard.py --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/open_pr.py --class spec --issue 67 --item-key FR-0007-release-gate-and-regression-checks --item-type FR --release v0.2.0 --sprint 2026-S15 --title "spec: 冻结 FR-0007 的版本门禁与回归检查" --closing refs --dry-run`
+- `gh pr checks 73`
+  - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
+- `python3 scripts/pr_guardian.py review 73`
+  - 结果：首轮 guardian 返回 `REQUEST_CHANGES`，当前按其最新阻断收口
 
 ## 未决风险
 
@@ -75,4 +85,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9`
+- `92261bd8c7a63706551e5a2bc406d71190a7e1f6`
