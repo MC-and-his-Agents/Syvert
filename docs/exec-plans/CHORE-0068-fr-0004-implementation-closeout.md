@@ -67,7 +67,9 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：`#87/#89/#88` 已关闭，`#68/#64` 仍为 `OPEN`
+- 已核对：GitHub 中当前可见的 `FR-0004` implementation Work Item 仅有 `#87/#89/#88`，未发现额外仍处于 `OPEN` 的 implementation 子事项；额外出现的 `#85` 为 `spec_issue_sync.py` 自动维护的 spec 索引 issue，不承载 `#64` 下的 implementation closeout 语义
 - 已核对：当前 `#68` worktree 基于 `origin/main@fe328a8dcb6228bf9d38b28b9c9c59ebf5cc34c2`
+- 已核对：`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 已同时索引 `FR-0004/#64`、历史 formal spec 回合、当前 implementation closeout 回合，以及 `#87/#89/#88 -> PR #90/#91/#92` 的主干实现链；合并本 PR 后不会留下双 active 或断链入口
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -79,6 +81,13 @@
 - `python3 scripts/open_pr.py --class docs --issue 68 --item-key CHORE-0068-fr-0004-implementation-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 implementation 聚合事项' --closing fixes --dry-run`
   - 结果：通过
 - 已创建当前受审 PR：`#93 https://github.com/MC-and-his-Agents/Syvert/pull/93`
+
+## closeout 证据
+
+- formal spec 主干事实：PR `#82` 已合入，`InputTarget` 与 `CollectionPolicy` 的 formal spec 真相位于 `docs/specs/FR-0004-input-target-and-collection-policy/`
+- implementation 子事项主干事实：`#87/#89/#88` 已分别由 PR `#90/#91/#92` 合入并关闭
+- GitHub 调度层事实：当前仅剩 `#68` implementation 聚合 closeout 与父 FR `#64` 仍为 `OPEN`
+- release / sprint 索引事实：`docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 已同时回链 formal spec、implementation closeout 与三条实现 PR，合并本 PR 后即可直接作为 `#68` closeout 评论引用入口
 
 ## 未决风险
 

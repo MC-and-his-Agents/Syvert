@@ -33,16 +33,15 @@
 
 ## 当前停点
 
-- 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
-- `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，当前受审 PR 为 `#82`。
-- 历史 PR `#75` 已因 GitHub checks 未绑定最新 head 而关闭；当前轮次由 PR `#82` 继续承接相同分支的最新 formal spec 审查。
-- 最近一次显式 checkpoint 绑定 `e600b4d26717227f2610c1434a39b350271c67ee`；其后的提交仅用于同步当前 PR #82 的审查态元数据、恢复语义与 GitHub 状态面对齐，不单独形成新的实现停点。
-- 当前停在等待 guardian 基于当前受审 head 重跑并给出最终 verdict。
+- 历史 worktree / 分支：`issue-68-inputtarget-collectionpolicy`，已用于完成 `#68` 的 formal spec closeout 回合。
+- 历史 PR `#75` 已因 GitHub checks 未绑定最新 head 而关闭；formal spec 审查最终由 PR `#82` 承接并完成。
+- PR `#82` 已合入主干，`FR-0004` formal spec 套件、对应 release / sprint 索引与本 exec-plan 的历史记录已入库。
+- 最近一次显式 checkpoint 绑定 `e600b4d26717227f2610c1434a39b350271c67ee`；后续 closeout 语义已由 implementation 聚合回合接管，不再在本文件上继续推进 active 执行动作。
 
 ## 下一步动作
 
-- 重跑 guardian；若通过，则直接进入受控 `merge_pr`。
-- guardian 通过后使用受控 `merge_pr` 合入，并回写 closeout 状态。
+- 无 active 动作。
+- `FR-0004` 的后续执行与 GitHub closeout 由 `docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md` 继续承接；本文件仅保留为 formal spec 历史收口记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -73,6 +72,7 @@
 - 已创建当前受审 PR：`#82 https://github.com/MC-and-his-Agents/Syvert/pull/82`
 - 已确认当前受审 head 的 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
 - 已完成多轮 guardian 审查，并按阻断收口了兼容映射、`spec review` 口径、active `exec-plan` 绑定、Adapter SDK 契约边界与恢复工件一致性
+- 已完成 formal spec 合入：PR `#82` merged，`FR-0004` formal spec 成为主干真相
 
 ## 未决风险
 
