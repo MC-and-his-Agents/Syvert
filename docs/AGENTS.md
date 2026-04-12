@@ -68,8 +68,8 @@
 `docs/specs/` 只承载正式规约，不承载 backlog 草稿。
 
 - FR 目录命名：`FR-XXXX-<slug>`
-- 当前主干 live 最小套件：`spec.md`、`plan.md`、`TODO.md`
-- `GOV-0029` 只批准 `TODO.md` 在后续独立 governance 实现 PR 中退出 live 最小套件；在此之前，历史 `TODO.md` 仍以 compat 过渡态存在，不得新增语义或继续承担状态镜像 / 恢复主入口职责
+- 当前主干 live 最小套件：`spec.md`、`plan.md`
+- legacy `TODO.md` 已退出 formal governance flow；不得新增、回写或继续承担状态镜像 / 恢复主入口职责
 - 正式规约与实现默认分 PR；例外按 [spec_review.md](../spec_review.md) 执行
 - formal spec 绑定到 GitHub FR；Work Item 只通过 `item_key`、exec-plan、PR 与该 formal spec 建立关联
 

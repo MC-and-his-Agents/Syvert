@@ -20,7 +20,6 @@
 ## 范围
 
 - 本次纳入：
-  - `docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md`
   - `docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`
   - `docs/releases/v0.1.0.md`
   - `docs/sprints/2026-S15.md`
@@ -100,7 +99,7 @@
 
 ## 回滚方式
 
-- 如需回滚，使用独立 revert PR 撤销本事项对 `docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md`、`docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`、`docs/releases/v0.1.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
+- 如需回滚，使用独立 revert PR 撤销本事项对 `docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`、`docs/releases/v0.1.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
 
 ## 最近一次 checkpoint 对应的 head SHA
 

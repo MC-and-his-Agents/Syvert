@@ -19,6 +19,13 @@ class DocsGuardTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("不存在", errors[0])
 
+    def test_skips_deleted_tracked_markdown_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            with mock.patch("scripts.docs_guard.git_ls_files", return_value=["docs/specs/FR-0001-example/TODO.md"]):
+                errors = validate_markdown_links(repo)
+        self.assertEqual(errors, [])
+
     def test_detects_python_syntax_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

@@ -20,7 +20,7 @@ class Policy:
         if not normalized:
             return "implementation"
         # Priority order matters.
-        for key in ("governance", "spec_todo", "spec", "docs", "implementation"):
+        for key in ("governance", "spec", "docs", "implementation"):
             for pattern in self.path_categories.get(key, []):
                 from fnmatch import fnmatch
 

@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import hashlib
 import re
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
@@ -25,6 +26,8 @@ from scripts.item_context import (
     parse_exec_plan_metadata,
     strip_fenced_code_blocks,
     spec_dir_has_minimum_suite,
+    authorized_additional_spec_dirs_for_diff,
+    validate_additional_spec_contracts,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
     validate_bound_spec_contract,
@@ -35,6 +38,14 @@ from scripts.spec_guard import validate_suite
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
 ITEM_KEY_RE = re.compile(r"^(FR|HOTFIX|GOV|CHORE)-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES = {
+    "GOV-0029-remove-legacy-todo-md": {
+        Path("docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md"): {
+            "required_todo": Path("docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"),
+            "content_sha256": "2c2d8df1c881c0e837cca17c7420a29e684dcee5e6fdaa9c939f9d8810c57952",
+        },
+    }
+}
 FIELD_RE = re.compile(r"^- ([^：:\n]+)[：:][ \t]*(.*)$", re.MULTILINE)
 HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
@@ -122,12 +133,11 @@ def decision_item_type_from_name(path: Path) -> str | None:
 
 def is_spec_suite_file(path: Path) -> bool:
     value = path.as_posix()
-    if re.search(r"(^|/)docs/specs/_template/(spec|plan|TODO)\.md$", value):
+    if re.search(r"(^|/)docs/specs/_template/(spec|plan)\.md$", value):
         return True
-    return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan|TODO)\.md$", value) is not None
+    return re.search(r"(^|/)docs/specs/FR-[^/]+/(spec|plan)\.md$", value) is not None
 
-
-def is_todo_spec_file(path: Path) -> bool:
+def is_legacy_todo_file(path: Path) -> bool:
     value = path.as_posix()
     if re.search(r"(^|/)docs/specs/_template/TODO\.md$", value):
         return True
@@ -197,12 +207,24 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
         if input_mode == INPUT_MODE_FORMAL_SPEC:
             bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
             errors.extend(f"{path}: {error}" for error in bound_spec_errors)
+            bound_spec_relative: Path | None = None
             if not bound_spec_errors:
                 spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
                 if spec_dir is not None:
+                    bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                     errors.extend(
                         f"{path}: 绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                         for error in validate_suite(spec_dir)
+                    )
+            additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+            errors.extend(f"{path}: {error}" for error in additional_spec_errors)
+            if not additional_spec_errors:
+                for extra_spec_dir in additional_spec_dirs:
+                    if extra_spec_dir == bound_spec_relative:
+                        continue
+                    errors.extend(
+                        f"{path}: `额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                        for error in validate_suite(repo_root / extra_spec_dir)
                     )
             if fields.get("关联 decision", ""):
                 decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
@@ -311,6 +333,46 @@ def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tu
     return ([], payloads)
 
 
+def legacy_todo_cleanup_foreign_exec_plan_rule(
+    repo_root: Path,
+    exec_plan_path: Path,
+    *,
+    current_issue: int | None,
+) -> dict[str, object] | None:
+    if current_issue is None:
+        return None
+    context_errors, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
+    if context_errors or not payloads:
+        return None
+    item_key = payloads[0].get("item_key", "").strip()
+    allowed_paths = LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES.get(item_key)
+    if not allowed_paths:
+        return None
+    relative_exec_plan = exec_plan_path.resolve().relative_to(repo_root.resolve())
+    return allowed_paths.get(relative_exec_plan)
+
+
+def validate_legacy_todo_cleanup_foreign_exec_plan_touch(
+    repo_root: Path,
+    exec_plan_path: Path,
+    *,
+    current_issue: int | None,
+    changed_paths: list[str] | None,
+) -> list[str]:
+    rule = legacy_todo_cleanup_foreign_exec_plan_rule(repo_root, exec_plan_path, current_issue=current_issue)
+    if rule is None:
+        return []
+    if not changed_paths:
+        return ["缺少当前 diff，无法验证 foreign exec-plan 的收口约束。"]
+    required_todo = rule["required_todo"]
+    if required_todo.as_posix() not in changed_paths or (repo_root / required_todo).exists():
+        return [f"当前 foreign exec-plan 收口必须伴随 `{required_todo.as_posix()}` 的删除。"]
+    digest = hashlib.sha256(exec_plan_path.read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+    if digest != rule["content_sha256"]:
+        return ["当前 foreign exec-plan 仅允许收敛到已批准的最小终态，不允许额外改写。"]
+    return []
+
+
 def missing_spec_suite_files(spec_dir: Path) -> list[str]:
     required_files = set(spec_suite_policy()["required_files"])
     child_names = {child.name for child in spec_dir.iterdir()} if spec_dir.exists() and spec_dir.is_dir() else set()
@@ -347,12 +409,24 @@ def validate_formal_spec_authorization_contract(
     if input_mode == INPUT_MODE_FORMAL_SPEC:
         bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
         errors.extend(bound_spec_errors)
+        bound_spec_relative: Path | None = None
         if not bound_spec_errors:
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
+                bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                     for error in validate_suite(spec_dir)
+                )
+        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+        errors.extend(additional_spec_errors)
+        if not additional_spec_errors:
+            for extra_spec_dir in additional_spec_dirs:
+                if extra_spec_dir == bound_spec_relative:
+                    continue
+                errors.extend(
+                    f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(repo_root / extra_spec_dir)
                 )
     elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
         expected_dir = repo_root / "docs" / "specs" / item_key
@@ -386,12 +460,24 @@ def validate_decision_authorization_contract(
     if input_mode == INPUT_MODE_FORMAL_SPEC:
         bound_spec_errors = validate_bound_spec_contract(repo_root, fields)
         errors.extend(bound_spec_errors)
+        bound_spec_relative: Path | None = None
         if not bound_spec_errors:
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
+                bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
                     for error in validate_suite(spec_dir)
+                )
+        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
+        errors.extend(additional_spec_errors)
+        if not additional_spec_errors:
+            for extra_spec_dir in additional_spec_dirs:
+                if extra_spec_dir == bound_spec_relative:
+                    continue
+                errors.extend(
+                    f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
+                    for error in validate_suite(repo_root / extra_spec_dir)
                 )
 
     require_present = input_mode in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC} or has_meaningful_binding(
@@ -426,7 +512,12 @@ def authorized_decision_exec_plans(
     return errors, matches
 
 
-def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -> tuple[list[str], set[Path]]:
+def authorized_formal_spec_dirs(
+    repo_root: Path,
+    *,
+    current_issue: int | None,
+    changed_paths: list[str] | None = None,
+) -> tuple[list[str], set[Path]]:
     authorized: set[Path] = set()
     errors: list[str] = []
     for fields in authorization_exec_plan_payloads(repo_root, current_issue=current_issue):
@@ -447,6 +538,15 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
                 authorized.add(spec_dir.relative_to(repo_root.resolve()))
+            additional_errors, additional_spec_dirs = authorized_additional_spec_dirs_for_diff(
+                repo_root,
+                fields,
+                changed_paths,
+            )
+            if additional_errors:
+                errors.extend(additional_errors)
+            else:
+                authorized.update(additional_spec_dirs)
             continue
         if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
             expected_dir = repo_root / "docs" / "specs" / item_key
@@ -487,9 +587,6 @@ def collect_targets(
                         candidate = suite_dir / name
                         if candidate.exists():
                             spec_files.add(candidate)
-                    todo_candidate = suite_dir / "TODO.md"
-                    if todo_candidate.exists():
-                        spec_files.add(todo_candidate)
     else:
         exec_plans.update(path for path in (repo_root / "docs" / "exec-plans").glob("*.md") if path.name != "README.md")
         release_files.update(path for path in (repo_root / "docs" / "releases").glob("*.md") if path.name != "README.md")
@@ -503,20 +600,11 @@ def collect_targets(
                 candidate = suite_dir / name
                 if candidate.exists():
                     spec_files.add(candidate)
-        for suite_dir in specs_root.glob("FR-*"):
-            if not suite_dir.is_dir():
-                continue
-            candidate = suite_dir / "TODO.md"
-            if candidate.exists():
-                spec_files.add(candidate)
         template_dir = specs_root / "_template"
         for name in ("spec.md", "plan.md"):
             candidate = template_dir / name
             if candidate.exists():
                 spec_files.add(candidate)
-        template_todo = template_dir / "TODO.md"
-        if template_todo.exists():
-            spec_files.add(template_todo)
 
     return (
         sorted(exec_plans),
@@ -539,6 +627,11 @@ def validate_context_rules(
     if changed_paths is not None:
         for raw_path in changed_paths:
             path = Path(raw_path)
+            target = repo_root / path
+            if is_legacy_todo_file(path):
+                if target.exists():
+                    errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
+                continue
             if not (
                 is_exec_plan_file(path)
                 or is_release_file(path)
@@ -547,7 +640,6 @@ def validate_context_rules(
                 or is_spec_suite_file(path)
             ):
                 continue
-            target = repo_root / path
             if not target.exists():
                 errors.append(f"{target}: 变更目标不存在（可能已删除），请补充替代工件或同步调整引用。")
 
@@ -557,7 +649,11 @@ def validate_context_rules(
     if changed_paths is not None:
         touched_spec_dirs = formal_spec_dirs(changed_paths)
         if touched_spec_dirs:
-            authorization_errors, authorized_spec_dirs = authorized_formal_spec_dirs(repo_root, current_issue=current_issue)
+            authorization_errors, authorized_spec_dirs = authorized_formal_spec_dirs(
+                repo_root,
+                current_issue=current_issue,
+                changed_paths=changed_paths,
+            )
             errors.extend(authorization_errors)
             for spec_dir in sorted(touched_spec_dirs):
                 if spec_dir not in authorized_spec_dirs:
@@ -572,13 +668,29 @@ def validate_context_rules(
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = parse_exec_plan_metadata(target)
+            foreign_exec_plan_errors = validate_legacy_todo_cleanup_foreign_exec_plan_touch(
+                repo_root,
+                target,
+                current_issue=current_issue,
+                changed_paths=changed_paths,
+            )
+            allow_foreign_exec_plan_touch = bool(
+                legacy_todo_cleanup_foreign_exec_plan_rule(repo_root, target, current_issue=current_issue)
+            ) and not foreign_exec_plan_errors
+            errors.extend(f"{target}: {error}" for error in foreign_exec_plan_errors)
             exec_issue = fields.get("Issue", "").strip()
-            if current_issue is not None and exec_issue and exec_issue != str(current_issue) and not is_inactive_exec_plan(fields):
+            if (
+                current_issue is not None
+                and exec_issue
+                and exec_issue != str(current_issue)
+                and not is_inactive_exec_plan(fields)
+                and not allow_foreign_exec_plan_touch
+            ):
                 errors.append(
                     f"{target}: 当前 touched exec-plan 的 `Issue` `{exec_issue}` 与当前执行回合 `#{current_issue}` 不一致。"
                 )
             input_mode = classify_exec_plan_input_mode(fields)
-            if input_mode == INPUT_MODE_FORMAL_SPEC:
+            if input_mode == INPUT_MODE_FORMAL_SPEC and not allow_foreign_exec_plan_touch:
                 errors.extend(
                     f"{target}: {error}"
                     for error in validate_bound_formal_spec_scope(repo_root, fields, changed_paths)
@@ -664,9 +776,7 @@ def validate_repository(repo_root: Path) -> list[str]:
 
     template_todo = repo_root / "docs" / "specs" / "_template" / "TODO.md"
     if template_todo.exists():
-        baseline_paths.append(template_todo.relative_to(repo_root).as_posix())
-    else:
-        errors.append(f"{template_todo}: 缺少基线模板工件 `{template_todo.relative_to(repo_root).as_posix()}`。")
+        errors.append(f"{template_todo}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
 
     for path in sorted((repo_root / "docs" / "releases").glob("*.md")):
         if path.name in {"README.md", "_template.md"}:
