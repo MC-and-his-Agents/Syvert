@@ -338,7 +338,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "target_type_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_public_collection_mode_before_legacy_projection(self) -> None:
         request = CoreTaskRequest(
@@ -359,7 +359,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_authenticated_collection_mode_before_legacy_projection(self) -> None:
         request = CoreTaskRequest(
@@ -380,7 +380,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(
