@@ -10,6 +10,7 @@
   - success envelope 满足 contract
   - failed envelope 走统一失败处理
   - adapter 返回非法结果时产生 contract violation
+  - 样例在进入 adapter 执行前即不满足前置条件时，验证工具产出 `执行前置不满足`
 
 ## 2. fake adapter contract
 
