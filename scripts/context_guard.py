@@ -37,6 +37,13 @@ from scripts.spec_guard import validate_suite
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
 ITEM_KEY_RE = re.compile(r"^(FR|HOTFIX|GOV|CHORE)-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES = {
+    "GOV-0029-remove-legacy-todo-md": {
+        Path("docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md"): Path(
+            "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"
+        ),
+    }
+}
 FIELD_RE = re.compile(r"^- ([^：:\n]+)[：:][ \t]*(.*)$", re.MULTILINE)
 HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 CODE_RE = re.compile(r"`([^`]+)`")
@@ -322,6 +329,29 @@ def active_exec_plan_context_for_issue(repo_root: Path, issue_number: int) -> tu
     if len(payloads) > 1:
         return ([f"当前 `Issue` #{issue_number} 存在多个 active `exec-plan`，无法确认唯一授权上下文。"], [])
     return ([], payloads)
+
+
+def allows_legacy_todo_cleanup_foreign_exec_plan_touch(
+    repo_root: Path,
+    exec_plan_path: Path,
+    *,
+    current_issue: int | None,
+    changed_paths: list[str] | None,
+) -> bool:
+    if current_issue is None or not changed_paths:
+        return False
+    context_errors, payloads = active_exec_plan_context_for_issue(repo_root, current_issue)
+    if context_errors or not payloads:
+        return False
+    item_key = payloads[0].get("item_key", "").strip()
+    allowed_paths = LEGACY_TODO_CLEANUP_FOREIGN_EXEC_PLAN_TOUCHES.get(item_key)
+    if not allowed_paths:
+        return False
+    relative_exec_plan = exec_plan_path.resolve().relative_to(repo_root.resolve())
+    required_todo = allowed_paths.get(relative_exec_plan)
+    if required_todo is None:
+        return False
+    return required_todo.as_posix() in changed_paths and not (repo_root / required_todo).exists()
 
 
 def missing_spec_suite_files(spec_dir: Path) -> list[str]:
@@ -619,13 +649,25 @@ def validate_context_rules(
             if not (is_exec_plan_file(path) and not is_template(path) and target.exists()):
                 continue
             fields = parse_exec_plan_metadata(target)
+            allow_foreign_exec_plan_touch = allows_legacy_todo_cleanup_foreign_exec_plan_touch(
+                repo_root,
+                target,
+                current_issue=current_issue,
+                changed_paths=changed_paths,
+            )
             exec_issue = fields.get("Issue", "").strip()
-            if current_issue is not None and exec_issue and exec_issue != str(current_issue) and not is_inactive_exec_plan(fields):
+            if (
+                current_issue is not None
+                and exec_issue
+                and exec_issue != str(current_issue)
+                and not is_inactive_exec_plan(fields)
+                and not allow_foreign_exec_plan_touch
+            ):
                 errors.append(
                     f"{target}: 当前 touched exec-plan 的 `Issue` `{exec_issue}` 与当前执行回合 `#{current_issue}` 不一致。"
                 )
             input_mode = classify_exec_plan_input_mode(fields)
-            if input_mode == INPUT_MODE_FORMAL_SPEC:
+            if input_mode == INPUT_MODE_FORMAL_SPEC and not allow_foreign_exec_plan_touch:
                 errors.extend(
                     f"{target}: {error}"
                     for error in validate_bound_formal_spec_scope(repo_root, fields, changed_paths)
