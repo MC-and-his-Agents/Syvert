@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：`#80`
+- 关联 PR：`#84`
 - active 收口事项：`CHORE-0079-fr-0007-formal-spec-closeout`
 
 ## 目标
@@ -33,15 +33,16 @@
 ## 当前停点
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
-- 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，已关闭并由当前 PR `#80` 接续。
-- 当前 PR `#80` 已把 latest guardian 指出的 readiness、父 FR closeout 与 `CollectionPolicy` 依赖问题收口到最近一次实质 checkpoint。
+- 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，随后由 `#80` 接续。
+- `#80` 已把 latest guardian 指出的 readiness、父 FR closeout 与 `CollectionPolicy` 依赖问题收口到最近一次实质 checkpoint。
 - 其后提交仅同步 guardian / review 元数据，不构成新的执行停点；当前受审 head 由 guardian state 绑定。
+- 当前活跃 PR 已切换为 `#84`，用于恢复 GitHub `pull_request` checks；formal spec 内容与 Work Item 绑定保持不变。
 
 ## 下一步动作
 
 - 在当前 head 上重跑 guardian，确认 formal spec 审查输入已闭合。
 - 若 guardian 通过，则继续处理 merge gate 所需的 checks / head 一致性。
-- 通过受控 merge 完成 PR `#80`，随后关闭 `#79`。
+- 通过受控 merge 完成 PR `#84`，随后关闭 `#79`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,7 +70,7 @@
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class spec --issue 79 --item-key CHORE-0079-fr-0007-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title "spec: 收口 FR-0007 的 formal spec" --closing fixes --dry-run`
-- `gh pr checks 80`
+- `gh pr checks 84`
   - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
 - `python3 scripts/pr_guardian.py review 80`
   - 结果：latest guardian 继续要求 formal spec、exec-plan 与 PR 目标对 `spec-ready` / `implementation-ready` 的口径保持一致
