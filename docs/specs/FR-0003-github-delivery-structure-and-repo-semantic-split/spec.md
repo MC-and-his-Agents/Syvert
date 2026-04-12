@@ -22,7 +22,7 @@
   - 规定 `FR` 是 canonical requirement 容器，formal spec 绑定到 FR
   - 规定 `release / sprint` 只保留为执行上下文或仓内索引语义
   - 收敛 legacy `TODO.md` 在 formal governance flow 中的地位
-  - 冻结 legacy `TODO.md` 退出 formal governance flow 后必须满足的最小语义：formal spec 最小套件、模板、guard、policy 与存量清理边界
+  - 冻结 legacy `TODO.md` 退出 formal governance flow 后必须满足的最小语义：formal spec 最小套件、模板、review / workflow 规则、guard、policy、测试与存量清理边界
 - 本次不纳入：
   - 与 legacy `TODO.md` 清理无关的 `scripts/**` 行为改造
   - 与 legacy `TODO.md` 清理无关的 harness 自动化入口、guardian、merge gate 运行时改造
@@ -93,8 +93,9 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 - [ ] 文档明确写出 `Work Item` 是唯一执行入口
 - [ ] formal spec 明确绑定 FR，exec-plan 明确绑定 Work Item
 - [ ] release / sprint 被定义为执行上下文或索引，而不是状态真相源
+- [ ] `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md`、`docs/process/agent-loop.md` 与 `docs/specs/_template/**` 不再把 `TODO.md` 视为 formal spec 必需项、正式恢复入口或必须同步维护的流程工件
 - [ ] formal spec 最小套件、模板与治理 guard 不再要求 `TODO.md`
-- [ ] governance guard / policy 对 legacy `TODO.md` 只允许未触碰保留或删除，不允许新增或继续回写
+- [ ] governance guard / policy / `open_pr` / `tests/governance/**` 对 legacy `TODO.md` 只允许未触碰保留或删除，不允许新增、继续回写或把它当作 formal flow 必需输入
 
 ## 依赖与外部前提
 

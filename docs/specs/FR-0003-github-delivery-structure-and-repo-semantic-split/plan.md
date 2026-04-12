@@ -64,12 +64,12 @@
 
 ## 进入实现前条件
 
-- [x] `spec review` 已通过
+- [ ] `spec review` 已通过
 - [x] 关键风险已记录并有缓解策略
 - [x] 关键依赖可用
 
 ## spec review 结论
 
-- 结论：通过
-- 未决问题：无
-- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许 `GOV-0027`、`GOV-0028`、`GOV-0029` 按各自边界进入执行回合，其中 `GOV-0029` 需先完成当前独立规约 PR，再进入独立治理实现 PR
+- 结论：待当前 formal spec PR 审查
+- 未决问题：需确认 legacy `TODO.md` 退出 formal governance flow 的规范来源、实施范围与后续独立治理实现边界已收敛一致
+- implementation-ready 判定：未满足；待当前 formal spec PR 通过后，`GOV-0027`、`GOV-0028`、`GOV-0029` 才分别按各自边界进入后续执行回合，其中 `GOV-0029` 仍需另开独立 governance 实现 PR
