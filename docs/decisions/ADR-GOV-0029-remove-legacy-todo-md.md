@@ -21,12 +21,14 @@
 ## 决策
 
 - `GOV-0029` 使用独立 Work Item decision 记录本轮 `TODO.md` 退出 formal governance flow 的收口语义。
+- `GOV-0029` 分两步执行：先以独立 `spec` 类 PR 更新 `FR-0003` formal spec 与当前事项工件，再以独立 `governance` 类 PR 落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
 - 对当前事项，formal spec 最小套件收敛为 `spec.md` + `plan.md`；模板、guard 与 policy 不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
-- 当前事项仅允许把 `FR-0001` 与 `FR-0002` 作为额外 formal spec 套件纳入清理；每个套件都必须在当前 diff 中删除对应的 legacy `TODO.md`，并且只能触碰完成该清理所需的最小文件集合。
+- 当前事项仅允许在后续独立 governance PR 中把 `FR-0001` 与 `FR-0002` 作为额外 formal spec 套件纳入清理；每个套件都必须在当前 diff 中删除对应的 legacy `TODO.md`，并且只能触碰完成该清理所需的最小文件集合。
 - 本 decision 在 `TODO.md` 退出 formal governance flow 这一窄范围内，替代 `ADR-0003` 历史文本里关于“不删除 `TODO.md` / 不调整 formal spec required files”的旧非目标表述。
 
 ## 影响
 
 - `ADR-0003` 继续保留为 `FR-0003` 的 shared decision，不再承担当前 Work Item 的 machine-checkable 绑定。
+- 当前 formal spec PR 合入后，`FR-0003` 将成为后续独立 governance 实现 PR 的批准输入。
 - `GOV-0029` 的 exec-plan、guard、policy、测试与文档索引统一追溯到本 decision。
 - 历史 `TODO.md` 文件可在未触碰时保留为 inert legacy，但后续 PR 不得继续维护、回写或把它当恢复入口。

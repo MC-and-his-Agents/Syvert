@@ -23,15 +23,18 @@
     "governance": [
       "governance",
       "spec",
+      "spec_todo",
       "docs"
     ],
     "implementation": [
       "implementation",
-      "docs"
+      "docs",
+      "spec_todo"
     ],
     "spec": [
       "spec",
-      "docs"
+      "docs",
+      "spec_todo"
     ]
   },
   "path_categories": [
@@ -50,6 +53,12 @@
         ".githooks/**",
         "scripts/**",
         "tests/governance/**"
+      ]
+    },
+    {
+      "name": "spec_todo",
+      "patterns": [
+        "docs/specs/FR-*/TODO.md"
       ]
     },
     {
@@ -80,7 +89,8 @@
   "spec_suite": {
     "required_files": [
       "spec.md",
-      "plan.md"
+      "plan.md",
+      "TODO.md"
     ],
     "spec_required_headings": [
       "## GWT 验收场景",

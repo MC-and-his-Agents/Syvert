@@ -22,7 +22,7 @@
   - 规定 `FR` 是 canonical requirement 容器，formal spec 绑定到 FR
   - 规定 `release / sprint` 只保留为执行上下文或仓内索引语义
   - 收敛 legacy `TODO.md` 在 formal governance flow 中的地位
-  - 为落实上述收敛所必需的 formal spec 模板、存量 formal spec 套件、governance guard、policy 与回归测试调整
+  - 冻结 legacy `TODO.md` 退出 formal governance flow 后必须满足的最小语义：formal spec 最小套件、模板、guard、policy 与存量清理边界
 - 本次不纳入：
   - 与 legacy `TODO.md` 清理无关的 `scripts/**` 行为改造
   - 与 legacy `TODO.md` 清理无关的 harness 自动化入口、guardian、merge gate 运行时改造
@@ -44,6 +44,7 @@
 - 非功能需求：
   - 所有相关治理文档口径必须一致，不能出现并行分层定义。
   - 本事项必须保持 governance-only 边界，不混入业务实现代码。
+  - `GOV-0029` 的 formal spec 收敛与后续治理实现必须分开进入独立 PR。
 
 ## 约束
 
@@ -53,6 +54,7 @@
   - GitHub 不承载 formal spec 正文、exec-plan 或 checkpoint 细节。
   - 仓库不承载 backlog / sprint / project 状态真相。
   - formal spec 与实现 PR 仍默认分离。
+  - `GOV-0029` 必须先通过独立 formal spec 审查，再以独立 governance PR 落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
 
 ## GWT 验收场景
 
@@ -82,6 +84,7 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 - 边界场景：
   - legacy `TODO.md` 可以作为历史文件被清理，但不得再作为 formal governance flow 的必需工件或恢复入口。
   - `release / sprint` 允许继续作为仓内索引存在，但只能承担聚合与执行上下文职责。
+  - `GOV-0029` 可在独立实现 PR 中清理存量 legacy `TODO.md`，但不得在 formal spec PR 中直接混入实现代码或测试改造。
 
 ## 验收标准
 
@@ -98,4 +101,5 @@ Then 文档必须明确 formal spec 绑定 FR，exec-plan 与 PR 绑定各自 Wo
 - 外部依赖：
   - GitHub 中已存在 `#54 -> #55 -> #56` 的事项树
 - 上下游影响：
-  - `#57`、`#58` 在此 formal spec 基础上分别完成 harness 兼容迁移与 legacy `TODO.md` 清理
+  - `#57` 在此 formal spec 基础上完成 harness 兼容迁移
+  - `#58` 在此 formal spec 基础上先完成规约审查，再进入独立治理实现 PR 收口 legacy `TODO.md`

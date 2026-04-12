@@ -8,91 +8,74 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
-- 额外关联 specs：docs/specs/FR-0001-governance-stack-v1/, docs/specs/FR-0002-content-detail-runtime-v0-1/
 - 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
 - 关联 PR：`#61`
 
 ## 目标
 
-- 把 legacy `TODO.md` 从正式治理流、formal spec 最小套件、guard 与模板中完全移除。
-- 收敛仓内仍把 `TODO.md` 当作事项状态镜像、恢复入口或 formal spec 必需工件的引用。
-- 保证后续事项只通过 GitHub + FR formal spec + active `exec-plan` 进入交付漏斗。
+- 为 `GOV-0029` 先补齐一条独立的 formal spec 审查链路，合法授权 legacy `TODO.md` 退出 formal governance flow。
+- 把当前事项需要的规约、decision、release / sprint 索引与 exec-plan 工件链先收成一致。
+- 为后续独立 governance 实现 PR 提供可审查、已批准的 formal spec 输入。
 
 ## 范围
 
 - 本次纳入：
-  - `WORKFLOW.md`
-  - `docs/AGENTS.md`
-  - `docs/process/agent-loop.md`
-  - `docs/specs/README.md`
-  - `spec_review.md`
-  - `code_review.md`
-  - `docs/exec-plans/README.md`
-  - `docs/specs/FR-0001-governance-stack-v1/**`
-  - `docs/specs/FR-0002-content-detail-runtime-v0-1/**`
-  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/**`
-  - `docs/specs/_template/**`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
+  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
+- `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
   - `docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
+  - `docs/exec-plans/GOV-0029-remove-legacy-todo-md.md`
   - `docs/releases/v0.2.0.md`
   - `docs/sprints/2026-S15.md`
-  - `scripts/context_guard.py`
-  - `scripts/spec_guard.py`
-  - `scripts/policy/loader.py`
-  - `scripts/policy/policy.json`
-  - `scripts/governance_gate.py`
-  - `tests/governance/**`
 - 本次不纳入：
-  - 新治理契约正文重写
+  - `FR-0001` / `FR-0002` 的 legacy `TODO.md` 实体清理
+  - formal spec 模板、治理 guard、policy、测试与 `open_pr` 的实现改造
+  - `FR-0002` exec-plan 收口与其他存量文档引用修正
   - 与 `TODO.md` 清理无关的 harness 兼容改造
   - `v0.2.0` 业务实现
 
 ## 当前停点
 
-- 已删除 `FR-0001` / `FR-0002` 的 live legacy `TODO.md`，并把 `FR-0002` exec-plan 中仍把 `TODO.md` 当范围/回滚入口的引用移除。
-- 已把 `额外关联 specs` 收紧为仅 `GOV-0029` 可用，且每个额外 suite 都必须伴随对应 `TODO.md` 删除，并受最小文件集合约束。
-- 已把 `FR-0002` foreign exec-plan 例外锁定为“同 diff 删除对应 TODO + 文件内容匹配批准的最小终态”，并补齐 exec-plan-only / arbitrary rewrite 的负向回归测试。
-- 已对齐 `open_pr` preflight 与新的 legacy `TODO.md` 合同，并修复 `test_touched_spec_todo_is_rejected_after_legacy_flow_removal` 的失真覆盖。
-- 最近一次 checkpoint 对应实质变更 head 为 `599febd478e027ec736eca125a007887261d4068`；该 head 已通过本地治理回归、`commit_check`、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`。
+- 上一轮把 `FR-0003` formal spec 语义与治理实现代码放在同一 PR 中，guardian 因“formal spec / implementation 必须分离”给出 `REQUEST_CHANGES`。
+- 当前分支已回退为 spec-only 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan 与 release / sprint 索引的最小必要变更；legacy `TODO.md` 的实体删除留在后续独立 governance PR。
+- 当前目标是先让 PR `#61` 作为独立 formal spec 审查入口合入 `main`，再基于已批准规约继续后续 governance 实现 PR。
 
 ## 下一步动作
 
-- 推送当前分支并等待 PR `#61` 的 GitHub checks 收敛。
-- 在当前 PR head 上等待 guardian 给出最终 verdict，并确认 `APPROVE + safe_to_merge=true`。
-- 使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
+- 推送当前分支并把 PR `#61` 的标题 / 描述改成 `spec` 审查语义，关闭自动 `Fixes #58`。
+- 在当前 PR head 上等待 GitHub checks 与 guardian 收敛，并确认 `APPROVE + safe_to_merge=true`。
+- 使用受控入口执行 squash merge，但保持 Issue `#58` 继续打开。
+- 基于合入后的 `main` 重建 `GOV-0029` 的独立 governance 实现 PR，完成模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
 
 ## 当前 checkpoint 推进的 release 目标
 
-- 为 `v0.2.0` 的治理收敛回合去除 legacy `TODO.md` 这条并行恢复/状态表达路径，只保留 FR formal spec + Work Item `exec-plan` 的主链路。
+- 为 `v0.2.0` 的治理收敛回合补齐 legacy `TODO.md` 退出 formal governance flow 所需的正式规约授权，确保后续实现 PR 不再混审规约与实现。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`FR-0003 / #55` 下的第三个治理 Work Item，负责完成 formal governance flow 对 legacy `TODO.md` 的最终清理。
-- 阻塞：无外部阻塞；需要同时保持历史事项可追溯性，并阻断未来重新引入 `TODO.md` 的入口。
+- 阻塞：后续实现 PR 必须等待当前 formal spec PR 先合入 `main`。
 
 ## 已验证项
 
 - `#56 / PR #59` 已完成 GitHub 单一调度层与仓内单一语义层的契约收敛。
-- `#57 / PR #60` 已完成 harness 兼容迁移，允许在不破坏现有治理流的前提下清理 `TODO.md` 残留。
-- `python3 -m unittest tests.governance.test_docs_guard tests.governance.test_item_context tests.governance.test_context_guard tests.governance.test_governance_gate tests.governance.test_open_pr`
-- `python3 scripts/commit_check.py --base-ref origin/main --head-ref HEAD`
+- `#57 / PR #60` 已完成 harness 兼容迁移，为 `TODO.md` 清理的后续实现侧收口提供兼容前提。
 - `python3 scripts/docs_guard.py`
 - `python3 scripts/spec_guard.py --all`
-- `python3 scripts/context_guard.py`
-- `python3 scripts/workflow_guard.py`
-- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
-- `python3 scripts/open_pr.py --class governance --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
-- `gh pr edit 61 --title ... --body-file ...`
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/open_pr.py --class spec --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing refs --dry-run`
 
 ## 未决风险
 
-- 若 formal spec、guard 与 policy 的更新不同步，可能出现“文档已删除 `TODO.md`，但 guard 仍把它视为合法或必需工件”的双轨状态。
-- 若只删模板不删历史实体文件，后续事项仍可能把 legacy `TODO.md` 误认成可继续维护的状态镜像。
+- 若当前 spec PR 合入后没有及时跟进独立 governance 实现 PR，formal spec 与实际 guard / policy 行为会暂时不一致。
+- 若后续实现 PR 超出本次 formal spec 批准边界，guardian 仍会再次阻断 merge gate。
 
 ## 回滚方式
 
-- 使用独立 revert PR 恢复本事项对 formal spec 文档、guard、policy、测试与 legacy `TODO.md` 文件的变更。
+- 使用独立 revert PR 撤销本事项对 `FR-0003` formal spec、decision、release / sprint 索引与当前 exec-plan 的变更。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `599febd478e027ec736eca125a007887261d4068`
+- `1b6a9531f9e1c1eddfd33ecfb0d78b95d3a25b1b`

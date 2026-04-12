@@ -50,7 +50,7 @@ def write_formal_spec_suite(
     repo: Path,
     *,
     suite_name: str = "FR-0001-governance-stack-v1",
-    with_todo: bool = False,
+    with_todo: bool = True,
 ) -> None:
     fr_dir = repo / "docs" / "specs" / suite_name
     fr_dir.mkdir(parents=True, exist_ok=True)
@@ -185,7 +185,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 6,
@@ -620,7 +620,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -646,7 +646,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -672,7 +672,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-9999-missing/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -698,7 +698,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-9999-missing/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -723,7 +723,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 sprint="2026-S15",
                 active_item_key="GOV-0028-harness-compat-migration",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -749,7 +749,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/spec.md",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -775,8 +775,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -805,7 +805,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="GOV-0028-harness-compat-migration",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 57,
@@ -817,171 +817,6 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertEqual(errors, [])
-
-    def test_bound_formal_spec_accepts_gov_0029_delete_only_legacy_todo_cleanup(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="GOV-0029-remove-legacy-todo-md",
-                issue="#58",
-                item_type="GOV",
-                release="v0.2.0",
-                sprint="2026-S15",
-                active_item_key="GOV-0029-remove-legacy-todo-md",
-                related_spec="docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
-                related_decision="docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-            )
-            write_formal_spec_suite(repo, suite_name="FR-0003-github-delivery-structure-and-repo-semantic-split", with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-0001-governance-stack-v1", with_todo=True)
-            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
-            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "risks.md").write_text("# risks\n", encoding="utf-8")
-            write_decision(
-                repo,
-                "docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-                issue="#58",
-                item_key="GOV-0029-remove-legacy-todo-md",
-            )
-            plan = repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n",
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n- 额外关联 specs：docs/specs/FR-0001-governance-stack-v1/, docs/specs/FR-0002-content-detail-runtime-v0-1/\n",
-                ),
-                encoding="utf-8",
-            )
-            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "TODO.md").unlink()
-            (repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1" / "TODO.md").unlink()
-            errors = validate_pr_preflight(
-                "governance",
-                58,
-                "GOV-0029-remove-legacy-todo-md",
-                "GOV",
-                "v0.2.0",
-                "2026-S15",
-                [
-                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
-                    "docs/specs/FR-0001-governance-stack-v1/plan.md",
-                    "docs/specs/FR-0001-governance-stack-v1/risks.md",
-                    "docs/specs/FR-0001-governance-stack-v1/TODO.md",
-                    "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md",
-                ],
-                repo_root=repo,
-            )
-        self.assertEqual(errors, [])
-
-    def test_governance_pr_rejects_exec_plan_only_additional_spec_binding_without_matching_todo_deletions(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="GOV-0029-remove-legacy-todo-md",
-                issue="#58",
-                item_type="GOV",
-                release="v0.2.0",
-                sprint="2026-S15",
-                active_item_key="GOV-0029-remove-legacy-todo-md",
-                related_spec="docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
-                related_decision="docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-            )
-            write_formal_spec_suite(repo, suite_name="FR-0003-github-delivery-structure-and-repo-semantic-split", with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-0001-governance-stack-v1", with_todo=True)
-            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
-            write_decision(
-                repo,
-                "docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-                issue="#58",
-                item_key="GOV-0029-remove-legacy-todo-md",
-            )
-            plan = repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n",
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n- 额外关联 specs：docs/specs/FR-0001-governance-stack-v1/, docs/specs/FR-0002-content-detail-runtime-v0-1/\n",
-                ),
-                encoding="utf-8",
-            )
-            errors = validate_pr_preflight(
-                "governance",
-                58,
-                "GOV-0029-remove-legacy-todo-md",
-                "GOV",
-                "v0.2.0",
-                "2026-S15",
-                ["docs/exec-plans/GOV-0029-remove-legacy-todo-md.md"],
-                repo_root=repo,
-            )
-        self.assertTrue(errors)
-
-    def test_governance_pr_rejects_invalid_additional_spec_binding_on_docs_only_diff(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="GOV-0028-harness-compat-migration",
-                issue="#57",
-                item_type="GOV",
-                release="v0.2.0",
-                sprint="2026-S15",
-                active_item_key="GOV-0028-harness-compat-migration",
-                related_spec="docs/specs/FR-0001-governance-stack-v1/",
-            )
-            write_formal_spec_suite(repo, with_todo=False)
-            plan = repo / "docs" / "exec-plans" / "GOV-0028-harness-compat-migration.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/_template/`\n",
-                ),
-                encoding="utf-8",
-            )
-            errors = validate_pr_preflight(
-                "governance",
-                57,
-                "GOV-0028-harness-compat-migration",
-                "GOV",
-                "v0.2.0",
-                "2026-S15",
-                ["AGENTS.md"],
-                repo_root=repo,
-            )
-        self.assertTrue(errors)
-
-    def test_spec_pr_rejects_additional_spec_binding_for_non_governance_item(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="FR-0001-governance-stack-v1",
-                issue="#1",
-                item_type="FR",
-                active_item_key="FR-0001-governance-stack-v1",
-                related_spec="docs/specs/FR-0001-governance-stack-v1/",
-            )
-            write_formal_spec_suite(repo, with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
-            plan = repo / "docs" / "exec-plans" / "FR-0001-governance-stack-v1.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
-                ),
-                encoding="utf-8",
-            )
-            errors = validate_pr_preflight(
-                "spec",
-                1,
-                "FR-0001-governance-stack-v1",
-                "FR",
-                "v0.1.0",
-                "2026-S14",
-                [
-                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
-                    "docs/specs/FR-9999-unrelated/spec.md",
-                ],
-                repo_root=repo,
-            )
-        self.assertTrue(errors)
 
     def test_bound_formal_spec_must_be_reviewable_not_just_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1204,7 +1039,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertTrue(any("核心文件变更" in error or "正式规约区变更" in error for error in errors))
 
-    def test_spec_pr_rejects_live_legacy_todo_rewrite(self) -> None:
+    def test_spec_pr_rejects_todo_only_changes_without_spec_core_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_exec_plan(
@@ -1226,100 +1061,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 ["docs/specs/FR-0001-governance-stack-v1/TODO.md"],
                 repo_root=repo,
             )
-        self.assertTrue(any("请删除该文件" in error for error in errors))
-
-    def test_governance_pr_rejects_invalid_foreign_exec_plan_rewrite_even_with_todo_deletion(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="GOV-0029-remove-legacy-todo-md",
-                issue="#58",
-                item_type="GOV",
-                release="v0.2.0",
-                sprint="2026-S15",
-                active_item_key="GOV-0029-remove-legacy-todo-md",
-                related_spec="docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
-                related_decision="docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-            )
-            write_formal_spec_suite(repo, suite_name="FR-0003-github-delivery-structure-and-repo-semantic-split", with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
-            write_decision(
-                repo,
-                "docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
-                issue="#58",
-                item_key="GOV-0029-remove-legacy-todo-md",
-            )
-            plan = repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n",
-                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n- 额外关联 specs：docs/specs/FR-0002-content-detail-runtime-v0-1/\n",
-                ),
-                encoding="utf-8",
-            )
-            write_decision(
-                repo,
-                "docs/decisions/ADR-0001-governance-bootstrap-contract.md",
-                issue="#38",
-                item_key="FR-0002-content-detail-runtime-v0-1",
-            )
-            write_exec_plan(
-                repo,
-                item_key="FR-0002-content-detail-runtime-v0-1",
-                issue="#38",
-                item_type="FR",
-                release="v0.1.0",
-                sprint="2026-S15",
-                active_item_key="FR-0002-content-detail-runtime-v0-1",
-                related_spec="docs/specs/FR-0002-content-detail-runtime-v0-1/",
-                related_decision="docs/decisions/ADR-0001-governance-bootstrap-contract.md",
-            )
-            foreign = repo / "docs" / "exec-plans" / "FR-0002-content-detail-runtime-v0-1.md"
-            foreign.write_text(
-                foreign.read_text(encoding="utf-8").replace("# plan", "# rewritten"),
-                encoding="utf-8",
-            )
-            (repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1" / "TODO.md").unlink()
-            errors = validate_pr_preflight(
-                "governance",
-                58,
-                "GOV-0029-remove-legacy-todo-md",
-                "GOV",
-                "v0.2.0",
-                "2026-S15",
-                [
-                    "docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md",
-                    "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md",
-                ],
-                repo_root=repo,
-            )
-        self.assertTrue(any("最小终态" in error for error in errors))
-
-    def test_spec_pr_accepts_delete_only_legacy_todo_cleanup(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir)
-            write_exec_plan(
-                repo,
-                item_key="FR-0001-governance-stack-v1",
-                issue="#1",
-                item_type="FR",
-                active_item_key="FR-0001-governance-stack-v1",
-                related_spec="docs/specs/FR-0001-governance-stack-v1/",
-            )
-            write_formal_spec_suite(repo, with_todo=True)
-            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "TODO.md").unlink()
-            errors = validate_pr_preflight(
-                "spec",
-                1,
-                "FR-0001-governance-stack-v1",
-                "FR",
-                "v0.1.0",
-                "2026-S14",
-                ["docs/specs/FR-0001-governance-stack-v1/TODO.md"],
-                repo_root=repo,
-            )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("核心文件变更" in error for error in errors))
 
     def test_spec_pr_rejects_adjunct_only_suite_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1332,7 +1074,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 active_item_key="FR-0001-governance-stack-v1",
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             adjunct = repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "contracts" / "README.md"
             adjunct.parent.mkdir(parents=True, exist_ok=True)
             adjunct.write_text("# contracts\n", encoding="utf-8")
@@ -1358,7 +1100,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=True)
             errors = validate_pr_preflight(
                 "spec",
                 1,
@@ -1381,7 +1123,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "implementation",
                 1,
@@ -1406,7 +1148,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 related_spec="docs/specs/FR-0002-content-detail-runtime-v0-1/",
                 related_decision="docs/decisions/ADR-0001-governance-bootstrap-contract.md",
             )
-            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
             (repo / "docs" / "decisions").mkdir(parents=True, exist_ok=True)
             (repo / "docs" / "decisions" / "ADR-0001-governance-bootstrap-contract.md").write_text(
                 "# ADR-0001 bootstrap\n",
@@ -1437,7 +1179,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 related_spec="docs/specs/FR-0001-governance-stack-v1/",
                 related_decision="docs/decisions/ADR-0003-shared.md",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             write_decision(repo, "docs/decisions/ADR-0003-shared.md", issue="#2", item_key="GOV-0002-other")
             errors = validate_pr_preflight(
                 "spec",
@@ -1470,7 +1212,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 issue="#57",
                 item_key="GOV-0028-harness-compat-migration",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "spec",
                 57,
@@ -1493,7 +1235,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 item_type="FR",
                 active_item_key="FR-0001-governance-stack-v1",
             )
-            write_formal_spec_suite(repo, with_todo=False)
+            write_formal_spec_suite(repo, with_todo=True)
             errors = validate_pr_preflight(
                 "governance",
                 1,

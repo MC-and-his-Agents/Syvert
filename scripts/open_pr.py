@@ -19,7 +19,6 @@ from scripts.item_context import (
     INPUT_MODE_UNBOUND,
     active_exec_plans_for_issue,
     allows_legacy_metadata_free_formal_spec_decision,
-    validate_additional_spec_contracts,
     classify_exec_plan_input_mode,
     load_item_context_from_exec_plan,
     spec_dir_has_minimum_suite,
@@ -30,12 +29,6 @@ from scripts.item_context import (
     valid_item_key,
     validate_bound_formal_spec_scope,
 )
-from scripts.context_guard import (
-    is_exec_plan_file,
-    is_legacy_todo_file,
-    validate_legacy_todo_cleanup_foreign_exec_plan_touch,
-)
-
 from scripts.common import (
     CommandError,
     REPO_ROOT,
@@ -58,25 +51,13 @@ ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "A
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
 
 
-def is_deleted_legacy_todo_change(path: str, *, repo_root: Path) -> bool:
-    normalized = Path(path)
-    parts = normalized.parts
-    if len(parts) != 4:
-        return False
-    if parts[0] != "docs" or parts[1] != "specs" or not parts[2].startswith("FR-") or parts[3] != "TODO.md":
-        return False
-    return not (repo_root / normalized).exists()
-
-
-def has_formal_spec_core_file_changes(changed_files: list[str], *, repo_root: Path | None = None) -> bool:
+def has_formal_spec_core_file_changes(changed_files: list[str]) -> bool:
     for path in changed_files:
         normalized = Path(path)
         parts = normalized.parts
         if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in FORMAL_SPEC_CORE_FILES:
             return True
-    if repo_root is None:
-        return False
-    return bool(changed_files) and all(is_deleted_legacy_todo_change(path, repo_root=repo_root) for path in changed_files)
+    return False
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -125,9 +106,6 @@ def has_bound_formal_spec_input(
         spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
         if spec_dir is None:
             return False
-        additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, exec_plan)
-        if additional_spec_errors:
-            return False
         if validate_bound_formal_spec_scope(repo_root, exec_plan, changed_files):
             return False
         if exec_plan.get("关联 decision", ""):
@@ -137,14 +115,7 @@ def has_bound_formal_spec_input(
                 and allows_legacy_metadata_free_formal_spec_decision(exec_plan, decision_errors)
             ):
                 return False
-        if validate_suite(spec_dir):
-            return False
-        for extra_spec_dir in additional_spec_dirs:
-            if extra_spec_dir == spec_dir.relative_to(repo_root.resolve()):
-                continue
-            if validate_suite(repo_root / extra_spec_dir):
-                return False
-        return True
+        return not validate_suite(spec_dir)
 
     if allow_unbound_local_fallback and input_mode == INPUT_MODE_UNBOUND and item_type == "FR":
         expected_dir = repo_root / "docs" / "specs" / item_key
@@ -373,23 +344,7 @@ def validate_pr_preflight(
     if validate_worktree_binding_check:
         errors.extend(validate_current_worktree_binding(issue, repo_root=repo_root))
 
-    for raw_path in changed_files:
-        path = Path(raw_path)
-        target = repo_root / path
-        if is_legacy_todo_file(path) and target.exists():
-            errors.append(f"{target}: legacy `TODO.md` 已退出正式治理流，请删除该文件。")
-        if issue is not None and is_exec_plan_file(path) and target.exists():
-            errors.extend(
-                f"{target}: {error}"
-                for error in validate_legacy_todo_cleanup_foreign_exec_plan_touch(
-                    repo_root,
-                    target,
-                    current_issue=issue,
-                    changed_paths=changed_files,
-                )
-            )
-
-    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files, repo_root=repo_root):
+    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files):
         errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
     if pr_class == "spec" and not has_bound_formal_spec_input(

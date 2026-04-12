@@ -20,11 +20,13 @@
 - 阶段 1：建立 `FR-0003` formal spec 套件，冻结治理 requirement 与边界。
 - 阶段 2：更新顶层治理文档，消除“版本层 / 冲刺层 / 事项层”与 `Phase / FR / Work Item` 的冲突。
 - 阶段 3：补齐 `v0.2.0` / `2026-S15` 索引，以及 `GOV-0027`、`GOV-0028`、`GOV-0029` 的 exec-plan / decision 工件链，完成受控 PR 前置条件。
+- 阶段 4：由 `GOV-0029` 先完成独立 spec review，随后在独立 governance PR 中落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
 
 ## 实现约束
 
 - 不允许触碰的边界：
-  - 只允许为关闭 legacy `TODO.md` 入口做最小必要的存量 formal spec、`scripts/**`、`scripts/policy/**` 与 `tests/governance/**` 调整
+  - formal spec PR 只允许修改 `FR-0003` formal spec 套件与当前事项所需的最小文档工件
+  - `GOV-0029` 的模板、`scripts/**`、`scripts/policy/**`、`tests/governance/**` 与存量 suite 清理必须放在独立 governance PR
   - 不混入与 `TODO.md` 清理无关的治理改造
   - 不混入业务实现代码
 - 与上位文档的一致性约束：
@@ -34,28 +36,29 @@
 ## 测试与验证策略
 
 - 单元测试：
-  - 运行治理测试套件，确认未破坏现有 guard / workflow 约束
+  - formal spec PR 运行 `docs_guard` 与 `spec_guard --all`，确认 formal spec 套件与文档引用结构合法
 - 集成/契约测试：
-  - 运行 `open_pr --dry-run`、`pr_scope_guard`、`governance_gate` 验证当前 Work Item 的受控入口链路
+  - formal spec PR 运行 `open_pr --class spec --dry-run` 与 `pr_scope_guard --class spec`，确认当前事项可通过独立规约审查入口
+  - 后续独立 governance PR 再运行治理测试套件、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --class governance --dry-run`
 - 手动验证：
   - 核对 GitHub `#54 / #55 / #56 / #57 / #58` 与仓内 `FR-0003 / GOV-0027 / GOV-0028 / GOV-0029 / v0.2.0 / 2026-S15` 的映射关系
 
 ## TDD 范围
 
 - 先写测试的模块：
-  - 与 legacy `TODO.md` 生命周期相关的 governance guard / policy 回归场景
+  - 无。formal spec PR 本身不引入运行时代码；相关 guard / policy 回归测试放在后续独立 governance PR 中完成
 - 暂不纳入 TDD 的模块与理由：
-  - 纯文档口径收敛部分不新增独立运行时入口，以现有治理门禁作为回归证据
+  - formal spec 与索引工件更新属于规约审查输入，不在当前 PR 中实现对应运行时行为
 
 ## 并行 / 串行关系
 
 - 可并行项：
   - formal spec 套件编写
-  - 顶层治理文档口径收敛
   - release / sprint 索引与 decision / exec-plan 补齐
 - 串行依赖项：
   - `GOV-0027`、`GOV-0028`、`GOV-0029` 开 PR 前，必须先完成 formal spec、exec-plan 与索引落盘
-  - merge 前，必须完成所有 governance guard、review、guardian 与 checks
+  - `GOV-0029` 的独立 governance PR 必须等待当前 formal spec PR 合入 `main`
+  - merge 前，必须完成当前 PR 所需的 review、guardian 与 checks
 - 阻塞项：
   - 若 `release` / `sprint` 索引缺失或 active `exec-plan` 不合法，受控入口会直接拒绝
 
@@ -69,4 +72,4 @@
 
 - 结论：通过
 - 未决问题：无
-- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许 `GOV-0027`、`GOV-0028`、`GOV-0029` 按各自边界进入治理 PR 收口
+- implementation-ready 判定：已满足；`FR-0003` 的 formal spec 允许 `GOV-0027`、`GOV-0028`、`GOV-0029` 按各自边界进入执行回合，其中 `GOV-0029` 需先完成当前独立规约 PR，再进入独立治理实现 PR

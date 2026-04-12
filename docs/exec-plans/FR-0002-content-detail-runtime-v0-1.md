@@ -20,6 +20,7 @@
 ## 范围
 
 - 本次纳入：
+  - `docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md`
   - `docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`
   - `docs/releases/v0.1.0.md`
   - `docs/sprints/2026-S15.md`
@@ -33,7 +34,7 @@
 
 - `origin/main@dca85ef22fa420ac420b893254449c658fd01b05` 已包含 `FR-0002` 当前主线所需的关键前提：PR `#43`、`#44`、`#48`、`#51`、`#52`。
 - PR `#53` 已打开，当前受审 head 已把父事项 closeout 文档、release 完成依据与 sprint closeout 结果落入本轮 docs-only diff。
-- 首轮 guardian 已指出三处工件一致性问题：formal closeout 证据成熟度过早推进、active `exec-plan` 未绑定当前 PR、`#44` 的 runtime / CLI 证据链尚未回指 `CHORE-0041`。
+- 首轮 guardian 已指出三处工件一致性问题：`TODO.md` 的成熟度过早推进到 `merge-ready`、active `exec-plan` 未绑定当前 PR、`#44` 的 runtime / CLI 证据链尚未回指 `CHORE-0041`。
 - 当前执行现场为独立 docs closeout worktree：`/Users/claw/code/worktrees/syvert/issue-38-fr-0002-content-detail-runtime-v0-1-fr-0002-v0-1-0-content-detail-runtime`。
 
 ## 下一步动作
@@ -99,7 +100,7 @@
 
 ## 回滚方式
 
-- 如需回滚，使用独立 revert PR 撤销本事项对 `docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`、`docs/releases/v0.1.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
+- 如需回滚，使用独立 revert PR 撤销本事项对 `docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md`、`docs/exec-plans/FR-0002-content-detail-runtime-v0-1.md`、`docs/releases/v0.1.0.md` 与 `docs/sprints/2026-S15.md` 的增量修改。
 
 ## 最近一次 checkpoint 对应的 head SHA
 

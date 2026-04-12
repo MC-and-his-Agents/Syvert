@@ -18,7 +18,7 @@ class PrScopeGuardTests(unittest.TestCase):
         )
         self.assertEqual(report["violations"], [])
 
-    def test_implementation_rejects_legacy_todo(self) -> None:
+    def test_implementation_allows_spec_todo(self) -> None:
         report = build_report(
             "implementation",
             [
@@ -26,7 +26,7 @@ class PrScopeGuardTests(unittest.TestCase):
                 "docs/specs/FR-0001-example/TODO.md",
             ],
         )
-        self.assertTrue(any(item["path"].endswith("TODO.md") for item in report["violations"]))
+        self.assertEqual(report["violations"], [])
 
     def test_docs_rejects_governance(self) -> None:
         report = build_report(
