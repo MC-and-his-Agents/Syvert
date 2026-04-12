@@ -20,7 +20,7 @@
   - 定义双参考适配器回归检查的对象、覆盖范围、失败语义与固定版本流程地位
   - 定义平台泄漏检查在本仓库中的判定边界与失败语义
   - 定义 `FR-0007` 与 `FR-0006` contract harness 的关系
-  - 定义与 `InputTarget`、`CollectionPolicy`、标准化错误模型、adapter registry 的依赖关系
+  - 定义与共享输入模型、标准化错误模型、adapter registry、contract harness 的依赖关系
 - 本次不纳入：
   - 任何具体 CI 工作流、脚本参数、目录结构或 GitHub Actions 编排
   - `FR-0004`、`FR-0005`、`FR-0006` 的 formal spec 语义本体
@@ -38,8 +38,9 @@
   - `FR-0006` 定义的是 contract test harness 与 fake adapter 的验证基座；`FR-0007` 定义的是版本级 gate 如何消费 harness 结论、如何叠加真实参考适配器回归与平台泄漏检查。二者不得互相替代。
   - 双参考适配器回归检查的 gate object 至少包括：
     - adapter registry 中登记为 `v0.2.0` 参考适配器的两条真实参考实现
-    - 它们在 `FR-0004` 定义的 `InputTarget` 与 `CollectionPolicy` 约束下可构造的标准输入与执行策略
-    - 它们在 `FR-0005` 定义的错误模型与 registry 语义下产生的成功态 / 失败态结果
+    - 它们在上游共享输入模型约束下可构造的标准输入与执行策略
+    - 它们在上游错误模型与 registry 语义下产生的成功态 / 失败态结果
+  - 本 FR 只要求版本 gate 消费上游已批准的共享输入模型、错误模型、registry 与 harness 结论；不在此处冻结这些上游 contract 的字段、状态机或 payload 细节。
   - 平台泄漏检查的判定边界必须固定为：
     - 允许平台语义存在于 reference adapter、自身平台研究文档与 adapter 私有实现边界
     - 禁止平台语义渗入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、以及版本 gate 自身的共享判定逻辑
@@ -116,15 +117,14 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 - [ ] formal spec 明确写出版本 gate 的 mandatory trigger、覆盖对象与 fail-closed 失败语义
 - [ ] formal spec 明确写出平台泄漏检查在 Syvert 中的允许边界与禁止边界
 - [ ] formal spec 明确区分 `FR-0006` 的 harness 基座职责与 `FR-0007` 的版本 gate 职责
-- [ ] formal spec 明确写出 `FR-0004`、`FR-0005`、adapter registry 与错误模型对版本 gate 的依赖关系
-- [ ] formal spec 明确写出 `InputTarget` 与 `CollectionPolicy` 对版本 gate 输入约束的依赖关系
+- [ ] formal spec 明确写出共享输入模型、错误模型、adapter registry 与 harness 结果对版本 gate 的依赖关系
 - [ ] formal spec 不把唯一实现形式绑定到某个脚本、CI 文件或命令行参数
 
 ## 依赖与外部前提
 
 - 外部依赖：
   - `#63` 作为 `v0.2.0` 当前 Phase 已建立
-  - `#64`、`#65`、`#66` 分别承载输入模型、错误模型/registry、contract harness 的上游 FR
+  - `#64`、`#65`、`#66` 分别承载共享输入模型、错误模型/registry、contract harness 的上游 FR
 - 上下游影响：
   - 后续 `FR-0007` 下属 Work Item 需基于本 formal spec 实现 gate 编排、结果收口与 closeout
   - `FR-0006` 的实现必须提供可被版本 gate 消费的 contract harness 结论
