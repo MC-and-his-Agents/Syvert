@@ -10,7 +10,8 @@
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
 - 关联 PR：`#91`
-- active 收口事项：`CHORE-0089-fr-0004-core-adapter-projection`
+- 状态：`inactive (historical implementation round; merged via PR #91 and issue #89 closed)`
+- 历史收口事项：`CHORE-0089-fr-0004-core-adapter-projection`
 
 ## 目标
 
@@ -38,27 +39,25 @@
 ## 当前停点
 
 - `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 已由 PR `#90` 合入并关闭。
-- 当前行为 checkpoint 已落盘到 `72858bfc4c14e7d763b47c1c37c784aee8d4dbf8`：
+- `#89` 已由 PR `#91` 合入并关闭；最终主干行为 checkpoint 固定为 `72858bfc4c14e7d763b47c1c37c784aee8d4dbf8`：
   - Runtime 新增 `AdapterTaskRequest(capability, target_type, target_value, collection_mode)`，由 Core 统一把 legacy `TaskRequest` 与 native `CoreTaskRequest` 投影到 adapter-facing request
   - 调用侧 operation `content_detail_by_url` 已在进入 adapter 前投影为 capability family `content_detail`
   - native `CoreTaskRequest` 不再在 `#87` 的 fail-closed 位置提前返回，而是与 legacy 路径一起命中 shared admission 与 adapter projection
   - unsupported `target_type` / `collection_mode` 现在统一在 shared admission 层失败
   - in-tree adapters 与 runtime fixtures 已把 `supported_capabilities` 同步到 `content_detail`，并承接显式 `target_type` / `target_value` / `collection_mode`
-- guardian 首轮针对 PR `#91` / head `9e9b45e3472e1acad3b8c97538fd57829cf5e179` 返回 `REQUEST_CHANGES`：
+- guardian 首轮针对 PR `#91` / head `9e9b45e3472e1acad3b8c97538fd57829cf5e179` 的 `REQUEST_CHANGES` 已在最终合入前完成收口：
   - 阻断 1：shared admission 保护不足，若未来 adapter 声明更宽 target / collection 轴，`content_id`、`public`、`authenticated` 会错误进入执行链
   - 阻断 2：xhs / douyin adapter 对 `AdapterTaskRequest` 的 direct invocation 接受了其未声明支持的 `public` / `authenticated`
-- 当前收口：
+- 最终收口结果：
   - Runtime 重新前置 shared projection guard，保持当前执行边界仍为 `target_type=url` 与 `collection_mode=hybrid`
   - xhs / douyin adapter 自身对 `AdapterTaskRequest` 也回到 fail-closed，只接受 `collection_mode=hybrid`
   - 回归测试新增“broad declared axes 仍被 shared projection guard 拦截”和“reference adapter direct invocation 拒绝非 hybrid”的覆盖
-- 当前独立 worktree：`/Users/mc/code/worktrees/syvert/issue-89-fr-0004-core-adapter`
-- 当前执行分支：`issue-89-fr-0004-core-adapter`
+- 历史 worktree / 分支：`/Users/mc/code/worktrees/syvert/issue-89-fr-0004-core-adapter` / `issue-89-fr-0004-core-adapter`；对应实现回合已完成并退役
 
 ## 下一步动作
 
-- 重新运行实现门禁与 guardian，确认 `REQUEST_CHANGES` 已收口。
-- 若 guardian `APPROVE` 且 `safe_to_merge=true`，通过受控入口合并 PR。
-- 合并后关闭 `#89`，并把 release / sprint / closeout 工件回链到该 PR。
+- 无 active 动作。
+- `#89` 的主干实现、测试与 closeout 证据已由 `#68` implementation 聚合 closeout 继续消费；本文件仅保留为历史实现记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -85,7 +84,7 @@
 - `gh issue view 87 --repo MC-and-his-Agents/Syvert`
 - `gh issue view 88 --repo MC-and-his-Agents/Syvert`
 - `gh issue view 89 --repo MC-and-his-Agents/Syvert`
-- 已核对：`#87` 已关闭，`#89/#88/#68/#64` 仍为 `OPEN`
+- 已核对：`#87` 已关闭，`#89` 已由 PR `#91` 合入并关闭，`#88/#68/#64` 仍为 `OPEN`
 - 已核对：`#64` 正文仍保留过期的 `formal spec：待创建`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_cli tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 120 tests in 3.315s`，`OK`
@@ -105,6 +104,7 @@
   - 收口动作：恢复 shared projection guard 到 `url + hybrid`，并让 xhs / douyin adapter 对 `AdapterTaskRequest` 的 collection_mode 回到 fail-closed
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_cli`
   - 结果：`Ran 122 tests in 3.821s`，`OK`
+- 已完成最终收口：PR `#91` merged，Issue `#89` closed
 
 ## 未决风险
 

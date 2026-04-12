@@ -7,7 +7,9 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
+- 状态：`historical formal-spec planning record; formal spec merged via PR #82`
+- 当前 active exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-implementation-closeout.md`
+- formal spec 历史 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
 
 ## 实施目标
 
@@ -66,13 +68,13 @@
 
 ## 进入实现前条件
 
-- [ ] `spec review` 已通过
+- [x] `spec review` 已通过
 - [x] 关键风险已记录并有缓解策略
 - [x] 关键依赖可用
 - [x] `InputTarget` 与 `CollectionPolicy` 的最小语义、边界与兼容关系已冻结
 
 ## spec review 结论
 
-- 结论：待当前 PR 的 reviewer / guardian 审查输出最终结论。
-- 未决问题：审查应重点确认 `FR-0002` 兼容映射、`InputTarget` / `CollectionPolicy` 与 `adapter-sdk.md` 的契约边界，以及 active `exec-plan` 与当前 Work Item 审查态的一致性。
-- implementation-ready 判定：待 `spec_review.md` 定义的 formal spec 审查结论确认后再更新。
+- 结论：`APPROVE`。`FR-0004` formal spec 已由 PR `#82` 合入主干。
+- 未决问题：无。formal spec 审查回合已完成；后续只允许在独立 implementation / closeout 回合中消费该 formal spec。
+- implementation-ready 判定：`是`。`#87/#89/#88` 已按 formal spec 边界完成 implementation 回合，并由 `#68` 继续承接 implementation 聚合 closeout。

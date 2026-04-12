@@ -10,7 +10,8 @@
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
 - 关联 PR：`#90`
-- active 收口事项：`CHORE-0087-fr-0004-core-input-admission`
+- 状态：`inactive (historical implementation round; merged via PR #90 and issue #87 closed)`
+- 历史收口事项：`CHORE-0087-fr-0004-core-input-admission`
 
 ## 目标
 
@@ -35,18 +36,15 @@
 
 ## 当前停点
 
-- `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 当前已完成 Core 共享输入模型接入、最小结构校验与对应测试补强。
-- 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`；实现分支 `issue-87-fr-0004-core` 已推送远端，并打开 implementation PR `#90`。
-- 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。
-- 第二轮收口已把显式 `CoreTaskRequest` 的执行路径收紧为 fail-closed：`#87` 只负责 shared model 受理与校验，不提前开放 adapter admission / execution happy path。
-- 第三轮实现收口已把 legacy `TaskRequest(input.url)` 路径纳入 shared-axis admission：adapter 现在必须显式声明 `supported_targets` 包含 `url` 且 `supported_collection_modes` 包含 `hybrid`，否则 legacy URL 流量在进入 adapter 前 fail-closed。
-- 第四轮实现收口已把 native `CoreTaskRequest` 的 fail-closed 重新前置到 adapter lookup / shared-axis admission 之前，保持 `#87` 的边界为“显式受理 + 校验”，不提前吞并 `#89` 的 adapter admission 责任。
-- 最近一次行为 checkpoint 固定为 `3f8444d342298193c63518725edcb74ecdff1418`；其后若只追加 PR / exec-plan 审查态元数据，不改写运行时行为。当前受审 head 以 PR `#90` 与 guardian state 绑定为准。
+- `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 已由 PR `#90` 合入并关闭。
+- 历史 worktree / 分支：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core` / `issue-87-fr-0004-core`；对应实现回合已完成并退役。
+- `#87` 的最终主干行为已收口为：Core 显式接收 `InputTarget` 与 `CollectionPolicy`，完成最小结构校验，并保持平台特定字段不提升到 Core。
+- guardian 多轮阻断已全部在 PR `#90` 中收口；最近一次行为 checkpoint `3f8444d342298193c63518725edcb74ecdff1418` 仅保留为历史追溯锚点，不再承载 active 审查语义。
 
 ## 下一步动作
 
-- 基于当前 head 重跑 guardian 审查与受控 merge。
-- 合并后关闭 `#87`，并退役当前 branch / worktree。
+- 无 active 动作。
+- `#87` 的主干实现、测试与 closeout 证据已由 `#68` implementation 聚合 closeout 继续消费；本文件仅保留为历史实现记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,7 +67,7 @@
 - 已阅读：`spec_review.md`
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
-- 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
+- 已核对：当前 `FR-0004` formal spec 已合入主干，`#87` 已由 PR `#90` 合入并关闭
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：在最近一次行为 checkpoint `3f8444d342298193c63518725edcb74ecdff1418` 上执行，`Ran 120 tests in 4.289s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
@@ -94,6 +92,7 @@
 - guardian 三轮审查：`REQUEST_CHANGES`
   - 阻断项：native `CoreTaskRequest` 在 fail-closed 前先触发了 adapter admission，越过了 `#87` 的边界
   - 收口结果：native shared-input 现在在 adapter lookup / shared-axis admission 前直接 fail-close；legacy URL 路径继续承担本回合允许的最小可执行语义
+- 已完成最终收口：PR `#90` merged，Issue `#87` closed
 
 ## 未决风险
 
