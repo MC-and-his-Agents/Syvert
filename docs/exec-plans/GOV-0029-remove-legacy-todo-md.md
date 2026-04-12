@@ -23,8 +23,6 @@
 - 本次纳入：
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
   - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
-  - `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/spec.md`
-- `docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/plan.md`
   - `docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
   - `docs/exec-plans/GOV-0029-remove-legacy-todo-md.md`
   - `docs/releases/v0.2.0.md`
