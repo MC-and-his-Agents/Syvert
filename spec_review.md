@@ -20,9 +20,9 @@
 
 - `spec.md`
 - `plan.md`
-- `TODO.md`
+- `TODO.md`（当前主干 live guard 仍要求；`GOV-0029` 仅批准其在后续独立 governance 实现 PR 中退出最小套件）
 
-模板路径见 [docs/specs/_template](./docs/specs/_template)。
+模板路径见 [docs/specs/_template](./docs/specs/_template)。注意：其中的 `TODO.md` 当前仍作为 compat 过渡模板保留，以匹配现行 live guard；待 `GOV-0029` 的后续独立 governance 实现 PR 合入后，才会退出 formal spec 最小套件。
 
 ### `spec.md` 必查项
 
@@ -71,9 +71,10 @@
 ## 规约与实现分离规则
 
 - 正式规约变更默认不与实现代码混在同一 PR
-- 若实现 PR 仅回写 `TODO.md` 进度且不改变正式契约语义，可与实现同 PR
 - 一旦修改正式契约语义，应回到规约审查链路
 - 治理 bootstrap 例外仅允许 `governance` 类 PR 同时携带 bootstrap contract 或对应正式规约工件；不得混入业务实现代码
+- 当 formal spec 已明确批准某个治理事项的目标态与过渡规则后，后续严格受该批准范围约束的 legacy 工件清理、guard / policy / `open_pr` / 测试收口，可进入独立 `governance` 实现 PR；只要实现 PR 不再改写 formal spec 语义本身，就不应被再次判定为新的 formal spec 变更
+- 对 `GOV-0029` 这类 legacy `TODO.md` 退出事项，上述后续实现 PR 允许在已批准范围内删除 legacy `TODO.md`、同步治理文档 / 模板 / guard / policy / `open_pr` / 回归测试，但前提是 PR 范围、exec-plan、decision 与 formal spec 对该清理边界表达一致
 
 ## 审查结论
 

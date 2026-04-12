@@ -45,7 +45,8 @@
 ## 示例链路
 
 - formal spec：`docs/specs/FR-XXXX-<slug>/spec.md`
+- formal spec plan：`docs/specs/FR-XXXX-<slug>/plan.md`
 - exec-plan：`docs/exec-plans/<item_key>.md`
-- TODO：`docs/specs/FR-XXXX-<slug>/TODO.md`
+- legacy TODO（若仍存在）：`docs/specs/FR-XXXX-<slug>/TODO.md`，仅作为 inert 历史残留，不再是 live formal spec 入口
 - 绑定关系：formal spec 绑定 FR `item_key`，exec-plan 绑定当前 Work Item `item_key`
 - 目标：通过 FR / Work Item 绑定关系，以及 `Issue`、`release`、`sprint` 串起规约、恢复工件与 PR

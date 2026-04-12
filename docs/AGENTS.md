@@ -23,7 +23,7 @@
 - 事项术语：`轻量事项` / `中等事项` / `核心事项`
 - 执行术语：
   - `新事项`：首次进入当前交付漏斗、且尚未形成 active `exec-plan` 恢复工件的事项
-  - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项；若只保留 legacy `TODO.md` 而没有 active `exec-plan`，仍不得视为已具备当前执行回合恢复入口
+  - `存量事项`：已存在仓库内恢复工件，但尚未补齐当前事项上下文字段的事项；若缺少 active `exec-plan`，仍不得视为已具备当前执行回合恢复入口
   - `长任务`：需要 `checkpoint / resume / handoff` 恢复能力，并因此维护 `exec-plan` 的执行回合
 - GitHub 层次术语：`Phase` / `FR` / `Work Item`
 - 仓内语义术语：`formal spec` / `exec-plan` / `decision` / `release index` / `sprint index`
@@ -68,11 +68,10 @@
 `docs/specs/` 只承载正式规约，不承载 backlog 草稿。
 
 - FR 目录命名：`FR-XXXX-<slug>`
-- 最小套件：`spec.md`、`plan.md`、`TODO.md`
-- `TODO.md` 可在实现 PR 按需回写进度，但不得修改正式契约语义
+- 当前主干 live 最小套件：`spec.md`、`plan.md`、`TODO.md`
+- `GOV-0029` 只批准 `TODO.md` 在后续独立 governance 实现 PR 中退出 live 最小套件；在此之前，历史 `TODO.md` 仍以 compat 过渡态存在，不得新增语义或继续承担状态镜像 / 恢复主入口职责
 - 正式规约与实现默认分 PR；例外按 [spec_review.md](../spec_review.md) 执行
 - formal spec 绑定到 GitHub FR；Work Item 只通过 `item_key`、exec-plan、PR 与该 formal spec 建立关联
-- 本轮不删除已有 `TODO.md`
 
 ## 载体职责
 
@@ -84,7 +83,6 @@
 - `docs/sprints/**`：sprint 协作主题、退出条件与工件入口
 - `spec.md`：需求、验收、异常与边界
 - `plan.md`：实施拆分、依赖、验证、进入实现前条件
-- `TODO.md`：formal spec 补充清单与历史停点载体；当前恢复主入口仍是 active `exec-plan`
 - `exec-plan`：长任务执行细节、事项上下文、checkpoint 与恢复上下文；是默认恢复主入口
 - PR：仅绑定当前 Work Item 的变更范围、风险、验证证据、关闭语义，并显式引用上位 FR / Phase
 
