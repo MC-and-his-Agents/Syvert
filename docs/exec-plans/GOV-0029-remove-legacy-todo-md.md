@@ -42,7 +42,7 @@
 ## 当前停点
 
 - 上一轮把 `FR-0003` formal spec 语义与治理实现代码放在同一 PR 中，guardian 因“formal spec / implementation 必须分离”给出 `REQUEST_CHANGES`。
-- 当前分支已回退为 governance contract 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan、release / sprint 索引，以及使 TODO-exit 语义成为仓内权威口径所必需的治理文档变更；legacy `TODO.md` 的文件删除与实现侧收口留在后续独立 governance PR。
+- 当前分支已回退为 governance contract 范围，只保留 `FR-0003` formal spec、当前事项 decision / exec-plan、release / sprint 索引，以及使 TODO-exit 语义成为仓内权威口径所必需的治理文档变更；legacy `TODO.md` 的文件删除与实现侧收口留在后续独立 governance 实现 PR。
 - 当前目标是先让 PR `#61` 作为独立 formal spec 审查入口合入 `main`，再基于已批准规约继续后续 governance 实现 PR。
 
 ## 下一步动作

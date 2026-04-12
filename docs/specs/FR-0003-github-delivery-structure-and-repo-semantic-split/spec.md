@@ -54,7 +54,7 @@
   - GitHub 不承载 formal spec 正文、exec-plan 或 checkpoint 细节。
   - 仓库不承载 backlog / sprint / project 状态真相。
   - formal spec 与实现 PR 仍默认分离。
-  - `GOV-0029` 必须先通过独立 formal spec 审查，再以独立 governance PR 落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
+  - `GOV-0029` 必须先通过独立 formal spec 审查，再以独立 governance 实现 PR 落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理。
 
 ## GWT 验收场景
 
@@ -84,15 +84,15 @@ Then legacy `TODO.md` 可以作为未触碰的 inert 历史文件保留，但不
 
 ### 场景 5
 
-Given 当前 formal spec / governance contract PR 已把高优先级治理文档与模板口径收成一致  
-When `GOV-0029` 的后续独立 governance PR 对已授权套件删除 legacy `TODO.md` 并同步修改 guard / policy / `open_pr` / 回归测试  
+Given 当前 formal spec / governance contract PR 已把高优先级治理文档口径收成一致  
+When `GOV-0029` 的后续独立 governance 实现 PR 对已授权套件删除 legacy `TODO.md` 并同步修改 guard / policy / `open_pr` / 回归测试  
 Then 删除必须被允许，且实现链路必须覆盖 guard、policy、`open_pr`、回归测试与存量 suite 清理的对齐收口
 
 ### 场景 6
 
-Given `GOV-0029` 先以 spec-only PR 更新 `FR-0003` formal spec  
+Given `GOV-0029` 先以 formal spec / governance contract PR 更新 `FR-0003` formal spec  
 When 后续需要落地模板、guard、policy、测试与存量 legacy `TODO.md` 清理  
-Then 必须另开独立 governance PR；若 PR 继续回写或新增 legacy `TODO.md`，则必须被拒绝
+Then 必须另开独立 governance 实现 PR；若 PR 继续回写或新增 legacy `TODO.md`，则必须被拒绝
 
 ## 异常与边界场景
 
@@ -112,12 +112,12 @@ Then 必须另开独立 governance PR；若 PR 继续回写或新增 legacy `TOD
 - [ ] formal spec 明确绑定 FR，exec-plan 明确绑定 Work Item
 - [ ] release / sprint 被定义为执行上下文或索引，而不是状态真相源
 - [ ] 当前 formal spec / governance contract PR 已让 `WORKFLOW.md`、`docs/AGENTS.md`、`spec_review.md`、`docs/specs/README.md` 与 `docs/process/agent-loop.md` 对 legacy `TODO.md` 的治理口径一致
-- [ ] 后续独立 governance PR 已让 `docs/specs/_template/**`、formal spec 最小套件、guard、policy、`open_pr` 与 `tests/governance/**` 对 legacy `TODO.md` 的处理收口一致，并完成存量 legacy `TODO.md` 清理
+- [ ] 后续独立 governance 实现 PR 已让 `docs/specs/_template/**`、formal spec 最小套件、guard、policy、`open_pr` 与 `tests/governance/**` 对 legacy `TODO.md` 的处理收口一致，并完成存量 legacy `TODO.md` 清理
 
 ## 依赖与外部前提
 
 - 外部依赖：
-  - GitHub 中已存在 `#54 -> #55 -> #56` 的事项树
+  - GitHub 中已存在 `#54 -> #55 -> #56/#57/#58` 的事项树
 - 上下游影响：
   - `#57` 在此 formal spec 基础上完成 harness 兼容迁移
   - `#58` 在此 formal spec 基础上先完成规约审查，再进入独立治理实现 PR 收口 legacy `TODO.md`
