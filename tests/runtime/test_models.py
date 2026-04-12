@@ -1,8 +1,22 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import unittest
 
-from syvert.runtime import TaskInput, TaskRequest, validate_request, validate_success_payload
+from syvert.runtime import (
+    CollectionPolicy,
+    CoreTaskRequest,
+    InputTarget,
+    TaskInput,
+    TaskRequest,
+    validate_request,
+    validate_success_payload,
+)
+
+
+@dataclass(frozen=True)
+class ExtendedInputTarget(InputTarget):
+    note_id: str
 
 
 class TaskRequestValidationTests(unittest.TestCase):
@@ -56,6 +70,84 @@ class TaskRequestValidationTests(unittest.TestCase):
             adapter_key="xhs",
             capability="content_detail_by_url",
             input=TaskInput(url=""),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
+
+    def test_accepts_core_request_model(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://www.xiaohongshu.com/explore/abc123",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        self.assertIsNone(validate_request(request))
+
+    def test_rejects_empty_target_value(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
+
+    def test_rejects_unknown_target_type(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                target_type="unknown_type",
+                target_value="https://www.xiaohongshu.com/explore/abc123",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
+
+    def test_rejects_unknown_collection_mode(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://www.xiaohongshu.com/explore/abc123",
+            ),
+            policy=CollectionPolicy(collection_mode="private"),
+        )
+
+        error = validate_request(request)
+
+        self.assertIsNotNone(error)
+        self.assertEqual(error["code"], "invalid_task_request")
+
+    def test_rejects_extended_target_shape_with_platform_specific_fields(self) -> None:
+        request = CoreTaskRequest(
+            target=ExtendedInputTarget(
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://www.xiaohongshu.com/explore/abc123",
+                note_id="66fad51c000000001b0224b8",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
         )
 
         error = validate_request(request)

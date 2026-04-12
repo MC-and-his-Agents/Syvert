@@ -3,7 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import unittest
 
-from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import (
+    CollectionPolicy,
+    CoreTaskRequest,
+    InputTarget,
+    PlatformAdapterError,
+    TaskInput,
+    TaskRequest,
+    execute_task,
+)
 
 
 @dataclass(frozen=True)
@@ -212,6 +220,93 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertIn("raw", envelope)
         self.assertEqual(envelope["normalized"]["canonical_url"], request.input.url)
         self.assertEqual(adapter.last_request.input.url, request.input.url)
+
+    def test_execute_task_accepts_core_request_shape(self) -> None:
+        adapter = SuccessfulAdapter()
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": adapter},
+            task_id_factory=lambda: "task-001b",
+        )
+
+        self.assertEqual(envelope["task_id"], "task-001b")
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["adapter_key"], "stub")
+        self.assertEqual(envelope["normalized"]["canonical_url"], "https://example.com/posts/2")
+        self.assertEqual(adapter.last_request.input.url, "https://example.com/posts/2")
+
+    def test_execute_task_rejects_unknown_target_type(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="unknown_type",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-invalid-target-type",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_unknown_collection_mode(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="private"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-invalid-collection-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_non_url_target_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="content_id",
+                target_value="abc123",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-non-url-target",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(

@@ -8,21 +8,43 @@ from uuid import uuid4
 
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
+LEGACY_COLLECTION_MODE = "hybrid"
+ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
+ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 MISSING = object()
 
 
 @dataclass(frozen=True)
-class TaskRequest:
-    adapter_key: str
-    capability: str
-    input: "TaskInput"
+class TaskInput:
+    url: str
 
 
 @dataclass(frozen=True)
-class TaskInput:
-    url: str
+class InputTarget:
+    adapter_key: str
+    capability: str
+    target_type: str
+    target_value: str
+
+
+@dataclass(frozen=True)
+class CollectionPolicy:
+    collection_mode: str
+
+
+@dataclass(frozen=True)
+class CoreTaskRequest:
+    target: InputTarget
+    policy: CollectionPolicy
+
+
+@dataclass(frozen=True)
+class TaskRequest:
+    adapter_key: str
+    capability: str
+    input: TaskInput
 
 
 @dataclass
@@ -40,7 +62,7 @@ def default_task_id_factory() -> str:
 
 
 def execute_task(
-    request: TaskRequest,
+    request: TaskRequest | CoreTaskRequest,
     *,
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
@@ -50,9 +72,19 @@ def execute_task(
     if task_id_error is not None:
         return failure_envelope(task_id, adapter_key, capability, task_id_error)
 
-    contract_error = validate_request(request)
+    normalized_request, contract_error = normalize_request(request)
     if contract_error is not None:
         return failure_envelope(task_id, adapter_key, capability, contract_error)
+    if normalized_request is None:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法"),
+        )
+
+    adapter_key = normalized_request.target.adapter_key
+    capability = normalized_request.target.capability
 
     adapter, adapter_error = get_adapter(adapters, adapter_key)
     if adapter_error is not None:
@@ -90,8 +122,12 @@ def execute_task(
             },
         )
 
+    adapter_request, projection_error = project_to_adapter_request(normalized_request)
+    if projection_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, projection_error)
+
     try:
-        payload = adapter.execute(request)
+        payload = adapter.execute(adapter_request)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error)
@@ -129,23 +165,82 @@ def execute_task(
 
 
 def validate_request(request: Any) -> dict[str, Any] | None:
-    if type(request) is not TaskRequest:
-        return runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法")
-    if not isinstance(request.adapter_key, str) or not request.adapter_key:
-        return runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
-    if request.capability != CONTENT_DETAIL_BY_URL:
-        return runtime_contract_error(
+    _, error = normalize_request(request)
+    return error
+
+
+def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, Any] | None]:
+    if type(request) is TaskRequest:
+        if not isinstance(request.adapter_key, str) or not request.adapter_key:
+            return None, runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
+        if request.capability != CONTENT_DETAIL_BY_URL:
+            return None, runtime_contract_error(
+                "invalid_capability",
+                f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
+            )
+        if type(request.input) is not TaskInput:
+            return None, runtime_contract_error("invalid_task_request", "input 必须为对象")
+        if not isinstance(request.input.url, str) or not request.input.url:
+            return None, runtime_contract_error("invalid_task_request", "input.url 不能为空")
+        return (
+            CoreTaskRequest(
+                target=InputTarget(
+                    adapter_key=request.adapter_key,
+                    capability=request.capability,
+                    target_type="url",
+                    target_value=request.input.url,
+                ),
+                policy=CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+            ),
+            None,
+        )
+    if type(request) is not CoreTaskRequest:
+        return None, runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法")
+    if type(request.target) is not InputTarget:
+        return None, runtime_contract_error("invalid_task_request", "target 必须为对象")
+    if type(request.policy) is not CollectionPolicy:
+        return None, runtime_contract_error("invalid_task_request", "policy 必须为对象")
+
+    target = request.target
+    policy = request.policy
+    if not isinstance(target.adapter_key, str) or not target.adapter_key:
+        return None, runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
+    if target.capability != CONTENT_DETAIL_BY_URL:
+        return None, runtime_contract_error(
             "invalid_capability",
             f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
         )
-    if type(request.input) is not TaskInput:
-        return runtime_contract_error("invalid_task_request", "input 必须为对象")
-    if not isinstance(request.input.url, str) or not request.input.url:
-        return runtime_contract_error("invalid_task_request", "input.url 不能为空")
-    return None
+    if not isinstance(target.target_value, str) or not target.target_value:
+        return None, runtime_contract_error("invalid_task_request", "target_value 不能为空")
+    if not isinstance(target.target_type, str) or target.target_type not in ALLOWED_TARGET_TYPES:
+        return None, runtime_contract_error("invalid_task_request", "target_type 不合法")
+    if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
+        return None, runtime_contract_error("invalid_task_request", "collection_mode 不合法")
+    return request, None
+
+
+def project_to_adapter_request(request: CoreTaskRequest) -> tuple[TaskRequest | None, dict[str, Any] | None]:
+    if request.target.target_type != "url":
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_task_request",
+                "当前运行时过渡路径仅支持 target_type=url",
+            ),
+        )
+    return (
+        TaskRequest(
+        adapter_key=request.target.adapter_key,
+        capability=request.target.capability,
+        input=TaskInput(url=request.target.target_value),
+        ),
+        None,
+    )
 
 
 def extract_request_context(request: Any) -> tuple[str, str]:
+    adapter_key: Any = ""
+    capability: Any = ""
     if isinstance(request, Mapping):
         try:
             adapter_key = request.get("adapter_key")
@@ -155,6 +250,20 @@ def extract_request_context(request: Any) -> tuple[str, str]:
             capability = request.get("capability")
         except Exception:
             capability = ""
+        if not isinstance(adapter_key, str) or not adapter_key:
+            try:
+                target = request.get("target")
+            except Exception:
+                target = None
+            if isinstance(target, Mapping):
+                try:
+                    adapter_key = target.get("adapter_key", "")
+                except Exception:
+                    adapter_key = ""
+                try:
+                    capability = target.get("capability", capability)
+                except Exception:
+                    capability = capability
     else:
         try:
             adapter_key = getattr(request, "adapter_key", "")
@@ -164,6 +273,20 @@ def extract_request_context(request: Any) -> tuple[str, str]:
             capability = getattr(request, "capability", "")
         except Exception:
             capability = ""
+        if (not isinstance(adapter_key, str) or not adapter_key) or (not isinstance(capability, str) or not capability):
+            try:
+                target = getattr(request, "target", None)
+            except Exception:
+                target = None
+            if target is not None:
+                try:
+                    adapter_key = getattr(target, "adapter_key", adapter_key)
+                except Exception:
+                    adapter_key = adapter_key
+                try:
+                    capability = getattr(target, "capability", capability)
+                except Exception:
+                    capability = capability
     safe_adapter_key = adapter_key if isinstance(adapter_key, str) else ""
     safe_capability = capability if isinstance(capability, str) else ""
     return safe_adapter_key, safe_capability
