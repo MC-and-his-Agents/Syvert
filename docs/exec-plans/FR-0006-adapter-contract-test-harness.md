@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 关联 PR：
+- 关联 PR：`#71`
 - active 收口事项：`FR-0006-adapter-contract-test-harness`
 
 ## 目标
@@ -32,6 +32,7 @@
 - 已在独立 worktree `issue-66-fr-0006-v0-2-0` 中创建 `FR-0006` formal spec 套件初稿，并同步最小 release / sprint 索引。
 - `docs_guard`、`spec_guard --all` 已通过。
 - `open_pr --dry-run` 首次校验暴露出当前仓库要求 active `exec-plan` 的受控入口约束，故补建本执行计划以继续受控 PR 流程。
+- spec PR `#71` 已通过受控入口创建，当前等待 checks 与 guardian。
 
 ## 下一步动作
 
@@ -61,6 +62,8 @@
   - 结果：通过
 - `python3 scripts/open_pr.py --class spec --issue 66 --item-key FR-0006-adapter-contract-test-harness --item-type FR --release v0.2.0 --sprint 2026-S15 --dry-run`
   - 结果：首次失败，原因是缺少 active `exec-plan`；已据此补齐当前执行上下文工件
+- `python3 scripts/open_pr.py --class spec --issue 66 --item-key FR-0006-adapter-contract-test-harness --item-type FR --release v0.2.0 --sprint 2026-S15 --title "spec: 收口 FR-0006 的适配器契约测试基座"`
+  - 结果：成功创建 PR `#71`
 
 ## 未决风险
 
@@ -73,5 +76,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9`
-- 说明：当前 checkpoint 基于创建 worktree 时的 `origin/main` head；待本轮 formal spec 变更形成提交后，再把新的受审 head 交由 guardian 与 merge gate 绑定。
+- `5c762f0b77bdcb1136334cbe69a12f871781ec44`
+- 说明：该 checkpoint 对应当前 formal spec 套件与最小索引更新的首个提交；后续若只补充 PR/guardian 元数据，可保留该 checkpoint，并由 guardian state 绑定最新受审 head。
