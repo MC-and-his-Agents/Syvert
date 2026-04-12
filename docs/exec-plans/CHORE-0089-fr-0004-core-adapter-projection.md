@@ -38,19 +38,20 @@
 ## 当前停点
 
 - `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 已由 PR `#90` 合入并关闭。
-- 当前 `main` / 本 worktree 仍处于 `#87` 结束时的过渡态：
-  - `CoreTaskRequest` 已可显式受理，但 native 路径在 adapter admission 前 fail-closed
-  - legacy `TaskRequest(input.url)` 已统一归一到 shared input 并命中 `supported_targets` / `supported_collection_modes`
-  - `project_to_adapter_request()` 仍投影回 legacy `TaskRequest(adapter_key, capability, input.url)` 形状
-  - in-tree adapters 仍以 `request.input.url` 与 `supported_capabilities={content_detail_by_url}` 工作
+- 当前行为 checkpoint 已落盘到 `72858bfc4c14e7d763b47c1c37c784aee8d4dbf8`：
+  - Runtime 新增 `AdapterTaskRequest(capability, target_type, target_value, collection_mode)`，由 Core 统一把 legacy `TaskRequest` 与 native `CoreTaskRequest` 投影到 adapter-facing request
+  - 调用侧 operation `content_detail_by_url` 已在进入 adapter 前投影为 capability family `content_detail`
+  - native `CoreTaskRequest` 不再在 `#87` 的 fail-closed 位置提前返回，而是与 legacy 路径一起命中 shared admission 与 adapter projection
+  - unsupported `target_type` / `collection_mode` 现在统一在 shared admission 层失败
+  - in-tree adapters 与 runtime fixtures 已把 `supported_capabilities` 同步到 `content_detail`，并承接显式 `target_type` / `target_value` / `collection_mode`
 - 当前独立 worktree：`/Users/mc/code/worktrees/syvert/issue-89-fr-0004-core-adapter`
 - 当前执行分支：`issue-89-fr-0004-core-adapter`
 
 ## 下一步动作
 
-- 引入最小 adapter-facing request 形状，并把 runtime admission / projection 顺序调整为“共享轴校验 -> capability family 投影 -> adapter 执行”。
-- 同步参考 adapter、fixtures 与回归测试到新请求契约。
-- 通过实现门禁后打开 implementation PR，完成 guardian / merge / closeout。
+- 运行 `pr_scope_guard`、`open_pr --dry-run` 与 `commit_check`，补齐进入 PR 的受控门禁记录。
+- 打开 implementation PR，完成 guardian / merge gate。
+- 合并后关闭 `#89`，并把 release / sprint / closeout 工件回链到该 PR。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -79,6 +80,12 @@
 - `gh issue view 89 --repo MC-and-his-Agents/Syvert`
 - 已核对：`#87` 已关闭，`#89/#88/#68/#64` 仍为 `OPEN`
 - 已核对：`#64` 正文仍保留过期的 `formal spec：待创建`
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_cli tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：`Ran 120 tests in 3.315s`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
 
 ## 未决风险
 
@@ -92,4 +99,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `c4df7d26893f86771285e98314ec0df29b75921b`
+- `72858bfc4c14e7d763b47c1c37c784aee8d4dbf8`
