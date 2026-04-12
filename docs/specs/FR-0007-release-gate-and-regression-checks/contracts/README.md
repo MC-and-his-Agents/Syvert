@@ -11,7 +11,8 @@
    - 平台泄漏检查结论
 
 2. gate 对象契约
-   - 双参考适配器集合按当前版本冻结的 reference pair 解析；对于 `v0.2.0`，该集合固定为 adapter registry 中登记的小红书与抖音参考适配器
+   - 双参考适配器集合在 `v0.2.0` 范围内固定为 adapter registry 中登记的小红书与抖音参考适配器
+   - 若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结
    - gate 输入必须遵循共享输入模型
    - gate 成功/失败判定必须兼容共享错误模型与 registry 语义
 
