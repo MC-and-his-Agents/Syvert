@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#91`
 - active 收口事项：`CHORE-0089-fr-0004-core-adapter-projection`
 
 ## 目标
@@ -49,8 +49,8 @@
 
 ## 下一步动作
 
-- 运行 `pr_scope_guard`、`open_pr --dry-run` 与 `commit_check`，补齐进入 PR 的受控门禁记录。
-- 打开 implementation PR，完成 guardian / merge gate。
+- 等待 PR `#91` 的 GitHub checks 全绿，并对当前 head 运行 guardian 审查。
+- 若 guardian `APPROVE` 且 `safe_to_merge=true`，通过受控入口合并 PR。
 - 合并后关闭 `#89`，并把 release / sprint / closeout 工件回链到该 PR。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -86,6 +86,13 @@
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 2 条提交信息，全部通过
+- `python3 scripts/open_pr.py --class implementation --issue 89 --item-key CHORE-0089-fr-0004-core-adapter-projection --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 承接 FR-0004 adapter-facing 请求投影' --closing fixes --dry-run`
+  - 结果：通过
+- 已创建当前受审 PR：`#91 https://github.com/MC-and-his-Agents/Syvert/pull/91`
 
 ## 未决风险
 
