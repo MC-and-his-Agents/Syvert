@@ -37,7 +37,7 @@
 - 契约需求：
   - `FR-0006` 预期定义 contract test harness 与 fake adapter 的验证基座；`FR-0007` 定义的是版本级 gate 将来如何消费 harness 结论、如何叠加真实参考适配器回归与平台泄漏检查。二者不得互相替代。
   - 双参考适配器回归检查的 gate object 至少包括：
-    - adapter registry 中登记为 `v0.2.0` 参考适配器的两条真实参考实现
+    - 当前版本冻结的 reference pair；对于 `v0.2.0`，该集合固定为 adapter registry 中登记的小红书与抖音两条真实参考实现
     - 它们在未来共享输入模型约束下可构造的标准输入与执行策略
     - 它们在未来错误模型与 registry 语义下产生的成功态 / 失败态结果
   - 本 FR 只要求版本 gate 在实现时消费上游已落盘并获批准的共享输入模型、错误模型、registry 与 harness 结论；不在此处冻结这些上游 contract 的字段、状态机或 payload 细节。
@@ -124,7 +124,7 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 
 - 外部依赖：
   - `#63` 作为 `v0.2.0` 当前 Phase 已建立
-  - `#64`、`#65`、`#66` 分别承载共享输入模型、错误模型/registry、contract harness 的上游 FR；这些 formal spec 当前仍是待落盘前置条件
+  - `#64`、`#65`、`#66` 分别承载共享输入模型、错误模型/registry、contract harness 的上游 FR；其中 `FR-0005`、`FR-0006` 已在仓内落盘，`FR-0004` 仍是待落盘前置条件
 - 上下游影响：
   - 后续 `FR-0007` 下属 Work Item 需基于本 formal spec 实现 gate 编排、结果收口与 closeout
   - `FR-0006` 的实现必须提供可被版本 gate 消费的 contract harness 结论
