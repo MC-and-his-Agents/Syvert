@@ -38,7 +38,7 @@
 ## 当前停点
 
 - `origin/main@74f7407ac109d4ef8eeb86522ae5caf1a5804a38` 已包含 `FR-0004` closeout 所需的关键前提：PR `#82`、`#90`、`#91`、`#92`、`#93`。
-- `#68` 已由 PR `#93` 合入并关闭；当前 `FR-0004` GitHub 调度层仅剩父 FR `#64` 仍为 `OPEN`。
+- `#68` 已由 PR `#93` 合入并关闭；当前 `FR-0004` GitHub closeout 仍包含 Work Item `#95`、父 FR `#64` 与 spec 索引 issue `#85`。
 - `#64` 正文仍保留过期的 `formal spec：待创建`，需要在关闭前修正为主干真相。
 - `#85` 仍为 `OPEN`，但其正文显示它是 `spec_issue_sync.py` 自动维护的 `FR-0004` spec 索引 issue；若不与 `#64` 同步收口，会留下额外的 open FR-0004 GitHub 镜像。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-95-fr-0004-closeout`。
@@ -47,7 +47,7 @@
 
 - 已把 `FR-0004` requirement container、`#68` 历史 closeout 记录、release / sprint 索引与 spec plan 对齐到 `#95` 成为唯一 active closeout 入口后的主干真相。
 - 当前 head 已完成 `docs_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard`、`open_pr --dry-run` 与受控 PR 创建。
-- 合并后修正 GitHub `#64` 正文、发布 `#64` closeout 评论，并关闭 `#64`；同时关闭 `#85` 以避免 `FR-0004` 留下第二个 open issue 镜像。
+- 合并后先关闭当前 Work Item `#95`，再修正 GitHub `#64` 正文、发布 `#64` closeout 评论并关闭 `#64`；最后关闭 `#85` 以避免 `FR-0004` 留下第二个 open issue 镜像。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -103,7 +103,7 @@
   - 结果：通过
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过
-- `python3 scripts/open_pr.py --class spec --issue 95 --item-key CHORE-0095-fr-0004-parent-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 父事项' --closing refs --dry-run`
+- `python3 scripts/open_pr.py --class spec --issue 95 --item-key CHORE-0095-fr-0004-parent-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0004 父事项' --closing fixes --dry-run`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
   - 结果：已校验当前 PR 的提交信息，全部通过
@@ -118,7 +118,7 @@
   - PR `#92` / `#88`：`FR-0002` legacy URL 路径映射到 `url + hybrid`，并补齐反例与兼容证据
 - implementation 聚合证据：PR `#93` 已把 `#68` closeout 到主干，并将 formal spec、实现子事项、release / sprint / exec-plan 的引用关系收成一致
 - release / sprint 证据：`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 已回链 `#64/#68/#87/#89/#88` 与 PR `#82/#90/#91/#92/#93`
-- GitHub closeout 证据：当前只剩父 FR `#64` 与 spec 索引 issue `#85` 需要在本回合同步收口
+- GitHub closeout 证据：当前剩余 GitHub closeout issue 为 active Work Item `#95`、父 FR `#64` 与 spec 索引 issue `#85`；PR `#96` 合入后应先关闭 `#95`，再关闭 `#64/#85`
 
 ## GitHub closeout 工件
 
@@ -154,4 +154,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `74f7407ac109d4ef8eeb86522ae5caf1a5804a38`
+- `654f085c62c78a78e870a5e79b3b277ea5bed934`
+- 说明：其后的提交仅用于收口 guardian 指出的 `#95` 关闭路径、GitHub closeout 工件与 checkpoint 叙述，不改写 `FR-0004` requirement truth；当前受审 head 以 PR `#96` 最新 head 与 guardian verdict 绑定为准。
