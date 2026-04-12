@@ -49,15 +49,15 @@
 
 ## 当前停点
 
-- 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
-- 最近一次已推送 checkpoint 对应 head 为 `7c46804a4d4a16d59181ceaa4afbf428eb05f701`；该 head 已完成额外 formal spec 例外的治理边界收紧、delete-only legacy `TODO.md` 预检与 FR-0003 supporting artifacts 的本地门禁收口。
-- 当前工作树在上述 checkpoint 之上继续删除 `FR-0001` / `FR-0002` 的 live legacy `TODO.md`，并把跨 suite 授权收紧为仅允许本轮 delete-only 清理。
+- 已删除 `FR-0001` / `FR-0002` 的 live legacy `TODO.md`，并把 `FR-0002` exec-plan 中仍把 `TODO.md` 当范围/回滚入口的引用移除。
+- 已把 `额外关联 specs` 收紧为仅 `GOV-0029` 可用，且每个额外 suite 都必须伴随对应 `TODO.md` 删除，并受最小文件集合约束；同时允许 `FR-0002` exec-plan 在同一约束下完成 foreign exec-plan 收口。
+- 最近一次 checkpoint 对应实质变更 head 为 `aaa15aa551bc6570112b1c6f6936b0edd20f7799`；该 head 已通过本地治理回归、`docs_guard`、`spec_guard`、`context_guard`、`workflow_guard`、`governance_gate` 与 `open_pr --dry-run`。
 
 ## 下一步动作
 
-- 完成 `FR-0001` / `FR-0002` live legacy `TODO.md` 删除与相关引用清理。
-- 在当前 PR head 上重跑本地治理门禁、GitHub checks 与 guardian。
-- 确认 `APPROVE + safe_to_merge=true` 后，使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
+- 推送当前分支并等待 PR `#61` 的 GitHub checks 收敛。
+- 在当前 PR head 上等待 guardian 给出最终 verdict，并确认 `APPROVE + safe_to_merge=true`。
+- 使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -72,13 +72,13 @@
 
 - `#56 / PR #59` 已完成 GitHub 单一调度层与仓内单一语义层的契约收敛。
 - `#57 / PR #60` 已完成 harness 兼容迁移，允许在不破坏现有治理流的前提下清理 `TODO.md` 残留。
-- `python3 -m unittest tests.governance.test_spec_guard tests.governance.test_pr_scope_guard tests.governance.test_governance_gate tests.governance.test_context_guard tests.governance.test_item_context tests.governance.test_open_pr tests.governance.test_workflow_guard`
+- `python3 -m unittest tests.governance.test_docs_guard tests.governance.test_item_context tests.governance.test_context_guard tests.governance.test_governance_gate tests.governance.test_open_pr`
 - `python3 scripts/commit_check.py --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/docs_guard.py`
 - `python3 scripts/spec_guard.py --all`
 - `python3 scripts/context_guard.py`
 - `python3 scripts/workflow_guard.py`
-- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-58-governance-remove-legacy-todo-md-from-the-formal-governance-flow`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/open_pr.py --class governance --issue 58 --item-key GOV-0029-remove-legacy-todo-md --item-type GOV --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 - `gh pr edit 61 --title ... --body-file ...`
 
@@ -93,4 +93,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7c46804a4d4a16d59181ceaa4afbf428eb05f701`
+- `aaa15aa551bc6570112b1c6f6936b0edd20f7799`
