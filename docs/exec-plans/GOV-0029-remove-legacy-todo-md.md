@@ -75,6 +75,7 @@
 
 - 若当前 spec PR 合入后没有及时跟进独立 governance 实现 PR，formal spec 与实际 guard / policy 行为会暂时不一致。
 - 若后续实现 PR 超出本次 formal spec 批准边界，guardian 仍会再次阻断 merge gate。
+- `ae8f015` 之后的跟进提交属于当前 formal spec PR 的审查态纠偏与元数据补充；在形成新的可恢复执行停点前，guardian 必须绑定当前受审 head，最近一次可恢复 checkpoint 仍以 `ae8f015` 为准。
 
 ## 回滚方式
 
