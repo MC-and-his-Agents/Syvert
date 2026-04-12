@@ -42,6 +42,9 @@
   - `capability`
   - `target_type=url`
   - `target_value=input.url`
+  - `collection_mode=hybrid`
+
+之所以固定为 `hybrid`，是因为 `FR-0002` 没有把“必须公开”或“必须认证”冻结为旧请求的一部分；若在兼容投影时擅自改成 `public` 或 `authenticated`，都会把既有单目标 URL 请求收窄为更强约束。
 
 ## 后续 FR 的使用边界
 

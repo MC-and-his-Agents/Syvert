@@ -32,12 +32,13 @@
 ## 当前停点
 
 - 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
-- 当前停在 formal spec 套件编写、索引补齐与本地门禁前置校验阶段。
+- `FR-0004` formal spec 套件、最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，受审 PR 为 `#75`。
+- 当前停在根据 guardian 第一轮阻断收口兼容映射、checkpoint 与验证轨迹，然后重跑受影响门禁与 guardian。
 
 ## 下一步动作
 
-- 运行 `docs_guard`、`workflow_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard` 与 `open_pr --class spec --dry-run`。
-- 提交 spec PR，等待 checks 全绿后执行 guardian。
+- 修正当前 guardian 阻断涉及的 spec / exec-plan / PR 正文不一致。
+- 重跑 `docs_guard`、`workflow_guard`、`spec_guard`、`governance_gate`、`pr_scope_guard` 与 `open_pr --class spec --dry-run`。
 - guardian 通过后使用受控 `merge_pr` 合入，并回写 closeout 状态。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -59,6 +60,16 @@
 - 已阅读：`spec_review.md`
 - 已阅读：`docs/releases/v0.2.0.md`
 - 已核对 GitHub 真相：`#63=Phase`、`#64=FR`、`#68=Work Item`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/spec_guard.py --mode ci --all`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/open_pr.py --class spec --issue 68 --item-key FR-0004-input-target-and-collection-policy --item-type FR --release v0.2.0 --sprint 2026-S15 --title 'spec: 冻结 FR-0004 的 InputTarget 与 CollectionPolicy 模型' --closing refs --dry-run`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+- 已创建 PR：`#75 https://github.com/MC-and-his-Agents/Syvert/pull/75`
+- 已确认 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
+- 已完成 guardian 第一轮审查，并收到需要收口兼容映射、checkpoint 与验证轨迹的一轮阻断
 
 ## 未决风险
 
@@ -72,4 +83,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f9bf12ad92f6f9afab3d3761c7df8c8b48a07ef9`
+- `6cc7ec0f8431d78aeeb648950a99bfc90d31184d`
