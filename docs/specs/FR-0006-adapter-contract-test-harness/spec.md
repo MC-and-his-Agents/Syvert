@@ -44,7 +44,8 @@
   - harness 必须能验证 Core 对 adapter 失败返回的统一 envelope 处理语义，但不在本 FR 中重新定义错误分类枚举或错误对象字段。
   - 当 fake adapter 返回缺失必填字段、结构非法，或 adapter 声明与实际行为不一致时，harness 必须能证明该样例不满足已批准 contract；这里的 `contract violation` 是验证工具层的判定标签，不是新的运行时 `error.category`。
   - 对于运行时已经按上位 contract 返回的合法失败 envelope，验证工具必须将其识别为“合法失败样例已按预期发生”，而不是 `contract violation`；例如 capability 不受支持且返回 `unsupported`、输入不合法且返回 `invalid_input`，都属于合法失败。
-  - `执行前置不满足` 固定表示验证工具或 harness 在进入 Core 执行前发现样例装配、测试替身注册或测试期输入前提缺失；它不是 Core 运行时结果，也不替代 `invalid_input` / `unsupported` / `runtime_contract` 的上位语义。
+  - `执行前置不满足` 固定表示验证工具或 harness 在进入 Core 执行前发现测试夹具缺失、fake adapter 未注册、样例装配不完整或其他测试期前提缺失；它不是 Core 运行时结果，也不替代 `invalid_input` / `unsupported` / `runtime_contract` 的上位语义。
+  - 凡请求已进入 Core / adapter 标准路径后暴露的最小字段缺失、类型不合法、adapter 前置输入约束不满足，都必须继续归入 `FR-0005` 定义的 `invalid_input`，不得被 harness 提前折叠为 `执行前置不满足`。
   - 验证工具输出至少必须能区分：通过、合法失败、contract violation、执行前置不满足四类结果，并能把失败归因到样例/断言级别。
   - harness 的样例输入必须围绕已批准 capability 的最小公共 contract 组织，不得为方便测试而引入只服务 fake adapter 的生产字段。
   - harness 必须允许后续实现为同一 contract 复用多组 fake adapter 样例，但本 FR 不要求定义录制回放、随机数据生成或跨进程协议。
@@ -93,7 +94,8 @@ Then 该样例必须被判定为 `执行前置不满足`，且不得冒充 Core 
 ## 异常与边界场景
 
 - 异常场景：
-  - 若验证样例本身缺少 contract 必需输入，验证工具必须在进入 adapter 执行前给出可归因的前置失败，而不是产出模糊结论。
+  - 若验证样例本身缺少测试夹具、fake adapter 注册或 harness 运行所需的测试期前提，验证工具必须在进入 Core 执行前给出可归因的 `执行前置不满足`，而不是产出模糊结论。
+  - 若请求已进入 Core / adapter 标准路径后才暴露出最小字段缺失、类型不合法或 adapter 前置输入约束不满足，则必须按 `FR-0005` 的 `invalid_input` 处理，而不是回退成 `执行前置不满足`。
   - 若 fake adapter 需要依赖真实网络、真实平台 cookie 或外部签名环境，说明该样例已越出本 FR 的 contract harness 边界。
   - 若 Core 只能在绕过标准 adapter 宿主路径时才能通过样例，说明该 harness 不能作为 contract 验证基座。
 - 边界场景：
