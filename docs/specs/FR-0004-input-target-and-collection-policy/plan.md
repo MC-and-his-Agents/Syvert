@@ -7,7 +7,7 @@
 - item_type：`FR`
 - release：`v0.2.0`
 - sprint：`2026-S15`
-- 关联 exec-plan：`docs/exec-plans/FR-0004-input-target-and-collection-policy.md`
+- 关联 exec-plan：`docs/exec-plans/CHORE-0068-fr-0004-formal-spec-closeout.md`
 
 ## 实施目标
 
