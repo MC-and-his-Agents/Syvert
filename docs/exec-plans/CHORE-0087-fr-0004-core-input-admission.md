@@ -37,7 +37,9 @@
 
 - `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 当前已完成 Core 共享输入模型接入、最小结构校验与对应测试补强。
 - 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`；实现分支 `issue-87-fr-0004-core` 已推送远端，并打开 implementation PR `#90`。
-- 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。当前已按“过渡路径只允许 `collection_mode=hybrid`，`public/authenticated` fail-closed”完成收口，等待第二轮 guardian 复审。
+- 首轮 guardian 针对 PR `#90` / head `727cf564c58094b99d60d90bf739b39aaf368f6a` 给出 `REQUEST_CHANGES`：指出 `CollectionPolicy` 在 legacy adapter 投影前被静默丢失。
+- 第二轮收口已把显式 `CoreTaskRequest` 的执行路径收紧为 fail-closed：`#87` 只负责 shared model 受理与校验，不提前开放 adapter admission / execution happy path；legacy `TaskRequest(input.url)` 仍保持可运行。
+- 当前停在基于 head `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2` 重新执行 guardian 复审与 merge gate。
 
 ## 下一步动作
 
@@ -67,7 +69,7 @@
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
-  - 结果：`Ran 65 tests in 2.171s`，`OK`
+  - 结果：在当前 head `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2` 上执行，`Ran 65 tests in 1.936s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -83,7 +85,7 @@
 - 已创建当前受审 PR：`#90 https://github.com/MC-and-his-Agents/Syvert/pull/90`
 - guardian 首轮审查：`REQUEST_CHANGES`
   - 阻断项：`CollectionPolicy` 在执行前被 legacy 投影静默丢弃
-  - 收口结果：当前运行时过渡路径仅允许 `collection_mode=hybrid`；`public` / `authenticated` 在进入 adapter 前 fail-closed，并已补定点回归测试
+  - 收口结果：当前运行时过渡路径仅允许 legacy `TaskRequest(input.url)`；显式 shared-input 请求在进入 adapter 前 fail-closed，避免绕过 `#89` 才应落地的 shared-axis admission
 
 ## 未决风险
 
@@ -97,4 +99,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `727cf564c58094b99d60d90bf739b39aaf368f6a`
+- `e11e4ec760ebe9fd724b5f7a19b85d99e22e30a2`
