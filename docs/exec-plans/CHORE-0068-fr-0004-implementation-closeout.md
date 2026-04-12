@@ -35,6 +35,7 @@
 - `#89` 已由 PR `#91` 合入并关闭。
 - `#88` 已由 PR `#92` 合入并关闭。
 - 当前 `#68` 仍为 `OPEN`，但其下已无未完成 implementation 子事项。
+- 旧 `CHORE-0068-fr-0004-formal-spec-closeout` 已显式标记为 `状态：inactive (...)`，避免与当前 implementation closeout 回合形成双 active 上下文。
 - 当前独立 worktree：`/Users/mc/code/worktrees/syvert/issue-68-inputtarget-collectionpolicy`
 - 当前执行分支：`issue-68-fr-0004-closeout`
 
@@ -66,6 +67,10 @@
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：`#87/#89/#88` 已关闭，`#68/#64` 仍为 `OPEN`
 - 已核对：当前 `#68` worktree 基于 `origin/main@fe328a8dcb6228bf9d38b28b9c9c59ebf5cc34c2`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
 
 ## 未决风险
 

@@ -7,9 +7,10 @@
 - item_type：`CHORE`
 - release：`v0.2.0`
 - sprint：`2026-S15`
+- 状态：`inactive (historical spec closeout; superseded by implementation closeout round after PR #82 merged)`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 PR：`#82`
-- active 收口事项：`CHORE-0068-fr-0004-formal-spec-closeout`
+- 历史收口事项：`CHORE-0068-fr-0004-formal-spec-closeout`
 
 ## 目标
 
