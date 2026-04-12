@@ -144,6 +144,12 @@ Then Core 必须返回 `category=unsupported` 的失败 envelope，而不是让 
   - `FR-0006` 负责冻结 fake adapter / harness / validator 的验证基座；`FR-0005` 只提供其依赖的 error model 与 registry contract。
   - `FR-0007` 负责冻结 gate / regression / 平台泄漏检查流程；`FR-0005` 不直接定义这些门禁。
 
+## 迁移与覆盖关系
+
+- `FR-0005` 不改写 `FR-0002` 的 `v0.1.0` 历史 contract；`FR-0002` 继续描述 `content_detail_by_url` 在 `v0.1.0` baseline 下的 envelope 与最小字段。
+- 自 `v0.2.0+` 起，凡涉及统一失败 envelope 的 `error.category` 闭集与边界，均以 `FR-0005` 为权威来源；`FR-0002` 中仅有 `runtime_contract` / `platform` 两类的旧约束应按 superseded historical baseline 解释。
+- 此覆盖关系只作用于 `error.category` 的分类集合与边界，不改变 `FR-0002` 已冻结的失败 envelope 顶层字段 `task_id`、`adapter_key`、`capability`、`status` 与 `error`。
+
 ## 验收标准
 
 - [ ] `invalid_input`、`unsupported`、`runtime_contract`、`platform` 四类错误的语义边界已冻结
