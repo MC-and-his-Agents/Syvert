@@ -37,10 +37,11 @@
 - 契约需求：
   - `FR-0006` 预期定义 contract test harness 与 fake adapter 的验证基座；`FR-0007` 定义的是版本级 gate 将来如何消费 harness 结论、如何叠加真实参考适配器回归与平台泄漏检查。二者不得互相替代。
   - 双参考适配器回归检查的 gate object 至少包括：
-    - `v0.2.0` 冻结的 reference pair；该集合固定为 adapter registry 中登记的小红书与抖音两条真实参考实现。若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结。
+    - `v0.2.0` 冻结的 reference pair；该集合固定为 adapter registry 中登记、`adapter_key` 分别为 `xhs` 与 `douyin` 的两条真实参考实现。若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结。
     - 它们在未来共享输入模型约束下可构造的标准输入与执行策略
     - 它们在未来错误模型与 registry 语义下产生的成功态 / 失败态结果
     - `v0.2.0` 冻结的最小回归矩阵：两条 reference adapter 都必须覆盖 `content_detail_by_url` 的共享 operation 语义，或其经 `FR-0004` 批准的 `target_type=url` / adapter-facing `content_detail` 投影；每条 adapter 至少命中一条成功结果，以及一条按共享错误模型归类的真实失败结果（类别限于真实 adapter 执行允许出现的 `invalid_input` 或 `platform`）
+  - 版本 gate 对 `FR-0006` harness 结论的通过判据必须固定为：当前版本要求消费的 harness 样例集合覆盖完整，且每个样例结果都只能是 `通过` 或与已批准 contract 对齐的 `合法失败`；任一 `contract violation`、任一 `执行前置不满足`、缺失样例、或无法归类的 harness 结果都必须使 harness 结论 fail-closed。
   - 本 FR 只要求版本 gate 在实现时消费上游已落盘并获批准的共享输入模型、错误模型、registry 与 harness 结论；不在此处冻结这些上游 contract 的字段、状态机或 payload 细节。
   - 平台泄漏检查的判定边界必须固定为：
     - 允许平台语义存在于 reference adapter、自身平台研究文档与 adapter 私有实现边界

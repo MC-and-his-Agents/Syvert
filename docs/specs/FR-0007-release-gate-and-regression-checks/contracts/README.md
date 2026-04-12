@@ -17,11 +17,12 @@
    - 平台泄漏检查结论
 
 3. gate 对象契约
-   - 双参考适配器集合在 `v0.2.0` 范围内固定为 adapter registry 中登记的小红书与抖音参考适配器
+   - 双参考适配器集合在 `v0.2.0` 范围内固定为 adapter registry 中 `adapter_key=xhs` 与 `adapter_key=douyin` 的参考适配器
    - 若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结
    - gate 输入必须遵循共享输入模型
    - gate 成功/失败判定必须兼容共享错误模型与 registry 语义
    - `v0.2.0` 的最小回归矩阵固定覆盖 `content_detail_by_url` 共享 operation，或其经 `FR-0004` 批准的 `target_type=url` / `content_detail` 投影；每条 reference adapter 至少命中一条成功结果与一条按共享错误模型归类的真实失败结果（`invalid_input` 或 `platform`）
+   - harness 结论只有在 required sample set 覆盖完整，且各样例结果仅包含 `通过` 或与已批准 contract 对齐的 `合法失败` 时才可视为 gate pass；任一 `contract violation`、任一 `执行前置不满足`、缺失样例或无法归类结果都必须 fail-closed
 
 4. 失败语义契约
    - 任一必选 gate 未执行、失败、结果不完整、结论不可信或不可追溯时，版本 gate 一律 fail-closed
