@@ -30,15 +30,15 @@
 ## 当前停点
 
 - 已在独立 worktree `issue-74-chore-0051-fr-0006-formal-spec-closeout` 中承接 `FR-0006` formal spec 文档增量，并把执行入口从 FR `#66` 纠正为当前 Work Item `#74`。
-- 当前 head 已补齐 formal spec 门禁与 PR 验证证据入口：`docs_guard`、`spec_guard --all`、`governance_gate --mode local --base-ref origin/main --head-ref HEAD` 均已针对当前分支重跑通过，PR `#76` 的 GitHub checks 已全绿。
+- `595160a94611087dd6cadd619d822215692c2845` 已成为当前 formal spec 语义变更的最新 checkpoint head；与该 checkpoint 绑定的 `docs_guard`、`spec_guard --all`、`governance_gate --mode local --base-ref origin/main --head-ref HEAD` 均已通过，PR `#76` 的 GitHub checks 也已全绿。
 - guardian 首轮审查已指出 FR 不能直接作为执行入口；当前增量只修该阻断所要求的工件绑定与索引一致性。
 - superseded PR `#71` 已关闭，当前合法受审入口为 Work Item `#74` 对应的 PR `#76`。
 
 ## 下一步动作
 
 - 复跑 formal spec 门禁与受控 `open_pr`，确认当前 Work Item 绑定链路合法。
-- 让 PR `#76` 的 checks 全绿，并在同一 head 上重跑 guardian。
-- 等待 checks 全绿后重跑 guardian，并在通过后执行受控合并与 closeout。
+- 当前 head 仅回填 `exec-plan` 的验证与 closeout 元数据，不再改写 formal spec 语义。
+- 在最新 head 上重跑 guardian，并在通过后执行受控合并与 closeout。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -74,6 +74,8 @@
   - 结果：通过（当前 head）
 - `gh pr checks 76`
   - 结果：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Governance Tooling` / `Validate Spec Review Boundaries` 全部通过（当前 head）
+- `git rev-parse HEAD`
+  - 结果：`595160a94611087dd6cadd619d822215692c2845`
 
 ## 未决风险
 
@@ -86,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `04d675f7db500653a321e34f2633d227c72eb7ae`
-- 说明：该 checkpoint 对应修正 Work Item 绑定后的当前合法受审 head；后续 guardian 与 merge gate 必须绑定该 head 或其后续显式 checkpoint。
+- `595160a94611087dd6cadd619d822215692c2845`
+- 说明：该 checkpoint 绑定最近一次 formal spec 语义变更；当前增量之后若仅补充 guardian / merge gate 元数据，可保留该 checkpoint，并由 guardian state 绑定最终受审 head。
