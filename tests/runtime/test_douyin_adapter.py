@@ -10,7 +10,7 @@ from typing import Any
 import unittest
 from unittest import mock
 
-from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import AdapterTaskRequest, PlatformAdapterError, TaskInput, TaskRequest, execute_task
 
 
 def build_douyin_aweme_detail(
@@ -53,6 +53,23 @@ def build_douyin_aweme_detail(
 
 
 class DouyinAdapterTests(unittest.TestCase):
+    def test_douyin_adapter_rejects_non_hybrid_adapter_task_request_before_session_lookup(self) -> None:
+        from syvert.adapters.douyin import DouyinAdapter
+
+        adapter = DouyinAdapter()
+
+        with self.assertRaises(PlatformAdapterError) as raised:
+            adapter.execute(
+                AdapterTaskRequest(
+                    capability="content_detail",
+                    target_type="url",
+                    target_value="https://www.douyin.com/video/7580570616932224282",
+                    collection_mode="authenticated",
+                )
+            )
+
+        self.assertEqual(raised.exception.code, "invalid_douyin_request")
+
     def test_parse_douyin_detail_url_extracts_aweme_id_from_canonical_url(self) -> None:
         from syvert.adapters.douyin import parse_douyin_detail_url
 

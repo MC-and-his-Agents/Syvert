@@ -110,6 +110,10 @@ def execute_task(
             runtime_contract_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
         )
 
+    projection_axis_error = validate_projection_axes_for_current_runtime(normalized_request)
+    if projection_axis_error is not None:
+        return failure_envelope(task_id, adapter_key, capability, projection_axis_error)
+
     adapter, adapter_error = get_adapter(adapters, adapter_key)
     if adapter_error is not None:
         return failure_envelope(task_id, adapter_key, capability, adapter_error)
@@ -304,6 +308,20 @@ def project_to_adapter_request(
         ),
         None,
     )
+
+
+def validate_projection_axes_for_current_runtime(request: CoreTaskRequest) -> dict[str, Any] | None:
+    if request.target.target_type != "url":
+        return runtime_contract_error(
+            "invalid_task_request",
+            "当前运行时执行路径仅支持 target_type=url",
+        )
+    if request.policy.collection_mode != LEGACY_COLLECTION_MODE:
+        return runtime_contract_error(
+            "invalid_task_request",
+            "当前运行时执行路径仅支持 collection_mode=hybrid",
+        )
+    return None
 
 
 def extract_request_context(request: Any) -> tuple[str, str]:

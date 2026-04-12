@@ -232,6 +232,16 @@ class UnsupportedHybridCollectionModeAdapter:
         raise AssertionError("execute should not be called")
 
 
+class BroadAxesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url", "content_id", "creator_id", "keyword"})
+    supported_collection_modes = frozenset({"public", "authenticated", "hybrid"})
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("shared admission should fail before adapter execution")
+
+
 class RuntimeExecutionTests(unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
@@ -331,7 +341,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
-    def test_execute_task_rejects_unsupported_target_type_at_shared_admission(self) -> None:
+    def test_execute_task_rejects_non_url_target_at_shared_projection_guard(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(
                 adapter_key="stub",
@@ -344,15 +354,15 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         envelope = execute_task(
             request,
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={"stub": BroadAxesAdapter()},
             task_id_factory=lambda: "task-non-url-target",
         )
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "target_type_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
-    def test_execute_task_rejects_unsupported_public_collection_mode_at_shared_admission(self) -> None:
+    def test_execute_task_rejects_public_collection_mode_at_shared_projection_guard(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(
                 adapter_key="stub",
@@ -365,15 +375,15 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         envelope = execute_task(
             request,
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={"stub": BroadAxesAdapter()},
             task_id_factory=lambda: "task-public-mode",
         )
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
-    def test_execute_task_rejects_unsupported_authenticated_collection_mode_at_shared_admission(self) -> None:
+    def test_execute_task_rejects_authenticated_collection_mode_at_shared_projection_guard(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(
                 adapter_key="stub",
@@ -386,13 +396,13 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         envelope = execute_task(
             request,
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={"stub": BroadAxesAdapter()},
             task_id_factory=lambda: "task-authenticated-mode",
         )
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(

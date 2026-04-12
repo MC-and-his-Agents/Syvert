@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 from syvert.cli import main
-from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import AdapterTaskRequest, PlatformAdapterError, TaskInput, TaskRequest, execute_task
 
 from syvert.adapters.xhs import (
     XhsAdapter,
@@ -68,6 +68,21 @@ class FakeHttpResponse:
 
 
 class XhsAdapterTests(unittest.TestCase):
+    def test_xhs_adapter_rejects_non_hybrid_adapter_task_request_before_session_lookup(self) -> None:
+        adapter = XhsAdapter()
+
+        with self.assertRaises(PlatformAdapterError) as raised:
+            adapter.execute(
+                AdapterTaskRequest(
+                    capability="content_detail",
+                    target_type="url",
+                    target_value="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+                    collection_mode="public",
+                )
+            )
+
+        self.assertEqual(raised.exception.code, "invalid_xhs_request")
+
     def test_default_page_state_transport_returns_browser_bridge_page_state_without_rewrapping(self) -> None:
         note_id = "69d33f6a000000001f0078b3"
         raw_state = {

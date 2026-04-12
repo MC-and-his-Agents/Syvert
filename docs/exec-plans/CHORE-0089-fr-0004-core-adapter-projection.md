@@ -44,12 +44,19 @@
   - native `CoreTaskRequest` 不再在 `#87` 的 fail-closed 位置提前返回，而是与 legacy 路径一起命中 shared admission 与 adapter projection
   - unsupported `target_type` / `collection_mode` 现在统一在 shared admission 层失败
   - in-tree adapters 与 runtime fixtures 已把 `supported_capabilities` 同步到 `content_detail`，并承接显式 `target_type` / `target_value` / `collection_mode`
+- guardian 首轮针对 PR `#91` / head `9e9b45e3472e1acad3b8c97538fd57829cf5e179` 返回 `REQUEST_CHANGES`：
+  - 阻断 1：shared admission 保护不足，若未来 adapter 声明更宽 target / collection 轴，`content_id`、`public`、`authenticated` 会错误进入执行链
+  - 阻断 2：xhs / douyin adapter 对 `AdapterTaskRequest` 的 direct invocation 接受了其未声明支持的 `public` / `authenticated`
+- 当前收口：
+  - Runtime 重新前置 shared projection guard，保持当前执行边界仍为 `target_type=url` 与 `collection_mode=hybrid`
+  - xhs / douyin adapter 自身对 `AdapterTaskRequest` 也回到 fail-closed，只接受 `collection_mode=hybrid`
+  - 回归测试新增“broad declared axes 仍被 shared projection guard 拦截”和“reference adapter direct invocation 拒绝非 hybrid”的覆盖
 - 当前独立 worktree：`/Users/mc/code/worktrees/syvert/issue-89-fr-0004-core-adapter`
 - 当前执行分支：`issue-89-fr-0004-core-adapter`
 
 ## 下一步动作
 
-- 等待 PR `#91` 的 GitHub checks 全绿，并对当前 head 运行 guardian 审查。
+- 重新运行实现门禁与 guardian，确认 `REQUEST_CHANGES` 已收口。
 - 若 guardian `APPROVE` 且 `safe_to_merge=true`，通过受控入口合并 PR。
 - 合并后关闭 `#89`，并把 release / sprint / closeout 工件回链到该 PR。
 
@@ -93,6 +100,11 @@
 - `python3 scripts/open_pr.py --class implementation --issue 89 --item-key CHORE-0089-fr-0004-core-adapter-projection --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 承接 FR-0004 adapter-facing 请求投影' --closing fixes --dry-run`
   - 结果：通过
 - 已创建当前受审 PR：`#91 https://github.com/MC-and-his-Agents/Syvert/pull/91`
+- guardian 首轮审查：`REQUEST_CHANGES`
+  - 阻断项：shared projection guard 被放宽，且 adapter direct invocation 接受了未声明支持的 `public` / `authenticated`
+  - 收口动作：恢复 shared projection guard 到 `url + hybrid`，并让 xhs / douyin adapter 对 `AdapterTaskRequest` 的 collection_mode 回到 fail-closed
+- `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_models tests.runtime.test_executor tests.runtime.test_cli`
+  - 结果：`Ran 122 tests in 3.821s`，`OK`
 
 ## 未决风险
 

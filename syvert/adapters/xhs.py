@@ -68,7 +68,7 @@ class XhsAdapter:
         self._page_state_transport = page_state_transport or default_page_state_transport
 
     def execute(self, request: TaskRequest | AdapterTaskRequest) -> dict[str, Any]:
-        input_url = resolve_input_url(request=request, adapter_key=self.adapter_key)
+        input_url = resolve_input_url(request=request)
         url_info = parse_xhs_detail_url(input_url)
         session = self._session_provider(self._session_path)
         body = build_detail_body(url_info)
@@ -225,7 +225,7 @@ def build_adapters() -> dict[str, object]:
     return {"xhs": XhsAdapter()}
 
 
-def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest, adapter_key: str) -> str:
+def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
     if type(request) is AdapterTaskRequest:
         if request.capability != CONTENT_DETAIL:
             raise PlatformAdapterError(
@@ -239,10 +239,10 @@ def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest, adapter_key:
                 message="xhs adapter 仅支持 target_type=url",
                 details={"target_type": request.target_type},
             )
-        if request.collection_mode not in {"hybrid", "authenticated", "public"}:
+        if request.collection_mode != "hybrid":
             raise PlatformAdapterError(
                 code="invalid_xhs_request",
-                message="xhs adapter 收到未知 collection_mode",
+                message="xhs adapter 仅支持 collection_mode=hybrid",
                 details={"collection_mode": request.collection_mode},
             )
         return request.target_value
