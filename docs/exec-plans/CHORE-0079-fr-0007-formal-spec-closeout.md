@@ -34,13 +34,13 @@
 
 - `FR-0007` formal spec 套件已迁入当前 Work Item 分支，当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-79-fr-0007-formal-spec`。
 - 旧 PR `#73` 因直接把 FR 作为执行入口，被 guardian 判定违反 Work-Item-only 执行契约，已关闭并由当前 PR `#80` 接续。
-- 当前 PR `#80` 的 GitHub checks 已通过；最新 guardian 阻断集中在 active `exec-plan` 审查态信息回写与 release 索引范围收窄。
+- 当前 PR `#80` 的最新 guardian 阻断集中在三处：readiness 判定需与上游依赖保持一致、spec-only PR 不得计划关闭父 FR `#67`、active `exec-plan` 需刷新到当前受审 head 与当前停点。
 
 ## 下一步动作
 
-- 回写当前 `exec-plan` 与 release 索引到最新 guardian 指出的阻断。
+- 回写当前 `exec-plan`、`plan.md` 与 `spec.md` 到最新 guardian 指出的阻断。
 - 推送当前 head，确认 PR `#80` checks 继续全绿。
-- 重跑 guardian；通过后受控合并 PR `#80`，并关闭 `#79` 与 `#67`。
+- 重跑 guardian；通过后受控合并 PR `#80`，并关闭 `#79`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -71,7 +71,7 @@
 - `gh pr checks 80`
   - 结果：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全部通过
 - `python3 scripts/pr_guardian.py review 80`
-  - 结果：最新 guardian 要求同步当前 active `exec-plan` 审查态，并收窄 `docs/releases/v0.2.0.md` 到 FR-0007 所需的最小索引更新
+  - 结果：latest guardian 要求把 readiness 判定收回到与上游依赖一致、移除关闭父 FR `#67` 的计划，并把 `CollectionPolicy` 依赖真正落到 formal spec requirement
 
 ## 未决风险
 
@@ -84,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `c3fb529cf0ca4cbb5f9a411b4fb1adfd27d44939`
+- `5b711fa5d55755b31546936458e872f7d7cce1d8`

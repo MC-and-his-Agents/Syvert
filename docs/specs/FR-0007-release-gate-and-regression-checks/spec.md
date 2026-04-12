@@ -38,7 +38,7 @@
   - `FR-0006` 定义的是 contract test harness 与 fake adapter 的验证基座；`FR-0007` 定义的是版本级 gate 如何消费 harness 结论、如何叠加真实参考适配器回归与平台泄漏检查。二者不得互相替代。
   - 双参考适配器回归检查的 gate object 至少包括：
     - adapter registry 中登记为 `v0.2.0` 参考适配器的两条真实参考实现
-    - 它们在 `FR-0004` 定义的输入模型约束下可构造的标准输入
+    - 它们在 `FR-0004` 定义的 `InputTarget` 与 `CollectionPolicy` 约束下可构造的标准输入与执行策略
     - 它们在 `FR-0005` 定义的错误模型与 registry 语义下产生的成功态 / 失败态结果
   - 平台泄漏检查的判定边界必须固定为：
     - 允许平台语义存在于 reference adapter、自身平台研究文档与 adapter 私有实现边界
@@ -117,6 +117,7 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 - [ ] formal spec 明确写出平台泄漏检查在 Syvert 中的允许边界与禁止边界
 - [ ] formal spec 明确区分 `FR-0006` 的 harness 基座职责与 `FR-0007` 的版本 gate 职责
 - [ ] formal spec 明确写出 `FR-0004`、`FR-0005`、adapter registry 与错误模型对版本 gate 的依赖关系
+- [ ] formal spec 明确写出 `InputTarget` 与 `CollectionPolicy` 对版本 gate 输入约束的依赖关系
 - [ ] formal spec 不把唯一实现形式绑定到某个脚本、CI 文件或命令行参数
 
 ## 依赖与外部前提
