@@ -122,6 +122,11 @@ Then formal spec 必须允许该实现替换，而不要求沿用某个固定脚
 - [ ] formal spec 明确写出未来共享输入模型、错误模型、adapter registry 与 harness 结果对版本 gate 的依赖关系
 - [ ] formal spec 不把唯一实现形式绑定到某个脚本、CI 文件或命令行参数
 
+## 数据模型与迁移说明
+
+- 本 FR 不新增也不修改共享输入模型、共享错误模型、adapter registry 或 contract harness 的数据字段与状态机。
+- 本 PR 只落盘 `FR-0007` requirement、契约摘要、风险与索引入口，不涉及任何数据迁移步骤。
+
 ## 依赖与外部前提
 
 - 外部依赖：

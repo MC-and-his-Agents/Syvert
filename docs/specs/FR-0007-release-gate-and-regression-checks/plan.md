@@ -73,5 +73,5 @@
 ## spec review 结论
 
 - 结论：当前 PR 的目标是把 `FR-0007` 从“issue 意图”推进到可追溯、可复验的 formal spec 基线。
-- 未决问题：平台泄漏检查边界需继续保持对实现形式中立；`FR-0004`、`FR-0005`、`FR-0006` 已作为当前审查输入的入库基线存在，但 `FR-0007` 的 implementation-ready 仍取决于后续 Work Item 对这些上游 contract 的实际消费与版本 gate 实现收口。
-- implementation-ready 判定：当前 formal spec PR 合入后，`FR-0007` 达到 `spec-ready` 并成为主干上的 requirement truth；后续需在独立实现 Work Item 中基于已入库的上游 formal spec / contract 基线完成 gate 编排与验证落地，再进入 implementation-ready 判定。
+- 未决问题：平台泄漏检查边界需继续保持对实现形式中立；`FR-0004`、`FR-0005`、`FR-0006` 已作为当前审查输入的入库基线存在，后续实现 Work Item 仍必须按这些已批准 contract 落地 gate 编排与验证。
+- implementation-ready 判定：当前 formal spec PR 负责把 `FR-0007` 收口为主干上的 `spec-ready` requirement truth；是否进入 `implementation-ready` 由 `spec_review.md` 的审查结论与进入实现前条件共同决定，不由本 closeout PR 额外改写其判定语义。
