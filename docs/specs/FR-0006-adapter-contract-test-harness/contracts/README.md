@@ -7,9 +7,10 @@
 - harness 的职责是以受控样例驱动 Core 经过标准 adapter 宿主路径执行 contract 验证。
 - harness 的验证对象是共享 adapter contract 的运行时语义，不是平台抓取正确性。
 - harness 必须能观测并判定：
-  - success envelope 满足 contract
+  - success envelope 满足 contract，且同时具备 `raw payload` 与 `normalized result`
   - failed envelope 走统一失败处理
   - adapter 返回非法结果时产生 contract violation
+  - adapter 声明与实际行为不一致时产生 contract violation
   - 样例在进入 adapter 执行前即不满足前置条件时，验证工具产出 `执行前置不满足`
 
 ## 2. fake adapter contract
