@@ -94,38 +94,38 @@
 
 ### 场景 1
 
-Given Core 持有一个已 materialize 的 adapter registry，且其中存在 `adapter_key=xhs` 并声明支持 `content_detail_by_url`  
-When 调用方向 Core 请求查找 `xhs` 并验证该 capability  
+Given Core 持有一个已 materialize 的 adapter registry，且其中存在 `adapter_key=xhs` 并声明支持 `content_detail_by_url`
+When 调用方向 Core 请求查找 `xhs` 并验证该 capability
 Then Core 必须在进入平台执行前得到确定的“adapter 存在且 capability 受支持”的结论
 
 ### 场景 2
 
-Given 请求的 `adapter_key` 不存在于当前 registry  
-When Core 进行 adapter 查找  
+Given 请求的 `adapter_key` 不存在于当前 registry
+When Core 进行 adapter 查找
 Then Core 必须返回 `category=unsupported` 的失败 envelope，而不是推断默认 adapter 或回退到其他注册项
 
 ### 场景 3
 
-Given 当前 registry 存在重复 key、歧义注册、无效 adapter 声明或无效 capability 元数据  
-When Core 尝试 materialize、discover 或 lookup  
+Given 当前 registry 存在重复 key、歧义注册、无效 adapter 声明或无效 capability 元数据
+When Core 尝试 materialize、discover 或 lookup
 Then Core 必须返回 `category=runtime_contract` 的失败 envelope，并按 fail-closed 终止该次执行
 
 ### 场景 4
 
-Given 请求缺少当前 contract 要求的最小字段，或字段类型不合法  
-When Core 在进入有效 registry 分发前校验请求  
+Given 请求缺少当前 contract 要求的最小字段，或字段类型不合法
+When Core 在进入有效 registry 分发前校验请求
 Then Core 必须返回 `category=invalid_input` 的失败 envelope
 
 ### 场景 5
 
-Given adapter 已被成功查找到，且 capability 声明有效  
-When adapter 在真实平台执行过程中遇到登录失效、签名错误、内容不存在或平台风控  
+Given adapter 已被成功查找到，且 capability 声明有效
+When adapter 在真实平台执行过程中遇到登录失效、签名错误、内容不存在或平台风控
 Then Core 必须返回 `category=platform` 的统一失败 envelope，并保留 adapter 提供的结构化平台细节
 
 ### 场景 6
 
-Given registry 与请求都合法，但目标 adapter 未声明支持当前 capability  
-When Core 在执行前校验 capability  
+Given registry 与请求都合法，但目标 adapter 未声明支持当前 capability
+When Core 在执行前校验 capability
 Then Core 必须返回 `category=unsupported` 的失败 envelope，而不是让 adapter 进入不受支持的执行路径
 
 ## 异常与边界场景
