@@ -22,7 +22,7 @@
 
 - `GOV-0029` 使用独立 Work Item decision 记录本轮 `TODO.md` 退出 formal governance flow 的收口语义。
 - 对当前事项，formal spec 最小套件收敛为 `spec.md` + `plan.md`；模板、guard 与 policy 不得再把 legacy `TODO.md` 视为必需工件、状态镜像或恢复入口。
-- 当前事项允许在绑定 `FR-0003` formal spec 的前提下，显式列出并清理仍保留 legacy `TODO.md` 规范入口的存量 formal spec 套件。
+- 当前事项仅允许把 `FR-0001` 与 `FR-0002` 作为额外 formal spec 套件纳入清理；每个套件都必须在当前 diff 中删除对应的 legacy `TODO.md`，并且只能触碰完成该清理所需的最小文件集合。
 - 本 decision 在 `TODO.md` 退出 formal governance flow 这一窄范围内，替代 `ADR-0003` 历史文本里关于“不删除 `TODO.md` / 不调整 formal spec required files”的旧非目标表述。
 
 ## 影响

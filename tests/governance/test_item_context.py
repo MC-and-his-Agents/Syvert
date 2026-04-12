@@ -190,48 +190,78 @@ class ItemContextTests(unittest.TestCase):
             )
         self.assertTrue(any("FR formal spec 套件根目录" in error for error in errors))
 
-    def test_validate_bound_formal_spec_scope_accepts_authorized_additional_suite(self) -> None:
+    def test_validate_bound_formal_spec_scope_accepts_gov_0029_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            first = repo / "docs" / "specs" / "FR-0001-example"
-            second = repo / "docs" / "specs" / "FR-0002-example"
-            write_file(first / "spec.md", "# spec\n")
-            write_file(first / "plan.md", "# plan\n")
-            write_file(second / "spec.md", "# spec\n")
-            write_file(second / "plan.md", "# plan\n")
+            bound = repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split"
+            extra = repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1"
+            write_file(bound / "spec.md", "# spec\n")
+            write_file(bound / "plan.md", "# plan\n")
+            write_file(extra / "spec.md", "# spec\n")
+            write_file(extra / "plan.md", "# plan\n")
+            write_file(extra / "TODO.md", "# todo\n")
+            (extra / "TODO.md").unlink()
             errors = validate_bound_formal_spec_scope(
                 repo,
                 {
+                    "item_key": "GOV-0029-remove-legacy-todo-md",
                     "item_type": "GOV",
-                    "关联 spec": "docs/specs/FR-0001-example/",
-                    "额外关联 specs": "docs/specs/FR-0002-example/",
+                    "关联 spec": "docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
+                    "额外关联 specs": "docs/specs/FR-0002-content-detail-runtime-v0-1/",
+                },
+                ["docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"],
+            )
+        self.assertEqual(errors, [])
+
+    def test_validate_bound_formal_spec_scope_accepts_fr_0001_minimal_suite_files_when_todo_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            bound = repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split"
+            extra = repo / "docs" / "specs" / "FR-0001-governance-stack-v1"
+            write_file(bound / "spec.md", "# spec\n")
+            write_file(bound / "plan.md", "# plan\n")
+            write_file(extra / "spec.md", "# spec\n")
+            write_file(extra / "plan.md", "# plan\n")
+            write_file(extra / "risks.md", "# risks\n")
+            write_file(extra / "TODO.md", "# todo\n")
+            (extra / "TODO.md").unlink()
+            errors = validate_bound_formal_spec_scope(
+                repo,
+                {
+                    "item_key": "GOV-0029-remove-legacy-todo-md",
+                    "item_type": "GOV",
+                    "关联 spec": "docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
+                    "额外关联 specs": "docs/specs/FR-0001-governance-stack-v1/",
                 },
                 [
-                    "docs/specs/FR-0001-example/spec.md",
-                    "docs/specs/FR-0002-example/spec.md",
+                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
+                    "docs/specs/FR-0001-governance-stack-v1/plan.md",
+                    "docs/specs/FR-0001-governance-stack-v1/risks.md",
+                    "docs/specs/FR-0001-governance-stack-v1/TODO.md",
                 ],
             )
         self.assertEqual(errors, [])
 
-    def test_validate_bound_formal_spec_scope_accepts_only_authorized_additional_suite(self) -> None:
+    def test_validate_bound_formal_spec_scope_rejects_non_delete_change_in_additional_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
-            first = repo / "docs" / "specs" / "FR-0001-example"
-            second = repo / "docs" / "specs" / "FR-0002-example"
-            write_file(first / "spec.md", "# spec\n")
-            write_file(first / "plan.md", "# plan\n")
-            write_file(second / "spec.md", "# spec\n")
-            write_file(second / "plan.md", "# plan\n")
+            bound = repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split"
+            extra = repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1"
+            write_file(bound / "spec.md", "# spec\n")
+            write_file(bound / "plan.md", "# plan\n")
+            write_file(extra / "spec.md", "# spec\n")
+            write_file(extra / "plan.md", "# plan\n")
             errors = validate_bound_formal_spec_scope(
                 repo,
                 {
+                    "item_key": "GOV-0029-remove-legacy-todo-md",
                     "item_type": "GOV",
-                    "关联 spec": "docs/specs/FR-0001-example/",
-                    "额外关联 specs": "docs/specs/FR-0002-example/",
+                    "关联 spec": "docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
+                    "额外关联 specs": "docs/specs/FR-0002-content-detail-runtime-v0-1/",
                 },
-                ["docs/specs/FR-0002-example/spec.md"],
+                ["docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md"],
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("必须在当前 diff 中删除" in error for error in errors))
 
 
 if __name__ == "__main__":

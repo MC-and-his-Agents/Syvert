@@ -1432,112 +1432,185 @@ Then
             )
         self.assertEqual(errors, [])
 
-    def test_formal_spec_exec_plan_accepts_authorized_additional_touched_suite(self) -> None:
+    def test_formal_spec_exec_plan_accepts_gov_0029_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
+            example_spec = (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8")
+            example_plan = (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8")
+            for suite_name, issue in (
+                ("FR-0003-github-delivery-structure-and-repo-semantic-split", "#55"),
+                ("FR-0002-content-detail-runtime-v0-1", "#38"),
+            ):
+                write_file(
+                    repo / "docs" / "specs" / suite_name / "spec.md",
+                    example_spec.replace("FR-0001-example", suite_name).replace("Issue：`#2`", f"Issue：`{issue}`"),
+                )
+                write_file(
+                    repo / "docs" / "specs" / suite_name / "plan.md",
+                    example_plan.replace("FR-0001-example", suite_name)
+                    .replace("Issue：`#2`", f"Issue：`{issue}`")
+                    .replace(
+                        "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                        "docs/exec-plans/GOV-0029-remove-legacy-todo-md.md",
+                    ),
+                )
+                write_file(repo / "docs" / "specs" / suite_name / "contracts" / "README.md", "# contracts\n")
+            todo = repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1" / "TODO.md"
+            write_file(todo, "# TODO\n")
             write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
-                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
-                    "FR-0001-example",
-                    "FR-9999-unrelated",
-                ).replace(
-                    "Issue：`#2`",
-                    "Issue：`#9999`",
-                ),
+                repo / "docs" / "decisions" / "ADR-GOV-0029-remove-legacy-todo-md.md",
+                """# ADR-GOV-0029
+
+- Issue：`#58`
+- item_key：`GOV-0029-remove-legacy-todo-md`
+""",
             )
             write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
-                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
-                    "FR-0001-example",
-                    "FR-9999-unrelated",
-                ).replace(
-                    "Issue：`#2`",
-                    "Issue：`#9999`",
-                ),
+                repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md",
+                """# GOV-0029
+
+## 关联信息
+
+- item_key：`GOV-0029-remove-legacy-todo-md`
+- Issue：`#58`
+- item_type：`GOV`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 额外关联 specs：docs/specs/FR-0002-content-detail-runtime-v0-1/
+- 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
+- active 收口事项：`GOV-0029-remove-legacy-todo-md`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
             )
-            write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "contracts" / "README.md",
-                "# contracts\n",
-            )
-            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
-                ),
-                encoding="utf-8",
-            )
+            todo.unlink()
             errors = validate_context_rules(
                 repo,
-                changed_paths=[
-                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
-                    "docs/specs/FR-0001-example/spec.md",
-                    "docs/specs/FR-9999-unrelated/spec.md",
-                ],
+                changed_paths=["docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md"],
+                current_issue=58,
             )
         self.assertEqual(errors, [])
 
-    def test_formal_spec_exec_plan_accepts_only_authorized_additional_touched_suite(self) -> None:
+    def test_formal_spec_exec_plan_rejects_non_delete_change_in_additional_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
+            example_spec = (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8")
+            example_plan = (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8")
+            for suite_name, issue in (
+                ("FR-0003-github-delivery-structure-and-repo-semantic-split", "#55"),
+                ("FR-0002-content-detail-runtime-v0-1", "#38"),
+            ):
+                write_file(
+                    repo / "docs" / "specs" / suite_name / "spec.md",
+                    example_spec.replace("FR-0001-example", suite_name).replace("Issue：`#2`", f"Issue：`{issue}`"),
+                )
+                write_file(
+                    repo / "docs" / "specs" / suite_name / "plan.md",
+                    example_plan.replace("FR-0001-example", suite_name)
+                    .replace("Issue：`#2`", f"Issue：`{issue}`")
+                    .replace(
+                        "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                        "docs/exec-plans/GOV-0029-remove-legacy-todo-md.md",
+                    ),
+                )
+                write_file(repo / "docs" / "specs" / suite_name / "contracts" / "README.md", "# contracts\n")
             write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "spec.md",
-                (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8").replace(
-                    "FR-0001-example",
-                    "FR-9999-unrelated",
-                ).replace(
-                    "Issue：`#2`",
-                    "Issue：`#9999`",
-                ),
+                repo / "docs" / "decisions" / "ADR-GOV-0029-remove-legacy-todo-md.md",
+                """# ADR-GOV-0029
+
+- Issue：`#58`
+- item_key：`GOV-0029-remove-legacy-todo-md`
+""",
             )
             write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "plan.md",
-                (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8").replace(
-                    "FR-0001-example",
-                    "FR-9999-unrelated",
-                ).replace(
-                    "Issue：`#2`",
-                    "Issue：`#9999`",
-                ),
-            )
-            write_file(
-                repo / "docs" / "specs" / "FR-9999-unrelated" / "contracts" / "README.md",
-                "# contracts\n",
-            )
-            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
-                ),
-                encoding="utf-8",
+                repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md",
+                """# GOV-0029
+
+## 关联信息
+
+- item_key：`GOV-0029-remove-legacy-todo-md`
+- Issue：`#58`
+- item_type：`GOV`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 额外关联 specs：docs/specs/FR-0002-content-detail-runtime-v0-1/
+- 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
+- active 收口事项：`GOV-0029-remove-legacy-todo-md`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
             )
             errors = validate_context_rules(
                 repo,
-                changed_paths=[
-                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
-                    "docs/specs/FR-9999-unrelated/spec.md",
-                ],
+                changed_paths=["docs/specs/FR-0002-content-detail-runtime-v0-1/spec.md"],
+                current_issue=58,
             )
-        self.assertEqual(errors, [])
+        self.assertTrue(any("必须在当前 diff 中删除" in error for error in errors))
 
     def test_exec_plan_rejects_invalid_additional_spec_binding_even_without_touched_spec(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_governance_docs(repo)
-            plan = repo / "docs" / "exec-plans" / "GOV-0001-release-sprint-structure.md"
-            plan.write_text(
-                plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-example/`\n- 额外关联 specs：`docs/specs/_template/`\n",
+            example_spec = (repo / "docs" / "specs" / "FR-0001-example" / "spec.md").read_text(encoding="utf-8")
+            example_plan = (repo / "docs" / "specs" / "FR-0001-example" / "plan.md").read_text(encoding="utf-8")
+            write_file(
+                repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split" / "spec.md",
+                example_spec.replace("FR-0001-example", "FR-0003-github-delivery-structure-and-repo-semantic-split").replace("Issue：`#2`", "Issue：`#55`"),
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split" / "plan.md",
+                example_plan.replace("FR-0001-example", "FR-0003-github-delivery-structure-and-repo-semantic-split")
+                .replace("Issue：`#2`", "Issue：`#55`")
+                .replace(
+                    "docs/exec-plans/GOV-0001-release-sprint-structure.md",
+                    "docs/exec-plans/GOV-0029-remove-legacy-todo-md.md",
                 ),
-                encoding="utf-8",
+            )
+            write_file(
+                repo / "docs" / "specs" / "FR-0003-github-delivery-structure-and-repo-semantic-split" / "contracts" / "README.md",
+                "# contracts\n",
+            )
+            write_file(
+                repo / "docs" / "decisions" / "ADR-GOV-0029-remove-legacy-todo-md.md",
+                """# ADR-GOV-0029
+
+- Issue：`#58`
+- item_key：`GOV-0029-remove-legacy-todo-md`
+""",
+            )
+            write_file(
+                repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md",
+                """# GOV-0029
+
+## 关联信息
+
+- item_key：`GOV-0029-remove-legacy-todo-md`
+- Issue：`#58`
+- item_type：`GOV`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
+- 额外关联 specs：`docs/specs/_template/`
+- 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
+- active 收口事项：`GOV-0029-remove-legacy-todo-md`
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `1234567890abcdef1234567890abcdef12345678`
+""",
             )
             errors = validate_context_rules(
                 repo,
-                changed_paths=["docs/exec-plans/GOV-0001-release-sprint-structure.md"],
+                changed_paths=["docs/exec-plans/GOV-0029-remove-legacy-todo-md.md"],
+                current_issue=58,
             )
         self.assertTrue(any("额外关联 specs" in error for error in errors))
 

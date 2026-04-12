@@ -25,6 +25,7 @@ from scripts.item_context import (
     parse_exec_plan_metadata,
     strip_fenced_code_blocks,
     spec_dir_has_minimum_suite,
+    authorized_additional_spec_dirs_for_diff,
     validate_additional_spec_contracts,
     validate_bound_decision_contract,
     validate_bound_formal_spec_scope,
@@ -462,7 +463,12 @@ def authorized_decision_exec_plans(
     return errors, matches
 
 
-def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -> tuple[list[str], set[Path]]:
+def authorized_formal_spec_dirs(
+    repo_root: Path,
+    *,
+    current_issue: int | None,
+    changed_paths: list[str] | None = None,
+) -> tuple[list[str], set[Path]]:
     authorized: set[Path] = set()
     errors: list[str] = []
     for fields in authorization_exec_plan_payloads(repo_root, current_issue=current_issue):
@@ -483,8 +489,14 @@ def authorized_formal_spec_dirs(repo_root: Path, *, current_issue: int | None) -
             spec_dir = normalize_bound_spec_dir(repo_root, str(fields.get("关联 spec", "")).strip())
             if spec_dir is not None:
                 authorized.add(spec_dir.relative_to(repo_root.resolve()))
-            additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
-            if not additional_errors:
+            additional_errors, additional_spec_dirs = authorized_additional_spec_dirs_for_diff(
+                repo_root,
+                fields,
+                changed_paths,
+            )
+            if additional_errors:
+                errors.extend(additional_errors)
+            else:
                 authorized.update(additional_spec_dirs)
             continue
         if input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
@@ -588,7 +600,11 @@ def validate_context_rules(
     if changed_paths is not None:
         touched_spec_dirs = formal_spec_dirs(changed_paths)
         if touched_spec_dirs:
-            authorization_errors, authorized_spec_dirs = authorized_formal_spec_dirs(repo_root, current_issue=current_issue)
+            authorization_errors, authorized_spec_dirs = authorized_formal_spec_dirs(
+                repo_root,
+                current_issue=current_issue,
+                changed_paths=changed_paths,
+            )
             errors.extend(authorization_errors)
             for spec_dir in sorted(touched_spec_dirs):
                 if spec_dir not in authorized_spec_dirs:

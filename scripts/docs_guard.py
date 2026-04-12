@@ -51,6 +51,8 @@ def validate_markdown_links(repo_root: Path) -> list[str]:
     repo_root = repo_root.resolve()
     errors: list[str] = []
     for markdown_file in tracked_markdown_files(repo_root):
+        if not markdown_file.exists():
+            continue
         content = markdown_file.read_text(encoding="utf-8")
         refs: list[str] = []
         refs.extend(match.group(1) for match in LINK_RE.finditer(content))

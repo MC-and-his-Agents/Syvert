@@ -818,37 +818,54 @@ class OpenPrPreflightTests(unittest.TestCase):
             )
         self.assertEqual(errors, [])
 
-    def test_bound_formal_spec_accepts_only_authorized_additional_touched_suite(self) -> None:
+    def test_bound_formal_spec_accepts_gov_0029_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_exec_plan(
                 repo,
-                item_key="GOV-0028-harness-compat-migration",
-                issue="#57",
+                item_key="GOV-0029-remove-legacy-todo-md",
+                issue="#58",
                 item_type="GOV",
                 release="v0.2.0",
                 sprint="2026-S15",
-                active_item_key="GOV-0028-harness-compat-migration",
-                related_spec="docs/specs/FR-0001-governance-stack-v1/",
+                active_item_key="GOV-0029-remove-legacy-todo-md",
+                related_spec="docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/",
+                related_decision="docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
             )
-            write_formal_spec_suite(repo, with_todo=False)
-            write_formal_spec_suite(repo, suite_name="FR-9999-unrelated", with_todo=False)
-            plan = repo / "docs" / "exec-plans" / "GOV-0028-harness-compat-migration.md"
+            write_formal_spec_suite(repo, suite_name="FR-0003-github-delivery-structure-and-repo-semantic-split", with_todo=False)
+            write_formal_spec_suite(repo, suite_name="FR-0001-governance-stack-v1", with_todo=True)
+            write_formal_spec_suite(repo, suite_name="FR-0002-content-detail-runtime-v0-1", with_todo=True)
+            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "risks.md").write_text("# risks\n", encoding="utf-8")
+            write_decision(
+                repo,
+                "docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md",
+                issue="#58",
+                item_key="GOV-0029-remove-legacy-todo-md",
+            )
+            plan = repo / "docs" / "exec-plans" / "GOV-0029-remove-legacy-todo-md.md"
             plan.write_text(
                 plan.read_text(encoding="utf-8").replace(
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n",
-                    "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`\n- 额外关联 specs：`docs/specs/FR-9999-unrelated/`\n",
+                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n",
+                    "- 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`\n- 额外关联 specs：docs/specs/FR-0001-governance-stack-v1/, docs/specs/FR-0002-content-detail-runtime-v0-1/\n",
                 ),
                 encoding="utf-8",
             )
+            (repo / "docs" / "specs" / "FR-0001-governance-stack-v1" / "TODO.md").unlink()
+            (repo / "docs" / "specs" / "FR-0002-content-detail-runtime-v0-1" / "TODO.md").unlink()
             errors = validate_pr_preflight(
                 "governance",
-                57,
-                "GOV-0028-harness-compat-migration",
+                58,
+                "GOV-0029-remove-legacy-todo-md",
                 "GOV",
                 "v0.2.0",
                 "2026-S15",
-                ["docs/specs/FR-9999-unrelated/spec.md"],
+                [
+                    "docs/specs/FR-0001-governance-stack-v1/spec.md",
+                    "docs/specs/FR-0001-governance-stack-v1/plan.md",
+                    "docs/specs/FR-0001-governance-stack-v1/risks.md",
+                    "docs/specs/FR-0001-governance-stack-v1/TODO.md",
+                    "docs/specs/FR-0002-content-detail-runtime-v0-1/TODO.md",
+                ],
                 repo_root=repo,
             )
         self.assertEqual(errors, [])

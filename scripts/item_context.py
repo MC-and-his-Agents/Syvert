@@ -43,6 +43,12 @@ MISSING_BOUND_DECISION_METADATA_ERRORS = {
     "`关联 decision` 缺少 `Issue` 字段，bootstrap contract 无法与当前事项建立对应关系。",
     "`关联 decision` 缺少 `item_key` 字段，bootstrap contract 无法与当前事项建立对应关系。",
 }
+LEGACY_TODO_CLEANUP_ADDITIONAL_SPEC_RULES = {
+    "GOV-0029-remove-legacy-todo-md": {
+        Path("docs/specs/FR-0001-governance-stack-v1"): {"spec.md", "plan.md", "risks.md", "TODO.md"},
+        Path("docs/specs/FR-0002-content-detail-runtime-v0-1"): {"TODO.md"},
+    }
+}
 
 
 def allows_legacy_metadata_free_formal_spec_decision(
@@ -271,6 +277,22 @@ def parse_additional_spec_bindings(raw_value: str) -> list[str]:
     return [item.strip() for item in re.split(r"[，,]", cleaned) if item.strip()]
 
 
+def additional_spec_policy_item_key(payload: Mapping[str, str]) -> str | None:
+    item_key = str(payload.get("item_key", "")).strip()
+    if str(payload.get("item_type", "")).strip() != "GOV":
+        return None
+    if classify_exec_plan_input_mode(payload) != INPUT_MODE_FORMAL_SPEC:
+        return None
+    if item_key not in LEGACY_TODO_CLEANUP_ADDITIONAL_SPEC_RULES:
+        return None
+    return item_key
+
+
+def diff_paths_for_spec_dir(changed_files: list[str], spec_dir: Path) -> list[Path]:
+    prefix = f"{spec_dir.as_posix()}/"
+    return [Path(path) for path in changed_files if path.startswith(prefix)]
+
+
 def validate_additional_spec_contracts(
     repo_root: Path,
     payload: Mapping[str, str],
@@ -279,9 +301,12 @@ def validate_additional_spec_contracts(
     if not has_meaningful_binding(raw_value):
         return [], []
 
-    if str(payload.get("item_type", "")).strip() != "GOV" or classify_exec_plan_input_mode(payload) != INPUT_MODE_FORMAL_SPEC:
-        return ["`额外关联 specs` 仅允许用于绑定 formal spec 的治理收敛事项。"], []
+    policy_item_key = additional_spec_policy_item_key(payload)
+    if policy_item_key is None:
+        return ["`额外关联 specs` 仅允许用于 `GOV-0029-remove-legacy-todo-md` 的 legacy `TODO.md` 清理事项。"], []
 
+    allowed_spec_rules = LEGACY_TODO_CLEANUP_ADDITIONAL_SPEC_RULES[policy_item_key]
+    allowed_spec_dirs = set(allowed_spec_rules)
     errors: list[str] = []
     normalized_dirs: list[Path] = []
     seen: set[Path] = set()
@@ -295,11 +320,75 @@ def validate_additional_spec_contracts(
             errors.append(f"`额外关联 specs` 条目 `{raw_path}` 无法解析为 formal spec 套件根目录。")
             continue
         relative = spec_dir.relative_to(repo_root.resolve())
+        if relative not in allowed_spec_dirs:
+            errors.append(
+                f"`额外关联 specs` 条目 `{raw_path}` 不在 `{policy_item_key}` 允许清理的 legacy `TODO.md` 套件范围内。"
+            )
+            continue
         if relative in seen:
             continue
         seen.add(relative)
         normalized_dirs.append(relative)
     return errors, normalized_dirs
+
+
+def validate_additional_spec_diff_scope(
+    repo_root: Path,
+    payload: Mapping[str, str],
+    changed_files: list[str],
+    additional_spec_dirs: list[Path],
+) -> list[str]:
+    if not changed_files or not additional_spec_dirs:
+        return []
+    if additional_spec_policy_item_key(payload) is None:
+        return []
+
+    policy_item_key = additional_spec_policy_item_key(payload)
+    if policy_item_key is None:
+        return []
+
+    touched_spec_dirs = formal_spec_dirs(changed_files)
+    allowed_spec_rules = LEGACY_TODO_CLEANUP_ADDITIONAL_SPEC_RULES[policy_item_key]
+    errors: list[str] = []
+    for spec_dir in additional_spec_dirs:
+        if spec_dir not in touched_spec_dirs:
+            continue
+        suite_paths = diff_paths_for_spec_dir(changed_files, spec_dir)
+        expected_todo = spec_dir / "TODO.md"
+        allowed_paths = {spec_dir / name for name in allowed_spec_rules[spec_dir]}
+        if expected_todo not in suite_paths:
+            errors.append(
+                f"`额外关联 specs` 条目 `{spec_dir.as_posix()}/` 必须在当前 diff 中删除该套件的 legacy `TODO.md`。"
+            )
+            continue
+        unexpected = sorted(path.as_posix() for path in suite_paths if path not in allowed_paths)
+        if unexpected:
+            errors.append(
+                f"`额外关联 specs` 条目 `{spec_dir.as_posix()}/` 超出当前事项允许的最小文件集合：{', '.join(unexpected)}。"
+            )
+            continue
+        if (repo_root / expected_todo).exists():
+            errors.append(
+                f"`额外关联 specs` 条目 `{spec_dir.as_posix()}/` 仅允许在当前 diff 中删除 legacy `TODO.md`，发现该文件仍存在。"
+            )
+    return errors
+
+
+def authorized_additional_spec_dirs_for_diff(
+    repo_root: Path,
+    payload: Mapping[str, str],
+    changed_files: list[str] | None,
+) -> tuple[list[str], list[Path]]:
+    additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, payload)
+    if additional_errors:
+        return additional_errors, []
+    if not changed_files:
+        return [], []
+    diff_scope_errors = validate_additional_spec_diff_scope(repo_root, payload, changed_files, additional_spec_dirs)
+    if diff_scope_errors:
+        return diff_scope_errors, []
+    touched_spec_dirs = formal_spec_dirs(changed_files)
+    return [], [spec_dir for spec_dir in additional_spec_dirs if spec_dir in touched_spec_dirs]
 
 
 def validate_bound_formal_spec_scope(
@@ -323,6 +412,9 @@ def validate_bound_formal_spec_scope(
     foreign = sorted(path.as_posix() for path in touched_spec_dirs if path not in authorized_spec_dirs)
     if foreign:
         return [f"当前 diff 只能触碰当前绑定的 formal spec 套件，发现额外套件：{', '.join(foreign)}。"]
+    diff_scope_errors = validate_additional_spec_diff_scope(repo_root, payload, changed_files, additional_spec_dirs)
+    if diff_scope_errors:
+        return diff_scope_errors
     return []
 
 

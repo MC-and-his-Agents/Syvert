@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0003-github-delivery-structure-and-repo-semantic-split/`
-- 额外关联 specs：`docs/specs/FR-0001-governance-stack-v1/`
+- 额外关联 specs：docs/specs/FR-0001-governance-stack-v1/, docs/specs/FR-0002-content-detail-runtime-v0-1/
 - 关联 decision：`docs/decisions/ADR-GOV-0029-remove-legacy-todo-md.md`
 - active 收口事项：`GOV-0029-remove-legacy-todo-md`
 - 关联 PR：`#61`
@@ -51,13 +51,13 @@
 
 - 已删除当前 FR 的 legacy `TODO.md` 与 formal spec 模板中的 `TODO.md`，并把 formal spec 最小套件收敛为 `spec.md + plan.md`。
 - 最近一次已推送 checkpoint 对应 head 为 `7c46804a4d4a16d59181ceaa4afbf428eb05f701`；该 head 已完成额外 formal spec 例外的治理边界收紧、delete-only legacy `TODO.md` 预检与 FR-0003 supporting artifacts 的本地门禁收口。
-- 当前工作树仅在上述 checkpoint 之上补充 guardian / checks / merge gate 所需的审查态元数据。
+- 当前工作树在上述 checkpoint 之上继续删除 `FR-0001` / `FR-0002` 的 live legacy `TODO.md`，并把跨 suite 授权收紧为仅允许本轮 delete-only 清理。
 
 ## 下一步动作
 
-- 等待当前 PR head 的 GitHub checks 与 guardian verdict 收敛。
-- 在当前 PR head 上确认 `APPROVE + safe_to_merge=true`。
-- 使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
+- 完成 `FR-0001` / `FR-0002` live legacy `TODO.md` 删除与相关引用清理。
+- 在当前 PR head 上重跑本地治理门禁、GitHub checks 与 guardian。
+- 确认 `APPROVE + safe_to_merge=true` 后，使用受控入口执行 squash merge，并核对 `#58` 自动关闭与远端分支删除。
 
 ## 当前 checkpoint 推进的 release 目标
 

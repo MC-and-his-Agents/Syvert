@@ -27,7 +27,7 @@
 - `exec-plan` 负责记录长任务执行细节、事项上下文、停点、下一步、风险与恢复入口。
 - `exec-plan` 在进入 review 前必须更新到可恢复状态，至少覆盖最近一次 checkpoint head、已验证项、未决风险与 checkpoint 语义。
 - `exec-plan` 不是 sprint 状态面，不承担 backlog 或 sprint 镜像职责。
-- 若 `item_type=GOV` 且绑定 formal spec 的治理收敛事项必须关闭当前绑定 formal spec 之外的存量规范残留，可选记录 `额外关联 specs`；仅允许列出与当前事项直接相关且可审查的 FR formal spec 套件根目录。
+- 当前仅 `GOV-0029-remove-legacy-todo-md` 允许记录 `额外关联 specs`；每个条目都必须伴随对应套件 `TODO.md` 的删除，且只能触碰完成该清理所需的最小文件集合。
 - `长任务`、`新事项`、`存量事项` 的判定以 [WORKFLOW.md](../../WORKFLOW.md) 与 [docs/AGENTS.md](../AGENTS.md) 为准。
 
 ## 命名与模板
