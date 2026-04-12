@@ -40,7 +40,7 @@
 - 集成/契约测试：
   - `python3 scripts/spec_guard.py --all`
   - `python3 scripts/docs_guard.py --mode ci`
-  - `python3 scripts/open_pr.py --class spec --issue 67 --item-key FR-0007-release-gate-and-regression-checks --item-type FR --release v0.2.0 --sprint 2026-S15 --closing refs --dry-run`
+  - `python3 scripts/open_pr.py --class spec --issue 79 --item-key CHORE-0079-fr-0007-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --closing fixes --dry-run`
 - 手动验证：
   - 核对 `#63 -> #67` 的 GitHub 事项关系、`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 的入口索引
   - 按 `spec_review.md` rubric 审核 requirement 是否覆盖 gate 对象、触发语义、失败语义、边界与依赖
