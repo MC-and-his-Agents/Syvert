@@ -37,7 +37,8 @@
 - 当前 `#68` 仍为 `OPEN`，但其下已无未完成 implementation 子事项。
 - 旧 `CHORE-0068-fr-0004-formal-spec-closeout` 已显式标记为 `状态：inactive (...)`，避免与当前 implementation closeout 回合形成双 active 上下文。
 - 当前独立 worktree：`/Users/mc/code/worktrees/syvert/issue-68-inputtarget-collectionpolicy`
-- 当前执行分支：`issue-68-fr-0004-closeout`
+- 当前执行分支：`issue-68-inputtarget-collectionpolicy`
+- 最近一次显式 checkpoint 绑定 `480f0e697c5fa37313046838d7a3a16b71d5eb58`；其后的提交仅用于补齐 active exec-plan 的 PR 绑定、唯一化上下文与 sprint 聚合索引，不单独形成新的 closeout 停点。
 
 ## 下一步动作
 
@@ -90,4 +91,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `fe328a8dcb6228bf9d38b28b9c9c59ebf5cc34c2`
+- `480f0e697c5fa37313046838d7a3a16b71d5eb58`
