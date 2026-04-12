@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 class SuccessfulAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request):
         url = request.input.url

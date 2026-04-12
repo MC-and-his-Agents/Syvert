@@ -47,6 +47,8 @@ PageStateTransport = Callable[..., Mapping[str, Any]]
 class XhsAdapter:
     adapter_key = "xhs"
     supported_capabilities = frozenset({CONTENT_DETAIL_BY_URL})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def __init__(
         self,

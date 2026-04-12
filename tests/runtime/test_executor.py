@@ -8,6 +8,8 @@ from syvert.runtime import TaskInput, TaskRequest, execute_task
 class SuccessfulAdapter:
     adapter_key = "xhs"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         return {
@@ -43,6 +45,8 @@ class SuccessfulAdapter:
 class UnsupportedCapabilityAdapter:
     adapter_key = "xhs"
     supported_capabilities = frozenset({"creator_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         raise AssertionError("execute should not be called")

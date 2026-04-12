@@ -1632,6 +1632,8 @@ class XhsAdapterTests(unittest.TestCase):
         class BrokenXhsAdapter:
             adapter_key = "xhs"
             supported_capabilities = frozenset({"content_detail_by_url"})
+            supported_targets = frozenset({"url"})
+            supported_collection_modes = frozenset({"hybrid"})
 
             def execute(self, request: TaskRequest) -> dict[str, Any]:
                 return {

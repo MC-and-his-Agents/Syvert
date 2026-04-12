@@ -3,7 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import unittest
 
-from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import (
+    CollectionPolicy,
+    CoreTaskRequest,
+    InputTarget,
+    PlatformAdapterError,
+    TaskInput,
+    TaskRequest,
+    execute_task,
+)
 
 
 @dataclass(frozen=True)
@@ -19,6 +27,8 @@ class ExtendedTaskRequest(TaskRequest):
 class SuccessfulAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
@@ -58,6 +68,8 @@ class SuccessfulAdapter:
 class MissingRawAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         return {
@@ -92,6 +104,8 @@ class MissingRawAdapter:
 class NonePayloadAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest):
         return None
@@ -100,6 +114,8 @@ class NonePayloadAdapter:
 class ListPayloadAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest):
         return []
@@ -108,6 +124,8 @@ class ListPayloadAdapter:
 class CrashingAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest):
         raise RuntimeError("boom")
@@ -116,6 +134,8 @@ class CrashingAdapter:
 class PlatformErrorWithBadDetailsAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest):
         from syvert.runtime import PlatformAdapterError
@@ -126,6 +146,8 @@ class PlatformErrorWithBadDetailsAdapter:
 class PlatformFailureAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         raise PlatformAdapterError(
@@ -190,6 +212,25 @@ class ExplodingRequestMapping(dict):
         raise RuntimeError("boom")
 
 
+class MissingTargetsAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class UnsupportedHybridCollectionModeAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail_by_url"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"authenticated"})
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
 class RuntimeExecutionTests(unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
@@ -213,6 +254,134 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["normalized"]["canonical_url"], request.input.url)
         self.assertEqual(adapter.last_request.input.url, request.input.url)
 
+    def test_execute_task_fails_closed_for_core_request_shape_before_shared_axis_admission(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-001b",
+        )
+
+        self.assertEqual(envelope["task_id"], "task-001b")
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["adapter_key"], "stub")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_unknown_target_type(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="unknown_type",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-invalid-target-type",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_unknown_collection_mode(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="private"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-invalid-collection-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_non_url_target_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="content_id",
+                target_value="abc123",
+            ),
+            policy=CollectionPolicy(collection_mode="hybrid"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-non-url-target",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_public_collection_mode_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="public"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-public-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_task_rejects_authenticated_collection_mode_before_legacy_projection(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/2",
+            ),
+            policy=CollectionPolicy(collection_mode="authenticated"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-authenticated-mode",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_task_request")
+
     def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
         request = TaskRequest(
             adapter_key="missing",
@@ -230,6 +399,40 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "adapter_not_found")
+
+    def test_execute_task_rejects_legacy_request_when_adapter_lacks_supported_targets(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingTargetsAdapter()},
+            task_id_factory=lambda: "task-missing-targets",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_targets")
+
+    def test_execute_task_rejects_legacy_request_when_adapter_does_not_declare_hybrid_mode(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": UnsupportedHybridCollectionModeAdapter()},
+            task_id_factory=lambda: "task-unsupported-hybrid",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
 
     def test_execute_task_rejects_unsupported_capability(self) -> None:
         request = TaskRequest(
