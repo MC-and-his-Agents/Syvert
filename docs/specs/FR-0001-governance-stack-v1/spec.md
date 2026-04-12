@@ -1,5 +1,13 @@
 # FR-0001 治理栈 v2 Repo Harness 闭环
 
+## 关联信息
+
+- item_key：`FR-0001-governance-stack-v1`
+- Issue：`#6`
+- item_type：`FR`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+
 ## 背景与目标
 
 - 背景：v1 已建立规则闭环，但尚缺 repo harness 层的运行契约、长任务恢复协议、workspace 生命周期与统一状态面。本事项绑定 GitHub Issue `#6`。
@@ -73,7 +81,7 @@ Then 可得到统一 text/json 状态视图，且兼容 legacy 状态读取
   - `governance` 或 `spec` 事项缺少 formal spec 或 bootstrap contract 时，`open_pr` 必须拒绝。
   - guardian 未给出 `APPROVE` 或 `safe_to_merge=false` 时，`merge_pr` 必须拒绝。
 - 边界场景：
-  - `docs/specs/**/TODO.md` 可在实现 PR 回写进度，不得修改正式契约语义。
+  - legacy `docs/specs/**/TODO.md` 已退出 formal governance flow；不得新增、回写或继续承担 live 状态入口。
   - v2 不引入 daemon，不引入仓库内 backlog/sprint 镜像。
 
 ## 验收标准
