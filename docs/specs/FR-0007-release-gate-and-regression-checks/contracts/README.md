@@ -21,6 +21,7 @@
    - 若后续版本要调整 reference pair，必须通过新的 formal spec 明确冻结
    - gate 输入必须遵循共享输入模型
    - gate 成功/失败判定必须兼容共享错误模型与 registry 语义
+   - `v0.2.0` 的最小回归矩阵固定覆盖 `content_detail_by_url` 共享 operation，或其经 `FR-0004` 批准的 `target_type=url` / `content_detail` 投影；每条 reference adapter 至少命中一条成功结果与一条按共享错误模型归类的真实失败结果（`invalid_input` 或 `platform`）
 
 4. 失败语义契约
    - 任一必选 gate 未执行、失败、结果不完整、结论不可信或不可追溯时，版本 gate 一律 fail-closed
@@ -29,6 +30,7 @@
 
 5. 平台泄漏边界契约
    - 允许平台语义留在 adapter 私有实现与平台研究文档
-   - 禁止平台语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）与 gate 共享判定逻辑
+   - 允许已批准的共享字段继续承载跨平台共用语义，例如 `normalized.platform` 与统一 `error.details` 中的结构化平台细节
+   - 禁止平台专属、只服务单一平台或会导致共享层分叉的语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）与 gate 共享判定逻辑
 
 如需增加更细的 gate payload 结构、结果格式或执行协议，应在后续实现 Work Item 中补充独立契约文档，并保持与本 requirement 一致。
