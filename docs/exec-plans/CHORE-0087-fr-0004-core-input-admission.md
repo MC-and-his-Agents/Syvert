@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#90`
 - active 收口事项：`CHORE-0087-fr-0004-core-input-admission`
 
 ## 目标
@@ -35,15 +35,15 @@
 
 ## 当前停点
 
-- `FR-0004` formal spec 已由 PR `#82` 合入主干，但 `#87` 尚未建立 implementation 回合的 active `exec-plan`、代码实现与验证证据。
-- 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`。
-- 当前回合从 `origin/main@366f0ac054483a93179eec8dbfac3b2da8a6abfb` 起步，后续仅围绕 Core 输入受理与共享模型接入推进。
+- `FR-0004` formal spec 已由 PR `#82` 合入主干，`#87` 当前已完成 Core 共享输入模型接入、最小结构校验与对应测试补强。
+- 当前独立 worktree 已建立：`/Users/mc/code/worktrees/syvert/issue-87-fr-0004-core`；实现分支 `issue-87-fr-0004-core` 已推送远端，并打开 implementation PR `#90`。
+- 当前停在 review / guardian / merge gate 前的最后一致性校对阶段；后续若仅补 PR 正文、review 元数据或 guardian 收口，不单独改写实现范围。
 
 ## 下一步动作
 
-- 在运行时引入 `InputTarget`、`CollectionPolicy` 与新的 Core 请求对象。
-- 补齐最小结构校验与对应单元测试。
-- 运行 implementation 相关验证、创建 PR，并完成 `#87` closeout。
+- 完善 PR `#90` 的审查输入与验证摘要。
+- 基于当前 head 执行 guardian 审查与受控 merge。
+- 合并后关闭 `#87`，并退役当前 branch / worktree。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -67,11 +67,27 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0004-input-target-and-collection-policy/`
 - 已核对：当前 `FR-0004` formal spec 已合入主干，而 `#87` 仍为 `OPEN`
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
+  - 结果：`Ran 63 tests in 1.913s`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 87 --item-key CHORE-0087-fr-0004-core-input-admission --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 接入 FR-0004 Core 共享输入模型' --closing fixes --dry-run`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 1 条提交信息，全部通过
+- `python3 -m unittest tests.runtime.test_douyin_browser_bridge.DouyinBrowserBridgeTests.test_extract_page_state_falls_back_to_authenticated_detail_request_when_page_state_misses_target`
+  - 结果：在当前分支与 `main` 基线均因本地签名服务未启动而失败，不作为本回合阻断性回归结论
+- 已创建当前受审 PR：`#90 https://github.com/MC-and-his-Agents/Syvert/pull/90`
 
 ## 未决风险
 
 - 若 Core 输入模型在本回合提前混入平台派生字段，会直接违背 `FR-0004` 的 Core / Adapter 边界。
 - 若在本回合把 `content_detail_by_url -> content_detail` 投影一起落地，会与 `#89` 的责任边界串线。
+- 当前实现对非 `url` 的合法 `target_type` 采取“结构上可受理、执行时在 legacy 投影前 fail-closed”的过渡策略；该缺口需由 `#89` 的正式 adapter-facing 契约承接完成收口。
 
 ## 回滚方式
 
@@ -79,4 +95,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `366f0ac054483a93179eec8dbfac3b2da8a6abfb`
+- `30ac9e5d1f7a05c316fd928c6ad689ff8ca56ea7`
