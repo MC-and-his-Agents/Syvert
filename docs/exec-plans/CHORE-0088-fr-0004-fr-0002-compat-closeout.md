@@ -33,7 +33,7 @@
 
 - `#87` 已完成 legacy `TaskRequest(adapter_key, capability, input.url)` 到 shared input 的基础归一。
 - `#89` 已通过 PR `#91` 合入主干，完成 `content_detail_by_url -> content_detail` capability family 投影，以及 legacy/native 共用 `AdapterTaskRequest` 的执行链。
-- 当前回合已补齐 runtime 回归测试草案：
+- 当前行为 checkpoint 已落盘到 `10f5b5a5bfdcb1913ace9b5eb8c1985e90e44045`：
   - legacy URL 请求与 native `CoreTaskRequest(url + hybrid)` 命中同一 `AdapterTaskRequest(url + hybrid)` 投影，并返回等价结果
   - adapter 未声明 `hybrid` 时，legacy/native 命中同一 `collection_mode_not_supported` 失败
   - release / sprint 已登记 `#88` 的兼容证据入口，待 PR / closeout 回链
@@ -69,7 +69,11 @@
 - 已核对：`#88` 仍为 `OPEN`，`#89` 已关闭，`#68/#64` 仍为 `OPEN`
 - 已核对：当前 `#88` worktree 基于 `main@e2b6b53d9a73f22b8e2f36ba9c4069a79ae45a08`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_models`
-  - 结果：`Ran 69 tests in 2.412s`，`OK`
+  - 结果：`Ran 69 tests in 1.779s`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
 
 ## 兼容 closeout 证据
 
@@ -95,4 +99,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e2b6b53d9a73f22b8e2f36ba9c4069a79ae45a08`
+- `10f5b5a5bfdcb1913ace9b5eb8c1985e90e44045`
