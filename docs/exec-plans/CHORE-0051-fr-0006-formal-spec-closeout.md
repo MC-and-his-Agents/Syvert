@@ -30,7 +30,7 @@
 ## 当前停点
 
 - 已在独立 worktree `issue-74-chore-0051-fr-0006-formal-spec-closeout` 中承接 `FR-0006` formal spec 文档增量，并把执行入口从 FR `#66` 纠正为当前 Work Item `#74`。
-- `340d567e44dcce72957a07e343c8d50fc01bcedc` 已成为最近一次 formal spec 语义变更的 checkpoint head；与该 checkpoint 绑定的 `docs_guard`、`spec_guard --all`、`governance_gate --mode local --base-ref origin/main --head-ref HEAD` 均已通过，PR `#76` 在该 checkpoint 对应 head 上的 GitHub checks 也已全绿。
+- `7de064a942cba7bcc5f39b153dcaf7f02c87ee75` 已成为最近一次 formal spec 语义变更的 checkpoint head；与该 checkpoint 绑定的 `docs_guard`、`spec_guard --all`、`governance_gate --mode local --base-ref origin/main --head-ref HEAD` 均已通过，PR `#76` 在该 checkpoint 对应 head 上的 GitHub checks 也已全绿。
 - guardian 首轮审查已指出 FR 不能直接作为执行入口；当前增量只修该阻断所要求的工件绑定与索引一致性。
 - superseded PR `#71` 已关闭，当前合法受审入口为 Work Item `#74` 对应的 PR `#76`。
 
@@ -67,15 +67,15 @@
 - `python3 scripts/open_pr.py --class spec --issue 74 --item-key CHORE-0051-fr-0006-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --closing refs --title "spec: 收口 FR-0006 的适配器契约测试基座"`
   - 结果：成功创建 PR `#76`
 - `python3 scripts/docs_guard.py`
-  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
+  - 结果：通过（绑定 checkpoint `7de064a942cba7bcc5f39b153dcaf7f02c87ee75`）
 - `python3 scripts/spec_guard.py --all`
-  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
+  - 结果：通过（绑定 checkpoint `7de064a942cba7bcc5f39b153dcaf7f02c87ee75`）
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main --head-ref HEAD`
-  - 结果：通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc`）
+  - 结果：通过（绑定 checkpoint `7de064a942cba7bcc5f39b153dcaf7f02c87ee75`）
 - `gh pr checks 76`
-  - 结果：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Governance Tooling` / `Validate Spec Review Boundaries` 全部通过（绑定 checkpoint `340d567e44dcce72957a07e343c8d50fc01bcedc` 对应的受审 head）
+  - 结果：`Validate Commit Messages` / `Validate Docs And Guard Scripts` / `Validate Governance Tooling` / `Validate Spec Review Boundaries` 全部通过（绑定 checkpoint `7de064a942cba7bcc5f39b153dcaf7f02c87ee75` 对应的受审 head）
 - `git rev-parse HEAD`
-  - 结果：`340d567e44dcce72957a07e343c8d50fc01bcedc`
+  - 结果：`7de064a942cba7bcc5f39b153dcaf7f02c87ee75`
 
 ## 未决风险
 
@@ -88,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `340d567e44dcce72957a07e343c8d50fc01bcedc`
+- `7de064a942cba7bcc5f39b153dcaf7f02c87ee75`
 - 说明：该 checkpoint 绑定最近一次 formal spec 语义变更；当前增量之后若仅补充 guardian / merge gate 元数据，可保留该 checkpoint，并由 guardian state 绑定最终受审 head。
