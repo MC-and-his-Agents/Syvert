@@ -34,7 +34,8 @@
 - 已建立 `issue-68-inputtarget-collectionpolicy` worktree，并核对 `#64=FR`、`#68=Work Item`、`release=v0.2.0`、`sprint=2026-S15`。
 - `FR-0004` formal spec 套件、当前 Work Item 的最小 active `exec-plan` 与 `v0.2.0` / `2026-S15` 索引已提交到当前分支，当前受审 PR 为 `#82`。
 - 历史 PR `#75` 已因 GitHub checks 未绑定最新 head 而关闭；当前轮次由 PR `#82` 继续承接相同分支的最新 formal spec 审查。
-- 当前停在将 active `exec-plan` 的审查态、验证轨迹与 checkpoint 对齐到当前受审 head `e52b70dc910a4ef357f3b61a8248cb4a2831a320`，然后重入 guardian。
+- 最近一次显式 checkpoint 仍绑定 `e52b70dc910a4ef357f3b61a8248cb4a2831a320`；其后的提交仅用于同步当前 PR #82 的审查态元数据、恢复语义与 GitHub 状态面对齐，不单独形成新的实现停点。
+- 当前停在等待 guardian 基于当前受审 head 重跑并给出最终 verdict。
 
 ## 下一步动作
 
@@ -68,7 +69,7 @@
 - `python3 scripts/open_pr.py --class spec --issue 68 --item-key CHORE-0068-fr-0004-formal-spec-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'spec: 冻结 FR-0004 的 InputTarget 与 CollectionPolicy 模型' --closing refs --dry-run`
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
 - 已创建当前受审 PR：`#82 https://github.com/MC-and-his-Agents/Syvert/pull/82`
-- 已确认当前 head `e52b70dc910a4ef357f3b61a8248cb4a2831a320` 的 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
+- 已确认当前受审 head 的 GitHub checks：`Validate Commit Messages`、`Validate Docs And Guard Scripts`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 全绿
 - 已完成多轮 guardian 审查，并按阻断收口了兼容映射、`spec review` 口径、active `exec-plan` 绑定、Adapter SDK 契约边界与恢复工件一致性
 
 ## 未决风险
