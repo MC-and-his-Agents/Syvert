@@ -80,7 +80,8 @@ def validate_contract_sample(
         )
 
     if sample.expected_outcome == "success":
-        if observed_status == "success":
+        success_violation = _validate_success_envelope(envelope)
+        if success_violation is None:
             return _build_result(
                 sample_id=sample.sample_id,
                 verdict="pass",
@@ -92,8 +93,8 @@ def validate_contract_sample(
         return _build_result(
             sample_id=sample.sample_id,
             verdict="contract_violation",
-            reason_code="unexpected_failed_envelope",
-            reason_message="sample expected success but observed failed envelope",
+            reason_code=success_violation["code"],
+            reason_message=success_violation["message"],
             observed_status=observed_status,
             observed_error=observed_error,
         )
@@ -167,6 +168,15 @@ def _classify_legal_failure_sample(
             verdict="contract_violation",
             reason_code="invalid_runtime_error_category",
             reason_message="runtime error category is missing or invalid",
+            observed_status=observed_status,
+            observed_error=observed_error,
+        )
+    if error_category == "runtime_contract":
+        return _build_result(
+            sample_id=sample_id,
+            verdict="contract_violation",
+            reason_code="runtime_contract_failure_observed",
+            reason_message="runtime contract failure cannot satisfy legal failure expectation",
             observed_status=observed_status,
             observed_error=observed_error,
         )
@@ -267,3 +277,24 @@ def _build_result(
         "observed_error": dict(observed_error) if observed_error is not None else None,
     }
     return result
+
+
+def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+    if envelope.get("status") != "success":
+        return {
+            "code": "unexpected_failed_envelope",
+            "message": "sample expected success but observed failed envelope",
+        }
+    raw_payload = envelope.get("raw")
+    if not isinstance(raw_payload, Mapping):
+        return {
+            "code": "missing_raw_payload",
+            "message": "success runtime envelope must carry raw payload mapping",
+        }
+    normalized_result = envelope.get("normalized")
+    if not isinstance(normalized_result, Mapping):
+        return {
+            "code": "missing_normalized_result",
+            "message": "success runtime envelope must carry normalized result mapping",
+        }
+    return None

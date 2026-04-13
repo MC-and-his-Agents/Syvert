@@ -13,7 +13,13 @@ from tests.runtime.contract_harness import (
 class ContractHarnessValidationToolTests(unittest.TestCase):
     def test_returns_pass_for_success_sample_with_success_envelope(self) -> None:
         sample = ContractSampleDefinition(sample_id="sample-success", expected_outcome="success")
-        execution_result = HarnessExecutionResult(runtime_envelope={"status": "success"})
+        execution_result = HarnessExecutionResult(
+            runtime_envelope={
+                "status": "success",
+                "raw": {"content_id": "raw-1"},
+                "normalized": {"content_id": "normalized-1"},
+            }
+        )
 
         result = validate_contract_sample(sample, execution_result)
 
@@ -22,6 +28,20 @@ class ContractHarnessValidationToolTests(unittest.TestCase):
         self.assertEqual(result["reason"]["code"], "success_envelope_observed")
         self.assertEqual(result["observed_status"], "success")
         self.assertIsNone(result["observed_error"])
+
+    def test_success_sample_with_missing_normalized_result_is_contract_violation(self) -> None:
+        sample = ContractSampleDefinition(sample_id="sample-success", expected_outcome="success")
+        execution_result = HarnessExecutionResult(
+            runtime_envelope={
+                "status": "success",
+                "raw": {"content_id": "raw-1"},
+            }
+        )
+
+        result = validate_contract_sample(sample, execution_result)
+
+        self.assertEqual(result["verdict"], "contract_violation")
+        self.assertEqual(result["reason"]["code"], "missing_normalized_result")
 
     def test_returns_legal_failure_for_fr0005_failed_envelope(self) -> None:
         sample = ContractSampleDefinition(sample_id="sample-legal-failure", expected_outcome="legal_failure")
@@ -126,6 +146,24 @@ class ContractHarnessValidationToolTests(unittest.TestCase):
         self.assertEqual(result["verdict"], "contract_violation")
         self.assertEqual(result["reason"]["code"], "invalid_runtime_error_category")
         self.assertEqual(result["observed_status"], "failed")
+
+    def test_runtime_contract_failure_does_not_count_as_legal_failure(self) -> None:
+        sample = ContractSampleDefinition(sample_id="sample-runtime-contract", expected_outcome="legal_failure")
+        execution_result = HarnessExecutionResult(
+            runtime_envelope={
+                "status": "failed",
+                "error": {
+                    "category": "runtime_contract",
+                    "code": "invalid_adapter_payload",
+                    "message": "adapter payload shape mismatch",
+                },
+            }
+        )
+
+        result = validate_contract_sample(sample, execution_result)
+
+        self.assertEqual(result["verdict"], "contract_violation")
+        self.assertEqual(result["reason"]["code"], "runtime_contract_failure_observed")
 
 
 if __name__ == "__main__":
