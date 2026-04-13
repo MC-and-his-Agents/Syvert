@@ -70,6 +70,22 @@ body:
     validations:
       required: true
 
+  - type: markdown
+    attributes:
+      value: |
+        `Integration` 字段必须满足以下约束：
+        - `integration_touchpoint != none` 时，`integration_ref` 不得为空或 `none`，且必须指向可核查的具体 integration issue / item。
+        - `external_dependency != none`、`joint_acceptance_needed=yes` 或 `contract_surface != none` 时，`integration_touchpoint` 不得为 `none`，且 `merge_gate` 必须为 `integration_check_required`。
+        - 纯本仓库事项必须显式写 `integration_touchpoint=none`、`integration_ref=none`、`external_dependency=none`、`contract_surface=none`、`joint_acceptance_needed=no`、`merge_gate=local_only`。
+
+  - type: checkboxes
+    id: integration_guardrails
+    attributes:
+      label: Integration Guardrails
+      options:
+        - label: 我已按上述 integration 组合约束核对本 Work Item，当前填写值不存在互相冲突的元数据。
+          required: true
+
   - type: dropdown
     id: integration_touchpoint
     attributes:
@@ -87,7 +103,7 @@ body:
     id: integration_ref
     attributes:
       label: integration_ref
-      description: 填具体 integration issue / item 链接或编号；纯本仓库事项写 `none`。
+      description: 填具体 integration issue / item 链接或编号（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）；纯本仓库事项写 `none`。
     validations:
       required: true
 

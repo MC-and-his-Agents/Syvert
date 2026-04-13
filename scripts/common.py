@@ -181,3 +181,16 @@ def slugify(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     tokens = re.findall(r"[a-z0-9]+", normalized.lower())
     return "-".join(tokens) or "task"
+
+
+def integration_ref_is_checkable(value: str) -> bool:
+    normalized = value.strip()
+    if not normalized or normalized.lower() == "none":
+        return False
+    patterns = (
+        r"^#\d+$",
+        r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$",
+        r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+$",
+        r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+\?.*itemId=[A-Za-z0-9_-]+.*$",
+    )
+    return any(re.match(pattern, normalized) for pattern in patterns)

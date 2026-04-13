@@ -45,7 +45,7 @@ CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
         "## integration_check",
         "",
         "- integration_touchpoint: active",
-        "- integration_ref: https://example.test/integration/1",
+        "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
         "- external_dependency: both",
         "- merge_gate: local_only",
         "- contract_surface: runtime_modes",
@@ -120,7 +120,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             [
                 "- integration_touchpoint: active",
                 "- integration_ref:",
-                "  https://example.test/integration/1",
+                "  https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "- external_dependency: both",
                 "- merge_gate: integration_check_required",
                 "- contract_surface: runtime_modes",
@@ -137,7 +137,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         payload = parse_bullet_kv_section(section)
 
         self.assertEqual(payload["integration_status_checked_before_merge"], "yes")
-        self.assertEqual(payload["integration_ref"], "https://example.test/integration/1")
+        self.assertEqual(payload["integration_ref"], "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
 
     def test_integration_merge_gate_errors_accepts_standard_template_shape(self) -> None:
         meta = {
@@ -147,7 +147,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "",
                     "- integration_touchpoint: active",
                     "- integration_ref:",
-                    "  https://example.test/integration/1",
+                    "  https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                     "- external_dependency: both",
                     "- merge_gate: integration_check_required",
                     "- contract_surface: runtime_modes",
@@ -237,6 +237,53 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "`merge_gate` 必须为 `integration_check_required`。"
             ],
         )
+
+    def test_integration_merge_gate_errors_rejects_invalid_enum_values(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: unexpected",
+                    "- integration_ref: #12",
+                    "- external_dependency: somewhere",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: typo_surface",
+                    "- joint_acceptance_needed: maybe",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertTrue(any("integration_touchpoint" in error for error in errors))
+        self.assertTrue(any("external_dependency" in error for error in errors))
+        self.assertTrue(any("contract_surface" in error for error in errors))
+        self.assertTrue(any("joint_acceptance_needed" in error for error in errors))
+
+    def test_integration_merge_gate_errors_rejects_uncheckable_integration_ref(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- integration_ref: later",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertTrue(any("可核查的具体 integration issue / item" in error for error in errors))
 
     @patch("scripts.pr_guardian.subprocess.run")
     def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:

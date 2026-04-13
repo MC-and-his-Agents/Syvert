@@ -16,7 +16,17 @@ import subprocess
 import tempfile
 from datetime import datetime, timezone
 
-from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, format_changed_files, load_json, require_cli, run
+from scripts.common import (
+    REPO_ROOT,
+    bool_text,
+    dump_json,
+    ensure_parent,
+    format_changed_files,
+    integration_ref_is_checkable,
+    load_json,
+    require_cli,
+    run,
+)
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
@@ -25,6 +35,18 @@ SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 CODE_REVIEW_PATH = "code_review.md"
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
+INTEGRATION_TOUCHPOINT_VALUES = {"none", "check_required", "active", "blocked", "resolved"}
+EXTERNAL_DEPENDENCY_VALUES = {"none", "syvert", "webenvoy", "both"}
+CONTRACT_SURFACE_VALUES = {
+    "none",
+    "execution_provider",
+    "ids_trace",
+    "errors",
+    "raw_normalized",
+    "diagnostics_observability",
+    "runtime_modes",
+}
+JOINT_ACCEPTANCE_VALUES = {"yes", "no"}
 REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "sprint")
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
@@ -263,6 +285,26 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         return [f"PR 描述中的 `integration_check.merge_gate` 非法：`{merge_gate}`（仅允许 `local_only` / `integration_check_required`）。"]
 
     errors: list[str] = []
+    if integration_touchpoint not in INTEGRATION_TOUCHPOINT_VALUES:
+        errors.append(
+            "`integration_check.integration_touchpoint` 非法："
+            f"`{integration_touchpoint}`（仅允许 `{', '.join(sorted(INTEGRATION_TOUCHPOINT_VALUES))}`）。"
+        )
+    if external_dependency not in EXTERNAL_DEPENDENCY_VALUES:
+        errors.append(
+            "`integration_check.external_dependency` 非法："
+            f"`{external_dependency}`（仅允许 `{', '.join(sorted(EXTERNAL_DEPENDENCY_VALUES))}`）。"
+        )
+    if contract_surface not in CONTRACT_SURFACE_VALUES:
+        errors.append(
+            "`integration_check.contract_surface` 非法："
+            f"`{contract_surface}`（仅允许 `{', '.join(sorted(CONTRACT_SURFACE_VALUES))}`）。"
+        )
+    if joint_acceptance_needed not in JOINT_ACCEPTANCE_VALUES:
+        errors.append(
+            "`integration_check.joint_acceptance_needed` 非法："
+            f"`{joint_acceptance_needed}`（仅允许 `{', '.join(sorted(JOINT_ACCEPTANCE_VALUES))}`）。"
+        )
     integration_active = integration_touchpoint != "none"
     has_external_dependency = external_dependency != "none"
     joint_acceptance = joint_acceptance_needed == "yes"
@@ -272,6 +314,8 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
     if integration_active and integration_ref.lower() == "none":
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
+    if integration_active and integration_ref and not integration_ref_is_checkable(integration_ref):
+        errors.append("`integration_touchpoint != none` 时，`integration_ref` 必须指向可核查的具体 integration issue / item。")
     if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and merge_gate != "integration_check_required":
         errors.append(
             "`merge_gate=local_only` 与当前 integration 元数据冲突："
@@ -286,9 +330,11 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     if merge_gate != "integration_check_required":
         if not integration_ref:
             errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
+        if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
+            errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
         return errors
 
-    if not integration_ref or integration_ref.lower() == "none":
+    if not integration_ref or not integration_ref_is_checkable(integration_ref):
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
     if payload.get("integration_status_checked_before_pr", "").strip().lower() != "yes":
         errors.append("`merge_gate=integration_check_required` 时，PR 描述必须记录 `integration_status_checked_before_pr=yes`。")

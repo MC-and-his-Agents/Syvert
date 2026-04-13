@@ -198,7 +198,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "--integration-touchpoint",
                 "none",
                 "--integration-ref",
-                "https://example.test/integration/1",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "--external-dependency",
                 "both",
                 "--merge-gate",
@@ -215,6 +215,32 @@ class OpenPrPreflightTests(unittest.TestCase):
         errors = validate_integration_args(args)
 
         self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
+
+    def test_validate_integration_args_rejects_uncheckable_integration_ref(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "later",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("可核查的具体 integration issue / item" in error for error in errors))
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
@@ -289,7 +315,7 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "--integration-touchpoint",
                 "active",
                 "--integration-ref",
-                "https://example.test/integration/1",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "--external-dependency",
                 "both",
                 "--merge-gate",
@@ -308,7 +334,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         body = build_body(args, [])
 
         self.assertIn("- integration_touchpoint: active", body)
-        self.assertIn("- integration_ref: https://example.test/integration/1", body)
+        self.assertIn("- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466", body)
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
 
