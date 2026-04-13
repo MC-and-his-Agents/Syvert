@@ -25,13 +25,13 @@
 
 ## 当前停点
 
-- 已在 `issue-112-governance-remove-default-300s-guardian-timeout-cap` worktree 中完成 `pr_guardian` 默认超时行为调整、测试补齐、门禁验证与 PR 创建；当前停在等待 GitHub checks 与 guardian 审查。
+- 已在 `issue-112-governance-remove-default-300s-guardian-timeout-cap` worktree 中完成 `pr_guardian` 默认超时行为调整、测试补齐、门禁验证、PR 创建与 guardian 阻断修复；当前停在等待最新 head `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 的 GitHub checks 与 guardian 复核。
 
 ## 下一步动作
 
-- 观察 PR `#113` 的 GitHub checks，确认当前 head 上的自动化门禁通过。
-- 对 PR `#113` 执行 guardian 审查，确认默认无超时策略没有破坏现有 merge gate 语义。
-- 如出现阻断，仅在本事项范围内修复并回写验证与风险记录。
+- 等待 PR `#113` 当前 head `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 的 GitHub checks 全绿。
+- 对 PR `#113` 当前 head 重新执行 guardian 审查，确认 exec-plan 工件与受审 head 已一致。
+- guardian 通过后按受控入口推进 squash merge，并同步分支/worktree 退役。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -67,6 +67,11 @@
 - `git push -u origin issue-112-governance-remove-default-300s-guardian-timeout-cap`
 - `python3 scripts/open_pr.py --class governance --issue 112 --item-key GOV-0030-guardian-timeout-unbounded --item-type GOV --release v0.2.0 --sprint 2026-S16 --title "fix(governance): 移除 guardian 默认 300 秒超时"`
 - 已创建 PR：`#113 https://github.com/MC-and-his-Agents/Syvert/pull/113`
+- guardian 初次审查结论：`REQUEST_CHANGES`；阻断项为显式非法超时配置与测试契约不一致
+- 已按 guardian 阻断收口：显式拒绝 `0` / 负数超时配置，并补齐正向透传断言
+- `git push`
+- guardian 二次审查结论：`REQUEST_CHANGES`；阻断项为 active `exec-plan` 的 checkpoint head 未对齐当前受审 head
+- 已按 guardian 阻断收口：同步 active `exec-plan` 的停点、下一步与 checkpoint head 到当前受审 head
 
 ## 未决风险
 
@@ -80,4 +85,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2d6b513e2306b7c592016b31774d5b7edbb6ff3a`
+- `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb`
