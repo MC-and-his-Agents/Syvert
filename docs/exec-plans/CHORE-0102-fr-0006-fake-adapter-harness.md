@@ -63,6 +63,9 @@
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host`
   - 结果：`Ran 43 tests in 0.003s`，`OK`
+- 当前受审 PR：`#104`
+- 当前实现 head：`45887530c25ed0cde250fc7eb298d1c3303cbf40`
+- 说明：`45887530c25ed0cde250fc7eb298d1c3303cbf40` 收紧 fake adapter 分支范围并补齐 active exec-plan 的 PR 绑定；其后的提交仅用于回填 review 证据与 checkpoint 元数据，不改写实现代码。
 
 ## 未决风险
 
@@ -75,4 +78,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `530f94a2e9c23684fc4119162c34a5292143f30a`
+- `45887530c25ed0cde250fc7eb298d1c3303cbf40`
