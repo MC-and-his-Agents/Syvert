@@ -31,6 +31,7 @@ LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
         "## integration_check",
         "",
         "- integration_touchpoint: none",
+        "- shared_contract_changed: no",
         "- integration_ref: none",
         "- external_dependency: none",
         "- merge_gate: local_only",
@@ -46,6 +47,7 @@ CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
         "## integration_check",
         "",
         "- integration_touchpoint: active",
+        "- shared_contract_changed: no",
         "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
         "- external_dependency: both",
         "- merge_gate: local_only",
@@ -61,6 +63,7 @@ INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY = "\n".join(
         "## integration_check",
         "",
         "- integration_touchpoint: active",
+        "- shared_contract_changed: no",
         "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
         "- external_dependency: both",
         "- merge_gate: integration_check_required",
@@ -209,19 +212,46 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
-    def test_integration_merge_gate_errors_allows_missing_section_for_non_gated_pr(self) -> None:
+    def test_integration_merge_gate_errors_rejects_missing_section(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, [])
+        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落。"])
 
     def test_integration_merge_gate_errors_rejects_missing_section_for_explicit_required_gate(self) -> None:
         meta = {"body": "## 摘要\n\n- merge_gate: integration_check_required\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"])
+        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落。"])
+
+    def test_integration_merge_gate_errors_rejects_missing_canonical_fields(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- integration_ref: #12",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(
+            errors,
+            [
+                "PR 描述中的 `integration_check` 缺少必填字段："
+                "`integration_check.joint_acceptance_needed`、`integration_check.shared_contract_changed`。"
+            ],
+        )
 
     def test_integration_merge_gate_errors_rejects_unknown_merge_gate_value(self) -> None:
         meta = {
@@ -248,6 +278,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "## integration_check",
                     "",
                     "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
                     "- integration_ref: none",
                     "- external_dependency: both",
                     "- merge_gate: integration_check_required",
@@ -363,6 +394,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "## integration_check",
                     "",
                     "- integration_touchpoint: none",
+                    "- shared_contract_changed: no",
                     "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                     "- external_dependency: none",
                     "- merge_gate: local_only",

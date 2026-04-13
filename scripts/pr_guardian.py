@@ -312,9 +312,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     raw_sections = parse_all_markdown_sections(body)
     integration_section = raw_sections.get("integration_check", "")
     if not integration_section:
-        if re.search(r"(?im)^\s*-\s*merge_gate\s*[：:]\s*integration_check_required\b", body):
-            return ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"]
-        return []
+        return ["PR 描述缺少 `integration_check` 段落。"]
 
     payload = parse_integration_check_payload(integration_section)
     integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
@@ -328,6 +326,14 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         return ["PR 描述中的 `integration_check.merge_gate` 不能为空。"]
     if merge_gate not in {"local_only", "integration_check_required"}:
         return [f"PR 描述中的 `integration_check.merge_gate` 非法：`{merge_gate}`（仅允许 `local_only` / `integration_check_required`）。"]
+    missing_fields = [
+        key
+        for key in sorted(INTEGRATION_CHECK_CANONICAL_FIELDS)
+        if key not in payload or not str(payload.get(key) or "").strip()
+    ]
+    if missing_fields:
+        missing = "、".join(f"`integration_check.{field}`" for field in missing_fields)
+        return [f"PR 描述中的 `integration_check` 缺少必填字段：{missing}。"]
 
     errors: list[str] = []
     if integration_touchpoint not in INTEGRATION_TOUCHPOINT_VALUES:

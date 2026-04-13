@@ -87,10 +87,12 @@ codex:
 - 默认执行真相源仍是当前仓库的 GitHub Project；仅当事项触及跨仓共享契约、跨仓依赖或联合验收时，才查看 owner 级 integration project。
 - 每个进入执行回合的 issue / work item 在 GitHub 侧都必须显式声明：
   - `integration_touchpoint`
+  - `shared_contract_changed`
   - `integration_ref`
   - `external_dependency`
   - `merge_gate`
   - `contract_surface`
+  - `joint_acceptance_needed`
 - 满足以下任一条件时，`integration_touchpoint` 不得为 `none`，并且开工前必须先查看 `integration_ref` 对应的 integration issue / item：
   - 改共享输入输出
   - 改错误码或错误语义
@@ -99,6 +101,9 @@ codex:
   - 改执行模式或 gate 口径
   - 依赖另一仓库先做、同步做或共同验收
   - 影响联合 PoC、联合回归或共享桥接能力
+- `shared_contract_changed` 取值约定：
+  - `yes`：当前事项显式修改共享契约或 merge gate 口径
+  - `no`：未修改共享契约或 gate 口径
 - `integration_touchpoint` 取值约定：
   - `none`：纯本仓库事项，不需要 integration 联动
   - `check_required`：实现前必须核对 integration 状态
@@ -121,6 +126,9 @@ codex:
   - `raw_normalized`
   - `diagnostics_observability`
   - `runtime_modes`
+- `joint_acceptance_needed` 取值约定：
+  - `yes`：当前事项需要联合验收
+  - `no`：当前事项不需要联合验收
 - integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
 
 ## stop conditions
