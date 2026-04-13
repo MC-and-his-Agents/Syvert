@@ -66,9 +66,9 @@
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 已核对：以 `origin/main@1dbf4c6` 为基线，本分支仅新增 validation tool 与对应测试，并更新 `__init__.py` 导出与本 exec-plan 元数据
 - `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 10 tests`，`OK`
+  - 结果：`Ran 13 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 54 tests`，`OK`
+  - 结果：`Ran 57 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：`通过`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -87,6 +87,11 @@
   - 阻断项已修复：
     - success 样例与 legal failure 样例改为校验完整 runtime envelope，而非只看局部字段
     - active exec-plan 已与已创建的 PR `#108`、当前 review 状态和后续动作对齐
+- guardian 三轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - 混合 `precondition_code` 与 `runtime_envelope` 的非法状态不再被误判为执行前置不满足
+    - contract violation 样例在观察到 success envelope 时恢复独立 reason code
+    - 新增一条由 `execute_harness_sample()` 驱动的 platform legal failure -> validator 联动测试
 - review gate 语义：当前分支已满足 `implementation` 类 PR 的本地测试与 guard 前置条件；后续仅需按流程进入 reviewer / guardian / checks 与 merge gate
 
 ## 未决风险
@@ -100,4 +105,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e860de08f889b6195fc68f4263a39fcb4e54f0d5`
+- `cf98c8a4e7fa6d7b8a54e1608f2fe810e0f41d64`
