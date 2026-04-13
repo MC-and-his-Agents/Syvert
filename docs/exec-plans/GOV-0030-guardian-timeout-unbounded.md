@@ -25,12 +25,14 @@
 
 ## 当前停点
 
-- 已在 `issue-112-governance-remove-default-300s-guardian-timeout-cap` worktree 中完成 `pr_guardian` 默认超时行为调整、测试补齐、门禁验证、PR 创建与 guardian 阻断修复；当前停在等待最新 head `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 的 GitHub checks 与 guardian 复核。
+- 最近一次实现 checkpoint 绑定到 head `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb`，已覆盖默认无超时、显式正整数超时与非法配置报错的代码/测试收口。
+- 当前 PR head 为 `df79c4075c722ffd27d6c88fbe06a8f55198c7ac`；该增量提交仅补充审查态 `exec-plan` 元数据，用于对齐当前停点与 guardian 输入，不构成新的实现 checkpoint。
+- 当前停在等待 PR `#113` 的最新 GitHub checks 与 guardian 复核，确认审查工件与当前受审 head 描述一致。
 
 ## 下一步动作
 
-- 等待 PR `#113` 当前 head `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 的 GitHub checks 全绿。
-- 对 PR `#113` 当前 head 重新执行 guardian 审查，确认 exec-plan 工件与受审 head 已一致。
+- 等待 PR `#113` 当前 head `df79c4075c722ffd27d6c88fbe06a8f55198c7ac` 的 GitHub checks 全绿。
+- 对 PR `#113` 当前 head 重新执行 guardian 审查，确认其绑定的 guardian state 与最近一次实现 checkpoint `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 之间关系描述清晰且一致。
 - guardian 通过后按受控入口推进 squash merge，并同步分支/worktree 退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -70,8 +72,8 @@
 - guardian 初次审查结论：`REQUEST_CHANGES`；阻断项为显式非法超时配置与测试契约不一致
 - 已按 guardian 阻断收口：显式拒绝 `0` / 负数超时配置，并补齐正向透传断言
 - `git push`
-- guardian 二次审查结论：`REQUEST_CHANGES`；阻断项为 active `exec-plan` 的 checkpoint head 未对齐当前受审 head
-- 已按 guardian 阻断收口：同步 active `exec-plan` 的停点、下一步与 checkpoint head 到当前受审 head
+- guardian 二次审查结论：`REQUEST_CHANGES`；阻断项为 active `exec-plan` 错把 checkpoint head 写成当前受审 head
+- 已按 guardian 阻断收口：区分最近一次实现 checkpoint `ae12b60da3c1f1dfb6cffb3d05a78ba3294a76cb` 与当前 PR head `df79c4075c722ffd27d6c88fbe06a8f55198c7ac`
 
 ## 未决风险
 
