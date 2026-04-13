@@ -41,6 +41,7 @@
 - `#74` 已由 PR `#76` 合入并关闭；`#102` 已由 PR `#104` 合入并关闭；`#101` 已由 PR `#108` 合入并关闭；`#103` 已由 PR `#109` 合入并关闭。
 - 当前 `FR-0006` GitHub closeout 仍包含 Work Item `#110` 与父 FR `#66`；`#83` 为已关闭的历史镜像，不得重新打开。
 - 当前受审 PR `#111` 最新 head 已包含 requirement container、active closeout plan 与 release / sprint 回链。
+- `#74/#102/#101/#103` 对应 exec-plan 中的 active / current 表述仅保留各自历史执行轮次的原始记录；当前 `FR-0006` 父事项收口语义只认 `#110` 这一条 active 入口。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-110-chore-fr-0006`。
 
 ## 下一步动作

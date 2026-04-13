@@ -9,8 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 关联 PR：`#109`
-- 状态：`historical / inactive`
-- 历史实现事项：`CHORE-0103-fr-0006-contract-samples-minimal-automation`
+- active Work Item：`CHORE-0103-fr-0006-contract-samples-minimal-automation`
 
 ## 目标
 
@@ -42,12 +41,12 @@
   - `execution-precondition-not-met`
 - automation 聚合入口已落地，可批量执行样例、交给 validator 分类，并输出按 `sample_id` 可追溯的 verdict 结果。
 - 最小自动化验证已落地，当前在本地可证明四组样例的 observed verdict 与 spec 一致。
-- 当前该 Work Item 已由 PR `#109` 合入并关闭。
+- 当前受审 PR：`#109`
 
 ## 下一步动作
 
-1. 当前仅保留为历史实现记录，供 `FR-0006` parent closeout 回链 contract samples 与最小 automation 的主干事实。
-2. 后续如需调整该实现，应通过新的合法 Work Item 建立新的 active 执行回合。
+1. 当前受审 PR `#109` 进入 reviewer / guardian / merge gate。
+2. 若审查出现阻断，仅在 `#103` 的 contract samples / automation / 索引证据范围内做最小修复。
 
 ## 已验证项
 

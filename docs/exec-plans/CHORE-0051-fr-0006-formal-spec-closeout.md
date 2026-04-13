@@ -9,8 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 关联 PR：`#76`
-- 状态：`historical / inactive`
-- 历史 formal spec 收口事项：`CHORE-0051-fr-0006-formal-spec-closeout`
+- active 收口事项：`CHORE-0051-fr-0006-formal-spec-closeout`
 
 ## 目标
 
