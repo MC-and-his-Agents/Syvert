@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from syvert.runtime import CONTENT_DETAIL, CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE
 from tests.runtime.contract_harness.fake_adapter import FakeContractAdapter
 from tests.runtime.contract_harness.host import HarnessExecutionInput, execute_harness_sample
 from tests.runtime.contract_harness.samples import CONTRACT_SAMPLES, ContractSample, ExpectedVerdict
@@ -36,10 +35,11 @@ def build_contract_sample_definitions(
 def execute_harness_samples(
     samples: Iterable[ContractSample],
 ) -> dict[str, HarnessExecutionResult]:
-    return {
-        sample.sample_id: _execute_single_sample(sample)
-        for sample in samples
-    }
+    execution_results: dict[str, HarnessExecutionResult] = {}
+    for sample in samples:
+        _store_unique_sample_id(execution_results, sample.sample_id)
+        execution_results[sample.sample_id] = _execute_single_sample(sample)
+    return execution_results
 
 
 def run_contract_harness_automation(
@@ -114,13 +114,21 @@ def validate_contract_harness_run(
 def build_expected_verdict_index(
     samples: Iterable[ContractSample],
 ) -> Mapping[str, str]:
-    return {sample.sample_id: sample.expected_verdict.value for sample in samples}
+    verdict_index: dict[str, str] = {}
+    for sample in samples:
+        _store_unique_sample_id(verdict_index, sample.sample_id)
+        verdict_index[sample.sample_id] = sample.expected_verdict.value
+    return verdict_index
 
 
 def build_sample_index(
     samples: Iterable[ContractSample],
 ) -> Mapping[str, ContractSample]:
-    return {sample.sample_id: sample for sample in samples}
+    sample_index: dict[str, ContractSample] = {}
+    for sample in samples:
+        _store_unique_sample_id(sample_index, sample.sample_id)
+        sample_index[sample.sample_id] = sample
+    return sample_index
 
 
 def _execute_single_sample(sample: ContractSample) -> HarnessExecutionResult:
@@ -167,34 +175,9 @@ def _validate_sample_metadata(sample: ContractSample) -> dict[str, str] | None:
             "code": "sample_adapter_key_mismatch",
             "message": "sample input adapter_key does not match adapter profile",
         }
-    if sample.input.capability != CONTENT_DETAIL_BY_URL:
-        return {
-            "code": "unsupported_sample_capability",
-            "message": "current harness only supports content_detail_by_url samples",
-        }
-    if CONTENT_DETAIL not in profile.declared_capabilities:
-        return {
-            "code": "unsupported_profile_capability",
-            "message": "adapter profile must declare content_detail capability",
-        }
-    if sample.input.target_type not in profile.supported_targets:
-        return {
-            "code": "unsupported_sample_target_type",
-            "message": "adapter profile does not support sample target_type",
-        }
-    if sample.input.collection_mode not in profile.supported_collection_modes:
-        return {
-            "code": "unsupported_sample_collection_mode",
-            "message": "adapter profile does not support sample collection_mode",
-        }
-    if sample.input.target_type != "url":
-        return {
-            "code": "unsupported_harness_target_type",
-            "message": "current harness host only supports target_type=url",
-        }
-    if sample.input.collection_mode != LEGACY_COLLECTION_MODE:
-        return {
-            "code": "unsupported_harness_collection_mode",
-            "message": "current harness host only supports collection_mode=hybrid",
-        }
     return None
+
+
+def _store_unique_sample_id(index: Mapping[str, object], sample_id: str) -> None:
+    if sample_id in index:
+        raise ValueError(f"duplicate contract sample_id: {sample_id}")

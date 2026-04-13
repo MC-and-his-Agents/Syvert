@@ -96,7 +96,7 @@ class ContractHarnessAutomationTests(unittest.TestCase):
             "precondition_sample_unexpectedly_reached_runtime",
         )
 
-    def test_sample_metadata_drift_fails_closed_before_runtime(self) -> None:
+    def test_sample_metadata_drift_is_reported_by_runtime_failed_envelope(self) -> None:
         sample = replace(
             build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"],
             adapter_profile=replace(
@@ -106,10 +106,20 @@ class ContractHarnessAutomationTests(unittest.TestCase):
         )
 
         execution_result = execute_harness_samples([sample])["success-full-envelope"]
-        results = validate_contract_harness_run([sample], {"success-full-envelope": execution_result})
 
-        self.assertEqual(results[0]["verdict"], "execution_precondition_not_met")
-        self.assertEqual(results[0]["reason"]["code"], "unsupported_sample_target_type")
+        self.assertIsNotNone(execution_result.runtime_envelope)
+        self.assertEqual(execution_result.runtime_envelope["status"], "failed")
+        self.assertEqual(execution_result.runtime_envelope["error"]["category"], "invalid_input")
+        self.assertEqual(execution_result.runtime_envelope["error"]["code"], "target_type_not_supported")
+
+    def test_duplicate_sample_id_is_rejected(self) -> None:
+        duplicate_samples = [
+            build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"],
+            replace(build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"]),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "duplicate contract sample_id"):
+            build_sample_index(duplicate_samples)
 
 
 if __name__ == "__main__":
