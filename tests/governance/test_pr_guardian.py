@@ -13,9 +13,11 @@ from scripts.pr_guardian import (
     codex_review_timeout_seconds,
     extract_reviewer_rubric_excerpt,
     find_latest_guardian_result,
+    integration_merge_gate_errors,
     load_guardian_state,
     load_reviewer_rubric_excerpt,
     merge_if_safe,
+    parse_bullet_kv_section,
     render_item_context_supplement,
     review_once,
     run_codex_review,
@@ -82,6 +84,55 @@ class GuardianStateTests(unittest.TestCase):
 
 
 class CodexReviewExecutionTests(unittest.TestCase):
+    def test_parse_bullet_kv_section_ignores_following_explanatory_heading(self) -> None:
+        section = "\n".join(
+            [
+                "- integration_touchpoint: active",
+                "- integration_ref:",
+                "  https://example.test/integration/1",
+                "- external_dependency: both",
+                "- merge_gate: integration_check_required",
+                "- contract_surface: runtime_modes",
+                "- joint_acceptance_needed: yes",
+                "- integration_status_checked_before_pr: yes",
+                "- integration_status_checked_before_merge: yes",
+                "",
+                "补充说明：",
+                "",
+                "- merge 前必须再次核对 integration 状态",
+            ]
+        )
+
+        payload = parse_bullet_kv_section(section)
+
+        self.assertEqual(payload["integration_status_checked_before_merge"], "yes")
+        self.assertEqual(payload["integration_ref"], "https://example.test/integration/1")
+
+    def test_integration_merge_gate_errors_accepts_standard_template_shape(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- integration_ref:",
+                    "  https://example.test/integration/1",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                    "",
+                    "补充说明：",
+                    "",
+                    "- merge 前必须再次核对 integration 状态",
+                ]
+            )
+        }
+
+        self.assertEqual(integration_merge_gate_errors(meta), [])
+
     @patch("scripts.pr_guardian.subprocess.run")
     def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:
         subprocess_run_mock.return_value = subprocess.CompletedProcess(

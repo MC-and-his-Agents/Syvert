@@ -460,17 +460,22 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
     integration_active = args.integration_touchpoint != "none"
     has_external_dependency = args.external_dependency != "none"
     joint_acceptance = args.joint_acceptance_needed == "yes"
+    has_contract_surface = args.contract_surface != "none"
 
     if integration_active and not integration_ref:
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
     if integration_active and integration_ref.lower() == "none":
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
+    if integration_gated and not integration_ref:
+        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 不能为空。")
     if integration_gated and integration_ref.lower() == "none":
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
     if integration_gated and args.integration_status_checked_before_pr != "yes":
         errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
-    if (integration_active or has_external_dependency or joint_acceptance) and not integration_gated:
-        errors.append("触及 integration 联动、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
+    if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and not integration_gated:
+        errors.append("触及 integration 联动、共享 contract surface、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
+    if has_contract_surface and not integration_active:
+        errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
     if not integration_gated and integration_ref == "":
         errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
     return errors

@@ -7,7 +7,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.common import CommandError
-from scripts.open_pr import build_body, build_issue_summary, parse_args, validate_current_worktree_binding, validate_pr_preflight
+from scripts.open_pr import (
+    build_body,
+    build_issue_summary,
+    parse_args,
+    validate_current_worktree_binding,
+    validate_integration_args,
+    validate_pr_preflight,
+)
 
 
 def write_exec_plan(
@@ -134,6 +141,55 @@ def write_decision(repo: Path, path: str, *, issue: str, item_key: str) -> None:
 
 
 class OpenPrPreflightTests(unittest.TestCase):
+    def test_validate_integration_args_rejects_empty_ref_for_gated_pr(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`integration_ref` 不能为空" in error for error in errors))
+
+    def test_validate_integration_args_requires_gate_for_shared_contract_surface(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "errors",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`merge_gate` 必须为 `integration_check_required`" in error for error in errors))
+        self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(
@@ -162,6 +218,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("## Goal", summary)
         self.assertIn("## Scope", summary)
         self.assertIn("## Out of Scope", summary)
+
     def test_legacy_filename_exec_plan_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -197,6 +254,37 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertEqual(errors, [])
+
+    def test_build_body_populates_integration_check_fields(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "https://example.test/integration/1",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_touchpoint: active", body)
+        self.assertIn("- integration_ref: https://example.test/integration/1", body)
+        self.assertIn("- merge_gate: integration_check_required", body)
+        self.assertIn("- contract_surface: runtime_modes", body)
 
     def test_inactive_exec_plan_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -236,7 +236,7 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
             current_key = normalized_key
             payload[current_key] = value_part.strip()
             continue
-        if current_key and stripped:
+        if current_key and stripped and raw_line[:1].isspace():
             payload[current_key] = "\n".join(filter(None, [payload[current_key], stripped])).strip()
     return payload
 
