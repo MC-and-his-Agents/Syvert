@@ -10,7 +10,8 @@
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
 - 关联 PR：`#98`
-- 状态：`active`
+- 状态：`inactive (historical implementation round; merged via PR #98 and issue #70 closed)`
+- 历史收口事项：`CHORE-0070-fr-0005-adapter-registry`
 
 ## 目标
 
@@ -35,18 +36,14 @@
 
 ## 当前停点
 
-- `FR-0005` formal spec 已由 PR `#78` 合入主干。
-- 已新增 `syvert/registry.py` 并在 `execute_task()` 中接入 registry materialization / lookup / discovery。
-- 已补齐 registry / runtime 相关测试并更新 release / sprint 索引。
-- 当前受审 PR 为 `#98`，绑定 `Issue #70` / `item_key=CHORE-0070-fr-0005-adapter-registry`。
-- guardian 首轮审查已给出两个阻断：无效 adapter 声明未在 materialization 阶段 fail-close，以及默认 shared builder 路径会吞掉 duplicate key。
-- 当前停在 guardian 阻断收口后的待提交状态：已补齐 adapter `execute` 最小宿主契约校验、shared builder duplicate-key 保留语义，以及对应 runtime / registry / CLI 回归测试。
+- `FR-0005` formal spec 已由 PR `#78` 合入主干，`#70` 已由 PR `#98` 合入并关闭。
+- 历史 worktree / 分支：`/Users/mc/code/worktrees/syvert/issue-70-task` / `issue-70-task`；对应实现回合已完成，待在本次 closeout 后退役。
+- 当前主干已具备 registry materialization、lookup、capability discovery、duplicate-key fail-close 与 invalid declaration fail-close；本文件仅保留为历史实现记录。
 
 ## 下一步动作
 
-- 在当前 head 上完成 guardian 审查。
-- 若 guardian 给出新的阻断，只修当前 head 的最新阻断。
-- guardian 通过后使用受控 `merge_pr` 合并，并同步 closeout `#70`。
+- 无 active 动作。
+- `#70` 的主干实现与 closeout 证据由 `docs/exec-plans/CHORE-0099-fr-0005-parent-closeout.md` 继续消费；本文件仅保留为历史实现记录。
 
 ## 当前 checkpoint 推进的 release 目标
 

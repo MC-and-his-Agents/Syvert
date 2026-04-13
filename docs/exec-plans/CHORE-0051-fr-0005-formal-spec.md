@@ -10,7 +10,8 @@
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
 - 关联 PR：`#78`
-- active 收口事项：`CHORE-0051-fr-0005-formal-spec`
+- 状态：`inactive (historical formal-spec round; merged via PR #78 and issue #77 closed)`
+- 历史收口事项：`CHORE-0051-fr-0005-formal-spec`
 
 ## 目标
 
@@ -32,16 +33,14 @@
 
 ## 当前停点
 
-- `FR-0005` formal spec 套件已在当前分支落地，且已按 guardian 对 PR `#72` 的阻断要求，将执行回合从 FR `#65` 重绑到独立 Work Item `#77`。
-- 当前受审 PR 为 `#78`，绑定 `Issue #77` / `item_key=CHORE-0051-fr-0005-formal-spec`，远端 checks 已全绿。
-- 当前停在 guardian 前的最后审查补件：已补齐 adapter-side pre-platform 输入失败的分类语义、exec-plan 当前停点与本轮验证证据。
+- `FR-0005` formal spec 套件已由 PR `#78` 合入主干，`#77` 已关闭。
+- 当前 formal spec 真相位于 `docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`；本文件仅保留为历史 formal-spec 收口记录。
+- 后续实现与父事项 closeout 已分别由 `#69`、`#70`、`#99` 承接。
 
 ## 下一步动作
 
-- 对 PR `#78` 执行 guardian 审查。
-- 若 guardian 给出新的阻断，只修当前 head 的最新阻断。
-- guardian 通过后使用受控 `merge_pr` 合并。
-- 合并后同步 `#65` 的 formal spec 入口，并关闭 `#77`。
+- 无 active 动作。
+- formal spec 真相与后续 closeout 证据由 `docs/exec-plans/FR-0005-standardized-error-model-and-adapter-registry.md` 与 `docs/exec-plans/CHORE-0099-fr-0005-parent-closeout.md` 继续消费；本文件仅保留为历史记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
