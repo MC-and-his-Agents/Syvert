@@ -75,7 +75,7 @@
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：已校验 1 条提交信息，全部通过
+  - 结果：已校验 2 条提交信息，全部通过
 - `python3 scripts/open_pr.py --class implementation --issue 70 --item-key CHORE-0070-fr-0005-adapter-registry --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0005 适配器注册表' --closing fixes --dry-run`
   - 结果：通过
 - 已创建当前受审 PR：`#98 https://github.com/MC-and-his-Agents/Syvert/pull/98`
