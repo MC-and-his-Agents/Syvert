@@ -4,9 +4,12 @@ import unittest
 
 from tests.runtime.contract_harness import (
     ContractSampleDefinition,
+    FakeContractAdapter,
     HarnessExecutionResult,
+    HarnessExecutionInput,
     validate_contract_sample,
     validate_contract_samples,
+    execute_harness_sample,
 )
 
 def build_success_envelope() -> dict[str, object]:
@@ -186,6 +189,46 @@ class ContractHarnessValidationToolTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "contract_violation")
         self.assertEqual(result["reason"]["code"], "invalid_runtime_task_id")
+
+    def test_mixed_precondition_and_runtime_observation_is_contract_violation(self) -> None:
+        sample = ContractSampleDefinition(sample_id="sample-mixed-state", expected_outcome="success")
+        execution_result = HarnessExecutionResult(
+            runtime_envelope=build_success_envelope(),
+            precondition_code="fake_adapter_not_registered",
+            precondition_message="should not coexist with runtime result",
+        )
+
+        result = validate_contract_sample(sample, execution_result)
+
+        self.assertEqual(result["verdict"], "contract_violation")
+        self.assertEqual(result["reason"]["code"], "mixed_precondition_and_runtime_observation")
+
+    def test_contract_violation_sample_reports_success_as_contract_violation_success_reason(self) -> None:
+        sample = ContractSampleDefinition(sample_id="sample-contract-violation", expected_outcome="contract_violation")
+        execution_result = HarnessExecutionResult(runtime_envelope=build_success_envelope())
+
+        result = validate_contract_sample(sample, execution_result)
+
+        self.assertEqual(result["verdict"], "contract_violation")
+        self.assertEqual(result["reason"]["code"], "expected_contract_violation_but_observed_success")
+
+    def test_host_legal_failure_output_can_be_consumed_by_validator(self) -> None:
+        sample = ContractSampleDefinition(sample_id="sample-host-legal-failure", expected_outcome="legal_failure")
+        runtime_envelope = execute_harness_sample(
+            HarnessExecutionInput(
+                sample_id="sample-host-legal-failure",
+                url="https://example.com/legal-failure",
+                adapter_key="fake:platform-failure",
+            ),
+            adapters={"fake:platform-failure": FakeContractAdapter(scenario="legal_failure")},
+            task_id="task-host-legal-failure",
+        )
+        execution_result = HarnessExecutionResult(runtime_envelope=runtime_envelope)
+
+        result = validate_contract_sample(sample, execution_result)
+
+        self.assertEqual(result["verdict"], "legal_failure")
+        self.assertEqual(result["observed_error"]["category"], "platform")
 
 
 if __name__ == "__main__":

@@ -36,6 +36,15 @@ def validate_contract_sample(
     sample: ContractSampleDefinition,
     execution_result: HarnessExecutionResult,
 ) -> dict[str, Any]:
+    if execution_result.precondition_code and execution_result.runtime_envelope is not None:
+        return _build_result(
+            sample_id=sample.sample_id,
+            verdict="contract_violation",
+            reason_code="mixed_precondition_and_runtime_observation",
+            reason_message="execution result cannot carry both precondition marker and runtime envelope",
+            observed_status=None,
+            observed_error=None,
+        )
     if execution_result.precondition_code:
         return _build_result(
             sample_id=sample.sample_id,
@@ -195,6 +204,15 @@ def _classify_contract_violation_sample(
     observed_status: str | None,
     observed_error: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    if observed_status == "success":
+        return _build_result(
+            sample_id=sample_id,
+            verdict="contract_violation",
+            reason_code="expected_contract_violation_but_observed_success",
+            reason_message="contract violation sample unexpectedly produced success envelope",
+            observed_status=observed_status,
+            observed_error=observed_error,
+        )
     envelope_error = _validate_failed_envelope(envelope)
     if envelope_error is not None:
         return _build_result(
@@ -221,16 +239,6 @@ def _classify_contract_violation_sample(
             verdict="contract_violation",
             reason_code="expected_contract_violation_observed_other_failure",
             reason_message="contract violation sample did not resolve to runtime_contract category",
-            observed_status=observed_status,
-            observed_error=observed_error,
-        )
-
-    if observed_status == "success":
-        return _build_result(
-            sample_id=sample_id,
-            verdict="contract_violation",
-            reason_code="expected_contract_violation_but_observed_success",
-            reason_message="contract violation sample unexpectedly produced success envelope",
             observed_status=observed_status,
             observed_error=observed_error,
         )
