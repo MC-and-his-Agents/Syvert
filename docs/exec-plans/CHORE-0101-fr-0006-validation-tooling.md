@@ -93,6 +93,6 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `tests/runtime/contract_harness/`、`tests/runtime/test_contract_harness_validation_tool.py` 与本 exec-plan 的增量修改。
 
-## 最近一次完成验证的代码 head SHA
+## 最近一次 checkpoint 对应的 head SHA
 
 - `3d4e5e6441773cec27f1817491f594890a18809d`
