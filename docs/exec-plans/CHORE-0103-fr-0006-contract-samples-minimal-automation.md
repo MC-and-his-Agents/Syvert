@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 关联 PR：待创建
+- 关联 PR：`#109`
 - active Work Item：`CHORE-0103-fr-0006-contract-samples-minimal-automation`
 
 ## 目标
@@ -44,9 +44,8 @@
 
 ## 下一步动作
 
-1. 补齐 `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 对 `#101/#102/#103` 的证据回链。
-2. 完成 guards、开 PR，并进入 reviewer / guardian / merge gate。
-3. 待当前 PR 创建后，回填 PR 编号到本 exec-plan 与 release / sprint 索引。
+1. 当前受审 PR `#109` 进入 reviewer / guardian / merge gate。
+2. 若审查出现阻断，仅在 `#103` 的 contract samples / automation / 索引证据范围内做最小修复。
 
 ## 已验证项
 
@@ -59,7 +58,6 @@
 
 ## 未决风险
 
-- release / sprint 文档尚未回链当前 `#103` PR 编号，需在 PR 创建后补齐。
 - 若 `#103` 的 automation 断言后续与 `#101` validator 语义漂移，会削弱 `FR-0007` 对 harness 基座的复用稳定性。
 
 ## 回滚方式
