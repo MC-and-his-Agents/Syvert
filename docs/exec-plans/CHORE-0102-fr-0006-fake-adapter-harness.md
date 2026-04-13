@@ -9,8 +9,8 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 关联 PR：`#104`
-- 状态：`active`
-- active 收口事项：`CHORE-0102-fr-0006-fake-adapter-harness`
+- 状态：`historical / inactive`
+- 历史实现事项：`CHORE-0102-fr-0006-fake-adapter-harness`
 
 ## 目标
 
@@ -32,14 +32,14 @@
 
 ## 当前停点
 
-- `FR-0006` formal spec 已合入主干，并明确 `#102` 负责 fake adapter 与最小 harness host。
+- `FR-0006` formal spec 已合入主干，并明确 `#102` 负责 fake adapter 与最小 harness host；当前该 Work Item 已由 PR `#104` 合入并关闭。
 - 运行时现状：`execute_task` 已具备标准 registry materialization、capability projection 与 success payload fail-closed 校验能力，可直接作为 harness 宿主。
 - 本地已完成测试侧 `contract_harness` 最小实现与单测，覆盖 `success`、受控 `legal failure` 与 `illegal payload` 三条最小分支。
 
 ## 下一步动作
 
-- 进入当前 Work Item 的评审与门禁回合。
-- 仅在评审阻断要求下进行最小增量修复，不扩展到 validator、sample automation 或 closeout 索引事项。
+- 当前仅保留为历史实现记录，供 `FR-0006` parent closeout 回链 fake adapter 与 harness host 的主干事实。
+- 后续如需调整该实现，应通过新的合法 Work Item 建立新的 active 执行回合。
 
 ## 当前 checkpoint 推进的 release 目标
 

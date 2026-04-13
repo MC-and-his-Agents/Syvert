@@ -10,8 +10,8 @@
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 关联 decision：
 - 关联 PR：`#108`
-- 状态：`active`
-- active 收口事项：`CHORE-0101-fr-0006-validation-tooling`
+- 状态：`historical / inactive`
+- 历史实现事项：`CHORE-0101-fr-0006-validation-tooling`
 
 ## 目标
 
@@ -35,15 +35,15 @@
 
 ## 当前停点
 
-- `FR-0006` formal spec 已合入主干；`#101` 当前作为 implementation Work Item 承接“验证工具与结果分类”。
+- `FR-0006` formal spec 已合入主干；`#101` 已作为 implementation Work Item 完成“验证工具与结果分类”，并由 PR `#108` 合入主干。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-101-fr-0006`，仅处理测试侧 harness 验证工具与必要最小测试改动。
 - 当前分支已 rebase 到 `origin/main@1dbf4c6`（`#102` 已合入后的主干状态）。
 - validation tool 已在测试侧落地，包含单样例与批量样例两条分类入口；当前受审 PR 为 `#108`。
 
 ## 下一步动作
 
-- 等当前 PR `#108` 完成 reviewer / guardian / merge gate。
-- 若再出现阻断，仅做 `FR-0006` 验证层边界内的最小修复，不扩展到 `#102/#103`。
+- 当前仅保留为历史实现记录，供 `FR-0006` parent closeout 回链 validator 与 verdict 分类的主干事实。
+- 后续如需调整该实现，应通过新的合法 Work Item 建立新的 active 执行回合。
 
 ## 当前 checkpoint 推进的 release 目标
 
