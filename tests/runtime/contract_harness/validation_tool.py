@@ -4,6 +4,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from syvert.runtime import validate_success_payload
+
 SampleExpectation = Literal["success", "legal_failure", "contract_violation"]
 ValidationVerdict = Literal[
     "pass",
@@ -102,12 +104,14 @@ def validate_contract_sample(
     if sample.expected_outcome == "legal_failure":
         return _classify_legal_failure_sample(
             sample_id=sample.sample_id,
+            envelope=envelope,
             observed_status=observed_status,
             observed_error=observed_error,
         )
 
     return _classify_contract_violation_sample(
         sample_id=sample.sample_id,
+        envelope=envelope,
         observed_status=observed_status,
         observed_error=observed_error,
     )
@@ -139,38 +143,22 @@ def validate_contract_samples(
 def _classify_legal_failure_sample(
     *,
     sample_id: str,
+    envelope: Mapping[str, Any],
     observed_status: str | None,
     observed_error: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    if observed_status != "failed":
+    envelope_error = _validate_failed_envelope(envelope)
+    if envelope_error is not None:
         return _build_result(
             sample_id=sample_id,
             verdict="contract_violation",
-            reason_code="unexpected_success_envelope",
-            reason_message="sample expected legal failure but observed success envelope",
-            observed_status=observed_status,
-            observed_error=observed_error,
-        )
-    if observed_error is None:
-        return _build_result(
-            sample_id=sample_id,
-            verdict="contract_violation",
-            reason_code="missing_error_object",
-            reason_message="failed runtime envelope must carry error object",
+            reason_code=envelope_error["code"],
+            reason_message=envelope_error["message"],
             observed_status=observed_status,
             observed_error=observed_error,
         )
 
     error_category = observed_error.get("category")
-    if not isinstance(error_category, str) or not error_category:
-        return _build_result(
-            sample_id=sample_id,
-            verdict="contract_violation",
-            reason_code="invalid_runtime_error_category",
-            reason_message="runtime error category is missing or invalid",
-            observed_status=observed_status,
-            observed_error=observed_error,
-        )
     if error_category == "runtime_contract":
         return _build_result(
             sample_id=sample_id,
@@ -190,17 +178,6 @@ def _classify_legal_failure_sample(
             observed_error=observed_error,
         )
 
-    error_code = observed_error.get("code")
-    if not isinstance(error_code, str) or not error_code:
-        return _build_result(
-            sample_id=sample_id,
-            verdict="contract_violation",
-            reason_code="invalid_runtime_error_code",
-            reason_message="runtime error code is missing or invalid",
-            observed_status=observed_status,
-            observed_error=observed_error,
-        )
-
     return _build_result(
         sample_id=sample_id,
         verdict="legal_failure",
@@ -214,9 +191,20 @@ def _classify_legal_failure_sample(
 def _classify_contract_violation_sample(
     *,
     sample_id: str,
+    envelope: Mapping[str, Any],
     observed_status: str | None,
     observed_error: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    envelope_error = _validate_failed_envelope(envelope)
+    if envelope_error is not None:
+        return _build_result(
+            sample_id=sample_id,
+            verdict="contract_violation",
+            reason_code=envelope_error["code"],
+            reason_message=envelope_error["message"],
+            observed_status=observed_status,
+            observed_error=observed_error,
+        )
     if observed_status == "failed" and observed_error is not None:
         error_category = observed_error.get("category")
         if error_category == "runtime_contract":
@@ -280,21 +268,76 @@ def _build_result(
 
 
 def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+    context_error = _validate_runtime_context_fields(envelope)
+    if context_error is not None:
+        return context_error
     if envelope.get("status") != "success":
         return {
             "code": "unexpected_failed_envelope",
             "message": "sample expected success but observed failed envelope",
         }
-    raw_payload = envelope.get("raw")
-    if not isinstance(raw_payload, Mapping):
+    payload_error = validate_success_payload(envelope)
+    if payload_error is not None:
         return {
-            "code": "missing_raw_payload",
-            "message": "success runtime envelope must carry raw payload mapping",
+            "code": payload_error["code"],
+            "message": payload_error["message"],
         }
-    normalized_result = envelope.get("normalized")
-    if not isinstance(normalized_result, Mapping):
+    return None
+
+
+def _validate_failed_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+    context_error = _validate_runtime_context_fields(envelope)
+    if context_error is not None:
+        return context_error
+    if envelope.get("status") != "failed":
         return {
-            "code": "missing_normalized_result",
-            "message": "success runtime envelope must carry normalized result mapping",
+            "code": "unexpected_success_envelope",
+            "message": "sample expected legal failure but observed success envelope",
         }
+    observed_error = envelope.get("error")
+    if not isinstance(observed_error, Mapping):
+        return {
+            "code": "missing_error_object",
+            "message": "failed runtime envelope must carry error object",
+        }
+    error_category = observed_error.get("category")
+    if not isinstance(error_category, str) or not error_category:
+        return {
+            "code": "invalid_runtime_error_category",
+            "message": "runtime error category is missing or invalid",
+        }
+    error_code = observed_error.get("code")
+    if not isinstance(error_code, str) or not error_code:
+        return {
+            "code": "invalid_runtime_error_code",
+            "message": "runtime error code is missing or invalid",
+        }
+    error_message = observed_error.get("message")
+    if not isinstance(error_message, str) or not error_message:
+        return {
+            "code": "invalid_runtime_error_message",
+            "message": "runtime error message is missing or invalid",
+        }
+    error_details = observed_error.get("details")
+    if error_details is None:
+        return {
+            "code": "missing_runtime_error_details",
+            "message": "runtime error details must be present",
+        }
+    if not isinstance(error_details, Mapping):
+        return {
+            "code": "invalid_runtime_error_details",
+            "message": "runtime error details must be a mapping",
+        }
+    return None
+
+
+def _validate_runtime_context_fields(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+    for field in ("task_id", "adapter_key", "capability"):
+        value = envelope.get(field)
+        if not isinstance(value, str) or not value:
+            return {
+                "code": f"invalid_runtime_{field}",
+                "message": f"runtime envelope field `{field}` is missing or invalid",
+            }
     return None
