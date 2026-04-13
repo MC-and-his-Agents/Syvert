@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#97`
 
 ## 目标
 
@@ -34,15 +34,16 @@
 
 ## 当前停点
 
-- `FR-0005` formal spec 已由 PR `#78` 合入主干，`#69` 仍为 open Work Item，尚无 implementation PR。
+- `FR-0005` formal spec 已由 PR `#78` 合入主干，`#69` 当前通过 PR `#97` 进入 implementation review / guardian 回合。
 - 当前主干运行时仅实做 `runtime_contract` / `platform` 两类失败分类，`invalid_input` / `unsupported` 尚未进入统一实现路径。
 - 当前 `execute_task()` 仍把 adapter 不存在、capability 不支持、非法请求形状等路径大多打成 `runtime_contract`，与 `FR-0005` formal spec 不一致。
+- 当前分支 `issue-69-task` 已把 runtime / CLI 错误分类重映射到四类语义，并同步更新 release / sprint / exec-plan 索引与回归测试。
 
 ## 下一步动作
 
-- 为 runtime / CLI 新增 `invalid_input` 与 `unsupported` 错误 helper，并把现有失败分支重映射到 formal spec 指定分类。
-- 补齐并更新 runtime / executor / CLI 回归测试。
-- 运行 implementation 门禁，创建 `#69` 对应 PR。
+- 消化 guardian 结论并保持 active exec-plan、PR、GitHub checks 与当前 head 一致。
+- 在 guardian `APPROVE` 且 checks 全绿后，通过受控 merge 入口完成合并与 closeout。
+- 合并后关闭 `#69`，退役分支 / worktree，并切换到 `#70` 的独立执行回合。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -66,6 +67,27 @@
 - `gh issue view 69 --repo MC-and-his-Agents/Syvert`
 - `python3 scripts/create_worktree.py --issue 69 --class implementation`
   - 结果：已创建 worktree `/Users/mc/code/worktrees/syvert/issue-69-task`
+- `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
+  - 结果：`Ran 48 tests in 1.726s`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 1 条提交信息，全部通过
+- `python3 scripts/open_pr.py --class implementation --issue 69 --item-key CHORE-0069-fr-0005-standardized-error-model --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0005 标准化错误模型' --closing fixes --dry-run`
+  - 结果：通过
+- 已创建当前受审 PR：`#97 https://github.com/MC-and-his-Agents/Syvert/pull/97`
+- GitHub checks：
+  - `Validate Commit Messages`：通过
+  - `Validate Docs And Guard Scripts`：通过
+  - `Validate Governance Tooling`：通过
+  - `Validate Spec Review Boundaries`：通过
+- guardian 首轮审查：`REQUEST_CHANGES`
+  - 阻断项：active exec-plan 仍停留在 pre-PR 状态，`关联 PR` 为空，且“下一步动作”仍写着创建 PR，导致仓内执行上下文与当前受审 PR `#97` 不一致
+  - 收口动作：更新 active exec-plan，使其与当前 PR / head / merge gate 状态对齐
 
 ## 未决风险
 
@@ -79,4 +101,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `bb0f4af77f8ba54fff43290ff8c98a903d35a4ed`
+- `06682d32357b5301acee500239301af86b33c56d`
