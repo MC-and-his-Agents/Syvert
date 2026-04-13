@@ -55,11 +55,15 @@
 - `python3 scripts/create_worktree.py --issue 103 --class implementation`
   - 结果：should produce `/Users/mc/code/worktrees/syvert/issue-103-fr-0006` (current context).
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
-  - 结果：`Ran 62 tests`，`OK`
+  - 结果：`Ran 63 tests`，`OK`
 - guardian 首轮审查：`REQUEST_CHANGES`
   - 阻断项已修复：
     - execution_precondition_not_met 样例若意外进入 runtime，不再可能被误判为 `pass`
     - 新增 precondition 样例误入 runtime 的负向回归测试
+- guardian 次轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - `build_contract_sample_definitions()` 不再把 precondition 样例降格为 `success`
+    - precondition 样例改由 dedicated validation path 输出，避免 exported helper 丢失第四类 verdict 语义
 
 ## 未决风险
 
@@ -71,4 +75,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3274678cf96749532d7803346c580fd80b2f77fa`
+- `4b10f6a6f3d32b9266cdcf6829093f0cad22795d`
