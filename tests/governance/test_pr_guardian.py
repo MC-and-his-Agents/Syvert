@@ -6,12 +6,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import ANY, patch
 
+from scripts.common import CommandError
 from scripts.pr_guardian import (
     build_item_context_summary,
     build_prompt,
     build_review_context,
     codex_review_timeout_seconds,
     extract_reviewer_rubric_excerpt,
+    fetch_issue_context,
     find_latest_guardian_result,
     integration_merge_gate_errors,
     load_guardian_state,
@@ -212,19 +214,19 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
-    def test_integration_merge_gate_errors_rejects_missing_section(self) -> None:
+    def test_integration_merge_gate_errors_allows_missing_section_for_non_gated_pr(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落。"])
+        self.assertEqual(errors, [])
 
     def test_integration_merge_gate_errors_rejects_missing_section_for_explicit_required_gate(self) -> None:
         meta = {"body": "## 摘要\n\n- merge_gate: integration_check_required\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落。"])
+        self.assertEqual(errors, ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"])
 
     def test_integration_merge_gate_errors_rejects_missing_canonical_fields(self) -> None:
         meta = {
@@ -1722,11 +1724,88 @@ class MergeIfSafeTests(unittest.TestCase):
             )
 
         self.assertIn("merge 前 integration 复核后 PR HEAD 已变化", str(ctx.exception))
-        self.assertEqual(run_mock.call_count, 1)
+        self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_reverts_merge_time_recheck_when_merge_command_fails(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+        ]
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-reviewed",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        run_mock.side_effect = [
+            subprocess.CompletedProcess(args=["gh", "pr", "edit"], returncode=0, stdout="", stderr=""),
+            CommandError(["gh", "pr", "merge", "1"], "命令失败", "", "merge failed"),
+            subprocess.CompletedProcess(args=["gh", "pr", "edit"], returncode=0, stdout="", stderr=""),
+        ]
+
+        with self.assertRaises(CommandError):
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertEqual(run_mock.call_count, 3)
+        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
+        self.assertEqual(run_mock.call_args_list[2].args[0][:4], ["gh", "pr", "edit", "1"])
+        review_once_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    def test_fetch_issue_context_parses_issue_form_headings(self) -> None:
+        with patch(
+            "scripts.pr_guardian.run",
+            return_value=subprocess.CompletedProcess(args=["gh"], returncode=0, stdout='{"number": 105, "title": "治理：integration baseline", "url": "https://example.test/issues/105", "body": "### 摘要\\n\\n- 为 Syvert 保留本地执行真相源\\n\\n### 范围\\n\\n- 补齐 integration 联动插槽"}', stderr=""),
+        ):
+            context = fetch_issue_context(105)
+
+        self.assertIn("- Issue: #105", context["identity"])
+        self.assertIn("## Goal", context["summary"])
+        self.assertIn("## Scope", context["summary"])
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)

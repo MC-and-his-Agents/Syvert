@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 
 from scripts.common import (
+    CommandError,
     REPO_ROOT,
     bool_text,
     dump_json,
@@ -29,6 +30,7 @@ from scripts.common import (
     run,
 )
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.open_pr import extract_issue_summary_sections
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
@@ -312,7 +314,9 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     raw_sections = parse_all_markdown_sections(body)
     integration_section = raw_sections.get("integration_check", "")
     if not integration_section:
-        return ["PR 描述缺少 `integration_check` 段落。"]
+        if re.search(r"(?im)^\s*-\s*merge_gate\s*[：:]\s*integration_check_required\b", body):
+            return ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"]
+        return []
 
     payload = parse_integration_check_payload(integration_section)
     integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
@@ -427,14 +431,25 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> dict:
     body = str(meta.get("body") or "")
     updated_body = set_integration_status_checked_before_merge(body, "yes")
     if updated_body != body:
-        with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
-            handle.write(updated_body)
-            temp_path = Path(handle.name)
-        try:
-            run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
-        finally:
-            temp_path.unlink(missing_ok=True)
+        update_pr_body(pr_number, updated_body)
     return pr_meta(pr_number)
+
+
+def update_pr_body(pr_number: int, body: str) -> None:
+    with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+        handle.write(body)
+        temp_path = Path(handle.name)
+    try:
+        run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def restore_merge_time_integration_recheck(pr_number: int, body: str) -> None:
+    try:
+        update_pr_body(pr_number, body)
+    except CommandError:
+        return
 
 
 def extract_reviewer_rubric_excerpt(text: str) -> str:
@@ -510,6 +525,8 @@ def fetch_issue_context(issue_number: int) -> dict[str, object]:
         f"- 链接: {payload.get('url', '')}",
     ]
     sections = extract_named_markdown_sections(body, ISSUE_CONTEXT_HEADINGS)
+    if not sections:
+        sections = extract_issue_summary_sections(body)
     if sections:
         summary_parts: list[str] = []
         for heading in ISSUE_CONTEXT_HEADINGS:
@@ -953,6 +970,7 @@ def merge_if_safe(
 ) -> int:
     require_auth()
     current = pr_meta(pr_number)
+    original_body = str(current.get("body") or "")
     payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"])
 
     if payload:
@@ -979,6 +997,7 @@ def merge_if_safe(
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
+    merge_time_integration_recheck_recorded = False
     if merge_gate_requires_integration_recheck(current):
         if not confirm_integration_recheck:
             raise SystemExit(
@@ -992,10 +1011,14 @@ def merge_if_safe(
             detail = "\n".join(f"- {item}" for item in preview_errors)
             raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
         current = record_merge_time_integration_recheck(pr_number, current)
+        merge_time_integration_recheck_recorded = True
         if current["headRefOid"] != reviewed_head_sha:
+            restore_merge_time_integration_recheck(pr_number, original_body)
             raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck(pr_number, original_body)
         detail = "\n".join(f"- {item}" for item in integration_errors)
         raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
 
@@ -1010,7 +1033,12 @@ def merge_if_safe(
     ]
     if delete_branch:
         command.append("--delete-branch")
-    run(command, cwd=REPO_ROOT)
+    try:
+        run(command, cwd=REPO_ROOT)
+    except CommandError:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck(pr_number, original_body)
+        raise
     return 0
 
 
