@@ -78,6 +78,8 @@ body:
         - none
         - check_required
         - active
+        - blocked
+        - resolved
     validations:
       required: true
 
@@ -96,6 +98,16 @@ body:
         - syvert
         - webenvoy
         - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: merge_gate
+    attributes:
+      label: merge_gate
+      options:
+        - local_only
+        - integration_check_required
     validations:
       required: true
 

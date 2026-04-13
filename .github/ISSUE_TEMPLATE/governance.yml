@@ -1,9 +1,48 @@
-name: Governance
-description: 创建治理栈、流程、模板或门禁相关事项。
-title: "治理协议："
+name: Governance Work Item
+description: 创建 `item_type=GOV` 的治理工作项，不引入新的 GitHub 层级。
+title: "治理工作项："
 labels:
   - governance
 body:
+  - type: markdown
+    attributes:
+      value: |
+        此表单是 `Work Item` 的治理专用快捷入口，仍按既有 `Phase / FR / Work Item` 调度层级收口。
+
+  - type: input
+    id: item_key
+    attributes:
+      label: item_key
+      description: 使用 `GOV-<4-digit>-<slug>` 命名。
+      placeholder: GOV-0105-integration-governance-baseline
+    validations:
+      required: true
+
+  - type: dropdown
+    id: item_type
+    attributes:
+      label: item_type
+      options:
+        - GOV
+    validations:
+      required: true
+
+  - type: input
+    id: release
+    attributes:
+      label: release
+      placeholder: governance-baseline
+    validations:
+      required: true
+
+  - type: input
+    id: sprint
+    attributes:
+      label: sprint
+      placeholder: integration-governance
+    validations:
+      required: true
+
   - type: textarea
     id: objective
     attributes:
@@ -47,6 +86,8 @@ body:
         - none
         - check_required
         - active
+        - blocked
+        - resolved
     validations:
       required: true
 
@@ -64,6 +105,16 @@ body:
         - syvert
         - webenvoy
         - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: merge_gate
+    attributes:
+      label: merge_gate
+      options:
+        - local_only
+        - integration_check_required
     validations:
       required: true
 

@@ -23,13 +23,12 @@
 
 ## 当前停点
 
-- 当前 head 已完成 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
-- 当前阻断仅剩本仓库治理门禁要求的 active `exec-plan` 缺口；补齐后需要重新等待 GitHub checks 与 guardian 审查收口到同一 head。
+- 最新可执行 checkpoint 已覆盖 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
+- 当前回合正在根据 guardian finding 收紧 issue form schema 与 bootstrap contract 表达，确保 forms、workflow、decision 与 exec-plan 对同一套 canonical 规则达成一致。
 
 ## 下一步动作
 
-- 推送包含 active `exec-plan` 的新 head，并等待 PR `#107` 的 GitHub checks 全绿。
-- checks 全绿后运行 `python3 scripts/pr_guardian.py review 107 --post-review`。
+- 推送收紧后的 forms / decision / exec-plan head，并重新等待 PR `#107` 的 GitHub checks 与 guardian 结论。
 - 若 guardian 给出 `APPROVE + safe_to_merge=true`，再通过 `python3 scripts/merge_pr.py 107 --delete-branch` 走受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -46,6 +45,8 @@
 - `python3` 成功解析 `.github/ISSUE_TEMPLATE/*.yml`
 - 已人工复核 PR 模板、workflow、code review 与 issue forms 的 integration 字段口径一致
 - owner 级 integration project、repo project 字段、labels 与治理锚点 issue 已落地
+- `python3 scripts/context_guard.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
+- `python3 scripts/governance_gate.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
 
 ## 未决风险
 
@@ -58,4 +59,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `4270b81d3b69d107e97752f7419c9af742ad66c1`
+- `7e062a64c5662c0f6dd2026548ceeb6d8e5b39b4`
