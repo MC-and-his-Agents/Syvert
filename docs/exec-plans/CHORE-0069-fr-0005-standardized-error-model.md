@@ -38,7 +38,7 @@
 - 当前主干运行时仅实做 `runtime_contract` / `platform` 两类失败分类，`invalid_input` / `unsupported` 尚未进入统一实现路径。
 - 当前 `execute_task()` 仍把 adapter 不存在、capability 不支持、非法请求形状等路径大多打成 `runtime_contract`，与 `FR-0005` formal spec 不一致。
 - 当前分支 `issue-69-task` 已把 runtime / CLI 错误分类重映射到四类语义，并同步更新 release / sprint / exec-plan 索引与回归测试。
-- guardian 第二轮指出：真实 xhs / douyin adapter 在进入平台前因 invalid URL / invalid request 抛出的 `PlatformAdapterError` 仍被 blanket 映射到 `platform`；当前 head 已补上 runtime 分类逻辑与真实 adapter 回归测试，待重新受审。
+- guardian 第三轮指出：Core 仍靠 `invalid_*_url` / `invalid_*_request` 这类 code 命名启发式识别 adapter pre-platform invalid input，缺少显式 contract；当前 head 已将该边界改为 `PlatformAdapterError(category=\"invalid_input\")` 的显式 adapter-side 信号，并补上真实 adapter 与非命名启发式回归测试，待重新受审。
 
 ## 下一步动作
 
@@ -72,6 +72,8 @@
   - 结果：`Ran 48 tests in 1.726s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
   - 结果：在修正真实 adapter pre-platform 输入分类后重跑，`Ran 50 tests in 1.729s`，`OK`
+- `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在引入 `PlatformAdapterError(category=\"invalid_input\")` 显式 contract 后重跑，`Ran 106 tests in 3.291s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -94,6 +96,9 @@
 - guardian 次轮审查：`REQUEST_CHANGES`
   - 阻断项：真实 adapter 在 pre-platform 输入失败时抛出的 `invalid_xhs_url` / `invalid_douyin_url` 仍被 runtime 映射到 `platform`
   - 收口动作：runtime 新增 adapter pre-platform invalid-input 分类逻辑，并补充真实 xhs / douyin invalid URL 回归测试
+- guardian 三轮审查：`REQUEST_CHANGES`
+  - 阻断项：Core 仍依赖 error code 后缀启发式识别 adapter pre-platform invalid input，未形成显式 Core / Adapter contract
+  - 收口动作：为 `PlatformAdapterError` 增加显式 `category` 字段，并在 xhs / douyin 的 pre-platform request/url 校验路径上标记 `invalid_input`；同时补充一条不依赖 `*_request` / `*_url` 命名的回归测试
 
 ## 未决风险
 
@@ -107,4 +112,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `984ae6176d8a37853bf696176372b9d946c8d5cb`
+- `491fe7e81c50b2f7d8cb4b51cbcab9cb1e7f72f8`
