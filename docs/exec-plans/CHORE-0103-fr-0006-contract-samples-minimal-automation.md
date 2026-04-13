@@ -8,6 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
+- 关联 PR：待创建
 - active Work Item：`CHORE-0103-fr-0006-contract-samples-minimal-automation`
 
 ## 目标
@@ -43,9 +44,9 @@
 
 ## 下一步动作
 
-1. 等 `#101` 合入主干后，剥离当前分支历史中夹带的 `#101` 提交，确保 `#103` PR diff 只保留本事项改动。
-2. 补齐 `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 对 `#101/#102/#103` 与对应 PR 的证据回链。
-3. 完成 guards、开 PR，并进入 reviewer / guardian / merge gate。
+1. 补齐 `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 对 `#101/#102/#103` 的证据回链。
+2. 完成 guards、开 PR，并进入 reviewer / guardian / merge gate。
+3. 待当前 PR 创建后，回填 PR 编号到本 exec-plan 与 release / sprint 索引。
 
 ## 已验证项
 
@@ -54,12 +55,12 @@
 - `python3 scripts/create_worktree.py --issue 103 --class implementation`
   - 结果：should produce `/Users/mc/code/worktrees/syvert/issue-103-fr-0006` (current context).
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
-  - 结果：`Ran 55 tests`，`OK`
+  - 结果：`Ran 61 tests`，`OK`
 
 ## 未决风险
 
-- 当前分支历史仍包含 `#101` 的旧提交；若不在开 PR 前剥离，会让 `#103` PR 范围污染。
-- release / sprint 文档尚未回链 `#101/#102/#103` 的实现 PR 事实，当前仍未满足本事项最终 closeout 证据要求。
+- release / sprint 文档尚未回链当前 `#103` PR 编号，需在 PR 创建后补齐。
+- 若 `#103` 的 automation 断言后续与 `#101` validator 语义漂移，会削弱 `FR-0007` 对 harness 基座的复用稳定性。
 
 ## 回滚方式
 
@@ -67,4 +68,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `d2e18aa1d608d4572662978549cc5d01f6d9f047`
+- `297b487f22df17a8504dcab32a0a9b3f2c80d876`
