@@ -6,7 +6,15 @@ import json
 import sys
 from typing import Any, Callable, Mapping, TextIO
 
-from syvert.runtime import TaskInput, TaskRequest, execute_task, failure_envelope, resolve_task_id
+from syvert.runtime import (
+    TaskInput,
+    TaskRequest,
+    execute_task,
+    failure_envelope,
+    invalid_input_error,
+    resolve_task_id,
+    runtime_contract_error,
+)
 
 
 class CliArgumentError(ValueError):
@@ -45,12 +53,7 @@ def main(
     except CliArgumentError as error:
         task_id, task_id_error = resolve_task_id(task_id_factory)
         adapter_key, capability = extract_cli_context(argv)
-        envelope_error = task_id_error or {
-            "category": "runtime_contract",
-            "code": "invalid_cli_arguments",
-            "message": str(error),
-            "details": {},
-        }
+        envelope_error = task_id_error or invalid_input_error("invalid_cli_arguments", str(error))
         envelope = failure_envelope(task_id, adapter_key, capability, envelope_error)
         err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
         return 1
@@ -76,12 +79,10 @@ def main(
             task_id,
             request.adapter_key,
             request.capability,
-            {
-                "category": "runtime_contract",
-                "code": "adapter_loader_error",
-                "message": str(error) or error.__class__.__name__,
-                "details": {},
-            },
+            runtime_contract_error(
+                "adapter_loader_error",
+                str(error) or error.__class__.__name__,
+            ),
         )
         err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
         return 1
@@ -101,14 +102,11 @@ def main(
             fallback_task_id,
             request.adapter_key,
             request.capability,
-            {
-                "category": "runtime_contract",
-                "code": "envelope_not_json_serializable",
-                "message": "CLI 输出结果无法序列化为 JSON",
-                "details": {
-                    "error_type": error.__class__.__name__,
-                },
-            },
+            runtime_contract_error(
+                "envelope_not_json_serializable",
+                "CLI 输出结果无法序列化为 JSON",
+                details={"error_type": error.__class__.__name__},
+            ),
         )
         payload = json.dumps(envelope, ensure_ascii=False)
         stream = err

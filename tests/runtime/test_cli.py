@@ -86,7 +86,7 @@ class CliTests(unittest.TestCase):
         payload = json.loads(result.stderr)
         self.assertEqual(payload["status"], "failed")
         self.assertEqual(payload["adapter_key"], "stub")
-        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["category"], "invalid_input")
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
     def test_cli_parse_failure_preserves_adapter_key_from_equals_syntax(self) -> None:
@@ -312,7 +312,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         payload = json.loads(stderr.getvalue())
         self.assertEqual(payload["status"], "failed")
-        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["category"], "unsupported")
 
     def test_injected_empty_adapter_registry_is_authoritative(self) -> None:
         stdout = io.StringIO()
@@ -338,6 +338,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         payload = json.loads(stderr.getvalue())
         self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"]["category"], "unsupported")
         self.assertEqual(payload["error"]["code"], "adapter_not_found")
 
     def test_cli_loader_failure_returns_machine_readable_failure(self) -> None:
