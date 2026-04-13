@@ -47,6 +47,16 @@ CONTRACT_SURFACE_VALUES = {
     "runtime_modes",
 }
 JOINT_ACCEPTANCE_VALUES = {"yes", "no"}
+INTEGRATION_CHECK_CANONICAL_FIELDS = {
+    "integration_touchpoint",
+    "integration_ref",
+    "external_dependency",
+    "merge_gate",
+    "contract_surface",
+    "joint_acceptance_needed",
+    "integration_status_checked_before_pr",
+    "integration_status_checked_before_merge",
+}
 REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "sprint")
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
@@ -263,6 +273,36 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
     return payload
 
 
+def parse_integration_check_payload(section: str) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    current_key: str | None = None
+    parsing_closed = False
+    for raw_line in section.splitlines():
+        stripped = raw_line.strip()
+        if parsing_closed:
+            continue
+        if stripped.startswith("- "):
+            entry = stripped[2:]
+            key_part, _, value_part = entry.partition(":")
+            if not _:
+                key_part, _, value_part = entry.partition("：")
+            normalized_key = key_part.split("（", 1)[0].split("(", 1)[0].strip()
+            if normalized_key not in INTEGRATION_CHECK_CANONICAL_FIELDS:
+                current_key = None
+                continue
+            current_key = normalized_key
+            payload[current_key] = value_part.strip()
+            continue
+        if current_key and stripped and raw_line[:1].isspace():
+            payload[current_key] = "\n".join(filter(None, [payload[current_key], stripped])).strip()
+            continue
+        if stripped:
+            current_key = None
+            if payload:
+                parsing_closed = True
+    return payload
+
+
 def integration_merge_gate_errors(meta: dict) -> list[str]:
     body = str(meta.get("body") or "")
     raw_sections = parse_all_markdown_sections(body)
@@ -272,7 +312,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
             return ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"]
         return []
 
-    payload = parse_bullet_kv_section(integration_section)
+    payload = parse_integration_check_payload(integration_section)
     integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
     integration_ref = payload.get("integration_ref", "").strip()
     external_dependency = payload.get("external_dependency", "").strip().lower() or "none"

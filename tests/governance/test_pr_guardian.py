@@ -18,6 +18,7 @@ from scripts.pr_guardian import (
     load_reviewer_rubric_excerpt,
     merge_if_safe,
     parse_bullet_kv_section,
+    parse_integration_check_payload,
     render_item_context_supplement,
     review_once,
     run_codex_review,
@@ -138,6 +139,28 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(payload["integration_status_checked_before_merge"], "yes")
         self.assertEqual(payload["integration_ref"], "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
+
+    def test_parse_integration_check_payload_ignores_free_form_note_bullets(self) -> None:
+        section = "\n".join(
+            [
+                "- integration_touchpoint: active",
+                "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "- external_dependency: both",
+                "- merge_gate: integration_check_required",
+                "- contract_surface: runtime_modes",
+                "- joint_acceptance_needed: yes",
+                "- integration_status_checked_before_pr: yes",
+                "- integration_status_checked_before_merge: no",
+                "",
+                "补充说明：",
+                "",
+                "- integration_status_checked_before_merge: yes",
+            ]
+        )
+
+        payload = parse_integration_check_payload(section)
+
+        self.assertEqual(payload["integration_status_checked_before_merge"], "no")
 
     def test_integration_merge_gate_errors_accepts_standard_template_shape(self) -> None:
         meta = {
