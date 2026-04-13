@@ -149,12 +149,64 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
-    def test_integration_merge_gate_errors_rejects_missing_section(self) -> None:
+    def test_integration_merge_gate_errors_allows_missing_section_for_non_gated_pr(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落，无法执行 integration merge gate。"])
+        self.assertEqual(errors, [])
+
+    def test_integration_merge_gate_errors_rejects_missing_section_for_explicit_required_gate(self) -> None:
+        meta = {"body": "## 摘要\n\n- merge_gate: integration_check_required\n"}
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"])
+
+    def test_integration_merge_gate_errors_rejects_unknown_merge_gate_value(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- merge_gate: experimental_mode",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(
+            errors,
+            ["PR 描述中的 `integration_check.merge_gate` 非法：`experimental_mode`（仅允许 `local_only` / `integration_check_required`）。"],
+        )
+
+    def test_integration_merge_gate_errors_requires_metadata_for_required_gate(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- integration_ref: none",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: no",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertIn("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。", errors)
+        self.assertIn("`merge_gate=integration_check_required` 时，PR 描述必须记录 `integration_status_checked_before_pr=yes`。", errors)
+        self.assertIn(
+            "`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。",
+            errors,
+        )
 
     @patch("scripts.pr_guardian.subprocess.run")
     def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:

@@ -242,15 +242,20 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
 
 
 def integration_merge_gate_errors(meta: dict) -> list[str]:
-    raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
+    body = str(meta.get("body") or "")
+    raw_sections = parse_all_markdown_sections(body)
     integration_section = raw_sections.get("integration_check", "")
     if not integration_section:
-        return ["PR 描述缺少 `integration_check` 段落，无法执行 integration merge gate。"]
+        if re.search(r"(?im)^\s*-\s*merge_gate\s*[：:]\s*integration_check_required\b", body):
+            return ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"]
+        return []
 
     payload = parse_bullet_kv_section(integration_section)
     merge_gate = payload.get("merge_gate", "").strip()
     if not merge_gate:
         return ["PR 描述中的 `integration_check.merge_gate` 不能为空。"]
+    if merge_gate not in {"local_only", "integration_check_required"}:
+        return [f"PR 描述中的 `integration_check.merge_gate` 非法：`{merge_gate}`（仅允许 `local_only` / `integration_check_required`）。"]
     if merge_gate != "integration_check_required":
         return []
 
