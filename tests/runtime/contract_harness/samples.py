@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Mapping, Sequence
+from typing import Sequence
 
 from syvert.runtime import CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE
+from tests.runtime.contract_harness.fake_adapter import FakeAdapterScenario
 
 
 class ExpectedVerdict(Enum):
@@ -19,6 +20,7 @@ class ExpectedVerdict(Enum):
 @dataclass(frozen=True)
 class FakeAdapterProfile:
     adapter_key: str
+    scenario: FakeAdapterScenario
     declared_capabilities: Sequence[str]
     supported_targets: Sequence[str]
     supported_collection_modes: Sequence[str]
@@ -39,14 +41,15 @@ class ContractSample:
     description: str
     input: SampleInput
     expected_verdict: ExpectedVerdict
-    expected_runtime_category: str | None
+    expected_runtime_status: str | None
+    expected_runtime_error_category: str | None
     adapter_profile: FakeAdapterProfile | None = None
-    adapter_response_shape: Mapping[str, object] | None = None
     precondition_notes: Sequence[str] = field(default_factory=tuple)
 
 
 SUCCESS_PROFILE = FakeAdapterProfile(
     adapter_key="fake:contract-success",
+    scenario="success",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),
     supported_collection_modes=(LEGACY_COLLECTION_MODE,),
@@ -54,6 +57,7 @@ SUCCESS_PROFILE = FakeAdapterProfile(
 
 LEGAL_FAILURE_PROFILE = FakeAdapterProfile(
     adapter_key="fake:contract-legal-failure",
+    scenario="legal_failure",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),
     supported_collection_modes=(LEGACY_COLLECTION_MODE,),
@@ -61,6 +65,7 @@ LEGAL_FAILURE_PROFILE = FakeAdapterProfile(
 
 VIOLATION_PROFILE = FakeAdapterProfile(
     adapter_key="fake:contract-violation",
+    scenario="illegal_payload",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),
     supported_collection_modes=(LEGACY_COLLECTION_MODE,),
@@ -75,51 +80,21 @@ CONTRACT_SAMPLES: Sequence[ContractSample] = (
             target_url="https://contract-host/success",
         ),
         expected_verdict=ExpectedVerdict.PASS,
-        expected_runtime_category="success",
+        expected_runtime_status="success",
+        expected_runtime_error_category=None,
         adapter_profile=SUCCESS_PROFILE,
-        adapter_response_shape={
-            "raw": {"id": "success-1", "payload": {"detail": "ok"}},
-            "normalized": {
-                "platform": "fake",
-                "content_id": "success-1",
-                "content_type": "unknown",
-                "canonical_url": "https://contract-host/success",
-                "title": "",
-                "body_text": "",
-                "published_at": None,
-                "author": {
-                    "author_id": None,
-                    "display_name": None,
-                    "avatar_url": None,
-                },
-                "stats": {
-                    "like_count": None,
-                    "comment_count": None,
-                    "share_count": None,
-                    "collect_count": None,
-                },
-                "media": {
-                    "cover_url": None,
-                    "video_url": None,
-                    "image_urls": [],
-                },
-            },
-        },
     ),
     ContractSample(
-        sample_id="legal-failure-invalid-input",
-        description="请求进入 Core 后返回 FR-0005 允许的 invalid_input failed envelope。",
+        sample_id="legal-failure-platform-envelope",
+        description="fake adapter 受控返回平台失败 envelope，并由 validator 判定为合法失败。",
         input=SampleInput(
             adapter_key=LEGAL_FAILURE_PROFILE.adapter_key,
-            target_url="https://contract-host/invalid-input",
-            target_type="content_id",
+            target_url="https://contract-host/legal-failure",
         ),
         expected_verdict=ExpectedVerdict.LEGAL_FAILURE,
-        expected_runtime_category="invalid_input",
+        expected_runtime_status="failed",
+        expected_runtime_error_category="platform",
         adapter_profile=LEGAL_FAILURE_PROFILE,
-        precondition_notes=(
-            "target_type 非默认 url，使 runtime 在进入 adapter 前返回 invalid_input。",
-        ),
     ),
     ContractSample(
         sample_id="contract-violation-missing-normalized",
@@ -129,11 +104,9 @@ CONTRACT_SAMPLES: Sequence[ContractSample] = (
             target_url="https://contract-host/violation",
         ),
         expected_verdict=ExpectedVerdict.CONTRACT_VIOLATION,
-        expected_runtime_category="runtime_contract",
+        expected_runtime_status="failed",
+        expected_runtime_error_category="runtime_contract",
         adapter_profile=VIOLATION_PROFILE,
-        adapter_response_shape={
-            "raw": {"id": "violation-1", "payload": {"detail": "missing normalized"}},
-        },
     ),
     ContractSample(
         sample_id="execution-precondition-not-met",
@@ -143,7 +116,8 @@ CONTRACT_SAMPLES: Sequence[ContractSample] = (
             target_url="https://contract-host/missing-fixture",
         ),
         expected_verdict=ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET,
-        expected_runtime_category=None,
+        expected_runtime_status=None,
+        expected_runtime_error_category=None,
         precondition_notes=(
             "fake adapter 未注册到 AdapterRegistry，必须由 harness 先判定。",
         ),
