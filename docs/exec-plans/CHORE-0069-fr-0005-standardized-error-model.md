@@ -38,6 +38,7 @@
 - 当前主干运行时仅实做 `runtime_contract` / `platform` 两类失败分类，`invalid_input` / `unsupported` 尚未进入统一实现路径。
 - 当前 `execute_task()` 仍把 adapter 不存在、capability 不支持、非法请求形状等路径大多打成 `runtime_contract`，与 `FR-0005` formal spec 不一致。
 - 当前分支 `issue-69-task` 已把 runtime / CLI 错误分类重映射到四类语义，并同步更新 release / sprint / exec-plan 索引与回归测试。
+- guardian 第二轮指出：真实 xhs / douyin adapter 在进入平台前因 invalid URL / invalid request 抛出的 `PlatformAdapterError` 仍被 blanket 映射到 `platform`；当前 head 已补上 runtime 分类逻辑与真实 adapter 回归测试，待重新受审。
 
 ## 下一步动作
 
@@ -69,6 +70,8 @@
   - 结果：已创建 worktree `/Users/mc/code/worktrees/syvert/issue-69-task`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
   - 结果：`Ran 48 tests in 1.726s`，`OK`
+- `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_cli tests.runtime.test_executor`
+  - 结果：在修正真实 adapter pre-platform 输入分类后重跑，`Ran 50 tests in 1.729s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -88,6 +91,9 @@
 - guardian 首轮审查：`REQUEST_CHANGES`
   - 阻断项：active exec-plan 仍停留在 pre-PR 状态，`关联 PR` 为空，且“下一步动作”仍写着创建 PR，导致仓内执行上下文与当前受审 PR `#97` 不一致
   - 收口动作：更新 active exec-plan，使其与当前 PR / head / merge gate 状态对齐
+- guardian 次轮审查：`REQUEST_CHANGES`
+  - 阻断项：真实 adapter 在 pre-platform 输入失败时抛出的 `invalid_xhs_url` / `invalid_douyin_url` 仍被 runtime 映射到 `platform`
+  - 收口动作：runtime 新增 adapter pre-platform invalid-input 分类逻辑，并补充真实 xhs / douyin invalid URL 回归测试
 
 ## 未决风险
 
@@ -101,4 +107,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `06682d32357b5301acee500239301af86b33c56d`
+- `984ae6176d8a37853bf696176372b9d946c8d5cb`
