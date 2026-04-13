@@ -18,7 +18,7 @@ guardian 审查经常需要消费较长上下文，且仓库约束已经明确 g
 
 - `GOV-0030` 将 guardian 的默认超时策略调整为“不设置环境变量时不限制超时”。
 - `SYVERT_GUARDIAN_TIMEOUT_SECONDS` 仅在显式设置为正整数时生效，并作为 `subprocess.run(timeout=...)` 的秒数传入。
-- `SYVERT_GUARDIAN_TIMEOUT_SECONDS` 为空字符串或非正整数时，不再作为有效超时配置使用；其中非整数值应直接报错，避免静默误配。
+- `SYVERT_GUARDIAN_TIMEOUT_SECONDS` 未设置或为空字符串时表示“不限制超时”；一旦显式设置为 `0`、负数或非整数值，必须立即报错，避免把非法配置静默解释为“关闭超时”。
 - 当前事项只修改 guardian 超时策略与对应治理测试，不改变 reviewer rubric、guardian verdict schema、`safe_to_merge` 语义或 merge gate 职责边界。
 
 ## 影响

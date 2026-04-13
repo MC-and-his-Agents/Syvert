@@ -61,7 +61,7 @@ def codex_review_timeout_seconds() -> int | None:
     except ValueError as exc:
         raise SystemExit("SYVERT_GUARDIAN_TIMEOUT_SECONDS 必须是正整数；留空或不设置表示不限制超时。") from exc
     if timeout_seconds <= 0:
-        return None
+        raise SystemExit("SYVERT_GUARDIAN_TIMEOUT_SECONDS 必须是正整数；留空或不设置表示不限制超时。")
     return timeout_seconds
 
 

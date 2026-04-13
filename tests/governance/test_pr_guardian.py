@@ -103,6 +103,21 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertTrue(env["TMPDIR"].endswith(".codex-tmp"))
         self.assertIsNone(subprocess_run_mock.call_args.kwargs["timeout"])
 
+    @patch("scripts.pr_guardian.subprocess.run")
+    def test_run_codex_review_passes_configured_timeout(self, subprocess_run_mock) -> None:
+        subprocess_run_mock.return_value = subprocess.CompletedProcess(
+            args=["codex"],
+            returncode=0,
+            stdout='{"verdict":"APPROVE","safe_to_merge":true,"summary":"ok","findings":[],"required_actions":[]}',
+            stderr="",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict("scripts.pr_guardian.os.environ", {"SYVERT_GUARDIAN_TIMEOUT_SECONDS": "600"}, clear=True):
+                run_codex_review(Path(temp_dir), "prompt", Path(temp_dir) / "review.json")
+
+        self.assertEqual(subprocess_run_mock.call_args.kwargs["timeout"], 600)
+
     @patch("scripts.pr_guardian.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["codex"], timeout=300))
     def test_run_codex_review_times_out_with_actionable_error(self, subprocess_run_mock) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -121,9 +136,19 @@ class CodexReviewExecutionTests(unittest.TestCase):
         with patch.dict("scripts.pr_guardian.os.environ", {"SYVERT_GUARDIAN_TIMEOUT_SECONDS": "600"}, clear=True):
             self.assertEqual(codex_review_timeout_seconds(), 600)
 
-    def test_codex_review_timeout_seconds_treats_zero_as_unbounded(self) -> None:
+    def test_codex_review_timeout_seconds_rejects_zero(self) -> None:
         with patch.dict("scripts.pr_guardian.os.environ", {"SYVERT_GUARDIAN_TIMEOUT_SECONDS": "0"}, clear=True):
-            self.assertIsNone(codex_review_timeout_seconds())
+            with self.assertRaises(SystemExit) as ctx:
+                codex_review_timeout_seconds()
+
+        self.assertIn("SYVERT_GUARDIAN_TIMEOUT_SECONDS", str(ctx.exception))
+
+    def test_codex_review_timeout_seconds_rejects_negative_integer(self) -> None:
+        with patch.dict("scripts.pr_guardian.os.environ", {"SYVERT_GUARDIAN_TIMEOUT_SECONDS": "-1"}, clear=True):
+            with self.assertRaises(SystemExit) as ctx:
+                codex_review_timeout_seconds()
+
+        self.assertIn("SYVERT_GUARDIAN_TIMEOUT_SECONDS", str(ctx.exception))
 
     def test_codex_review_timeout_seconds_rejects_invalid_value(self) -> None:
         with patch.dict("scripts.pr_guardian.os.environ", {"SYVERT_GUARDIAN_TIMEOUT_SECONDS": "abc"}, clear=True):
