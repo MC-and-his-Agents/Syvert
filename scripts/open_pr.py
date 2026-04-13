@@ -56,7 +56,16 @@ from scripts.spec_guard import validate_suite
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
-ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
+    "Goal": ("Goal", "Summary", "摘要", "治理目标", "执行目标", "阶段目标"),
+    "Scope": ("Scope", "范围", "影响载体"),
+    "Required Outcomes": ("Required Outcomes", "Formal Spec Suite", "Formal Spec 套件"),
+    "Acceptance": ("Acceptance", "验收"),
+    "Acceptance Criteria": ("Acceptance Criteria", "验收标准", "进入 / 关闭条件", "进入/关闭条件"),
+    "Out of Scope": ("Out of Scope", "非目标"),
+    "Dependency": ("Dependency", "Dependencies", "依赖", "关联 FR"),
+}
+ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
 INTEGRATION_TOUCHPOINT_CHOICES = ("none", "check_required", "active", "blocked", "resolved")
 EXTERNAL_DEPENDENCY_CHOICES = ("none", "syvert", "webenvoy", "both")
@@ -210,16 +219,32 @@ def closing_line(issue: int | None, mode: str) -> str:
     return f"{prefix} #{issue}"
 
 
+def normalize_issue_summary_heading(raw_heading: str) -> str:
+    heading = raw_heading.strip()
+    heading = re.sub(r"\s*[:：]\s*$", "", heading)
+    heading = re.sub(r"\s*/\s*", " / ", heading)
+    heading = re.sub(r"\s+", " ", heading)
+    return heading.casefold()
+
+
+ISSUE_SUMMARY_HEADING_LOOKUP = {
+    normalize_issue_summary_heading(alias): canonical
+    for canonical, aliases in ISSUE_SUMMARY_HEADING_ALIASES.items()
+    for alias in aliases
+}
+
+
 def extract_issue_summary_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
-    selected = set(ISSUE_SUMMARY_HEADINGS)
+    heading_pattern = re.compile(r"^#{2,6}\s+(.+?)\s*$")
 
     for line in body.splitlines():
         stripped = line.strip()
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip()
-            current = heading if heading in selected else None
+        heading_match = heading_pattern.match(stripped)
+        if heading_match:
+            canonical = ISSUE_SUMMARY_HEADING_LOOKUP.get(normalize_issue_summary_heading(heading_match.group(1)))
+            current = canonical
             if current:
                 sections.setdefault(current, [])
             continue

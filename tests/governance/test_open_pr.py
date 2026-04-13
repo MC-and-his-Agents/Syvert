@@ -10,6 +10,7 @@ from scripts.common import CommandError
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
+    extract_issue_summary_sections,
     parse_args,
     validate_current_worktree_binding,
     validate_integration_args,
@@ -322,6 +323,62 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("## Goal", summary)
         self.assertIn("## Scope", summary)
         self.assertIn("## Out of Scope", summary)
+
+    def test_extract_issue_summary_sections_supports_issue_form_heading_aliases(self) -> None:
+        body = "\n".join(
+            [
+                "### 摘要",
+                "",
+                "目标：收口本轮治理改造。",
+                "",
+                "### integration_touchpoint",
+                "",
+                "none",
+                "",
+                "### 治理目标",
+                "",
+                "补齐跨仓协同插槽。",
+            ]
+        )
+
+        sections = extract_issue_summary_sections(body)
+
+        self.assertIn("Goal", sections)
+        self.assertIn("目标：收口本轮治理改造。", sections["Goal"])
+        self.assertIn("补齐跨仓协同插槽。", sections["Goal"])
+        self.assertNotIn("integration_touchpoint", sections)
+
+    def test_build_issue_summary_renders_chinese_issue_form_sections(self) -> None:
+        payload = {
+            "body": "\n".join(
+                [
+                    "### 摘要",
+                    "",
+                    "目标：统一执行入口。",
+                    "",
+                    "### 影响载体",
+                    "",
+                    "- WORKFLOW.md",
+                    "",
+                    "### Formal Spec 套件",
+                    "",
+                    "- spec.md",
+                ]
+            )
+        }
+
+        with patch(
+            "scripts.open_pr.run",
+            return_value=type("Completed", (), {"returncode": 0, "stdout": __import__("json").dumps(payload)})(),
+        ):
+            summary = build_issue_summary(105)
+
+        self.assertIn("## Goal", summary)
+        self.assertIn("## Scope", summary)
+        self.assertIn("## Required Outcomes", summary)
+        self.assertIn("目标：统一执行入口。", summary)
+        self.assertIn("- WORKFLOW.md", summary)
+        self.assertIn("- spec.md", summary)
 
     def test_legacy_filename_exec_plan_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
