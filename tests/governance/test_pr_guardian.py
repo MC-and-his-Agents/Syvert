@@ -251,7 +251,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 with self.assertRaises(SystemExit) as ctx:
                     run_codex_review(Path(temp_dir), "prompt", Path(temp_dir) / "review.json")
 
-        self.assertIn("Codex 审查超时", str(ctx.exception))
+        self.assertIn("Codex 审查超时（>300 秒）", str(ctx.exception))
+        self.assertEqual(subprocess_run_mock.call_args.kwargs["timeout"], 300)
         subprocess_run_mock.assert_called_once()
 
     def test_codex_review_timeout_seconds_defaults_to_none(self) -> None:
