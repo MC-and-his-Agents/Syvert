@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from syvert.runtime import AdapterTaskRequest, PlatformAdapterError
+from syvert.runtime import AdapterTaskRequest
 
-FakeAdapterScenario = Literal["success", "legal_failure", "illegal_payload"]
+FakeAdapterScenario = Literal["success", "illegal_payload"]
 
 
 def _build_success_payload(url: str) -> dict[str, Any]:
@@ -52,12 +52,6 @@ class FakeContractAdapter:
         self.last_request = request
         if self.scenario == "success":
             return _build_success_payload(request.target_value)
-        if self.scenario == "legal_failure":
-            raise PlatformAdapterError(
-                code="content_not_found",
-                message="fake adapter returns controlled legal failure",
-                details={"scenario": self.scenario},
-            )
         if self.scenario == "illegal_payload":
             # Deliberately violate success payload contract to exercise Core fail-closed path.
             return {"raw": {"content_id": "fake-invalid-only-raw"}}

@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 关联 PR：
+- 关联 PR：`#104`
 - 状态：`active`
 - active 收口事项：`CHORE-0102-fr-0006-fake-adapter-harness`
 
