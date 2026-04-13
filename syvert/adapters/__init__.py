@@ -3,6 +3,7 @@ from syvert.adapters.xhs import XhsAdapter, build_adapters as build_xhs_adapters
 
 
 def build_adapters() -> dict[str, object]:
+    """Return adapter bindings for registry materialization."""
     adapters: dict[str, object] = {}
     adapters.update(build_xhs_adapters())
     adapters.update(build_douyin_adapters())
