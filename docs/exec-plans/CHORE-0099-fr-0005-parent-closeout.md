@@ -23,6 +23,7 @@
 - 本次纳入：
   - `docs/exec-plans/FR-0005-standardized-error-model-and-adapter-registry.md`
   - `docs/exec-plans/CHORE-0099-fr-0005-parent-closeout.md`
+  - `docs/exec-plans/CHORE-0051-fr-0005-formal-spec.md`
   - `docs/exec-plans/CHORE-0069-fr-0005-standardized-error-model.md`
   - `docs/exec-plans/CHORE-0070-fr-0005-adapter-registry.md`
   - `docs/releases/v0.2.0.md`
