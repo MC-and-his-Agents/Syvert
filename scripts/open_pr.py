@@ -474,6 +474,8 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
         errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
     if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and not integration_gated:
         errors.append("触及 integration 联动、共享 contract surface、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
+    if (has_external_dependency or joint_acceptance or has_contract_surface) and not integration_active:
+        errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
     if has_contract_surface and not integration_active:
         errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
     if not integration_gated and integration_ref == "":

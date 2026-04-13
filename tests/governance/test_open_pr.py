@@ -190,6 +190,32 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertTrue(any("`merge_gate` 必须为 `integration_check_required`" in error for error in errors))
         self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
 
+    def test_validate_integration_args_rejects_dependency_with_none_touchpoint(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://example.test/integration/1",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(

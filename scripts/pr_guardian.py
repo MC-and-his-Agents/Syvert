@@ -245,10 +245,13 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
     integration_section = raw_sections.get("integration_check", "")
     if not integration_section:
-        return []
+        return ["PR 描述缺少 `integration_check` 段落，无法执行 integration merge gate。"]
 
     payload = parse_bullet_kv_section(integration_section)
-    if payload.get("merge_gate", "").strip() != "integration_check_required":
+    merge_gate = payload.get("merge_gate", "").strip()
+    if not merge_gate:
+        return ["PR 描述中的 `integration_check.merge_gate` 不能为空。"]
+    if merge_gate != "integration_check_required":
         return []
 
     errors: list[str] = []

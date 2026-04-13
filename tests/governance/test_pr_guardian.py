@@ -25,6 +25,22 @@ from scripts.pr_guardian import (
 )
 
 
+LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
+    [
+        "## integration_check",
+        "",
+        "- integration_touchpoint: none",
+        "- integration_ref: none",
+        "- external_dependency: none",
+        "- merge_gate: local_only",
+        "- contract_surface: none",
+        "- joint_acceptance_needed: no",
+        "- integration_status_checked_before_pr: no",
+        "- integration_status_checked_before_merge: no",
+    ]
+)
+
+
 class GuardianStateTests(unittest.TestCase):
     def test_load_guardian_state_falls_back_to_legacy_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -132,6 +148,13 @@ class CodexReviewExecutionTests(unittest.TestCase):
         }
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
+
+    def test_integration_merge_gate_errors_rejects_missing_section(self) -> None:
+        meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, ["PR 描述缺少 `integration_check` 段落，无法执行 integration merge gate。"])
 
     @patch("scripts.pr_guardian.subprocess.run")
     def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:
@@ -992,6 +1015,7 @@ class MergeIfSafeTests(unittest.TestCase):
             "number": 1,
             "isDraft": False,
             "headRefOid": "sha-1",
+            "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
         }
         find_result_mock.return_value = {
             "schema_version": 1,
@@ -1035,11 +1059,13 @@ class MergeIfSafeTests(unittest.TestCase):
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-2",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-2",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
         ]
         review_once_mock.return_value = (
@@ -1086,11 +1112,13 @@ class MergeIfSafeTests(unittest.TestCase):
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-3",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-3",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
         ]
         review_once_mock.return_value = (
