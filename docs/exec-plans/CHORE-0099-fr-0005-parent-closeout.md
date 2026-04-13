@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#100`
 - 状态：`active`
 - active 收口事项：`CHORE-0099-fr-0005-parent-closeout`
 
@@ -45,7 +45,7 @@
 ## 下一步动作
 
 - 把 `FR-0005` requirement container、`#69/#70` 历史实现记录、release / sprint 索引与 `#99` 对齐到“唯一 active closeout 入口”后的主干真相。
-- 当前 head 完成门禁与受控 PR 创建后进入 guardian / merge gate。
+- 当前 head 已完成门禁与受控 PR 创建，下一步进入 guardian / merge gate。
 - 合并后先关闭当前 Work Item `#99`，再修正 GitHub `#65` 正文、发布 `#65` closeout 评论并关闭 `#65`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -86,6 +86,19 @@
   - 结果：`state=MERGED`
 - `gh pr view 98 --repo MC-and-his-Agents/Syvert --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=eb400dcfddecb05ddeb3fd67b30ad223c6b3d063`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：已校验 1 条提交信息，全部通过
+- `python3 scripts/open_pr.py --class docs --issue 99 --item-key CHORE-0099-fr-0005-parent-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0005 父事项' --closing fixes --dry-run`
+  - 结果：通过
+- 已创建当前受审 PR：`#100 https://github.com/MC-and-his-Agents/Syvert/pull/100`
 
 ## closeout 证据
 
