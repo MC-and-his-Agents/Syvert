@@ -31,8 +31,6 @@ class SampleInput:
     adapter_key: str
     capability: str = CONTENT_DETAIL_BY_URL
     target_url: str = "https://example.com/resource"
-    target_type: str = "url"
-    collection_mode: str = LEGACY_COLLECTION_MODE
 
 
 @dataclass(frozen=True)
