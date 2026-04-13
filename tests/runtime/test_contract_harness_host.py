@@ -59,6 +59,22 @@ class ContractHarnessHostTests(unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "invalid_adapter_success_payload")
 
+    def test_preserves_controlled_legal_failure_from_fake_adapter(self) -> None:
+        adapter = FakeContractAdapter(scenario="legal_failure")
+        sample = HarnessExecutionInput(sample_id="sample-legal-failure", url="https://example.com/fake/3")
+
+        result = execute_harness_sample(
+            sample,
+            adapters={DEFAULT_HARNESS_ADAPTER_KEY: adapter},
+            task_id="task-harness-legal-failure",
+        )
+
+        self.assertEqual(result["task_id"], "task-harness-legal-failure")
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "platform")
+        self.assertEqual(result["error"]["code"], "content_not_found")
+        self.assertEqual(result["error"]["details"]["scenario"], "legal_failure")
+
 
 if __name__ == "__main__":
     unittest.main()

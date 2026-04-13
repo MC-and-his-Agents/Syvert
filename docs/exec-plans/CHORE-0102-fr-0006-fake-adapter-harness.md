@@ -16,7 +16,7 @@
 
 - 在测试侧落地受控 fake adapter 与最小 harness host。
 - 通过 `syvert.runtime.execute_task` + `AdapterRegistry` 标准路径执行样例，不依赖真实平台。
-- 固定验证 `success` 与 `illegal payload` 两条最小分支，且非法 payload 继续归入既有 `runtime_contract` 语义。
+- 固定验证 `success`、受控 `legal failure` 与 `illegal payload` 三条最小分支，且非法 payload 继续归入既有 `runtime_contract` 语义。
 
 ## 范围
 
@@ -34,7 +34,7 @@
 
 - `FR-0006` formal spec 已合入主干，并明确 `#102` 负责 fake adapter 与最小 harness host。
 - 运行时现状：`execute_task` 已具备标准 registry materialization、capability projection 与 success payload fail-closed 校验能力，可直接作为 harness 宿主。
-- 本地已完成测试侧 `contract_harness` 最小实现与单测，覆盖 `success` + `illegal payload` 两条最小分支。
+- 本地已完成测试侧 `contract_harness` 最小实现与单测，覆盖 `success`、受控 `legal failure` 与 `illegal payload` 三条最小分支。
 
 ## 下一步动作
 
@@ -62,15 +62,15 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host`
-  - 结果：`Ran 43 tests in 0.003s`，`OK`
+  - 结果：`Ran 44 tests in 0.005s`，`OK`
 - 当前受审 PR：`#104`
-- 当前实现 head：`45887530c25ed0cde250fc7eb298d1c3303cbf40`
-- 说明：`45887530c25ed0cde250fc7eb298d1c3303cbf40` 收紧 fake adapter 分支范围并补齐 active exec-plan 的 PR 绑定；其后的提交仅用于回填 review 证据与 checkpoint 元数据，不改写实现代码。
+- 当前实现 head：`9e4623687ced99df65cebbaffc8835d0d7b59e46`
+- 说明：`9e4623687ced99df65cebbaffc8835d0d7b59e46` 补齐 fake adapter 的受控 `legal_failure` 分支与 host-level 验证，并以当前受审 head 重新绑定验证证据。
 
 ## 未决风险
 
 - 若 fake adapter 绕过 `execute_task`/registry 直调内部函数，会破坏 `FR-0006` 的标准宿主路径要求。
-- 若 illegal payload 在 harness 层被提前重分类，会与 `FR-0005` 既有错误模型语义冲突。
+- 若 legal failure 或 illegal payload 在 harness 层被提前重分类，会与 `FR-0005` 既有错误模型语义冲突。
 
 ## 回滚方式
 
@@ -78,4 +78,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `45887530c25ed0cde250fc7eb298d1c3303cbf40`
+- `9e4623687ced99df65cebbaffc8835d0d7b59e46`
