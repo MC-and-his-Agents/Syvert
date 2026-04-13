@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 关联 decision：
-- 关联 PR：待创建
+- 关联 PR：`#108`
 - 状态：`active`
 - active 收口事项：`CHORE-0101-fr-0006-validation-tooling`
 
@@ -38,11 +38,12 @@
 - `FR-0006` formal spec 已合入主干；`#101` 当前作为 implementation Work Item 承接“验证工具与结果分类”。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-101-fr-0006`，仅处理测试侧 harness 验证工具与必要最小测试改动。
 - 当前分支已 rebase 到 `origin/main@1dbf4c6`（`#102` 已合入后的主干状态）。
-- validation tool 已在测试侧落地，包含单样例与批量样例两条分类入口，并已通过目标单测。
+- validation tool 已在测试侧落地，包含单样例与批量样例两条分类入口；当前受审 PR 为 `#108`。
 
 ## 下一步动作
 
-- 由上层执行回合创建 PR、进入 reviewer / guardian 审查并完成 closeout。
+- 等当前 PR `#108` 完成 reviewer / guardian / merge gate。
+- 若再出现阻断，仅做 `FR-0006` 验证层边界内的最小修复，不扩展到 `#102/#103`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -65,9 +66,9 @@
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - 已核对：以 `origin/main@1dbf4c6` 为基线，本分支仅新增 validation tool 与对应测试，并更新 `__init__.py` 导出与本 exec-plan 元数据
 - `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 7 tests`，`OK`
+  - 结果：`Ran 10 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 53 tests`，`OK`
+  - 结果：`Ran 54 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：`通过`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -82,6 +83,10 @@
   - 阻断项已修复：
     - success 样例不再接受缺失 `raw` / `normalized` 的伪 success envelope
     - `runtime_contract` 失败不再被归类为 `legal_failure`
+- guardian 次轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - success 样例与 legal failure 样例改为校验完整 runtime envelope，而非只看局部字段
+    - active exec-plan 已与已创建的 PR `#108`、当前 review 状态和后续动作对齐
 - review gate 语义：当前分支已满足 `implementation` 类 PR 的本地测试与 guard 前置条件；后续仅需按流程进入 reviewer / guardian / checks 与 merge gate
 
 ## 未决风险
@@ -95,4 +100,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3d4e5e6441773cec27f1817491f594890a18809d`
+- `e860de08f889b6195fc68f4263a39fcb4e54f0d5`
