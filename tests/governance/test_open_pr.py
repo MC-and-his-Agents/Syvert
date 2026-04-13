@@ -8,7 +8,7 @@ from pathlib import Path
 
 from unittest.mock import patch
 
-from scripts.common import CommandError
+from scripts.common import CommandError, normalize_integration_ref_for_comparison, parse_github_repo_from_remote_url
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
@@ -145,6 +145,23 @@ def write_decision(repo: Path, path: str, *, issue: str, item_key: str) -> None:
 
 
 class OpenPrPreflightTests(unittest.TestCase):
+    def test_parse_github_repo_from_remote_url_supports_https_and_ssh(self) -> None:
+        self.assertEqual(
+            parse_github_repo_from_remote_url("https://github.com/MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
+        self.assertEqual(
+            parse_github_repo_from_remote_url("git@github.com:MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
+
+    @patch("scripts.common.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_normalize_integration_ref_for_comparison_resolves_local_issue_against_repo_slug(self, default_repo_mock) -> None:
+        normalized = normalize_integration_ref_for_comparison("#12")
+
+        self.assertEqual(normalized, "issue:mc-and-his-agents/syvert#12")
+        default_repo_mock.assert_called_once_with()
+
     def test_validate_integration_args_rejects_empty_ref_for_gated_pr(self) -> None:
         args = parse_args(
             [
@@ -479,6 +496,82 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertIn("无法读取 Issue #105 的 canonical integration 元数据", errors[0])
         run_mock.assert_called_once()
+
+    @patch(
+        "scripts.open_pr.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    @patch("scripts.common.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_validate_integration_args_accepts_equivalent_issue_ref_forms(self, default_repo_mock, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/Syvert/issues/12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        run_mock.assert_called_once()
+        default_repo_mock.assert_called_once_with()
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {

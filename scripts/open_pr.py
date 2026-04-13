@@ -45,6 +45,7 @@ from scripts.common import (
     git_fetch_branch,
     integration_ref_is_checkable,
     load_json,
+    normalize_integration_ref_for_comparison,
     require_cli,
     run,
     syvert_state_file,
@@ -541,7 +542,7 @@ def validate_pr_preflight(
 def normalize_issue_canonical_integration_value(field: str, value: str) -> str:
     raw = str(value or "").strip()
     if field == "integration_ref":
-        return raw
+        return normalize_integration_ref_for_comparison(raw)
     return raw.lower()
 
 

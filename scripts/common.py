@@ -7,6 +7,7 @@ import shlex
 import subprocess
 import sys
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -177,6 +178,32 @@ def now_iso_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def parse_github_repo_from_remote_url(origin_url: str) -> str | None:
+    normalized = origin_url.strip()
+    if not normalized:
+        return None
+    https_match = re.match(r"^https://github\.com/([^/]+/[^/]+?)(?:\.git)?$", normalized)
+    if https_match:
+        return https_match.group(1)
+    ssh_match = re.match(r"^git@github\.com:([^/]+/[^/]+?)(?:\.git)?$", normalized)
+    if ssh_match:
+        return ssh_match.group(1)
+    return None
+
+
+@lru_cache(maxsize=1)
+def default_github_repo() -> str:
+    configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
+    if configured:
+        return configured
+    completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
+    if completed.returncode == 0:
+        parsed = parse_github_repo_from_remote_url(completed.stdout)
+        if parsed:
+            return parsed
+    return f"MC-and-his-Agents/{REPO_ROOT.name}"
+
+
 def slugify(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     tokens = re.findall(r"[a-z0-9]+", normalized.lower())
@@ -194,3 +221,28 @@ def integration_ref_is_checkable(value: str) -> bool:
         r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+(?:/views/[A-Za-z0-9_-]+)?\?.*itemId=[A-Za-z0-9_-]+.*$",
     )
     return any(re.match(pattern, normalized) for pattern in patterns)
+
+
+def normalize_integration_ref_for_comparison(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        return ""
+    if normalized.lower() == "none":
+        return "none"
+
+    local_issue_match = re.match(r"^#(\d+)$", normalized)
+    if local_issue_match:
+        return f"issue:{default_github_repo().lower()}#{local_issue_match.group(1)}"
+
+    repo_issue_match = re.match(r"^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+)$", normalized)
+    if repo_issue_match:
+        return f"issue:{repo_issue_match.group(1).lower()}#{repo_issue_match.group(2)}"
+
+    issue_url_match = re.match(r"^https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/(\d+)$", normalized)
+    if issue_url_match:
+        return f"issue:{issue_url_match.group(1).lower()}#{issue_url_match.group(2)}"
+
+    if re.match(r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+(?:/views/[A-Za-z0-9_-]+)?\?.*itemId=[A-Za-z0-9_-]+.*$", normalized):
+        return normalized
+
+    return normalized

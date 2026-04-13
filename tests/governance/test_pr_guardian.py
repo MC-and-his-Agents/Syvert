@@ -230,6 +230,15 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(errors, ["PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"])
         resolve_issue_mock.assert_called_once_with(meta)
 
+    @patch("scripts.pr_guardian.resolve_issue_canonical_integration", return_value=(105, {}))
+    def test_integration_merge_gate_errors_allows_legacy_issue_without_canonical_metadata(self, resolve_issue_mock) -> None:
+        meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, [])
+        resolve_issue_mock.assert_called_once_with(meta)
+
     def test_integration_merge_gate_errors_rejects_issue_canonical_lookup_failure(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
@@ -466,6 +475,45 @@ class CodexReviewExecutionTests(unittest.TestCase):
         errors = integration_merge_gate_errors(meta)
 
         self.assertEqual(errors, [])
+
+    @patch(
+        "scripts.pr_guardian.resolve_issue_canonical_integration",
+        return_value=(
+            105,
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "MC-and-his-Agents/Syvert#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+        ),
+    )
+    def test_integration_merge_gate_errors_accepts_equivalent_issue_ref_forms(self, resolve_issue_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/MC-and-his-Agents/Syvert/issues/12",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, [])
+        resolve_issue_mock.assert_called_once_with(meta)
 
     def test_integration_merge_gate_errors_rejects_local_only_external_integration_ref(self) -> None:
         meta = {

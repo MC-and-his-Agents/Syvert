@@ -26,6 +26,7 @@ from scripts.common import (
     format_changed_files,
     integration_ref_is_checkable,
     load_json,
+    normalize_integration_ref_for_comparison,
     require_cli,
     run,
 )
@@ -643,7 +644,7 @@ def issue_number_from_meta(meta: dict) -> int | None:
 def normalize_issue_canonical_integration_value(field: str, value: str) -> str:
     raw = str(value or "").strip()
     if field == "integration_ref":
-        return raw
+        return normalize_integration_ref_for_comparison(raw)
     return raw.lower()
 
 
@@ -680,10 +681,7 @@ def resolve_issue_canonical_integration(meta: dict) -> tuple[int | None, dict[st
     canonical = extract_issue_canonical_integration_fields(str(payload.get("body") or ""))
     meta["_issue_canonical_issue_number"] = issue_number
     meta["_issue_canonical_integration"] = canonical
-    if not canonical:
-        meta["_issue_canonical_integration_error"] = f"Issue #{issue_number} 缺少 canonical integration 元数据，拒绝继续。"
-    else:
-        meta["_issue_canonical_integration_error"] = None
+    meta["_issue_canonical_integration_error"] = None
     return issue_number, canonical
 
 
