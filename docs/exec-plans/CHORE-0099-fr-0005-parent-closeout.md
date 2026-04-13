@@ -123,6 +123,34 @@
   - `#70` / PR `#98` 已完成 adapter registry materialization、lookup、capability discovery 与 fail-closed 实现
   - 当前父事项 closeout 已由 `#99` 承接，`docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 与 active exec-plan 已与 GitHub 真相一致
   - 当前不存在遗漏的 `FR-0005` implementation 子事项，且 `#81` 保持关闭
+- `#65` 正文草案：
+
+```md
+## 目标
+
+为 `v0.2.0` 建立标准化错误模型与 adapter registry 契约，确保能力发现与错误分类保持一致。
+
+## 明确不在范围内
+
+- 输入目标与采集策略建模
+- adapter contract test harness 与假适配器细节
+- 版本 gate 与双参考适配器回归
+
+## 关闭条件
+
+- formal spec 已由 PR `#78` 建立并通过审查
+- 标准化错误模型已由 `#69` / PR `#97` 落地，并与 formal spec 对齐
+- adapter registry 已由 `#70` / PR `#98` 落地，并与 formal spec 对齐
+- 父事项 closeout 已由 `#99` 承接并完成 release / sprint / exec-plan / GitHub 语义收口
+
+## 关系
+
+- 层级：`FR`
+- 版本：`v0.2.0`
+- 父阶段：`#63`
+- formal spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
+- 子 Work Item：`#69`, `#70`, `#99`
+```
 
 ## 未决风险
 
