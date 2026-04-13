@@ -10,6 +10,8 @@
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
 - 关联 PR：`#97`
+- 状态：`inactive (historical implementation round; merged via PR #97 and issue #69 closed)`
+- 历史收口事项：`CHORE-0069-fr-0005-standardized-error-model`
 
 ## 目标
 
@@ -34,17 +36,14 @@
 
 ## 当前停点
 
-- `FR-0005` formal spec 已由 PR `#78` 合入主干，`#69` 当前通过 PR `#97` 进入 implementation review / guardian 回合。
-- 当前主干运行时仅实做 `runtime_contract` / `platform` 两类失败分类，`invalid_input` / `unsupported` 尚未进入统一实现路径。
-- 当前 `execute_task()` 仍把 adapter 不存在、capability 不支持、非法请求形状等路径大多打成 `runtime_contract`，与 `FR-0005` formal spec 不一致。
-- 当前分支 `issue-69-task` 已把 runtime / CLI 错误分类重映射到四类语义，并同步更新 release / sprint / exec-plan 索引与回归测试。
-- guardian 第三轮指出：Core 仍靠 `invalid_*_url` / `invalid_*_request` 这类 code 命名启发式识别 adapter pre-platform invalid input，缺少显式 contract；当前 head 已将该边界改为 `PlatformAdapterError(category=\"invalid_input\")` 的显式 adapter-side 信号，并补上真实 adapter 与非命名启发式回归测试，待重新受审。
+- `FR-0005` formal spec 已由 PR `#78` 合入主干，`#69` 已由 PR `#97` 合入并关闭。
+- 历史 worktree / 分支：`/Users/mc/code/worktrees/syvert/issue-69-task` / `issue-69-task`；对应实现回合已完成并退役，不再承担 active 审查语义。
+- 当前主干已统一 `invalid_input`、`unsupported`、`runtime_contract`、`platform` 四类错误语义；本文件仅保留为历史实现记录。
 
 ## 下一步动作
 
-- 消化 guardian 结论并保持 active exec-plan、PR、GitHub checks 与当前 head 一致。
-- 在 guardian `APPROVE` 且 checks 全绿后，通过受控 merge 入口完成合并与 closeout。
-- 合并后关闭 `#69`，退役分支 / worktree，并切换到 `#70` 的独立执行回合。
+- 无 active 动作。
+- `#69` 的主干实现与 closeout 证据由 `docs/exec-plans/CHORE-0099-fr-0005-parent-closeout.md` 继续消费；本文件仅保留为历史实现记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
