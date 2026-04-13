@@ -1,0 +1,125 @@
+name: Work Item
+description: 创建可进入执行回合的本地事项。
+title: "工作项："
+body:
+  - type: input
+    id: issue_context
+    attributes:
+      label: 上位 Issue / FR
+      description: 填当前 work item 绑定的 canonical issue / FR 编号。
+      placeholder: "#123"
+    validations:
+      required: true
+
+  - type: input
+    id: item_key
+    attributes:
+      label: item_key
+      description: 使用 `<item_type>-<4-digit>-<slug>` 命名。
+      placeholder: FR-0123-content-detail-runtime
+    validations:
+      required: true
+
+  - type: dropdown
+    id: item_type
+    attributes:
+      label: item_type
+      options:
+        - FR
+        - HOTFIX
+        - GOV
+        - CHORE
+    validations:
+      required: true
+
+  - type: input
+    id: release
+    attributes:
+      label: release
+      placeholder: v0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: sprint
+    attributes:
+      label: sprint
+      placeholder: sprint-contract-harness
+    validations:
+      required: true
+
+  - type: textarea
+    id: execution_goal
+    attributes:
+      label: 执行目标
+      description: 说明本次 work item 的交付边界、验证方式和回滚方式。
+      placeholder: |
+        交付目标：
+        验证方式：
+        回滚方式：
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration_touchpoint
+    attributes:
+      label: integration_touchpoint
+      options:
+        - none
+        - check_required
+        - active
+    validations:
+      required: true
+
+  - type: input
+    id: integration_ref
+    attributes:
+      label: integration_ref
+      description: 纯本仓库事项留空；跨仓事项必须填写 integration issue / item。
+
+  - type: dropdown
+    id: external_dependency
+    attributes:
+      label: external_dependency
+      options:
+        - none
+        - syvert
+        - webenvoy
+        - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_surface
+    attributes:
+      label: contract_surface
+      options:
+        - none
+        - execution_provider
+        - ids_trace
+        - errors
+        - raw_normalized
+        - diagnostics_observability
+        - runtime_modes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: joint_acceptance_needed
+    attributes:
+      label: joint_acceptance_needed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
