@@ -9,7 +9,8 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#98`
+- 状态：`active`
 
 ## 目标
 
@@ -36,12 +37,15 @@
 
 - `FR-0005` formal spec 已由 PR `#78` 合入主干。
 - 已新增 `syvert/registry.py` 并在 `execute_task()` 中接入 registry materialization / lookup / discovery。
-- 已补齐 registry / runtime 相关测试并更新 release / sprint 索引；当前待进入提交、PR、guardian 与 merge gate。
+- 已补齐 registry / runtime 相关测试并更新 release / sprint 索引。
+- 当前受审 PR 为 `#98`，绑定 `Issue #70` / `item_key=CHORE-0070-fr-0005-adapter-registry`。
+- 当前停在 guardian 前的最后审查补件：已完成实现提交、PR scope 校验、commit check 与受控 `open_pr` 创建。
 
 ## 下一步动作
 
-- 提交改动并完成 `pr_scope_guard` / `commit_check` / `open_pr --dry-run`。
-- 进入 review / guardian / merge gate 后按流程完成 PR 与 closeout。
+- 在当前 head 上完成 guardian 审查。
+- 若 guardian 给出新的阻断，只修当前 head 的最新阻断。
+- guardian 通过后使用受控 `merge_pr` 合并，并同步 closeout `#70`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -63,17 +67,18 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_cli tests.runtime.test_registry`
-  - 结果：`Ran 58 tests in 1.769s`，`OK`
+  - 结果：`Ran 58 tests in 1.765s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：待在当前实现提交形成后执行
+  - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：待在当前实现提交形成后执行
+  - 结果：已校验 1 条提交信息，全部通过
 - `python3 scripts/open_pr.py --class implementation --issue 70 --item-key CHORE-0070-fr-0005-adapter-registry --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0005 适配器注册表' --closing fixes --dry-run`
-  - 结果：待在当前实现提交形成后执行
+  - 结果：通过
+- 已创建当前受审 PR：`#98 https://github.com/MC-and-his-Agents/Syvert/pull/98`
 
 ## 未决风险
 
@@ -86,4 +91,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `94a90f13b78e0af20fed3939397b674d5a20ad3a`
+- `37d6b835f01867ac99e307a46016498f5f9e5af9`
+- 说明：该 checkpoint 已包含 registry 实现、测试与索引更新；当前增量只补充 PR / 门禁元数据，可由 guardian state 继续绑定当前受审 head。
