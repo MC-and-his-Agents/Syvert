@@ -65,8 +65,9 @@
   - 结果：`Ran 44 tests in 0.004s`，`OK`
 - 当前受审 PR：`#104`
 - 最后一次实现代码 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
-- 当前受审 head：`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc`
-- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 是最后一次改写 fake adapter / harness host 行为的实现 checkpoint；`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc` 在该实现基础上补强 success contract 对 `raw` 与 `normalized` 的显式断言，并已在当前 head 上重新执行目标单测，故以下验证证据直接绑定到当前受审 head。
+- 最近一次重跑目标单测的代码 head：`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc`
+- 当前受审 head：`PR #104 最新 head（当前 docs-only 审查元数据提交）`
+- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 是最后一次改写 fake adapter / harness host 行为的实现 checkpoint；`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc` 在该实现基础上补强 success contract 对 `raw` 与 `normalized` 的显式断言，并已重跑目标单测。后续仅回填 exec-plan 审查元数据，不改写实现代码，因此继续复用 `ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc` 的测试结果。
 
 ## 未决风险
 
@@ -81,4 +82,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 实现 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
-- 当前受审 head：`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc`
+- 最近一次重跑目标单测的代码 head：`ad652f03c0c5d9f47f4c6bbcb633e311d771d4fc`
+- 当前 docs-only 审查 head：`PR #104 最新 head（仅回填 exec-plan 元数据）`
