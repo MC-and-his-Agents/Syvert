@@ -55,7 +55,7 @@
 - `python3 scripts/create_worktree.py --issue 103 --class implementation`
   - 结果：should produce `/Users/mc/code/worktrees/syvert/issue-103-fr-0006` (current context).
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
-  - 结果：`Ran 64 tests`，`OK`
+  - 结果：`Ran 65 tests`，`OK`
 - guardian 首轮审查：`REQUEST_CHANGES`
   - 阻断项已修复：
     - execution_precondition_not_met 样例若意外进入 runtime，不再可能被误判为 `pass`
@@ -69,6 +69,10 @@
     - precondition verdict 改为来自真实前置检查，不再靠 expected 值直接硬编码
     - sample metadata 现在实际驱动 adapter 声明与 harness 前置校验，元数据漂移会 fail-close
     - 新增一条经过真实 execution path 的 metadata drift 负向回归测试
+- guardian 四轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - adapter 声明/输入约束不匹配不再前移成 precondition，而是保留为经 Core 产出的运行时 failed envelope
+    - 新增重复 `sample_id` fail-close，保证样例级索引不被静默覆盖
 
 ## 未决风险
 
@@ -80,4 +84,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2aed1fb5de8b208c3de67e0106f2cbc6ef42c75d`
+- `fe4c44719b902a5c9ef4f0fbdc6fd664e883213e`
