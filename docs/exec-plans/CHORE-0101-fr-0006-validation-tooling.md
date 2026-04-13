@@ -67,7 +67,7 @@
 - `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
   - 结果：`Ran 7 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 51 tests`，`OK`
+  - 结果：`Ran 53 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：`通过`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -78,6 +78,10 @@
   - 结果：`通过`
 - `python3 scripts/open_pr.py --class implementation --issue 101 --item-key CHORE-0101-fr-0006-validation-tooling --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(test): 落地 FR-0006 验证工具与结果分类' --closing fixes --dry-run`
   - 结果：`通过`
+- guardian 首轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - success 样例不再接受缺失 `raw` / `normalized` 的伪 success envelope
+    - `runtime_contract` 失败不再被归类为 `legal_failure`
 - review gate 语义：当前分支已满足 `implementation` 类 PR 的本地测试与 guard 前置条件；后续仅需按流程进入 reviewer / guardian / checks 与 merge gate
 
 ## 未决风险
@@ -89,6 +93,6 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `tests/runtime/contract_harness/`、`tests/runtime/test_contract_harness_validation_tool.py` 与本 exec-plan 的增量修改。
 
-## 最近一次 checkpoint 对应的 head SHA
+## 最近一次完成验证的代码 head SHA
 
-- `c3725ea6d8313d58aa5950856596ff4d2a732a0f`
+- `3d4e5e6441773cec27f1817491f594890a18809d`
