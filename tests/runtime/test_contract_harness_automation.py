@@ -6,6 +6,7 @@ import unittest
 from tests.runtime.contract_harness import (
     CONTRACT_SAMPLES,
     HarnessExecutionResult,
+    build_contract_sample_definitions,
     build_expected_verdict_index,
     build_sample_index,
     execute_harness_samples,
@@ -32,6 +33,18 @@ class ContractHarnessAutomationTests(unittest.TestCase):
         observed = {result["sample_id"]: result["verdict"] for result in results}
 
         self.assertEqual(observed, build_expected_verdict_index(CONTRACT_SAMPLES))
+
+    def test_definition_builder_excludes_precondition_samples_from_runtime_outcomes(self) -> None:
+        definitions = build_contract_sample_definitions(CONTRACT_SAMPLES)
+
+        self.assertEqual(
+            [definition.sample_id for definition in definitions],
+            [
+                "success-full-envelope",
+                "legal-failure-platform-envelope",
+                "contract-violation-missing-normalized",
+            ],
+        )
 
     def test_automation_preserves_expected_runtime_status_and_error_categories(self) -> None:
         samples_by_id = build_sample_index(CONTRACT_SAMPLES)

@@ -16,7 +16,6 @@ _EXPECTED_OUTCOME_BY_VERDICT = {
     ExpectedVerdict.PASS: "success",
     ExpectedVerdict.LEGAL_FAILURE: "legal_failure",
     ExpectedVerdict.CONTRACT_VIOLATION: "contract_violation",
-    ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET: "success",
 }
 
 
@@ -29,6 +28,7 @@ def build_contract_sample_definitions(
             expected_outcome=_EXPECTED_OUTCOME_BY_VERDICT[sample.expected_verdict],
         )
         for sample in samples
+        if sample.expected_verdict != ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET
     ]
 
 
@@ -55,29 +55,58 @@ def validate_contract_harness_run(
     definitions = build_contract_sample_definitions(samples)
     validation_results = validate_contract_samples(definitions, execution_results)
     sample_index = build_sample_index(samples)
+    results_by_sample_id = {result["sample_id"]: result for result in validation_results}
     fail_closed_results: list[dict[str, Any]] = []
-    for result in validation_results:
-        sample = sample_index[result["sample_id"]]
+    for sample in samples:
+        result = results_by_sample_id.get(sample.sample_id)
         execution_result = execution_results.get(sample.sample_id)
         if (
             sample.expected_verdict == ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET
-            and execution_result is not None
-            and execution_result.runtime_envelope is not None
         ):
+            if execution_result is not None and execution_result.runtime_envelope is not None:
+                fail_closed_results.append(
+                    {
+                        "sample_id": sample.sample_id,
+                        "verdict": "contract_violation",
+                        "reason": {
+                            "code": "precondition_sample_unexpectedly_reached_runtime",
+                            "message": "precondition sample unexpectedly produced runtime envelope",
+                        },
+                        "observed_status": None,
+                        "observed_error": None,
+                    }
+                )
+                continue
+            if execution_result is not None and execution_result.precondition_code:
+                fail_closed_results.append(
+                    {
+                        "sample_id": sample.sample_id,
+                        "verdict": "execution_precondition_not_met",
+                        "reason": {
+                            "code": execution_result.precondition_code,
+                            "message": execution_result.precondition_message
+                            or "harness precondition is not met",
+                        },
+                        "observed_status": None,
+                        "observed_error": None,
+                    }
+                )
+                continue
             fail_closed_results.append(
                 {
                     "sample_id": sample.sample_id,
-                    "verdict": "contract_violation",
+                    "verdict": "execution_precondition_not_met",
                     "reason": {
-                        "code": "precondition_sample_unexpectedly_reached_runtime",
-                        "message": "precondition sample unexpectedly produced runtime envelope",
+                        "code": "missing_harness_execution_result",
+                        "message": "sample has no harness execution result",
                     },
-                    "observed_status": result["observed_status"],
-                    "observed_error": result["observed_error"],
+                    "observed_status": None,
+                    "observed_error": None,
                 }
             )
             continue
-        fail_closed_results.append(result)
+        if result is not None:
+            fail_closed_results.append(result)
     return fail_closed_results
 
 
