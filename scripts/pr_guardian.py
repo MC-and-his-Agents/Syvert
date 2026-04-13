@@ -251,16 +251,43 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         return []
 
     payload = parse_bullet_kv_section(integration_section)
-    merge_gate = payload.get("merge_gate", "").strip()
+    integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
+    integration_ref = payload.get("integration_ref", "").strip()
+    external_dependency = payload.get("external_dependency", "").strip().lower() or "none"
+    joint_acceptance_needed = payload.get("joint_acceptance_needed", "").strip().lower() or "no"
+    contract_surface = payload.get("contract_surface", "").strip().lower() or "none"
+    merge_gate = payload.get("merge_gate", "").strip().lower()
     if not merge_gate:
         return ["PR 描述中的 `integration_check.merge_gate` 不能为空。"]
     if merge_gate not in {"local_only", "integration_check_required"}:
         return [f"PR 描述中的 `integration_check.merge_gate` 非法：`{merge_gate}`（仅允许 `local_only` / `integration_check_required`）。"]
-    if merge_gate != "integration_check_required":
-        return []
 
     errors: list[str] = []
-    integration_ref = payload.get("integration_ref", "").strip()
+    integration_active = integration_touchpoint != "none"
+    has_external_dependency = external_dependency != "none"
+    joint_acceptance = joint_acceptance_needed == "yes"
+    has_contract_surface = contract_surface != "none"
+
+    if integration_active and not integration_ref:
+        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
+    if integration_active and integration_ref.lower() == "none":
+        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
+    if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and merge_gate != "integration_check_required":
+        errors.append(
+            "`merge_gate=local_only` 与当前 integration 元数据冲突："
+            "当 `integration_touchpoint != none`、`external_dependency != none`、"
+            "`contract_surface != none` 或 `joint_acceptance_needed=yes` 时，"
+            "`merge_gate` 必须为 `integration_check_required`。"
+        )
+    if (has_external_dependency or joint_acceptance or has_contract_surface) and not integration_active:
+        errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
+    if has_contract_surface and not integration_active:
+        errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
+    if merge_gate != "integration_check_required":
+        if not integration_ref:
+            errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
+        return errors
+
     if not integration_ref or integration_ref.lower() == "none":
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
     if payload.get("integration_status_checked_before_pr", "").strip().lower() != "yes":

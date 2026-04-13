@@ -40,6 +40,21 @@ LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
     ]
 )
 
+CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
+    [
+        "## integration_check",
+        "",
+        "- integration_touchpoint: active",
+        "- integration_ref: https://example.test/integration/1",
+        "- external_dependency: both",
+        "- merge_gate: local_only",
+        "- contract_surface: runtime_modes",
+        "- joint_acceptance_needed: yes",
+        "- integration_status_checked_before_pr: yes",
+        "- integration_status_checked_before_merge: yes",
+    ]
+)
+
 
 class GuardianStateTests(unittest.TestCase):
     def test_load_guardian_state_falls_back_to_legacy_file(self) -> None:
@@ -206,6 +221,21 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn(
             "`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。",
             errors,
+        )
+
+    def test_integration_merge_gate_errors_rejects_local_only_with_integration_invariants(self) -> None:
+        meta = {"body": CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY}
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(
+            errors,
+            [
+                "`merge_gate=local_only` 与当前 integration 元数据冲突："
+                "当 `integration_touchpoint != none`、`external_dependency != none`、"
+                "`contract_surface != none` 或 `joint_acceptance_needed=yes` 时，"
+                "`merge_gate` 必须为 `integration_check_required`。"
+            ],
         )
 
     @patch("scripts.pr_guardian.subprocess.run")
@@ -1268,6 +1298,47 @@ class MergeIfSafeTests(unittest.TestCase):
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
 
         self.assertIn("GitHub checks 未全部通过", str(ctx.exception))
+        review_once_mock.assert_not_called()
+        run_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_rejects_contradictory_local_only_integration_metadata(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        pr_meta_mock.return_value = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-integration-contradiction",
+            "body": CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY,
+        }
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-integration-contradiction",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
+
+        self.assertIn("integration merge gate 未满足", str(ctx.exception))
+        self.assertIn("`merge_gate=local_only` 与当前 integration 元数据冲突", str(ctx.exception))
         review_once_mock.assert_not_called()
         run_mock.assert_not_called()
         require_auth_mock.assert_called_once()
