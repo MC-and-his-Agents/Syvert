@@ -64,8 +64,9 @@
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host`
   - 结果：`Ran 44 tests in 0.005s`，`OK`
 - 当前受审 PR：`#104`
-- 当前实现 head：`f833a77e63a42320b6606fe597f5cb828588961b`
-- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 补齐 fake adapter 的受控 `legal_failure` 分支、host-level 验证，以及与当前受审 head 一致的 exec-plan 证据绑定。
+- 最后一次实现代码 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
+- 当前受审 head：`61ff8fd80a43c12aaceecf180d8892b6d3228c49`
+- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 是最后一次改写 fake adapter / harness host 行为并重跑目标单测的实现 checkpoint；`61ff8fd80a43c12aaceecf180d8892b6d3228c49` 仅刷新 exec-plan 的审查证据绑定，不改写实现代码，因此继续复用 `f833a77e63a42320b6606fe597f5cb828588961b` 对应的测试结果。
 
 ## 未决风险
 
@@ -78,4 +79,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f833a77e63a42320b6606fe597f5cb828588961b`
+- 实现 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
+- 当前 docs-only 审查 head：`61ff8fd80a43c12aaceecf180d8892b6d3228c49`
