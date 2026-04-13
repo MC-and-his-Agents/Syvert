@@ -241,6 +241,34 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
 
+    def test_validate_integration_args_requires_touchpoint_for_gated_pr(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "no",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(
+            any("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`" in error for error in errors)
+        )
+
     def test_validate_integration_args_rejects_uncheckable_integration_ref(self) -> None:
         args = parse_args(
             [

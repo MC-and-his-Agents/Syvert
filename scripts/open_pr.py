@@ -500,6 +500,8 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 不能为空。")
     if integration_gated and not integration_ref_is_checkable(integration_ref):
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
+    if integration_gated and not integration_active:
+        errors.append("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`。")
     if integration_gated and args.integration_status_checked_before_pr != "yes":
         errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
     if args.integration_status_checked_before_merge == "yes":
