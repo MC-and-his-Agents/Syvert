@@ -387,6 +387,8 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
             errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
         return errors
 
+    if not integration_active:
+        errors.append("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`。")
     if not integration_ref or not integration_ref_is_checkable(integration_ref):
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
     if payload.get("integration_status_checked_before_pr", "").strip().lower() != "yes":
@@ -984,6 +986,8 @@ def merge_if_safe(
             detail = "\n".join(f"- {item}" for item in preview_errors)
             raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
         current = record_merge_time_integration_recheck(pr_number, current)
+        if current["headRefOid"] != reviewed_head_sha:
+            raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         detail = "\n".join(f"- {item}" for item in integration_errors)
