@@ -160,6 +160,21 @@ class PlatformFailureAdapter:
         )
 
 
+class PrePlatformValidationAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def execute(self, request: TaskRequest):
+        raise PlatformAdapterError(
+            code="adapter_precheck_failed",
+            message="adapter pre-platform validation failed",
+            details={"reason": "precheck"},
+            category="invalid_input",
+        )
+
+
 class NoneCapabilitiesAdapter:
     adapter_key = "stub"
     supported_capabilities = None
@@ -685,6 +700,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_douyin_url")
+
+    def test_execute_task_maps_explicit_pre_platform_adapter_error_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": PrePlatformValidationAdapter()},
+            task_id_factory=lambda: "task-preplatform-invalid-input",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "adapter_precheck_failed")
 
     def test_execute_task_rejects_empty_task_id_from_factory(self) -> None:
         request = TaskRequest(

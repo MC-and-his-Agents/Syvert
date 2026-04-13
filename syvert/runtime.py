@@ -66,6 +66,7 @@ class PlatformAdapterError(Exception):
     code: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
+    category: str = "platform"
 
     def __post_init__(self) -> None:
         super().__init__(self.message)
@@ -718,7 +719,7 @@ def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any
 
 def classify_adapter_error(error: PlatformAdapterError) -> dict[str, Any]:
     details = error.details if isinstance(error.details, Mapping) else {}
-    if is_pre_platform_invalid_input_error(error.code):
+    if error.category == "invalid_input":
         return invalid_input_error(error.code, error.message, details=details)
     return {
         "category": "platform",
@@ -726,12 +727,6 @@ def classify_adapter_error(error: PlatformAdapterError) -> dict[str, Any]:
         "message": error.message,
         "details": dict(details),
     }
-
-
-def is_pre_platform_invalid_input_error(code: str) -> bool:
-    if not isinstance(code, str):
-        return False
-    return code.startswith("invalid_") and (code.endswith("_request") or code.endswith("_url"))
 
 
 def invalid_input_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:

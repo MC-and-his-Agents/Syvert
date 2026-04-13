@@ -190,18 +190,21 @@ def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
                 code="invalid_douyin_request",
                 message="douyin adapter 不支持该 capability family",
                 details={"capability": request.capability},
+                category="invalid_input",
             )
         if request.target_type != "url":
             raise PlatformAdapterError(
                 code="invalid_douyin_request",
                 message="douyin adapter 仅支持 target_type=url",
                 details={"target_type": request.target_type},
+                category="invalid_input",
             )
         if request.collection_mode != "hybrid":
             raise PlatformAdapterError(
                 code="invalid_douyin_request",
                 message="douyin adapter 仅支持 collection_mode=hybrid",
                 details={"collection_mode": request.collection_mode},
+                category="invalid_input",
             )
         return request.target_value
     if type(request) is TaskRequest:
@@ -210,6 +213,7 @@ def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
         code="invalid_douyin_request",
         message="douyin adapter request 顶层形状不合法",
         details={"request_type": type(request).__name__},
+        category="invalid_input",
     )
 
 
@@ -228,12 +232,14 @@ def parse_douyin_detail_url(url: str) -> DouyinUrlInfo:
             code="invalid_douyin_url",
             message="暂不支持抖音短链，需先解析到详情 URL",
             details={"url": url},
+            category="invalid_input",
         )
     else:
         raise PlatformAdapterError(
             code="invalid_douyin_url",
             message="不是支持的抖音详情 URL",
             details={"url": url},
+            category="invalid_input",
         )
 
     if not aweme_id.isdigit():
@@ -241,6 +247,7 @@ def parse_douyin_detail_url(url: str) -> DouyinUrlInfo:
             code="invalid_douyin_url",
             message="无法从 URL 中解析 aweme_id",
             details={"url": url},
+            category="invalid_input",
         )
     return DouyinUrlInfo(
         aweme_id=aweme_id,
