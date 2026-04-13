@@ -6,6 +6,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from syvert.cli import main
 
@@ -262,6 +263,36 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["normalized"]["canonical_url"], "https://www.douyin.com/video/7580570616932224282")
         self.assertEqual(len(handler_state["sign_calls"]), 1)
         self.assertEqual(len(handler_state["detail_calls"]), 1)
+
+    def test_cli_shared_builder_fails_closed_for_duplicate_adapter_keys(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with mock.patch("syvert.adapters.build_xhs_adapters", return_value={"dup": SuccessfulAdapter()}), mock.patch(
+            "syvert.adapters.build_douyin_adapters",
+            return_value={"dup": SuccessfulAdapter()},
+        ):
+            exit_code = main(
+                [
+                    "--adapter",
+                    "dup",
+                    "--capability",
+                    "content_detail_by_url",
+                    "--url",
+                    "https://example.com/posts/1",
+                    "--adapter-module",
+                    "syvert.adapters:build_adapters",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "invalid_adapter_registry")
 
     def test_main_writes_success_envelope_to_stdout(self) -> None:
         stdout = io.StringIO()

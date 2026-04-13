@@ -6,6 +6,7 @@ import re
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
+from syvert.registry import AdapterRegistry, RegistryError
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_DETAIL = "content_detail"
@@ -15,7 +16,6 @@ ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 CAPABILITY_FAMILY_BY_OPERATION = {CONTENT_DETAIL_BY_URL: CONTENT_DETAIL}
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
-MISSING = object()
 
 
 @dataclass(frozen=True)
@@ -115,10 +115,22 @@ def execute_task(
     if projection_axis_error is not None:
         return failure_envelope(task_id, adapter_key, capability, projection_axis_error)
 
-    adapter, adapter_error = get_adapter(adapters, adapter_key)
-    if adapter_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, adapter_error)
-    if adapter is None:
+    try:
+        registry = AdapterRegistry.from_mapping(adapters)
+    except RegistryError as error:
+        return failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                error.code,
+                error.message,
+                details=error.details,
+            ),
+        )
+
+    declaration = registry.lookup(adapter_key)
+    if declaration is None:
         return failure_envelope(
             task_id,
             adapter_key,
@@ -126,11 +138,7 @@ def execute_task(
             unsupported_error("adapter_not_found", f"adapter `{adapter_key}` 不存在"),
         )
 
-    supported_capabilities, capability_error = validate_supported_capabilities(
-        get_adapter_supported_capabilities(adapter)
-    )
-    if capability_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, capability_error)
+    supported_capabilities = declaration.supported_capabilities
     if capability_family not in supported_capabilities:
         return failure_envelope(
             task_id,
@@ -146,9 +154,7 @@ def execute_task(
             ),
         )
 
-    supported_targets, targets_error = validate_supported_targets(get_adapter_supported_targets(adapter))
-    if targets_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, targets_error)
+    supported_targets = declaration.supported_targets
     if normalized_request.target.target_type not in supported_targets:
         return failure_envelope(
             task_id,
@@ -161,11 +167,7 @@ def execute_task(
             ),
         )
 
-    supported_collection_modes, collection_modes_error = validate_supported_collection_modes(
-        get_adapter_supported_collection_modes(adapter)
-    )
-    if collection_modes_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, collection_modes_error)
+    supported_collection_modes = declaration.supported_collection_modes
     if normalized_request.policy.collection_mode not in supported_collection_modes:
         return failure_envelope(
             task_id,
@@ -183,7 +185,7 @@ def execute_task(
         return failure_envelope(task_id, adapter_key, capability, projection_error)
 
     try:
-        payload = adapter.execute(adapter_request)
+        payload = declaration.adapter.execute(adapter_request)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error)
@@ -361,168 +363,6 @@ def extract_request_context(request: Any) -> tuple[str, str]:
     return safe_adapter_key, safe_capability
 
 
-def get_adapter(adapters: Mapping[str, Any], adapter_key: str) -> tuple[Any, dict[str, Any] | None]:
-    try:
-        getter = getattr(adapters, "get")
-    except Exception as error:
-        return None, runtime_contract_error(
-            "invalid_adapter_registry",
-            "adapters 必须是支持 get() 的映射对象",
-            details={"error_type": error.__class__.__name__},
-        )
-    if not callable(getter):
-        return None, runtime_contract_error(
-            "invalid_adapter_registry",
-            "adapters 必须是支持 get() 的映射对象",
-        )
-    try:
-        return getter(adapter_key), None
-    except Exception as error:
-        return None, runtime_contract_error(
-            "invalid_adapter_registry",
-            "adapters.get() 执行失败",
-            details={"error_type": error.__class__.__name__},
-        )
-
-
-def get_adapter_supported_capabilities(adapter: Any) -> Any:
-    try:
-        return getattr(adapter, "supported_capabilities")
-    except AttributeError:
-        return MISSING
-    except Exception:
-        return MISSING
-
-
-def get_adapter_supported_targets(adapter: Any) -> Any:
-    try:
-        return getattr(adapter, "supported_targets")
-    except AttributeError:
-        return MISSING
-    except Exception:
-        return MISSING
-
-
-def get_adapter_supported_collection_modes(adapter: Any) -> Any:
-    try:
-        return getattr(adapter, "supported_collection_modes")
-    except AttributeError:
-        return MISSING
-    except Exception:
-        return MISSING
-
-
-def validate_supported_capabilities(raw_capabilities: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
-    if raw_capabilities is MISSING:
-        return frozenset(), runtime_contract_error(
-            "invalid_adapter_capabilities",
-            "supported_capabilities 必须为字符串集合",
-            details={"reason": "missing"},
-        )
-    if raw_capabilities is None:
-        return frozenset(), runtime_contract_error(
-            "invalid_adapter_capabilities",
-            "supported_capabilities 必须为字符串集合",
-            details={"actual_type": "NoneType"},
-        )
-    if isinstance(raw_capabilities, (str, bytes)):
-        return frozenset(), runtime_contract_error(
-            "invalid_adapter_capabilities",
-            "supported_capabilities 必须为字符串集合",
-            details={"actual_type": type(raw_capabilities).__name__},
-        )
-    try:
-        iterator = iter(raw_capabilities)
-    except TypeError:
-        return frozenset(), runtime_contract_error(
-            "invalid_adapter_capabilities",
-            "supported_capabilities 必须为字符串集合",
-            details={"actual_type": type(raw_capabilities).__name__},
-        )
-    validated: list[str] = []
-    try:
-        for value in iterator:
-            if not isinstance(value, str):
-                return frozenset(), runtime_contract_error(
-                    "invalid_adapter_capabilities",
-                    "supported_capabilities 必须为字符串集合",
-                    details={"invalid_value_type": type(value).__name__},
-                )
-            validated.append(value)
-    except Exception as error:
-        return frozenset(), runtime_contract_error(
-            "invalid_adapter_capabilities",
-            "supported_capabilities 必须为字符串集合",
-            details={"error_type": error.__class__.__name__},
-        )
-    return frozenset(validated), None
-
-
-def validate_supported_targets(raw_targets: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
-    return validate_supported_axis(
-        raw_targets,
-        missing_code="invalid_adapter_targets",
-        message="supported_targets 必须为字符串集合",
-    )
-
-
-def validate_supported_collection_modes(raw_modes: Any) -> tuple[frozenset[str], dict[str, Any] | None]:
-    return validate_supported_axis(
-        raw_modes,
-        missing_code="invalid_adapter_collection_modes",
-        message="supported_collection_modes 必须为字符串集合",
-    )
-
-
-def validate_supported_axis(
-    raw_values: Any,
-    *,
-    missing_code: str,
-    message: str,
-) -> tuple[frozenset[str], dict[str, Any] | None]:
-    if raw_values is MISSING:
-        return frozenset(), runtime_contract_error(
-            missing_code,
-            message,
-            details={"reason": "missing"},
-        )
-    if raw_values is None:
-        return frozenset(), runtime_contract_error(
-            missing_code,
-            message,
-            details={"actual_type": "NoneType"},
-        )
-    if isinstance(raw_values, (str, bytes)):
-        return frozenset(), runtime_contract_error(
-            missing_code,
-            message,
-            details={"actual_type": type(raw_values).__name__},
-        )
-    try:
-        iterator = iter(raw_values)
-    except TypeError:
-        return frozenset(), runtime_contract_error(
-            missing_code,
-            message,
-            details={"actual_type": type(raw_values).__name__},
-        )
-    validated: list[str] = []
-    try:
-        for value in iterator:
-            if not isinstance(value, str):
-                return frozenset(), runtime_contract_error(
-                    missing_code,
-                    message,
-                    details={"invalid_value_type": type(value).__name__},
-                )
-            validated.append(value)
-    except Exception as error:
-        return frozenset(), runtime_contract_error(
-            missing_code,
-            message,
-            details={"error_type": error.__class__.__name__},
-        )
-    return frozenset(validated), None
 
 
 def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dict[str, Any] | None]:

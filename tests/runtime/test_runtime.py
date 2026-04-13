@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Iterator, Tuple
 import unittest
 
 from syvert.adapters.douyin import DouyinAdapter
@@ -220,9 +222,37 @@ class BrokenIterableCapabilitiesAdapter:
         raise AssertionError("execute should not be called")
 
 
-class ExplodingAdapterRegistry(dict):
-    def get(self, key, default=None):
+class ExplodingAdapterRegistry(Mapping[str, object]):
+    def __iter__(self) -> Iterator[str]:
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+    def __getitem__(self, key: str) -> object:
+        raise KeyError(key)
+
+    def items(self) -> Iterator[Tuple[str, object]]:
         raise RuntimeError("boom")
+
+
+class DuplicateAdapterRegistry(Mapping[str, object]):
+    def __init__(self, adapter: object) -> None:
+        self._adapter = adapter
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(("stub", "stub"))
+
+    def __len__(self) -> int:
+        return 2
+
+    def __getitem__(self, key: str) -> object:
+        if key != "stub":
+            raise KeyError(key)
+        return self._adapter
+
+    def items(self) -> Iterator[Tuple[str, object]]:
+        return iter((("stub", self._adapter), ("stub", self._adapter)))
 
 
 class ExplodingRequestMapping(dict):
@@ -257,6 +287,22 @@ class BroadAxesAdapter:
 
     def execute(self, request: TaskRequest):
         raise AssertionError("shared admission should fail before adapter execution")
+
+
+class MissingCollectionModesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class MissingExecuteAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
 
 class RuntimeExecutionTests(unittest.TestCase):
@@ -510,6 +556,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+
+    def test_execute_task_fails_closed_for_missing_supported_collection_modes(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingCollectionModesAdapter()},
+            task_id_factory=lambda: "task-missing-collection-modes",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_collection_modes")
 
     def test_execute_task_rejects_legacy_and_native_requests_with_same_hybrid_admission_error(self) -> None:
         legacy_request = TaskRequest(
@@ -875,7 +938,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
 
-    def test_execute_task_fails_closed_for_adapter_registry_that_raises_on_get(self) -> None:
+    def test_execute_task_fails_closed_for_adapter_registry_that_raises_on_items(self) -> None:
         request = TaskRequest(
             adapter_key="stub",
             capability="content_detail_by_url",
@@ -889,6 +952,24 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_registry")
+
+    def test_execute_task_fails_closed_for_duplicate_adapter_registry_keys(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters=DuplicateAdapterRegistry(SuccessfulAdapter()),
+            task_id_factory=lambda: "task-duplicate-registry",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["task_id"], "task-duplicate-registry")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_registry")
 
@@ -942,6 +1023,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_missing_execute_contract(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingExecuteAdapter()},
+            task_id_factory=lambda: "task-missing-execute",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_declaration")
 
 
 if __name__ == "__main__":
