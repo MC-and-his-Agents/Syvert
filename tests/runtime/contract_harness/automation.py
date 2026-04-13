@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from syvert.runtime import CONTENT_DETAIL, CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE
 from tests.runtime.contract_harness.fake_adapter import FakeContractAdapter
 from tests.runtime.contract_harness.host import HarnessExecutionInput, execute_harness_sample
 from tests.runtime.contract_harness.samples import CONTRACT_SAMPLES, ContractSample, ExpectedVerdict
@@ -123,20 +124,24 @@ def build_sample_index(
 
 
 def _execute_single_sample(sample: ContractSample) -> HarnessExecutionResult:
-    if sample.expected_verdict == ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET:
+    if sample.adapter_profile is None:
         return HarnessExecutionResult(
             precondition_code="fake_adapter_not_registered",
             precondition_message="fake adapter is intentionally not registered for this sample",
         )
 
     profile = sample.adapter_profile
-    if profile is None:
+    metadata_error = _validate_sample_metadata(sample)
+    if metadata_error is not None:
         return HarnessExecutionResult(
-            precondition_code="missing_fake_adapter_profile",
-            precondition_message="sample requires adapter profile before harness execution",
+            precondition_code=metadata_error["code"],
+            precondition_message=metadata_error["message"],
         )
 
     adapter = FakeContractAdapter(scenario=profile.scenario)
+    adapter.supported_capabilities = frozenset(profile.declared_capabilities)
+    adapter.supported_targets = frozenset(profile.supported_targets)
+    adapter.supported_collection_modes = frozenset(profile.supported_collection_modes)
     envelope = execute_harness_sample(
         HarnessExecutionInput(
             sample_id=sample.sample_id,
@@ -148,3 +153,48 @@ def _execute_single_sample(sample: ContractSample) -> HarnessExecutionResult:
         task_id=f"task-{sample.sample_id}",
     )
     return HarnessExecutionResult(runtime_envelope=envelope)
+
+
+def _validate_sample_metadata(sample: ContractSample) -> dict[str, str] | None:
+    profile = sample.adapter_profile
+    if profile is None:
+        return {
+            "code": "missing_fake_adapter_profile",
+            "message": "sample requires adapter profile before harness execution",
+        }
+    if sample.input.adapter_key != profile.adapter_key:
+        return {
+            "code": "sample_adapter_key_mismatch",
+            "message": "sample input adapter_key does not match adapter profile",
+        }
+    if sample.input.capability != CONTENT_DETAIL_BY_URL:
+        return {
+            "code": "unsupported_sample_capability",
+            "message": "current harness only supports content_detail_by_url samples",
+        }
+    if CONTENT_DETAIL not in profile.declared_capabilities:
+        return {
+            "code": "unsupported_profile_capability",
+            "message": "adapter profile must declare content_detail capability",
+        }
+    if sample.input.target_type not in profile.supported_targets:
+        return {
+            "code": "unsupported_sample_target_type",
+            "message": "adapter profile does not support sample target_type",
+        }
+    if sample.input.collection_mode not in profile.supported_collection_modes:
+        return {
+            "code": "unsupported_sample_collection_mode",
+            "message": "adapter profile does not support sample collection_mode",
+        }
+    if sample.input.target_type != "url":
+        return {
+            "code": "unsupported_harness_target_type",
+            "message": "current harness host only supports target_type=url",
+        }
+    if sample.input.collection_mode != LEGACY_COLLECTION_MODE:
+        return {
+            "code": "unsupported_harness_collection_mode",
+            "message": "current harness host only supports collection_mode=hybrid",
+        }
+    return None

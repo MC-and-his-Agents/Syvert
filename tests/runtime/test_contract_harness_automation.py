@@ -5,7 +5,6 @@ import unittest
 
 from tests.runtime.contract_harness import (
     CONTRACT_SAMPLES,
-    HarnessExecutionResult,
     build_contract_sample_definitions,
     build_expected_verdict_index,
     build_sample_index,
@@ -89,20 +88,28 @@ class ContractHarnessAutomationTests(unittest.TestCase):
             adapter_profile=samples_by_id["success-full-envelope"].adapter_profile,
             input=samples_by_id["success-full-envelope"].input,
         )
-        success_runtime = execute_harness_samples([samples_by_id["success-full-envelope"]])[
-            "success-full-envelope"
-        ]
-
-        results = validate_contract_harness_run(
-            [sample],
-            {"execution-precondition-not-met": HarnessExecutionResult(runtime_envelope=success_runtime.runtime_envelope)},
-        )
+        results = run_contract_harness_automation([sample])
 
         self.assertEqual(results[0]["verdict"], "contract_violation")
         self.assertEqual(
             results[0]["reason"]["code"],
             "precondition_sample_unexpectedly_reached_runtime",
         )
+
+    def test_sample_metadata_drift_fails_closed_before_runtime(self) -> None:
+        sample = replace(
+            build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"],
+            adapter_profile=replace(
+                build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"].adapter_profile,
+                supported_targets=("content_id",),
+            ),
+        )
+
+        execution_result = execute_harness_samples([sample])["success-full-envelope"]
+        results = validate_contract_harness_run([sample], {"success-full-envelope": execution_result})
+
+        self.assertEqual(results[0]["verdict"], "execution_precondition_not_met")
+        self.assertEqual(results[0]["reason"]["code"], "unsupported_sample_target_type")
 
 
 if __name__ == "__main__":
