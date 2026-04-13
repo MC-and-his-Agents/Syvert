@@ -40,6 +40,7 @@
 - `origin/main@5fcdbf60885c988c1cf7817852195495547924da` 已包含 `FR-0006` closeout 所需的关键前提：PR `#76`、`#104`、`#108`、`#109`。
 - `#74` 已由 PR `#76` 合入并关闭；`#102` 已由 PR `#104` 合入并关闭；`#101` 已由 PR `#108` 合入并关闭；`#103` 已由 PR `#109` 合入并关闭。
 - 当前 `FR-0006` GitHub closeout 仍包含 Work Item `#110` 与父 FR `#66`；`#83` 为已关闭的历史镜像，不得重新打开。
+- 当前受审 PR `#111` 的 head `7a21c256aa1f25fc7fa2708bc8f6bc9a83012ee9` 已包含 requirement container、active closeout plan 与 release / sprint 回链。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-110-chore-fr-0006`。
 
 ## 下一步动作
@@ -91,6 +92,8 @@
   - 结果：`state=MERGED`
 - `gh pr view 109 --repo MC-and-his-Agents/Syvert --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=5fcdbf60885c988c1cf7817852195495547924da`
+- `gh pr view 111 --repo MC-and-his-Agents/Syvert --json state,headRefOid,url`
+  - 结果：`state=OPEN`，`headRefOid=7a21c256aa1f25fc7fa2708bc8f6bc9a83012ee9`
 
 ## closeout 证据
 
@@ -135,5 +138,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5fcdbf60885c988c1cf7817852195495547924da`
-- 说明：该 checkpoint 已包含 `FR-0006` formal spec、fake adapter / harness host、validation tool、contract samples / automation 与 release / sprint 的主干事实；当前回合仅补齐父事项 closeout 工件与 GitHub 关闭语义。
+- `7a21c256aa1f25fc7fa2708bc8f6bc9a83012ee9`
+- 说明：该 checkpoint 已包含 `FR-0006` requirement container、active parent closeout plan、release / sprint 索引回链与当前受审 PR `#111` 元数据；其后的提交仅用于响应 guardian 对 checkpoint 前移的阻断，不改写 closeout 语义。
