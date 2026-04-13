@@ -12,30 +12,40 @@
 
 ## 目标
 
-- 基于 `FR-0006` spec 的 contract harness 架构，定义 sample 数据结构、四类代表样例，以及与后续验证工具对接的最小 automation 骨架，使 `#103` 能在 `#102/#101` 具体实现交付前就拥有可追踪的 exec-plan。
+- 基于 `FR-0006` spec 的 contract harness 架构，落地 contract samples 清单、最小 automation 聚合执行与自动化断言。
+- 固定四类样例：`pass`、`legal_failure`、`contract_violation`、`execution_precondition_not_met`。
+- 为后续 `FR-0007` 提供不依赖真实平台的稳定 harness 输入。
 
 ## 范围
 
 - 本次纳入：
-  - 测试侧 contract sample 模型与基础常量
-  - 四类 sample 的骨架定义（pass / legal failure / contract violation / execution precondition not met）
-  - tests/runtime/contract_harness/ 下的结构化样例集合
-  - exec-plan skeleton 记录当前 Work Item 所需的上下文、验证与出口 checkpoint
+  - `tests/runtime/contract_harness/samples.py`
+  - `tests/runtime/contract_harness/automation.py`
+  - `tests/runtime/contract_harness/__init__.py`
+  - `tests/runtime/test_contract_harness_automation.py`
+  - 本 exec-plan
 - 本次不纳入：
-  - fake adapter 的 executable 逻辑
-  - 验证工具 concrete implementation
-  - automation 实际断言或 runner
+  - fake adapter / harness host 的实现细节（`#102` 范围）
+  - validator 本体实现（`#101` 范围）
+  - 真实平台回归、版本 gate、平台泄漏检查
+  - GitHub closeout 与父 FR `#66` 收口
 
 ## 当前停点
 
-- task_id：`issue-103-fr-0006` worktree 目录已准备，下一步先定义 sample 数据模型。
-- `tests/runtime/contract_harness/` 目录下尚无具体模块，exec-plan 仍处 draft 模式。
+- 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-103-fr-0006`。
+- contract samples 已补齐四组稳定样例：
+  - `success-full-envelope`
+  - `legal-failure-platform-envelope`
+  - `contract-violation-missing-normalized`
+  - `execution-precondition-not-met`
+- automation 聚合入口已落地，可批量执行样例、交给 validator 分类，并输出按 `sample_id` 可追溯的 verdict 结果。
+- 最小自动化验证已落地，当前在本地可证明四组样例的 observed verdict 与 spec 一致。
 
 ## 下一步动作
 
-1. 定义 sample 描述符（adapter profile / input / verdict）并建立 `CONTRACT_SAMPLES` 常量，确保 sample_id、expected verdict、runtime category、必要 precondition 描述可供后续 harness 读取。
-2. 软连 spec 四类场景，确保 pass/legal failure/contract violation/execution precondition not met 四组样例骨架存在，并用注释标注何时由后续 Item 填充具体 adapter responses。
-3. 将当前 Work Item 的 review/checkpoints 核心步骤写入 exec-plan（guard commands、验证脚本、后续依赖），为后续 `#103` PR 提供骨干参考。
+1. 等 `#101` 合入主干后，剥离当前分支历史中夹带的 `#101` 提交，确保 `#103` PR diff 只保留本事项改动。
+2. 补齐 `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 对 `#101/#102/#103` 与对应 PR 的证据回链。
+3. 完成 guards、开 PR，并进入 reviewer / guardian / merge gate。
 
 ## 已验证项
 
@@ -43,16 +53,18 @@
   - 结果：确认 `#103` 已 open 并关联 `FR-0006` harness automation Work Item。
 - `python3 scripts/create_worktree.py --issue 103 --class implementation`
   - 结果：should produce `/Users/mc/code/worktrees/syvert/issue-103-fr-0006` (current context).
+- `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
+  - 结果：`Ran 55 tests`，`OK`
 
 ## 未决风险
 
-- 在 sample 定义阶段依赖 `#102` fake adapter 具体 response shape 可能演进，因此此阶段只记录数据结构与 intent，不在本 exec-plan 中锁定 adapter 实现。
-- exec-plan completion 需要 pair with `#101` 验证 tool inputs later;必须保留 placeholder 以便 future PR 绑定 guard commands。
+- 当前分支历史仍包含 `#101` 的旧提交；若不在开 PR 前剥离，会让 `#103` PR 范围污染。
+- release / sprint 文档尚未回链 `#101/#102/#103` 的实现 PR 事实，当前仍未满足本事项最终 closeout 证据要求。
 
 ## 回滚方式
 
-- 若 sample skeleton 冲撞 spec semantics，可通过 revert `CHORE-0103` exec-plan 与 `tests/runtime/contract_harness/samples.py` 的 Git commit 实现。
+- 若 contract samples 或 automation 与 spec 语义冲突，使用独立 revert PR 撤销本事项对 `tests/runtime/contract_harness/`、`tests/runtime/test_contract_harness_automation.py` 与本 exec-plan 的增量修改。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 当前仍在 worktree `issue-103-fr-0006` 未提交，checkpoint 暂未记录。
+- `d2e18aa1d608d4572662978549cc5d01f6d9f047`
