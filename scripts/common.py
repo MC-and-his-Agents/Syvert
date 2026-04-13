@@ -191,6 +191,6 @@ def integration_ref_is_checkable(value: str) -> bool:
         r"^#\d+$",
         r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$",
         r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+$",
-        r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+\?.*itemId=[A-Za-z0-9_-]+.*$",
+        r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+(?:/views/[A-Za-z0-9_-]+)?\?.*itemId=[A-Za-z0-9_-]+.*$",
     )
     return any(re.match(pattern, normalized) for pattern in patterns)

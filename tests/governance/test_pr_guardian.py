@@ -333,6 +333,29 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertTrue(any("可核查的具体 integration issue / item" in error for error in errors))
 
+    def test_integration_merge_gate_errors_accepts_project_item_url_with_view(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=123456",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, [])
+
     def test_integration_merge_gate_errors_rejects_local_only_external_integration_ref(self) -> None:
         meta = {
             "body": "\n".join(
