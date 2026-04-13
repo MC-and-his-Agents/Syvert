@@ -168,4 +168,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `eb400dcfddecb05ddeb3fd67b30ad223c6b3d063`
+- `101e1d0d673a9a3ae6ec66b54067267d371a62af`
+- 说明：该 checkpoint 已包含 requirement container、`#69/#70` 历史化处理、release / sprint 索引与 `#99` closeout 工件的首轮落盘；其后的提交仅用于补充受审 PR、guardian 阻断收口与范围映射元数据，不改写 `FR-0005` closeout 语义。
