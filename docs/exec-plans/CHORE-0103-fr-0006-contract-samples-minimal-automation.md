@@ -73,6 +73,9 @@
   - 阻断项已修复：
     - adapter 声明/输入约束不匹配不再前移成 precondition，而是保留为经 Core 产出的运行时 failed envelope
     - 新增重复 `sample_id` fail-close，保证样例级索引不被静默覆盖
+- guardian 五轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - `SampleInput` 不再暴露当前宿主未执行的 `target_type` / `collection_mode` 字段，避免样例 contract 与实际执行路径漂移
 
 ## 未决风险
 
@@ -84,4 +87,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `fe4c44719b902a5c9ef4f0fbdc6fd664e883213e`
+- `26c25591d08d7857f5471b3f99656b64a1524bc7`
