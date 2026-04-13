@@ -117,6 +117,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--integration-touchpoint", default="none", choices=INTEGRATION_TOUCHPOINT_CHOICES)
+    parser.add_argument("--shared-contract-changed", default="no", choices=YES_NO_CHOICES)
     parser.add_argument("--integration-ref", default="none")
     parser.add_argument("--external-dependency", default="none", choices=EXTERNAL_DEPENDENCY_CHOICES)
     parser.add_argument("--merge-gate", default="local_only", choices=MERGE_GATE_CHOICES)
@@ -484,6 +485,7 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
     integration_ref = str(args.integration_ref or "").strip()
     integration_gated = args.merge_gate == "integration_check_required"
     integration_active = args.integration_touchpoint != "none"
+    shared_contract_changed = args.shared_contract_changed == "yes"
     has_external_dependency = args.external_dependency != "none"
     joint_acceptance = args.joint_acceptance_needed == "yes"
     has_contract_surface = args.contract_surface != "none"
@@ -502,8 +504,8 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
         errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
     if args.integration_status_checked_before_merge == "yes":
         errors.append("`open_pr` 阶段不得把 `integration_status_checked_before_merge` 设为 `yes`；该字段只能在进入 `merge_pr` 前显式确认。")
-    if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and not integration_gated:
-        errors.append("触及 integration 联动、共享 contract surface、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
+    if (integration_active or shared_contract_changed or has_external_dependency or joint_acceptance or has_contract_surface) and not integration_gated:
+        errors.append("触及 integration 联动、共享契约、共享 contract surface、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
     if (has_external_dependency or joint_acceptance or has_contract_surface) and not integration_active:
         errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
     if has_contract_surface and not integration_active:
@@ -544,6 +546,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
         body = body.replace(token, value)
     integration_values = {
         "integration_touchpoint": args.integration_touchpoint,
+        "shared_contract_changed": args.shared_contract_changed,
         "integration_ref": args.integration_ref,
         "external_dependency": args.external_dependency,
         "merge_gate": args.merge_gate,

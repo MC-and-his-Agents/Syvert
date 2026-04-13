@@ -139,6 +139,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         section = "\n".join(
             [
                 "- integration_touchpoint: active",
+                "- shared_contract_changed: no",
                 "- integration_ref:",
                 "  https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "- external_dependency: both",
@@ -163,6 +164,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         section = "\n".join(
             [
                 "- integration_touchpoint: active",
+                "- shared_contract_changed: no",
                 "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "- external_dependency: both",
                 "- merge_gate: integration_check_required",
@@ -188,6 +190,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "## integration_check",
                     "",
                     "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
                     "- integration_ref:",
                     "  https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                     "- external_dependency: both",
@@ -274,7 +277,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             errors,
             [
                 "`merge_gate=local_only` 与当前 integration 元数据冲突："
-                "当 `integration_touchpoint != none`、`external_dependency != none`、"
+                "当 `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、"
                 "`contract_surface != none` 或 `joint_acceptance_needed=yes` 时，"
                 "`merge_gate` 必须为 `integration_check_required`。"
             ],
@@ -287,6 +290,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "## integration_check",
                     "",
                     "- integration_touchpoint: unexpected",
+                    "- shared_contract_changed: maybe",
                     "- integration_ref: #12",
                     "- external_dependency: somewhere",
                     "- merge_gate: integration_check_required",
@@ -301,6 +305,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         errors = integration_merge_gate_errors(meta)
 
         self.assertTrue(any("integration_touchpoint" in error for error in errors))
+        self.assertTrue(any("shared_contract_changed" in error for error in errors))
         self.assertTrue(any("external_dependency" in error for error in errors))
         self.assertTrue(any("contract_surface" in error for error in errors))
         self.assertTrue(any("joint_acceptance_needed" in error for error in errors))
@@ -312,6 +317,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "## integration_check",
                     "",
                     "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
                     "- integration_ref: later",
                     "- external_dependency: both",
                     "- merge_gate: integration_check_required",
@@ -348,6 +354,29 @@ class CodexReviewExecutionTests(unittest.TestCase):
         errors = integration_merge_gate_errors(meta)
 
         self.assertIn("纯本仓库事项必须显式使用 `integration_ref=none`，不得保留外部 integration 绑定。", errors)
+
+    def test_integration_merge_gate_errors_rejects_local_only_shared_contract_change(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: none",
+                    "- shared_contract_changed: yes",
+                    "- integration_ref: none",
+                    "- external_dependency: none",
+                    "- merge_gate: local_only",
+                    "- contract_surface: none",
+                    "- joint_acceptance_needed: no",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertTrue(any("shared_contract_changed=yes" in error for error in errors))
 
     @patch("scripts.pr_guardian.subprocess.run")
     def test_run_codex_review_falls_back_to_stdout_json(self, subprocess_run_mock) -> None:

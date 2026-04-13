@@ -48,8 +48,10 @@ CONTRACT_SURFACE_VALUES = {
     "runtime_modes",
 }
 JOINT_ACCEPTANCE_VALUES = {"yes", "no"}
+SHARED_CONTRACT_CHANGED_VALUES = {"yes", "no"}
 INTEGRATION_CHECK_CANONICAL_FIELDS = {
     "integration_touchpoint",
+    "shared_contract_changed",
     "integration_ref",
     "external_dependency",
     "merge_gate",
@@ -316,6 +318,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
 
     payload = parse_integration_check_payload(integration_section)
     integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
+    shared_contract_changed = payload.get("shared_contract_changed", "").strip().lower() or "no"
     integration_ref = payload.get("integration_ref", "").strip()
     external_dependency = payload.get("external_dependency", "").strip().lower() or "none"
     joint_acceptance_needed = payload.get("joint_acceptance_needed", "").strip().lower() or "no"
@@ -337,6 +340,11 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
             "`integration_check.external_dependency` 非法："
             f"`{external_dependency}`（仅允许 `{', '.join(sorted(EXTERNAL_DEPENDENCY_VALUES))}`）。"
         )
+    if shared_contract_changed not in SHARED_CONTRACT_CHANGED_VALUES:
+        errors.append(
+            "`integration_check.shared_contract_changed` 非法："
+            f"`{shared_contract_changed}`（仅允许 `{', '.join(sorted(SHARED_CONTRACT_CHANGED_VALUES))}`）。"
+        )
     if contract_surface not in CONTRACT_SURFACE_VALUES:
         errors.append(
             "`integration_check.contract_surface` 非法："
@@ -348,6 +356,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
             f"`{joint_acceptance_needed}`（仅允许 `{', '.join(sorted(JOINT_ACCEPTANCE_VALUES))}`）。"
         )
     integration_active = integration_touchpoint != "none"
+    has_shared_contract_change = shared_contract_changed == "yes"
     has_external_dependency = external_dependency != "none"
     joint_acceptance = joint_acceptance_needed == "yes"
     has_contract_surface = contract_surface != "none"
@@ -358,10 +367,10 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
     if integration_active and integration_ref and not integration_ref_is_checkable(integration_ref):
         errors.append("`integration_touchpoint != none` 时，`integration_ref` 必须指向可核查的具体 integration issue / item。")
-    if (integration_active or has_external_dependency or joint_acceptance or has_contract_surface) and merge_gate != "integration_check_required":
+    if (integration_active or has_shared_contract_change or has_external_dependency or joint_acceptance or has_contract_surface) and merge_gate != "integration_check_required":
         errors.append(
             "`merge_gate=local_only` 与当前 integration 元数据冲突："
-            "当 `integration_touchpoint != none`、`external_dependency != none`、"
+            "当 `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、"
             "`contract_surface != none` 或 `joint_acceptance_needed=yes` 时，"
             "`merge_gate` 必须为 `integration_check_required`。"
         )

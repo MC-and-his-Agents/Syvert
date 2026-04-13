@@ -191,6 +191,30 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertTrue(any("`merge_gate` 必须为 `integration_check_required`" in error for error in errors))
         self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
 
+    def test_validate_integration_args_requires_gate_for_shared_contract_change(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--shared-contract-changed",
+                "yes",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "none",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("共享契约" in error and "`integration_check_required`" in error for error in errors))
+
     def test_validate_integration_args_rejects_dependency_with_none_touchpoint(self) -> None:
         args = parse_args(
             [
@@ -250,6 +274,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "governance",
                 "--integration-touchpoint",
                 "active",
+                "--shared-contract-changed",
+                "yes",
                 "--integration-ref",
                 "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "--external-dependency",
@@ -423,6 +449,8 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "governance",
                 "--integration-touchpoint",
                 "active",
+                "--shared-contract-changed",
+                "yes",
                 "--integration-ref",
                 "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
                 "--external-dependency",
@@ -443,6 +471,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         body = build_body(args, [])
 
         self.assertIn("- integration_touchpoint: active", body)
+        self.assertIn("- shared_contract_changed: yes", body)
         self.assertIn("- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466", body)
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
