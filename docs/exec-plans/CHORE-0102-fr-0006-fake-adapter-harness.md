@@ -62,16 +62,17 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host`
-  - 结果：`Ran 44 tests in 0.005s`，`OK`
+  - 结果：`Ran 44 tests in 0.004s`，`OK`
 - 当前受审 PR：`#104`
 - 最后一次实现代码 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
-- 当前受审 head：`61ff8fd80a43c12aaceecf180d8892b6d3228c49`
-- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 是最后一次改写 fake adapter / harness host 行为并重跑目标单测的实现 checkpoint；`61ff8fd80a43c12aaceecf180d8892b6d3228c49` 仅刷新 exec-plan 的审查证据绑定，不改写实现代码，因此继续复用 `f833a77e63a42320b6606fe597f5cb828588961b` 对应的测试结果。
+- 当前受审 head：`1a16c69c24041ad8fe566eb535903b54ea8f2ffc`
+- 说明：`f833a77e63a42320b6606fe597f5cb828588961b` 是最后一次改写 fake adapter / harness host 行为并重跑目标单测的实现 checkpoint；`1a16c69c24041ad8fe566eb535903b54ea8f2ffc` 仅澄清 exec-plan 中“实现 checkpoint”与“docs-only 审查 head”的关系，不改写实现代码。当前会在最新 head 上重新执行同一组目标单测并回填结果，保证证据与受审 head 一致。
 
 ## 未决风险
 
 - 若 fake adapter 绕过 `execute_task`/registry 直调内部函数，会破坏 `FR-0006` 的标准宿主路径要求。
 - 若 legal failure 或 illegal payload 在 harness 层被提前重分类，会与 `FR-0005` 既有错误模型语义冲突。
+- 若 success 用例未显式断言 `raw` 与 `normalized`，则无法证明最小 harness 宿主保持统一 success envelope contract。
 
 ## 回滚方式
 
@@ -80,4 +81,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 实现 checkpoint：`f833a77e63a42320b6606fe597f5cb828588961b`
-- 当前 docs-only 审查 head：`61ff8fd80a43c12aaceecf180d8892b6d3228c49`
+- 当前 docs-only 审查 head：`1a16c69c24041ad8fe566eb535903b54ea8f2ffc`
