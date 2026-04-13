@@ -242,6 +242,34 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertTrue(any("可核查的具体 integration issue / item" in error for error in errors))
 
+    def test_validate_integration_args_rejects_merge_recheck_at_open_pr_time(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`open_pr` 阶段不得把 `integration_status_checked_before_merge` 设为 `yes`" in error for error in errors))
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(

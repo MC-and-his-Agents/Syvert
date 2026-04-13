@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
+from tempfile import NamedTemporaryFile
 
 from scripts.common import (
     REPO_ROOT,
@@ -111,6 +112,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     merge.add_argument("--post-review", action="store_true")
     merge.add_argument("--delete-branch", action="store_true")
     merge.add_argument("--refresh-review", action="store_true")
+    merge.add_argument("--confirm-integration-recheck", action="store_true")
 
     return parser.parse_args(argv)
 
@@ -381,6 +383,39 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     if payload.get("integration_status_checked_before_merge", "").strip().lower() != "yes":
         errors.append("`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。")
     return errors
+
+
+def merge_gate_requires_integration_recheck(meta: dict) -> bool:
+    body = str(meta.get("body") or "")
+    integration_section = parse_all_markdown_sections(body).get("integration_check", "")
+    if not integration_section:
+        return False
+    payload = parse_integration_check_payload(integration_section)
+    return payload.get("merge_gate", "").strip().lower() == "integration_check_required"
+
+
+def set_integration_status_checked_before_merge(body: str, value: str = "yes") -> str:
+    pattern = re.compile(
+        r"(?im)^(\s*-\s*integration_status_checked_before_merge(?:（[^）]*）|\([^)]*\))?\s*[：:]\s*)(yes|no)\s*$"
+    )
+    updated_body, count = pattern.subn(rf"\1{value}", body, count=1)
+    if count == 0:
+        raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法在 merge 前记录 integration 复核。")
+    return updated_body
+
+
+def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> dict:
+    body = str(meta.get("body") or "")
+    updated_body = set_integration_status_checked_before_merge(body, "yes")
+    if updated_body != body:
+        with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write(updated_body)
+            temp_path = Path(handle.name)
+        try:
+            run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
+        finally:
+            temp_path.unlink(missing_ok=True)
+    return pr_meta(pr_number)
 
 
 def extract_reviewer_rubric_excerpt(text: str) -> str:
@@ -889,7 +924,14 @@ def review_once(pr_number: int, *, post: bool, json_output: str | None) -> tuple
         cleanup(temp_dir)
 
 
-def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_review: bool) -> int:
+def merge_if_safe(
+    pr_number: int,
+    *,
+    post: bool,
+    delete_branch: bool,
+    refresh_review: bool,
+    confirm_integration_recheck: bool = False,
+) -> int:
     require_auth()
     current = pr_meta(pr_number)
     payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"])
@@ -918,6 +960,13 @@ def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_re
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
+    if merge_gate_requires_integration_recheck(current):
+        if not confirm_integration_recheck:
+            raise SystemExit(
+                "`merge_gate=integration_check_required` 时，进入 `merge_pr` 必须显式传入 "
+                "`--confirm-integration-recheck`，并在该步骤记录 merge 前 integration 复核。"
+            )
+        current = record_merge_time_integration_recheck(pr_number, current)
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         detail = "\n".join(f"- {item}" for item in integration_errors)
@@ -948,6 +997,7 @@ def main(argv: list[str] | None = None) -> int:
         post=args.post_review,
         delete_branch=args.delete_branch,
         refresh_review=args.refresh_review,
+        confirm_integration_recheck=args.confirm_integration_recheck,
     )
 
 
