@@ -41,6 +41,7 @@
   - `execution-precondition-not-met`
 - automation 聚合入口已落地，可批量执行样例、交给 validator 分类，并输出按 `sample_id` 可追溯的 verdict 结果。
 - 最小自动化验证已落地，当前在本地可证明四组样例的 observed verdict 与 spec 一致。
+- 当前受审 PR：`#109`
 
 ## 下一步动作
 
@@ -54,7 +55,11 @@
 - `python3 scripts/create_worktree.py --issue 103 --class implementation`
   - 结果：should produce `/Users/mc/code/worktrees/syvert/issue-103-fr-0006` (current context).
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
-  - 结果：`Ran 61 tests`，`OK`
+  - 结果：`Ran 62 tests`，`OK`
+- guardian 首轮审查：`REQUEST_CHANGES`
+  - 阻断项已修复：
+    - execution_precondition_not_met 样例若意外进入 runtime，不再可能被误判为 `pass`
+    - 新增 precondition 样例误入 runtime 的负向回归测试
 
 ## 未决风险
 
@@ -66,4 +71,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `297b487f22df17a8504dcab32a0a9b3f2c80d876`
+- `3274678cf96749532d7803346c580fd80b2f77fa`
