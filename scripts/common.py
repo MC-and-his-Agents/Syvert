@@ -7,6 +7,7 @@ import shlex
 import subprocess
 import sys
 import unicodedata
+from urllib.parse import parse_qs, urlparse
 from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -188,6 +189,9 @@ def parse_github_repo_from_remote_url(origin_url: str) -> str | None:
     ssh_match = re.match(r"^git@github\.com:([^/]+/[^/]+?)(?:\.git)?$", normalized)
     if ssh_match:
         return ssh_match.group(1)
+    ssh_url_match = re.match(r"^ssh://git@github\.com(?::\d+)?/([^/]+/[^/]+?)(?:\.git)?/?$", normalized)
+    if ssh_url_match:
+        return ssh_url_match.group(1)
     return None
 
 
@@ -242,7 +246,14 @@ def normalize_integration_ref_for_comparison(value: str) -> str:
     if issue_url_match:
         return f"issue:{issue_url_match.group(1).lower()}#{issue_url_match.group(2)}"
 
-    if re.match(r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+(?:/views/[A-Za-z0-9_-]+)?\?.*itemId=[A-Za-z0-9_-]+.*$", normalized):
-        return normalized
+    parsed = urlparse(normalized)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if parsed.scheme == "https" and parsed.netloc.lower() == "github.com" and len(path_parts) >= 4:
+        if path_parts[0] == "orgs" and path_parts[2] == "projects":
+            item_ids = parse_qs(parsed.query).get("itemId", [])
+            if item_ids:
+                organization = path_parts[1].lower()
+                project_number = path_parts[3]
+                return f"project-item:{organization}/{project_number}#{item_ids[0]}"
 
     return normalized

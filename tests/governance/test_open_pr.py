@@ -154,6 +154,10 @@ class OpenPrPreflightTests(unittest.TestCase):
             parse_github_repo_from_remote_url("git@github.com:MC-and-his-Agents/Syvert.git"),
             "MC-and-his-Agents/Syvert",
         )
+        self.assertEqual(
+            parse_github_repo_from_remote_url("ssh://git@github.com/MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
 
     @patch("scripts.common.default_github_repo", return_value="MC-and-his-Agents/Syvert")
     def test_normalize_integration_ref_for_comparison_resolves_local_issue_against_repo_slug(self, default_repo_mock) -> None:
@@ -161,6 +165,19 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertEqual(normalized, "issue:mc-and-his-agents/syvert#12")
         default_repo_mock.assert_called_once_with()
+
+    def test_normalize_integration_ref_for_comparison_normalizes_project_item_variants(self) -> None:
+        with_view = "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test"
+        reordered_query = "https://github.com/orgs/MC-and-his-Agents/projects/3?itemId=PVTI_test&pane=issue"
+
+        self.assertEqual(
+            normalize_integration_ref_for_comparison(with_view),
+            "project-item:mc-and-his-agents/3#PVTI_test",
+        )
+        self.assertEqual(
+            normalize_integration_ref_for_comparison(with_view),
+            normalize_integration_ref_for_comparison(reordered_query),
+        )
 
     def test_validate_integration_args_rejects_empty_ref_for_gated_pr(self) -> None:
         args = parse_args(
@@ -572,6 +589,80 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertEqual(errors, [])
         run_mock.assert_called_once()
         default_repo_mock.assert_called_once_with()
+
+    @patch(
+        "scripts.open_pr.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "https://github.com/orgs/MC-and-his-Agents/projects/3?itemId=PVTI_test&pane=issue",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_project_item_urls(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        run_mock.assert_called_once()
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {

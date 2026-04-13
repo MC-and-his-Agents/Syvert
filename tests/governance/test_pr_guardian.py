@@ -515,6 +515,45 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(errors, [])
         resolve_issue_mock.assert_called_once_with(meta)
 
+    @patch(
+        "scripts.pr_guardian.resolve_issue_canonical_integration",
+        return_value=(
+            105,
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?itemId=PVTI_test&pane=issue",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+        ),
+    )
+    def test_integration_merge_gate_errors_accepts_equivalent_project_item_urls(self, resolve_issue_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, [])
+        resolve_issue_mock.assert_called_once_with(meta)
+
     def test_integration_merge_gate_errors_rejects_local_only_external_integration_ref(self) -> None:
         meta = {
             "body": "\n".join(
