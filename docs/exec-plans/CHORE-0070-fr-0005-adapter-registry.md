@@ -39,7 +39,8 @@
 - 已新增 `syvert/registry.py` 并在 `execute_task()` 中接入 registry materialization / lookup / discovery。
 - 已补齐 registry / runtime 相关测试并更新 release / sprint 索引。
 - 当前受审 PR 为 `#98`，绑定 `Issue #70` / `item_key=CHORE-0070-fr-0005-adapter-registry`。
-- 当前停在 guardian 前的最后审查补件：已完成实现提交、PR scope 校验、commit check 与受控 `open_pr` 创建。
+- guardian 首轮审查已给出两个阻断：无效 adapter 声明未在 materialization 阶段 fail-close，以及默认 shared builder 路径会吞掉 duplicate key。
+- 当前停在 guardian 阻断收口后的待提交状态：已补齐 adapter `execute` 最小宿主契约校验、shared builder duplicate-key 保留语义，以及对应 runtime / registry / CLI 回归测试。
 
 ## 下一步动作
 
@@ -67,7 +68,7 @@
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0005-standardized-error-model-and-adapter-registry/`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_cli tests.runtime.test_registry`
-  - 结果：`Ran 58 tests in 1.765s`，`OK`
+  - 结果：`Ran 62 tests in 1.703s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -75,10 +76,12 @@
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：已校验 2 条提交信息，全部通过
+  - 结果：已校验 3 条提交信息，全部通过
 - `python3 scripts/open_pr.py --class implementation --issue 70 --item-key CHORE-0070-fr-0005-adapter-registry --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0005 适配器注册表' --closing fixes --dry-run`
   - 结果：通过
 - 已创建当前受审 PR：`#98 https://github.com/MC-and-his-Agents/Syvert/pull/98`
+- `SYVERT_GUARDIAN_TIMEOUT_SECONDS=36000 python3 scripts/pr_guardian.py review 98 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`；阻断项已定位为“无效 adapter 声明未在 materialization 阶段 fail-close”和“默认 shared builder 路径吞掉 duplicate key”
 
 ## 未决风险
 
@@ -92,4 +95,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `37d6b835f01867ac99e307a46016498f5f9e5af9`
-- 说明：该 checkpoint 已包含 registry 实现、测试与索引更新；当前增量只补充 PR / 门禁元数据，可由 guardian state 继续绑定当前受审 head。
+- 说明：该 checkpoint 已包含 registry 实现、测试与索引更新；后续 guardian 阻断收口提交仅补充 fail-closed 与 duplicate-key 保真，不改写 `FR-0005` contract 边界。

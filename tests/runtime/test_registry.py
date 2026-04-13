@@ -12,6 +12,9 @@ class SuccessfulAdapter:
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
 
 class DiscoveryOnlyAdapter:
     supported_capabilities = frozenset({"content_detail"})
@@ -26,15 +29,30 @@ class MissingCapabilitiesAdapter:
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
 
 class MissingTargetsAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_collection_modes = frozenset({"hybrid"})
 
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
 
 class MissingCollectionModesAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
+class MissingExecuteAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
 
 
 class DuplicateAdapterRegistry(Mapping[str, object]):
@@ -98,6 +116,12 @@ class RegistryTests(unittest.TestCase):
             AdapterRegistry.from_mapping({"stub": MissingCollectionModesAdapter()})
 
         self.assertEqual(context.exception.code, "invalid_adapter_collection_modes")
+
+    def test_registry_rejects_missing_execute_contract(self) -> None:
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping({"stub": MissingExecuteAdapter()})
+
+        self.assertEqual(context.exception.code, "invalid_adapter_declaration")
 
 
 if __name__ == "__main__":

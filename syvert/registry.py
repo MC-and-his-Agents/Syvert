@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 
 MISSING = object()
@@ -98,6 +99,7 @@ class AdapterRegistry:
 
 
 def _build_adapter_declaration(adapter_key: str, adapter: Any) -> AdapterDeclaration:
+    _validate_adapter_execute(adapter_key, adapter)
     capabilities = _get_adapter_attribute(adapter, "supported_capabilities")
     targets = _get_adapter_attribute(adapter, "supported_targets")
     collection_modes = _get_adapter_attribute(adapter, "supported_collection_modes")
@@ -122,6 +124,22 @@ def _get_adapter_attribute(adapter: Any, name: str) -> Any:
         return MISSING
     except Exception:
         return MISSING
+
+
+def _validate_adapter_execute(adapter_key: str, adapter: Any) -> None:
+    execute = _get_adapter_attribute(adapter, "execute")
+    if execute is MISSING:
+        raise RegistryError(
+            "invalid_adapter_declaration",
+            "adapter 必须提供可调用的 execute",
+            details={"adapter_key": adapter_key, "reason": "missing_execute"},
+        )
+    if not callable(execute):
+        raise RegistryError(
+            "invalid_adapter_declaration",
+            "adapter 必须提供可调用的 execute",
+            details={"adapter_key": adapter_key, "reason": "non_callable_execute"},
+        )
 
 
 def _validate_supported_capabilities(raw_capabilities: Any) -> frozenset[str]:

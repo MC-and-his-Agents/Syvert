@@ -289,6 +289,22 @@ class BroadAxesAdapter:
         raise AssertionError("shared admission should fail before adapter execution")
 
 
+class MissingCollectionModesAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class MissingExecuteAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+
 class RuntimeExecutionTests(unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
@@ -540,6 +556,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
+
+    def test_execute_task_fails_closed_for_missing_supported_collection_modes(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingCollectionModesAdapter()},
+            task_id_factory=lambda: "task-missing-collection-modes",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_collection_modes")
 
     def test_execute_task_rejects_legacy_and_native_requests_with_same_hybrid_admission_error(self) -> None:
         legacy_request = TaskRequest(
@@ -990,6 +1023,23 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_capabilities")
+
+    def test_execute_task_fails_closed_for_missing_execute_contract(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": MissingExecuteAdapter()},
+            task_id_factory=lambda: "task-missing-execute",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_declaration")
 
 
 if __name__ == "__main__":
