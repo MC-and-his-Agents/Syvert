@@ -8,7 +8,7 @@
 - release：`governance-baseline`
 - sprint：`integration-governance`
 - 关联 spec：无（治理联动事项）
-- 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
+- 关联 decision：`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`
 - 关联 PR：`#107`
 - active 收口事项：`GOV-0105-integration-governance-baseline`
 
