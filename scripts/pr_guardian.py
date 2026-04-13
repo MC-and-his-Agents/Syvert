@@ -419,6 +419,22 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
     if has_contract_surface and not integration_active:
         errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
+    if issue_canonical_integration and not issue_missing_fields:
+        pr_issue_comparison_values = {
+            "integration_touchpoint": integration_touchpoint,
+            "shared_contract_changed": shared_contract_changed,
+            "integration_ref": integration_ref,
+            "external_dependency": external_dependency,
+            "merge_gate": merge_gate,
+            "contract_surface": contract_surface,
+            "joint_acceptance_needed": joint_acceptance_needed,
+        }
+        for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
+            expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
+            actual = normalize_issue_canonical_integration_value(field, pr_issue_comparison_values.get(field, ""))
+            if expected != actual:
+                issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
+                errors.append(f"`integration_check.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
     if merge_gate != "integration_check_required":
         if not integration_ref:
             errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
@@ -436,22 +452,6 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         errors.append("`merge_gate=integration_check_required` 时，PR 描述必须记录 `integration_status_checked_before_pr=yes`。")
     if integration_status_checked_before_merge in INTEGRATION_STATUS_VALUES and integration_status_checked_before_merge != "yes":
         errors.append("`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。")
-    if issue_canonical_integration and not issue_missing_fields:
-        pr_issue_comparison_values = {
-            "integration_touchpoint": integration_touchpoint,
-            "shared_contract_changed": shared_contract_changed,
-            "integration_ref": integration_ref,
-            "external_dependency": external_dependency,
-            "merge_gate": merge_gate,
-            "contract_surface": contract_surface,
-            "joint_acceptance_needed": joint_acceptance_needed,
-        }
-        for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
-            expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
-            actual = normalize_issue_canonical_integration_value(field, pr_issue_comparison_values.get(field, ""))
-            if expected != actual:
-                issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
-                errors.append(f"`integration_check.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
     return errors
 
 
@@ -517,8 +517,12 @@ def update_pr_body(pr_number: int, body: str) -> None:
 
 def restore_merge_time_integration_recheck(pr_number: int, previous_value: str, *, current_body: str | None = None) -> None:
     latest_body = current_body
-    if latest_body is None:
+    try:
         latest = pr_meta(pr_number)
+    except (CommandError, SystemExit):
+        if latest_body is None:
+            raise
+    else:
         latest_body = str(latest.get("body") or "")
     restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
     if restored_body == latest_body:

@@ -26,10 +26,11 @@
 - 最新可执行 checkpoint 已覆盖 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
 - 当前回合已按 guardian finding 收紧 issue form schema、`integration_ref` 可核查性、guardian merge gate 解析逻辑与 merge-time 回滚路径，并补上 issue/work-item canonical integration 元数据与 PR `integration_check` 的一致性校验。
 - 当前回合同时补入存量 PR 兼容策略：缺少 `integration_check` 的历史 PR 只有在其上位 issue / work item 尚未声明 canonical integration 字段时，才允许沿用 legacy 路径继续收口。
+- 最新 guardian 已基于 `6478660` 给出新一轮 finding；当前工作树已针对 `local_only` 绕过 canonical integration 一致性校验、merge-time 恢复覆盖并发 PR 描述编辑、以及 `open_pr` 未对上位 Issue canonical integration 元数据 fail-closed 三项问题完成修复并补齐回归测试，等待推送新 head 重新复核。
 
 ## 下一步动作
 
-- 推送当前修正后的 forms / workflow / guardian head，并把 Issue `#105` 回填为带 canonical integration 字段的治理锚点。
+- 推送当前修正后的 guardian / `open_pr` / tests / exec-plan head，并重新运行 guardian，确认最新 head 收到 `APPROVE + safe_to_merge=true`。
 - 若 guardian 给出 `APPROVE + safe_to_merge=true`，先把当前分支 rebase 到最新 `origin/main`，再通过 `python3 scripts/merge_pr.py 107 --delete-branch --confirm-integration-recheck` 走受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -63,5 +64,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `398fa4e9e0325fcf63f57aca75c395b5e939f95f`
-- 说明：当前 checkpoint 已覆盖 `integration_ref` 可核查性、canonical 枚举 fail-closed、merge-time integration 复核回滚、存量 PR 兼容路径与 issue/work-item → PR 的 canonical integration 一致性校验；当前受审 head 仍以 PR `#107` 最新 head 与 guardian verdict 绑定为准。
+- `647866060d73de0da6134fc509e42c7078989ea2`
+- 说明：该 checkpoint 已把前一轮 guardian finding 收口到 `integration_ref` 可核查性、canonical 枚举 fail-closed、merge-time integration 复核回滚、存量 PR 兼容路径与 issue/work-item → PR 的 canonical integration 一致性校验；当前工作树正在此基础上继续修复 guardian 于 `6478660` 提出的三项剩余问题。

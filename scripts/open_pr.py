@@ -286,7 +286,7 @@ def extract_issue_canonical_integration_fields(body: str) -> dict[str, str]:
     return payload
 
 
-def build_issue_summary(issue: int | None) -> str:
+def fetch_issue_body(issue: int | None) -> str:
     if issue is None:
         return ""
 
@@ -300,7 +300,15 @@ def build_issue_summary(issue: int | None) -> str:
         return ""
 
     payload = json.loads(completed.stdout or "{}")
-    sections = extract_issue_summary_sections(str(payload.get("body") or ""))
+    return str(payload.get("body") or "")
+
+
+def build_issue_summary(issue: int | None) -> str:
+    body = fetch_issue_body(issue)
+    if not body:
+        return ""
+
+    sections = extract_issue_summary_sections(body)
     if not sections:
         return ""
 
@@ -511,6 +519,13 @@ def validate_pr_preflight(
     return errors
 
 
+def normalize_issue_canonical_integration_value(field: str, value: str) -> str:
+    raw = str(value or "").strip()
+    if field == "integration_ref":
+        return raw
+    return raw.lower()
+
+
 def validate_integration_args(args: argparse.Namespace) -> list[str]:
     errors: list[str] = []
     integration_ref = str(args.integration_ref or "").strip()
@@ -549,6 +564,31 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
         errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
     if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
         errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
+
+    issue_canonical_integration = extract_issue_canonical_integration_fields(fetch_issue_body(args.issue))
+    if issue_canonical_integration:
+        issue_missing_fields = [
+            field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS if not str(issue_canonical_integration.get(field) or "").strip()
+        ]
+        if issue_missing_fields:
+            missing = "、".join(f"`{field}`" for field in issue_missing_fields)
+            errors.append(f"Issue #{args.issue} 的 canonical integration 元数据缺少字段：{missing}。")
+        else:
+            arg_comparison_values = {
+                "integration_touchpoint": args.integration_touchpoint,
+                "shared_contract_changed": args.shared_contract_changed,
+                "integration_ref": integration_ref,
+                "external_dependency": args.external_dependency,
+                "merge_gate": args.merge_gate,
+                "contract_surface": args.contract_surface,
+                "joint_acceptance_needed": args.joint_acceptance_needed,
+            }
+            for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
+                expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
+                actual = normalize_issue_canonical_integration_value(field, arg_comparison_values.get(field, ""))
+                if expected != actual:
+                    cli_flag = f"--{field.replace('_', '-')}"
+                    errors.append(f"`{cli_flag}` 与 Issue #{args.issue} 中的 canonical integration 元数据不一致。")
     return errors
 
 

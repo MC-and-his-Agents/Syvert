@@ -500,6 +500,46 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertTrue(any("shared_contract_changed=yes" in error for error in errors))
 
+    @patch(
+        "scripts.pr_guardian.resolve_issue_canonical_integration",
+        return_value=(
+            105,
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "yes",
+                "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+        ),
+    )
+    def test_integration_merge_gate_errors_rejects_local_only_issue_canonical_mismatch(self, resolve_issue_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: none",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: none",
+                    "- external_dependency: none",
+                    "- merge_gate: local_only",
+                    "- contract_surface: none",
+                    "- joint_acceptance_needed: no",
+                    "- integration_status_checked_before_pr: no",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertIn("`integration_check.integration_touchpoint` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        self.assertIn("`integration_check.merge_gate` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        resolve_issue_mock.assert_called_once_with(meta)
+
     def test_integration_merge_gate_errors_rejects_required_gate_with_touchpoint_none(self) -> None:
         meta = {
             "body": "\n".join(
@@ -1817,6 +1857,10 @@ class MergeIfSafeTests(unittest.TestCase):
         all_checks_mock,
         run_mock,
     ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
@@ -1840,6 +1884,12 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
             },
             SystemExit("refresh failed"),
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
         ]
         find_result_mock.return_value = {
             "schema_version": 1,
@@ -1865,6 +1915,85 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(len(edited_bodies), 2)
         self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
+        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
+        review_once_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_restores_latest_body_when_refresh_after_record_fails(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        concurrent_body = updated_body + "\n\n补充说明：并发编辑\n"
+        edited_bodies: list[str] = []
+
+        def run_side_effect(command, cwd=None, check=True):
+            if command[:4] == ["gh", "pr", "edit", "1"]:
+                body_file = Path(command[command.index("--body-file") + 1])
+                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            SystemExit("refresh failed"),
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": concurrent_body,
+            },
+        ]
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-reviewed",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        run_mock.side_effect = run_side_effect
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("refresh failed", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(len(edited_bodies), 2)
+        self.assertIn("补充说明：并发编辑", edited_bodies[1])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
