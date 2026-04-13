@@ -1,0 +1,82 @@
+# CHORE-0101-fr-0006-validation-tooling 执行计划
+
+## 关联信息
+
+- item_key：`CHORE-0101-fr-0006-validation-tooling`
+- Issue：`#101`
+- item_type：`CHORE`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
+- 关联 decision：
+- 关联 PR：待创建
+- 状态：`active`
+- active 收口事项：`CHORE-0101-fr-0006-validation-tooling`
+
+## 目标
+
+- 在 `FR-0006` 边界内落地 validation tool：消费 contract sample 定义与 harness 执行结果，稳定输出统一 verdict 结构。
+- 保证最小四类结果可判定：`pass`、`legal_failure`、`contract_violation`、`execution_precondition_not_met`。
+- 保持 `FR-0005` 运行时错误模型原语义；validation tool 只做验证层分类，不改写 runtime `error.category`。
+
+## 范围
+
+- 本次纳入：
+  - `tests/runtime/contract_harness/validation_tool.py`
+  - `tests/runtime/contract_harness/__init__.py`
+  - `tests/runtime/test_contract_harness_validation_tool.py`
+  - 本 exec-plan
+- 本次不纳入：
+  - release / sprint 文档更新
+  - GitHub 状态与 closeout 操作
+  - fake adapter / harness host 的实现细节（`#102` 范围）
+  - contract samples 与最小自动化验证聚合（`#103` 范围）
+  - 真实 adapter 与平台逻辑
+
+## 当前停点
+
+- `FR-0006` formal spec 已合入主干；`#101` 当前作为 implementation Work Item 承接“验证工具与结果分类”。
+- 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-101-fr-0006`，仅处理测试侧 harness 验证工具与必要最小测试改动。
+- validation tool 已在测试侧落地，包含单样例与批量样例两条分类入口，并已通过目标单测。
+
+## 下一步动作
+
+- 由上层执行回合创建 PR、进入 reviewer / guardian 审查并完成 closeout。
+
+## 当前 checkpoint 推进的 release 目标
+
+- 为 `v0.2.0` 提供稳定的 contract harness 验证分类层，作为后续 `FR-0007` 消费 `FR-0006` 输出的前置基座。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`FR-0006` implementation 第二步，负责 validation tool。
+- 阻塞：
+  - 需保持与 `#102/#103` 并行实现边界，避免越界到 fake adapter/harness host 或样例聚合自动化。
+
+## 已验证项
+
+- 已阅读：`AGENTS.md`
+- 已阅读：`WORKFLOW.md`
+- 已阅读：`docs/AGENTS.md`
+- 已阅读：`docs/process/delivery-funnel.md`
+- 已阅读：`spec_review.md`
+- 已阅读：`code_review.md`
+- 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
+- 已核对：`tests/runtime/contract_harness/` 与 `docs/exec-plans/CHORE-0101-fr-0006-validation-tooling.md` 在当前 worktree 原先不存在
+- `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
+  - 结果：`Ran 7 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_validation_tool`
+  - 结果：`Ran 48 tests`，`OK`
+
+## 未决风险
+
+- 若将 `execution_precondition_not_met` 与进入 Core 后的 `invalid_input` 混淆，会破坏 `FR-0006` 对分类边界的要求。
+- 若 validation tool 擅自改写 runtime `error.category`，会越界到 `FR-0005` 的上位语义。
+
+## 回滚方式
+
+- 如需回滚，使用独立 revert PR 撤销本事项对 `tests/runtime/contract_harness/`、`tests/runtime/test_contract_harness_validation_tool.py` 与本 exec-plan 的增量修改。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `530f94a2e9c23684fc4119162c34a5292143f30a`
