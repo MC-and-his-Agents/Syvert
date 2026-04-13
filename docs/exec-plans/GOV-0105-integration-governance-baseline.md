@@ -24,12 +24,12 @@
 ## 当前停点
 
 - 最新可执行 checkpoint 已覆盖 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
-- 当前回合已按 guardian finding 收紧 issue form schema：恢复 `Phase` 创建入口、给治理快捷表单补回上位绑定字段，并刷新 bootstrap contract 工件到当前受审 head。
+- 当前回合已按 guardian finding 收紧 issue form schema、`integration_ref` 可核查性与 guardian merge gate 解析逻辑，并把 `integration_status_checked_before_merge` 绑定到 `merge_pr` 显式确认步骤。
 
 ## 下一步动作
 
 - 推送当前修正后的 forms / exec-plan head，重新等待 PR `#107` 的 GitHub checks 与 guardian 结论。
-- 若 guardian 给出 `APPROVE + safe_to_merge=true`，再通过 `python3 scripts/merge_pr.py 107 --delete-branch` 走受控合并。
+- 若 guardian 给出 `APPROVE + safe_to_merge=true`，先把当前分支 rebase 到最新 `origin/main`，再通过 `python3 scripts/merge_pr.py 107 --delete-branch --confirm-integration-recheck` 走受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -50,7 +50,7 @@
 
 ## 未决风险
 
-- 当前受控入口尚未把 `integration_check` 元数据完整接入 `open_pr` / `merge_pr`；若不补齐，文档门禁与实际受控入口会继续漂移。
+- `Syvert/main` 在当前审查回合内继续前进；若 guardian 基于旧 head 给出结论，仍需在最后一次 rebase 后重跑 checks 与 guardian 才能合并。
 - merge 前仍需再次核对 owner 级 integration project 的状态、依赖与联合验收口径。
 - 若后续继续扩张 integration 枚举或 gate 语义，需要再走独立治理回合，不应直接在当前 PR 上扩 scope。
 
@@ -60,5 +60,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `bb5cfea7906d5ab863499f68ff8bffc968fd8f07`
-- 说明：若当前修正提交仅用于收口 guardian 对 forms / bootstrap contract 的阻断，本工件继续记录最近一次显式 checkpoint SHA；当前受审 head 以 PR `#107` 最新 head 与 guardian verdict 绑定为准。
+- `828c9d49c4f4f203bd86d99c8d046b7b8a673102`
+- 说明：当前 checkpoint 已覆盖 `integration_ref` 可核查性、canonical 枚举 fail-closed、merge-time integration 复核确认与 free-form note 解析收口；当前受审 head 仍以 PR `#107` 最新 head 与 guardian verdict 绑定为准。
