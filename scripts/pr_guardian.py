@@ -25,7 +25,6 @@ SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 CODE_REVIEW_PATH = "code_review.md"
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
-CODEX_REVIEW_TIMEOUT_SECONDS = int(os.environ.get("SYVERT_GUARDIAN_TIMEOUT_SECONDS", "300"))
 REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "sprint")
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
@@ -48,6 +47,22 @@ REVIEW_GUIDE_HEADINGS = (
     "## 职责边界说明",
 )
 ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+
+
+def codex_review_timeout_seconds() -> int | None:
+    raw_value = os.environ.get("SYVERT_GUARDIAN_TIMEOUT_SECONDS")
+    if raw_value is None:
+        return None
+    value = raw_value.strip()
+    if not value:
+        return None
+    try:
+        timeout_seconds = int(value)
+    except ValueError as exc:
+        raise SystemExit("SYVERT_GUARDIAN_TIMEOUT_SECONDS 必须是正整数；留空或不设置表示不限制超时。") from exc
+    if timeout_seconds <= 0:
+        return None
+    return timeout_seconds
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -572,6 +587,7 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
     env["TMPDIR"] = scratch_dir_text
     env["TMP"] = scratch_dir_text
     env["TEMP"] = scratch_dir_text
+    timeout_seconds = codex_review_timeout_seconds()
     try:
         completed = subprocess.run(
             [
@@ -593,10 +609,11 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
             text=True,
             capture_output=True,
             check=False,
-            timeout=CODEX_REVIEW_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
-        raise SystemExit(f"Codex 审查超时（>{CODEX_REVIEW_TIMEOUT_SECONDS} 秒），未产出 guardian verdict。") from exc
+        timeout_hint = exc.timeout if exc.timeout is not None else timeout_seconds
+        raise SystemExit(f"Codex 审查超时（>{timeout_hint} 秒），未产出 guardian verdict。") from exc
     if completed.returncode != 0:
         raise SystemExit(completed.stderr.strip() or "Codex 审查失败。")
     if result_path.exists():
