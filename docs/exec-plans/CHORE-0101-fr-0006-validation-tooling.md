@@ -65,8 +65,18 @@
 - 已核对：`tests/runtime/contract_harness/` 与 `docs/exec-plans/CHORE-0101-fr-0006-validation-tooling.md` 在当前 worktree 原先不存在
 - `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
   - 结果：`Ran 7 tests`，`OK`
-- `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 48 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool`
+  - 结果：`Ran 51 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/open_pr.py --class implementation --issue 101 --item-key CHORE-0101-fr-0006-validation-tooling --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(test): 落地 FR-0006 验证工具与结果分类' --closing fixes --dry-run`
+  - 结果：`通过`
 
 ## 未决风险
 
@@ -79,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `530f94a2e9c23684fc4119162c34a5292143f30a`
+- `c3725ea6d8313d58aa5950856596ff4d2a732a0f`
