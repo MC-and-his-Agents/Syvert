@@ -38,7 +38,7 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`Syvert × WebEnvoy` integration governance baseline 的 Syvert 侧治理收口项。
-- 阻塞：无外部实现阻塞；当前只受本仓库 checks 与 guardian 门禁约束。
+- 阻塞：当前事项自身属于 `integration_touchpoint=active`、`external_dependency=both`、`merge_gate=integration_check_required` 的治理基线收口项；除本仓库 checks 与 guardian 外，merge 前还必须把 `integration_ref` 对应状态复核收口到 PR 元数据与受控 merge gate。
 
 ## 已验证项
 
@@ -50,6 +50,7 @@
 
 ## 未决风险
 
+- 当前受控入口尚未把 `integration_check` 元数据完整接入 `open_pr` / `merge_pr`；若不补齐，文档门禁与实际受控入口会继续漂移。
 - merge 前仍需再次核对 owner 级 integration project 的状态、依赖与联合验收口径。
 - 若后续继续扩张 integration 枚举或 gate 语义，需要再走独立治理回合，不应直接在当前 PR 上扩 scope。
 

@@ -10,6 +10,7 @@ if __package__ in {None, ""}:
 import argparse
 import json
 import os
+import re
 import tempfile
 
 from scripts.item_context import (
@@ -56,6 +57,19 @@ TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
 ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+INTEGRATION_TOUCHPOINT_CHOICES = ("none", "check_required", "active", "blocked", "resolved")
+EXTERNAL_DEPENDENCY_CHOICES = ("none", "syvert", "webenvoy", "both")
+MERGE_GATE_CHOICES = ("local_only", "integration_check_required")
+CONTRACT_SURFACE_CHOICES = (
+    "none",
+    "execution_provider",
+    "ids_trace",
+    "errors",
+    "raw_normalized",
+    "diagnostics_observability",
+    "runtime_modes",
+)
+YES_NO_CHOICES = ("yes", "no")
 
 
 def is_deleted_legacy_todo_change(path: str, *, repo_root: Path) -> bool:
@@ -92,6 +106,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--closing", default="fixes", choices=get_policy()["closing_modes"])
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--integration-touchpoint", default="none", choices=INTEGRATION_TOUCHPOINT_CHOICES)
+    parser.add_argument("--integration-ref", default="none")
+    parser.add_argument("--external-dependency", default="none", choices=EXTERNAL_DEPENDENCY_CHOICES)
+    parser.add_argument("--merge-gate", default="local_only", choices=MERGE_GATE_CHOICES)
+    parser.add_argument("--contract-surface", default="none", choices=CONTRACT_SURFACE_CHOICES)
+    parser.add_argument("--joint-acceptance-needed", default="no", choices=YES_NO_CHOICES)
+    parser.add_argument("--integration-status-checked-before-pr", default="no", choices=YES_NO_CHOICES)
+    parser.add_argument("--integration-status-checked-before-merge", default="no", choices=YES_NO_CHOICES)
     return parser.parse_args(argv)
 
 
@@ -431,6 +453,35 @@ def validate_pr_preflight(
     return errors
 
 
+def validate_integration_args(args: argparse.Namespace) -> list[str]:
+    errors: list[str] = []
+    integration_ref = str(args.integration_ref or "").strip()
+    integration_gated = args.merge_gate == "integration_check_required"
+    integration_active = args.integration_touchpoint != "none"
+    has_external_dependency = args.external_dependency != "none"
+    joint_acceptance = args.joint_acceptance_needed == "yes"
+
+    if integration_active and not integration_ref:
+        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
+    if integration_active and integration_ref.lower() == "none":
+        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
+    if integration_gated and integration_ref.lower() == "none":
+        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
+    if integration_gated and args.integration_status_checked_before_pr != "yes":
+        errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
+    if (integration_active or has_external_dependency or joint_acceptance) and not integration_gated:
+        errors.append("触及 integration 联动、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
+    if not integration_gated and integration_ref == "":
+        errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
+    return errors
+
+
+def replace_markdown_field(body: str, label: str, value: str) -> str:
+    pattern = re.compile(rf"^- {re.escape(label)}(?:（[^\n]*?）)?:\s*$", re.MULTILINE)
+    replacement = f"- {label}: {value}"
+    return pattern.sub(replacement, body, count=1)
+
+
 def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     if not TEMPLATE_PATH.exists():
         raise SystemExit(f"缺少 PR 模板: {TEMPLATE_PATH}")
@@ -450,6 +501,18 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     }
     for token, value in replacements.items():
         body = body.replace(token, value)
+    integration_values = {
+        "integration_touchpoint": args.integration_touchpoint,
+        "integration_ref": args.integration_ref,
+        "external_dependency": args.external_dependency,
+        "merge_gate": args.merge_gate,
+        "contract_surface": args.contract_surface,
+        "joint_acceptance_needed": args.joint_acceptance_needed,
+        "integration_status_checked_before_pr": args.integration_status_checked_before_pr,
+        "integration_status_checked_before_merge": args.integration_status_checked_before_merge,
+    }
+    for label, value in integration_values.items():
+        body = replace_markdown_field(body, label, value)
     return body
 
 
@@ -477,6 +540,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     if preflight_errors:
         for error in preflight_errors:
+            print(error, file=sys.stderr)
+        return 1
+    integration_errors = validate_integration_args(args)
+    if integration_errors:
+        for error in integration_errors:
             print(error, file=sys.stderr)
         return 1
 

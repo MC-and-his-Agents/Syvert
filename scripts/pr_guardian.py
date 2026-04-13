@@ -221,6 +221,47 @@ def parse_markdown_sections(body: str) -> dict[str, str]:
     return sections
 
 
+def parse_bullet_kv_section(section: str) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    current_key: str | None = None
+    for raw_line in section.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            entry = stripped[2:]
+            key_part, _, value_part = entry.partition(":")
+            if not _:
+                key_part, _, value_part = entry.partition("：")
+            normalized_key = key_part.split("（", 1)[0].split("(", 1)[0].strip()
+            current_key = normalized_key
+            payload[current_key] = value_part.strip()
+            continue
+        if current_key and stripped:
+            payload[current_key] = "\n".join(filter(None, [payload[current_key], stripped])).strip()
+    return payload
+
+
+def integration_merge_gate_errors(meta: dict) -> list[str]:
+    raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
+    integration_section = raw_sections.get("integration_check", "")
+    if not integration_section:
+        return []
+
+    payload = parse_bullet_kv_section(integration_section)
+    if payload.get("merge_gate", "").strip() != "integration_check_required":
+        return []
+
+    errors: list[str] = []
+    integration_ref = payload.get("integration_ref", "").strip()
+    if not integration_ref or integration_ref.lower() == "none":
+        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
+    if payload.get("integration_status_checked_before_pr", "").strip().lower() != "yes":
+        errors.append("`merge_gate=integration_check_required` 时，PR 描述必须记录 `integration_status_checked_before_pr=yes`。")
+    if payload.get("integration_status_checked_before_merge", "").strip().lower() != "yes":
+        errors.append("`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。")
+    return errors
+
+
 def extract_reviewer_rubric_excerpt(text: str) -> str:
     lines = text.splitlines()
     selected: list[str] = []
@@ -756,6 +797,10 @@ def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_re
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
+    integration_errors = integration_merge_gate_errors(current)
+    if integration_errors:
+        detail = "\n".join(f"- {item}" for item in integration_errors)
+        raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
 
     command = [
         "gh",
