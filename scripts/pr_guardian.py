@@ -372,6 +372,8 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     if merge_gate != "integration_check_required":
         if not integration_ref:
             errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
+        if not integration_active and integration_ref.lower() != "none":
+            errors.append("纯本仓库事项必须显式使用 `integration_ref=none`，不得保留外部 integration 绑定。")
         if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
             errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
         return errors
@@ -966,6 +968,12 @@ def merge_if_safe(
                 "`merge_gate=integration_check_required` 时，进入 `merge_pr` 必须显式传入 "
                 "`--confirm-integration-recheck`，并在该步骤记录 merge 前 integration 复核。"
             )
+        preview_current = dict(current)
+        preview_current["body"] = set_integration_status_checked_before_merge(str(current.get("body") or ""), "yes")
+        preview_errors = integration_merge_gate_errors(preview_current)
+        if preview_errors:
+            detail = "\n".join(f"- {item}" for item in preview_errors)
+            raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
         current = record_merge_time_integration_recheck(pr_number, current)
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:

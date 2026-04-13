@@ -270,6 +270,30 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertTrue(any("`open_pr` 阶段不得把 `integration_status_checked_before_merge` 设为 `yes`" in error for error in errors))
 
+    def test_validate_integration_args_rejects_local_only_external_integration_ref(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "no",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("纯本仓库事项必须显式使用 `integration_ref=none`" in error for error in errors))
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(

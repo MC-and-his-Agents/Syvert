@@ -483,6 +483,8 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
         errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
     if has_contract_surface and not integration_active:
         errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
+    if not integration_active and not integration_gated and integration_ref.lower() != "none":
+        errors.append("纯本仓库事项必须显式使用 `integration_ref=none`，不得保留外部 integration 绑定。")
     if not integration_gated and integration_ref == "":
         errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
     if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
