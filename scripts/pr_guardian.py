@@ -51,6 +51,7 @@ CONTRACT_SURFACE_VALUES = {
 }
 JOINT_ACCEPTANCE_VALUES = {"yes", "no"}
 SHARED_CONTRACT_CHANGED_VALUES = {"yes", "no"}
+INTEGRATION_STATUS_VALUES = {"yes", "no"}
 INTEGRATION_CHECK_CANONICAL_FIELDS = {
     "integration_touchpoint",
     "shared_contract_changed",
@@ -323,6 +324,8 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     external_dependency = payload.get("external_dependency", "").strip().lower() or "none"
     joint_acceptance_needed = payload.get("joint_acceptance_needed", "").strip().lower() or "no"
     contract_surface = payload.get("contract_surface", "").strip().lower() or "none"
+    integration_status_checked_before_pr = payload.get("integration_status_checked_before_pr", "").strip().lower()
+    integration_status_checked_before_merge = payload.get("integration_status_checked_before_merge", "").strip().lower()
     merge_gate = payload.get("merge_gate", "").strip().lower()
     if not merge_gate:
         return ["PR 描述中的 `integration_check.merge_gate` 不能为空。"]
@@ -363,6 +366,16 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
             "`integration_check.joint_acceptance_needed` 非法："
             f"`{joint_acceptance_needed}`（仅允许 `{', '.join(sorted(JOINT_ACCEPTANCE_VALUES))}`）。"
         )
+    if integration_status_checked_before_pr not in INTEGRATION_STATUS_VALUES:
+        errors.append(
+            "`integration_check.integration_status_checked_before_pr` 非法："
+            f"`{integration_status_checked_before_pr}`（仅允许 `{', '.join(sorted(INTEGRATION_STATUS_VALUES))}`）。"
+        )
+    if integration_status_checked_before_merge not in INTEGRATION_STATUS_VALUES:
+        errors.append(
+            "`integration_check.integration_status_checked_before_merge` 非法："
+            f"`{integration_status_checked_before_merge}`（仅允许 `{', '.join(sorted(INTEGRATION_STATUS_VALUES))}`）。"
+        )
     integration_active = integration_touchpoint != "none"
     has_shared_contract_change = shared_contract_changed == "yes"
     has_external_dependency = external_dependency != "none"
@@ -399,9 +412,9 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         errors.append("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`。")
     if not integration_ref or not integration_ref_is_checkable(integration_ref):
         errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
-    if payload.get("integration_status_checked_before_pr", "").strip().lower() != "yes":
+    if integration_status_checked_before_pr in INTEGRATION_STATUS_VALUES and integration_status_checked_before_pr != "yes":
         errors.append("`merge_gate=integration_check_required` 时，PR 描述必须记录 `integration_status_checked_before_pr=yes`。")
-    if payload.get("integration_status_checked_before_merge", "").strip().lower() != "yes":
+    if integration_status_checked_before_merge in INTEGRATION_STATUS_VALUES and integration_status_checked_before_merge != "yes":
         errors.append("`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。")
     return errors
 
@@ -448,7 +461,11 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[d
     updated_body = set_integration_status_checked_before_merge(latest_body, "yes")
     if updated_body != latest_body:
         update_pr_body(pr_number, updated_body)
-        latest = pr_meta(pr_number)
+        try:
+            latest = pr_meta(pr_number)
+        except (CommandError, SystemExit):
+            restore_merge_time_integration_recheck(pr_number, previous_value, current_body=updated_body)
+            raise
     return latest, previous_value
 
 
@@ -462,16 +479,22 @@ def update_pr_body(pr_number: int, body: str) -> None:
         temp_path.unlink(missing_ok=True)
 
 
-def restore_merge_time_integration_recheck(pr_number: int, previous_value: str) -> None:
-    try:
+def restore_merge_time_integration_recheck(pr_number: int, previous_value: str, *, current_body: str | None = None) -> None:
+    latest_body = current_body
+    if latest_body is None:
         latest = pr_meta(pr_number)
         latest_body = str(latest.get("body") or "")
-        restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
-        if restored_body == latest_body:
-            return
-        update_pr_body(pr_number, restored_body)
-    except (CommandError, SystemExit):
+    restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
+    if restored_body == latest_body:
         return
+    update_pr_body(pr_number, restored_body)
+
+
+def restore_merge_time_integration_recheck_or_die(pr_number: int, previous_value: str, *, failure_context: str) -> None:
+    try:
+        restore_merge_time_integration_recheck(pr_number, previous_value)
+    except (CommandError, SystemExit) as exc:
+        raise SystemExit(f"{failure_context}，且无法恢复 `integration_status_checked_before_merge`：{exc}") from exc
 
 
 def extract_reviewer_rubric_excerpt(text: str) -> str:
@@ -1036,12 +1059,20 @@ def merge_if_safe(
         current, previous_merge_recheck_value = record_merge_time_integration_recheck(pr_number, current)
         merge_time_integration_recheck_recorded = True
         if current["headRefOid"] != reviewed_head_sha:
-            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前 integration 复核后 PR HEAD 已变化",
+            )
             raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         if merge_time_integration_recheck_recorded:
-            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="integration merge gate 校验失败后无法保持 PR 元数据一致",
+            )
         detail = "\n".join(f"- {item}" for item in integration_errors)
         raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
 
@@ -1060,7 +1091,11 @@ def merge_if_safe(
         run(command, cwd=REPO_ROOT)
     except CommandError:
         if merge_time_integration_recheck_recorded:
-            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="`gh pr merge` 失败",
+            )
         raise
     return 0
 
