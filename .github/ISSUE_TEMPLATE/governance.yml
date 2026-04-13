@@ -82,7 +82,8 @@ body:
       value: |
         `Integration` 字段必须满足以下约束：
         - `integration_touchpoint != none` 时，`integration_ref` 不得为空或 `none`，且必须指向可核查的具体 integration issue / item。
-        - `external_dependency != none`、`joint_acceptance_needed=yes` 或 `contract_surface != none` 时，`integration_touchpoint` 不得为 `none`，且 `merge_gate` 必须为 `integration_check_required`。
+        - 只要满足以下任一条件：`integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、`joint_acceptance_needed=yes`、`contract_surface != none`，`merge_gate` 就必须为 `integration_check_required`。
+        - 当 `merge_gate=integration_check_required` 时，`integration_touchpoint` 不得为 `none`，且 `integration_ref` 必须指向可核查的具体 integration issue / item。
         - 纯本仓库事项必须显式写 `integration_touchpoint=none`、`integration_ref=none`、`external_dependency=none`、`contract_surface=none`、`joint_acceptance_needed=no`、`merge_gate=local_only`。
 
   - type: checkboxes
