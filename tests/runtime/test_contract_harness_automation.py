@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import unittest
 
 from tests.runtime.contract_harness import (
     CONTRACT_SAMPLES,
+    HarnessExecutionResult,
     build_expected_verdict_index,
     build_sample_index,
     execute_harness_samples,
     run_contract_harness_automation,
+    validate_contract_harness_run,
 )
 
 
@@ -65,6 +68,28 @@ class ContractHarnessAutomationTests(unittest.TestCase):
         self.assertEqual(success_envelope["status"], "success")
         self.assertIn("raw", success_envelope)
         self.assertIn("normalized", success_envelope)
+
+    def test_precondition_sample_that_unexpectedly_reaches_runtime_fails_closed(self) -> None:
+        samples_by_id = build_sample_index(CONTRACT_SAMPLES)
+        sample = replace(
+            samples_by_id["execution-precondition-not-met"],
+            adapter_profile=samples_by_id["success-full-envelope"].adapter_profile,
+            input=samples_by_id["success-full-envelope"].input,
+        )
+        success_runtime = execute_harness_samples([samples_by_id["success-full-envelope"]])[
+            "success-full-envelope"
+        ]
+
+        results = validate_contract_harness_run(
+            [sample],
+            {"execution-precondition-not-met": HarnessExecutionResult(runtime_envelope=success_runtime.runtime_envelope)},
+        )
+
+        self.assertEqual(results[0]["verdict"], "contract_violation")
+        self.assertEqual(
+            results[0]["reason"]["code"],
+            "precondition_sample_unexpectedly_reached_runtime",
+        )
 
 
 if __name__ == "__main__":

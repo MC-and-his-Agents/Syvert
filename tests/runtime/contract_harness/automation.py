@@ -44,9 +44,41 @@ def execute_harness_samples(
 def run_contract_harness_automation(
     samples: Sequence[ContractSample] = CONTRACT_SAMPLES,
 ) -> list[dict[str, Any]]:
-    definitions = build_contract_sample_definitions(samples)
     execution_results = execute_harness_samples(samples)
-    return validate_contract_samples(definitions, execution_results)
+    return validate_contract_harness_run(samples, execution_results)
+
+
+def validate_contract_harness_run(
+    samples: Sequence[ContractSample],
+    execution_results: Mapping[str, HarnessExecutionResult],
+) -> list[dict[str, Any]]:
+    definitions = build_contract_sample_definitions(samples)
+    validation_results = validate_contract_samples(definitions, execution_results)
+    sample_index = build_sample_index(samples)
+    fail_closed_results: list[dict[str, Any]] = []
+    for result in validation_results:
+        sample = sample_index[result["sample_id"]]
+        execution_result = execution_results.get(sample.sample_id)
+        if (
+            sample.expected_verdict == ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET
+            and execution_result is not None
+            and execution_result.runtime_envelope is not None
+        ):
+            fail_closed_results.append(
+                {
+                    "sample_id": sample.sample_id,
+                    "verdict": "contract_violation",
+                    "reason": {
+                        "code": "precondition_sample_unexpectedly_reached_runtime",
+                        "message": "precondition sample unexpectedly produced runtime envelope",
+                    },
+                    "observed_status": result["observed_status"],
+                    "observed_error": result["observed_error"],
+                }
+            )
+            continue
+        fail_closed_results.append(result)
+    return fail_closed_results
 
 
 def build_expected_verdict_index(
