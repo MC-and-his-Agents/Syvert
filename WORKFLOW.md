@@ -82,6 +82,47 @@ codex:
 - 不应把与当前判断无关的历史讨论、相邻事项材料或整仓重复探索默认塞给 reviewer / guardian。
 - 若要补充额外上下文，必须以“消除当前阻断或验证当前 head 风险”为目的，而不是让审查器无限制二次侦察。
 
+## integration project 联动规则
+
+- 默认执行真相源仍是当前仓库的 GitHub Project；仅当事项触及跨仓共享契约、跨仓依赖或联合验收时，才查看 owner 级 integration project。
+- 每个进入执行回合的 issue / work item 在 GitHub 侧都必须显式声明：
+  - `integration_touchpoint`
+  - `integration_ref`
+  - `external_dependency`
+  - `merge_gate`
+  - `contract_surface`
+- 满足以下任一条件时，`integration_touchpoint` 不得为 `none`，并且开工前必须先查看 `integration_ref` 对应的 integration issue / item：
+  - 改共享输入输出
+  - 改错误码或错误语义
+  - 改 `raw` / `normalized` / `diagnostics` / `observability`
+  - 改 `task_id` / `request_id` / `run_id`
+  - 改执行模式或 gate 口径
+  - 依赖另一仓库先做、同步做或共同验收
+  - 影响联合 PoC、联合回归或共享桥接能力
+- `integration_touchpoint` 取值约定：
+  - `none`：纯本仓库事项，不需要 integration 联动
+  - `check_required`：实现前必须核对 integration 状态
+  - `active`：当前执行回合正受 integration 约束
+  - `blocked`：被另一仓库或 integration 契约阻塞
+  - `resolved`：当前回合的 integration 约束已完成
+- `external_dependency` 取值约定：
+  - `none`：无跨仓前置
+  - `syvert`：依赖 Syvert 侧动作
+  - `webenvoy`：依赖 WebEnvoy 侧动作
+  - `both`：两边都有前置或联合验收依赖
+- `merge_gate` 取值约定：
+  - `local_only`：只受本仓库门禁约束
+  - `integration_check_required`：除本仓库门禁外，还必须检查 integration 状态
+- `contract_surface` 用于标记触达的跨仓表面，固定枚举：
+  - `none`
+  - `execution_provider`
+  - `ids_trace`
+  - `errors`
+  - `raw_normalized`
+  - `diagnostics_observability`
+  - `runtime_modes`
+- integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
+
 ## stop conditions
 
 - 缺少必需输入（Issue、事项上下文、formal spec 或 bootstrap contract）。
@@ -117,3 +158,4 @@ codex:
   - `safe_to_merge=true`
   - GitHub checks 全绿
   - PR 非 Draft，且审查与合并使用同一 head SHA
+  - 若 `merge_gate=integration_check_required`，则已在提 PR 前和合并前分别核对一次 `integration_ref` 对应 integration issue / item 的状态、依赖与联合验收约束

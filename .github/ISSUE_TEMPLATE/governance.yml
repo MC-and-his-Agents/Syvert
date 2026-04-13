@@ -1,0 +1,93 @@
+name: Governance
+description: 创建治理栈、流程、模板或门禁相关事项。
+title: "治理协议："
+labels:
+  - governance
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: 治理目标
+      description: 说明要调整的治理载体、为什么现在需要改、成功标准是什么。
+      placeholder: |
+        当前问题：
+        目标状态：
+        成功标准：
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_surfaces
+    attributes:
+      label: 影响载体
+      description: 列出将受影响的 workflow / review / template / GitHub project 载体。
+      placeholder: |
+        WORKFLOW.md
+        code_review.md
+        PULL_REQUEST_TEMPLATE.md
+        Project fields
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration_touchpoint
+    attributes:
+      label: integration_touchpoint
+      options:
+        - none
+        - check_required
+        - active
+    validations:
+      required: true
+
+  - type: input
+    id: integration_ref
+    attributes:
+      label: integration_ref
+
+  - type: dropdown
+    id: external_dependency
+    attributes:
+      label: external_dependency
+      options:
+        - none
+        - syvert
+        - webenvoy
+        - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_surface
+    attributes:
+      label: contract_surface
+      options:
+        - none
+        - execution_provider
+        - ids_trace
+        - errors
+        - raw_normalized
+        - diagnostics_observability
+        - runtime_modes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: joint_acceptance_needed
+    attributes:
+      label: joint_acceptance_needed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true

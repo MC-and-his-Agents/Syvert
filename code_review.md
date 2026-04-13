@@ -12,6 +12,7 @@
 - 与当前事项直接相关的 `spec` / `plan` / bootstrap contract / `exec-plan`
 - 与当前改动直接相关的治理或流程文档
 - 当前 diff、受影响文件与必要的调用链 / contract 边界
+- 若事项声明 `integration_touchpoint != none`，补充对应的 `integration_ref` 及其当前依赖 / 联合验收状态
 
 仅当历史事项确有 legacy `TODO.md`，且其中内容对当前风险、恢复或历史判断直接相关时，才补充该文件作为审查输入。
 
@@ -57,6 +58,7 @@
 | 可观测性 | 日志、指标、状态面、错误上下文是否足够定位问题 | 关键路径可定位，必要输出可支持发布后排障 | 出问题后无法判断输入、状态或失败原因 |
 | 安全 / 性能 / 成本 | 是否引入安全缺口、性能回退、额外成本或配额风险 | 风险已评估并在必要处验证或约束 | 新增高耗时/高成本路径或安全暴露但无说明 |
 | 发布与回滚准备 | 发布依赖、迁移步骤、回滚方式是否就绪 | 发布前提、回滚步骤、操作顺序清晰 | 需要人工操作却未记录，回滚方案缺失或不可执行 |
+| integration 联动一致性 | 是否正确标记跨仓触点、依赖和联合验收约束 | `integration_touchpoint`、`integration_ref`、`external_dependency`、`merge_gate` 与实际改动一致 | 共享契约改动未标记 integration 联动，或 merge 前未核对 integration 状态 |
 
 ## 事项分级视角
 
@@ -87,6 +89,7 @@
 4. PR 不是 Draft
 5. 合并时 head 与审查时 head 一致
 6. 必须通过受控入口 `merge_pr`
+7. 若当前事项 `merge_gate=integration_check_required`，PR 描述必须补齐 `integration_check`，且 reviewer / guardian 已确认提 PR 前与合并前都核对过 `integration_ref` 对应状态
 
 merge gate 只回答“当前 PR 是否允许进入受控合并”，不替代 reviewer 对实现质量的实质判断。
 

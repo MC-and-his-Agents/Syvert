@@ -1,0 +1,94 @@
+name: FR
+description: 创建或更新需要 formal spec / FR 容器承接的事项。
+title: "[FR-XXXX] "
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 摘要
+      description: 说明当前 FR 要解决的目标、非目标和阶段边界。
+      placeholder: |
+        目标：
+        非目标：
+        当前阶段：
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_artifacts
+    attributes:
+      label: Formal Spec 套件
+      description: 列出本 FR 需要承接的 formal spec / contract / 风险工件。
+      placeholder: |
+        spec.md:
+        plan.md:
+        contracts/:
+        data-model.md:
+        risks.md:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration_touchpoint
+    attributes:
+      label: integration_touchpoint
+      description: 纯本仓库事项默认选 `none`；会影响跨仓共享契约时选 `check_required` 或 `active`。
+      options:
+        - none
+        - check_required
+        - active
+    validations:
+      required: true
+
+  - type: input
+    id: integration_ref
+    attributes:
+      label: integration_ref
+      description: 填 integration project canonical issue / item 链接或编号；无则留空。
+
+  - type: dropdown
+    id: external_dependency
+    attributes:
+      label: external_dependency
+      options:
+        - none
+        - syvert
+        - webenvoy
+        - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_surface
+    attributes:
+      label: contract_surface
+      options:
+        - none
+        - execution_provider
+        - ids_trace
+        - errors
+        - raw_normalized
+        - diagnostics_observability
+        - runtime_modes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: joint_acceptance_needed
+    attributes:
+      label: joint_acceptance_needed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
