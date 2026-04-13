@@ -187,17 +187,7 @@ def execute_task(
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error)
     except PlatformAdapterError as error:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            {
-                "category": "platform",
-                "code": error.code,
-                "message": error.message,
-                "details": error.details,
-            },
-        )
+        return failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
     except Exception as error:
         return failure_envelope(
             task_id,
@@ -724,6 +714,24 @@ def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any
         "message": message,
         "details": dict(details or {}),
     }
+
+
+def classify_adapter_error(error: PlatformAdapterError) -> dict[str, Any]:
+    details = error.details if isinstance(error.details, Mapping) else {}
+    if is_pre_platform_invalid_input_error(error.code):
+        return invalid_input_error(error.code, error.message, details=details)
+    return {
+        "category": "platform",
+        "code": error.code,
+        "message": error.message,
+        "details": dict(details),
+    }
+
+
+def is_pre_platform_invalid_input_error(code: str) -> bool:
+    if not isinstance(code, str):
+        return False
+    return code.startswith("invalid_") and (code.endswith("_request") or code.endswith("_url"))
 
 
 def invalid_input_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:

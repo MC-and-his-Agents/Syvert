@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import unittest
 
+from syvert.adapters.douyin import DouyinAdapter
+from syvert.adapters.xhs import XhsAdapter
 from syvert.runtime import (
     AdapterTaskRequest,
     CollectionPolicy,
@@ -649,6 +651,40 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "platform")
         self.assertEqual(envelope["error"]["code"], "content_not_found")
         self.assertEqual(envelope["error"]["details"]["reason"], "missing")
+
+    def test_execute_task_maps_real_xhs_invalid_url_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/not-xhs"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"xhs": XhsAdapter()},
+            task_id_factory=lambda: "task-xhs-invalid-url",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "invalid_xhs_url")
+
+    def test_execute_task_maps_real_douyin_invalid_url_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="douyin",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/not-douyin"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"douyin": DouyinAdapter()},
+            task_id_factory=lambda: "task-douyin-invalid-url",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "invalid_douyin_url")
 
     def test_execute_task_rejects_empty_task_id_from_factory(self) -> None:
         request = TaskRequest(
