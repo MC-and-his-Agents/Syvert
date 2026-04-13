@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from dataclasses import replace
+import unittest
+
+from tests.runtime.contract_harness import (
+    CONTRACT_SAMPLES,
+    build_contract_sample_definitions,
+    build_expected_verdict_index,
+    build_sample_index,
+    execute_harness_samples,
+    run_contract_harness_automation,
+    validate_contract_harness_run,
+)
+
+
+class ContractHarnessAutomationTests(unittest.TestCase):
+    def test_catalog_covers_four_fr0006_stable_sample_classes(self) -> None:
+        self.assertEqual(
+            [sample.sample_id for sample in CONTRACT_SAMPLES],
+            [
+                "success-full-envelope",
+                "legal-failure-platform-envelope",
+                "contract-violation-missing-normalized",
+                "execution-precondition-not-met",
+            ],
+        )
+
+    def test_automation_returns_expected_verdicts_for_all_samples(self) -> None:
+        results = run_contract_harness_automation()
+
+        observed = {result["sample_id"]: result["verdict"] for result in results}
+
+        self.assertEqual(observed, build_expected_verdict_index(CONTRACT_SAMPLES))
+
+    def test_definition_builder_excludes_precondition_samples_from_runtime_outcomes(self) -> None:
+        definitions = build_contract_sample_definitions(CONTRACT_SAMPLES)
+
+        self.assertEqual(
+            [definition.sample_id for definition in definitions],
+            [
+                "success-full-envelope",
+                "legal-failure-platform-envelope",
+                "contract-violation-missing-normalized",
+            ],
+        )
+
+    def test_automation_preserves_expected_runtime_status_and_error_categories(self) -> None:
+        samples_by_id = build_sample_index(CONTRACT_SAMPLES)
+        execution_results = execute_harness_samples(CONTRACT_SAMPLES)
+        verdicts = {
+            result["sample_id"]: result
+            for result in run_contract_harness_automation()
+        }
+
+        for sample_id, sample in samples_by_id.items():
+            execution_result = execution_results[sample_id]
+            verdict = verdicts[sample_id]
+            self.assertEqual(verdict["observed_status"], sample.expected_runtime_status)
+            if sample.expected_runtime_error_category is None:
+                self.assertIsNone(verdict["observed_error"])
+                if sample.expected_runtime_status is None:
+                    self.assertIsNone(execution_result.runtime_envelope)
+                else:
+                    self.assertIsNotNone(execution_result.runtime_envelope)
+                continue
+            self.assertIsNotNone(execution_result.runtime_envelope)
+            self.assertIsNotNone(verdict["observed_error"])
+            self.assertEqual(
+                verdict["observed_error"]["category"],
+                sample.expected_runtime_error_category,
+            )
+
+    def test_success_sample_keeps_raw_and_normalized_envelope(self) -> None:
+        execution_results = execute_harness_samples(CONTRACT_SAMPLES)
+
+        success_envelope = execution_results["success-full-envelope"].runtime_envelope
+
+        self.assertIsNotNone(success_envelope)
+        self.assertEqual(success_envelope["status"], "success")
+        self.assertIn("raw", success_envelope)
+        self.assertIn("normalized", success_envelope)
+
+    def test_precondition_sample_that_unexpectedly_reaches_runtime_fails_closed(self) -> None:
+        samples_by_id = build_sample_index(CONTRACT_SAMPLES)
+        sample = replace(
+            samples_by_id["execution-precondition-not-met"],
+            adapter_profile=samples_by_id["success-full-envelope"].adapter_profile,
+            input=samples_by_id["success-full-envelope"].input,
+        )
+        results = run_contract_harness_automation([sample])
+
+        self.assertEqual(results[0]["verdict"], "contract_violation")
+        self.assertEqual(
+            results[0]["reason"]["code"],
+            "precondition_sample_unexpectedly_reached_runtime",
+        )
+
+    def test_sample_metadata_drift_is_reported_by_runtime_failed_envelope(self) -> None:
+        sample = replace(
+            build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"],
+            adapter_profile=replace(
+                build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"].adapter_profile,
+                supported_targets=("content_id",),
+            ),
+        )
+
+        execution_result = execute_harness_samples([sample])["success-full-envelope"]
+
+        self.assertIsNotNone(execution_result.runtime_envelope)
+        self.assertEqual(execution_result.runtime_envelope["status"], "failed")
+        self.assertEqual(execution_result.runtime_envelope["error"]["category"], "invalid_input")
+        self.assertEqual(execution_result.runtime_envelope["error"]["code"], "target_type_not_supported")
+
+    def test_duplicate_sample_id_is_rejected(self) -> None:
+        duplicate_samples = [
+            build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"],
+            replace(build_sample_index(CONTRACT_SAMPLES)["success-full-envelope"]),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "duplicate contract sample_id"):
+            build_sample_index(duplicate_samples)
+
+
+if __name__ == "__main__":
+    unittest.main()
