@@ -24,11 +24,12 @@
 ## 当前停点
 
 - 最新可执行 checkpoint 已覆盖 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
-- 当前回合已按 guardian finding 收紧 issue form schema、`integration_ref` 可核查性与 guardian merge gate 解析逻辑，并把 `integration_status_checked_before_merge` 绑定到 `merge_pr` 显式确认步骤。
+- 当前回合已按 guardian finding 收紧 issue form schema、`integration_ref` 可核查性、guardian merge gate 解析逻辑与 merge-time 回滚路径，并补上 issue/work-item canonical integration 元数据与 PR `integration_check` 的一致性校验。
+- 当前回合同时补入存量 PR 兼容策略：缺少 `integration_check` 的历史 PR 只有在其上位 issue / work item 尚未声明 canonical integration 字段时，才允许沿用 legacy 路径继续收口。
 
 ## 下一步动作
 
-- 推送当前修正后的 forms / exec-plan head，重新等待 PR `#107` 的 GitHub checks 与 guardian 结论。
+- 推送当前修正后的 forms / workflow / guardian head，并把 Issue `#105` 回填为带 canonical integration 字段的治理锚点。
 - 若 guardian 给出 `APPROVE + safe_to_merge=true`，先把当前分支 rebase 到最新 `origin/main`，再通过 `python3 scripts/merge_pr.py 107 --delete-branch --confirm-integration-recheck` 走受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -45,6 +46,7 @@
 - `python3` 成功解析 `.github/ISSUE_TEMPLATE/*.yml`
 - 已人工复核 PR 模板、workflow、code review 与 issue forms 的 integration 字段口径一致
 - owner 级 integration project、repo project 字段、labels 与治理锚点 issue 已落地
+- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian`
 - `python3 scripts/context_guard.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
 - `python3 scripts/governance_gate.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
 
@@ -52,6 +54,7 @@
 
 - `Syvert/main` 在当前审查回合内继续前进；若 guardian 基于旧 head 给出结论，仍需在最后一次 rebase 后重跑 checks 与 guardian 才能合并。
 - merge 前仍需再次核对 owner 级 integration project 的状态、依赖与联合验收口径。
+- 若后续仍有未回填 canonical integration 字段的存量 issue / PR，需要在进入下一轮执行前补齐，避免长期依赖 legacy 兼容路径。
 - 若后续继续扩张 integration 枚举或 gate 语义，需要再走独立治理回合，不应直接在当前 PR 上扩 scope。
 
 ## 回滚方式
@@ -60,5 +63,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `828c9d49c4f4f203bd86d99c8d046b7b8a673102`
-- 说明：当前 checkpoint 已覆盖 `integration_ref` 可核查性、canonical 枚举 fail-closed、merge-time integration 复核确认与 free-form note 解析收口；当前受审 head 仍以 PR `#107` 最新 head 与 guardian verdict 绑定为准。
+- `398fa4e9e0325fcf63f57aca75c395b5e939f95f`
+- 说明：当前 checkpoint 已覆盖 `integration_ref` 可核查性、canonical 枚举 fail-closed、merge-time integration 复核回滚、存量 PR 兼容路径与 issue/work-item → PR 的 canonical integration 一致性校验；当前受审 head 仍以 PR `#107` 最新 head 与 guardian verdict 绑定为准。

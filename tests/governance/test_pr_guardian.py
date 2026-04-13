@@ -214,12 +214,21 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
-    def test_integration_merge_gate_errors_rejects_missing_section(self) -> None:
+    def test_integration_merge_gate_errors_allows_missing_section_for_legacy_pr(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(errors, ["PR 描述缺少 canonical `integration_check` 段落。"])
+        self.assertEqual(errors, [])
+
+    @patch("scripts.pr_guardian.resolve_issue_canonical_integration", return_value=(105, {"merge_gate": "integration_check_required"}))
+    def test_integration_merge_gate_errors_rejects_missing_section_when_issue_declares_canonical_metadata(self, resolve_issue_mock) -> None:
+        meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, ["PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"])
+        resolve_issue_mock.assert_called_once_with(meta)
 
     def test_integration_merge_gate_errors_rejects_missing_canonical_fields(self) -> None:
         meta = {
@@ -359,6 +368,45 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertTrue(any("integration_status_checked_before_pr" in error for error in errors))
         self.assertTrue(any("integration_status_checked_before_merge" in error for error in errors))
+
+    @patch(
+        "scripts.pr_guardian.resolve_issue_canonical_integration",
+        return_value=(
+            105,
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "yes",
+                "integration_ref": "owner/repo#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+        ),
+    )
+    def test_integration_merge_gate_errors_rejects_pr_issue_canonical_mismatch(self, resolve_issue_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: owner/repo#12",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta)
+
+        self.assertIn("`integration_check.shared_contract_changed` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        resolve_issue_mock.assert_called_once_with(meta)
 
     def test_integration_merge_gate_errors_rejects_uncheckable_integration_ref(self) -> None:
         meta = {
@@ -909,11 +957,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "scripts.pr_guardian.build_item_context_summary",
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ) as build_item_context_summary_mock:
-                with patch("scripts.pr_guardian.fetch_issue_context") as fetch_issue_context_mock:
+                with patch(
+                    "scripts.pr_guardian.fetch_issue_context",
+                    return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                ) as fetch_issue_context_mock:
                     payload = build_review_context(meta, worktree_dir)
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
-        fetch_issue_context_mock.assert_not_called()
+        fetch_issue_context_mock.assert_called_once_with(24)
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
     def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
@@ -944,10 +995,13 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "scripts.pr_guardian.build_item_context_summary",
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ):
-                with patch("scripts.pr_guardian.fetch_issue_context") as fetch_issue_context_mock:
+                with patch(
+                    "scripts.pr_guardian.fetch_issue_context",
+                    return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                ) as fetch_issue_context_mock:
                     payload = build_review_context(meta, Path("/tmp/pr-worktree"))
 
-        fetch_issue_context_mock.assert_not_called()
+        fetch_issue_context_mock.assert_called_once_with(24)
         self.assertIn("## Goal", payload["pr_sections"]["issue_summary"])
         self.assertIn("## Scope", payload["pr_sections"]["issue_summary"])
 

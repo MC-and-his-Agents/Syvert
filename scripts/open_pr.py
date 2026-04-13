@@ -67,6 +67,15 @@ ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
 }
 ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+ISSUE_CANONICAL_INTEGRATION_FIELDS = (
+    "integration_touchpoint",
+    "shared_contract_changed",
+    "integration_ref",
+    "external_dependency",
+    "merge_gate",
+    "contract_surface",
+    "joint_acceptance_needed",
+)
 INTEGRATION_TOUCHPOINT_CHOICES = ("none", "check_required", "active", "blocked", "resolved")
 EXTERNAL_DEPENDENCY_CHOICES = ("none", "syvert", "webenvoy", "both")
 MERGE_GATE_CHOICES = ("local_only", "integration_check_required")
@@ -233,9 +242,12 @@ ISSUE_SUMMARY_HEADING_LOOKUP = {
     for canonical, aliases in ISSUE_SUMMARY_HEADING_ALIASES.items()
     for alias in aliases
 }
+ISSUE_CANONICAL_INTEGRATION_FIELD_LOOKUP = {
+    normalize_issue_summary_heading(field): field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS
+}
 
 
-def extract_issue_summary_sections(body: str) -> dict[str, str]:
+def extract_issue_form_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
     heading_pattern = re.compile(r"^#{2,6}\s+(.+?)\s*$")
@@ -244,15 +256,34 @@ def extract_issue_summary_sections(body: str) -> dict[str, str]:
         stripped = line.strip()
         heading_match = heading_pattern.match(stripped)
         if heading_match:
-            canonical = ISSUE_SUMMARY_HEADING_LOOKUP.get(normalize_issue_summary_heading(heading_match.group(1)))
-            current = canonical
-            if current:
-                sections.setdefault(current, [])
+            current = heading_match.group(1).strip()
+            sections.setdefault(current, [])
             continue
         if current:
             sections[current].append(line.rstrip())
 
     return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
+
+
+def extract_issue_summary_sections(body: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    for heading, content in extract_issue_form_sections(body).items():
+        canonical = ISSUE_SUMMARY_HEADING_LOOKUP.get(normalize_issue_summary_heading(heading))
+        if canonical and content:
+            if canonical in sections:
+                sections[canonical] = "\n\n".join([sections[canonical], content]).strip()
+            else:
+                sections[canonical] = content
+    return sections
+
+
+def extract_issue_canonical_integration_fields(body: str) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    for heading, content in extract_issue_form_sections(body).items():
+        canonical = ISSUE_CANONICAL_INTEGRATION_FIELD_LOOKUP.get(normalize_issue_summary_heading(heading))
+        if canonical and content:
+            payload[canonical] = content.strip()
+    return payload
 
 
 def build_issue_summary(issue: int | None) -> str:

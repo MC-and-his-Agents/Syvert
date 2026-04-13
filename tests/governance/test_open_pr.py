@@ -10,6 +10,7 @@ from scripts.common import CommandError
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
+    extract_issue_canonical_integration_fields,
     extract_issue_summary_sections,
     parse_args,
     validate_current_worktree_binding,
@@ -401,6 +402,34 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("目标：收口本轮治理改造。", sections["Goal"])
         self.assertIn("补齐跨仓协同插槽。", sections["Goal"])
         self.assertNotIn("integration_touchpoint", sections)
+
+    def test_extract_issue_canonical_integration_fields_preserves_issue_form_metadata(self) -> None:
+        body = "\n".join(
+            [
+                "### integration_touchpoint",
+                "",
+                "active",
+                "",
+                "### shared_contract_changed",
+                "",
+                "yes",
+                "",
+                "### integration_ref",
+                "",
+                "owner/repo#12",
+                "",
+                "### merge_gate",
+                "",
+                "integration_check_required",
+            ]
+        )
+
+        payload = extract_issue_canonical_integration_fields(body)
+
+        self.assertEqual(payload["integration_touchpoint"], "active")
+        self.assertEqual(payload["shared_contract_changed"], "yes")
+        self.assertEqual(payload["integration_ref"], "owner/repo#12")
+        self.assertEqual(payload["merge_gate"], "integration_check_required")
 
     def test_build_issue_summary_renders_chinese_issue_form_sections(self) -> None:
         payload = {

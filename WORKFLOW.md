@@ -130,6 +130,9 @@ codex:
   - `yes`：当前事项需要联合验收
   - `no`：当前事项不需要联合验收
 - integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
+- 存量 PR 兼容规则：
+  - 若某个已打开的存量 PR 缺少 `integration_check` 段落，且其上位 issue / work item 也尚未声明 canonical integration 字段，则 guardian 可按 legacy 路径继续执行本仓库门禁。
+  - 一旦上位 issue / work item 已声明 canonical integration 字段，PR 描述中的 `integration_check` 就必须完整存在，并与 issue / work item 的 canonical integration 元数据保持一致。
 
 ## stop conditions
 
@@ -166,4 +169,5 @@ codex:
   - `safe_to_merge=true`
   - GitHub checks 全绿
   - PR 非 Draft，且审查与合并使用同一 head SHA
+  - 若上位 issue / work item 已声明 canonical integration 字段，则 guardian 必须确认 PR 的 `integration_check` 与其保持一致
   - 若 `merge_gate=integration_check_required`，则已在提 PR 前和合并前分别核对一次 `integration_ref` 对应 integration issue / item 的状态、依赖与联合验收约束
