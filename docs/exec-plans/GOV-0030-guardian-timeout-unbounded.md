@@ -9,7 +9,7 @@
 - sprint：`2026-S16`
 - 关联 spec：无（治理脚本事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0030-guardian-timeout-unbounded.md`
-- 关联 PR：待补充
+- 关联 PR：`#113`
 - active 收口事项：`GOV-0030-guardian-timeout-unbounded`
 
 ## 目标
@@ -25,13 +25,13 @@
 
 ## 当前停点
 
-- 已在 `issue-112-governance-remove-default-300s-guardian-timeout-cap` worktree 中完成 `pr_guardian` 默认超时行为调整与测试补齐；当前停在补齐执行工件、完成门禁验证、提交并创建 PR。
+- 已在 `issue-112-governance-remove-default-300s-guardian-timeout-cap` worktree 中完成 `pr_guardian` 默认超时行为调整、测试补齐、门禁验证与 PR 创建；当前停在等待 GitHub checks 与 guardian 审查。
 
 ## 下一步动作
 
-- 运行治理相关单测与 workflow/docs guard，确认受控入口可接受当前事项上下文。
-- 生成中文 Conventional Commit，推送 issue 分支并通过受控入口创建 governance PR。
-- PR 打开后继续收口 checks、guardian 审查与后续 merge gate。
+- 观察 PR `#113` 的 GitHub checks，确认当前 head 上的自动化门禁通过。
+- 对 PR `#113` 执行 guardian 审查，确认默认无超时策略没有破坏现有 merge gate 语义。
+- 如出现阻断，仅在本事项范围内修复并回写验证与风险记录。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -64,6 +64,9 @@
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/open_pr.py --class governance --issue 112 --item-key GOV-0030-guardian-timeout-unbounded --item-type GOV --release v0.2.0 --sprint 2026-S16 --title "fix(governance): 移除 guardian 默认 300 秒超时" --dry-run`
+- `git push -u origin issue-112-governance-remove-default-300s-guardian-timeout-cap`
+- `python3 scripts/open_pr.py --class governance --issue 112 --item-key GOV-0030-guardian-timeout-unbounded --item-type GOV --release v0.2.0 --sprint 2026-S16 --title "fix(governance): 移除 guardian 默认 300 秒超时"`
+- 已创建 PR：`#113 https://github.com/MC-and-his-Agents/Syvert/pull/113`
 
 ## 未决风险
 
