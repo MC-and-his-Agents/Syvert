@@ -322,8 +322,11 @@ def parse_integration_check_payload(section: str) -> dict[str, str]:
 def integration_merge_gate_errors(meta: dict) -> list[str]:
     body = str(meta.get("body") or "")
     issue_number, issue_canonical_integration = resolve_issue_canonical_integration(meta)
+    issue_canonical_error = str(meta.get("_issue_canonical_integration_error") or "").strip()
     raw_sections = parse_all_markdown_sections(body)
     integration_section = raw_sections.get("integration_check", "")
+    if issue_canonical_error:
+        return [issue_canonical_error]
     if not integration_section:
         if issue_canonical_integration:
             issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
@@ -647,7 +650,10 @@ def normalize_issue_canonical_integration_value(field: str, value: str) -> str:
 def resolve_issue_canonical_integration(meta: dict) -> tuple[int | None, dict[str, str]]:
     cached_issue_number = meta.get("_issue_canonical_issue_number")
     cached_payload = meta.get("_issue_canonical_integration")
+    cached_error = meta.get("_issue_canonical_integration_error")
     if isinstance(cached_payload, dict):
+        if cached_error is not None:
+            meta["_issue_canonical_integration_error"] = str(cached_error)
         return (int(cached_issue_number) if isinstance(cached_issue_number, int) else None), {
             str(key): str(value) for key, value in cached_payload.items()
         }
@@ -656,6 +662,7 @@ def resolve_issue_canonical_integration(meta: dict) -> tuple[int | None, dict[st
     if issue_number is None:
         meta["_issue_canonical_issue_number"] = None
         meta["_issue_canonical_integration"] = {}
+        meta["_issue_canonical_integration_error"] = None
         return None, {}
 
     completed = run(
@@ -666,12 +673,17 @@ def resolve_issue_canonical_integration(meta: dict) -> tuple[int | None, dict[st
     if completed.returncode != 0:
         meta["_issue_canonical_issue_number"] = issue_number
         meta["_issue_canonical_integration"] = {}
+        meta["_issue_canonical_integration_error"] = f"无法读取 Issue #{issue_number} 的 canonical integration 元数据，拒绝继续。"
         return issue_number, {}
 
     payload = json.loads(completed.stdout or "{}")
     canonical = extract_issue_canonical_integration_fields(str(payload.get("body") or ""))
     meta["_issue_canonical_issue_number"] = issue_number
     meta["_issue_canonical_integration"] = canonical
+    if not canonical:
+        meta["_issue_canonical_integration_error"] = f"Issue #{issue_number} 缺少 canonical integration 元数据，拒绝继续。"
+    else:
+        meta["_issue_canonical_integration_error"] = None
     return issue_number, canonical
 
 
@@ -1165,6 +1177,24 @@ def merge_if_safe(
             )
         detail = "\n".join(f"- {item}" for item in integration_errors)
         raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
+    latest_before_merge = pr_meta(pr_number)
+    if latest_before_merge["headRefOid"] != current["headRefOid"]:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前 PR HEAD 已变化",
+            )
+        raise SystemExit("执行 `gh pr merge` 前 PR HEAD 已变化，拒绝合并。")
+    if str(latest_before_merge.get("body") or "") != str(current.get("body") or ""):
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前 PR 描述已变化",
+            )
+        raise SystemExit("执行 `gh pr merge` 前 PR 描述已变化，拒绝合并。")
+    current = latest_before_merge
 
     command = [
         "gh",

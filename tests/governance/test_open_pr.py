@@ -426,6 +426,60 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("`--shared-contract-changed` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
         run_mock.assert_called_once()
 
+    @patch(
+        "scripts.open_pr.run",
+        return_value=subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps({"body": "### 摘要\n\n- no metadata"}), stderr=""),
+    )
+    def test_validate_integration_args_rejects_issue_without_canonical_integration_metadata(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("Issue #105 缺少 canonical integration 元数据", errors[0])
+        run_mock.assert_called_once()
+
+    @patch(
+        "scripts.open_pr.run",
+        return_value=subprocess.CompletedProcess(args=["gh"], returncode=1, stdout="", stderr="boom"),
+    )
+    def test_validate_integration_args_rejects_issue_fetch_failure_for_canonical_integration(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("无法读取 Issue #105 的 canonical integration 元数据", errors[0])
+        run_mock.assert_called_once()
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(

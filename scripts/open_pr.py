@@ -303,6 +303,25 @@ def fetch_issue_body(issue: int | None) -> str:
     return str(payload.get("body") or "")
 
 
+def resolve_issue_canonical_integration(issue: int | None) -> tuple[dict[str, str], str | None]:
+    if issue is None:
+        return {}, None
+
+    body = fetch_issue_body(issue)
+    if not body:
+        return {}, f"无法读取 Issue #{issue} 的 canonical integration 元数据。"
+
+    canonical = extract_issue_canonical_integration_fields(body)
+    if not canonical:
+        return {}, f"Issue #{issue} 缺少 canonical integration 元数据，受控 `open_pr` 入口拒绝继续。"
+
+    missing_fields = [field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS if not str(canonical.get(field) or "").strip()]
+    if missing_fields:
+        missing = "、".join(f"`{field}`" for field in missing_fields)
+        return canonical, f"Issue #{issue} 的 canonical integration 元数据缺少字段：{missing}。"
+    return canonical, None
+
+
 def build_issue_summary(issue: int | None) -> str:
     body = fetch_issue_body(issue)
     if not body:
@@ -565,30 +584,25 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
     if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
         errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
 
-    issue_canonical_integration = extract_issue_canonical_integration_fields(fetch_issue_body(args.issue))
-    if issue_canonical_integration:
-        issue_missing_fields = [
-            field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS if not str(issue_canonical_integration.get(field) or "").strip()
-        ]
-        if issue_missing_fields:
-            missing = "、".join(f"`{field}`" for field in issue_missing_fields)
-            errors.append(f"Issue #{args.issue} 的 canonical integration 元数据缺少字段：{missing}。")
-        else:
-            arg_comparison_values = {
-                "integration_touchpoint": args.integration_touchpoint,
-                "shared_contract_changed": args.shared_contract_changed,
-                "integration_ref": integration_ref,
-                "external_dependency": args.external_dependency,
-                "merge_gate": args.merge_gate,
-                "contract_surface": args.contract_surface,
-                "joint_acceptance_needed": args.joint_acceptance_needed,
-            }
-            for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
-                expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
-                actual = normalize_issue_canonical_integration_value(field, arg_comparison_values.get(field, ""))
-                if expected != actual:
-                    cli_flag = f"--{field.replace('_', '-')}"
-                    errors.append(f"`{cli_flag}` 与 Issue #{args.issue} 中的 canonical integration 元数据不一致。")
+    issue_canonical_integration, issue_canonical_error = resolve_issue_canonical_integration(args.issue)
+    if issue_canonical_error:
+        errors.append(issue_canonical_error)
+    elif issue_canonical_integration:
+        arg_comparison_values = {
+            "integration_touchpoint": args.integration_touchpoint,
+            "shared_contract_changed": args.shared_contract_changed,
+            "integration_ref": integration_ref,
+            "external_dependency": args.external_dependency,
+            "merge_gate": args.merge_gate,
+            "contract_surface": args.contract_surface,
+            "joint_acceptance_needed": args.joint_acceptance_needed,
+        }
+        for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
+            expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
+            actual = normalize_issue_canonical_integration_value(field, arg_comparison_values.get(field, ""))
+            if expected != actual:
+                cli_flag = f"--{field.replace('_', '-')}"
+                errors.append(f"`{cli_flag}` 与 Issue #{args.issue} 中的 canonical integration 元数据不一致。")
     return errors
 
 

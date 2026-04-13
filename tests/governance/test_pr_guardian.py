@@ -230,6 +230,19 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(errors, ["PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"])
         resolve_issue_mock.assert_called_once_with(meta)
 
+    def test_integration_merge_gate_errors_rejects_issue_canonical_lookup_failure(self) -> None:
+        meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
+
+        def resolve_side_effect(payload):
+            payload["_issue_canonical_integration_error"] = "无法读取 Issue #105 的 canonical integration 元数据，拒绝继续。"
+            return 105, {}
+
+        with patch("scripts.pr_guardian.resolve_issue_canonical_integration", side_effect=resolve_side_effect) as resolve_issue_mock:
+            errors = integration_merge_gate_errors(meta)
+
+        self.assertEqual(errors, ["无法读取 Issue #105 的 canonical integration 元数据，拒绝继续。"])
+        resolve_issue_mock.assert_called_once_with(meta)
+
     def test_integration_merge_gate_errors_rejects_missing_canonical_fields(self) -> None:
         meta = {
             "body": "\n".join(
@@ -1481,6 +1494,12 @@ class MergeIfSafeTests(unittest.TestCase):
                 "headRefOid": "sha-2",
                 "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-2",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
+            },
         ]
         review_once_mock.return_value = (
             {
@@ -1522,6 +1541,12 @@ class MergeIfSafeTests(unittest.TestCase):
         run_mock,
     ) -> None:
         pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-3",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
+            },
             {
                 "number": 1,
                 "isDraft": False,
@@ -1746,6 +1771,12 @@ class MergeIfSafeTests(unittest.TestCase):
                 "isDraft": False,
                 "headRefOid": "sha-needs-recheck",
                 "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
             },
             {
                 "number": 1,
@@ -2005,6 +2036,86 @@ class MergeIfSafeTests(unittest.TestCase):
     @patch("scripts.pr_guardian.pr_meta")
     @patch("scripts.pr_guardian.require_auth")
     @patch("scripts.pr_guardian.review_once")
+    def test_merge_rejects_pr_body_drift_after_integration_validation(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        concurrent_body = updated_body + "\n\n补充说明：merge 前又有编辑\n"
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": concurrent_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": concurrent_body,
+            },
+        ]
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-reviewed",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="", stderr="")
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("执行 `gh pr merge` 前 PR 描述已变化", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
+        review_once_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
     def test_merge_rejects_head_change_after_recording_merge_time_recheck(
         self,
         review_once_mock,
@@ -2117,6 +2228,12 @@ class MergeIfSafeTests(unittest.TestCase):
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
                 "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
             },
         ]
@@ -2197,6 +2314,12 @@ class MergeIfSafeTests(unittest.TestCase):
                 "headRefOid": "sha-reviewed",
                 "body": concurrent_body,
             },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": concurrent_body,
+            },
         ]
         find_result_mock.return_value = {
             "schema_version": 1,
@@ -2220,7 +2343,7 @@ class MergeIfSafeTests(unittest.TestCase):
 
         run_mock.side_effect = run_side_effect
 
-        with self.assertRaises(CommandError):
+        with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(
                 1,
                 post=False,
@@ -2229,10 +2352,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertEqual(run_mock.call_count, 3)
+        self.assertIn("执行 `gh pr merge` 前 PR 描述已变化", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
-        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
-        self.assertEqual(run_mock.call_args_list[2].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
         self.assertEqual(len(edited_bodies), 2)
         self.assertIn("其他人已更新 PR 描述", edited_bodies[1])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
