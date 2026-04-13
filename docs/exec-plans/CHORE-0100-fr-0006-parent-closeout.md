@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 关联 PR：
+- 关联 PR：`#111`
 - 状态：`active`
 - active 收口事项：`CHORE-0100-fr-0006-parent-closeout`
 
@@ -45,7 +45,8 @@
 ## 下一步动作
 
 - 把 `FR-0006` requirement container、`#102/#101/#103` 历史实现记录、release / sprint 索引与 `#110` 对齐到“唯一 active closeout 入口”后的主干真相。
-- 当前 head 完成门禁与受控 PR 创建后，进入 reviewer / guardian / merge gate。
+- 当前受审 PR：`#111`
+- 当前 head 已完成门禁与受控 PR 创建，下一步进入 reviewer / guardian / merge gate。
 - 合并后先关闭当前 Work Item `#110`，再修正 GitHub `#66` 正文、发布 `#66` closeout 评论并关闭 `#66`。
 
 ## 当前 checkpoint 推进的 release 目标
