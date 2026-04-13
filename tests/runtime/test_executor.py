@@ -53,7 +53,7 @@ class UnsupportedCapabilityAdapter:
 
 
 class ExecutorTests(unittest.TestCase):
-    def test_returns_runtime_contract_failure_when_adapter_is_missing(self) -> None:
+    def test_returns_unsupported_failure_when_adapter_is_missing(self) -> None:
         request = TaskRequest(
             adapter_key="missing",
             capability="content_detail_by_url",
@@ -63,10 +63,10 @@ class ExecutorTests(unittest.TestCase):
         result = execute_task(request, adapters={})
 
         self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["category"], "unsupported")
         self.assertEqual(result["error"]["code"], "adapter_not_found")
 
-    def test_returns_runtime_contract_failure_when_capability_is_unsupported(self) -> None:
+    def test_returns_unsupported_failure_when_adapter_capability_is_unsupported(self) -> None:
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
@@ -76,7 +76,7 @@ class ExecutorTests(unittest.TestCase):
         result = execute_task(request, adapters={"xhs": UnsupportedCapabilityAdapter()})
 
         self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["category"], "unsupported")
         self.assertEqual(result["error"]["code"], "capability_not_supported")
 
     def test_returns_success_envelope_for_valid_adapter_result(self) -> None:

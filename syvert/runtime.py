@@ -66,6 +66,7 @@ class PlatformAdapterError(Exception):
     code: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
+    category: str = "platform"
 
     def __post_init__(self) -> None:
         super().__init__(self.message)
@@ -94,7 +95,7 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法"),
+            invalid_input_error("invalid_task_request", "task_request 顶层形状不合法"),
         )
 
     adapter_key = normalized_request.target.adapter_key
@@ -107,7 +108,7 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            runtime_contract_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
+            invalid_input_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
         )
 
     projection_axis_error = validate_projection_axes_for_current_runtime(normalized_request)
@@ -122,12 +123,7 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            {
-                "category": "runtime_contract",
-                "code": "adapter_not_found",
-                "message": f"adapter `{adapter_key}` 不存在",
-                "details": {},
-            },
+            unsupported_error("adapter_not_found", f"adapter `{adapter_key}` 不存在"),
         )
 
     supported_capabilities, capability_error = validate_supported_capabilities(
@@ -140,15 +136,14 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            {
-                "category": "runtime_contract",
-                "code": "capability_not_supported",
-                "message": f"adapter `{adapter_key}` 不支持 `{capability_family}`",
-                "details": {
+            unsupported_error(
+                "capability_not_supported",
+                f"adapter `{adapter_key}` 不支持 `{capability_family}`",
+                details={
                     "supported_capabilities": sorted(supported_capabilities),
                     "capability_family": capability_family,
                 },
-            },
+            ),
         )
 
     supported_targets, targets_error = validate_supported_targets(get_adapter_supported_targets(adapter))
@@ -159,12 +154,11 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            {
-                "category": "runtime_contract",
-                "code": "target_type_not_supported",
-                "message": f"adapter `{adapter_key}` 不支持 target_type `{normalized_request.target.target_type}`",
-                "details": {"supported_targets": sorted(supported_targets)},
-            },
+            invalid_input_error(
+                "target_type_not_supported",
+                f"adapter `{adapter_key}` 不支持 target_type `{normalized_request.target.target_type}`",
+                details={"supported_targets": sorted(supported_targets)},
+            ),
         )
 
     supported_collection_modes, collection_modes_error = validate_supported_collection_modes(
@@ -177,12 +171,11 @@ def execute_task(
             task_id,
             adapter_key,
             capability,
-            {
-                "category": "runtime_contract",
-                "code": "collection_mode_not_supported",
-                "message": f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
-                "details": {"supported_collection_modes": sorted(supported_collection_modes)},
-            },
+            invalid_input_error(
+                "collection_mode_not_supported",
+                f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
+                details={"supported_collection_modes": sorted(supported_collection_modes)},
+            ),
         )
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
@@ -195,17 +188,7 @@ def execute_task(
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error)
     except PlatformAdapterError as error:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            {
-                "category": "platform",
-                "code": error.code,
-                "message": error.message,
-                "details": error.details,
-            },
-        )
+        return failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
     except Exception as error:
         return failure_envelope(
             task_id,
@@ -235,16 +218,16 @@ def validate_request(request: Any) -> dict[str, Any] | None:
 def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, Any] | None]:
     if type(request) is TaskRequest:
         if not isinstance(request.adapter_key, str) or not request.adapter_key:
-            return None, runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
+            return None, invalid_input_error("invalid_task_request", "adapter_key 不能为空")
         if request.capability != CONTENT_DETAIL_BY_URL:
-            return None, runtime_contract_error(
+            return None, invalid_input_error(
                 "invalid_capability",
                 f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
             )
         if type(request.input) is not TaskInput:
-            return None, runtime_contract_error("invalid_task_request", "input 必须为对象")
+            return None, invalid_input_error("invalid_task_request", "input 必须为对象")
         if not isinstance(request.input.url, str) or not request.input.url:
-            return None, runtime_contract_error("invalid_task_request", "input.url 不能为空")
+            return None, invalid_input_error("invalid_task_request", "input.url 不能为空")
         return (
             CoreTaskRequest(
                 target=InputTarget(
@@ -258,27 +241,27 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
             None,
         )
     if type(request) is not CoreTaskRequest:
-        return None, runtime_contract_error("invalid_task_request", "task_request 顶层形状不合法")
+        return None, invalid_input_error("invalid_task_request", "task_request 顶层形状不合法")
     if type(request.target) is not InputTarget:
-        return None, runtime_contract_error("invalid_task_request", "target 必须为对象")
+        return None, invalid_input_error("invalid_task_request", "target 必须为对象")
     if type(request.policy) is not CollectionPolicy:
-        return None, runtime_contract_error("invalid_task_request", "policy 必须为对象")
+        return None, invalid_input_error("invalid_task_request", "policy 必须为对象")
 
     target = request.target
     policy = request.policy
     if not isinstance(target.adapter_key, str) or not target.adapter_key:
-        return None, runtime_contract_error("invalid_task_request", "adapter_key 不能为空")
+        return None, invalid_input_error("invalid_task_request", "adapter_key 不能为空")
     if target.capability != CONTENT_DETAIL_BY_URL:
-        return None, runtime_contract_error(
+        return None, invalid_input_error(
             "invalid_capability",
             f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
         )
     if not isinstance(target.target_value, str) or not target.target_value:
-        return None, runtime_contract_error("invalid_task_request", "target_value 不能为空")
+        return None, invalid_input_error("invalid_task_request", "target_value 不能为空")
     if not isinstance(target.target_type, str) or target.target_type not in ALLOWED_TARGET_TYPES:
-        return None, runtime_contract_error("invalid_task_request", "target_type 不合法")
+        return None, invalid_input_error("invalid_task_request", "target_type 不合法")
     if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
-        return None, runtime_contract_error("invalid_task_request", "collection_mode 不合法")
+        return None, invalid_input_error("invalid_task_request", "collection_mode 不合法")
     return request, None
 
 
@@ -287,7 +270,7 @@ def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, An
     if mapped is None:
         return (
             None,
-            runtime_contract_error(
+            invalid_input_error(
                 "invalid_capability",
                 f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
             ),
@@ -312,12 +295,12 @@ def project_to_adapter_request(
 
 def validate_projection_axes_for_current_runtime(request: CoreTaskRequest) -> dict[str, Any] | None:
     if request.target.target_type != "url":
-        return runtime_contract_error(
+        return invalid_input_error(
             "invalid_task_request",
             "当前运行时执行路径仅支持 target_type=url",
         )
     if request.policy.collection_mode != LEGACY_COLLECTION_MODE:
-        return runtime_contract_error(
+        return invalid_input_error(
             "invalid_task_request",
             "当前运行时执行路径仅支持 collection_mode=hybrid",
         )
@@ -728,6 +711,36 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
 def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
     return {
         "category": "runtime_contract",
+        "code": code,
+        "message": message,
+        "details": dict(details or {}),
+    }
+
+
+def classify_adapter_error(error: PlatformAdapterError) -> dict[str, Any]:
+    details = error.details if isinstance(error.details, Mapping) else {}
+    if error.category == "invalid_input":
+        return invalid_input_error(error.code, error.message, details=details)
+    return {
+        "category": "platform",
+        "code": error.code,
+        "message": error.message,
+        "details": dict(details),
+    }
+
+
+def invalid_input_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "category": "invalid_input",
+        "code": code,
+        "message": message,
+        "details": dict(details or {}),
+    }
+
+
+def unsupported_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "category": "unsupported",
         "code": code,
         "message": message,
         "details": dict(details or {}),

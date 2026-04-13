@@ -232,18 +232,21 @@ def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
                 code="invalid_xhs_request",
                 message="xhs adapter 不支持该 capability family",
                 details={"capability": request.capability},
+                category="invalid_input",
             )
         if request.target_type != "url":
             raise PlatformAdapterError(
                 code="invalid_xhs_request",
                 message="xhs adapter 仅支持 target_type=url",
                 details={"target_type": request.target_type},
+                category="invalid_input",
             )
         if request.collection_mode != "hybrid":
             raise PlatformAdapterError(
                 code="invalid_xhs_request",
                 message="xhs adapter 仅支持 collection_mode=hybrid",
                 details={"collection_mode": request.collection_mode},
+                category="invalid_input",
             )
         return request.target_value
     if type(request) is TaskRequest:
@@ -252,6 +255,7 @@ def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
         code="invalid_xhs_request",
         message="xhs adapter request 顶层形状不合法",
         details={"request_type": type(request).__name__},
+        category="invalid_input",
     )
 
 
@@ -263,6 +267,7 @@ def parse_xhs_detail_url(url: str) -> XhsUrlInfo:
             code="invalid_xhs_url",
             message="不是支持的小红书详情 URL",
             details={"url": url},
+            category="invalid_input",
         )
 
     path_parts = [part for part in parsed.path.split("/") if part]
@@ -274,6 +279,7 @@ def parse_xhs_detail_url(url: str) -> XhsUrlInfo:
             code="invalid_xhs_url",
             message="无法从 URL 中解析 note_id",
             details={"url": url},
+            category="invalid_input",
         )
 
     query = parse.parse_qs(parsed.query, keep_blank_values=True)

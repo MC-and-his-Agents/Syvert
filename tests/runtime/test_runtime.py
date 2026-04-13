@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import unittest
 
+from syvert.adapters.douyin import DouyinAdapter
+from syvert.adapters.xhs import XhsAdapter
 from syvert.runtime import (
     AdapterTaskRequest,
     CollectionPolicy,
@@ -155,6 +157,21 @@ class PlatformFailureAdapter:
             code="content_not_found",
             message="content not found",
             details={"reason": "missing"},
+        )
+
+
+class PrePlatformValidationAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def execute(self, request: TaskRequest):
+        raise PlatformAdapterError(
+            code="adapter_precheck_failed",
+            message="adapter pre-platform validation failed",
+            details={"reason": "precheck"},
+            category="invalid_input",
         )
 
 
@@ -355,7 +372,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_unknown_collection_mode(self) -> None:
@@ -376,7 +393,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_non_url_target_at_shared_projection_guard(self) -> None:
@@ -397,7 +414,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_public_collection_mode_at_shared_projection_guard(self) -> None:
@@ -418,7 +435,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_authenticated_collection_mode_at_shared_projection_guard(self) -> None:
@@ -439,10 +456,10 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
-    def test_execute_task_rejects_unknown_adapter_as_runtime_contract_failure(self) -> None:
+    def test_execute_task_rejects_unknown_adapter_as_unsupported_failure(self) -> None:
         request = TaskRequest(
             adapter_key="missing",
             capability="content_detail_by_url",
@@ -457,7 +474,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["task_id"], "task-002")
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "unsupported")
         self.assertEqual(envelope["error"]["code"], "adapter_not_found")
 
     def test_execute_task_rejects_legacy_request_when_adapter_lacks_supported_targets(self) -> None:
@@ -491,7 +508,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "collection_mode_not_supported")
 
     def test_execute_task_rejects_legacy_and_native_requests_with_same_hybrid_admission_error(self) -> None:
@@ -523,8 +540,8 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(legacy_envelope["status"], "failed")
         self.assertEqual(native_envelope["status"], "failed")
-        self.assertEqual(legacy_envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(native_envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(legacy_envelope["error"]["category"], "invalid_input")
+        self.assertEqual(native_envelope["error"]["category"], "invalid_input")
         self.assertEqual(legacy_envelope["error"]["code"], "collection_mode_not_supported")
         self.assertEqual(native_envelope["error"]["code"], "collection_mode_not_supported")
         self.assertEqual(legacy_envelope["error"]["details"], native_envelope["error"]["details"])
@@ -543,7 +560,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_capability")
 
     def test_execute_task_rejects_success_without_raw_payload(self) -> None:
@@ -650,6 +667,57 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "content_not_found")
         self.assertEqual(envelope["error"]["details"]["reason"], "missing")
 
+    def test_execute_task_maps_real_xhs_invalid_url_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/not-xhs"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"xhs": XhsAdapter()},
+            task_id_factory=lambda: "task-xhs-invalid-url",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "invalid_xhs_url")
+
+    def test_execute_task_maps_real_douyin_invalid_url_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="douyin",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/not-douyin"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"douyin": DouyinAdapter()},
+            task_id_factory=lambda: "task-douyin-invalid-url",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "invalid_douyin_url")
+
+    def test_execute_task_maps_explicit_pre_platform_adapter_error_to_invalid_input(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/1"),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={"stub": PrePlatformValidationAdapter()},
+            task_id_factory=lambda: "task-preplatform-invalid-input",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "adapter_precheck_failed")
+
     def test_execute_task_rejects_empty_task_id_from_factory(self) -> None:
         request = TaskRequest(
             adapter_key="stub",
@@ -724,7 +792,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_rejects_extended_task_request_shape(self) -> None:
@@ -742,7 +810,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_fails_closed_for_malformed_request_mapping(self) -> None:
@@ -758,7 +826,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["task_id"], "task-malformed-request")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_fails_closed_for_request_mapping_that_raises_on_get(self) -> None:
@@ -770,7 +838,7 @@ class RuntimeExecutionTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["task_id"], "task-exploding-request")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_fails_closed_for_none_supported_capabilities(self) -> None:
