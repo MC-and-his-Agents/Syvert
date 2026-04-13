@@ -40,7 +40,7 @@
 - `origin/main@5fcdbf60885c988c1cf7817852195495547924da` 已包含 `FR-0006` closeout 所需的关键前提：PR `#76`、`#104`、`#108`、`#109`。
 - `#74` 已由 PR `#76` 合入并关闭；`#102` 已由 PR `#104` 合入并关闭；`#101` 已由 PR `#108` 合入并关闭；`#103` 已由 PR `#109` 合入并关闭。
 - 当前 `FR-0006` GitHub closeout 仍包含 Work Item `#110` 与父 FR `#66`；`#83` 为已关闭的历史镜像，不得重新打开。
-- 当前受审 PR `#111` 最新 head 已包含 requirement container、active closeout plan 与 release / sprint 回链。
+- `a116cea51360965be7c9e472e4a6e4b16dc963bf` 已成为当前 closeout 工件完成“单一 active 入口语义 + release / sprint 回链”后的最近一次可恢复 checkpoint；其后的提交仅补充 sprint 树索引与验证证据绑定。
 - `#74/#102/#101/#103` 对应 exec-plan 中的 active / current 表述仅保留各自历史执行轮次的原始记录；当前 `FR-0006` 父事项收口语义只认 `#110` 这一条 active 入口。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-110-chore-fr-0006`。
 
@@ -103,7 +103,9 @@
   - PR `#104` / `#102`：落地 fake adapter、adapter profile 声明与最小 harness host，经标准 registry / Core 路径执行
   - PR `#108` / `#101`：落地 validator 与 `pass`、`legal_failure`、`contract_violation`、`execution_precondition_not_met` 四类 verdict 分类
   - PR `#109` / `#103`：落地 contract samples、最小 automation 聚合执行与自动化断言，并固定四个最小样例 verdict
-- 验证证据：`python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
+- 复用验证 checkpoint：`26c25591d08d7857f5471b3f99656b64a1524bc7`（`#103` automation 回合最近一次已记录 checkpoint，见 `docs/exec-plans/CHORE-0103-fr-0006-contract-samples-minimal-automation.md`）
+- `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation`
+  - 结果：`Ran 65 tests`，`OK`
 - release / sprint 证据：`docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 将在本回合回链 `#66/#74/#102/#101/#103/#110` 与 PR `#76/#104/#108/#109`
 - GitHub closeout 证据：当前剩余 GitHub closeout issue 为 active Work Item `#110` 与父 FR `#66`；本回合合入后应先关闭 `#110`，再关闭 `#66`
 
@@ -139,5 +141,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `PR #111 最新 head（以当前受审 head 为准）`
-- 说明：最近一次 checkpoint 已推进到当前 `FR-0006` parent closeout 轮次，覆盖 requirement container、active parent closeout plan、release / sprint 索引回链与当前受审 PR `#111` 元数据；后续若仅补充 guardian / merge gate 元数据，不改写 closeout 语义。
+- `a116cea51360965be7c9e472e4a6e4b16dc963bf`
+- 说明：该 checkpoint 已覆盖 requirement container、active parent closeout plan、release / sprint 索引回链与 `FR-0006` 单一 active 入口语义；其后的提交仅补充 sprint 事项树索引与验证证据绑定，不改写 closeout 语义。
