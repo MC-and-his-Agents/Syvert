@@ -41,7 +41,7 @@
 补充说明：
 
 - `integration_touchpoint != none` 时，`integration_ref` 不得为空，且必须指向可核查的具体 integration issue / project item。
-- `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、`joint_acceptance_needed=yes`，或当前 PR 改共享契约 / gate 口径时，当前事项的 `merge_gate` 必须收口为 `integration_check_required`。
+- `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、`contract_surface != none`、`joint_acceptance_needed=yes`，或当前 PR 改共享契约 / gate 口径时，当前事项的 `merge_gate` 必须收口为 `integration_check_required`。
 - 进入 merge gate 前必须再次核对 `integration_ref` 对应 integration issue / project item 的当前状态与依赖关系。
 
 ## 回滚

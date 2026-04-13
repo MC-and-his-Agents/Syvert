@@ -314,9 +314,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     raw_sections = parse_all_markdown_sections(body)
     integration_section = raw_sections.get("integration_check", "")
     if not integration_section:
-        if re.search(r"(?im)^\s*-\s*merge_gate\s*[：:]\s*integration_check_required\b", body):
-            return ["PR 声明 `merge_gate=integration_check_required`，但缺少 `integration_check` 段落。"]
-        return []
+        return ["PR 描述缺少 canonical `integration_check` 段落。"]
 
     payload = parse_integration_check_payload(integration_section)
     integration_touchpoint = payload.get("integration_touchpoint", "").strip().lower() or "none"
@@ -427,12 +425,31 @@ def set_integration_status_checked_before_merge(body: str, value: str = "yes") -
     return updated_body
 
 
-def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> dict:
-    body = str(meta.get("body") or "")
-    updated_body = set_integration_status_checked_before_merge(body, "yes")
-    if updated_body != body:
+def integration_status_checked_before_merge_value(body: str) -> str:
+    match = re.search(
+        r"(?im)^\s*-\s*integration_status_checked_before_merge(?:（[^）]*）|\([^)]*\))?\s*[：:]\s*(yes|no)\s*$",
+        body,
+    )
+    if not match:
+        raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法读取 merge 前 integration 复核状态。")
+    return match.group(1).strip().lower()
+
+
+def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[dict, str]:
+    expected_head_sha = str(meta.get("headRefOid") or "")
+    latest = pr_meta(pr_number)
+    latest_body = str(latest.get("body") or "")
+    original_body = str(meta.get("body") or "")
+    if expected_head_sha and latest.get("headRefOid") != expected_head_sha:
+        raise SystemExit("merge 前记录 integration 复核时发现 PR HEAD 已变化，拒绝继续。")
+    if latest_body != original_body:
+        raise SystemExit("merge 前记录 integration 复核时发现 PR 描述已变化，拒绝覆盖并发编辑。")
+    previous_value = integration_status_checked_before_merge_value(latest_body)
+    updated_body = set_integration_status_checked_before_merge(latest_body, "yes")
+    if updated_body != latest_body:
         update_pr_body(pr_number, updated_body)
-    return pr_meta(pr_number)
+        latest = pr_meta(pr_number)
+    return latest, previous_value
 
 
 def update_pr_body(pr_number: int, body: str) -> None:
@@ -445,10 +462,15 @@ def update_pr_body(pr_number: int, body: str) -> None:
         temp_path.unlink(missing_ok=True)
 
 
-def restore_merge_time_integration_recheck(pr_number: int, body: str) -> None:
+def restore_merge_time_integration_recheck(pr_number: int, previous_value: str) -> None:
     try:
-        update_pr_body(pr_number, body)
-    except CommandError:
+        latest = pr_meta(pr_number)
+        latest_body = str(latest.get("body") or "")
+        restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
+        if restored_body == latest_body:
+            return
+        update_pr_body(pr_number, restored_body)
+    except (CommandError, SystemExit):
         return
 
 
@@ -998,6 +1020,7 @@ def merge_if_safe(
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
     merge_time_integration_recheck_recorded = False
+    previous_merge_recheck_value: str | None = None
     if merge_gate_requires_integration_recheck(current):
         if not confirm_integration_recheck:
             raise SystemExit(
@@ -1010,15 +1033,15 @@ def merge_if_safe(
         if preview_errors:
             detail = "\n".join(f"- {item}" for item in preview_errors)
             raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
-        current = record_merge_time_integration_recheck(pr_number, current)
+        current, previous_merge_recheck_value = record_merge_time_integration_recheck(pr_number, current)
         merge_time_integration_recheck_recorded = True
         if current["headRefOid"] != reviewed_head_sha:
-            restore_merge_time_integration_recheck(pr_number, original_body)
+            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
             raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         if merge_time_integration_recheck_recorded:
-            restore_merge_time_integration_recheck(pr_number, original_body)
+            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
         detail = "\n".join(f"- {item}" for item in integration_errors)
         raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
 
@@ -1037,7 +1060,7 @@ def merge_if_safe(
         run(command, cwd=REPO_ROOT)
     except CommandError:
         if merge_time_integration_recheck_recorded:
-            restore_merge_time_integration_recheck(pr_number, original_body)
+            restore_merge_time_integration_recheck(pr_number, previous_merge_recheck_value or "no")
         raise
     return 0
 
