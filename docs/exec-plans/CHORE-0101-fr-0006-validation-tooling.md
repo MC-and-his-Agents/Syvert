@@ -37,6 +37,7 @@
 
 - `FR-0006` formal spec 已合入主干；`#101` 当前作为 implementation Work Item 承接“验证工具与结果分类”。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-101-fr-0006`，仅处理测试侧 harness 验证工具与必要最小测试改动。
+- 当前分支已 rebase 到 `origin/main@1dbf4c6`（`#102` 已合入后的主干状态）。
 - validation tool 已在测试侧落地，包含单样例与批量样例两条分类入口，并已通过目标单测。
 
 ## 下一步动作
@@ -62,7 +63,7 @@
 - 已阅读：`spec_review.md`
 - 已阅读：`code_review.md`
 - 已阅读：`docs/specs/FR-0006-adapter-contract-test-harness/`
-- 已核对：`tests/runtime/contract_harness/` 与 `docs/exec-plans/CHORE-0101-fr-0006-validation-tooling.md` 在当前 worktree 原先不存在
+- 已核对：以 `origin/main@1dbf4c6` 为基线，本分支仅新增 validation tool 与对应测试，并更新 `__init__.py` 导出与本 exec-plan 元数据
 - `python3 -m unittest tests.runtime.test_contract_harness_validation_tool`
   - 结果：`Ran 7 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool`
@@ -77,6 +78,7 @@
   - 结果：`通过`
 - `python3 scripts/open_pr.py --class implementation --issue 101 --item-key CHORE-0101-fr-0006-validation-tooling --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(test): 落地 FR-0006 验证工具与结果分类' --closing fixes --dry-run`
   - 结果：`通过`
+- review gate 语义：当前分支已满足 `implementation` 类 PR 的本地测试与 guard 前置条件；后续仅需按流程进入 reviewer / guardian / checks 与 merge gate
 
 ## 未决风险
 
