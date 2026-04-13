@@ -56,7 +56,9 @@ body:
     id: integration_ref
     attributes:
       label: integration_ref
-      description: 填 integration project canonical issue / item 链接或编号；无则留空。
+      description: 填具体 integration issue / item 链接或编号；纯本仓库事项写 `none`。
+    validations:
+      required: true
 
   - type: dropdown
     id: external_dependency
@@ -74,6 +76,7 @@ body:
     id: merge_gate
     attributes:
       label: merge_gate
+      description: 纯本仓库事项选 `local_only`；跨仓事项选 `integration_check_required`。
       options:
         - local_only
         - integration_check_required

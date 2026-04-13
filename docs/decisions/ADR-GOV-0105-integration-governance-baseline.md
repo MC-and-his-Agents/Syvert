@@ -20,7 +20,7 @@
 - `Syvert Project` 与 `WebEnvoy Project` 继续分别承担各自仓库的本地执行真相，不合并为单一产品 project。
 - 两个仓库的 issue / PR / review / workflow 载体统一补入 integration 字段与检查口径。
 - 纯本仓库事项保持 `integration_touchpoint=none`；触及共享契约、跨仓依赖或联合验收时，必须显式绑定 integration ref。
-- `WebEnvoy` 的治理改造必须保持五个冻结治理文件与 issue forms 两条独立 PR，不得混线。
+- 各仓库继续按各自本地治理门禁拆分 PR；integration project 不规定另一仓库的内部文件切片方式。
 
 ## 约束
 

@@ -18,7 +18,7 @@
 
 ## 范围
 
-- 本次纳入：`WORKFLOW.md`、`code_review.md`、`.github/PULL_REQUEST_TEMPLATE.md`、`.github/ISSUE_TEMPLATE/**` 与当前 exec-plan。
+- 本次纳入：`WORKFLOW.md`、`code_review.md`、`.github/PULL_REQUEST_TEMPLATE.md`、`.github/ISSUE_TEMPLATE/**`、`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md` 与当前 exec-plan。
 - 本次不纳入：自动 bot / 自动同步系统、新的产品仓库、跨仓实现代码、对现有 `Phase / FR / sprint` 语义做统一改造。
 
 ## 当前停点
