@@ -14,6 +14,7 @@ from scripts.common import REPO_ROOT, default_github_repo, integration_ref_is_ch
 from scripts.integration_contract import (
     build_review_packet,
     fetch_integration_ref_live_state,
+    merge_gate_requires_integration_recheck,
     parse_pr_integration_check,
     validate_issue_fetch,
     validate_integration_ref_live_state,
@@ -206,6 +207,9 @@ def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
         issue_error=issue_error,
         integration_ref_live=integration_ref_live,
     )
+    if not pr_canonical and issue_canonical:
+        packet["merge_gate"] = str(issue_canonical.get("merge_gate") or "").strip().lower()
+        packet["merge_gate_requires_recheck"] = merge_gate_requires_integration_recheck(issue_canonical)
     live_validation_payload = pr_canonical or issue_canonical
     live_errors = validate_integration_ref_live_state(
         live_validation_payload,

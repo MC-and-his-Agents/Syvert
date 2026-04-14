@@ -273,6 +273,10 @@ class GovernanceStatusTests(unittest.TestCase):
             ["`integration_ref` 联合验收状态未就绪（当前 `pending`），拒绝继续。"],
         )
         self.assertTrue(payload["integration"]["comparison_errors"])
+        self.assertEqual(payload["integration"]["merge_gate"], "integration_check_required")
+        self.assertTrue(payload["integration"]["merge_gate_requires_recheck"])
+        text_output = governance_status.render_text(payload)
+        self.assertIn("merge_gate=integration_check_required", text_output)
 
     def test_issue_status_reports_issue_canonical_without_pr_only_errors(self) -> None:
         resolution = type(
