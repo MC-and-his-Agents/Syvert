@@ -692,6 +692,9 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(payload["joint_acceptance"], "ready")
         self.assertEqual(payload["project_url"], "https://github.com/orgs/MC-and-his-Agents/projects/3")
         self.assertEqual(payload["title"], "integration baseline")
+        self.assertEqual(payload["content_type"], "issue")
+        self.assertEqual(payload["content_repo"], "MC-and-his-Agents/Syvert")
+        self.assertEqual(payload["content_issue_number"], "105")
 
     def test_fetch_integration_ref_live_state_rejects_issue_without_integration_project_item(self) -> None:
         graphql_payload = {

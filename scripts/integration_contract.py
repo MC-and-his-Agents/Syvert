@@ -882,6 +882,10 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
     candidate["url"] = str(issue.get("url") or "").strip()
     candidate["title"] = str(issue.get("title") or "").strip()
     candidate["issue_state"] = normalize_label_value(str(issue.get("state") or ""))
+    candidate["content_type"] = "issue"
+    candidate["content_url"] = str(issue.get("url") or "").strip()
+    candidate["content_issue_number"] = str(issue.get("number") or issue_number).strip()
+    candidate["content_repo"] = repo_slug
     return candidate
 
 
