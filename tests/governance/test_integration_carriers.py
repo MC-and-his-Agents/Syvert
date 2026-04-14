@@ -27,8 +27,13 @@ class IntegrationCarrierTests(unittest.TestCase):
             body = (template_dir / name).read_text(encoding="utf-8")
             for line in render_contract_reference_lines():
                 self.assertIn(line, body, msg=f"{name} missing canonical source line")
+            positions = []
             for field in ISSUE_SCOPE_FIELDS:
-                self.assertRegex(body, rf"id:\s+{re.escape(field)}", msg=f"{name} missing {field}")
+                marker = f"id: {field}"
+                index = body.find(marker)
+                self.assertGreaterEqual(index, 0, msg=f"{name} missing {field}")
+                positions.append(index)
+            self.assertEqual(positions, sorted(positions), msg=f"{name} issue carrier order drifted from canonical contract")
 
     def test_phase_form_explicitly_excludes_integration_metadata(self) -> None:
         body = (REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "phase.yml").read_text(encoding="utf-8")

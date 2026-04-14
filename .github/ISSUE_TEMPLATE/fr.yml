@@ -28,16 +28,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: shared_contract_changed
-    attributes:
-      label: shared_contract_changed
-      options:
-        - "no"
-        - "yes"
-    validations:
-      required: true
-
   - type: markdown
     attributes:
       value: |
@@ -65,6 +55,16 @@ body:
         - active
         - blocked
         - resolved
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
     validations:
       required: true
 

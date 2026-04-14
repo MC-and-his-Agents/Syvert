@@ -94,16 +94,6 @@ body:
           required: true
 
   - type: dropdown
-    id: shared_contract_changed
-    attributes:
-      label: shared_contract_changed
-      options:
-        - "no"
-        - "yes"
-    validations:
-      required: true
-
-  - type: dropdown
     id: integration_touchpoint
     attributes:
       label: integration_touchpoint
@@ -113,6 +103,16 @@ body:
         - active
         - blocked
         - resolved
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
     validations:
       required: true
 
