@@ -68,5 +68,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次完成 PR-B consumer wiring 代码收口的 checkpoint：`93d0fd6d7fab16a492548294422236b1fb08b4d9`
-- 当前 PR 审查态以 `#115` 的 latest head 为准；若后续只补充 review / guardian 元数据，不另起新的代码 checkpoint。
+- 最近一次完成 PR-B consumer wiring 代码收口并同步验证证据的 checkpoint：`3165cb69ae5eacae33e59d2833c7e0f671b92008`
+- 当前 PR 审查态以 `#115` 的 latest head 为准；本轮最小验证集与 guardian 必须绑定同一 latest head，不得继续复用旧 checkpoint 的验证摘要。
