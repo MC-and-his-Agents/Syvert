@@ -963,6 +963,7 @@ def merge_if_safe(
     require_auth()
     current = pr_meta(pr_number)
     original_body = str(current.get("body") or "")
+    reviewed_body = original_body
     payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"], body=original_body)
 
     if payload:
@@ -977,6 +978,7 @@ def merge_if_safe(
     else:
         meta, result = review_once(pr_number, post=post, json_output=None)
         reviewed_head_sha = meta["headRefOid"]
+        reviewed_body = str(meta.get("body") or "")
         current = pr_meta(pr_number)
         guardian_verdict_body_bound = True
 
@@ -989,6 +991,8 @@ def merge_if_safe(
         raise SystemExit("PR 仍为 Draft，拒绝合并。")
     if current["headRefOid"] != reviewed_head_sha:
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
+    if guardian_verdict_body_bound and str(current.get("body") or "") != reviewed_body:
+        raise SystemExit("guardian 审查后 PR 描述已变化，拒绝合并。")
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
     merge_time_integration_recheck_recorded = False

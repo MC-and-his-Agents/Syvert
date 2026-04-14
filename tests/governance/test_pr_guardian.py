@@ -1901,6 +1901,7 @@ class MergeIfSafeTests(unittest.TestCase):
             {
                 "number": 1,
                 "headRefOid": "sha-2",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
             {
                 "verdict": "APPROVE",
@@ -1920,6 +1921,58 @@ class MergeIfSafeTests(unittest.TestCase):
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-2", "--delete-branch"],
             cwd=ANY,
         )
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result", return_value=None)
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_rejects_body_drift_after_fresh_review_when_head_is_unchanged(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        reviewed_body = LOCAL_ONLY_INTEGRATION_CHECK_BODY
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-2",
+                "body": reviewed_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-2",
+                "body": reviewed_body + "\n\n补充说明：review 后被编辑\n",
+            },
+        ]
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-2",
+                "body": reviewed_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh",
+            },
+        )
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
+
+        self.assertIn("guardian 审查后 PR 描述已变化", str(ctx.exception))
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
+        all_checks_mock.assert_not_called()
+        run_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -1960,6 +2013,7 @@ class MergeIfSafeTests(unittest.TestCase):
             {
                 "number": 1,
                 "headRefOid": "sha-3",
+                "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
             },
             {
                 "verdict": "APPROVE",
