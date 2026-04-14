@@ -26,6 +26,7 @@
 - 当前回合的中心目标已收缩为“仓库内 canonical integration contract + 消费方接线”，不再把 owner project、repo project fields、labels 与 issue 回填写成 repo 内已完成事实。
 - repo 内改造需要同时收口三件事：单一机器可读 contract、`open_pr/pr_guardian/merge_pr` 的共享消费链路、以及 reviewer 可见的 integration review packet。
 - 外部 GitHub 平台 rollout 改为独立 evidence 包，当前 exec-plan 只保留 repo 内 contract、review packet 与受控 merge gate 的执行停点。
+- `integration_ref` 对应 integration item 的当前状态、依赖与联合验收结果属于 merge gate 的运行时输入，不属于 evidence 文档中的“已完成事实”。
 - 存量事项继续走受控兼容：issue lookup failure fail-closed；issue 存在但未声明 canonical integration 字段时允许 legacy 路径；一旦 issue 已声明 canonical integration 字段，PR 就必须完整对齐。
 
 ## 下一步动作
@@ -56,7 +57,8 @@
 ## 未决风险
 
 - `Syvert/main` 在当前审查回合内继续前进；任何基于旧 head 的 guardian 结论都不能直接用于最终合并，必须在最后一次 rebase 后重跑 checks 与 guardian。
-- merge 前仍需再次核对 `integration_ref` 与 owner 级 integration project 的当前状态，但这属于 merge gate / evidence 范围，不再由 exec-plan 直接宣称已完成。
+- merge 前仍需再次核对 `integration_ref` 与 owner 级 integration project 的当前状态，但这属于 merge gate 运行时读取范围，不由 evidence 文档或 exec-plan 直接宣称已完成。
+- 当前 `integration_ref` 对应 item 的 `Joint Acceptance` 若仍为 `pending` / `failed`，则 `#107` 不应进入受控合并，除非先完成外部状态收口或更正 canonical issue 元数据。
 - 若后续仍有未回填 canonical integration 字段的存量 issue / PR，需要在进入下一轮执行前补齐，避免长期依赖 legacy 兼容路径。
 - 若后续继续扩张 integration 枚举或 gate 语义，需要再走独立治理回合，不应直接在当前 PR 上扩 scope。
 

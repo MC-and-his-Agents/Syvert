@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -342,6 +343,60 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertTrue(any("联合验收状态未就绪" in item for item in errors))
 
+    def test_validate_integration_ref_live_state_fail_closed_when_status_missing(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "",
+                "dependency_order": "parallel",
+                "joint_acceptance": "ready",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("status" in item for item in errors))
+
+    def test_validate_integration_ref_live_state_fail_closed_when_dependency_missing(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "in_progress",
+                "dependency_order": "",
+                "joint_acceptance": "ready",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("dependency_order" in item for item in errors))
+
     def test_fetch_integration_ref_live_state_returns_error_for_unreadable_issue(self) -> None:
         with patch("scripts.integration_contract.run") as run_mock:
             run_mock.return_value.returncode = 1
@@ -352,6 +407,49 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "issue")
         self.assertIn("无法读取", payload["error"])
+
+    def test_fetch_integration_ref_live_state_rejects_project_item_owner_mismatch(self) -> None:
+        graphql_payload = {
+            "data": {
+                "node": {
+                    "__typename": "ProjectV2Item",
+                    "fieldValues": {
+                        "nodes": [
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "In Progress",
+                                "field": {"name": "Status"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "parallel",
+                                "field": {"name": "Dependency Order"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "ready",
+                                "field": {"name": "Joint Acceptance"},
+                            },
+                        ]
+                    },
+                    "project": {
+                        "url": "https://github.com/orgs/another-owner/projects/3",
+                        "number": 3,
+                        "title": "Integration",
+                        "owner": {"login": "another-owner"},
+                    },
+                }
+            }
+        }
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value.returncode = 0
+            run_mock.return_value.stdout = json.dumps(graphql_payload)
+            run_mock.return_value.stderr = ""
+
+            payload = fetch_integration_ref_live_state("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test")
+
+        self.assertEqual(payload["source"], "project_item")
+        self.assertIn("归属不一致", payload["error"])
 
     def test_validate_pr_merge_gate_payload_keeps_legacy_compatibility_decision_outside_payload_validation(self) -> None:
         payload = {

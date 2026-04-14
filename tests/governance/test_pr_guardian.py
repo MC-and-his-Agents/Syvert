@@ -1561,6 +1561,107 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(kwargs["integration_ref_live"]["source"], "project_item")
         self.assertEqual(kwargs["integration_ref_live"]["joint_acceptance"], "pending")
 
+    def test_build_review_context_falls_back_to_issue_canonical_integration_ref_for_live_snapshot(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: integration live snapshot fallback",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "Issue: #24\n## 摘要\n\n- integration_check 暂未补齐\n",
+        }
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
+            ):
+                with patch(
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(
+                        24,
+                        {
+                            "integration_touchpoint": "active",
+                            "shared_contract_changed": "no",
+                            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                            "external_dependency": "both",
+                            "merge_gate": "integration_check_required",
+                            "contract_surface": "runtime_modes",
+                            "joint_acceptance_needed": "yes",
+                        },
+                    ),
+                ):
+                    with patch(
+                        "scripts.pr_guardian.fetch_issue_context",
+                        return_value={"identity": ["- Issue: #24"], "summary": "issue summary", "canonical_integration": {}},
+                    ):
+                        with patch(
+                            "scripts.pr_guardian.fetch_integration_ref_live_state",
+                            return_value={"source": "project_item", "status": "in_progress", "dependency_order": "parallel", "joint_acceptance": "ready"},
+                        ) as fetch_live_mock:
+                            with patch(
+                                "scripts.pr_guardian.build_review_packet",
+                                return_value={"issue_number": 24},
+                            ) as build_review_packet_mock:
+                                build_review_context(meta, Path("/tmp/pr-worktree"))
+
+        fetch_live_mock.assert_called_once_with(
+            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test"
+        )
+        kwargs = build_review_packet_mock.call_args.kwargs
+        self.assertEqual(kwargs["integration_ref_live"]["source"], "project_item")
+
+    def test_build_review_context_skips_live_fetch_for_local_only_integration_ref_none(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: local-only integration snapshot",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "\n".join(
+                [
+                    "Issue: #24",
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: none",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: none",
+                    "- external_dependency: none",
+                    "- merge_gate: local_only",
+                    "- contract_surface: none",
+                    "- joint_acceptance_needed: no",
+                    "- integration_status_checked_before_pr: no",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            ),
+        }
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
+            ):
+                with patch(
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(24, {}),
+                ):
+                    with patch(
+                        "scripts.pr_guardian.fetch_issue_context",
+                        return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                    ):
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
+                            with patch(
+                                "scripts.pr_guardian.build_review_packet",
+                                return_value={"issue_number": 24},
+                            ) as build_review_packet_mock:
+                                build_review_context(meta, Path("/tmp/pr-worktree"))
+
+        fetch_live_mock.assert_not_called()
+        kwargs = build_review_packet_mock.call_args.kwargs
+        self.assertEqual(kwargs["integration_ref_live"], {})
+
     def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
         meta = {
             "number": 24,

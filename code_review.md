@@ -13,6 +13,7 @@
 - 与当前改动直接相关的治理或流程文档
 - 当前 diff、受影响文件与必要的调用链 / contract 边界
 - 若事项声明 `integration_touchpoint != none`，补充对应的 `integration_ref` 及其当前依赖 / 联合验收状态
+- 若需要引用 owner project / labels / issue backfill，只能把它们当作 rollout evidence；reviewer 不得把 evidence 文档当作 `integration_ref` 当前状态的替代品
 
 仅当历史事项确有 legacy `TODO.md`，且其中内容对当前风险、恢复或历史判断直接相关时，才补充该文件作为审查输入。
 
@@ -58,7 +59,7 @@
 | 可观测性 | 日志、指标、状态面、错误上下文是否足够定位问题 | 关键路径可定位，必要输出可支持发布后排障 | 出问题后无法判断输入、状态或失败原因 |
 | 安全 / 性能 / 成本 | 是否引入安全缺口、性能回退、额外成本或配额风险 | 风险已评估并在必要处验证或约束 | 新增高耗时/高成本路径或安全暴露但无说明 |
 | 发布与回滚准备 | 发布依赖、迁移步骤、回滚方式是否就绪 | 发布前提、回滚步骤、操作顺序清晰 | 需要人工操作却未记录，回滚方案缺失或不可执行 |
-| integration 联动一致性 | 是否按 canonical integration contract 正确标记跨仓触点、依赖和联合验收约束 | PR 与 issue / work item 的 canonical integration 元数据一致，且 reviewer 可确认提 PR 前检查口径成立 | 共享契约改动未标记 integration 联动、PR 与 issue canonical integration 漂移，或跨仓事项缺少可核查的 integration 绑定 |
+| integration 联动一致性 | 是否按 canonical integration contract 正确标记跨仓触点、依赖和联合验收约束 | PR 与 issue / work item 的 canonical integration 元数据一致，review packet 中可见 `integration_ref` 当前状态，且 reviewer 可确认提 PR 前检查口径成立 | 共享契约改动未标记 integration 联动、PR 与 issue canonical integration 漂移、跨仓事项缺少可核查的 integration 绑定，或 reviewer 看不到当前 `integration_ref` 状态 |
 
 ## 事项分级视角
 
@@ -90,6 +91,7 @@
 5. 合并时 head 与审查时 head 一致
 6. 必须通过受控入口 `merge_pr`
 7. 若当前事项 `merge_gate=integration_check_required`，PR 描述必须补齐 canonical `integration_check`，且 merge-time integration recheck 只由 merge gate / guardian 消费，不要求 reviewer 先验完成
+8. 若 review packet 无法读取 `integration_ref` 当前状态、依赖或联合验收结果，应按 fail-closed 处理，而不是用 rollout evidence 或 issue 摘录代替
 
 merge gate 只回答“当前 PR 是否允许进入受控合并”，不替代 reviewer 对实现质量的实质判断。
 

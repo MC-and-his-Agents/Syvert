@@ -34,4 +34,5 @@
 - 当前事项的 bootstrap contract 由 `Issue #105 + ADR-GOV-0105 + GOV-0105 exec-plan` 构成；PR 只作为实现与验证载体，不反向进入 input contract。
 - 后续所有触及跨仓共享契约的 Syvert / WebEnvoy PR，都必须通过 canonical integration contract 显式判断是否进入 integration merge gate。
 - 外部 GitHub Project / labels / issue 回填属于 rollout 结果，不进入 workflow contract；相关验证入口单独记录在 `docs/governance-rollouts/GOV-0105-platform-evidence.md`。
+- `integration_ref` 指向的 integration item 当前字段值属于 merge gate 运行时输入，不属于 rollout evidence；reviewer / guardian / merge gate 必须实时读取，不得把 evidence 文档或旧审查结论当成当前状态。
 - integration 协调不再依赖隐式记忆，而是进入 canonical contract、project 字段、issue form、PR 模板与 guardian 审查链路。

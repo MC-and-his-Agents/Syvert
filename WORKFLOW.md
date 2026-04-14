@@ -97,6 +97,8 @@ codex:
   - 影响联合 PoC、联合回归或共享桥接能力
 - `open_pr` 负责基于 canonical contract 校验上位 issue / work item 元数据并生成 PR `integration_check`；`pr_guardian` 与 `merge_pr` 只消费同一 contract 结果，不再各自定义一套 integration 规则。
 - integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
+- `docs/governance-rollouts/*` 中记录的 project / label / backfill 结果只属于 rollout evidence，用于证明平台侧配置已落地；它们不是 merge gate 可直接复用的运行时输入。
+- `integration_ref` 指向的 integration issue / item 当前字段值（例如 `Status`、`Dependency Order`、`Joint Acceptance`）属于受控外部运行时输入；reviewer / guardian / merge gate 必须按需实时读取，并在无法验证时 fail-closed。
 - 存量 PR 兼容仍走受控 legacy 路径：
   - issue lookup failure 继续 fail-closed
   - issue 存在但尚未声明 canonical integration 字段时，guardian 可沿用 legacy 路径
@@ -139,3 +141,4 @@ codex:
   - PR 非 Draft，且审查与合并使用同一 head SHA
   - 若上位 issue / work item 已声明 canonical integration 字段，则 guardian 必须通过 canonical contract 确认 PR 的 `integration_check` 与其保持一致
   - 若 `merge_gate=integration_check_required`，则 merge gate 必须记录提 PR 前检查已完成，并在合并前再次核对 `integration_ref` 对应 integration issue / item 的状态、依赖与联合验收约束
+  - 上述 integration recheck 只接受实时读取结果；不得用 rollout evidence、旧 review 结论或手工摘录文本代替当前 `integration_ref` 状态

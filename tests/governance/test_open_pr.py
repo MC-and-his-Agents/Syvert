@@ -167,15 +167,21 @@ class OpenPrPreflightTests(unittest.TestCase):
         default_repo_mock.assert_called_once_with()
 
     @patch("scripts.common.run")
-    def test_default_github_repo_ignores_local_origin_and_uses_canonical_repo(self, run_mock) -> None:
+    def test_default_github_repo_prefers_remote_origin_slug_when_env_is_missing(self, run_mock) -> None:
         default_github_repo.cache_clear()
         try:
             with patch.dict("scripts.common.os.environ", {}, clear=True):
-                self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert")
+                run_mock.return_value = subprocess.CompletedProcess(
+                    args=["git", "config", "--get", "remote.origin.url"],
+                    returncode=0,
+                    stdout="git@github.com:MC-and-his-Agents/WebEnvoy.git\n",
+                    stderr="",
+                )
+                self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
         finally:
             default_github_repo.cache_clear()
 
-        run_mock.assert_not_called()
+        run_mock.assert_called_once()
 
     def test_normalize_integration_ref_for_comparison_normalizes_project_item_variants(self) -> None:
         with_view = "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test"

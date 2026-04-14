@@ -613,6 +613,28 @@ def fetch_project_item_integration_ref_live_state(
 
     project = node.get("project") or {}
     project_url = str((project or {}).get("url") or "").strip()
+    project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
+    project_number_actual = str((project or {}).get("number") or "").strip()
+    if project_owner and project_owner != organization.strip().lower():
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "project_item",
+            "error": (
+                "`integration_ref` 与 project item 实际归属不一致："
+                f"URL owner=`{organization}`，返回 owner=`{project_owner}`。"
+            ),
+        }
+    if project_number_actual and project_number_actual != project_number.strip():
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "project_item",
+            "error": (
+                "`integration_ref` 与 project item 实际 project 编号不一致："
+                f"URL projects/{project_number}，返回 projects/{project_number_actual}。"
+            ),
+        }
     status = normalize_label_value(fields.get("status", ""))
     dependency_order = normalize_label_value(fields.get("dependency order", ""))
     joint_acceptance = normalize_label_value(fields.get("joint acceptance", ""))
@@ -693,6 +715,11 @@ def validate_integration_ref_live_state(
         errors.append("`integration_ref` 当前状态为 `blocked`，拒绝继续。")
 
     dependency_order = normalize_label_value(str(live_state.get("dependency_order") or ""))
+    status = normalize_label_value(str(live_state.get("status") or ""))
+    if not status:
+        errors.append("无法从 `integration_ref` 读取当前 `status`，拒绝继续。")
+    if not dependency_order:
+        errors.append("无法从 `integration_ref` 读取当前 `dependency_order`，拒绝继续。")
     repo_name = repo_name_from_slug(current_repo_slug or default_github_repo())
     if dependency_order == "webenvoy_first" and repo_name == "syvert":
         errors.append("`integration_ref` 的依赖顺序要求 `webenvoy_first`，当前仓库不得先合并。")
