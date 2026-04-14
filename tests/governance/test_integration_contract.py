@@ -191,7 +191,7 @@ class IntegrationContractTests(unittest.TestCase):
             "error": "",
         },
     )
-    def test_build_review_packet_accepts_cross_form_integration_ref_without_live_resolution(self, fetch_live_mock) -> None:
+    def test_build_review_packet_rejects_cross_form_integration_ref_without_live_resolution(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -221,7 +221,10 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(packet["comparison_errors"], [])
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
         self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
         self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
         fetch_live_mock.assert_not_called()
@@ -230,7 +233,7 @@ class IntegrationContractTests(unittest.TestCase):
         "scripts.integration_contract.fetch_integration_ref_live_state",
         return_value={"source": "project_item", "error": "lookup failed"},
     )
-    def test_build_review_packet_defers_unresolved_cross_form_ref_to_live_validators(self, fetch_live_mock) -> None:
+    def test_build_review_packet_rejects_unresolved_cross_form_ref_without_live_resolution(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -260,7 +263,10 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(packet["comparison_errors"], [])
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
         fetch_live_mock.assert_not_called()
 
     def test_default_github_repo_uses_repo_root_name_when_env_missing(self) -> None:

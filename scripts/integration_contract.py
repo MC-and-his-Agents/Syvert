@@ -410,8 +410,6 @@ def compare_issue_and_pr_canonical(
                 actual_normalized.split(":", 1)[0],
             } == {"issue", "project-item"}
             if not allow_live_resolution:
-                if cross_form_pair:
-                    continue
                 errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
                 continue
             expected, expected_resolved, expected_static = semantic_integration_ref_identity(str(issue_canonical.get(field, "") or ""))

@@ -978,6 +978,63 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
 
+    @patch(
+        "scripts.open_pr.resolve_issue_canonical_integration",
+        return_value=(
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "MC-and-his-Agents/Syvert#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            None,
+        ),
+    )
+    @patch(
+        "scripts.open_pr.semantic_integration_ref_identity",
+        side_effect=[
+            ("issue:mc-and-his-agents/syvert#12", True, "issue:mc-and-his-agents/syvert#12"),
+            ("issue:mc-and-his-agents/syvert#12", True, "project-item:mc-and-his-agents/3#PVTI_same"),
+        ],
+    )
+    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, semantic_identity_mock, resolve_issue_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
+        self.assertNotIn("PVTI_same", body)
+        resolve_issue_mock.assert_called_once_with(105)
+        self.assertEqual(semantic_identity_mock.call_count, 2)
+
     def test_inactive_exec_plan_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)

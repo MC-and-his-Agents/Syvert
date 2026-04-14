@@ -53,6 +53,7 @@ from scripts.integration_contract import (
     ISSUE_SCOPE_FIELDS,
     extract_issue_canonical_integration_fields,
     field_choices,
+    semantic_integration_ref_identity,
     validate_issue_fetch,
     validate_open_pr_payload,
 )
@@ -547,6 +548,23 @@ def render_integration_check_section(values: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+def canonicalize_integration_ref_for_body(issue: int | None, integration_ref: str) -> str:
+    raw_integration_ref = str(integration_ref or "").strip()
+    if issue is None or not raw_integration_ref:
+        return raw_integration_ref
+    issue_canonical, issue_error = resolve_issue_canonical_integration(issue)
+    if issue_error:
+        return raw_integration_ref
+    issue_integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    if not issue_integration_ref or issue_integration_ref == raw_integration_ref:
+        return raw_integration_ref
+    issue_identity, issue_resolved, _ = semantic_integration_ref_identity(issue_integration_ref)
+    pr_identity, pr_resolved, _ = semantic_integration_ref_identity(raw_integration_ref)
+    if issue_resolved and pr_resolved and issue_identity == pr_identity:
+        return issue_integration_ref
+    return raw_integration_ref
+
+
 def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     if not TEMPLATE_PATH.exists():
         raise SystemExit(f"缺少 PR 模板: {TEMPLATE_PATH}")
@@ -569,7 +587,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     integration_values = {
         "integration_touchpoint": args.integration_touchpoint,
         "shared_contract_changed": args.shared_contract_changed,
-        "integration_ref": args.integration_ref,
+        "integration_ref": canonicalize_integration_ref_for_body(args.issue, args.integration_ref),
         "external_dependency": args.external_dependency,
         "merge_gate": args.merge_gate,
         "contract_surface": args.contract_surface,
