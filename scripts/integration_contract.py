@@ -358,8 +358,11 @@ def validate_pr_integration_contract(
     *,
     issue_number: int | None,
     issue_canonical: Mapping[str, str],
+    issue_error: str | None = None,
     require_merge_time_recheck: bool,
 ) -> list[str]:
+    if issue_error:
+        return [issue_error]
     if not payload:
         return [missing_pr_integration_check_error(issue_number)] if issue_canonical else []
     return validate_pr_merge_gate_payload(
@@ -423,8 +426,12 @@ def build_review_packet(
 ) -> dict[str, object]:
     pr_payload = parse_pr_integration_check(body)
     issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
+    packet_issue_error = str(issue_error or "").strip()
     missing_pr_error = missing_pr_integration_check_error(issue_number) if issue_canonical and not pr_payload else ""
     comparison_errors = (
+        [packet_issue_error]
+        if packet_issue_error
+        else
         [missing_pr_error]
         if missing_pr_error
         else compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label) if issue_canonical and pr_payload else []
@@ -443,6 +450,7 @@ def build_review_packet(
         pr_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical,
+        issue_error=packet_issue_error,
         require_merge_time_recheck=False,
     )
     return {

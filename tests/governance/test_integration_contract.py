@@ -34,6 +34,21 @@ ISSUE_FORM_PATHS = [
     REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "governance.yml",
     REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "work-item.yml",
 ]
+LOCAL_ONLY_PR_BODY = "\n".join(
+    [
+        "## integration_check",
+        "",
+        "- integration_touchpoint: none",
+        "- shared_contract_changed: no",
+        "- integration_ref: none",
+        "- external_dependency: none",
+        "- merge_gate: local_only",
+        "- contract_surface: none",
+        "- joint_acceptance_needed: no",
+        "- integration_status_checked_before_pr: no",
+        "- integration_status_checked_before_merge: no",
+    ]
+)
 
 
 def form_block(text: str, field_id: str) -> str:
@@ -209,6 +224,23 @@ class IntegrationContractTests(unittest.TestCase):
         expected_error = "PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"
 
         self.assertEqual(packet["pr_canonical"], {})
+        self.assertEqual(packet["comparison_errors"], [expected_error])
+        self.assertEqual(packet["merge_validation_errors"], [expected_error])
+        self.assertIn(expected_error, rendered)
+        self.assertNotIn("canonical_mismatches: none", rendered)
+        self.assertNotIn("merge_gate_validation: ok", rendered)
+
+    def test_build_review_packet_propagates_issue_lookup_error_into_reviewer_packet(self) -> None:
+        packet = build_review_packet(
+            LOCAL_ONLY_PR_BODY,
+            issue_number=105,
+            issue_canonical={},
+            issue_error="无法读取 Issue #105 的 canonical integration 元数据，拒绝继续。",
+        )
+
+        rendered = "\n".join(render_review_packet_lines(packet))
+        expected_error = "无法读取 Issue #105 的 canonical integration 元数据，拒绝继续。"
+
         self.assertEqual(packet["comparison_errors"], [expected_error])
         self.assertEqual(packet["merge_validation_errors"], [expected_error])
         self.assertIn(expected_error, rendered)

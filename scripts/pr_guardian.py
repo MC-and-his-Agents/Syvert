@@ -279,6 +279,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
         integration_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical_integration,
+        issue_error=issue_canonical_error,
         require_merge_time_recheck=True,
     )
 
