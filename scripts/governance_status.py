@@ -10,12 +10,13 @@ if __package__ in {None, ""}:
 import argparse
 import json
 
-from scripts.common import REPO_ROOT, integration_ref_is_checkable, legacy_state_file, load_json, run, syvert_state_file
+from scripts.common import REPO_ROOT, default_github_repo, integration_ref_is_checkable, legacy_state_file, load_json, run, syvert_state_file
 from scripts.integration_contract import (
     build_review_packet,
     fetch_integration_ref_live_state,
     parse_pr_integration_check,
     validate_issue_fetch,
+    validate_integration_ref_live_state,
 )
 from scripts.item_context import (
     active_exec_plans_for_issue,
@@ -205,6 +206,12 @@ def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
         issue_error=issue_error,
         integration_ref_live=integration_ref_live,
     )
+    live_errors = validate_integration_ref_live_state(
+        pr_canonical,
+        integration_ref_live,
+        current_repo_slug=default_github_repo(),
+    )
+    packet["integration_ref_live_errors"] = live_errors
     packet["issue_lookup_error"] = issue_error
     return packet
 
@@ -222,6 +229,18 @@ def build_integration_status_for_issue(issue_number: int) -> dict[str, object]:
         issue_error=issue_error,
         integration_ref_live=integration_ref_live,
     )
+    live_errors = validate_integration_ref_live_state(
+        issue_canonical,
+        integration_ref_live,
+        current_repo_slug=default_github_repo(),
+    )
+    packet["pr_canonical"] = {}
+    packet["normalized_pr_canonical"] = {}
+    packet["comparison_errors"] = []
+    packet["merge_validation_errors"] = []
+    packet["integration_ref_live_errors"] = live_errors
+    packet["merge_gate"] = str(issue_canonical.get("merge_gate") or "").strip().lower()
+    packet["merge_gate_requires_recheck"] = packet["merge_gate"] == "integration_check_required"
     packet["issue_lookup_error"] = issue_error
     return packet
 

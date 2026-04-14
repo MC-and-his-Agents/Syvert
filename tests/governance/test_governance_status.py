@@ -152,6 +152,115 @@ class GovernanceStatusTests(unittest.TestCase):
         self.assertEqual(payload["integration"]["integration_ref_live"]["status"], "review")
         fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test")
 
+    def test_pr_status_surfaces_live_integration_validation_failures(self) -> None:
+        pr_body = "\n".join(
+            [
+                "Issue: #105",
+                "item_key: `GOV-0105-integration-governance-baseline`",
+                "item_type: `GOV`",
+                "release: `governance-baseline`",
+                "sprint: `integration-governance`",
+                "## integration_check",
+                "",
+                "- integration_touchpoint: active",
+                "- shared_contract_changed: yes",
+                "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                "- external_dependency: both",
+                "- merge_gate: integration_check_required",
+                "- contract_surface: runtime_modes",
+                "- joint_acceptance_needed: yes",
+                "- integration_status_checked_before_pr: yes",
+                "- integration_status_checked_before_merge: no",
+            ]
+        )
+        resolution = type(
+            "Resolution",
+            (),
+            {
+                "canonical": {
+                    "integration_touchpoint": "active",
+                    "shared_contract_changed": "yes",
+                    "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "external_dependency": "both",
+                    "merge_gate": "integration_check_required",
+                    "contract_surface": "runtime_modes",
+                    "joint_acceptance_needed": "yes",
+                },
+                "error": None,
+            },
+        )()
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {"k": {"branch": "feature/x", "key": "k", "issue": 105}}}):
+                    with patch(
+                        "scripts.governance_status.fetch_pr_meta",
+                        return_value={"headRefOid": "sha-1", "headRefName": "feature/x", "body": pr_body},
+                    ):
+                        with patch("scripts.governance_status.find_latest_guardian_result", return_value={"verdict": "APPROVE", "head_sha": "sha-1"}):
+                            with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
+                                with patch("scripts.governance_status.validate_issue_fetch", return_value=resolution):
+                                    with patch(
+                                        "scripts.governance_status.fetch_integration_ref_live_state",
+                                        return_value={
+                                            "source": "project_item",
+                                            "status": "review",
+                                            "dependency_order": "parallel",
+                                            "joint_acceptance": "pending",
+                                            "owner_repo": "joint",
+                                            "contract_status": "reviewing",
+                                            "error": "",
+                                        },
+                                    ):
+                                        payload = governance_status.build_status_payload(pr_number=115)
+
+        self.assertEqual(payload["integration"]["integration_ref_live_errors"], ["`integration_ref` 联合验收状态未就绪（当前 `pending`），拒绝继续。"])
+        text_output = governance_status.render_text(payload)
+        self.assertIn("integration_ref_live_errors=1", text_output)
+        self.assertIn("联合验收状态未就绪", text_output)
+
+    def test_issue_status_reports_issue_canonical_without_pr_only_errors(self) -> None:
+        resolution = type(
+            "Resolution",
+            (),
+            {
+                "canonical": {
+                    "integration_touchpoint": "active",
+                    "shared_contract_changed": "yes",
+                    "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "external_dependency": "both",
+                    "merge_gate": "integration_check_required",
+                    "contract_surface": "runtime_modes",
+                    "joint_acceptance_needed": "yes",
+                },
+                "error": None,
+            },
+        )()
+        with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
+            with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
+                with patch("scripts.governance_status.load_worktree_state", return_value={"worktrees": {}}):
+                    with patch("scripts.governance_status.matching_exec_plan_for_issue", return_value={}):
+                        with patch("scripts.governance_status.validate_issue_fetch", return_value=resolution):
+                            with patch(
+                                "scripts.governance_status.fetch_integration_ref_live_state",
+                                return_value={
+                                    "source": "project_item",
+                                    "status": "review",
+                                    "dependency_order": "parallel",
+                                    "joint_acceptance": "ready",
+                                    "owner_repo": "joint",
+                                    "contract_status": "reviewing",
+                                    "error": "",
+                                },
+                            ):
+                                payload = governance_status.build_status_payload(issue_number=105)
+
+        self.assertEqual(payload["integration"]["issue_number"], 105)
+        self.assertEqual(payload["integration"]["pr_canonical"], {})
+        self.assertEqual(payload["integration"]["comparison_errors"], [])
+        self.assertEqual(payload["integration"]["merge_validation_errors"], [])
+        self.assertEqual(payload["integration"]["integration_ref_live_errors"], [])
+        self.assertEqual(payload["integration"]["merge_gate"], "integration_check_required")
+
     def test_pr_body_missing_item_context_fields_returns_empty(self) -> None:
         with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
             with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
