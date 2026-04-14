@@ -44,6 +44,16 @@ FIELD_CHOICES = {
 REF_EXAMPLES = tuple(str(example) for example in FIELD_DEFINITIONS["integration_ref"].get("examples", []))
 CONTRACT_SOURCE_MACHINE_READABLE = str(RAW_CONTRACT["canonical_source"]["machine_readable"])
 CONTRACT_SOURCE_MODULE = str(RAW_CONTRACT["canonical_source"]["python_module"])
+CANONICAL_INTEGRATION_PROJECT_TITLE = "Syvert × WebEnvoy Integration"
+CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS = frozenset(
+    {
+        "status",
+        "dependency order",
+        "joint acceptance",
+        "owner repo",
+        "contract status",
+    }
+)
 INTEGRATION_PROJECT_ITEM_QUERY = """
 query($id: ID!) {
   node(id: $id) {
@@ -98,14 +108,14 @@ query($id: ID!) {
 """.strip()
 
 ISSUE_PROJECT_ITEMS_QUERY = """
-query($owner: String!, $name: String!, $number: Int!) {
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
       number
       title
       url
       state
-      projectItems(first: 20) {
+      projectItems(first: 100, after: $after) {
         nodes {
           __typename
           ... on ProjectV2Item {
@@ -143,6 +153,10 @@ query($owner: String!, $name: String!, $number: Int!) {
               }
             }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -552,6 +566,12 @@ def repo_name_from_slug(slug: str) -> str:
     return slug.split("/", 1)[1].strip().lower()
 
 
+def canonical_integration_project_owner() -> str:
+    repo_slug = default_github_repo()
+    owner, _, _ = repo_slug.partition("/")
+    return owner.strip().lower()
+
+
 def project_item_fields(node: Mapping[str, object]) -> dict[str, str]:
     field_nodes = ((node.get("fieldValues") or {}).get("nodes") or []) if isinstance(node, dict) else []
     fields: dict[str, str] = {}
@@ -564,6 +584,17 @@ def project_item_fields(node: Mapping[str, object]) -> dict[str, str]:
                 continue
             fields[field_name.lower()] = value_from_project_item_node(raw_node)
     return fields
+
+
+def is_canonical_integration_project_item(node: Mapping[str, object], fields: Mapping[str, str]) -> bool:
+    project = node.get("project") or {}
+    project_title = str((project or {}).get("title") or "").strip()
+    project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
+    return (
+        project_title == CANONICAL_INTEGRATION_PROJECT_TITLE
+        and project_owner == canonical_integration_project_owner()
+        and CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS.issubset(fields.keys())
+    )
 
 
 def build_project_item_live_state(
@@ -637,8 +668,12 @@ def build_project_item_live_state(
 
 def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str, issue_number: int) -> dict[str, object]:
     owner, _, name = repo_slug.partition("/")
-    completed = run(
-        [
+    issue: dict[str, object] | None = None
+    project_nodes: list[dict[str, object]] = []
+    after: str | None = None
+
+    while True:
+        command = [
             "gh",
             "api",
             "graphql",
@@ -650,11 +685,50 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
             f"name={name}",
             "-F",
             f"number={issue_number}",
-        ],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if completed.returncode != 0:
+        ]
+        if after:
+            command.extend(["-f", f"after={after}"])
+        completed = run(command, cwd=REPO_ROOT, check=False)
+        if completed.returncode != 0:
+            return {
+                "integration_ref": integration_ref,
+                "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+                "source": "issue",
+                "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
+            }
+
+        payload = json.loads(completed.stdout or "{}")
+        current_issue = (((payload.get("data") or {}).get("repository") or {}).get("issue") or {}) if isinstance(payload, dict) else {}
+        if not isinstance(current_issue, dict) or not current_issue:
+            return {
+                "integration_ref": integration_ref,
+                "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+                "source": "issue",
+                "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
+            }
+
+        issue = current_issue
+        project_items = (current_issue.get("projectItems") or {}) if isinstance(current_issue, dict) else {}
+        nodes = project_items.get("nodes") or []
+        if isinstance(nodes, list):
+            project_nodes.extend(item for item in nodes if isinstance(item, dict))
+        page_info = project_items.get("pageInfo") or {}
+        has_next_page = bool(page_info.get("hasNextPage"))
+        if not has_next_page:
+            break
+        after = str(page_info.get("endCursor") or "").strip()
+        if not after:
+            return {
+                "integration_ref": integration_ref,
+                "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+                "source": "issue",
+                "error": (
+                    f"`integration_ref` 指向的 issue `{repo_slug}#{issue_number}` 的 projectItems 分页信息不完整，"
+                    "无法完整读取 owner 级 integration project item，拒绝继续。"
+                ),
+            }
+
+    if issue is None:
         return {
             "integration_ref": integration_ref,
             "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
@@ -662,26 +736,17 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
             "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
         }
 
-    payload = json.loads(completed.stdout or "{}")
-    issue = (((payload.get("data") or {}).get("repository") or {}).get("issue") or {}) if isinstance(payload, dict) else {}
-    if not isinstance(issue, dict) or not issue:
-        return {
-            "integration_ref": integration_ref,
-            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-            "source": "issue",
-            "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
-        }
-
-    project_nodes = ((issue.get("projectItems") or {}).get("nodes") or []) if isinstance(issue, dict) else []
     candidates: list[dict[str, object]] = []
     for raw_node in project_nodes:
         if not isinstance(raw_node, dict) or bool(raw_node.get("isArchived")):
             continue
+        fields = project_item_fields(raw_node)
+        if not is_canonical_integration_project_item(raw_node, fields):
+            continue
         candidate = build_project_item_live_state(integration_ref, raw_node, source="issue_project_item")
         if str(candidate.get("error") or "").strip():
             continue
-        if candidate.get("status") and candidate.get("dependency_order") and candidate.get("joint_acceptance"):
-            candidates.append(candidate)
+        candidates.append(candidate)
 
     if not candidates:
         return {

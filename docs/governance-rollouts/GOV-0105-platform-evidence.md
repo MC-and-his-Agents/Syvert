@@ -49,4 +49,4 @@
 
 - 最近一次验证日期：`2026-04-14`
 - 验证方式：`gh` 只读查询
-- 说明：repo 内 PR 只承诺 canonical contract、消费者接线与 review packet；外部平台状态以本 evidence 文件中的入口和查询结果为准
+- 说明：本文件只提供外部 rollout 的验证入口与抽样结果；reviewer / guardian / merge gate 的运行时输入仍以 issue / PR canonical integration 与 `integration_ref` 的实时读取结果为准

@@ -2901,11 +2901,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertIn("refresh failed", str(ctx.exception))
-        self.assertEqual(run_mock.call_count, 2)
-        self.assertEqual(len(edited_bodies), 2)
+        self.assertIn("无法重新读取最新 PR 描述", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 1)
+        self.assertEqual(len(edited_bodies), 1)
         self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
-        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
@@ -2916,7 +2915,7 @@ class MergeIfSafeTests(unittest.TestCase):
     @patch("scripts.pr_guardian.pr_meta")
     @patch("scripts.pr_guardian.require_auth")
     @patch("scripts.pr_guardian.review_once")
-    def test_merge_restores_latest_body_when_refresh_after_record_fails(
+    def test_merge_does_not_restore_body_when_refresh_after_record_fails(
         self,
         review_once_mock,
         require_auth_mock,
@@ -2929,7 +2928,6 @@ class MergeIfSafeTests(unittest.TestCase):
             "- integration_status_checked_before_merge: no",
             "- integration_status_checked_before_merge: yes",
         )
-        concurrent_body = updated_body + "\n\n补充说明：并发编辑\n"
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
@@ -2953,12 +2951,6 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
             },
             SystemExit("refresh failed"),
-            {
-                "number": 1,
-                "isDraft": False,
-                "headRefOid": "sha-reviewed",
-                "body": concurrent_body,
-            },
         ]
         find_result_mock.return_value = {
             "schema_version": 1,
@@ -2980,11 +2972,9 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertIn("refresh failed", str(ctx.exception))
-        self.assertEqual(run_mock.call_count, 2)
-        self.assertEqual(len(edited_bodies), 2)
-        self.assertIn("补充说明：并发编辑", edited_bodies[1])
-        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
+        self.assertIn("不会尝试自动恢复", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 1)
+        self.assertEqual(len(edited_bodies), 1)
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)

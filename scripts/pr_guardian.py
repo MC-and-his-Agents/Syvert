@@ -414,8 +414,10 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[d
         try:
             latest = pr_meta(pr_number)
         except (CommandError, SystemExit):
-            restore_merge_time_integration_recheck(pr_number, previous_value, current_body=updated_body)
-            raise
+            raise SystemExit(
+                "merge 前写入 `integration_status_checked_before_merge=yes` 后，无法重新读取最新 PR 描述；"
+                "为避免覆盖并发编辑，当前不会尝试自动恢复，请人工复核 PR 正文。"
+            )
     return latest, previous_value
 
 
@@ -429,15 +431,9 @@ def update_pr_body(pr_number: int, body: str) -> None:
         temp_path.unlink(missing_ok=True)
 
 
-def restore_merge_time_integration_recheck(pr_number: int, previous_value: str, *, current_body: str | None = None) -> None:
-    latest_body = current_body
-    try:
-        latest = pr_meta(pr_number)
-    except (CommandError, SystemExit):
-        if latest_body is None:
-            raise
-    else:
-        latest_body = str(latest.get("body") or "")
+def restore_merge_time_integration_recheck(pr_number: int, previous_value: str) -> None:
+    latest = pr_meta(pr_number)
+    latest_body = str(latest.get("body") or "")
     restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
     if restored_body == latest_body:
         return

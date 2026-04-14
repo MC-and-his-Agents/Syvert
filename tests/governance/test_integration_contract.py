@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -445,6 +446,11 @@ class IntegrationContractTests(unittest.TestCase):
                                                 "name": "reviewing",
                                                 "field": {"name": "Contract Status"},
                                             },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "joint",
+                                                "field": {"name": "Owner Repo"},
+                                            },
                                         ]
                                     },
                                     "project": {
@@ -454,7 +460,8 @@ class IntegrationContractTests(unittest.TestCase):
                                         "owner": {"login": "MC-and-his-Agents"},
                                     },
                                 }
-                            ]
+                            ],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
                         },
                     }
                 }
@@ -483,7 +490,7 @@ class IntegrationContractTests(unittest.TestCase):
                         "title": "integration baseline",
                         "url": "https://github.com/MC-and-his-Agents/Syvert/issues/105",
                         "state": "OPEN",
-                        "projectItems": {"nodes": []},
+                        "projectItems": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}},
                     }
                 }
             }
@@ -497,6 +504,160 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "issue")
         self.assertIn("未挂接可核查的 integration project item", payload["error"])
+
+    def test_fetch_integration_ref_live_state_ignores_non_canonical_project_items(self) -> None:
+        graphql_payload = {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "number": 105,
+                        "title": "integration baseline",
+                        "url": "https://github.com/MC-and-his-Agents/Syvert/issues/105",
+                        "state": "OPEN",
+                        "projectItems": {
+                            "nodes": [
+                                {
+                                    "__typename": "ProjectV2Item",
+                                    "id": "PVTI_wrong",
+                                    "isArchived": False,
+                                    "fieldValues": {
+                                        "nodes": [
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "In Progress",
+                                                "field": {"name": "Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "parallel",
+                                                "field": {"name": "Dependency Order"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "ready",
+                                                "field": {"name": "Joint Acceptance"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "reviewing",
+                                                "field": {"name": "Contract Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "joint",
+                                                "field": {"name": "Owner Repo"},
+                                            },
+                                        ]
+                                    },
+                                    "project": {
+                                        "url": "https://github.com/orgs/MC-and-his-Agents/projects/99",
+                                        "number": 99,
+                                        "title": "Some Other Project",
+                                        "owner": {"login": "MC-and-his-Agents"},
+                                    },
+                                }
+                            ],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        },
+                    }
+                }
+            }
+        }
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value.returncode = 0
+            run_mock.return_value.stdout = json.dumps(graphql_payload)
+            run_mock.return_value.stderr = ""
+
+            payload = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(payload["source"], "issue")
+        self.assertIn("未挂接可核查的 integration project item", payload["error"])
+
+    def test_fetch_integration_ref_live_state_paginates_issue_project_items(self) -> None:
+        first_page = {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "number": 105,
+                        "title": "integration baseline",
+                        "url": "https://github.com/MC-and-his-Agents/Syvert/issues/105",
+                        "state": "OPEN",
+                        "projectItems": {
+                            "nodes": [],
+                            "pageInfo": {"hasNextPage": True, "endCursor": "cursor-2"},
+                        },
+                    }
+                }
+            }
+        }
+        second_page = {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "number": 105,
+                        "title": "integration baseline",
+                        "url": "https://github.com/MC-and-his-Agents/Syvert/issues/105",
+                        "state": "OPEN",
+                        "projectItems": {
+                            "nodes": [
+                                {
+                                    "__typename": "ProjectV2Item",
+                                    "id": "PVTI_ready",
+                                    "isArchived": False,
+                                    "fieldValues": {
+                                        "nodes": [
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "In Progress",
+                                                "field": {"name": "Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "parallel",
+                                                "field": {"name": "Dependency Order"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "ready",
+                                                "field": {"name": "Joint Acceptance"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "reviewing",
+                                                "field": {"name": "Contract Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "joint",
+                                                "field": {"name": "Owner Repo"},
+                                            },
+                                        ]
+                                    },
+                                    "project": {
+                                        "url": "https://github.com/orgs/MC-and-his-Agents/projects/3",
+                                        "number": 3,
+                                        "title": "Syvert × WebEnvoy Integration",
+                                        "owner": {"login": "MC-and-his-Agents"},
+                                    },
+                                }
+                            ],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        },
+                    }
+                }
+            }
+        }
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.side_effect = [
+                subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps(first_page), stderr=""),
+                subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps(second_page), stderr=""),
+            ]
+
+            payload = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(payload["source"], "issue")
+        self.assertEqual(payload["joint_acceptance"], "ready")
 
     def test_fetch_integration_ref_live_state_rejects_project_item_owner_mismatch(self) -> None:
         graphql_payload = {
