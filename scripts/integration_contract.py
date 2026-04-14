@@ -220,6 +220,11 @@ def compare_issue_and_pr_canonical(
     return errors
 
 
+def missing_pr_integration_check_error(issue_number: int | None) -> str:
+    issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
+    return f"PR 对应的 {issue_label} 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"
+
+
 def validate_issue_canonical_resolution(resolution: IssueCanonicalResolution, *, allow_missing_payload: bool) -> list[str]:
     if resolution.error:
         return [resolution.error]
@@ -348,6 +353,23 @@ def validate_pr_merge_gate_payload(
     return errors
 
 
+def validate_pr_integration_contract(
+    payload: Mapping[str, str],
+    *,
+    issue_number: int | None,
+    issue_canonical: Mapping[str, str],
+    require_merge_time_recheck: bool,
+) -> list[str]:
+    if not payload:
+        return [missing_pr_integration_check_error(issue_number)] if issue_canonical else []
+    return validate_pr_merge_gate_payload(
+        payload,
+        issue_number=issue_number,
+        issue_canonical=issue_canonical,
+        require_merge_time_recheck=require_merge_time_recheck,
+    )
+
+
 def merge_gate_requires_integration_recheck(payload: Mapping[str, str]) -> bool:
     return str(payload.get("merge_gate") or "").strip().lower() == "integration_check_required"
 
@@ -401,7 +423,12 @@ def build_review_packet(
 ) -> dict[str, object]:
     pr_payload = parse_pr_integration_check(body)
     issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
-    comparison_errors = compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label) if issue_canonical and pr_payload else []
+    missing_pr_error = missing_pr_integration_check_error(issue_number) if issue_canonical and not pr_payload else ""
+    comparison_errors = (
+        [missing_pr_error]
+        if missing_pr_error
+        else compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label) if issue_canonical and pr_payload else []
+    )
     normalized_issue = {
         field: normalize_integration_value(field, issue_canonical.get(field, ""))
         for field in ISSUE_SCOPE_FIELDS
@@ -412,12 +439,12 @@ def build_review_packet(
         for field in PR_SCOPE_FIELDS
         if str(pr_payload.get(field) or "").strip()
     }
-    merge_validation_errors = validate_pr_merge_gate_payload(
+    merge_validation_errors = validate_pr_integration_contract(
         pr_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical,
         require_merge_time_recheck=False,
-    ) if pr_payload else []
+    )
     return {
         "contract_sources": [
             CONTRACT_SOURCE_MACHINE_READABLE,

@@ -39,7 +39,7 @@ from scripts.integration_contract import (
     parse_pr_integration_check,
     render_review_packet_lines,
     validate_issue_fetch,
-    validate_pr_merge_gate_payload,
+    validate_pr_integration_contract,
 )
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
 from scripts.open_pr import extract_issue_summary_sections
@@ -275,12 +275,7 @@ def integration_merge_gate_errors(meta: dict) -> list[str]:
     integration_payload = parse_pr_integration_check(body)
     if issue_canonical_error:
         return [issue_canonical_error]
-    if not integration_payload:
-        if issue_canonical_integration:
-            issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
-            return [f"PR 对应的 {issue_label} 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"]
-        return []
-    return validate_pr_merge_gate_payload(
+    return validate_pr_integration_contract(
         integration_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical_integration,

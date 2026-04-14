@@ -866,6 +866,71 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertNotIn("默认 Squash Merge", prompt)
         self.assertNotIn("检查清单：", prompt)
 
+    def test_build_prompt_surfaces_missing_pr_integration_check_as_blocking_packet_error(self) -> None:
+        meta = {
+            "number": 107,
+            "title": "治理: 统一 canonical integration contract",
+            "url": "https://example.test/pr/107",
+            "baseRefName": "main",
+            "headRefOid": "sha-107",
+            "headRefName": "issue-105-integration-governance-baseline",
+            "body": "## 摘要\n\n- 变更目的：统一 contract\n",
+        }
+
+        expected_error = "PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #107", "- 标题: 治理: 统一 canonical integration contract"],
+                "issue_context": {
+                    "identity": ["- Issue: #105", "- 标题: governance: canonical integration contract"],
+                    "summary": "",
+                },
+                "item_context": {"issue": "105", "item_key": "GOV-0105-integration-governance-baseline"},
+                "raw_sections": {"摘要": "- 变更目的：统一 contract"},
+                "pr_sections": {"summary": "- 变更目的：统一 contract"},
+                "integration_review_packet": {
+                    "contract_sources": [
+                        "scripts/policy/integration_contract.json",
+                        "scripts/integration_contract.py",
+                    ],
+                    "issue_number": 105,
+                    "issue_error": "",
+                    "issue_canonical": {
+                        "integration_touchpoint": "active",
+                        "shared_contract_changed": "no",
+                        "integration_ref": "#12",
+                        "external_dependency": "both",
+                        "merge_gate": "integration_check_required",
+                        "contract_surface": "runtime_modes",
+                        "joint_acceptance_needed": "yes",
+                    },
+                    "normalized_issue_canonical": {
+                        "integration_ref": "issue:mc-and-his-agents/syvert#12",
+                    },
+                    "pr_canonical": {},
+                    "normalized_pr_canonical": {},
+                    "comparison_errors": [expected_error],
+                    "merge_gate": "none",
+                    "merge_gate_requires_recheck": False,
+                    "merge_validation_errors": [expected_error],
+                },
+                "checks": ["- governance: bucket=pass, state=SUCCESS"],
+                "worktree_binding": [{"key": "issue-105", "path": "/tmp/issue-105"}],
+                "changed_files": ["scripts/integration_contract.py"],
+                "diff_stat": "1 file changed, 10 insertions(+), 2 deletions(-)",
+                "related_paths": ["docs/exec-plans/GOV-0105-integration-governance-baseline.md"],
+                "context_notes": ["结构化事项上下文已加载。"],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn(expected_error, prompt)
+        self.assertNotIn("canonical_mismatches: none", prompt)
+        self.assertNotIn("merge_gate_validation: ok", prompt)
+
     def test_extract_reviewer_rubric_excerpt_excludes_review_inputs_section(self) -> None:
         excerpt = extract_reviewer_rubric_excerpt(
             "\n".join(

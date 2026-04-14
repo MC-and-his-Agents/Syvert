@@ -19,6 +19,7 @@ from scripts.integration_contract import (
     render_contract_reference_lines,
     render_issue_form_guidance_lines,
     render_pr_template_guidance_lines,
+    render_review_packet_lines,
     validate_pr_merge_gate_payload,
 )
 
@@ -187,6 +188,32 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertFalse(packet["comparison_errors"])
         self.assertEqual(packet["merge_validation_errors"], [])
         self.assertTrue(packet["merge_gate_requires_recheck"])
+
+    def test_build_review_packet_rejects_missing_pr_canonical_when_issue_declares_contract(self) -> None:
+        packet = build_review_packet(
+            "## 摘要\n\n- 变更目的：验证 reviewer packet\n",
+            issue_number=105,
+            issue_canonical={
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            issue_error="",
+        )
+
+        rendered = "\n".join(render_review_packet_lines(packet))
+        expected_error = "PR 对应的 Issue #105 已声明 canonical integration 元数据，PR 描述缺少 canonical `integration_check` 段落。"
+
+        self.assertEqual(packet["pr_canonical"], {})
+        self.assertEqual(packet["comparison_errors"], [expected_error])
+        self.assertEqual(packet["merge_validation_errors"], [expected_error])
+        self.assertIn(expected_error, rendered)
+        self.assertNotIn("canonical_mismatches: none", rendered)
+        self.assertNotIn("merge_gate_validation: ok", rendered)
 
     def test_validate_pr_merge_gate_payload_keeps_legacy_compatibility_decision_outside_payload_validation(self) -> None:
         payload = {
