@@ -9,7 +9,7 @@
 - sprint：`integration-governance`
 - 关联 spec：无（治理联动事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`
-- 关联 PR：待创建（`PR-A: Contract Kernel`）
+- 关联 PR：`#114`
 - active 收口事项：`GOV-0105-integration-governance-baseline`
 
 ## 目标
@@ -29,11 +29,11 @@
 
 - `#107` 保持 Draft 并冻结，不再继续修 findings 或提交 guardian；它只作为拆分母体和审查历史容器保留。
 - 当前真正需要先落地的是 `PR-A Contract Kernel`，否则 `#105` 在 `main` 上没有 active bootstrap contract，后续替代 PR 无法通过受控入口。
-- 当前 PR-A 已完成 contract kernel 与最小 bootstrap contract 裁剪，并已通过本地 contract 单测与治理门禁；下一步进入 Draft PR 和仓外审查。
+- 当前 PR-A 已以 Draft PR `#114` 打开，当前受审目标是其 latest head。
+- contract kernel 本地门禁已通过；当前停点转为 reviewer / guardian 收口，并保持 scope 只限于 kernel 与最小 bootstrap contract。
 
 ## 下一步动作
 
-- 为当前分支创建 Draft PR，并将其声明为 `#107` 的 replacement PR-A。
 - 在同一 head 上等待 reviewer、GitHub checks 与 guardian 收口，再执行受控合并。
 - PR-A 合并后，再按同一 `Issue #105` 串行推进 PR-B、PR-C、PR-D。
 
@@ -64,4 +64,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `a1fd9a375ae7e83d1845b86b981a7288066b506d`
+- 最近一次完成 contract kernel 代码收口的 checkpoint：`eadb3b814af668814566efe96a6247f215b7a87a`
+- 当前 PR 审查态以 `#114` 的 latest head 为准；若后续只补充 review / guardian 元数据，不另起新的代码 checkpoint。

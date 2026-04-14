@@ -851,6 +851,19 @@ def fetch_project_item_integration_ref_live_state(
         require_canonical_contract=True,
     )
     if not str(live_state.get("error") or "").strip():
+        content = node.get("content") or {}
+        if str(content.get("__typename") or "") != "Issue":
+            return {
+                "integration_ref": integration_ref,
+                "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+                "source": "project_item",
+                "error": "`integration_ref` 直连的 project item 必须绑定到可核查的 Issue 内容，拒绝继续。",
+            }
+        repository = content.get("repository") or {}
+        live_state["content_type"] = "issue"
+        live_state["content_url"] = str(content.get("url") or "").strip()
+        live_state["content_issue_number"] = str(content.get("number") or "").strip()
+        live_state["content_repo"] = str(repository.get("nameWithOwner") or "").strip()
         live_state["item_id"] = item_id
     return live_state
 
