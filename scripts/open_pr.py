@@ -280,7 +280,7 @@ def fetch_issue_body(issue: int | None) -> str:
 def resolve_issue_canonical_integration(issue: int | None) -> tuple[dict[str, str], str | None]:
     if issue is None:
         return {}, None
-    resolution = validate_issue_fetch(issue, allow_missing_payload=False)
+    resolution = validate_issue_fetch(issue, allow_missing_payload=True)
     return resolution.canonical, resolution.error
 
 

@@ -185,10 +185,8 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
         self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
         self.assertFalse(packet["comparison_errors"])
-        self.assertIn(
-            "`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。",
-            packet["merge_validation_errors"],
-        )
+        self.assertEqual(packet["merge_validation_errors"], [])
+        self.assertTrue(packet["merge_gate_requires_recheck"])
 
     def test_validate_pr_merge_gate_payload_keeps_legacy_compatibility_decision_outside_payload_validation(self) -> None:
         payload = {

@@ -464,7 +464,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps({"body": "### 摘要\n\n- no metadata"}), stderr=""),
     )
-    def test_validate_integration_args_rejects_issue_without_canonical_integration_metadata(self, run_mock) -> None:
+    def test_validate_integration_args_allows_legacy_issue_without_canonical_integration_metadata(self, run_mock) -> None:
         args = parse_args(
             [
                 "--class",
@@ -484,7 +484,7 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         errors = validate_integration_args(args)
 
-        self.assertIn("Issue #105 缺少 canonical integration 元数据", errors[0])
+        self.assertEqual(errors, [])
         run_mock.assert_called_once()
 
     @patch(

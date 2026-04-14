@@ -416,7 +416,7 @@ def build_review_packet(
         pr_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical,
-        require_merge_time_recheck=True,
+        require_merge_time_recheck=False,
     ) if pr_payload else []
     return {
         "contract_sources": [
