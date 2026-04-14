@@ -53,7 +53,6 @@ from scripts.integration_contract import (
     ISSUE_SCOPE_FIELDS,
     extract_issue_canonical_integration_fields,
     field_choices,
-    semantic_integration_ref_identity,
     validate_issue_fetch,
     validate_open_pr_payload,
 )
@@ -573,9 +572,9 @@ def canonicalize_integration_ref_for_issue(
     issue_integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
     if not issue_integration_ref or issue_integration_ref == raw_integration_ref:
         return raw_integration_ref
-    issue_identity, issue_resolved, _ = semantic_integration_ref_identity(issue_integration_ref)
-    pr_identity, pr_resolved, _ = semantic_integration_ref_identity(raw_integration_ref)
-    if issue_resolved and pr_resolved and issue_identity == pr_identity:
+    if raw_integration_ref.lower() == "none":
+        return raw_integration_ref
+    if issue_integration_ref:
         return issue_integration_ref
     return raw_integration_ref
 

@@ -774,7 +774,8 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
         self.assertGreaterEqual(run_mock.call_count, 1)
-        self.assertGreaterEqual(fetch_live_mock.call_count, 2)
+        self.assertEqual(args.integration_ref, "MC-and-his-Agents/Syvert#12")
+        fetch_live_mock.assert_not_called()
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
@@ -993,14 +994,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             None,
         ),
     )
-    @patch(
-        "scripts.open_pr.semantic_integration_ref_identity",
-        side_effect=[
-            ("issue:mc-and-his-agents/syvert#12", True, "issue:mc-and-his-agents/syvert#12"),
-            ("issue:mc-and-his-agents/syvert#12", True, "project-item:mc-and-his-agents/3#PVTI_same"),
-        ],
-    )
-    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, semantic_identity_mock, resolve_issue_mock) -> None:
+    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, resolve_issue_mock) -> None:
         args = parse_args(
             [
                 "--class",
@@ -1033,7 +1027,6 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
         self.assertNotIn("PVTI_same", body)
         resolve_issue_mock.assert_called_once_with(105)
-        self.assertEqual(semantic_identity_mock.call_count, 2)
 
     def test_inactive_exec_plan_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
