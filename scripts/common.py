@@ -199,20 +199,8 @@ def parse_github_repo_from_remote_url(origin_url: str) -> str | None:
 @lru_cache(maxsize=1)
 def default_github_repo() -> str:
     configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
-    if configured:
+    if configured and re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", configured):
         return configured
-    env_repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
-    if re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", env_repo):
-        return env_repo
-    remote = run(
-        ["git", "config", "--get", "remote.origin.url"],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if remote.returncode == 0:
-        parsed = parse_github_repo_from_remote_url(remote.stdout)
-        if parsed:
-            return parsed
     return CANONICAL_GITHUB_REPO
 
 

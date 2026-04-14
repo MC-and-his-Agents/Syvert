@@ -97,6 +97,59 @@ query($id: ID!) {
 }
 """.strip()
 
+ISSUE_PROJECT_ITEMS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      number
+      title
+      url
+      state
+      projectItems(first: 20) {
+        nodes {
+          __typename
+          ... on ProjectV2Item {
+            id
+            isArchived
+            fieldValues(first: 100) {
+              nodes {
+                __typename
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+                ... on ProjectV2ItemFieldTextValue {
+                  text
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+                ... on ProjectV2ItemFieldNumberValue {
+                  number
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+                ... on ProjectV2ItemFieldDateValue {
+                  date
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+              }
+            }
+            project {
+              url
+              number
+              title
+              owner {
+                __typename
+                ... on Organization { login }
+                ... on User { login }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+""".strip()
+
 
 def field_names(scope: str) -> tuple[str, ...]:
     if scope == "issue":
@@ -499,17 +552,104 @@ def repo_name_from_slug(slug: str) -> str:
     return slug.split("/", 1)[1].strip().lower()
 
 
+def project_item_fields(node: Mapping[str, object]) -> dict[str, str]:
+    field_nodes = ((node.get("fieldValues") or {}).get("nodes") or []) if isinstance(node, dict) else []
+    fields: dict[str, str] = {}
+    if isinstance(field_nodes, list):
+        for raw_node in field_nodes:
+            if not isinstance(raw_node, dict):
+                continue
+            field_name = str(((raw_node.get("field") or {}).get("name") or "")).strip()
+            if not field_name:
+                continue
+            fields[field_name.lower()] = value_from_project_item_node(raw_node)
+    return fields
+
+
+def build_project_item_live_state(
+    integration_ref: str,
+    node: Mapping[str, object],
+    *,
+    source: str,
+    expected_owner: str | None = None,
+    expected_project_number: str | None = None,
+) -> dict[str, object]:
+    if str(node.get("__typename") or "") != "ProjectV2Item":
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": source,
+            "error": "`integration_ref` 指向对象不是可读的 ProjectV2Item，拒绝继续。",
+        }
+
+    fields = project_item_fields(node)
+    project = node.get("project") or {}
+    project_url = str((project or {}).get("url") or "").strip()
+    project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
+    project_number_actual = str((project or {}).get("number") or "").strip()
+    if expected_owner and project_owner and project_owner != expected_owner.strip().lower():
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": source,
+            "error": (
+                "`integration_ref` 与 project item 实际归属不一致："
+                f"URL owner=`{expected_owner}`，返回 owner=`{project_owner}`。"
+            ),
+        }
+    if expected_project_number and project_number_actual and project_number_actual != expected_project_number.strip():
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": source,
+            "error": (
+                "`integration_ref` 与 project item 实际 project 编号不一致："
+                f"URL projects/{expected_project_number}，返回 projects/{project_number_actual}。"
+            ),
+        }
+
+    status = normalize_label_value(fields.get("status", ""))
+    dependency_order = normalize_label_value(fields.get("dependency order", ""))
+    joint_acceptance = normalize_label_value(fields.get("joint acceptance", ""))
+    contract_status = normalize_label_value(fields.get("contract status", ""))
+    owner_repo = normalize_label_value(fields.get("owner repo", ""))
+    blocked = status == "blocked"
+
+    return {
+        "integration_ref": integration_ref,
+        "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+        "source": source,
+        "url": integration_ref,
+        "project_url": project_url,
+        "project_title": str((project or {}).get("title") or "").strip(),
+        "project_number": project_number_actual or (expected_project_number or "").strip(),
+        "organization": project_owner or (expected_owner or "").strip().lower(),
+        "item_id": str(node.get("id") or "").strip(),
+        "status": status,
+        "dependency_order": dependency_order,
+        "joint_acceptance": joint_acceptance,
+        "contract_status": contract_status,
+        "owner_repo": owner_repo,
+        "blocked": blocked,
+        "error": "",
+    }
+
+
 def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str, issue_number: int) -> dict[str, object]:
+    owner, _, name = repo_slug.partition("/")
     completed = run(
         [
             "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--repo",
-            repo_slug,
-            "--json",
-            "number,title,state,url,labels",
+            "api",
+            "graphql",
+            "-f",
+            f"query={ISSUE_PROJECT_ITEMS_QUERY}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={issue_number}",
         ],
         cwd=REPO_ROOT,
         check=False,
@@ -523,44 +663,57 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
         }
 
     payload = json.loads(completed.stdout or "{}")
-    labels_payload = payload.get("labels") or []
-    labels: list[str] = []
-    if isinstance(labels_payload, list):
-        for item in labels_payload:
-            if isinstance(item, dict):
-                name = str(item.get("name") or "").strip()
-                if name:
-                    labels.append(name)
-            elif isinstance(item, str):
-                name = item.strip()
-                if name:
-                    labels.append(name)
+    issue = (((payload.get("data") or {}).get("repository") or {}).get("issue") or {}) if isinstance(payload, dict) else {}
+    if not isinstance(issue, dict) or not issue:
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "issue",
+            "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
+        }
 
-    status_label = extract_label_value(labels, ("status:", "integration_status:", "integration-status:"))
-    dependency_order = extract_label_value(labels, ("dependency_order:", "dependency-order:", "dependency:"))
-    joint_acceptance = extract_label_value(labels, ("joint_acceptance:", "joint-acceptance:"))
-    contract_status = extract_label_value(labels, ("contract_status:", "contract-status:"))
-    owner_repo = extract_label_value(labels, ("owner_repo:", "owner-repo:"))
+    project_nodes = ((issue.get("projectItems") or {}).get("nodes") or []) if isinstance(issue, dict) else []
+    candidates: list[dict[str, object]] = []
+    for raw_node in project_nodes:
+        if not isinstance(raw_node, dict) or bool(raw_node.get("isArchived")):
+            continue
+        candidate = build_project_item_live_state(integration_ref, raw_node, source="issue_project_item")
+        if str(candidate.get("error") or "").strip():
+            continue
+        if candidate.get("status") and candidate.get("dependency_order") and candidate.get("joint_acceptance"):
+            candidates.append(candidate)
 
-    blocked = any(label.strip().lower() in {"blocked", "status:blocked", "integration:blocked"} for label in labels)
-    status = status_label or str(payload.get("state") or "").strip().lower()
-    if status in {"open", "closed"}:
-        status = "done" if status == "closed" else "in_progress"
+    if not candidates:
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "issue",
+            "url": str(issue.get("url") or "").strip(),
+            "title": str(issue.get("title") or "").strip(),
+            "error": (
+                f"`integration_ref` 指向的 issue `{repo_slug}#{issue_number}` 未挂接可核查的 integration project item，"
+                "无法读取 `status` / `dependency_order` / `joint_acceptance`，拒绝继续。"
+            ),
+        }
+    if len(candidates) > 1:
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "issue",
+            "url": str(issue.get("url") or "").strip(),
+            "title": str(issue.get("title") or "").strip(),
+            "error": (
+                f"`integration_ref` 指向的 issue `{repo_slug}#{issue_number}` 命中多个可核查的 integration project item，"
+                "当前无法唯一确定 merge gate 真相源，拒绝继续。"
+            ),
+        }
 
-    return {
-        "integration_ref": integration_ref,
-        "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-        "source": "issue",
-        "url": str(payload.get("url") or "").strip(),
-        "title": str(payload.get("title") or "").strip(),
-        "status": status,
-        "dependency_order": dependency_order,
-        "joint_acceptance": joint_acceptance,
-        "contract_status": contract_status,
-        "owner_repo": owner_repo,
-        "blocked": blocked,
-        "error": "",
-    }
+    candidate = dict(candidates[0])
+    candidate["source"] = "issue"
+    candidate["url"] = str(issue.get("url") or "").strip()
+    candidate["title"] = str(issue.get("title") or "").strip()
+    candidate["issue_state"] = normalize_label_value(str(issue.get("state") or ""))
+    return candidate
 
 
 def fetch_project_item_integration_ref_live_state(
@@ -592,74 +745,16 @@ def fetch_project_item_integration_ref_live_state(
 
     payload = json.loads(completed.stdout or "{}")
     node = ((payload.get("data") or {}).get("node") or {}) if isinstance(payload, dict) else {}
-    if str(node.get("__typename") or "") != "ProjectV2Item":
-        return {
-            "integration_ref": integration_ref,
-            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-            "source": "project_item",
-            "error": f"`integration_ref` 指向对象不是可读的 ProjectV2Item（itemId={item_id}），拒绝继续。",
-        }
-
-    field_nodes = ((node.get("fieldValues") or {}).get("nodes") or []) if isinstance(node, dict) else []
-    fields: dict[str, str] = {}
-    if isinstance(field_nodes, list):
-        for raw_node in field_nodes:
-            if not isinstance(raw_node, dict):
-                continue
-            field_name = str(((raw_node.get("field") or {}).get("name") or "")).strip()
-            if not field_name:
-                continue
-            fields[field_name.lower()] = value_from_project_item_node(raw_node)
-
-    project = node.get("project") or {}
-    project_url = str((project or {}).get("url") or "").strip()
-    project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
-    project_number_actual = str((project or {}).get("number") or "").strip()
-    if project_owner and project_owner != organization.strip().lower():
-        return {
-            "integration_ref": integration_ref,
-            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-            "source": "project_item",
-            "error": (
-                "`integration_ref` 与 project item 实际归属不一致："
-                f"URL owner=`{organization}`，返回 owner=`{project_owner}`。"
-            ),
-        }
-    if project_number_actual and project_number_actual != project_number.strip():
-        return {
-            "integration_ref": integration_ref,
-            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-            "source": "project_item",
-            "error": (
-                "`integration_ref` 与 project item 实际 project 编号不一致："
-                f"URL projects/{project_number}，返回 projects/{project_number_actual}。"
-            ),
-        }
-    status = normalize_label_value(fields.get("status", ""))
-    dependency_order = normalize_label_value(fields.get("dependency order", ""))
-    joint_acceptance = normalize_label_value(fields.get("joint acceptance", ""))
-    contract_status = normalize_label_value(fields.get("contract status", ""))
-    owner_repo = normalize_label_value(fields.get("owner repo", ""))
-    blocked = status == "blocked"
-
-    return {
-        "integration_ref": integration_ref,
-        "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
-        "source": "project_item",
-        "url": integration_ref,
-        "project_url": project_url,
-        "project_title": str((project or {}).get("title") or "").strip(),
-        "project_number": str((project or {}).get("number") or project_number).strip(),
-        "organization": organization.lower(),
-        "item_id": item_id,
-        "status": status,
-        "dependency_order": dependency_order,
-        "joint_acceptance": joint_acceptance,
-        "contract_status": contract_status,
-        "owner_repo": owner_repo,
-        "blocked": blocked,
-        "error": "",
-    }
+    live_state = build_project_item_live_state(
+        integration_ref,
+        node,
+        source="project_item",
+        expected_owner=organization,
+        expected_project_number=project_number,
+    )
+    if not str(live_state.get("error") or "").strip():
+        live_state["item_id"] = item_id
+    return live_state
 
 
 def fetch_integration_ref_live_state(integration_ref: str) -> dict[str, object]:
