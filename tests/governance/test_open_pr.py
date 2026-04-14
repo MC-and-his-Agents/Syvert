@@ -785,6 +785,97 @@ class OpenPrPreflightTests(unittest.TestCase):
         fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
 
     @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_issue_ref_for_project_item_canonical(
+        self, run_mock, fetch_live_mock
+    ) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "MC-and-his-Agents/Syvert#12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            args.integration_ref,
+            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+        )
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
         "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(
             args=["gh"],
@@ -1119,6 +1210,67 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
         self.assertNotIn("PVTI_same", body)
+        resolve_issue_mock.assert_called_once_with(105)
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    @patch(
+        "scripts.open_pr.resolve_issue_canonical_integration",
+        return_value=(
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            None,
+        ),
+    )
+    def test_build_body_canonicalizes_equivalent_issue_ref_to_project_item_carrier(self, resolve_issue_mock, fetch_live_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "MC-and-his-Agents/Syvert#12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same", body)
+        self.assertNotIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
         resolve_issue_mock.assert_called_once_with(105)
         fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
 

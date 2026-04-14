@@ -580,15 +580,28 @@ def canonicalize_integration_ref_for_issue(
     raw_normalized = normalize_integration_value("integration_ref", raw_integration_ref)
     if issue_integration_ref and issue_normalized == raw_normalized:
         return issue_integration_ref
-    live_state = integration_contract.fetch_integration_ref_live_state(raw_integration_ref)
-    if not str(live_state.get("error") or "").strip():
-        live_repo = str(live_state.get("content_repo") or "").strip()
-        live_issue_number = str(live_state.get("content_issue_number") or "").strip()
-        if live_repo and live_issue_number:
-            live_issue_ref = f"{live_repo}#{live_issue_number}"
-            if normalize_integration_value("integration_ref", live_issue_ref) == issue_normalized:
-                return issue_integration_ref
+    issue_canonical_issue_identity = resolved_issue_identity_from_integration_ref(issue_integration_ref)
+    raw_issue_identity = resolved_issue_identity_from_integration_ref(raw_integration_ref)
+    if issue_canonical_issue_identity and raw_issue_identity and issue_canonical_issue_identity == raw_issue_identity:
+        return issue_integration_ref
     return raw_integration_ref
+
+
+def resolved_issue_identity_from_integration_ref(integration_ref: str) -> str:
+    raw_ref = str(integration_ref or "").strip()
+    if not raw_ref:
+        return ""
+    normalized_ref = normalize_integration_value("integration_ref", raw_ref)
+    if normalized_ref.startswith("issue:"):
+        return normalized_ref
+    live_state = integration_contract.fetch_integration_ref_live_state(raw_ref)
+    if str(live_state.get("error") or "").strip():
+        return ""
+    live_repo = str(live_state.get("content_repo") or "").strip()
+    live_issue_number = str(live_state.get("content_issue_number") or "").strip()
+    if not live_repo or not live_issue_number:
+        return ""
+    return normalize_integration_value("integration_ref", f"{live_repo}#{live_issue_number}")
 
 
 def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
