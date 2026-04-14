@@ -210,6 +210,45 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(packet["merge_validation_errors"], [])
         self.assertTrue(packet["merge_gate_requires_recheck"])
 
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={"item_id": "PVTI_same", "organization": "mc-and-his-agents", "project_number": "3", "error": ""},
+    )
+    def test_build_review_packet_collapses_equivalent_issue_and_project_item_refs(self, fetch_live_mock) -> None:
+        packet = build_review_packet(
+            "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            ),
+            issue_number=105,
+            issue_canonical={
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "MC-and-his-Agents/Syvert#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            issue_error="",
+        )
+
+        self.assertEqual(packet["comparison_errors"], [])
+        self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
+        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
+        self.assertGreaterEqual(fetch_live_mock.call_count, 2)
+
     def test_build_review_packet_rejects_missing_pr_canonical_when_issue_declares_contract(self) -> None:
         packet = build_review_packet(
             "## 摘要\n\n- 变更目的：验证 reviewer packet\n",

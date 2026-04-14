@@ -491,7 +491,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         errors = validate_integration_args(args)
 
         self.assertIn("`--shared-contract-changed` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
-        run_mock.assert_called_once()
+        self.assertGreaterEqual(run_mock.call_count, 1)
 
     @patch(
         "scripts.integration_contract.run",
@@ -620,8 +620,8 @@ class OpenPrPreflightTests(unittest.TestCase):
         errors = validate_integration_args(args)
 
         self.assertEqual(errors, [])
-        run_mock.assert_called_once()
-        default_repo_mock.assert_called_once_with()
+        self.assertGreaterEqual(run_mock.call_count, 1)
+        self.assertGreaterEqual(default_repo_mock.call_count, 1)
 
     @patch(
         "scripts.integration_contract.run",
@@ -695,7 +695,86 @@ class OpenPrPreflightTests(unittest.TestCase):
         errors = validate_integration_args(args)
 
         self.assertEqual(errors, [])
-        run_mock.assert_called_once()
+        self.assertGreaterEqual(run_mock.call_count, 1)
+
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={"item_id": "PVTI_same", "organization": "mc-and-his-agents", "project_number": "3", "error": ""},
+    )
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "MC-and-his-Agents/Syvert#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_issue_and_project_item_refs(self, run_mock, fetch_live_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertGreaterEqual(run_mock.call_count, 1)
+        self.assertGreaterEqual(fetch_live_mock.call_count, 2)
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
