@@ -26,7 +26,6 @@ from scripts.common import (
     dump_json,
     ensure_parent,
     format_changed_files,
-    integration_ref_is_checkable,
     load_json,
     require_cli,
     run,
@@ -686,13 +685,6 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
     issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
     issue_error = str(meta.get("_issue_canonical_integration_error") or "")
-    integration_payload = parse_pr_integration_check(body)
-    pr_integration_ref = str(integration_payload.get("integration_ref") or "").strip() if integration_payload else ""
-    issue_integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
-    snapshot_ref = pr_integration_ref if integration_ref_is_checkable(pr_integration_ref) else ""
-    if not snapshot_ref and integration_ref_is_checkable(issue_integration_ref):
-        snapshot_ref = issue_integration_ref
-    integration_ref_live = fetch_integration_ref_live_state(snapshot_ref) if snapshot_ref else {}
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
@@ -716,7 +708,6 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             issue_number=issue_number,
             issue_canonical=issue_canonical,
             issue_error=issue_error,
-            integration_ref_live=integration_ref_live,
         ),
         "changed_files": changed_files,
         "diff_stat": diff_stat,

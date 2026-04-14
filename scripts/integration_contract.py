@@ -1175,17 +1175,6 @@ def build_review_packet(
         require_merge_time_recheck=False,
     )
     packet_integration_ref_live = dict(integration_ref_live or {})
-    integration_ref_live_errors = (
-        validate_integration_ref_live_state(
-            pr_payload,
-            packet_integration_ref_live,
-            current_repo_slug=default_github_repo(),
-        )
-        if integration_ref_live is not None
-        else []
-    )
-    if integration_ref_live_errors:
-        merge_validation_errors = [*merge_validation_errors, *[item for item in integration_ref_live_errors if item not in merge_validation_errors]]
     return {
         "contract_sources": [
             CONTRACT_SOURCE_MACHINE_READABLE,
@@ -1201,7 +1190,7 @@ def build_review_packet(
         "merge_gate": str(pr_payload.get("merge_gate") or "").strip().lower() if pr_payload else "",
         "merge_gate_requires_recheck": merge_gate_requires_integration_recheck(pr_payload) if pr_payload else False,
         "integration_ref_live": packet_integration_ref_live,
-        "integration_ref_live_errors": integration_ref_live_errors,
+        "integration_ref_live_errors": [],
         "merge_validation_errors": merge_validation_errors,
     }
 

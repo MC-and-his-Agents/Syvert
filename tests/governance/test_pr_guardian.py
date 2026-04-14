@@ -1626,34 +1626,19 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.fetch_issue_context",
                         return_value={"identity": [], "summary": "", "canonical_integration": {}},
                     ):
-                        with patch(
-                            "scripts.pr_guardian.fetch_integration_ref_live_state",
-                            return_value={
-                                "source": "project_item",
-                                "status": "in_progress",
-                                "dependency_order": "parallel",
-                                "joint_acceptance": "pending",
-                                "owner_repo": "joint",
-                                "contract_status": "reviewing",
-                                "error": "",
-                            },
-                        ) as fetch_live_mock:
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
                                 return_value={"issue_number": 24},
                             ) as build_review_packet_mock:
                                 build_review_context(meta, Path("/tmp/pr-worktree"))
 
-        fetch_live_mock.assert_called_once_with(
-            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test"
-        )
+        fetch_live_mock.assert_not_called()
         build_review_packet_mock.assert_called_once()
         kwargs = build_review_packet_mock.call_args.kwargs
-        self.assertIn("integration_ref_live", kwargs)
-        self.assertEqual(kwargs["integration_ref_live"]["source"], "project_item")
-        self.assertEqual(kwargs["integration_ref_live"]["joint_acceptance"], "pending")
+        self.assertNotIn("integration_ref_live", kwargs)
 
-    def test_build_review_context_falls_back_to_issue_canonical_integration_ref_for_live_snapshot(self) -> None:
+    def test_build_review_context_does_not_fetch_live_snapshot_from_issue_canonical_fallback(self) -> None:
         meta = {
             "number": 24,
             "title": "治理: integration live snapshot fallback",
@@ -1688,28 +1673,16 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.fetch_issue_context",
                         return_value={"identity": ["- Issue: #24"], "summary": "issue summary", "canonical_integration": {}},
                     ):
-                        with patch(
-                            "scripts.pr_guardian.fetch_integration_ref_live_state",
-                            return_value={
-                                "source": "project_item",
-                                "status": "in_progress",
-                                "dependency_order": "parallel",
-                                "joint_acceptance": "ready",
-                                "owner_repo": "joint",
-                                "contract_status": "reviewing",
-                            },
-                        ) as fetch_live_mock:
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
                                 return_value={"issue_number": 24},
                             ) as build_review_packet_mock:
                                 build_review_context(meta, Path("/tmp/pr-worktree"))
 
-        fetch_live_mock.assert_called_once_with(
-            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test"
-        )
+        fetch_live_mock.assert_not_called()
         kwargs = build_review_packet_mock.call_args.kwargs
-        self.assertEqual(kwargs["integration_ref_live"]["source"], "project_item")
+        self.assertNotIn("integration_ref_live", kwargs)
 
     def test_build_review_context_skips_live_fetch_for_local_only_integration_ref_none(self) -> None:
         meta = {
@@ -1759,7 +1732,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         fetch_live_mock.assert_not_called()
         kwargs = build_review_packet_mock.call_args.kwargs
-        self.assertEqual(kwargs["integration_ref_live"], {})
+        self.assertNotIn("integration_ref_live", kwargs)
 
     def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
         meta = {
