@@ -266,24 +266,32 @@ class IntegrationContractTests(unittest.TestCase):
         )
         self.assertGreaterEqual(fetch_live_mock.call_count, 1)
 
-    def test_default_github_repo_falls_back_to_canonical_repo_when_env_missing(self) -> None:
+    def test_default_github_repo_uses_repo_root_name_when_env_missing(self) -> None:
         default_github_repo.cache_clear()
-        with patch.dict("os.environ", {}, clear=True), patch("scripts.common.run") as run_mock:
-            run_mock.return_value = subprocess.CompletedProcess(
-                args=["git"],
-                returncode=0,
-                stdout="git@github.com:MC-and-his-Agents/WebEnvoy.git\n",
-                stderr="",
-            )
-
-            self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert")
-
+        with patch.dict("os.environ", {}, clear=True), patch("scripts.common.REPO_ROOT", Path("/tmp/WebEnvoy")):
+            self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
         default_github_repo.cache_clear()
 
     def test_default_github_repo_honors_explicit_env_override(self) -> None:
         default_github_repo.cache_clear()
         with patch.dict("os.environ", {"SYVERT_GITHUB_REPO": "MC-and-his-Agents/WebEnvoy"}, clear=True):
             self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
+        default_github_repo.cache_clear()
+
+    def test_default_github_repo_maps_fork_origin_to_canonical_repo(self) -> None:
+        default_github_repo.cache_clear()
+        with patch.dict("os.environ", {}, clear=True), patch("scripts.common.REPO_ROOT", Path("/tmp/unknown-repo")), patch(
+            "scripts.common.run"
+        ) as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=["git"],
+                returncode=0,
+                stdout="git@github.com:contributor/WebEnvoy.git\n",
+                stderr="",
+            )
+
+            self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
+
         default_github_repo.cache_clear()
 
     def test_build_review_packet_rejects_missing_pr_canonical_when_issue_declares_contract(self) -> None:

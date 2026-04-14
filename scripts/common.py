@@ -15,6 +15,10 @@ from typing import Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CANONICAL_GITHUB_REPO = "MC-and-his-Agents/Syvert"
+REPO_CANONICAL_GITHUB_REPOS = {
+    "syvert": "MC-and-his-Agents/Syvert",
+    "webenvoy": "MC-and-his-Agents/WebEnvoy",
+}
 
 
 class CommandError(RuntimeError):
@@ -201,6 +205,16 @@ def default_github_repo() -> str:
     configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
     if configured and re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", configured):
         return configured
+    repo_name = REPO_ROOT.name.strip().casefold()
+    if repo_name in REPO_CANONICAL_GITHUB_REPOS:
+        return REPO_CANONICAL_GITHUB_REPOS[repo_name]
+    completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
+    if completed.returncode == 0:
+        parsed = parse_github_repo_from_remote_url(completed.stdout.strip())
+        if parsed:
+            parsed_name = parsed.split("/", 1)[1].strip().casefold()
+            if parsed_name in REPO_CANONICAL_GITHUB_REPOS:
+                return REPO_CANONICAL_GITHUB_REPOS[parsed_name]
     return CANONICAL_GITHUB_REPO
 
 
