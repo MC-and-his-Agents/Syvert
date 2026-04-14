@@ -393,6 +393,7 @@ def compare_issue_and_pr_canonical(
                 actual_static.split(":", 1)[0],
             } == {"issue", "project-item"}
             if cross_form_pair and (not expected_resolved or not actual_resolved):
+                errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
                 continue
             errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
             continue

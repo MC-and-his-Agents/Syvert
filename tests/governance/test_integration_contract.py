@@ -226,6 +226,46 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
         self.assertGreaterEqual(fetch_live_mock.call_count, 1)
 
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={"source": "project_item", "error": "lookup failed"},
+    )
+    def test_build_review_packet_fail_closed_when_cross_form_ref_cannot_be_resolved(self, fetch_live_mock) -> None:
+        packet = build_review_packet(
+            "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_missing",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            ),
+            issue_number=105,
+            issue_canonical={
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "MC-and-his-Agents/Syvert#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            issue_error="",
+        )
+
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
+        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
+
     def test_default_github_repo_uses_origin_remote_when_env_missing(self) -> None:
         default_github_repo.cache_clear()
         with patch.dict("os.environ", {}, clear=True), patch("scripts.common.run") as run_mock:
