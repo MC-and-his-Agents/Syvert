@@ -604,6 +604,7 @@ def build_project_item_live_state(
     source: str,
     expected_owner: str | None = None,
     expected_project_number: str | None = None,
+    require_canonical_contract: bool = False,
 ) -> dict[str, object]:
     if str(node.get("__typename") or "") != "ProjectV2Item":
         return {
@@ -612,8 +613,25 @@ def build_project_item_live_state(
             "source": source,
             "error": "`integration_ref` 指向对象不是可读的 ProjectV2Item，拒绝继续。",
         }
+    if bool(node.get("isArchived")):
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": source,
+            "error": "`integration_ref` 指向的 ProjectV2Item 已归档，不能作为 merge gate 真相源。",
+        }
 
     fields = project_item_fields(node)
+    if require_canonical_contract and not is_canonical_integration_project_item(node, fields):
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": source,
+            "error": (
+                "`integration_ref` 必须指向 owner 级 canonical integration project item "
+                f"`{CANONICAL_INTEGRATION_PROJECT_TITLE}`，拒绝继续。"
+            ),
+        }
     project = node.get("project") or {}
     project_url = str((project or {}).get("url") or "").strip()
     project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
@@ -816,6 +834,7 @@ def fetch_project_item_integration_ref_live_state(
         source="project_item",
         expected_owner=organization,
         expected_project_number=project_number,
+        require_canonical_contract=True,
     )
     if not str(live_state.get("error") or "").strip():
         live_state["item_id"] = item_id
@@ -876,10 +895,16 @@ def validate_integration_ref_live_state(
 
     dependency_order = normalize_label_value(str(live_state.get("dependency_order") or ""))
     status = normalize_label_value(str(live_state.get("status") or ""))
+    owner_repo = normalize_label_value(str(live_state.get("owner_repo") or ""))
+    contract_status = normalize_label_value(str(live_state.get("contract_status") or ""))
     if not status:
         errors.append("无法从 `integration_ref` 读取当前 `status`，拒绝继续。")
     if not dependency_order:
         errors.append("无法从 `integration_ref` 读取当前 `dependency_order`，拒绝继续。")
+    if not owner_repo:
+        errors.append("无法从 `integration_ref` 读取当前 `owner_repo`，拒绝继续。")
+    if not contract_status:
+        errors.append("无法从 `integration_ref` 读取当前 `contract_status`，拒绝继续。")
     repo_name = repo_name_from_slug(current_repo_slug or default_github_repo())
     if dependency_order == "webenvoy_first" and repo_name == "syvert":
         errors.append("`integration_ref` 的依赖顺序要求 `webenvoy_first`，当前仓库不得先合并。")

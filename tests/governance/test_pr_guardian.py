@@ -423,6 +423,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "status": "in_progress",
             "dependency_order": "parallel",
             "joint_acceptance": "ready",
+            "owner_repo": "joint",
+            "contract_status": "reviewing",
             "blocked": False,
             "error": "",
         },
@@ -1543,6 +1545,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
                                 "status": "in_progress",
                                 "dependency_order": "parallel",
                                 "joint_acceptance": "pending",
+                                "owner_repo": "joint",
+                                "contract_status": "reviewing",
                                 "error": "",
                             },
                         ) as fetch_live_mock:
@@ -1598,7 +1602,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     ):
                         with patch(
                             "scripts.pr_guardian.fetch_integration_ref_live_state",
-                            return_value={"source": "project_item", "status": "in_progress", "dependency_order": "parallel", "joint_acceptance": "ready"},
+                            return_value={
+                                "source": "project_item",
+                                "status": "in_progress",
+                                "dependency_order": "parallel",
+                                "joint_acceptance": "ready",
+                                "owner_repo": "joint",
+                                "contract_status": "reviewing",
+                            },
                         ) as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
@@ -2011,6 +2022,8 @@ class MergeIfSafeTests(unittest.TestCase):
                 "status": "in_progress",
                 "dependency_order": "parallel",
                 "joint_acceptance": "ready",
+                "owner_repo": "joint",
+                "contract_status": "reviewing",
                 "blocked": False,
                 "error": "",
             },
@@ -3410,6 +3423,8 @@ class MergeIfSafeTests(unittest.TestCase):
             "status": "in_progress",
             "dependency_order": "parallel",
             "joint_acceptance": "pending",
+            "owner_repo": "joint",
+            "contract_status": "reviewing",
             "blocked": False,
             "error": "",
         }
