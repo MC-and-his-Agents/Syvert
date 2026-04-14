@@ -2220,6 +2220,108 @@ class MergeIfSafeTests(unittest.TestCase):
     @patch("scripts.pr_guardian.pr_meta")
     @patch("scripts.pr_guardian.require_auth")
     @patch("scripts.pr_guardian.review_once")
+    def test_merge_reruns_guardian_when_cached_body_bound_verdict_becomes_stale_after_recheck(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        edited_bodies: list[str] = []
+
+        def run_side_effect(command, cwd=None, check=True):
+            if command[:4] == ["gh", "pr", "edit", "1"]:
+                body_file = Path(command[command.index("--body-file") + 1])
+                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+            if command[:4] == ["gh", "pr", "merge", "1"]:
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+        ]
+        find_result_mock.return_value = {
+            "schema_version": 2,
+            "pr_number": 1,
+            "head_sha": "sha-needs-recheck",
+            "body_fingerprint": guardian_body_fingerprint(INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY),
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-needs-recheck",
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
+        run_mock.side_effect = run_side_effect
+
+        exit_code = merge_if_safe(
+            1,
+            post=False,
+            delete_branch=False,
+            refresh_review=False,
+            confirm_integration_recheck=True,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(len(edited_bodies), 1)
+        self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
     def test_merge_rejects_body_drift_before_recording_merge_time_recheck(
         self,
         review_once_mock,

@@ -973,10 +973,12 @@ def merge_if_safe(
             "summary": payload.get("summary", ""),
         }
         reviewed_head_sha = payload["head_sha"]
+        guardian_verdict_body_bound = payload.get("schema_version") == 2
     else:
         meta, result = review_once(pr_number, post=post, json_output=None)
         reviewed_head_sha = meta["headRefOid"]
         current = pr_meta(pr_number)
+        guardian_verdict_body_bound = True
 
     if result["verdict"] != "APPROVE":
         raise SystemExit("guardian 未给出 APPROVE，拒绝合并。")
@@ -1012,6 +1014,39 @@ def merge_if_safe(
                 failure_context="merge 前 integration 复核后 PR HEAD 已变化",
             )
             raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
+    if merge_time_integration_recheck_recorded and guardian_verdict_body_bound:
+        try:
+            refreshed_meta, refreshed_result = review_once(pr_number, post=post, json_output=None)
+        except (CommandError, SystemExit) as exc:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 失败",
+            )
+            raise SystemExit(f"merge 前重跑 guardian 失败，拒绝合并：{exc}") from exc
+        if refreshed_result["verdict"] != "APPROVE":
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 未通过",
+            )
+            raise SystemExit("merge 前重跑 guardian 未给出 APPROVE，拒绝合并。")
+        if not refreshed_result["safe_to_merge"]:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 判定不安全",
+            )
+            raise SystemExit("merge 前重跑 guardian 判定不安全，拒绝合并。")
+        reviewed_head_sha = refreshed_meta["headRefOid"]
+        current = pr_meta(pr_number)
+        if current["headRefOid"] != reviewed_head_sha:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 后 PR HEAD 已变化",
+            )
+            raise SystemExit("merge 前重跑 guardian 后 PR HEAD 已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         if merge_time_integration_recheck_recorded:

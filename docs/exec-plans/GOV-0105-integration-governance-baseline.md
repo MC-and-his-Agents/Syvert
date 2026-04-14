@@ -48,7 +48,10 @@
 
 - `python3` 成功解析 `.github/ISSUE_TEMPLATE/*.yml`
 - 当前事项已把 external rollout 的验证入口独立到 `docs/governance-rollouts/GOV-0105-platform-evidence.md`
-- focused governance tests 会作为 canonical integration contract 的主验证面
+- 已执行：`python3 -m unittest tests.governance.test_integration_contract`
+- 已执行：`python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian tests.governance.test_governance_status`
+- 已执行：`python3 scripts/workflow_guard.py --mode pre-commit`
+- 已执行：`python3 scripts/governance_gate.py --mode ci --base-sha origin/main --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
 
 ## 未决风险
 

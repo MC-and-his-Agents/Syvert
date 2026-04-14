@@ -20,6 +20,7 @@ from scripts.integration_contract import (
     render_issue_form_guidance_lines,
     render_pr_template_guidance_lines,
     render_review_packet_lines,
+    validate_issue_canonical_payload,
     validate_pr_merge_gate_payload,
 )
 
@@ -268,6 +269,24 @@ class IntegrationContractTests(unittest.TestCase):
         )
 
         self.assertEqual(errors, [])
+
+    def test_validate_issue_canonical_payload_enforces_contract_combinations(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "none",
+            "external_dependency": "both",
+            "merge_gate": "local_only",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+        }
+
+        errors = validate_issue_canonical_payload(payload)
+
+        self.assertTrue(errors)
+        self.assertTrue(
+            any("Issue canonical integration 元数据与 contract 组合约束冲突" in item for item in errors)
+        )
 
     def test_workflow_and_code_review_reference_canonical_contract(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")

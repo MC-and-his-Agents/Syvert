@@ -377,6 +377,47 @@ def merge_gate_requires_integration_recheck(payload: Mapping[str, str]) -> bool:
     return str(payload.get("merge_gate") or "").strip().lower() == "integration_check_required"
 
 
+def validate_issue_canonical_payload(payload: Mapping[str, str]) -> list[str]:
+    errors: list[str] = []
+    merge_gate = str(payload.get("merge_gate") or "").strip().lower()
+    integration_touchpoint = str(payload.get("integration_touchpoint") or "").strip().lower()
+    integration_ref = str(payload.get("integration_ref") or "").strip()
+    if requires_checkable_integration_ref(payload):
+        if not integration_ref:
+            errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
+        elif integration_ref.lower() == "none":
+            errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
+        elif not integration_ref_is_checkable(integration_ref):
+            errors.append("`integration_touchpoint != none` 时，`integration_ref` 必须指向可核查的具体 integration issue / item。")
+    if requires_integration_gate(payload) and merge_gate != "integration_check_required":
+        errors.append(
+            "Issue canonical integration 元数据与 contract 组合约束冲突："
+            "当 `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、"
+            "`contract_surface != none` 或 `joint_acceptance_needed=yes` 时，`merge_gate` 必须为 `integration_check_required`。"
+        )
+    if str(payload.get("external_dependency") or "").strip().lower() != "none" and integration_touchpoint == "none":
+        errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
+    if str(payload.get("joint_acceptance_needed") or "").strip().lower() == "yes" and integration_touchpoint == "none":
+        errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
+    if str(payload.get("contract_surface") or "").strip().lower() != "none" and integration_touchpoint == "none":
+        errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
+
+    if merge_gate != "integration_check_required":
+        if not integration_ref:
+            errors.append("Issue canonical integration 元数据中的 `integration_ref` 不能为空；纯本仓库事项请显式填写 `none`。")
+        elif normalize_integration_value("integration_ref", integration_ref) != "none" and not integration_ref_is_checkable(integration_ref):
+            errors.append("Issue canonical integration 元数据中的 `integration_ref` 必须使用可核查的具体 integration issue / item 引用。")
+        elif normalize_integration_value("integration_ref", integration_ref) != "none":
+            errors.append("Issue canonical integration 元数据中 `merge_gate=local_only` 时必须显式使用 `integration_ref=none`。")
+        return errors
+
+    if integration_touchpoint == "none":
+        errors.append("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`。")
+    if not integration_ref or not integration_ref_is_checkable(integration_ref):
+        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
+    return errors
+
+
 def validate_issue_fetch(issue_number: int, *, allow_missing_payload: bool) -> IssueCanonicalResolution:
     completed = run(
         ["gh", "issue", "view", str(issue_number), "--json", "body"],
@@ -413,6 +454,13 @@ def validate_issue_fetch(issue_number: int, *, allow_missing_payload: bool) -> I
             issue_number=issue_number,
             canonical=canonical,
             error=enum_errors[0],
+        )
+    contract_errors = validate_issue_canonical_payload(canonical)
+    if contract_errors:
+        return IssueCanonicalResolution(
+            issue_number=issue_number,
+            canonical=canonical,
+            error=contract_errors[0],
         )
     return IssueCanonicalResolution(issue_number=issue_number, canonical=canonical, error=None)
 
