@@ -10,6 +10,7 @@ if __package__ in {None, ""}:
 import argparse
 import json
 import os
+import re
 import tempfile
 
 from scripts.item_context import (
@@ -47,6 +48,13 @@ from scripts.common import (
     run,
     syvert_state_file,
 )
+from scripts.integration_contract import (
+    ISSUE_SCOPE_FIELDS,
+    extract_issue_canonical_integration_fields,
+    field_choices,
+    validate_issue_fetch,
+    validate_open_pr_payload,
+)
 from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
 from scripts.spec_guard import validate_suite
@@ -54,8 +62,22 @@ from scripts.spec_guard import validate_suite
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 WORKTREE_STATE_FILE = syvert_state_file("worktrees.json")
-ISSUE_SUMMARY_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
+    "Goal": ("Goal", "Summary", "摘要", "治理目标", "执行目标", "阶段目标"),
+    "Scope": ("Scope", "范围", "影响载体"),
+    "Required Outcomes": ("Required Outcomes", "Formal Spec Suite", "Formal Spec 套件"),
+    "Acceptance": ("Acceptance", "验收"),
+    "Acceptance Criteria": ("Acceptance Criteria", "验收标准", "进入 / 关闭条件", "进入/关闭条件"),
+    "Out of Scope": ("Out of Scope", "非目标"),
+    "Dependency": ("Dependency", "Dependencies", "依赖", "关联 FR"),
+}
+ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
+EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
+MERGE_GATE_CHOICES = field_choices("merge_gate")
+CONTRACT_SURFACE_CHOICES = field_choices("contract_surface")
+YES_NO_CHOICES = field_choices("shared_contract_changed")
 
 
 def is_deleted_legacy_todo_change(path: str, *, repo_root: Path) -> bool:
@@ -92,6 +114,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--closing", default="fixes", choices=get_policy()["closing_modes"])
     parser.add_argument("--draft", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--integration-touchpoint", default="none", choices=INTEGRATION_TOUCHPOINT_CHOICES)
+    parser.add_argument("--shared-contract-changed", default="no", choices=YES_NO_CHOICES)
+    parser.add_argument("--integration-ref", default="none")
+    parser.add_argument("--external-dependency", default="none", choices=EXTERNAL_DEPENDENCY_CHOICES)
+    parser.add_argument("--merge-gate", default="local_only", choices=MERGE_GATE_CHOICES)
+    parser.add_argument("--contract-surface", default="none", choices=CONTRACT_SURFACE_CHOICES)
+    parser.add_argument("--joint-acceptance-needed", default="no", choices=YES_NO_CHOICES)
+    parser.add_argument("--integration-status-checked-before-pr", default="no", choices=YES_NO_CHOICES)
+    parser.add_argument("--integration-status-checked-before-merge", default="no", choices=YES_NO_CHOICES)
     return parser.parse_args(argv)
 
 
@@ -187,18 +218,30 @@ def closing_line(issue: int | None, mode: str) -> str:
     return f"{prefix} #{issue}"
 
 
-def extract_issue_summary_sections(body: str) -> dict[str, str]:
+def normalize_issue_summary_heading(raw_heading: str) -> str:
+    heading = raw_heading.strip()
+    heading = re.sub(r"\s*[:：]\s*$", "", heading)
+    heading = re.sub(r"\s*/\s*", " / ", heading)
+    heading = re.sub(r"\s+", " ", heading)
+    return heading.casefold()
+
+
+ISSUE_SUMMARY_HEADING_LOOKUP = {
+    normalize_issue_summary_heading(alias): canonical
+    for canonical, aliases in ISSUE_SUMMARY_HEADING_ALIASES.items()
+    for alias in aliases
+}
+def extract_issue_form_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
-    selected = set(ISSUE_SUMMARY_HEADINGS)
+    heading_pattern = re.compile(r"^#{2,6}\s+(.+?)\s*$")
 
     for line in body.splitlines():
         stripped = line.strip()
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip()
-            current = heading if heading in selected else None
-            if current:
-                sections.setdefault(current, [])
+        heading_match = heading_pattern.match(stripped)
+        if heading_match:
+            current = heading_match.group(1).strip()
+            sections.setdefault(current, [])
             continue
         if current:
             sections[current].append(line.rstrip())
@@ -206,7 +249,18 @@ def extract_issue_summary_sections(body: str) -> dict[str, str]:
     return {key: "\n".join(value).strip() for key, value in sections.items() if "\n".join(value).strip()}
 
 
-def build_issue_summary(issue: int | None) -> str:
+def extract_issue_summary_sections(body: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    for heading, content in extract_issue_form_sections(body).items():
+        canonical = ISSUE_SUMMARY_HEADING_LOOKUP.get(normalize_issue_summary_heading(heading))
+        if canonical and content:
+            if canonical in sections:
+                sections[canonical] = "\n\n".join([sections[canonical], content]).strip()
+            else:
+                sections[canonical] = content
+    return sections
+
+def fetch_issue_body(issue: int | None) -> str:
     if issue is None:
         return ""
 
@@ -220,7 +274,22 @@ def build_issue_summary(issue: int | None) -> str:
         return ""
 
     payload = json.loads(completed.stdout or "{}")
-    sections = extract_issue_summary_sections(str(payload.get("body") or ""))
+    return str(payload.get("body") or "")
+
+
+def resolve_issue_canonical_integration(issue: int | None) -> tuple[dict[str, str], str | None]:
+    if issue is None:
+        return {}, None
+    resolution = validate_issue_fetch(issue, allow_missing_payload=True)
+    return resolution.canonical, resolution.error
+
+
+def build_issue_summary(issue: int | None) -> str:
+    body = fetch_issue_body(issue)
+    if not body:
+        return ""
+
+    sections = extract_issue_summary_sections(body)
     if not sections:
         return ""
 
@@ -431,6 +500,52 @@ def validate_pr_preflight(
     return errors
 
 
+def validate_integration_args(args: argparse.Namespace) -> list[str]:
+    errors: list[str] = []
+    issue_canonical_integration, issue_canonical_error = resolve_issue_canonical_integration(args.issue)
+    if issue_canonical_error:
+        errors.append(issue_canonical_error)
+    payload = {
+        field: str(getattr(args, field, "") or "").strip()
+        for field in (
+            *ISSUE_SCOPE_FIELDS,
+            "integration_status_checked_before_pr",
+            "integration_status_checked_before_merge",
+        )
+    }
+    payload["integration_ref"] = str(args.integration_ref or "").strip()
+    open_pr_errors = validate_open_pr_payload(
+        payload,
+        issue_canonical=issue_canonical_integration,
+        issue_number=args.issue,
+    )
+    for error in open_pr_errors:
+        if error.startswith("`cli."):
+            field = error.split(".", 1)[1].split("`", 1)[0]
+            cli_flag = f"--{field.replace('_', '-')}"
+            errors.append(error.replace(f"`cli.{field}`", f"`{cli_flag}`", 1))
+        else:
+            errors.append(error)
+    return errors
+
+
+def replace_markdown_field(body: str, label: str, value: str) -> str:
+    pattern = re.compile(rf"^- {re.escape(label)}(?:（[^\n]*?）)?:\s*$", re.MULTILINE)
+    replacement = f"- {label}: {value}"
+    return pattern.sub(replacement, body, count=1)
+
+
+def has_markdown_section(body: str, heading: str) -> bool:
+    pattern = re.compile(rf"(?im)^##\s+{re.escape(heading)}\s*$")
+    return bool(pattern.search(body))
+
+
+def render_integration_check_section(values: dict[str, str]) -> str:
+    lines = ["## integration_check", ""]
+    lines.extend([f"- {label}: {value}" for label, value in values.items()])
+    return "\n".join(lines)
+
+
 def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     if not TEMPLATE_PATH.exists():
         raise SystemExit(f"缺少 PR 模板: {TEMPLATE_PATH}")
@@ -450,6 +565,21 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     }
     for token, value in replacements.items():
         body = body.replace(token, value)
+    integration_values = {
+        "integration_touchpoint": args.integration_touchpoint,
+        "shared_contract_changed": args.shared_contract_changed,
+        "integration_ref": args.integration_ref,
+        "external_dependency": args.external_dependency,
+        "merge_gate": args.merge_gate,
+        "contract_surface": args.contract_surface,
+        "joint_acceptance_needed": args.joint_acceptance_needed,
+        "integration_status_checked_before_pr": args.integration_status_checked_before_pr,
+        "integration_status_checked_before_merge": args.integration_status_checked_before_merge,
+    }
+    if not has_markdown_section(body, "integration_check"):
+        body = body.rstrip() + "\n\n" + render_integration_check_section(integration_values) + "\n"
+    for label, value in integration_values.items():
+        body = replace_markdown_field(body, label, value)
     return body
 
 
@@ -477,6 +607,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     if preflight_errors:
         for error in preflight_errors:
+            print(error, file=sys.stderr)
+        return 1
+    integration_errors = validate_integration_args(args)
+    if integration_errors:
+        for error in integration_errors:
             print(error, file=sys.stderr)
         return 1
 

@@ -309,21 +309,31 @@ def semantic_integration_ref_key(value: str) -> str:
     return identity
 
 
+def semantic_identity_from_live_state(live_state: Mapping[str, object]) -> str:
+    content_repo = str(live_state.get("content_repo") or "").strip().lower()
+    content_issue_number = str(live_state.get("content_issue_number") or "").strip()
+    if content_repo and content_issue_number:
+        return f"issue:{content_repo}#{content_issue_number}"
+    organization = str(live_state.get("organization") or "").strip().lower()
+    project_number = str(live_state.get("project_number") or "").strip()
+    item_id = str(live_state.get("item_id") or "").strip()
+    if organization and project_number and item_id:
+        return f"project-item:{organization}/{project_number}#{item_id}"
+    return ""
+
+
 def semantic_integration_ref_identity(value: str) -> tuple[str, bool, str]:
     normalized = normalize_integration_ref_for_comparison(value)
     if normalized in {"", "none"}:
         return normalized, True, normalized
-    if normalized.startswith("issue:"):
-        return normalized, True, normalized
-    if not normalized.startswith("project-item:"):
+    if not (normalized.startswith("issue:") or normalized.startswith("project-item:")):
         return normalized, True, normalized
     live_state = fetch_integration_ref_live_state(value)
     if str(live_state.get("error") or "").strip():
         return normalized, False, normalized
-    content_repo = str(live_state.get("content_repo") or "").strip().lower()
-    content_issue_number = str(live_state.get("content_issue_number") or "").strip()
-    if content_repo and content_issue_number:
-        return f"issue:{content_repo}#{content_issue_number}", True, normalized
+    semantic_identity = semantic_identity_from_live_state(live_state)
+    if semantic_identity:
+        return semantic_identity, True, normalized
     return normalized, False, normalized
 
 
@@ -385,6 +395,10 @@ def compare_issue_and_pr_canonical(
     errors: list[str] = []
     for field in ISSUE_SCOPE_FIELDS:
         if field == "integration_ref":
+            expected_normalized = normalize_integration_value(field, issue_canonical.get(field, ""))
+            actual_normalized = normalize_integration_value(field, pr_payload.get(field, ""))
+            if expected_normalized == actual_normalized:
+                continue
             expected, expected_resolved, expected_static = semantic_integration_ref_identity(str(issue_canonical.get(field, "") or ""))
             actual, actual_resolved, actual_static = semantic_integration_ref_identity(str(pr_payload.get(field, "") or ""))
             if expected == actual:

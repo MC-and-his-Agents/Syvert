@@ -145,7 +145,12 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
     if pr_number is not None:
         meta = fetch_pr_meta(pr_number)
         head_sha = meta.get("headRefOid", "")
-        payload["guardian"] = find_latest_guardian_result(pr_number, head_sha, path=GUARDIAN_STATE_FILE) or {}
+        payload["guardian"] = find_latest_guardian_result(
+            pr_number,
+            head_sha,
+            body=str(meta.get("body") or ""),
+            path=GUARDIAN_STATE_FILE,
+        ) or {}
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
         payload["checks"] = fetch_checks_summary(pr_number)
         branch_name = meta.get("headRefName", "")

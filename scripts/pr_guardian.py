@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -15,9 +16,38 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
+from tempfile import NamedTemporaryFile
 
-from scripts.common import REPO_ROOT, bool_text, dump_json, ensure_parent, format_changed_files, load_json, require_cli, run
+from scripts.common import (
+    CommandError,
+    REPO_ROOT,
+    bool_text,
+    default_github_repo,
+    dump_json,
+    ensure_parent,
+    format_changed_files,
+    integration_ref_is_checkable,
+    load_json,
+    require_cli,
+    run,
+)
+from scripts.integration_contract import (
+    ISSUE_SCOPE_FIELDS,
+    PR_SCOPE_FIELDS,
+    build_review_packet,
+    extract_issue_canonical_integration_fields,
+    fetch_integration_ref_live_state,
+    field_choices,
+    merge_gate_requires_integration_recheck as merge_gate_requires_integration_recheck_payload,
+    parse_integration_check_payload,
+    parse_pr_integration_check,
+    render_review_packet_lines,
+    validate_integration_ref_live_state,
+    validate_issue_fetch,
+    validate_pr_integration_contract,
+)
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.open_pr import extract_issue_summary_sections
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
@@ -25,6 +55,7 @@ SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 CODE_REVIEW_PATH = "code_review.md"
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
+INTEGRATION_STATUS_VALUES = set(field_choices("integration_status_checked_before_pr"))
 REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "sprint")
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
@@ -79,6 +110,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     merge.add_argument("--post-review", action="store_true")
     merge.add_argument("--delete-branch", action="store_true")
     merge.add_argument("--refresh-review", action="store_true")
+    merge.add_argument("--confirm-integration-recheck", action="store_true")
 
     return parser.parse_args(argv)
 
@@ -126,11 +158,16 @@ def now_iso_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def guardian_body_fingerprint(body: str) -> str:
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 def build_guardian_payload(meta: dict, result: dict) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "pr_number": meta["number"],
         "head_sha": meta["headRefOid"],
+        "body_fingerprint": guardian_body_fingerprint(str(meta.get("body") or "")),
         "verdict": result["verdict"],
         "safe_to_merge": result["safe_to_merge"],
         "summary": result["summary"],
@@ -154,14 +191,31 @@ def save_guardian_result(pr_number: int, payload: dict, *, path: Path = DEFAULT_
     dump_json(path, state)
 
 
-def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str) -> dict | None:
+def valid_guardian_payload(
+    payload: object,
+    *,
+    pr_number: int,
+    head_sha: str,
+    body: str | None = None,
+    require_body_bound: bool = False,
+) -> dict | None:
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") != 1:
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, 2}:
         return None
     if payload.get("pr_number") != pr_number:
         return None
     if payload.get("head_sha") != head_sha:
+        return None
+    body_fingerprint = payload.get("body_fingerprint")
+    if body is not None:
+        if schema_version == 2:
+            if body_fingerprint != guardian_body_fingerprint(body):
+                return None
+        elif require_body_bound:
+            return None
+    elif schema_version == 2 and not isinstance(body_fingerprint, str):
         return None
     if payload.get("verdict") not in VALID_VERDICTS:
         return None
@@ -174,13 +228,39 @@ def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str) ->
     return payload
 
 
-def local_guardian_result(pr_number: int, head_sha: str, *, path: Path = DEFAULT_STATE_FILE) -> dict | None:
+def local_guardian_result(
+    pr_number: int,
+    head_sha: str,
+    *,
+    body: str | None = None,
+    require_body_bound: bool = False,
+    path: Path = DEFAULT_STATE_FILE,
+) -> dict | None:
     payload = load_guardian_state(path).get("prs", {}).get(str(pr_number))
-    return valid_guardian_payload(payload, pr_number=pr_number, head_sha=head_sha)
+    return valid_guardian_payload(
+        payload,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        body=body,
+        require_body_bound=require_body_bound,
+    )
 
 
-def find_latest_guardian_result(pr_number: int, head_sha: str, *, path: Path = DEFAULT_STATE_FILE) -> dict | None:
-    return local_guardian_result(pr_number, head_sha, path=path)
+def find_latest_guardian_result(
+    pr_number: int,
+    head_sha: str,
+    *,
+    body: str | None = None,
+    require_body_bound: bool = False,
+    path: Path = DEFAULT_STATE_FILE,
+) -> dict | None:
+    return local_guardian_result(
+        pr_number,
+        head_sha,
+        body=body,
+        require_body_bound=require_body_bound,
+        path=path,
+    )
 
 
 def parse_all_markdown_sections(body: str) -> dict[str, str]:
@@ -219,6 +299,152 @@ def parse_markdown_sections(body: str) -> dict[str, str]:
         if key and content:
             sections[key] = content
     return sections
+
+
+def parse_bullet_kv_section(section: str) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    current_key: str | None = None
+    for raw_line in section.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            entry = stripped[2:]
+            key_part, _, value_part = entry.partition(":")
+            if not _:
+                key_part, _, value_part = entry.partition("：")
+            normalized_key = key_part.split("（", 1)[0].split("(", 1)[0].strip()
+            current_key = normalized_key
+            payload[current_key] = value_part.strip()
+            continue
+        if current_key and stripped and raw_line[:1].isspace():
+            payload[current_key] = "\n".join(filter(None, [payload[current_key], stripped])).strip()
+    return payload
+
+
+def integration_merge_gate_errors(meta: dict, *, require_live_state: bool = False) -> list[str]:
+    body = str(meta.get("body") or "")
+    issue_number, issue_canonical_integration = resolve_issue_canonical_integration(meta)
+    issue_canonical_error = str(meta.get("_issue_canonical_integration_error") or "").strip()
+    integration_payload = parse_pr_integration_check(body)
+    if issue_canonical_error:
+        return [issue_canonical_error]
+    errors = validate_pr_integration_contract(
+        integration_payload,
+        issue_number=issue_number,
+        issue_canonical=issue_canonical_integration,
+        issue_error=issue_canonical_error,
+        require_merge_time_recheck=True,
+    )
+    if errors:
+        return errors
+    if not require_live_state or not merge_gate_requires_integration_recheck_payload(integration_payload):
+        return []
+    integration_ref = str(integration_payload.get("integration_ref") or "").strip()
+    live_state = fetch_integration_ref_live_state(integration_ref)
+    meta["_integration_ref_live_state"] = live_state
+    return validate_integration_ref_live_state(
+        integration_payload,
+        live_state,
+        current_repo_slug=default_github_repo(),
+    )
+
+
+def merge_gate_requires_integration_recheck(meta: dict) -> bool:
+    payload = parse_pr_integration_check(str(meta.get("body") or ""))
+    return bool(payload) and merge_gate_requires_integration_recheck_payload(payload)
+
+
+def integration_check_section_span(body: str) -> tuple[int, int]:
+    heading_pattern = re.compile(r"(?im)^#{2,6}\s+(.+?)\s*$")
+    matches = list(heading_pattern.finditer(body))
+    for index, match in enumerate(matches):
+        if match.group(1).strip().casefold() != "integration_check":
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        return start, end
+    raise SystemExit("PR 描述缺少 `## integration_check` 段落，无法在 merge 前记录 integration 复核。")
+
+
+def integration_check_section_text(body: str) -> str:
+    start, end = integration_check_section_span(body)
+    return body[start:end]
+
+
+def set_integration_status_checked_before_merge(body: str, value: str = "yes") -> str:
+    pattern = re.compile(
+        r"(?im)^(\s*-\s*integration_status_checked_before_merge(?:（[^）]*）|\([^)]*\))?\s*[：:]\s*)(yes|no)\s*$"
+    )
+    section_start, section_end = integration_check_section_span(body)
+    section_body = body[section_start:section_end]
+    updated_section, count = pattern.subn(rf"\1{value}", section_body, count=1)
+    if count == 0:
+        raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法在 merge 前记录 integration 复核。")
+    return body[:section_start] + updated_section + body[section_end:]
+
+
+def integration_status_checked_before_merge_value(body: str) -> str:
+    section_body = integration_check_section_text(body)
+    payload = parse_integration_check_payload(section_body)
+    value = str(payload.get("integration_status_checked_before_merge") or "").strip().lower()
+    if not value:
+        raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法读取 merge 前 integration 复核状态。")
+    if value not in INTEGRATION_STATUS_VALUES:
+        allowed = " / ".join(sorted(INTEGRATION_STATUS_VALUES))
+        raise SystemExit(
+            "PR 描述中的 `integration_status_checked_before_merge` 非法："
+            f"`{value}`（仅允许 `{allowed}`）。"
+        )
+    return value
+
+
+def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[dict, str]:
+    expected_head_sha = str(meta.get("headRefOid") or "")
+    latest = pr_meta(pr_number)
+    latest_body = str(latest.get("body") or "")
+    original_body = str(meta.get("body") or "")
+    if expected_head_sha and latest.get("headRefOid") != expected_head_sha:
+        raise SystemExit("merge 前记录 integration 复核时发现 PR HEAD 已变化，拒绝继续。")
+    if latest_body != original_body:
+        raise SystemExit("merge 前记录 integration 复核时发现 PR 描述已变化，拒绝覆盖并发编辑。")
+    previous_value = integration_status_checked_before_merge_value(latest_body)
+    updated_body = set_integration_status_checked_before_merge(latest_body, "yes")
+    if updated_body != latest_body:
+        update_pr_body(pr_number, updated_body)
+        try:
+            latest = pr_meta(pr_number)
+        except (CommandError, SystemExit):
+            raise SystemExit(
+                "merge 前写入 `integration_status_checked_before_merge=yes` 后，无法重新读取最新 PR 描述；"
+                "为避免覆盖并发编辑，当前不会尝试自动恢复，请人工复核 PR 正文。"
+            )
+    return latest, previous_value
+
+
+def update_pr_body(pr_number: int, body: str) -> None:
+    with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+        handle.write(body)
+        temp_path = Path(handle.name)
+    try:
+        run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def restore_merge_time_integration_recheck(pr_number: int, previous_value: str) -> None:
+    latest = pr_meta(pr_number)
+    latest_body = str(latest.get("body") or "")
+    restored_body = set_integration_status_checked_before_merge(latest_body, previous_value)
+    if restored_body == latest_body:
+        return
+    update_pr_body(pr_number, restored_body)
+
+
+def restore_merge_time_integration_recheck_or_die(pr_number: int, previous_value: str, *, failure_context: str) -> None:
+    try:
+        restore_merge_time_integration_recheck(pr_number, previous_value)
+    except (CommandError, SystemExit) as exc:
+        raise SystemExit(f"{failure_context}，且无法恢复 `integration_status_checked_before_merge`：{exc}") from exc
 
 
 def extract_reviewer_rubric_excerpt(text: str) -> str:
@@ -284,16 +510,20 @@ def fetch_issue_context(issue_number: int) -> dict[str, object]:
         return {
             "identity": [f"- Issue: #{issue_number}", "- issue 上下文暂不可用"],
             "summary": "issue 内容暂不可用。",
+            "canonical_integration": {},
         }
 
     payload = json.loads(completed.stdout or "{}")
     body = str(payload.get("body") or "").strip()
+    canonical_integration = extract_issue_canonical_integration_fields(body)
     identity = [
         f"- Issue: #{payload.get('number', issue_number)}",
         f"- 标题: {payload.get('title', '')}",
         f"- 链接: {payload.get('url', '')}",
     ]
     sections = extract_named_markdown_sections(body, ISSUE_CONTEXT_HEADINGS)
+    if not sections:
+        sections = extract_issue_summary_sections(body)
     if sections:
         summary_parts: list[str] = []
         for heading in ISSUE_CONTEXT_HEADINGS:
@@ -304,7 +534,44 @@ def fetch_issue_context(issue_number: int) -> dict[str, object]:
         summary = "\n".join(summary_parts).strip()
     else:
         summary = body or "无 issue 正文。"
-    return {"identity": identity, "summary": summary}
+    return {"identity": identity, "summary": summary, "canonical_integration": canonical_integration}
+
+
+def issue_number_from_meta(meta: dict) -> int | None:
+    body_context = parse_item_context_from_body(str(meta.get("body") or ""))
+    issue_text = str(body_context.get("issue", "")).strip().lstrip("#")
+    if not issue_text:
+        return None
+    try:
+        return int(issue_text)
+    except ValueError:
+        return None
+
+
+def resolve_issue_canonical_integration(meta: dict) -> tuple[int | None, dict[str, str]]:
+    cached_issue_number = meta.get("_issue_canonical_issue_number")
+    cached_payload = meta.get("_issue_canonical_integration")
+    cached_error = meta.get("_issue_canonical_integration_error")
+    if isinstance(cached_payload, dict):
+        if cached_error is not None:
+            meta["_issue_canonical_integration_error"] = str(cached_error)
+        return (int(cached_issue_number) if isinstance(cached_issue_number, int) else None), {
+            str(key): str(value) for key, value in cached_payload.items()
+        }
+
+    issue_number = issue_number_from_meta(meta)
+    if issue_number is None:
+        meta["_issue_canonical_issue_number"] = None
+        meta["_issue_canonical_integration"] = {}
+        meta["_issue_canonical_integration_error"] = None
+        return None, {}
+
+    resolution = validate_issue_fetch(issue_number, allow_missing_payload=True)
+    canonical = resolution.canonical
+    meta["_issue_canonical_issue_number"] = issue_number
+    meta["_issue_canonical_integration"] = canonical
+    meta["_issue_canonical_integration_error"] = resolution.error
+    return issue_number, canonical
 
 
 def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]:
@@ -412,15 +679,20 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
 
 def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     base_ref = meta["baseRefName"]
+    body = str(meta.get("body") or "")
     raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     changed_files, diff_stat = fetch_diff_stats(worktree_dir, base_ref)
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
-    issue_number = 0
-    try:
-        issue_number = int(str(item_context.get("issue", "")).strip())
-    except ValueError:
-        issue_number = 0
+    issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
+    issue_error = str(meta.get("_issue_canonical_integration_error") or "")
+    integration_payload = parse_pr_integration_check(body)
+    pr_integration_ref = str(integration_payload.get("integration_ref") or "").strip() if integration_payload else ""
+    issue_integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    snapshot_ref = pr_integration_ref if integration_ref_is_checkable(pr_integration_ref) else ""
+    if not snapshot_ref and integration_ref_is_checkable(issue_integration_ref):
+        snapshot_ref = issue_integration_ref
+    integration_ref_live = fetch_integration_ref_live_state(snapshot_ref) if snapshot_ref else {}
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
@@ -435,10 +707,17 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             f"- 头部提交: {meta['headRefOid']}",
             f"- 头部分支: {meta.get('headRefName', '')}",
         ],
-        "issue_context": fetch_issue_context(issue_number) if needs_issue_context else {"identity": [], "summary": ""},
+        "issue_context": fetch_issue_context(issue_number) if needs_issue_context else {"identity": [], "summary": "", "canonical_integration": {}},
         "item_context": item_context,
         "raw_sections": raw_sections,
         "pr_sections": sections,
+        "integration_review_packet": build_review_packet(
+            body,
+            issue_number=issue_number,
+            issue_canonical=issue_canonical,
+            issue_error=issue_error,
+            integration_ref_live=integration_ref_live,
+        ),
         "changed_files": changed_files,
         "diff_stat": diff_stat,
         "related_paths": related_paths,
@@ -561,6 +840,9 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
             str(context["diff_stat"]),
         ]
     )
+    integration_packet = context.get("integration_review_packet") or {}
+    if integration_packet:
+        lines.extend(["", "Integration Review Packet：", *render_review_packet_lines(integration_packet)])
 
     append_optional_section(lines, "PR 关联事项补充：", item_context_supplement)
     lines.extend(["", "风险摘要：", sections.get("risk", "未提供结构化风险摘要。")])
@@ -727,10 +1009,24 @@ def review_once(pr_number: int, *, post: bool, json_output: str | None) -> tuple
         cleanup(temp_dir)
 
 
-def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_review: bool) -> int:
+def merge_if_safe(
+    pr_number: int,
+    *,
+    post: bool,
+    delete_branch: bool,
+    refresh_review: bool,
+    confirm_integration_recheck: bool = False,
+) -> int:
     require_auth()
     current = pr_meta(pr_number)
-    payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"])
+    original_body = str(current.get("body") or "")
+    reviewed_body = original_body
+    payload = None if refresh_review else find_latest_guardian_result(
+        pr_number,
+        current["headRefOid"],
+        body=original_body,
+        require_body_bound=True,
+    )
 
     if payload:
         print(f"复用已有 guardian verdict: {payload['verdict']} @ {payload['head_sha']}")
@@ -740,10 +1036,13 @@ def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_re
             "summary": payload.get("summary", ""),
         }
         reviewed_head_sha = payload["head_sha"]
+        guardian_verdict_body_bound = payload.get("schema_version") == 2
     else:
         meta, result = review_once(pr_number, post=post, json_output=None)
         reviewed_head_sha = meta["headRefOid"]
+        reviewed_body = str(meta.get("body") or "")
         current = pr_meta(pr_number)
+        guardian_verdict_body_bound = True
 
     if result["verdict"] != "APPROVE":
         raise SystemExit("guardian 未给出 APPROVE，拒绝合并。")
@@ -754,8 +1053,101 @@ def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_re
         raise SystemExit("PR 仍为 Draft，拒绝合并。")
     if current["headRefOid"] != reviewed_head_sha:
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
+    if guardian_verdict_body_bound and str(current.get("body") or "") != reviewed_body:
+        raise SystemExit("guardian 审查后 PR 描述已变化，拒绝合并。")
     if not all_checks_pass(pr_number):
         raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
+    merge_time_integration_recheck_recorded = False
+    previous_merge_recheck_value: str | None = None
+    if merge_gate_requires_integration_recheck(current):
+        if not confirm_integration_recheck:
+            raise SystemExit(
+                "`merge_gate=integration_check_required` 时，进入 `merge_pr` 必须显式传入 "
+                "`--confirm-integration-recheck`，并在该步骤记录 merge 前 integration 复核。"
+            )
+        preview_current = dict(current)
+        preview_current["body"] = set_integration_status_checked_before_merge(str(current.get("body") or ""), "yes")
+        preview_errors = integration_merge_gate_errors(preview_current, require_live_state=True)
+        if preview_errors:
+            detail = "\n".join(f"- {item}" for item in preview_errors)
+            raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
+        current, previous_merge_recheck_value = record_merge_time_integration_recheck(pr_number, current)
+        merge_time_integration_recheck_recorded = True
+        if current["headRefOid"] != reviewed_head_sha:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前 integration 复核后 PR HEAD 已变化",
+            )
+            raise SystemExit("merge 前 integration 复核后 PR HEAD 已变化，拒绝合并。")
+    if merge_time_integration_recheck_recorded and guardian_verdict_body_bound:
+        try:
+            refreshed_meta, refreshed_result = review_once(pr_number, post=post, json_output=None)
+        except (CommandError, SystemExit) as exc:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 失败",
+            )
+            raise SystemExit(f"merge 前重跑 guardian 失败，拒绝合并：{exc}") from exc
+        if refreshed_result["verdict"] != "APPROVE":
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 未通过",
+            )
+            raise SystemExit("merge 前重跑 guardian 未给出 APPROVE，拒绝合并。")
+        if not refreshed_result["safe_to_merge"]:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 判定不安全",
+            )
+            raise SystemExit("merge 前重跑 guardian 判定不安全，拒绝合并。")
+        reviewed_head_sha = refreshed_meta["headRefOid"]
+        current = pr_meta(pr_number)
+        if current["headRefOid"] != reviewed_head_sha:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 后 PR HEAD 已变化",
+            )
+            raise SystemExit("merge 前重跑 guardian 后 PR HEAD 已变化，拒绝合并。")
+        if str(current.get("body") or "") != str(refreshed_meta.get("body") or ""):
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 后 PR 描述已变化",
+            )
+            raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
+    integration_errors = integration_merge_gate_errors(current, require_live_state=True)
+    if integration_errors:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="integration merge gate 校验失败后无法保持 PR 元数据一致",
+            )
+        detail = "\n".join(f"- {item}" for item in integration_errors)
+        raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
+    latest_before_merge = pr_meta(pr_number)
+    if latest_before_merge["headRefOid"] != current["headRefOid"]:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前 PR HEAD 已变化",
+            )
+        raise SystemExit("执行 `gh pr merge` 前 PR HEAD 已变化，拒绝合并。")
+    if str(latest_before_merge.get("body") or "") != str(current.get("body") or ""):
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前 PR 描述已变化",
+            )
+        raise SystemExit("执行 `gh pr merge` 前 PR 描述已变化，拒绝合并。")
+    current = latest_before_merge
 
     command = [
         "gh",
@@ -768,7 +1160,16 @@ def merge_if_safe(pr_number: int, *, post: bool, delete_branch: bool, refresh_re
     ]
     if delete_branch:
         command.append("--delete-branch")
-    run(command, cwd=REPO_ROOT)
+    try:
+        run(command, cwd=REPO_ROOT)
+    except CommandError:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="`gh pr merge` 失败",
+            )
+        raise
     return 0
 
 
@@ -782,6 +1183,7 @@ def main(argv: list[str] | None = None) -> int:
         post=args.post_review,
         delete_branch=args.delete_branch,
         refresh_review=args.refresh_review,
+        confirm_integration_recheck=args.confirm_integration_recheck,
     )
 
 
