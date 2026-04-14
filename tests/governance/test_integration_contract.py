@@ -266,7 +266,7 @@ class IntegrationContractTests(unittest.TestCase):
         )
         self.assertGreaterEqual(fetch_live_mock.call_count, 1)
 
-    def test_default_github_repo_uses_origin_remote_when_env_missing(self) -> None:
+    def test_default_github_repo_falls_back_to_canonical_repo_when_env_missing(self) -> None:
         default_github_repo.cache_clear()
         with patch.dict("os.environ", {}, clear=True), patch("scripts.common.run") as run_mock:
             run_mock.return_value = subprocess.CompletedProcess(
@@ -276,8 +276,14 @@ class IntegrationContractTests(unittest.TestCase):
                 stderr="",
             )
 
-            self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
+            self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert")
 
+        default_github_repo.cache_clear()
+
+    def test_default_github_repo_honors_explicit_env_override(self) -> None:
+        default_github_repo.cache_clear()
+        with patch.dict("os.environ", {"SYVERT_GITHUB_REPO": "MC-and-his-Agents/WebEnvoy"}, clear=True):
+            self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
         default_github_repo.cache_clear()
 
     def test_build_review_packet_rejects_missing_pr_canonical_when_issue_declares_contract(self) -> None:
@@ -856,6 +862,72 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(payload["source"], "issue")
         self.assertEqual(payload["joint_acceptance"], "ready")
+
+    def test_fetch_integration_ref_live_state_rejects_issue_path_project_with_wrong_number(self) -> None:
+        graphql_payload = {
+            "data": {
+                "repository": {
+                    "issue": {
+                        "number": 105,
+                        "title": "integration baseline",
+                        "url": "https://github.com/MC-and-his-Agents/Syvert/issues/105",
+                        "state": "OPEN",
+                        "projectItems": {
+                            "nodes": [
+                                {
+                                    "__typename": "ProjectV2Item",
+                                    "id": "PVTI_wrong_number",
+                                    "isArchived": False,
+                                    "fieldValues": {
+                                        "nodes": [
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "Review",
+                                                "field": {"name": "Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "parallel",
+                                                "field": {"name": "Dependency Order"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "ready",
+                                                "field": {"name": "Joint Acceptance"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "reviewing",
+                                                "field": {"name": "Contract Status"},
+                                            },
+                                            {
+                                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                                "name": "joint",
+                                                "field": {"name": "Owner Repo"},
+                                            },
+                                        ]
+                                    },
+                                    "project": {
+                                        "url": "https://github.com/orgs/MC-and-his-Agents/projects/99",
+                                        "number": 99,
+                                        "title": "Syvert × WebEnvoy Integration",
+                                        "owner": {"login": "MC-and-his-Agents"},
+                                    },
+                                }
+                            ],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        },
+                    }
+                }
+            }
+        }
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps(graphql_payload), stderr="")
+
+            payload = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(payload["source"], "issue")
+        self.assertIn("未挂接可核查的 integration project item", payload["error"])
 
     def test_fetch_integration_ref_live_state_rejects_project_item_owner_mismatch(self) -> None:
         graphql_payload = {

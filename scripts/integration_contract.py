@@ -55,6 +55,7 @@ REF_EXAMPLES = tuple(str(example) for example in FIELD_DEFINITIONS["integration_
 CONTRACT_SOURCE_MACHINE_READABLE = str(RAW_CONTRACT["canonical_source"]["machine_readable"])
 CONTRACT_SOURCE_MODULE = str(RAW_CONTRACT["canonical_source"]["python_module"])
 CANONICAL_INTEGRATION_PROJECT_TITLE = "Syvert × WebEnvoy Integration"
+CANONICAL_INTEGRATION_PROJECT_NUMBER = "3"
 CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS = frozenset(
     {
         "status",
@@ -647,9 +648,11 @@ def is_canonical_integration_project_item(node: Mapping[str, object], fields: Ma
     project = node.get("project") or {}
     project_title = str((project or {}).get("title") or "").strip()
     project_owner = str(((project or {}).get("owner") or {}).get("login") or "").strip().lower()
+    project_number = str((project or {}).get("number") or "").strip()
     return (
         project_title == CANONICAL_INTEGRATION_PROJECT_TITLE
         and project_owner == canonical_integration_project_owner()
+        and project_number == CANONICAL_INTEGRATION_PROJECT_NUMBER
         and CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS.issubset(fields.keys())
     )
 
