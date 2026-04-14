@@ -22,10 +22,12 @@ from scripts.pr_guardian import (
     parse_bullet_kv_section,
     parse_integration_check_payload,
     guardian_body_fingerprint,
+    integration_status_checked_before_merge_value,
     render_item_context_supplement,
     review_once,
     run_codex_review,
     save_guardian_result,
+    set_integration_status_checked_before_merge,
 )
 
 
@@ -118,6 +120,33 @@ class GuardianStateTests(unittest.TestCase):
             self.assertIsNotNone(payload)
             self.assertEqual(payload["head_sha"], "sha-1")
 
+    def test_find_latest_guardian_result_accepts_schema_v1_when_body_is_provided(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "guardian.json"
+            save_guardian_result(
+                1,
+                {
+                    "schema_version": 1,
+                    "pr_number": 1,
+                    "head_sha": "sha-1",
+                    "verdict": "APPROVE",
+                    "safe_to_merge": True,
+                    "summary": "cached",
+                    "reviewed_at": "2026-03-28T10:00:00Z",
+                },
+                path=state_path,
+            )
+
+            payload = find_latest_guardian_result(
+                1,
+                "sha-1",
+                body="## integration_check\n\n- integration_status_checked_before_pr: yes\n",
+                path=state_path,
+            )
+
+            self.assertIsNotNone(payload)
+            self.assertEqual(payload["head_sha"], "sha-1")
+
     def test_find_latest_guardian_result_rejects_stale_head(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "guardian.json"
@@ -169,6 +198,57 @@ class GuardianStateTests(unittest.TestCase):
 
 
 class CodexReviewExecutionTests(unittest.TestCase):
+    def test_set_integration_status_checked_before_merge_updates_only_integration_check_section(self) -> None:
+        body = "\n".join(
+            [
+                "## 摘要",
+                "",
+                "- integration_status_checked_before_merge: no",
+                "",
+                "## integration_check",
+                "",
+                "- integration_touchpoint: active",
+                "- shared_contract_changed: no",
+                "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "- external_dependency: both",
+                "- merge_gate: integration_check_required",
+                "- contract_surface: runtime_modes",
+                "- joint_acceptance_needed: yes",
+                "- integration_status_checked_before_pr: yes",
+                "- integration_status_checked_before_merge: no",
+            ]
+        )
+
+        updated = set_integration_status_checked_before_merge(body, "yes")
+
+        self.assertIn("## 摘要\n\n- integration_status_checked_before_merge: no", updated)
+        self.assertIn("## integration_check", updated)
+        self.assertIn("- integration_status_checked_before_merge: yes", updated)
+        self.assertEqual(integration_status_checked_before_merge_value(updated), "yes")
+
+    def test_merge_recheck_reader_ignores_same_named_bullet_outside_integration_check_section(self) -> None:
+        body = "\n".join(
+            [
+                "## 补充说明",
+                "",
+                "- integration_status_checked_before_merge: yes",
+                "",
+                "## integration_check",
+                "",
+                "- integration_touchpoint: active",
+                "- shared_contract_changed: no",
+                "- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "- external_dependency: both",
+                "- merge_gate: integration_check_required",
+                "- contract_surface: runtime_modes",
+                "- joint_acceptance_needed: yes",
+                "- integration_status_checked_before_pr: yes",
+                "- integration_status_checked_before_merge: no",
+            ]
+        )
+
+        self.assertEqual(integration_status_checked_before_merge_value(body), "no")
+
     def test_parse_bullet_kv_section_ignores_following_explanatory_heading(self) -> None:
         section = "\n".join(
             [
@@ -1225,7 +1305,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "baseRefName": "main",
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
-            "body": "## Issue 摘要\n\n- Goal: 精简\n- Scope: 收敛 guardian review context\n",
+            "body": "Issue: #24\n## Issue 摘要\n\n- Goal: 精简\n- Scope: 收敛 guardian review context\n",
         }
         worktree_dir = Path("/tmp/pr-worktree")
 
@@ -1235,14 +1315,59 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ) as build_item_context_summary_mock:
                 with patch(
-                    "scripts.pr_guardian.fetch_issue_context",
-                    return_value={"identity": [], "summary": "", "canonical_integration": {}},
-                ) as fetch_issue_context_mock:
-                    payload = build_review_context(meta, worktree_dir)
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(24, {}),
+                ) as resolve_issue_canonical_integration_mock:
+                    with patch(
+                        "scripts.pr_guardian.build_review_packet",
+                        return_value={},
+                    ):
+                        with patch(
+                            "scripts.pr_guardian.fetch_issue_context",
+                            return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                        ) as fetch_issue_context_mock:
+                            payload = build_review_context(meta, worktree_dir)
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
+        resolve_issue_canonical_integration_mock.assert_called_once_with(meta)
         fetch_issue_context_mock.assert_called_once_with(24)
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
+
+    def test_build_review_context_keeps_issue_side_evidence_when_item_context_is_invalid(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "Issue: #24\n## 摘要\n\n- item context drift\n",
+        }
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"item_key": "GOV-0024-guardian-review-context"}, ["item context drift"], []),
+            ):
+                with patch(
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(24, {"merge_gate": "integration_check_required"}),
+                ) as resolve_issue_canonical_integration_mock:
+                    with patch(
+                        "scripts.pr_guardian.fetch_issue_context",
+                        return_value={"identity": ["- Issue: #24"], "summary": "issue summary", "canonical_integration": {}},
+                    ) as fetch_issue_context_mock:
+                        with patch(
+                            "scripts.pr_guardian.build_review_packet",
+                            return_value={"issue_number": 24, "issue_canonical": {"merge_gate": "integration_check_required"}},
+                        ) as build_review_packet_mock:
+                            payload = build_review_context(meta, Path("/tmp/pr-worktree"))
+
+        resolve_issue_canonical_integration_mock.assert_called_once_with(meta)
+        fetch_issue_context_mock.assert_called_once_with(24)
+        build_review_packet_mock.assert_called_once()
+        self.assertEqual(payload["integration_review_packet"]["issue_number"], 24)
+        self.assertEqual(payload["context_notes"], ["item context drift"])
 
     def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
         meta = {
@@ -1254,6 +1379,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "headRefName": "issue-24-branch",
             "body": "\n".join(
                 [
+                    "Issue: #24",
                     "## Issue 摘要",
                     "",
                     "## Goal",
@@ -1273,10 +1399,18 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
             ):
                 with patch(
-                    "scripts.pr_guardian.fetch_issue_context",
-                    return_value={"identity": [], "summary": "", "canonical_integration": {}},
-                ) as fetch_issue_context_mock:
-                    payload = build_review_context(meta, Path("/tmp/pr-worktree"))
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(24, {}),
+                ):
+                    with patch(
+                        "scripts.pr_guardian.build_review_packet",
+                        return_value={},
+                    ):
+                        with patch(
+                            "scripts.pr_guardian.fetch_issue_context",
+                            return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                        ) as fetch_issue_context_mock:
+                            payload = build_review_context(meta, Path("/tmp/pr-worktree"))
 
         fetch_issue_context_mock.assert_called_once_with(24)
         self.assertIn("## Goal", payload["pr_sections"]["issue_summary"])

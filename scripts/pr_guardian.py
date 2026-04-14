@@ -190,16 +190,17 @@ def save_guardian_result(pr_number: int, payload: dict, *, path: Path = DEFAULT_
 def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str, body: str | None = None) -> dict | None:
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") not in {1, 2}:
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, 2}:
         return None
     if payload.get("pr_number") != pr_number:
         return None
     if payload.get("head_sha") != head_sha:
         return None
-    if body is not None:
+    if body is not None and schema_version == 2:
         if payload.get("body_fingerprint") != guardian_body_fingerprint(body):
             return None
-    elif payload.get("schema_version") == 2 and not isinstance(payload.get("body_fingerprint"), str):
+    elif schema_version == 2 and not isinstance(payload.get("body_fingerprint"), str):
         return None
     if payload.get("verdict") not in VALID_VERDICTS:
         return None
@@ -300,24 +301,48 @@ def merge_gate_requires_integration_recheck(meta: dict) -> bool:
     return bool(payload) and merge_gate_requires_integration_recheck_payload(payload)
 
 
+def integration_check_section_span(body: str) -> tuple[int, int]:
+    heading_pattern = re.compile(r"(?im)^#{2,6}\s+(.+?)\s*$")
+    matches = list(heading_pattern.finditer(body))
+    for index, match in enumerate(matches):
+        if match.group(1).strip().casefold() != "integration_check":
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        return start, end
+    raise SystemExit("PR 描述缺少 `## integration_check` 段落，无法在 merge 前记录 integration 复核。")
+
+
+def integration_check_section_text(body: str) -> str:
+    start, end = integration_check_section_span(body)
+    return body[start:end]
+
+
 def set_integration_status_checked_before_merge(body: str, value: str = "yes") -> str:
     pattern = re.compile(
         r"(?im)^(\s*-\s*integration_status_checked_before_merge(?:（[^）]*）|\([^)]*\))?\s*[：:]\s*)(yes|no)\s*$"
     )
-    updated_body, count = pattern.subn(rf"\1{value}", body, count=1)
+    section_start, section_end = integration_check_section_span(body)
+    section_body = body[section_start:section_end]
+    updated_section, count = pattern.subn(rf"\1{value}", section_body, count=1)
     if count == 0:
         raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法在 merge 前记录 integration 复核。")
-    return updated_body
+    return body[:section_start] + updated_section + body[section_end:]
 
 
 def integration_status_checked_before_merge_value(body: str) -> str:
-    match = re.search(
-        r"(?im)^\s*-\s*integration_status_checked_before_merge(?:（[^）]*）|\([^)]*\))?\s*[：:]\s*(yes|no)\s*$",
-        body,
-    )
-    if not match:
+    section_body = integration_check_section_text(body)
+    payload = parse_integration_check_payload(section_body)
+    value = str(payload.get("integration_status_checked_before_merge") or "").strip().lower()
+    if not value:
         raise SystemExit("PR 描述缺少 `integration_status_checked_before_merge` 字段，无法读取 merge 前 integration 复核状态。")
-    return match.group(1).strip().lower()
+    if value not in INTEGRATION_STATUS_VALUES:
+        allowed = " / ".join(sorted(INTEGRATION_STATUS_VALUES))
+        raise SystemExit(
+            "PR 描述中的 `integration_status_checked_before_merge` 非法："
+            f"`{value}`（仅允许 `{allowed}`）。"
+        )
+    return value
 
 
 def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[dict, str]:
@@ -605,15 +630,13 @@ def build_item_context_summary(meta: dict, repo_root: Path) -> tuple[dict[str, s
 
 def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     base_ref = meta["baseRefName"]
+    body = str(meta.get("body") or "")
     raw_sections = parse_all_markdown_sections(str(meta.get("body") or ""))
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     changed_files, diff_stat = fetch_diff_stats(worktree_dir, base_ref)
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
-    issue_number = 0
-    try:
-        issue_number = int(str(item_context.get("issue", "")).strip())
-    except ValueError:
-        issue_number = 0
+    issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
+    issue_error = str(meta.get("_issue_canonical_integration_error") or "")
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
@@ -633,10 +656,10 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
         "raw_sections": raw_sections,
         "pr_sections": sections,
         "integration_review_packet": build_review_packet(
-            str(meta.get("body") or ""),
-            issue_number=issue_number or None,
-            issue_canonical=resolve_issue_canonical_integration(meta)[1] if issue_number else {},
-            issue_error=str(meta.get("_issue_canonical_integration_error") or ""),
+            body,
+            issue_number=issue_number,
+            issue_canonical=issue_canonical,
+            issue_error=issue_error,
         ),
         "changed_files": changed_files,
         "diff_stat": diff_stat,
