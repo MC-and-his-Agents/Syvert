@@ -219,13 +219,20 @@ def integration_ref_is_checkable(value: str) -> bool:
     normalized = value.strip()
     if not normalized or normalized.lower() == "none":
         return False
-    patterns = (
-        r"^#\d+$",
-        r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$",
-        r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+$",
-        r"^https://github\.com/orgs/[A-Za-z0-9_.-]+/projects/\d+(?:/views/[A-Za-z0-9_-]+)?\?.*itemId=[A-Za-z0-9_-]+.*$",
-    )
-    return any(re.match(pattern, normalized) for pattern in patterns)
+    if re.match(r"^#\d+$", normalized):
+        return True
+    if re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$", normalized):
+        return True
+    if re.match(r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+$", normalized):
+        return True
+    parsed = urlparse(normalized)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
+        return False
+    if len(path_parts) < 4 or path_parts[0] != "orgs" or path_parts[2] != "projects":
+        return False
+    item_ids = parse_qs(parsed.query).get("itemId", [])
+    return bool(item_ids and str(item_ids[0]).strip())
 
 
 def normalize_integration_ref_for_comparison(value: str) -> str:

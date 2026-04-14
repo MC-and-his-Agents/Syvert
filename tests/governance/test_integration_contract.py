@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.common import REPO_ROOT, default_github_repo, normalize_integration_ref_for_comparison
+from scripts.common import REPO_ROOT, default_github_repo, integration_ref_is_checkable, normalize_integration_ref_for_comparison
 from scripts.integration_contract import (
     CONTRACT_SOURCE_MACHINE_READABLE,
     CONTRACT_SOURCE_MODULE,
@@ -25,6 +25,7 @@ from scripts.integration_contract import (
     render_pr_template_guidance_lines,
     render_review_packet_lines,
     validate_integration_ref_live_state,
+    validate_issue_fetch,
     validate_issue_canonical_payload,
     validate_pr_merge_gate_payload,
 )
@@ -180,8 +181,17 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(packet["merge_validation_errors"], [])
         self.assertTrue(packet["merge_gate_requires_recheck"])
 
-    @patch("scripts.integration_contract.fetch_integration_ref_live_state")
-    def test_build_review_packet_treats_issue_and_project_item_refs_as_distinct_canonical_forms(self, fetch_live_mock) -> None:
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "source": "project_item",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "content_type": "issue",
+            "error": "",
+        },
+    )
+    def test_build_review_packet_collapses_equivalent_issue_and_project_item_refs(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -211,13 +221,10 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(
-            packet["comparison_errors"],
-            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
-        )
+        self.assertEqual(packet["comparison_errors"], [])
         self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
-        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
-        fetch_live_mock.assert_not_called()
+        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
+        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
 
     def test_default_github_repo_uses_origin_remote_when_env_missing(self) -> None:
         default_github_repo.cache_clear()
@@ -523,6 +530,42 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "issue")
         self.assertIn("无法读取", payload["error"])
+
+    def test_fetch_integration_ref_live_state_fail_closed_on_malformed_issue_json(self) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="not-json", stderr="")
+
+            payload = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(payload["source"], "issue")
+        self.assertIn("无法解析", payload["error"])
+
+    def test_fetch_integration_ref_live_state_fail_closed_on_malformed_project_item_json(self) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="not-json", stderr="")
+
+            payload = fetch_integration_ref_live_state(
+                "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test"
+            )
+
+        self.assertEqual(payload["source"], "project_item")
+        self.assertIn("无法解析", payload["error"])
+
+    def test_validate_issue_fetch_fail_closed_on_malformed_issue_json(self) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="not-json", stderr="")
+
+            resolution = validate_issue_fetch(105, allow_missing_payload=False)
+
+        self.assertIn("无法解析", resolution.error or "")
+
+    def test_integration_ref_is_checkable_matches_project_item_parser_shape(self) -> None:
+        self.assertFalse(
+            integration_ref_is_checkable("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&foo=itemId=PVTI_test")
+        )
+        self.assertTrue(
+            integration_ref_is_checkable("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test")
+        )
 
     def test_fetch_integration_ref_live_state_reads_issue_ref_from_integration_project_item(self) -> None:
         graphql_payload = {

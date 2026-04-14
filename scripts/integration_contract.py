@@ -31,6 +31,16 @@ def load_integration_contract() -> dict:
     return load_json(CONTRACT_PATH)
 
 
+def decode_remote_json(stdout: str, *, error_message: str) -> dict[str, object]:
+    try:
+        payload = json.loads(stdout or "{}")
+    except json.JSONDecodeError:
+        return {"error": error_message}
+    if not isinstance(payload, dict):
+        return {"error": error_message}
+    return payload
+
+
 RAW_CONTRACT = load_integration_contract()
 FIELD_ORDER = tuple(str(name) for name in RAW_CONTRACT["field_order"])
 ISSUE_SCOPE_FIELDS = tuple(str(name) for name in RAW_CONTRACT["issue_scope_fields"])
@@ -294,13 +304,32 @@ def normalize_integration_value(field: str, value: str) -> str:
 
 
 def semantic_integration_ref_key(value: str) -> str:
-    return normalize_integration_ref_for_comparison(value)
+    identity, _, _ = semantic_integration_ref_identity(value)
+    return identity
+
+
+def semantic_integration_ref_identity(value: str) -> tuple[str, bool, str]:
+    normalized = normalize_integration_ref_for_comparison(value)
+    if normalized in {"", "none"}:
+        return normalized, True, normalized
+    if normalized.startswith("issue:"):
+        return normalized, True, normalized
+    if not normalized.startswith("project-item:"):
+        return normalized, True, normalized
+    live_state = fetch_integration_ref_live_state(value)
+    if str(live_state.get("error") or "").strip():
+        return normalized, False, normalized
+    content_repo = str(live_state.get("content_repo") or "").strip().lower()
+    content_issue_number = str(live_state.get("content_issue_number") or "").strip()
+    if content_repo and content_issue_number:
+        return f"issue:{content_repo}#{content_issue_number}", True, normalized
+    return normalized, False, normalized
 
 
 def normalize_integration_value_for_packet(field: str, value: str) -> str:
     raw = str(value or "").strip()
     if field == "integration_ref":
-        return normalize_integration_value(field, raw)
+        return semantic_integration_ref_key(raw)
     return normalize_integration_value(field, raw)
 
 
@@ -354,6 +383,19 @@ def compare_issue_and_pr_canonical(
 ) -> list[str]:
     errors: list[str] = []
     for field in ISSUE_SCOPE_FIELDS:
+        if field == "integration_ref":
+            expected, expected_resolved, expected_static = semantic_integration_ref_identity(str(issue_canonical.get(field, "") or ""))
+            actual, actual_resolved, actual_static = semantic_integration_ref_identity(str(pr_payload.get(field, "") or ""))
+            if expected == actual:
+                continue
+            cross_form_pair = {
+                expected_static.split(":", 1)[0],
+                actual_static.split(":", 1)[0],
+            } == {"issue", "project-item"}
+            if cross_form_pair and (not expected_resolved or not actual_resolved):
+                continue
+            errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
+            continue
         expected = normalize_integration_value(field, issue_canonical.get(field, ""))
         actual = normalize_integration_value(field, pr_payload.get(field, ""))
         if expected != actual:
@@ -729,7 +771,19 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
                 "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
             }
 
-        payload = json.loads(completed.stdout or "{}")
+        payload = decode_remote_json(
+            completed.stdout,
+            error_message=(
+                f"无法解析 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}` 的远端响应，拒绝继续。"
+            ),
+        )
+        if payload.get("error"):
+            return {
+                "integration_ref": integration_ref,
+                "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+                "source": "issue",
+                "error": str(payload["error"]),
+            }
         current_issue = (((payload.get("data") or {}).get("repository") or {}).get("issue") or {}) if isinstance(payload, dict) else {}
         if not isinstance(current_issue, dict) or not current_issue:
             return {
@@ -840,7 +894,17 @@ def fetch_project_item_integration_ref_live_state(
             "error": f"无法读取 `integration_ref` 指向的 project item `{item_id}`，拒绝继续。",
         }
 
-    payload = json.loads(completed.stdout or "{}")
+    payload = decode_remote_json(
+        completed.stdout,
+        error_message=f"无法解析 `integration_ref` 指向的 project item `{item_id}` 的远端响应，拒绝继续。",
+    )
+    if payload.get("error"):
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "project_item",
+            "error": str(payload["error"]),
+        }
     node = ((payload.get("data") or {}).get("node") or {}) if isinstance(payload, dict) else {}
     live_state = build_project_item_live_state(
         integration_ref,
@@ -1007,7 +1071,16 @@ def validate_issue_fetch(issue_number: int, *, allow_missing_payload: bool) -> I
             canonical={},
             error=f"无法读取 Issue #{issue_number} 的 canonical integration 元数据，拒绝继续。",
         )
-    payload = json.loads(completed.stdout or "{}")
+    payload = decode_remote_json(
+        completed.stdout,
+        error_message=f"无法解析 Issue #{issue_number} 的 canonical integration 元数据响应，拒绝继续。",
+    )
+    if payload.get("error"):
+        return IssueCanonicalResolution(
+            issue_number=issue_number,
+            canonical={},
+            error=str(payload["error"]),
+        )
     canonical = extract_issue_canonical_integration_fields(str(payload.get("body") or ""))
     if not canonical and allow_missing_payload:
         return IssueCanonicalResolution(issue_number=issue_number, canonical={}, error=None)
