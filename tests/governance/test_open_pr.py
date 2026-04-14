@@ -387,7 +387,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertTrue(any("纯本仓库事项必须显式使用 `integration_ref=none`" in error for error in errors))
 
     @patch(
-        "scripts.open_pr.run",
+        "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(
             args=["gh"],
             returncode=0,
@@ -461,7 +461,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         run_mock.assert_called_once()
 
     @patch(
-        "scripts.open_pr.run",
+        "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps({"body": "### 摘要\n\n- no metadata"}), stderr=""),
     )
     def test_validate_integration_args_rejects_issue_without_canonical_integration_metadata(self, run_mock) -> None:
@@ -488,7 +488,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         run_mock.assert_called_once()
 
     @patch(
-        "scripts.open_pr.run",
+        "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(args=["gh"], returncode=1, stdout="", stderr="boom"),
     )
     def test_validate_integration_args_rejects_issue_fetch_failure_for_canonical_integration(self, run_mock) -> None:
@@ -515,7 +515,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         run_mock.assert_called_once()
 
     @patch(
-        "scripts.open_pr.run",
+        "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(
             args=["gh"],
             returncode=0,
@@ -591,7 +591,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         default_repo_mock.assert_called_once_with()
 
     @patch(
-        "scripts.open_pr.run",
+        "scripts.integration_contract.run",
         return_value=subprocess.CompletedProcess(
             args=["gh"],
             returncode=0,

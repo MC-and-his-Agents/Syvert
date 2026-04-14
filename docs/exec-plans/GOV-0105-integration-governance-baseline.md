@@ -18,22 +18,22 @@
 
 ## 范围
 
-- 本次纳入：`WORKFLOW.md`、`code_review.md`、`.github/PULL_REQUEST_TEMPLATE.md`、`.github/ISSUE_TEMPLATE/**`、`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`、当前 exec-plan，以及为受控 integration gate 落地所需的 `scripts/common.py`、`scripts/open_pr.py`、`scripts/pr_guardian.py`、`scripts/merge_pr.py`、`tests/governance/test_open_pr.py`、`tests/governance/test_pr_guardian.py`。
+- 本次纳入：canonical integration contract、其消费者载体（`WORKFLOW.md`、`code_review.md`、`.github/PULL_REQUEST_TEMPLATE.md`、`.github/ISSUE_TEMPLATE/**`、`scripts/open_pr.py`、`scripts/pr_guardian.py`、`scripts/merge_pr.py`）、review packet、当前 exec-plan、`ADR-GOV-0105` 与外部 rollout evidence 入口。
 - 本次不纳入：自动 bot / 自动同步系统、新的产品仓库、跨仓实现代码、对现有 `Phase / FR / sprint` 语义做统一改造。
 
 ## 当前停点
 
-- 最新可执行 checkpoint 已覆盖 Syvert 侧治理载体改造，并已在 GitHub owner 级 integration project、repo projects、labels 与 issue 回填层面建立联动基线。
-- 当前回合已按 guardian finding 收紧 issue form schema、`integration_ref` 可核查性、guardian merge gate 解析逻辑与 merge-time 回滚路径，并补上 issue/work-item canonical integration 元数据与 PR `integration_check` 的一致性校验。
-- 当前回合同时补入存量 PR 兼容策略：缺少 `integration_check` 的历史 PR 只有在其上位 issue / work item 尚未声明 canonical integration 字段时，才允许沿用 legacy 路径继续收口。
-- 最新 guardian 已对当前 PR head 给出新一轮 finding；当前工作树正在补齐 legacy PR 兼容路径、`integration_ref` 语义等价比较、独立 worktree 下的仓库 slug 归一、以及 exec-plan 作用域与最终合并顺序的同步。
+- 当前回合的中心目标已收缩为“仓库内 canonical integration contract + 消费方接线”，不再把 owner project、repo project fields、labels 与 issue 回填写成 repo 内已完成事实。
+- repo 内改造需要同时收口三件事：单一机器可读 contract、`open_pr/pr_guardian/merge_pr` 的共享消费链路、以及 reviewer 可见的 integration review packet。
+- 外部 GitHub 平台 rollout 改为独立 evidence 包，当前 exec-plan 只保留 repo 内 contract、review packet 与受控 merge gate 的执行停点。
+- 存量事项继续走受控兼容：issue lookup failure fail-closed；issue 存在但未声明 canonical integration 字段时允许 legacy 路径；一旦 issue 已声明 canonical integration 字段，PR 就必须完整对齐。
 
 ## 下一步动作
 
-- 推送当前修正后的 `common.py` / guardian / `open_pr` / tests / exec-plan head，并等待 checks 全绿。
-- 在当前工作分支准备进入最终合并前，先 rebase 到最新 `origin/main`。
-- 针对 rebase 后的最新 head 重新运行 checks 与 guardian，确认 `latest guardian=APPROVE`、`safe_to_merge=true`、checks 全绿、PR 非 Draft、reviewed head 与 merge head 一致。
-- 上述条件全部满足后，再通过 `python3 scripts/merge_pr.py 107 --delete-branch --confirm-integration-recheck` 走受控合并。
+- 完成 canonical integration contract、共享模块、review packet 与消费者载体之间的统一接线。
+- 用 focused governance tests 锁定 contract 枚举、组合约束、legacy 策略、`integration_ref` 归一与 doc/template 一致性。
+- 推送最新 contract 收口 head，等待 checks 全绿，并在同一 head 上重新运行 guardian。
+- 若 guardian 给出 `APPROVE + safe_to_merge=true`，再 rebase 到最新 `origin/main`，重跑 checks 与 guardian，然后通过 `python3 scripts/merge_pr.py 107 --delete-branch --confirm-integration-recheck` 受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -47,16 +47,13 @@
 ## 已验证项
 
 - `python3` 成功解析 `.github/ISSUE_TEMPLATE/*.yml`
-- 已人工复核 PR 模板、workflow、code review 与 issue forms 的 integration 字段口径一致
-- owner 级 integration project、repo project 字段、labels 与治理锚点 issue 已落地
-- `python3 -m unittest tests.governance.test_open_pr tests.governance.test_pr_guardian`
-- `python3 scripts/context_guard.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
-- `python3 scripts/governance_gate.py --mode ci --base-sha 530f94a2e9c23684fc4119162c34a5292143f30a --head-sha HEAD --head-ref issue-105-integration-governance-baseline`
+- 当前事项已把 external rollout 的验证入口独立到 `docs/governance-rollouts/GOV-0105-platform-evidence.md`
+- focused governance tests 会作为 canonical integration contract 的主验证面
 
 ## 未决风险
 
 - `Syvert/main` 在当前审查回合内继续前进；任何基于旧 head 的 guardian 结论都不能直接用于最终合并，必须在最后一次 rebase 后重跑 checks 与 guardian。
-- merge 前仍需再次核对 owner 级 integration project 的状态、依赖与联合验收口径。
+- merge 前仍需再次核对 `integration_ref` 与 owner 级 integration project 的当前状态，但这属于 merge gate / evidence 范围，不再由 exec-plan 直接宣称已完成。
 - 若后续仍有未回填 canonical integration 字段的存量 issue / PR，需要在进入下一轮执行前补齐，避免长期依赖 legacy 兼容路径。
 - 若后续继续扩张 integration 枚举或 gate 语义，需要再走独立治理回合，不应直接在当前 PR 上扩 scope。
 
@@ -66,6 +63,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 当前受审 head：以 PR `#107` 的 latest head 为准；本节不再把“当前受审 head”与静态 SHA 写成同一个值，避免文档在生成新 commit 时自带一拍滞后。
-- 最近一轮已完成 guardian 的 checkpoint：`ab258a69c684b2ceb2914fa0b46ba4452765624a`
-- 说明：该 checkpoint 已把上一轮 guardian finding 收口到 `local_only` 无法绕过 canonical integration 一致性校验、merge-time 回滚优先保留最新 PR 描述、以及 `open_pr` 对上位 Issue canonical integration 元数据的一致性校验；当前工作树继续在此基础上收口 guardian 于 `ab258a6` 提出的 fail-open 与最终 merge 前漂移保护问题。
+- 当前受审 head：以 PR `#107` 的 latest head 为准。
+- 当前 checkpoint 只记录 repo 内 contract 收口停点；guardian verdict 与最终 merge gate 继续绑定 latest head，而不在 exec-plan 中手写逐轮审查日志。
+- 最近一次完成的 repo 内 checkpoint：`e057102a03bdd1f43f3db916ce43b19af1e2045f`

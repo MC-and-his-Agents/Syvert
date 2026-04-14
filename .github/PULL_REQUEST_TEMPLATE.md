@@ -28,21 +28,23 @@
 
 ## integration_check
 
+Canonical integration contract source: `scripts/policy/integration_contract.json` / `scripts/integration_contract.py`
+
 - integration_touchpoint（`none` / `check_required` / `active` / `blocked` / `resolved`）:
-- shared_contract_changed（`yes` / `no`）:
+- shared_contract_changed（`no` / `yes`）:
 - integration_ref:
 - external_dependency（`none` / `syvert` / `webenvoy` / `both`）:
 - merge_gate（`local_only` / `integration_check_required`）:
 - contract_surface（`none` / `execution_provider` / `ids_trace` / `errors` / `raw_normalized` / `diagnostics_observability` / `runtime_modes`）:
-- joint_acceptance_needed（`yes` / `no`）:
-- integration_status_checked_before_pr（`yes` / `no`）:
-- integration_status_checked_before_merge（`yes` / `no`）:
+- joint_acceptance_needed（`no` / `yes`）:
+- integration_status_checked_before_pr（`no` / `yes`）:
+- integration_status_checked_before_merge（`no` / `yes`）:
 
 补充说明：
 
-- `integration_touchpoint != none` 时，`integration_ref` 不得为空，且必须指向可核查的具体 integration issue / project item。
-- `integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、`contract_surface != none`、`joint_acceptance_needed=yes`，或当前 PR 改共享契约 / gate 口径时，当前事项的 `merge_gate` 必须收口为 `integration_check_required`。
-- 进入 merge gate 前必须再次核对 `integration_ref` 对应 integration issue / project item 的当前状态与依赖关系。
+- 按 canonical contract 填写并校验 `integration_check`。
+- `merge_gate` 的触发条件、`integration_ref` 的可核查格式与归一规则，以 canonical contract 为准。
+- `integration_check_required` 的最终复核发生在 merge gate，不要把 merge-time recheck 写成 reviewer 已完成动作。
 
 ## 回滚
 

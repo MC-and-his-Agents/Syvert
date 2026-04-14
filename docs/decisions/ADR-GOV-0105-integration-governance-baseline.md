@@ -16,9 +16,10 @@
 
 ## 决策
 
+- canonical integration contract 的单一真相源固定在仓库内：机器可读定义位于 `scripts/policy/integration_contract.json`，共享消费逻辑位于 `scripts/integration_contract.py`。
 - 新增 owner 级 `Syvert × WebEnvoy Integration` project，作为跨仓协调真相源。
 - `Syvert Project` 与 `WebEnvoy Project` 继续分别承担各自仓库的本地执行真相，不合并为单一产品 project。
-- 两个仓库的 issue / PR / review / workflow 载体统一补入 integration 字段与检查口径。
+- 两个仓库的 issue / PR / review / workflow 载体只消费 canonical integration contract，不再各自维护第二套 integration 枚举或组合约束。
 - 纯本仓库事项保持 `integration_touchpoint=none`；触及共享契约、跨仓依赖或联合验收时，必须显式绑定 integration ref。
 - 各仓库继续按各自本地治理门禁拆分 PR；integration project 不规定另一仓库的内部文件切片方式。
 
@@ -31,5 +32,6 @@
 ## 影响
 
 - 当前事项的 bootstrap contract 由 `Issue #105 + ADR-GOV-0105 + GOV-0105 exec-plan` 构成；PR 只作为实现与验证载体，不反向进入 input contract。
-- 后续所有触及跨仓共享契约的 Syvert / WebEnvoy PR，都必须显式判断是否进入 integration merge gate。
-- integration 协调不再依赖隐式记忆，而是进入 project 字段、issue form、PR 模板与 guardian 审查链路。
+- 后续所有触及跨仓共享契约的 Syvert / WebEnvoy PR，都必须通过 canonical integration contract 显式判断是否进入 integration merge gate。
+- 外部 GitHub Project / labels / issue 回填属于 rollout 结果，不进入 workflow contract；相关验证入口单独记录在 `docs/governance-rollouts/GOV-0105-platform-evidence.md`。
+- integration 协调不再依赖隐式记忆，而是进入 canonical contract、project 字段、issue form、PR 模板与 guardian 审查链路。

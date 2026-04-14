@@ -205,7 +205,7 @@ def default_github_repo() -> str:
         parsed = parse_github_repo_from_remote_url(completed.stdout)
         if parsed:
             return parsed
-    return f"MC-and-his-Agents/{REPO_ROOT.name}"
+    return "MC-and-his-Agents/Syvert"
 
 
 def slugify(text: str) -> str:

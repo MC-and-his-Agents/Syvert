@@ -84,16 +84,10 @@ codex:
 
 ## integration project 联动规则
 
+- canonical integration contract 的单一真相源固定为 [`scripts/policy/integration_contract.json`](./scripts/policy/integration_contract.json) 与 [`scripts/integration_contract.py`](./scripts/integration_contract.py)。
+- issue / work item 消费 issue scope 字段；PR / guardian / merge gate 消费 PR scope 字段。字段集合、枚举值、组合约束、`integration_ref` 归一规则与 legacy 兼容策略都只以 canonical contract 为准。
 - 默认执行真相源仍是当前仓库的 GitHub Project；仅当事项触及跨仓共享契约、跨仓依赖或联合验收时，才查看 owner 级 integration project。
-- 每个进入执行回合的 issue / work item 在 GitHub 侧都必须显式声明：
-  - `integration_touchpoint`
-  - `shared_contract_changed`
-  - `integration_ref`
-  - `external_dependency`
-  - `merge_gate`
-  - `contract_surface`
-  - `joint_acceptance_needed`
-- 满足以下任一条件时，`integration_touchpoint` 不得为 `none`，并且开工前必须先查看 `integration_ref` 对应的 integration issue / item：
+- 满足以下任一条件时，执行者必须在开工前查看 `integration_ref` 对应的 integration issue / item，并按 canonical contract 进入 `integration_check_required` 路径：
   - 改共享输入输出
   - 改错误码或错误语义
   - 改 `raw` / `normalized` / `diagnostics` / `observability`
@@ -101,38 +95,12 @@ codex:
   - 改执行模式或 gate 口径
   - 依赖另一仓库先做、同步做或共同验收
   - 影响联合 PoC、联合回归或共享桥接能力
-- `shared_contract_changed` 取值约定：
-  - `yes`：当前事项显式修改共享契约或 merge gate 口径
-  - `no`：未修改共享契约或 gate 口径
-- `integration_touchpoint` 取值约定：
-  - `none`：纯本仓库事项，不需要 integration 联动
-  - `check_required`：实现前必须核对 integration 状态
-  - `active`：当前执行回合正受 integration 约束
-  - `blocked`：被另一仓库或 integration 契约阻塞
-  - `resolved`：当前回合的 integration 约束已完成
-- `external_dependency` 取值约定：
-  - `none`：无跨仓前置
-  - `syvert`：依赖 Syvert 侧动作
-  - `webenvoy`：依赖 WebEnvoy 侧动作
-  - `both`：两边都有前置或联合验收依赖
-- `merge_gate` 取值约定：
-  - `local_only`：只受本仓库门禁约束
-  - `integration_check_required`：除本仓库门禁外，还必须检查 integration 状态
-- `contract_surface` 用于标记触达的跨仓表面，固定枚举：
-  - `none`
-  - `execution_provider`
-  - `ids_trace`
-  - `errors`
-  - `raw_normalized`
-  - `diagnostics_observability`
-  - `runtime_modes`
-- `joint_acceptance_needed` 取值约定：
-  - `yes`：当前事项需要联合验收
-  - `no`：当前事项不需要联合验收
+- `open_pr` 负责基于 canonical contract 校验上位 issue / work item 元数据并生成 PR `integration_check`；`pr_guardian` 与 `merge_pr` 只消费同一 contract 结果，不再各自定义一套 integration 规则。
 - integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
-- 存量 PR 兼容规则：
-  - 若某个已打开的存量 PR 缺少 `integration_check` 段落，且其上位 issue / work item 也尚未声明 canonical integration 字段，则 guardian 可按 legacy 路径继续执行本仓库门禁。
-  - 一旦上位 issue / work item 已声明 canonical integration 字段，PR 描述中的 `integration_check` 就必须完整存在，并与 issue / work item 的 canonical integration 元数据保持一致。
+- 存量 PR 兼容仍走受控 legacy 路径：
+  - issue lookup failure 继续 fail-closed
+  - issue 存在但尚未声明 canonical integration 字段时，guardian 可沿用 legacy 路径
+  - 一旦上位 issue / work item 已声明 canonical integration 字段，PR `integration_check` 就必须完整存在并与之完全一致
 
 ## stop conditions
 
@@ -169,5 +137,5 @@ codex:
   - `safe_to_merge=true`
   - GitHub checks 全绿
   - PR 非 Draft，且审查与合并使用同一 head SHA
-  - 若上位 issue / work item 已声明 canonical integration 字段，则 guardian 必须确认 PR 的 `integration_check` 与其保持一致
-  - 若 `merge_gate=integration_check_required`，则已在提 PR 前和合并前分别核对一次 `integration_ref` 对应 integration issue / item 的状态、依赖与联合验收约束
+  - 若上位 issue / work item 已声明 canonical integration 字段，则 guardian 必须通过 canonical contract 确认 PR 的 `integration_check` 与其保持一致
+  - 若 `merge_gate=integration_check_required`，则 merge gate 必须记录提 PR 前检查已完成，并在合并前再次核对 `integration_ref` 对应 integration issue / item 的状态、依赖与联合验收约束

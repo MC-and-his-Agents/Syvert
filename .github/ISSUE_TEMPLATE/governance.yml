@@ -80,18 +80,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        `Integration` 字段必须满足以下约束：
-        - `integration_touchpoint != none` 时，`integration_ref` 不得为空或 `none`，且必须指向可核查的具体 integration issue / item。
-        - 只要满足以下任一条件：`integration_touchpoint != none`、`shared_contract_changed=yes`、`external_dependency != none`、`joint_acceptance_needed=yes`、`contract_surface != none`，`merge_gate` 就必须为 `integration_check_required`。
-        - 当 `merge_gate=integration_check_required` 时，`integration_touchpoint` 不得为 `none`，且 `integration_ref` 必须指向可核查的具体 integration issue / item。
-        - 纯本仓库事项必须显式写 `integration_touchpoint=none`、`integration_ref=none`、`external_dependency=none`、`contract_surface=none`、`joint_acceptance_needed=no`、`merge_gate=local_only`。
+        Canonical integration contract source: `scripts/policy/integration_contract.json` / `scripts/integration_contract.py`
+        - 按 canonical contract 填写以下字段。
+        - `merge_gate` 的触发条件、`integration_ref` 的合法格式与 legacy 兼容规则，以 canonical contract 为准。
+        - 纯本仓库事项必须显式收口为 local-only 组合；跨仓事项必须按 contract 进入 integration gate。
 
   - type: checkboxes
     id: integration_guardrails
     attributes:
       label: Integration Guardrails
       options:
-        - label: 我已按上述 integration 组合约束核对本治理工作项，当前填写值不存在互相冲突的元数据。
+        - label: 我已按 canonical integration contract 核对本治理工作项，当前填写值不存在互相冲突的元数据。
           required: true
 
   - type: dropdown
@@ -121,7 +120,7 @@ body:
     id: integration_ref
     attributes:
       label: integration_ref
-      description: 填具体 integration issue / item 链接或编号（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）；纯本仓库事项写 `none`。
+      description: 填具体 integration issue / item 链接或编号；合法格式与归一规则见 canonical contract。纯本仓库事项写 `none`。
     validations:
       required: true
 

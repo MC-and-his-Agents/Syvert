@@ -797,6 +797,46 @@ class CodexReviewExecutionTests(unittest.TestCase):
                     "validation": "- python3 -m unittest",
                     "rollback": "- revert PR",
                 },
+                "integration_review_packet": {
+                    "contract_sources": [
+                        "scripts/policy/integration_contract.json",
+                        "scripts/integration_contract.py",
+                    ],
+                    "issue_number": 24,
+                    "issue_error": "",
+                    "issue_canonical": {
+                        "integration_touchpoint": "active",
+                        "shared_contract_changed": "no",
+                        "integration_ref": "#24",
+                        "external_dependency": "both",
+                        "merge_gate": "integration_check_required",
+                        "contract_surface": "runtime_modes",
+                        "joint_acceptance_needed": "yes",
+                    },
+                    "normalized_issue_canonical": {
+                        "integration_ref": "issue:mc-and-his-agents/syvert#24",
+                    },
+                    "pr_canonical": {
+                        "integration_touchpoint": "active",
+                        "shared_contract_changed": "no",
+                        "integration_ref": "https://github.com/MC-and-his-Agents/Syvert/issues/24",
+                        "external_dependency": "both",
+                        "merge_gate": "integration_check_required",
+                        "contract_surface": "runtime_modes",
+                        "joint_acceptance_needed": "yes",
+                        "integration_status_checked_before_pr": "yes",
+                        "integration_status_checked_before_merge": "no",
+                    },
+                    "normalized_pr_canonical": {
+                        "integration_ref": "issue:mc-and-his-agents/syvert#24",
+                    },
+                    "comparison_errors": [],
+                    "merge_gate": "integration_check_required",
+                    "merge_gate_requires_recheck": True,
+                    "merge_validation_errors": [
+                        "`merge_gate=integration_check_required` 时，进入 `merge_pr` 前必须把 `integration_status_checked_before_merge` 更新为 `yes`。"
+                    ],
+                },
                 "checks": ["- governance: bucket=pass, state=SUCCESS"],
                 "worktree_binding": [{"key": "issue-24", "path": "/tmp/issue-24"}],
                 "changed_files": ["scripts/pr_guardian.py", "tests/governance/test_pr_guardian.py"],
@@ -817,6 +857,9 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("Diff Stat：", prompt)
         self.assertIn("docs/exec-plans/GOV-0024-guardian-review-context.md", prompt)
         self.assertIn("## Review Rubric", prompt)
+        self.assertIn("Integration Review Packet：", prompt)
+        self.assertIn("normalized_issue_canonical", prompt)
+        self.assertIn("integration_status_checked_before_merge", prompt)
         self.assertNotIn("PR 正文 fallback：", prompt)
         self.assertNotIn("审查输入", prompt)
         self.assertNotIn("进入 `merge-ready` 前，必须同时满足", prompt)

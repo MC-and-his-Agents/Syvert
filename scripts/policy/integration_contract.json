@@ -1,0 +1,199 @@
+{
+  "canonical_source": {
+    "machine_readable": "scripts/policy/integration_contract.json",
+    "python_module": "scripts/integration_contract.py"
+  },
+  "field_order": [
+    "integration_touchpoint",
+    "shared_contract_changed",
+    "integration_ref",
+    "external_dependency",
+    "merge_gate",
+    "contract_surface",
+    "joint_acceptance_needed",
+    "integration_status_checked_before_pr",
+    "integration_status_checked_before_merge"
+  ],
+  "issue_scope_fields": [
+    "integration_touchpoint",
+    "shared_contract_changed",
+    "integration_ref",
+    "external_dependency",
+    "merge_gate",
+    "contract_surface",
+    "joint_acceptance_needed"
+  ],
+  "pr_scope_fields": [
+    "integration_touchpoint",
+    "shared_contract_changed",
+    "integration_ref",
+    "external_dependency",
+    "merge_gate",
+    "contract_surface",
+    "joint_acceptance_needed",
+    "integration_status_checked_before_pr",
+    "integration_status_checked_before_merge"
+  ],
+  "fields": [
+    {
+      "name": "integration_touchpoint",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "none",
+        "check_required",
+        "active",
+        "blocked",
+        "resolved"
+      ]
+    },
+    {
+      "name": "shared_contract_changed",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "integration_ref",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "string",
+      "examples": [
+        "#123",
+        "owner/repo#123",
+        "https://github.com/owner/repo/issues/123",
+        "https://github.com/orgs/owner/projects/3?pane=issue&itemId=PVTI_xxx"
+      ]
+    },
+    {
+      "name": "external_dependency",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "none",
+        "syvert",
+        "webenvoy",
+        "both"
+      ]
+    },
+    {
+      "name": "merge_gate",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "local_only",
+        "integration_check_required"
+      ]
+    },
+    {
+      "name": "contract_surface",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "none",
+        "execution_provider",
+        "ids_trace",
+        "errors",
+        "raw_normalized",
+        "diagnostics_observability",
+        "runtime_modes"
+      ]
+    },
+    {
+      "name": "joint_acceptance_needed",
+      "scopes": [
+        "issue",
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "integration_status_checked_before_pr",
+      "scopes": [
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "name": "integration_status_checked_before_merge",
+      "scopes": [
+        "pr"
+      ],
+      "type": "enum",
+      "choices": [
+        "no",
+        "yes"
+      ]
+    }
+  ],
+  "rules": {
+    "merge_gate_required_when": [
+      {
+        "field": "integration_touchpoint",
+        "operator": "!=",
+        "value": "none"
+      },
+      {
+        "field": "shared_contract_changed",
+        "operator": "==",
+        "value": "yes"
+      },
+      {
+        "field": "external_dependency",
+        "operator": "!=",
+        "value": "none"
+      },
+      {
+        "field": "contract_surface",
+        "operator": "!=",
+        "value": "none"
+      },
+      {
+        "field": "joint_acceptance_needed",
+        "operator": "==",
+        "value": "yes"
+      }
+    ],
+    "integration_touchpoint_requires_checkable_ref": {
+      "field": "integration_touchpoint",
+      "operator": "!=",
+      "value": "none"
+    },
+    "local_only_required_values": {
+      "integration_ref": "none"
+    }
+  },
+  "legacy_compatibility": {
+    "issue_lookup_failure": "fail_closed",
+    "issue_without_canonical_payload": "allow_legacy_path",
+    "issue_with_canonical_payload": "pr_must_match_issue"
+  }
+}

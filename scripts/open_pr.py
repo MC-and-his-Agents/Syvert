@@ -43,12 +43,17 @@ from scripts.common import (
     git_changed_files,
     git_current_branch,
     git_fetch_branch,
-    integration_ref_is_checkable,
     load_json,
-    normalize_integration_ref_for_comparison,
     require_cli,
     run,
     syvert_state_file,
+)
+from scripts.integration_contract import (
+    ISSUE_SCOPE_FIELDS,
+    extract_issue_canonical_integration_fields,
+    field_choices,
+    validate_issue_fetch,
+    validate_open_pr_payload,
 )
 from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
@@ -68,28 +73,11 @@ ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
 }
 ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
-ISSUE_CANONICAL_INTEGRATION_FIELDS = (
-    "integration_touchpoint",
-    "shared_contract_changed",
-    "integration_ref",
-    "external_dependency",
-    "merge_gate",
-    "contract_surface",
-    "joint_acceptance_needed",
-)
-INTEGRATION_TOUCHPOINT_CHOICES = ("none", "check_required", "active", "blocked", "resolved")
-EXTERNAL_DEPENDENCY_CHOICES = ("none", "syvert", "webenvoy", "both")
-MERGE_GATE_CHOICES = ("local_only", "integration_check_required")
-CONTRACT_SURFACE_CHOICES = (
-    "none",
-    "execution_provider",
-    "ids_trace",
-    "errors",
-    "raw_normalized",
-    "diagnostics_observability",
-    "runtime_modes",
-)
-YES_NO_CHOICES = ("yes", "no")
+INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
+EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
+MERGE_GATE_CHOICES = field_choices("merge_gate")
+CONTRACT_SURFACE_CHOICES = field_choices("contract_surface")
+YES_NO_CHOICES = field_choices("shared_contract_changed")
 
 
 def is_deleted_legacy_todo_change(path: str, *, repo_root: Path) -> bool:
@@ -243,11 +231,6 @@ ISSUE_SUMMARY_HEADING_LOOKUP = {
     for canonical, aliases in ISSUE_SUMMARY_HEADING_ALIASES.items()
     for alias in aliases
 }
-ISSUE_CANONICAL_INTEGRATION_FIELD_LOOKUP = {
-    normalize_issue_summary_heading(field): field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS
-}
-
-
 def extract_issue_form_sections(body: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
@@ -277,16 +260,6 @@ def extract_issue_summary_sections(body: str) -> dict[str, str]:
                 sections[canonical] = content
     return sections
 
-
-def extract_issue_canonical_integration_fields(body: str) -> dict[str, str]:
-    payload: dict[str, str] = {}
-    for heading, content in extract_issue_form_sections(body).items():
-        canonical = ISSUE_CANONICAL_INTEGRATION_FIELD_LOOKUP.get(normalize_issue_summary_heading(heading))
-        if canonical and content:
-            payload[canonical] = content.strip()
-    return payload
-
-
 def fetch_issue_body(issue: int | None) -> str:
     if issue is None:
         return ""
@@ -307,20 +280,8 @@ def fetch_issue_body(issue: int | None) -> str:
 def resolve_issue_canonical_integration(issue: int | None) -> tuple[dict[str, str], str | None]:
     if issue is None:
         return {}, None
-
-    body = fetch_issue_body(issue)
-    if not body:
-        return {}, f"无法读取 Issue #{issue} 的 canonical integration 元数据。"
-
-    canonical = extract_issue_canonical_integration_fields(body)
-    if not canonical:
-        return {}, f"Issue #{issue} 缺少 canonical integration 元数据，受控 `open_pr` 入口拒绝继续。"
-
-    missing_fields = [field for field in ISSUE_CANONICAL_INTEGRATION_FIELDS if not str(canonical.get(field) or "").strip()]
-    if missing_fields:
-        missing = "、".join(f"`{field}`" for field in missing_fields)
-        return canonical, f"Issue #{issue} 的 canonical integration 元数据缺少字段：{missing}。"
-    return canonical, None
+    resolution = validate_issue_fetch(issue, allow_missing_payload=False)
+    return resolution.canonical, resolution.error
 
 
 def build_issue_summary(issue: int | None) -> str:
@@ -539,71 +500,32 @@ def validate_pr_preflight(
     return errors
 
 
-def normalize_issue_canonical_integration_value(field: str, value: str) -> str:
-    raw = str(value or "").strip()
-    if field == "integration_ref":
-        return normalize_integration_ref_for_comparison(raw)
-    return raw.lower()
-
-
 def validate_integration_args(args: argparse.Namespace) -> list[str]:
     errors: list[str] = []
-    integration_ref = str(args.integration_ref or "").strip()
-    integration_gated = args.merge_gate == "integration_check_required"
-    integration_active = args.integration_touchpoint != "none"
-    shared_contract_changed = args.shared_contract_changed == "yes"
-    has_external_dependency = args.external_dependency != "none"
-    joint_acceptance = args.joint_acceptance_needed == "yes"
-    has_contract_surface = args.contract_surface != "none"
-
-    if integration_active and not integration_ref:
-        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为空。")
-    if integration_active and integration_ref.lower() == "none":
-        errors.append("`integration_touchpoint != none` 时，`integration_ref` 不能为 `none`。")
-    if integration_active and integration_ref and not integration_ref_is_checkable(integration_ref):
-        errors.append("`integration_touchpoint != none` 时，`integration_ref` 必须指向可核查的具体 integration issue / item。")
-    if integration_gated and not integration_ref:
-        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 不能为空。")
-    if integration_gated and not integration_ref_is_checkable(integration_ref):
-        errors.append("`merge_gate=integration_check_required` 时，`integration_ref` 必须指向具体 integration issue / item。")
-    if integration_gated and not integration_active:
-        errors.append("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`。")
-    if integration_gated and args.integration_status_checked_before_pr != "yes":
-        errors.append("`merge_gate=integration_check_required` 时，进入 `open_pr` 前必须记录 `integration_status_checked_before_pr=yes`。")
-    if args.integration_status_checked_before_merge == "yes":
-        errors.append("`open_pr` 阶段不得把 `integration_status_checked_before_merge` 设为 `yes`；该字段只能在进入 `merge_pr` 前显式确认。")
-    if (integration_active or shared_contract_changed or has_external_dependency or joint_acceptance or has_contract_surface) and not integration_gated:
-        errors.append("触及 integration 联动、共享契约、共享 contract surface、跨仓依赖或联合验收时，`merge_gate` 必须为 `integration_check_required`。")
-    if (has_external_dependency or joint_acceptance or has_contract_surface) and not integration_active:
-        errors.append("存在跨仓依赖、联合验收或共享 contract surface 时，`integration_touchpoint` 不能为 `none`。")
-    if has_contract_surface and not integration_active:
-        errors.append("`contract_surface != none` 时，`integration_touchpoint` 不能为 `none`。")
-    if not integration_active and not integration_gated and integration_ref.lower() != "none":
-        errors.append("纯本仓库事项必须显式使用 `integration_ref=none`，不得保留外部 integration 绑定。")
-    if not integration_gated and integration_ref == "":
-        errors.append("纯本仓库事项也必须显式填写 `integration_ref`；若无 integration 联动，请写 `none`。")
-    if integration_ref.lower() != "none" and not integration_ref_is_checkable(integration_ref):
-        errors.append("`integration_ref` 必须使用可核查的具体 integration issue / item 引用（例如 `#123`、`owner/repo#123`、issue URL 或带 `itemId=` 的 project item URL）。")
-
     issue_canonical_integration, issue_canonical_error = resolve_issue_canonical_integration(args.issue)
     if issue_canonical_error:
         errors.append(issue_canonical_error)
-    elif issue_canonical_integration:
-        arg_comparison_values = {
-            "integration_touchpoint": args.integration_touchpoint,
-            "shared_contract_changed": args.shared_contract_changed,
-            "integration_ref": integration_ref,
-            "external_dependency": args.external_dependency,
-            "merge_gate": args.merge_gate,
-            "contract_surface": args.contract_surface,
-            "joint_acceptance_needed": args.joint_acceptance_needed,
-        }
-        for field in ISSUE_CANONICAL_INTEGRATION_FIELDS:
-            expected = normalize_issue_canonical_integration_value(field, issue_canonical_integration.get(field, ""))
-            actual = normalize_issue_canonical_integration_value(field, arg_comparison_values.get(field, ""))
-            if expected != actual:
-                cli_flag = f"--{field.replace('_', '-')}"
-                errors.append(f"`{cli_flag}` 与 Issue #{args.issue} 中的 canonical integration 元数据不一致。")
+    payload = {
+        field: str(getattr(args, field, "") or "").strip()
+        for field in (
+            *ISSUE_SCOPE_FIELDS,
+            "integration_status_checked_before_pr",
+            "integration_status_checked_before_merge",
+        )
+    }
+    payload["integration_ref"] = str(args.integration_ref or "").strip()
+    open_pr_errors = validate_open_pr_payload(
+        payload,
+        issue_canonical=issue_canonical_integration,
+        issue_number=args.issue,
+    )
+    for error in open_pr_errors:
+        if error.startswith("`cli."):
+            field = error.split(".", 1)[1].split("`", 1)[0]
+            cli_flag = f"--{field.replace('_', '-')}"
+            errors.append(error.replace(f"`cli.{field}`", f"`{cli_flag}`", 1))
+        else:
+            errors.append(error)
     return errors
 
 

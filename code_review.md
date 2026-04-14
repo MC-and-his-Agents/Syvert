@@ -58,7 +58,7 @@
 | 可观测性 | 日志、指标、状态面、错误上下文是否足够定位问题 | 关键路径可定位，必要输出可支持发布后排障 | 出问题后无法判断输入、状态或失败原因 |
 | 安全 / 性能 / 成本 | 是否引入安全缺口、性能回退、额外成本或配额风险 | 风险已评估并在必要处验证或约束 | 新增高耗时/高成本路径或安全暴露但无说明 |
 | 发布与回滚准备 | 发布依赖、迁移步骤、回滚方式是否就绪 | 发布前提、回滚步骤、操作顺序清晰 | 需要人工操作却未记录，回滚方案缺失或不可执行 |
-| integration 联动一致性 | 是否正确标记跨仓触点、依赖和联合验收约束 | `integration_touchpoint`、`integration_ref`、`external_dependency`、`merge_gate` 与实际改动一致，且 reviewer 可确认开工前 / 提 PR 前检查口径成立 | 共享契约改动未标记 integration 联动，或跨仓事项缺少可核查的 integration 绑定 |
+| integration 联动一致性 | 是否按 canonical integration contract 正确标记跨仓触点、依赖和联合验收约束 | PR 与 issue / work item 的 canonical integration 元数据一致，且 reviewer 可确认提 PR 前检查口径成立 | 共享契约改动未标记 integration 联动、PR 与 issue canonical integration 漂移，或跨仓事项缺少可核查的 integration 绑定 |
 
 ## 事项分级视角
 
@@ -89,7 +89,7 @@
 4. PR 不是 Draft
 5. 合并时 head 与审查时 head 一致
 6. 必须通过受控入口 `merge_pr`
-7. 若当前事项 `merge_gate=integration_check_required`，PR 描述必须补齐 `integration_check`，且 reviewer / guardian 已确认提 PR 前检查已完成、合并前复核仍被明确保留为 merge gate 动作
+7. 若当前事项 `merge_gate=integration_check_required`，PR 描述必须补齐 canonical `integration_check`，且 merge-time integration recheck 只由 merge gate / guardian 消费，不要求 reviewer 先验完成
 
 merge gate 只回答“当前 PR 是否允许进入受控合并”，不替代 reviewer 对实现质量的实质判断。
 
