@@ -206,8 +206,9 @@ def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
         issue_error=issue_error,
         integration_ref_live=integration_ref_live,
     )
+    live_validation_payload = pr_canonical or issue_canonical
     live_errors = validate_integration_ref_live_state(
-        pr_canonical,
+        live_validation_payload,
         integration_ref_live,
         current_repo_slug=default_github_repo(),
     )
