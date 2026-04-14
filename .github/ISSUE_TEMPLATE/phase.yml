@@ -1,0 +1,55 @@
+name: Phase
+description: 创建承接阶段目标、关闭条件与上位范围的 GitHub Phase 容器。
+title: "[PHASE-XXXX] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `Phase` 只承载阶段目标、边界和关闭条件，不是执行入口，也不是 canonical integration metadata carrier。
+        若事项触及跨仓 integration 元数据，请在 FR / Work Item / governance issue 中填写对应 carrier，不要写在 `Phase` 容器里。
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: 阶段目标
+      description: 说明本 Phase 要承接的版本目标、边界和阶段成果。
+      placeholder: |
+        版本目标：
+        阶段边界：
+        阶段成果：
+    validations:
+      required: true
+
+  - type: textarea
+    id: entry_exit_criteria
+    attributes:
+      label: 进入 / 关闭条件
+      description: 列出进入本阶段所需前提，以及 Phase 关闭时必须满足的条件。
+      placeholder: |
+        进入条件：
+        关闭条件：
+    validations:
+      required: true
+
+  - type: textarea
+    id: linked_frs
+    attributes:
+      label: 关联 FR
+      description: 列出本 Phase 下计划承接的 FR 编号或占位链接。
+      placeholder: |
+        #101
+        #102
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: 阶段风险
+      description: 说明当前阶段需要提前管理的风险、依赖和回退考虑。
+      placeholder: |
+        风险：
+        依赖：
+        回退考虑：
+    validations:
+      required: true

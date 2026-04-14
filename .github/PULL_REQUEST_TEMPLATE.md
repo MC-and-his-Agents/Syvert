@@ -26,6 +26,26 @@
 
 {{VALIDATION_SUGGESTION}}
 
+## integration_check
+
+Canonical integration contract source: `scripts/policy/integration_contract.json` / `scripts/integration_contract.py`
+
+- integration_touchpoint（`none` / `check_required` / `active` / `blocked` / `resolved`）:
+- shared_contract_changed（`no` / `yes`）:
+- integration_ref:
+- external_dependency（`none` / `syvert` / `webenvoy` / `both`）:
+- merge_gate（`local_only` / `integration_check_required`）:
+- contract_surface（`none` / `execution_provider` / `ids_trace` / `errors` / `raw_normalized` / `diagnostics_observability` / `runtime_modes`）:
+- joint_acceptance_needed（`no` / `yes`）:
+- integration_status_checked_before_pr（`no` / `yes`）:
+- integration_status_checked_before_merge（`no` / `yes`）:
+
+补充说明：
+
+- 按 canonical contract 填写并校验 `integration_check`。
+- `merge_gate` 的触发条件、`integration_ref` 的可核查格式与归一规则，以 canonical contract 为准。
+- `integration_check_required` 的最终复核发生在 merge gate，不要把 merge-time recheck 写成 reviewer 已完成动作。
+
 ## 回滚
 
 - 回滚方式：{{ROLLBACK}}
