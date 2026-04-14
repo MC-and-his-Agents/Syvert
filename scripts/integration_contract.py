@@ -1083,7 +1083,7 @@ def validate_issue_canonical_payload(payload: Mapping[str, str]) -> list[str]:
 
 def validate_issue_fetch(issue_number: int, *, allow_missing_payload: bool) -> IssueCanonicalResolution:
     completed = run(
-        ["gh", "issue", "view", str(issue_number), "--json", "body"],
+        ["gh", "issue", "view", str(issue_number), "--repo", default_github_repo(), "--json", "body"],
         cwd=REPO_ROOT,
         check=False,
     )

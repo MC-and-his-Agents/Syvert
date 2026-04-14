@@ -40,6 +40,7 @@ from scripts.context_guard import (
 from scripts.common import (
     CommandError,
     REPO_ROOT,
+    default_github_repo,
     git_changed_files,
     git_current_branch,
     git_fetch_branch,
@@ -266,7 +267,7 @@ def fetch_issue_body(issue: int | None) -> str:
 
     require_cli("gh")
     completed = run(
-        ["gh", "issue", "view", str(issue), "--json", "body"],
+        ["gh", "issue", "view", str(issue), "--repo", default_github_repo(), "--json", "body"],
         cwd=REPO_ROOT,
         check=False,
     )

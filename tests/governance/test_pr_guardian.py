@@ -2242,7 +2242,8 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
         run_mock.assert_called_once_with(
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-1"],
             cwd=ANY,
@@ -2302,7 +2303,8 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
         run_mock.assert_called_once_with(
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-2", "--delete-branch"],
             cwd=ANY,
@@ -2415,7 +2417,8 @@ class MergeIfSafeTests(unittest.TestCase):
         find_result_mock.assert_not_called()
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -2652,7 +2655,8 @@ class MergeIfSafeTests(unittest.TestCase):
         )
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -2755,7 +2759,8 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
     @patch("scripts.pr_guardian.run")
@@ -2976,9 +2981,10 @@ class MergeIfSafeTests(unittest.TestCase):
             )
 
         self.assertIn("无法重新读取最新 PR 描述", str(ctx.exception))
-        self.assertEqual(run_mock.call_count, 1)
-        self.assertEqual(len(edited_bodies), 1)
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(len(edited_bodies), 2)
         self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
+        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
@@ -3046,9 +3052,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertIn("不会尝试自动恢复", str(ctx.exception))
-        self.assertEqual(run_mock.call_count, 1)
-        self.assertEqual(len(edited_bodies), 1)
+        self.assertIn("已回滚到旧值", str(ctx.exception))
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(len(edited_bodies), 2)
+        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
@@ -3290,7 +3297,8 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_args_list[2].args[0][:4], ["gh", "pr", "edit", "1"])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        self.assertEqual(all_checks_mock.call_count, 2)
+        all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)

@@ -613,6 +613,25 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertIn("无法解析", resolution.error or "")
 
+    @patch("scripts.integration_contract.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_validate_issue_fetch_binds_issue_reads_to_canonical_repo(self, default_repo_mock) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=["gh"],
+                returncode=0,
+                stdout=json.dumps({"body": "### integration_touchpoint\n\nnone\n"}),
+                stderr="",
+            )
+
+            validate_issue_fetch(105, allow_missing_payload=True)
+
+        run_mock.assert_called_once_with(
+            ["gh", "issue", "view", "105", "--repo", "MC-and-his-Agents/Syvert", "--json", "body"],
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        default_repo_mock.assert_called_once_with()
+
     def test_integration_ref_is_checkable_matches_project_item_parser_shape(self) -> None:
         self.assertFalse(
             integration_ref_is_checkable("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&foo=itemId=PVTI_test")

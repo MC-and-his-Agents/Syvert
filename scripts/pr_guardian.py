@@ -413,9 +413,16 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[d
         try:
             latest = pr_meta(pr_number)
         except (CommandError, SystemExit):
+            try:
+                update_pr_body(pr_number, latest_body)
+            except (CommandError, SystemExit) as restore_exc:
+                raise SystemExit(
+                    "merge 前写入 `integration_status_checked_before_merge=yes` 后，无法重新读取最新 PR 描述，"
+                    f"且恢复旧值失败：{restore_exc}"
+                ) from restore_exc
             raise SystemExit(
-                "merge 前写入 `integration_status_checked_before_merge=yes` 后，无法重新读取最新 PR 描述；"
-                "为避免覆盖并发编辑，当前不会尝试自动恢复，请人工复核 PR 正文。"
+                "merge 前写入 `integration_status_checked_before_merge=yes` 后，无法重新读取最新 PR 描述，"
+                "已回滚到旧值，请人工复核后重试。"
             )
     return latest, previous_value
 
@@ -501,7 +508,7 @@ def extract_named_markdown_sections(body: str, headings: tuple[str, ...]) -> dic
 
 def fetch_issue_context(issue_number: int) -> dict[str, object]:
     completed = run(
-        ["gh", "issue", "view", str(issue_number), "--json", "number,title,body,url"],
+        ["gh", "issue", "view", str(issue_number), "--repo", default_github_repo(), "--json", "number,title,body,url"],
         cwd=REPO_ROOT,
         check=False,
     )
@@ -1139,6 +1146,14 @@ def merge_if_safe(
             )
         raise SystemExit("执行 `gh pr merge` 前 PR 描述已变化，拒绝合并。")
     current = latest_before_merge
+    if not all_checks_pass(pr_number):
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前 GitHub checks 已变化",
+            )
+        raise SystemExit("执行 `gh pr merge` 前 GitHub checks 未全部通过，拒绝合并。")
 
     command = [
         "gh",

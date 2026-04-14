@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from scripts.common import CommandError, default_github_repo, normalize_integration_ref_for_comparison, parse_github_repo_from_remote_url
 from scripts.open_pr import (
@@ -804,6 +804,25 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("## Goal", summary)
         self.assertIn("## Scope", summary)
         self.assertIn("## Out of Scope", summary)
+
+    @patch("scripts.open_pr.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    @patch("scripts.open_pr.run")
+    def test_build_issue_summary_binds_issue_reads_to_canonical_repo(self, run_mock, default_repo_mock) -> None:
+        run_mock.return_value = type(
+            "Completed",
+            (),
+            {"returncode": 0, "stdout": json.dumps({"body": "## Goal\n\n- 对齐 contract"}), "stderr": ""},
+        )()
+
+        summary = build_issue_summary(25)
+
+        self.assertIn("## Goal", summary)
+        run_mock.assert_called_once_with(
+            ["gh", "issue", "view", "25", "--repo", "MC-and-his-Agents/Syvert", "--json", "body"],
+            cwd=ANY,
+            check=False,
+        )
+        default_repo_mock.assert_called_once_with()
 
     def test_extract_issue_summary_sections_supports_issue_form_heading_aliases(self) -> None:
         body = "\n".join(
