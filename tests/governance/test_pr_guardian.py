@@ -84,6 +84,19 @@ INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY = "\n".join(
 )
 
 
+def cached_guardian_result(head_sha: str, body: str, *, verdict: str = "APPROVE", safe_to_merge: bool = True, summary: str = "cached") -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "pr_number": 1,
+        "head_sha": head_sha,
+        "body_fingerprint": guardian_body_fingerprint(body),
+        "verdict": verdict,
+        "safe_to_merge": safe_to_merge,
+        "summary": summary,
+        "reviewed_at": "2026-03-28T10:00:00Z",
+    }
+
+
 class GuardianStateTests(unittest.TestCase):
     def test_load_guardian_state_falls_back_to_legacy_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2113,15 +2126,13 @@ class MergeIfSafeTests(unittest.TestCase):
             "isDraft": False,
             "headRefOid": "sha-request-changes",
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-request-changes",
-            "verdict": "REQUEST_CHANGES",
-            "safe_to_merge": False,
-            "summary": "blocked",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-request-changes",
+            "",
+            verdict="REQUEST_CHANGES",
+            safe_to_merge=False,
+            summary="blocked",
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2149,15 +2160,12 @@ class MergeIfSafeTests(unittest.TestCase):
             "isDraft": False,
             "headRefOid": "sha-safe-false",
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-safe-false",
-            "verdict": "APPROVE",
-            "safe_to_merge": False,
-            "summary": "blocked",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-safe-false",
+            "",
+            safe_to_merge=False,
+            summary="blocked",
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2226,15 +2234,7 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-1",
             "body": LOCAL_ONLY_INTEGRATION_CHECK_BODY,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-1",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result("sha-1", LOCAL_ONLY_INTEGRATION_CHECK_BODY)
         run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="", stderr="")
 
         exit_code = merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2440,15 +2440,7 @@ class MergeIfSafeTests(unittest.TestCase):
             "isDraft": False,
             "headRefOid": "sha-current",
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result("sha-reviewed", "")
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2479,15 +2471,7 @@ class MergeIfSafeTests(unittest.TestCase):
             "isDraft": False,
             "headRefOid": "sha-green-check",
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-green-check",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result("sha-green-check", "")
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2519,15 +2503,10 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-integration-contradiction",
             "body": CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-integration-contradiction",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-integration-contradiction",
+            CONTRADICTORY_LOCAL_ONLY_INTEGRATION_CHECK_BODY,
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2560,15 +2539,10 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-needs-recheck",
             "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-needs-recheck",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-needs-recheck",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
@@ -2623,16 +2597,29 @@ class MergeIfSafeTests(unittest.TestCase):
                 "headRefOid": "sha-needs-recheck",
                 "body": updated_body,
             },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-needs-recheck",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-needs-recheck",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
         run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="", stderr="")
 
         exit_code = merge_if_safe(
@@ -2653,7 +2640,7 @@ class MergeIfSafeTests(unittest.TestCase):
             merge_command,
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-needs-recheck"],
         )
-        review_once_mock.assert_not_called()
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         self.assertEqual(all_checks_mock.call_count, 2)
         all_checks_mock.assert_called_with(1)
@@ -2886,15 +2873,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": concurrent_body,
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(
@@ -2960,15 +2942,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": updated_body,
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
         run_mock.side_effect = run_side_effect
 
         with self.assertRaises(SystemExit) as ctx:
@@ -3032,15 +3009,10 @@ class MergeIfSafeTests(unittest.TestCase):
             },
             SystemExit("refresh failed"),
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
         run_mock.side_effect = run_side_effect
 
         with self.assertRaises(SystemExit) as ctx:
@@ -3112,15 +3084,22 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": concurrent_body,
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
         run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="", stderr="")
 
         with self.assertRaises(SystemExit) as ctx:
@@ -3132,11 +3111,11 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertIn("执行 `gh pr merge` 前 PR 描述已变化", str(ctx.exception))
+        self.assertIn("merge 前重跑 guardian 后 PR 描述已变化", str(ctx.exception))
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
-        review_once_mock.assert_not_called()
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 
@@ -3188,15 +3167,10 @@ class MergeIfSafeTests(unittest.TestCase):
                 ),
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
         run_mock.return_value = subprocess.CompletedProcess(args=["gh"], returncode=0, stdout="", stderr="")
 
         with self.assertRaises(SystemExit) as ctx:
@@ -3264,18 +3238,31 @@ class MergeIfSafeTests(unittest.TestCase):
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
-                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
         run_mock.side_effect = [
             subprocess.CompletedProcess(args=["gh", "pr", "edit"], returncode=0, stdout="", stderr=""),
             CommandError(["gh", "pr", "merge", "1"], "命令失败", "", "merge failed"),
@@ -3295,7 +3282,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
         self.assertEqual(run_mock.call_args_list[2].args[0][:4], ["gh", "pr", "edit", "1"])
-        review_once_mock.assert_not_called()
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         self.assertEqual(all_checks_mock.call_count, 2)
         all_checks_mock.assert_called_with(1)
@@ -3352,15 +3339,22 @@ class MergeIfSafeTests(unittest.TestCase):
                 "body": concurrent_body,
             },
         ]
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-reviewed",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
@@ -3383,14 +3377,14 @@ class MergeIfSafeTests(unittest.TestCase):
                 confirm_integration_recheck=True,
             )
 
-        self.assertIn("执行 `gh pr merge` 前 PR 描述已变化", str(ctx.exception))
+        self.assertIn("merge 前重跑 guardian 后 PR 描述已变化", str(ctx.exception))
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
         self.assertEqual(len(edited_bodies), 2)
         self.assertIn("其他人已更新 PR 描述", edited_bodies[1])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
-        review_once_mock.assert_not_called()
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 
@@ -3430,15 +3424,10 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-invalid-before-record",
             "body": invalid_body,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-invalid-before-record",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-invalid-before-record",
+            invalid_body,
+        )
 
         with self.assertRaises(SystemExit) as ctx:
             merge_if_safe(
@@ -3478,15 +3467,10 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-live-not-ready",
             "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-live-not-ready",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-live-not-ready",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
         fetch_live_mock.return_value = {
             "source": "project_item",
             "status": "review",
@@ -3510,7 +3494,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("联合验收状态未就绪", str(ctx.exception))
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
-        fetch_live_mock.assert_called_once()
+        fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 
@@ -3537,15 +3521,10 @@ class MergeIfSafeTests(unittest.TestCase):
             "headRefOid": "sha-live-unreadable",
             "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         }
-        find_result_mock.return_value = {
-            "schema_version": 1,
-            "pr_number": 1,
-            "head_sha": "sha-live-unreadable",
-            "verdict": "APPROVE",
-            "safe_to_merge": True,
-            "summary": "cached",
-            "reviewed_at": "2026-03-28T10:00:00Z",
-        }
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-live-unreadable",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
         fetch_live_mock.return_value = {
             "source": "project_item",
             "error": "无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。",
@@ -3563,7 +3542,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("无法读取 `integration_ref` 指向的 project item", str(ctx.exception))
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
-        fetch_live_mock.assert_called_once()
+        fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 

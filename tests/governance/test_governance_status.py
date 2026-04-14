@@ -43,7 +43,7 @@ class GovernanceStatusTests(unittest.TestCase):
         self.assertEqual(payload["checks"][0]["name"], "check")
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0015-item-context-gate")
 
-    def test_pr_status_passes_current_body_to_guardian_lookup_and_keeps_schema_v1_payload(self) -> None:
+    def test_pr_status_passes_current_body_to_guardian_lookup_and_requires_body_bound_cache(self) -> None:
         pr_body = "Issue: #19\nitem_key: `GOV-0015-item-context-gate`\nitem_type: `GOV`\nrelease: `v0.1.0`\nsprint: `2026-S14`\n"
         with patch("scripts.governance_status.load_guardian_state", return_value={"prs": {}}):
             with patch("scripts.governance_status.load_review_poller_state", return_value={"prs": {}}):
@@ -54,7 +54,7 @@ class GovernanceStatusTests(unittest.TestCase):
                     ):
                         with patch(
                             "scripts.governance_status.find_latest_guardian_result",
-                            return_value={"schema_version": 1, "verdict": "APPROVE", "head_sha": "sha-1"},
+                            return_value=None,
                         ) as find_latest_guardian_result_mock:
                             with patch("scripts.governance_status.fetch_checks_summary", return_value=[]):
                                 payload = governance_status.build_status_payload(pr_number=7)
@@ -66,8 +66,7 @@ class GovernanceStatusTests(unittest.TestCase):
             require_body_bound=True,
             path=governance_status.GUARDIAN_STATE_FILE,
         )
-        self.assertEqual(payload["guardian"]["schema_version"], 1)
-        self.assertEqual(payload["guardian"]["verdict"], "APPROVE")
+        self.assertEqual(payload["guardian"], {})
 
     def test_pr_status_exposes_integration_contract_and_live_state(self) -> None:
         pr_body = "\n".join(
