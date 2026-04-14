@@ -187,7 +187,14 @@ def save_guardian_result(pr_number: int, payload: dict, *, path: Path = DEFAULT_
     dump_json(path, state)
 
 
-def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str, body: str | None = None) -> dict | None:
+def valid_guardian_payload(
+    payload: object,
+    *,
+    pr_number: int,
+    head_sha: str,
+    body: str | None = None,
+    require_body_bound: bool = False,
+) -> dict | None:
     if not isinstance(payload, dict):
         return None
     schema_version = payload.get("schema_version")
@@ -197,10 +204,14 @@ def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str, bo
         return None
     if payload.get("head_sha") != head_sha:
         return None
-    if body is not None and schema_version == 2:
-        if payload.get("body_fingerprint") != guardian_body_fingerprint(body):
+    body_fingerprint = payload.get("body_fingerprint")
+    if body is not None:
+        if schema_version == 2:
+            if body_fingerprint != guardian_body_fingerprint(body):
+                return None
+        elif require_body_bound:
             return None
-    elif schema_version == 2 and not isinstance(payload.get("body_fingerprint"), str):
+    elif schema_version == 2 and not isinstance(body_fingerprint, str):
         return None
     if payload.get("verdict") not in VALID_VERDICTS:
         return None
@@ -213,13 +224,39 @@ def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str, bo
     return payload
 
 
-def local_guardian_result(pr_number: int, head_sha: str, *, body: str | None = None, path: Path = DEFAULT_STATE_FILE) -> dict | None:
+def local_guardian_result(
+    pr_number: int,
+    head_sha: str,
+    *,
+    body: str | None = None,
+    require_body_bound: bool = False,
+    path: Path = DEFAULT_STATE_FILE,
+) -> dict | None:
     payload = load_guardian_state(path).get("prs", {}).get(str(pr_number))
-    return valid_guardian_payload(payload, pr_number=pr_number, head_sha=head_sha, body=body)
+    return valid_guardian_payload(
+        payload,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        body=body,
+        require_body_bound=require_body_bound,
+    )
 
 
-def find_latest_guardian_result(pr_number: int, head_sha: str, *, body: str | None = None, path: Path = DEFAULT_STATE_FILE) -> dict | None:
-    return local_guardian_result(pr_number, head_sha, body=body, path=path)
+def find_latest_guardian_result(
+    pr_number: int,
+    head_sha: str,
+    *,
+    body: str | None = None,
+    require_body_bound: bool = False,
+    path: Path = DEFAULT_STATE_FILE,
+) -> dict | None:
+    return local_guardian_result(
+        pr_number,
+        head_sha,
+        body=body,
+        require_body_bound=require_body_bound,
+        path=path,
+    )
 
 
 def parse_all_markdown_sections(body: str) -> dict[str, str]:
@@ -651,7 +688,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             f"- 头部提交: {meta['headRefOid']}",
             f"- 头部分支: {meta.get('headRefName', '')}",
         ],
-        "issue_context": fetch_issue_context(issue_number) if issue_number else {"identity": [], "summary": "", "canonical_integration": {}},
+        "issue_context": fetch_issue_context(issue_number) if needs_issue_context else {"identity": [], "summary": "", "canonical_integration": {}},
         "item_context": item_context,
         "raw_sections": raw_sections,
         "pr_sections": sections,
@@ -964,7 +1001,12 @@ def merge_if_safe(
     current = pr_meta(pr_number)
     original_body = str(current.get("body") or "")
     reviewed_body = original_body
-    payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"], body=original_body)
+    payload = None if refresh_review else find_latest_guardian_result(
+        pr_number,
+        current["headRefOid"],
+        body=original_body,
+        require_body_bound=True,
+    )
 
     if payload:
         print(f"复用已有 guardian verdict: {payload['verdict']} @ {payload['head_sha']}")
@@ -1051,6 +1093,13 @@ def merge_if_safe(
                 failure_context="merge 前重跑 guardian 后 PR HEAD 已变化",
             )
             raise SystemExit("merge 前重跑 guardian 后 PR HEAD 已变化，拒绝合并。")
+        if str(current.get("body") or "") != str(refreshed_meta.get("body") or ""):
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="merge 前重跑 guardian 后 PR 描述已变化",
+            )
+            raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
     integration_errors = integration_merge_gate_errors(current)
     if integration_errors:
         if merge_time_integration_recheck_recorded:

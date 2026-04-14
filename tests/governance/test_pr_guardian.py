@@ -147,6 +147,33 @@ class GuardianStateTests(unittest.TestCase):
             self.assertIsNotNone(payload)
             self.assertEqual(payload["head_sha"], "sha-1")
 
+    def test_find_latest_guardian_result_rejects_schema_v1_when_body_bound_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "guardian.json"
+            save_guardian_result(
+                1,
+                {
+                    "schema_version": 1,
+                    "pr_number": 1,
+                    "head_sha": "sha-1",
+                    "verdict": "APPROVE",
+                    "safe_to_merge": True,
+                    "summary": "cached",
+                    "reviewed_at": "2026-03-28T10:00:00Z",
+                },
+                path=state_path,
+            )
+
+            payload = find_latest_guardian_result(
+                1,
+                "sha-1",
+                body="## integration_check\n\n- integration_status_checked_before_pr: yes\n",
+                require_body_bound=True,
+                path=state_path,
+            )
+
+            self.assertIsNone(payload)
+
     def test_find_latest_guardian_result_rejects_stale_head(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "guardian.json"
@@ -1330,7 +1357,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         build_item_context_summary_mock.assert_called_once_with(meta, worktree_dir)
         resolve_issue_canonical_integration_mock.assert_called_once_with(meta)
-        fetch_issue_context_mock.assert_called_once_with(24)
+        fetch_issue_context_mock.assert_not_called()
         self.assertEqual(payload["item_context"]["item_key"], "GOV-0024-guardian-review-context")
 
     def test_build_review_context_keeps_issue_side_evidence_when_item_context_is_invalid(self) -> None:
@@ -1412,7 +1439,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         ) as fetch_issue_context_mock:
                             payload = build_review_context(meta, Path("/tmp/pr-worktree"))
 
-        fetch_issue_context_mock.assert_called_once_with(24)
+        fetch_issue_context_mock.assert_not_called()
         self.assertIn("## Goal", payload["pr_sections"]["issue_summary"])
         self.assertIn("## Scope", payload["pr_sections"]["issue_summary"])
 
@@ -1814,7 +1841,7 @@ class MergeIfSafeTests(unittest.TestCase):
             merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
 
         self.assertIn("guardian 未给出 APPROVE", str(ctx.exception))
-        find_result_mock.assert_called_once_with(1, "sha-reviewed", body=current_meta["body"])
+        find_result_mock.assert_called_once_with(1, "sha-reviewed", body=current_meta["body"], require_body_bound=True)
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         run_mock.assert_not_called()
         require_auth_mock.assert_called_once()
@@ -2344,6 +2371,7 @@ class MergeIfSafeTests(unittest.TestCase):
             {
                 "number": 1,
                 "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
             },
             {
                 "verdict": "APPROVE",
@@ -2367,6 +2395,100 @@ class MergeIfSafeTests(unittest.TestCase):
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_rejects_same_head_body_drift_after_recheck_refresh_review(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+        restore_merge_time_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        concurrent_body = updated_body + "\n\n补充说明：refresh 后被编辑\n"
+
+        def run_side_effect(command, cwd=None, check=True):
+            if command[:4] == ["gh", "pr", "edit", "1"]:
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-needs-recheck",
+                "body": concurrent_body,
+            },
+        ]
+        find_result_mock.return_value = {
+            "schema_version": 2,
+            "pr_number": 1,
+            "head_sha": "sha-needs-recheck",
+            "body_fingerprint": guardian_body_fingerprint(INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY),
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-needs-recheck",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
+        run_mock.side_effect = run_side_effect
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("merge 前重跑 guardian 后 PR 描述已变化", str(ctx.exception))
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
+        restore_merge_time_mock.assert_called_once()
+        self.assertEqual(run_mock.call_count, 1)
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 
