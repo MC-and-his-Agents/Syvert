@@ -10,7 +10,13 @@ if __package__ in {None, ""}:
 import argparse
 import json
 
-from scripts.common import REPO_ROOT, legacy_state_file, load_json, run, syvert_state_file
+from scripts.common import REPO_ROOT, integration_ref_is_checkable, legacy_state_file, load_json, run, syvert_state_file
+from scripts.integration_contract import (
+    build_review_packet,
+    fetch_integration_ref_live_state,
+    parse_pr_integration_check,
+    validate_issue_fetch,
+)
 from scripts.item_context import (
     active_exec_plans_for_issue,
     load_item_context_from_exec_plan,
@@ -140,6 +146,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         "worktrees": [],
         "checks": [],
         "item_context": {},
+        "integration": {},
     }
 
     if pr_number is not None:
@@ -158,6 +165,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         matched_worktree: dict | None = matching_worktrees[0] if len(matching_worktrees) == 1 else None
         payload["worktrees"] = matching_worktrees[:1] if len(matching_worktrees) == 1 else matching_worktrees
         payload["item_context"] = build_item_context_for_pr(meta, matched_worktree)
+        payload["integration"] = build_integration_status_for_pr(meta)
         return payload
 
     if issue_number is not None:
@@ -169,6 +177,34 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
     payload["review_poller"] = review_poller_state.get("prs", {})
     payload["worktrees"] = list(worktree_state.get("worktrees", {}).values())
     return payload
+
+
+def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
+    body = str(meta.get("body") or "")
+    body_context = parse_item_context_from_body(body)
+    issue_number: int | None = None
+    try:
+        issue_text = str(body_context.get("issue") or "").strip()
+        issue_number = int(issue_text) if issue_text else None
+    except ValueError:
+        issue_number = None
+    issue_resolution = validate_issue_fetch(issue_number, allow_missing_payload=True) if issue_number is not None else None
+    issue_canonical = dict(issue_resolution.canonical) if issue_resolution else {}
+    issue_error = str(issue_resolution.error or "") if issue_resolution else ""
+    pr_canonical = parse_pr_integration_check(body)
+    integration_ref = str(pr_canonical.get("integration_ref") or "").strip()
+    if not integration_ref:
+        integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    integration_ref_live = fetch_integration_ref_live_state(integration_ref) if integration_ref_is_checkable(integration_ref) else {}
+    packet = build_review_packet(
+        body,
+        issue_number=issue_number,
+        issue_canonical=issue_canonical,
+        issue_error=issue_error,
+        integration_ref_live=integration_ref_live,
+    )
+    packet["issue_lookup_error"] = issue_error
+    return packet
 
 
 def render_text(payload: dict) -> str:
@@ -229,6 +265,23 @@ def render_text(payload: dict) -> str:
         lines.append(f"count={len(checks)}")
         for item in checks:
             lines.append(f"- {item.get('name')} {item.get('bucket')} {item.get('state')}")
+
+    integration = payload.get("integration") or {}
+    lines.append("[integration]")
+    if not integration:
+        lines.append("empty=true")
+    else:
+        lines.append(f"issue_number={integration.get('issue_number', '')}")
+        lines.append(f"merge_gate={integration.get('merge_gate', '')}")
+        lines.append(f"merge_gate_requires_recheck={integration.get('merge_gate_requires_recheck', '')}")
+        pr_canonical = integration.get("pr_canonical") or {}
+        issue_canonical = integration.get("issue_canonical") or {}
+        lines.append(f"pr_integration_ref={pr_canonical.get('integration_ref', '')}")
+        lines.append(f"issue_integration_ref={issue_canonical.get('integration_ref', '')}")
+        live = integration.get("integration_ref_live") or {}
+        lines.append(f"live_source={live.get('source', '')}")
+        lines.append(f"live_status={live.get('status', '')}")
+        lines.append(f"live_dependency_order={live.get('dependency_order', '')}")
 
     return "\n".join(lines) + "\n"
 

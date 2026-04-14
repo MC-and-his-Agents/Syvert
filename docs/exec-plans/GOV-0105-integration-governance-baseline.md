@@ -15,6 +15,7 @@
 ## 目标
 
 - 把 `open_pr / pr_guardian / merge_pr / governance_status` 全部接到仓库内唯一的 canonical integration contract 上，让 issue / PR / reviewer / guardian / merge gate 真正消费同一份真相源。
+- reviewer packet 在本批只消费 canonical issue/PR contract 对比与本地工件；`integration_ref` 的 live-state 证据改由 `governance_status` 状态面展示，并继续只在 merge gate 阶段作为阻断条件强制执行。
 - 保持 `Syvert` 继续作为本地执行真相源，并为后续 PR-C / PR-D 的 carrier alignment 与 evidence 收口提供稳定的运行时治理链路。
 
 ## 范围
@@ -29,7 +30,7 @@
 
 - `#107` 保持 Draft 并冻结，不再继续修 findings 或提交 guardian；它只作为拆分母体和审查历史容器保留。
 - `PR-A Contract Kernel` 已合并到 `main`，当前仓库内 canonical integration contract 已成为后续替代 PR 的 bootstrap truth source。
-- 当前真正需要收口的是 `PR-B Consumer Wiring`，即让 `open_pr / pr_guardian / merge_pr / governance_status` 只消费 shared contract，并把 reviewer packet、merge-time recheck、guardian cache 身份模型与 issue-side canonical integration 证据统一到同一链路。
+- 当前真正需要收口的是 `PR-B Consumer Wiring`，即让 `open_pr / pr_guardian / merge_pr / governance_status` 只消费 shared contract，并把 reviewer packet、status 面、merge-time recheck、guardian cache 身份模型与 issue-side canonical integration 证据统一到同一链路。
 - 当前 PR-B 已以 Draft PR `#115` 打开；本地门禁与 GitHub checks 已通过，当前停点转为 reviewer / guardian 对 `#115` latest head 的收口。
 
 ## 下一步动作
@@ -59,6 +60,7 @@
 - `main` 在替代链路推进期间继续前进；每一批 PR 在进入 guardian 和 merge 前都必须基于最新 `origin/main` 重跑本地门禁。
 - 由于当前 issue 已声明 canonical integration 字段，后续所有替代 PR 都必须完整对齐 contract，不允许退回 legacy 路径。
 - 当前 PR-B 仍处于 PR-C 之前的阶段，因此 PR 模板尚未成为唯一 carrier；在 PR-C 合并前，`open_pr` 需要继续保证缺失模板 section 时也能生成 canonical `integration_check` 区块。
+- reviewer 阶段不能把外部 integration project 的 live-state 漂移升级为审查阻断；相关 live-state 只允许出现在 `governance_status` 诊断面与 merge gate 入口。
 
 ## 回滚方式
 
@@ -66,5 +68,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次完成 PR-B consumer wiring 代码收口的 checkpoint：`e426116e0c25386cb1456f49eec938b14792342c`
+- 最近一次完成 PR-B consumer wiring 代码收口的 checkpoint：`93d0fd6d7fab16a492548294422236b1fb08b4d9`
 - 当前 PR 审查态以 `#115` 的 latest head 为准；若后续只补充 review / guardian 元数据，不另起新的代码 checkpoint。
