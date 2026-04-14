@@ -507,6 +507,13 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
     issue_canonical_integration, issue_canonical_error = resolve_issue_canonical_integration(args.issue)
     if issue_canonical_error:
         errors.append(issue_canonical_error)
+    canonical_integration_ref = canonicalize_integration_ref_for_issue(
+        args.issue,
+        args.integration_ref,
+        issue_canonical=issue_canonical_integration,
+        issue_error=issue_canonical_error,
+    )
+    args.integration_ref = canonical_integration_ref
     payload = {
         field: str(getattr(args, field, "") or "").strip()
         for field in (
@@ -515,7 +522,7 @@ def validate_integration_args(args: argparse.Namespace) -> list[str]:
             "integration_status_checked_before_merge",
         )
     }
-    payload["integration_ref"] = str(args.integration_ref or "").strip()
+    payload["integration_ref"] = canonical_integration_ref
     open_pr_errors = validate_open_pr_payload(
         payload,
         issue_canonical=issue_canonical_integration,
@@ -548,11 +555,19 @@ def render_integration_check_section(values: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def canonicalize_integration_ref_for_body(issue: int | None, integration_ref: str) -> str:
+def canonicalize_integration_ref_for_issue(
+    issue: int | None,
+    integration_ref: str,
+    *,
+    issue_canonical: dict[str, str] | None = None,
+    issue_error: str | None = None,
+) -> str:
     raw_integration_ref = str(integration_ref or "").strip()
     if issue is None or not raw_integration_ref:
         return raw_integration_ref
-    issue_canonical, issue_error = resolve_issue_canonical_integration(issue)
+    if issue_canonical is None and issue_error is None:
+        issue_canonical, issue_error = resolve_issue_canonical_integration(issue)
+    issue_canonical = issue_canonical or {}
     if issue_error:
         return raw_integration_ref
     issue_integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
@@ -587,7 +602,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     integration_values = {
         "integration_touchpoint": args.integration_touchpoint,
         "shared_contract_changed": args.shared_contract_changed,
-        "integration_ref": canonicalize_integration_ref_for_body(args.issue, args.integration_ref),
+        "integration_ref": canonicalize_integration_ref_for_issue(args.issue, args.integration_ref),
         "external_dependency": args.external_dependency,
         "merge_gate": args.merge_gate,
         "contract_surface": args.contract_surface,
