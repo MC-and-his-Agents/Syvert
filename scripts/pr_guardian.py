@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -153,11 +154,16 @@ def now_iso_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def guardian_body_fingerprint(body: str) -> str:
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 def build_guardian_payload(meta: dict, result: dict) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "pr_number": meta["number"],
         "head_sha": meta["headRefOid"],
+        "body_fingerprint": guardian_body_fingerprint(str(meta.get("body") or "")),
         "verdict": result["verdict"],
         "safe_to_merge": result["safe_to_merge"],
         "summary": result["summary"],
@@ -181,14 +187,19 @@ def save_guardian_result(pr_number: int, payload: dict, *, path: Path = DEFAULT_
     dump_json(path, state)
 
 
-def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str) -> dict | None:
+def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str, body: str | None = None) -> dict | None:
     if not isinstance(payload, dict):
         return None
-    if payload.get("schema_version") != 1:
+    if payload.get("schema_version") not in {1, 2}:
         return None
     if payload.get("pr_number") != pr_number:
         return None
     if payload.get("head_sha") != head_sha:
+        return None
+    if body is not None:
+        if payload.get("body_fingerprint") != guardian_body_fingerprint(body):
+            return None
+    elif payload.get("schema_version") == 2 and not isinstance(payload.get("body_fingerprint"), str):
         return None
     if payload.get("verdict") not in VALID_VERDICTS:
         return None
@@ -201,13 +212,13 @@ def valid_guardian_payload(payload: object, *, pr_number: int, head_sha: str) ->
     return payload
 
 
-def local_guardian_result(pr_number: int, head_sha: str, *, path: Path = DEFAULT_STATE_FILE) -> dict | None:
+def local_guardian_result(pr_number: int, head_sha: str, *, body: str | None = None, path: Path = DEFAULT_STATE_FILE) -> dict | None:
     payload = load_guardian_state(path).get("prs", {}).get(str(pr_number))
-    return valid_guardian_payload(payload, pr_number=pr_number, head_sha=head_sha)
+    return valid_guardian_payload(payload, pr_number=pr_number, head_sha=head_sha, body=body)
 
 
-def find_latest_guardian_result(pr_number: int, head_sha: str, *, path: Path = DEFAULT_STATE_FILE) -> dict | None:
-    return local_guardian_result(pr_number, head_sha, path=path)
+def find_latest_guardian_result(pr_number: int, head_sha: str, *, body: str | None = None, path: Path = DEFAULT_STATE_FILE) -> dict | None:
+    return local_guardian_result(pr_number, head_sha, body=body, path=path)
 
 
 def parse_all_markdown_sections(body: str) -> dict[str, str]:
@@ -929,7 +940,7 @@ def merge_if_safe(
     require_auth()
     current = pr_meta(pr_number)
     original_body = str(current.get("body") or "")
-    payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"])
+    payload = None if refresh_review else find_latest_guardian_result(pr_number, current["headRefOid"], body=original_body)
 
     if payload:
         print(f"复用已有 guardian verdict: {payload['verdict']} @ {payload['head_sha']}")

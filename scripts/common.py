@@ -14,6 +14,7 @@ from typing import Iterable, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CANONICAL_GITHUB_REPO = "MC-and-his-Agents/Syvert"
 
 
 class CommandError(RuntimeError):
@@ -200,12 +201,7 @@ def default_github_repo() -> str:
     configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
     if configured:
         return configured
-    completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
-    if completed.returncode == 0:
-        parsed = parse_github_repo_from_remote_url(completed.stdout)
-        if parsed:
-            return parsed
-    return "MC-and-his-Agents/Syvert"
+    return CANONICAL_GITHUB_REPO
 
 
 def slugify(text: str) -> str:

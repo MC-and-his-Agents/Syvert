@@ -8,7 +8,7 @@ from pathlib import Path
 
 from unittest.mock import patch
 
-from scripts.common import CommandError, normalize_integration_ref_for_comparison, parse_github_repo_from_remote_url
+from scripts.common import CommandError, default_github_repo, normalize_integration_ref_for_comparison, parse_github_repo_from_remote_url
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
@@ -165,6 +165,17 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertEqual(normalized, "issue:mc-and-his-agents/syvert#12")
         default_repo_mock.assert_called_once_with()
+
+    @patch("scripts.common.run")
+    def test_default_github_repo_ignores_local_origin_and_uses_canonical_repo(self, run_mock) -> None:
+        default_github_repo.cache_clear()
+        try:
+            with patch.dict("scripts.common.os.environ", {}, clear=True):
+                self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert")
+        finally:
+            default_github_repo.cache_clear()
+
+        run_mock.assert_not_called()
 
     def test_normalize_integration_ref_for_comparison_normalizes_project_item_variants(self) -> None:
         with_view = "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test"

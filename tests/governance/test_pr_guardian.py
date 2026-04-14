@@ -21,6 +21,7 @@ from scripts.pr_guardian import (
     merge_if_safe,
     parse_bullet_kv_section,
     parse_integration_check_payload,
+    guardian_body_fingerprint,
     render_item_context_supplement,
     review_once,
     run_codex_review,
@@ -135,6 +136,34 @@ class GuardianStateTests(unittest.TestCase):
             )
 
             payload = find_latest_guardian_result(1, "sha-2", path=state_path)
+
+            self.assertIsNone(payload)
+
+    def test_find_latest_guardian_result_rejects_body_drift_with_same_head(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "guardian.json"
+            reviewed_body = "## integration_check\n\n- integration_status_checked_before_pr: yes\n"
+            save_guardian_result(
+                1,
+                {
+                    "schema_version": 2,
+                    "pr_number": 1,
+                    "head_sha": "sha-1",
+                    "body_fingerprint": guardian_body_fingerprint(reviewed_body),
+                    "verdict": "APPROVE",
+                    "safe_to_merge": True,
+                    "summary": "cached",
+                    "reviewed_at": "2026-03-28T10:00:00Z",
+                },
+                path=state_path,
+            )
+
+            payload = find_latest_guardian_result(
+                1,
+                "sha-1",
+                body=reviewed_body + "\n补充说明：body changed\n",
+                path=state_path,
+            )
 
             self.assertIsNone(payload)
 
@@ -1615,6 +1644,44 @@ class MergeIfSafeTests(unittest.TestCase):
 
         self.assertIn("guardian 认为当前 PR 不安全", str(ctx.exception))
         review_once_mock.assert_not_called()
+        run_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.find_latest_guardian_result", return_value=None)
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_uses_current_pr_body_when_checking_guardian_cache(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        run_mock,
+    ) -> None:
+        current_meta = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-reviewed",
+            "body": "## integration_check\n\n- integration_status_checked_before_pr: yes\n",
+        }
+        pr_meta_mock.return_value = current_meta
+        review_once_mock.return_value = (
+            current_meta,
+            {
+                "verdict": "REQUEST_CHANGES",
+                "safe_to_merge": False,
+                "summary": "reran",
+            },
+        )
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(1, post=False, delete_branch=False, refresh_review=False)
+
+        self.assertIn("guardian 未给出 APPROVE", str(ctx.exception))
+        find_result_mock.assert_called_once_with(1, "sha-reviewed", body=current_meta["body"])
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         run_mock.assert_not_called()
         require_auth_mock.assert_called_once()
 
