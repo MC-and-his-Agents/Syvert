@@ -156,6 +156,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
             pr_number,
             head_sha,
             body=str(meta.get("body") or ""),
+            require_body_bound=True,
             path=GUARDIAN_STATE_FILE,
         ) or {}
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
@@ -171,6 +172,7 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
     if issue_number is not None:
         payload["worktrees"] = filter_worktrees_by_issue(worktree_state, issue_number)
         payload["item_context"] = matching_exec_plan_for_issue(REPO_ROOT, issue_number)
+        payload["integration"] = build_integration_status_for_issue(issue_number)
         return payload
 
     payload["guardian"] = guardian_state.get("prs", {})
@@ -198,6 +200,23 @@ def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
     integration_ref_live = fetch_integration_ref_live_state(integration_ref) if integration_ref_is_checkable(integration_ref) else {}
     packet = build_review_packet(
         body,
+        issue_number=issue_number,
+        issue_canonical=issue_canonical,
+        issue_error=issue_error,
+        integration_ref_live=integration_ref_live,
+    )
+    packet["issue_lookup_error"] = issue_error
+    return packet
+
+
+def build_integration_status_for_issue(issue_number: int) -> dict[str, object]:
+    issue_resolution = validate_issue_fetch(issue_number, allow_missing_payload=True)
+    issue_canonical = dict(issue_resolution.canonical)
+    issue_error = str(issue_resolution.error or "")
+    integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    integration_ref_live = fetch_integration_ref_live_state(integration_ref) if integration_ref_is_checkable(integration_ref) else {}
+    packet = build_review_packet(
+        "",
         issue_number=issue_number,
         issue_canonical=issue_canonical,
         issue_error=issue_error,
@@ -282,6 +301,21 @@ def render_text(payload: dict) -> str:
         lines.append(f"live_source={live.get('source', '')}")
         lines.append(f"live_status={live.get('status', '')}")
         lines.append(f"live_dependency_order={live.get('dependency_order', '')}")
+        issue_lookup_error = str(integration.get("issue_lookup_error") or "")
+        if issue_lookup_error:
+            lines.append(f"issue_lookup_error={issue_lookup_error}")
+        comparison_errors = integration.get("comparison_errors") or []
+        lines.append(f"comparison_errors={len(comparison_errors)}")
+        for item in comparison_errors:
+            lines.append(f"- comparison_error: {item}")
+        merge_validation_errors = integration.get("merge_validation_errors") or []
+        lines.append(f"merge_validation_errors={len(merge_validation_errors)}")
+        for item in merge_validation_errors:
+            lines.append(f"- merge_validation_error: {item}")
+        live_errors = integration.get("integration_ref_live_errors") or []
+        lines.append(f"integration_ref_live_errors={len(live_errors)}")
+        for item in live_errors:
+            lines.append(f"- integration_live_error: {item}")
 
     return "\n".join(lines) + "\n"
 

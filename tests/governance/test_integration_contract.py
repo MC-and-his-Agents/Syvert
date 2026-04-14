@@ -191,7 +191,7 @@ class IntegrationContractTests(unittest.TestCase):
             "error": "",
         },
     )
-    def test_build_review_packet_collapses_equivalent_issue_and_project_item_refs(self, fetch_live_mock) -> None:
+    def test_build_review_packet_keeps_cross_form_integration_ref_mismatch_local_only(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -221,16 +221,19 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(packet["comparison_errors"], [])
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
         self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
-        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
-        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
+        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
+        fetch_live_mock.assert_not_called()
 
     @patch(
         "scripts.integration_contract.fetch_integration_ref_live_state",
         return_value={"source": "project_item", "error": "lookup failed"},
     )
-    def test_build_review_packet_fail_closed_when_cross_form_ref_cannot_be_resolved(self, fetch_live_mock) -> None:
+    def test_build_review_packet_keeps_unresolved_cross_form_ref_comparison_local_only(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -264,7 +267,7 @@ class IntegrationContractTests(unittest.TestCase):
             packet["comparison_errors"],
             ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
         )
-        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
+        fetch_live_mock.assert_not_called()
 
     def test_default_github_repo_uses_repo_root_name_when_env_missing(self) -> None:
         default_github_repo.cache_clear()

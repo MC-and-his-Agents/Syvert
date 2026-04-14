@@ -63,6 +63,7 @@ class GovernanceStatusTests(unittest.TestCase):
             7,
             "sha-1",
             body=pr_body,
+            require_body_bound=True,
             path=governance_status.GUARDIAN_STATE_FILE,
         )
         self.assertEqual(payload["guardian"]["schema_version"], 1)
