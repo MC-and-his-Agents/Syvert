@@ -314,7 +314,7 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
             integration_ref_live={
                 "source": "project_item",
-                "status": "in_progress",
+                "status": "review",
                 "dependency_order": "parallel",
                 "joint_acceptance": "ready",
                 "owner_repo": "joint",
@@ -375,7 +375,7 @@ class IntegrationContractTests(unittest.TestCase):
             payload,
             {
                 "source": "project_item",
-                "status": "in_progress",
+                "status": "review",
                 "dependency_order": "parallel",
                 "joint_acceptance": "pending",
                 "owner_repo": "joint",
@@ -387,6 +387,35 @@ class IntegrationContractTests(unittest.TestCase):
         )
 
         self.assertTrue(any("联合验收状态未就绪" in item for item in errors))
+
+    def test_validate_integration_ref_live_state_rejects_in_progress_status(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "in_progress",
+                "dependency_order": "parallel",
+                "joint_acceptance": "ready",
+                "owner_repo": "joint",
+                "contract_status": "reviewing",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("未进入允许合并的状态集合" in item for item in errors))
 
     def test_validate_integration_ref_live_state_fail_closed_when_status_missing(self) -> None:
         payload = {
@@ -431,7 +460,7 @@ class IntegrationContractTests(unittest.TestCase):
             payload,
             {
                 "source": "project_item",
-                "status": "in_progress",
+                "status": "review",
                 "dependency_order": "",
                 "joint_acceptance": "ready",
                 "blocked": False,

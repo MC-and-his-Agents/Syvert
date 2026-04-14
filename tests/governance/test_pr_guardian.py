@@ -420,7 +420,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         "scripts.pr_guardian.fetch_integration_ref_live_state",
         return_value={
             "source": "project_item",
-            "status": "in_progress",
+            "status": "review",
             "dependency_order": "parallel",
             "joint_acceptance": "ready",
             "owner_repo": "joint",
@@ -451,6 +451,43 @@ class CodexReviewExecutionTests(unittest.TestCase):
         errors = integration_merge_gate_errors(meta, require_live_state=True)
 
         self.assertEqual(errors, [])
+        live_state_mock.assert_called_once()
+
+    @patch(
+        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        return_value={
+            "source": "project_item",
+            "status": "in_progress",
+            "dependency_order": "parallel",
+            "joint_acceptance": "ready",
+            "owner_repo": "joint",
+            "contract_status": "reviewing",
+            "blocked": False,
+            "error": "",
+        },
+    )
+    def test_integration_merge_gate_errors_require_live_state_rejects_in_progress_status(self, live_state_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta, require_live_state=True)
+
+        self.assertTrue(any("未进入允许合并的状态集合" in item for item in errors))
         live_state_mock.assert_called_once()
 
     def test_integration_merge_gate_errors_allows_missing_section_for_legacy_pr(self) -> None:
@@ -2070,7 +2107,7 @@ class MergeIfSafeTests(unittest.TestCase):
             "scripts.pr_guardian.fetch_integration_ref_live_state",
             return_value={
                 "source": "project_item",
-                "status": "in_progress",
+                "status": "review",
                 "dependency_order": "parallel",
                 "joint_acceptance": "ready",
                 "owner_repo": "joint",
@@ -3471,7 +3508,7 @@ class MergeIfSafeTests(unittest.TestCase):
         }
         fetch_live_mock.return_value = {
             "source": "project_item",
-            "status": "in_progress",
+            "status": "review",
             "dependency_order": "parallel",
             "joint_acceptance": "pending",
             "owner_repo": "joint",

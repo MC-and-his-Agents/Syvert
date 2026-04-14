@@ -189,7 +189,12 @@
     },
     "local_only_required_values": {
       "integration_ref": "none"
-    }
+    },
+    "merge_time_allowed_live_statuses": [
+      "ready",
+      "review",
+      "done"
+    ]
   },
   "legacy_compatibility": {
     "issue_lookup_failure": "fail_closed",

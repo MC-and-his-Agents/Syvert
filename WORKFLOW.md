@@ -99,6 +99,7 @@ codex:
 - integration project 只承载跨仓协调真相；本地 issue / PR / review 仍是实现、关闭语义与 merge gate 的真相源。
 - `docs/governance-rollouts/*` 中记录的 project / label / backfill 结果只属于 rollout evidence，用于证明平台侧配置已落地；它们不是 merge gate 可直接复用的运行时输入。
 - `integration_ref` 指向的 integration issue / item 当前字段值（例如 `Status`、`Dependency Order`、`Joint Acceptance`）属于受控外部运行时输入；reviewer / guardian / merge gate 必须按需实时读取，并在无法验证时 fail-closed。
+- `merge_gate=integration_check_required` 时，merge-time 允许的 integration `Status` 只包括 `Ready / Review / Done`；`In Progress / Inbox / Blocked` 等状态一律不得放行。
 - 存量 PR 兼容仍走受控 legacy 路径：
   - issue lookup failure 继续 fail-closed
   - issue 存在但尚未声明 canonical integration 字段时，guardian 可沿用 legacy 路径

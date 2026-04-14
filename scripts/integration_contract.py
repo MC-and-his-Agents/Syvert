@@ -54,6 +54,9 @@ CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS = frozenset(
         "contract status",
     }
 )
+MERGE_TIME_ALLOWED_LIVE_STATUSES = tuple(
+    str(item).strip().lower() for item in RAW_CONTRACT["rules"].get("merge_time_allowed_live_statuses", [])
+)
 INTEGRATION_PROJECT_ITEM_QUERY = """
 query($id: ID!) {
   node(id: $id) {
@@ -925,6 +928,11 @@ def validate_integration_ref_live_state(
     contract_status = normalize_label_value(str(live_state.get("contract_status") or ""))
     if not status:
         errors.append("无法从 `integration_ref` 读取当前 `status`，拒绝继续。")
+    elif status not in MERGE_TIME_ALLOWED_LIVE_STATUSES:
+        allowed = " / ".join(MERGE_TIME_ALLOWED_LIVE_STATUSES)
+        errors.append(
+            f"`integration_ref` 当前 `status` 为 `{status}`，未进入允许合并的状态集合（仅允许 `{allowed}`）。"
+        )
     if not dependency_order:
         errors.append("无法从 `integration_ref` 读取当前 `dependency_order`，拒绝继续。")
     if not owner_repo:
