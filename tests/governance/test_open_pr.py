@@ -699,7 +699,14 @@ class OpenPrPreflightTests(unittest.TestCase):
 
     @patch(
         "scripts.integration_contract.fetch_integration_ref_live_state",
-        return_value={"item_id": "PVTI_same", "organization": "mc-and-his-agents", "project_number": "3", "error": ""},
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
     )
     @patch(
         "scripts.integration_contract.run",
@@ -775,7 +782,82 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertGreaterEqual(run_mock.call_count, 1)
         self.assertEqual(args.integration_ref, "MC-and-his-Agents/Syvert#12")
-        fetch_live_mock.assert_not_called()
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "MC-and-his-Agents/Syvert#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_rejects_non_equivalent_integration_ref_without_rewriting_input(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/999",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("`--integration-ref` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        self.assertEqual(args.integration_ref, "https://github.com/MC-and-his-Agents/WebEnvoy/issues/999")
+        self.assertGreaterEqual(run_mock.call_count, 1)
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
@@ -994,7 +1076,18 @@ class OpenPrPreflightTests(unittest.TestCase):
             None,
         ),
     )
-    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, resolve_issue_mock) -> None:
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, fetch_live_mock, resolve_issue_mock) -> None:
         args = parse_args(
             [
                 "--class",
@@ -1027,6 +1120,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
         self.assertNotIn("PVTI_same", body)
         resolve_issue_mock.assert_called_once_with(105)
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
 
     def test_inactive_exec_plan_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

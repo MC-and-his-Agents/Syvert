@@ -13,6 +13,7 @@ import os
 import re
 import tempfile
 
+from scripts import integration_contract
 from scripts.item_context import (
     ITEM_TYPES,
     INPUT_MODE_BOOTSTRAP,
@@ -53,6 +54,7 @@ from scripts.integration_contract import (
     ISSUE_SCOPE_FIELDS,
     extract_issue_canonical_integration_fields,
     field_choices,
+    normalize_integration_value,
     validate_issue_fetch,
     validate_open_pr_payload,
 )
@@ -574,8 +576,18 @@ def canonicalize_integration_ref_for_issue(
         return raw_integration_ref
     if raw_integration_ref.lower() == "none":
         return raw_integration_ref
-    if issue_integration_ref:
+    issue_normalized = normalize_integration_value("integration_ref", issue_integration_ref)
+    raw_normalized = normalize_integration_value("integration_ref", raw_integration_ref)
+    if issue_integration_ref and issue_normalized == raw_normalized:
         return issue_integration_ref
+    live_state = integration_contract.fetch_integration_ref_live_state(raw_integration_ref)
+    if not str(live_state.get("error") or "").strip():
+        live_repo = str(live_state.get("content_repo") or "").strip()
+        live_issue_number = str(live_state.get("content_issue_number") or "").strip()
+        if live_repo and live_issue_number:
+            live_issue_ref = f"{live_repo}#{live_issue_number}"
+            if normalize_integration_value("integration_ref", live_issue_ref) == issue_normalized:
+                return issue_integration_ref
     return raw_integration_ref
 
 
