@@ -115,6 +115,10 @@ query($id: ID!) {
           url
           repository { nameWithOwner }
         }
+        ... on DraftIssue {
+          title
+          body
+        }
       }
     }
   }
@@ -309,21 +313,31 @@ def semantic_integration_ref_key(value: str) -> str:
     return identity
 
 
+def semantic_identity_from_live_state(live_state: Mapping[str, object]) -> str:
+    content_repo = str(live_state.get("content_repo") or "").strip().lower()
+    content_issue_number = str(live_state.get("content_issue_number") or "").strip()
+    if content_repo and content_issue_number:
+        return f"issue:{content_repo}#{content_issue_number}"
+    organization = str(live_state.get("organization") or "").strip().lower()
+    project_number = str(live_state.get("project_number") or "").strip()
+    item_id = str(live_state.get("item_id") or "").strip()
+    if organization and project_number and item_id:
+        return f"project-item:{organization}/{project_number}#{item_id}"
+    return ""
+
+
 def semantic_integration_ref_identity(value: str) -> tuple[str, bool, str]:
     normalized = normalize_integration_ref_for_comparison(value)
     if normalized in {"", "none"}:
         return normalized, True, normalized
-    if normalized.startswith("issue:"):
-        return normalized, True, normalized
-    if not normalized.startswith("project-item:"):
+    if not (normalized.startswith("issue:") or normalized.startswith("project-item:")):
         return normalized, True, normalized
     live_state = fetch_integration_ref_live_state(value)
     if str(live_state.get("error") or "").strip():
         return normalized, False, normalized
-    content_repo = str(live_state.get("content_repo") or "").strip().lower()
-    content_issue_number = str(live_state.get("content_issue_number") or "").strip()
-    if content_repo and content_issue_number:
-        return f"issue:{content_repo}#{content_issue_number}", True, normalized
+    semantic_identity = semantic_identity_from_live_state(live_state)
+    if semantic_identity:
+        return semantic_identity, True, normalized
     return normalized, False, normalized
 
 
@@ -331,6 +345,11 @@ def normalize_integration_value_for_packet(field: str, value: str) -> str:
     raw = str(value or "").strip()
     if field == "integration_ref":
         return semantic_integration_ref_key(raw)
+    return normalize_integration_value(field, raw)
+
+
+def normalize_integration_value_for_review_packet(field: str, value: str) -> str:
+    raw = str(value or "").strip()
     return normalize_integration_value(field, raw)
 
 
@@ -385,16 +404,9 @@ def compare_issue_and_pr_canonical(
     errors: list[str] = []
     for field in ISSUE_SCOPE_FIELDS:
         if field == "integration_ref":
-            expected, expected_resolved, expected_static = semantic_integration_ref_identity(str(issue_canonical.get(field, "") or ""))
-            actual, actual_resolved, actual_static = semantic_integration_ref_identity(str(pr_payload.get(field, "") or ""))
-            if expected == actual:
-                continue
-            cross_form_pair = {
-                expected_static.split(":", 1)[0],
-                actual_static.split(":", 1)[0],
-            } == {"issue", "project-item"}
-            if cross_form_pair and (not expected_resolved or not actual_resolved):
-                errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
+            expected_normalized = normalize_integration_value(field, issue_canonical.get(field, ""))
+            actual_normalized = normalize_integration_value(field, pr_payload.get(field, ""))
+            if expected_normalized == actual_normalized:
                 continue
             errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
             continue
@@ -868,6 +880,10 @@ def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str,
     candidate["url"] = str(issue.get("url") or "").strip()
     candidate["title"] = str(issue.get("title") or "").strip()
     candidate["issue_state"] = normalize_label_value(str(issue.get("state") or ""))
+    candidate["content_type"] = "issue"
+    candidate["content_url"] = str(issue.get("url") or "").strip()
+    candidate["content_issue_number"] = str(issue.get("number") or issue_number).strip()
+    candidate["content_repo"] = repo_slug
     return candidate
 
 
@@ -920,18 +936,24 @@ def fetch_project_item_integration_ref_live_state(
     )
     if not str(live_state.get("error") or "").strip():
         content = node.get("content") or {}
-        if str(content.get("__typename") or "") != "Issue":
+        content_type = str(content.get("__typename") or "").strip()
+        if content_type == "Issue":
+            repository = content.get("repository") or {}
+            live_state["content_type"] = "issue"
+            live_state["content_url"] = str(content.get("url") or "").strip()
+            live_state["content_issue_number"] = str(content.get("number") or "").strip()
+            live_state["content_repo"] = str(repository.get("nameWithOwner") or "").strip()
+        elif content_type == "DraftIssue":
+            live_state["content_type"] = "draft_issue"
+            live_state["content_title"] = str(content.get("title") or "").strip()
+            live_state["content_body"] = str(content.get("body") or "").strip()
+        else:
             return {
                 "integration_ref": integration_ref,
                 "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
                 "source": "project_item",
-                "error": "`integration_ref` 直连的 project item 必须绑定到可核查的 Issue 内容，拒绝继续。",
+                "error": "`integration_ref` 直连的 project item 必须绑定到可核查的 Issue / DraftIssue 内容，拒绝继续。",
             }
-        repository = content.get("repository") or {}
-        live_state["content_type"] = "issue"
-        live_state["content_url"] = str(content.get("url") or "").strip()
-        live_state["content_issue_number"] = str(content.get("number") or "").strip()
-        live_state["content_repo"] = str(repository.get("nameWithOwner") or "").strip()
         live_state["item_id"] = item_id
     return live_state
 
@@ -1065,7 +1087,7 @@ def validate_issue_canonical_payload(payload: Mapping[str, str]) -> list[str]:
 
 def validate_issue_fetch(issue_number: int, *, allow_missing_payload: bool) -> IssueCanonicalResolution:
     completed = run(
-        ["gh", "issue", "view", str(issue_number), "--json", "body"],
+        ["gh", "issue", "view", str(issue_number), "--repo", default_github_repo(), "--json", "body"],
         cwd=REPO_ROOT,
         check=False,
     )
@@ -1131,21 +1153,21 @@ def build_review_packet(
     issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
     packet_issue_error = str(issue_error or "").strip()
     missing_pr_error = missing_pr_integration_check_error(issue_number) if issue_canonical and not pr_payload else ""
-    comparison_errors = (
-        [packet_issue_error]
-        if packet_issue_error
-        else
-        [missing_pr_error]
-        if missing_pr_error
-        else compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label) if issue_canonical and pr_payload else []
-    )
+    if packet_issue_error:
+        comparison_errors = [packet_issue_error]
+    elif missing_pr_error:
+        comparison_errors = [missing_pr_error]
+    elif issue_canonical and pr_payload:
+        comparison_errors = compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label)
+    else:
+        comparison_errors = []
     normalized_issue = {
-        field: normalize_integration_value_for_packet(field, issue_canonical.get(field, ""))
+        field: normalize_integration_value_for_review_packet(field, issue_canonical.get(field, ""))
         for field in ISSUE_SCOPE_FIELDS
         if str(issue_canonical.get(field) or "").strip()
     }
     normalized_pr = {
-        field: normalize_integration_value_for_packet(field, pr_payload.get(field, ""))
+        field: normalize_integration_value_for_review_packet(field, pr_payload.get(field, ""))
         for field in PR_SCOPE_FIELDS
         if str(pr_payload.get(field) or "").strip()
     }
@@ -1157,17 +1179,6 @@ def build_review_packet(
         require_merge_time_recheck=False,
     )
     packet_integration_ref_live = dict(integration_ref_live or {})
-    integration_ref_live_errors = (
-        validate_integration_ref_live_state(
-            pr_payload,
-            packet_integration_ref_live,
-            current_repo_slug=default_github_repo(),
-        )
-        if integration_ref_live is not None
-        else []
-    )
-    if integration_ref_live_errors:
-        merge_validation_errors = [*merge_validation_errors, *[item for item in integration_ref_live_errors if item not in merge_validation_errors]]
     return {
         "contract_sources": [
             CONTRACT_SOURCE_MACHINE_READABLE,
@@ -1183,7 +1194,7 @@ def build_review_packet(
         "merge_gate": str(pr_payload.get("merge_gate") or "").strip().lower() if pr_payload else "",
         "merge_gate_requires_recheck": merge_gate_requires_integration_recheck(pr_payload) if pr_payload else False,
         "integration_ref_live": packet_integration_ref_live,
-        "integration_ref_live_errors": integration_ref_live_errors,
+        "integration_ref_live_errors": [],
         "merge_validation_errors": merge_validation_errors,
     }
 

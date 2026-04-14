@@ -13,7 +13,10 @@ from scripts.pr_guardian import main as guardian_main
 def main(argv: list[str] | None = None) -> int:
     args = argv or sys.argv[1:]
     if not args:
-        print("用法: python3 scripts/merge_pr.py <pr-number> [--delete-branch] [--refresh-review]", file=sys.stderr)
+        print(
+            "用法: python3 scripts/merge_pr.py <pr-number> [--delete-branch] [--refresh-review] [--confirm-integration-recheck]",
+            file=sys.stderr,
+        )
         return 1
     return guardian_main(["merge-if-safe", *args])
 

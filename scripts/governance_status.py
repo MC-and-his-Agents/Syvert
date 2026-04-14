@@ -10,7 +10,15 @@ if __package__ in {None, ""}:
 import argparse
 import json
 
-from scripts.common import REPO_ROOT, legacy_state_file, load_json, run, syvert_state_file
+from scripts.common import REPO_ROOT, default_github_repo, integration_ref_is_checkable, legacy_state_file, load_json, run, syvert_state_file
+from scripts.integration_contract import (
+    build_review_packet,
+    fetch_integration_ref_live_state,
+    merge_gate_requires_integration_recheck,
+    parse_pr_integration_check,
+    validate_issue_fetch,
+    validate_integration_ref_live_state,
+)
 from scripts.item_context import (
     active_exec_plans_for_issue,
     load_item_context_from_exec_plan,
@@ -140,12 +148,19 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         "worktrees": [],
         "checks": [],
         "item_context": {},
+        "integration": {},
     }
 
     if pr_number is not None:
         meta = fetch_pr_meta(pr_number)
         head_sha = meta.get("headRefOid", "")
-        payload["guardian"] = find_latest_guardian_result(pr_number, head_sha, path=GUARDIAN_STATE_FILE) or {}
+        payload["guardian"] = find_latest_guardian_result(
+            pr_number,
+            head_sha,
+            body=str(meta.get("body") or ""),
+            require_body_bound=True,
+            path=GUARDIAN_STATE_FILE,
+        ) or {}
         payload["review_poller"] = review_poller_state.get("prs", {}).get(str(pr_number), {})
         payload["checks"] = fetch_checks_summary(pr_number)
         branch_name = meta.get("headRefName", "")
@@ -153,17 +168,86 @@ def build_status_payload(issue_number: int | None = None, pr_number: int | None 
         matched_worktree: dict | None = matching_worktrees[0] if len(matching_worktrees) == 1 else None
         payload["worktrees"] = matching_worktrees[:1] if len(matching_worktrees) == 1 else matching_worktrees
         payload["item_context"] = build_item_context_for_pr(meta, matched_worktree)
+        payload["integration"] = build_integration_status_for_pr(meta)
         return payload
 
     if issue_number is not None:
         payload["worktrees"] = filter_worktrees_by_issue(worktree_state, issue_number)
         payload["item_context"] = matching_exec_plan_for_issue(REPO_ROOT, issue_number)
+        payload["integration"] = build_integration_status_for_issue(issue_number)
         return payload
 
     payload["guardian"] = guardian_state.get("prs", {})
     payload["review_poller"] = review_poller_state.get("prs", {})
     payload["worktrees"] = list(worktree_state.get("worktrees", {}).values())
     return payload
+
+
+def build_integration_status_for_pr(meta: dict) -> dict[str, object]:
+    body = str(meta.get("body") or "")
+    body_context = parse_item_context_from_body(body)
+    issue_number: int | None = None
+    try:
+        issue_text = str(body_context.get("issue") or "").strip()
+        issue_number = int(issue_text) if issue_text else None
+    except ValueError:
+        issue_number = None
+    issue_resolution = validate_issue_fetch(issue_number, allow_missing_payload=True) if issue_number is not None else None
+    issue_canonical = dict(issue_resolution.canonical) if issue_resolution else {}
+    issue_error = str(issue_resolution.error or "") if issue_resolution else ""
+    pr_canonical = parse_pr_integration_check(body)
+    integration_ref = str(pr_canonical.get("integration_ref") or "").strip()
+    if not integration_ref:
+        integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    integration_ref_live = fetch_integration_ref_live_state(integration_ref) if integration_ref_is_checkable(integration_ref) else {}
+    packet = build_review_packet(
+        body,
+        issue_number=issue_number,
+        issue_canonical=issue_canonical,
+        issue_error=issue_error,
+        integration_ref_live=integration_ref_live,
+    )
+    if not pr_canonical and issue_canonical:
+        packet["merge_gate"] = str(issue_canonical.get("merge_gate") or "").strip().lower()
+        packet["merge_gate_requires_recheck"] = merge_gate_requires_integration_recheck(issue_canonical)
+    live_validation_payload = pr_canonical or issue_canonical
+    live_errors = validate_integration_ref_live_state(
+        live_validation_payload,
+        integration_ref_live,
+        current_repo_slug=default_github_repo(),
+    )
+    packet["integration_ref_live_errors"] = live_errors
+    packet["issue_lookup_error"] = issue_error
+    return packet
+
+
+def build_integration_status_for_issue(issue_number: int) -> dict[str, object]:
+    issue_resolution = validate_issue_fetch(issue_number, allow_missing_payload=True)
+    issue_canonical = dict(issue_resolution.canonical)
+    issue_error = str(issue_resolution.error or "")
+    integration_ref = str(issue_canonical.get("integration_ref") or "").strip()
+    integration_ref_live = fetch_integration_ref_live_state(integration_ref) if integration_ref_is_checkable(integration_ref) else {}
+    packet = build_review_packet(
+        "",
+        issue_number=issue_number,
+        issue_canonical=issue_canonical,
+        issue_error=issue_error,
+        integration_ref_live=integration_ref_live,
+    )
+    live_errors = validate_integration_ref_live_state(
+        issue_canonical,
+        integration_ref_live,
+        current_repo_slug=default_github_repo(),
+    )
+    packet["pr_canonical"] = {}
+    packet["normalized_pr_canonical"] = {}
+    packet["comparison_errors"] = []
+    packet["merge_validation_errors"] = []
+    packet["integration_ref_live_errors"] = live_errors
+    packet["merge_gate"] = str(issue_canonical.get("merge_gate") or "").strip().lower()
+    packet["merge_gate_requires_recheck"] = packet["merge_gate"] == "integration_check_required"
+    packet["issue_lookup_error"] = issue_error
+    return packet
 
 
 def render_text(payload: dict) -> str:
@@ -224,6 +308,38 @@ def render_text(payload: dict) -> str:
         lines.append(f"count={len(checks)}")
         for item in checks:
             lines.append(f"- {item.get('name')} {item.get('bucket')} {item.get('state')}")
+
+    integration = payload.get("integration") or {}
+    lines.append("[integration]")
+    if not integration:
+        lines.append("empty=true")
+    else:
+        lines.append(f"issue_number={integration.get('issue_number', '')}")
+        lines.append(f"merge_gate={integration.get('merge_gate', '')}")
+        lines.append(f"merge_gate_requires_recheck={integration.get('merge_gate_requires_recheck', '')}")
+        pr_canonical = integration.get("pr_canonical") or {}
+        issue_canonical = integration.get("issue_canonical") or {}
+        lines.append(f"pr_integration_ref={pr_canonical.get('integration_ref', '')}")
+        lines.append(f"issue_integration_ref={issue_canonical.get('integration_ref', '')}")
+        live = integration.get("integration_ref_live") or {}
+        lines.append(f"live_source={live.get('source', '')}")
+        lines.append(f"live_status={live.get('status', '')}")
+        lines.append(f"live_dependency_order={live.get('dependency_order', '')}")
+        issue_lookup_error = str(integration.get("issue_lookup_error") or "")
+        if issue_lookup_error:
+            lines.append(f"issue_lookup_error={issue_lookup_error}")
+        comparison_errors = integration.get("comparison_errors") or []
+        lines.append(f"comparison_errors={len(comparison_errors)}")
+        for item in comparison_errors:
+            lines.append(f"- comparison_error: {item}")
+        merge_validation_errors = integration.get("merge_validation_errors") or []
+        lines.append(f"merge_validation_errors={len(merge_validation_errors)}")
+        for item in merge_validation_errors:
+            lines.append(f"- merge_validation_error: {item}")
+        live_errors = integration.get("integration_ref_live_errors") or []
+        lines.append(f"integration_ref_live_errors={len(live_errors)}")
+        for item in live_errors:
+            lines.append(f"- integration_live_error: {item}")
 
     return "\n".join(lines) + "\n"
 

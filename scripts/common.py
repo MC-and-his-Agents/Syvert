@@ -205,9 +205,24 @@ def default_github_repo() -> str:
     configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
     if configured and re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", configured):
         return configured
-    repo_name = REPO_ROOT.name.strip().casefold()
-    if repo_name in REPO_CANONICAL_GITHUB_REPOS:
-        return REPO_CANONICAL_GITHUB_REPOS[repo_name]
+    repo_names = [REPO_ROOT.name.strip().casefold()]
+    git_entry = REPO_ROOT / ".git"
+    if git_entry.is_file():
+        try:
+            gitdir_line = git_entry.read_text(encoding="utf-8").strip()
+        except OSError:
+            gitdir_line = ""
+        if gitdir_line.lower().startswith("gitdir:"):
+            gitdir_path = Path(gitdir_line.split(":", 1)[1].strip())
+            if not gitdir_path.is_absolute():
+                gitdir_path = (REPO_ROOT / gitdir_path).resolve()
+            for parent in gitdir_path.parents:
+                if parent.name == ".git":
+                    repo_names.append(parent.parent.name.strip().casefold())
+                    break
+    for repo_name in repo_names:
+        if repo_name in REPO_CANONICAL_GITHUB_REPOS:
+            return REPO_CANONICAL_GITHUB_REPOS[repo_name]
     completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
     if completed.returncode == 0:
         parsed = parse_github_repo_from_remote_url(completed.stdout.strip())

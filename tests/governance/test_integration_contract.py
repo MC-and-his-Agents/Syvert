@@ -191,7 +191,7 @@ class IntegrationContractTests(unittest.TestCase):
             "error": "",
         },
     )
-    def test_build_review_packet_collapses_equivalent_issue_and_project_item_refs(self, fetch_live_mock) -> None:
+    def test_build_review_packet_rejects_cross_form_integration_ref_without_live_resolution(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -221,16 +221,19 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(packet["comparison_errors"], [])
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
         self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
-        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
-        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
+        self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
+        fetch_live_mock.assert_not_called()
 
     @patch(
         "scripts.integration_contract.fetch_integration_ref_live_state",
         return_value={"source": "project_item", "error": "lookup failed"},
     )
-    def test_build_review_packet_fail_closed_when_cross_form_ref_cannot_be_resolved(self, fetch_live_mock) -> None:
+    def test_build_review_packet_rejects_unresolved_cross_form_ref_without_live_resolution(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -264,7 +267,7 @@ class IntegrationContractTests(unittest.TestCase):
             packet["comparison_errors"],
             ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
         )
-        self.assertGreaterEqual(fetch_live_mock.call_count, 1)
+        fetch_live_mock.assert_not_called()
 
     def test_default_github_repo_uses_repo_root_name_when_env_missing(self) -> None:
         default_github_repo.cache_clear()
@@ -613,6 +616,25 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertIn("无法解析", resolution.error or "")
 
+    @patch("scripts.integration_contract.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_validate_issue_fetch_binds_issue_reads_to_canonical_repo(self, default_repo_mock) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=["gh"],
+                returncode=0,
+                stdout=json.dumps({"body": "### integration_touchpoint\n\nnone\n"}),
+                stderr="",
+            )
+
+            validate_issue_fetch(105, allow_missing_payload=True)
+
+        run_mock.assert_called_once_with(
+            ["gh", "issue", "view", "105", "--repo", "MC-and-his-Agents/Syvert", "--json", "body"],
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        default_repo_mock.assert_called_once_with()
+
     def test_integration_ref_is_checkable_matches_project_item_parser_shape(self) -> None:
         self.assertFalse(
             integration_ref_is_checkable("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&foo=itemId=PVTI_test")
@@ -692,6 +714,9 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(payload["joint_acceptance"], "ready")
         self.assertEqual(payload["project_url"], "https://github.com/orgs/MC-and-his-Agents/projects/3")
         self.assertEqual(payload["title"], "integration baseline")
+        self.assertEqual(payload["content_type"], "issue")
+        self.assertEqual(payload["content_repo"], "MC-and-his-Agents/Syvert")
+        self.assertEqual(payload["content_issue_number"], "105")
 
     def test_fetch_integration_ref_live_state_rejects_issue_without_integration_project_item(self) -> None:
         graphql_payload = {
@@ -991,7 +1016,7 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(payload["source"], "project_item")
         self.assertIn("canonical integration project item", payload["error"])
 
-    def test_fetch_integration_ref_live_state_rejects_project_item_without_issue_content(self) -> None:
+    def test_fetch_integration_ref_live_state_accepts_project_item_with_draft_issue_content(self) -> None:
         graphql_payload = {
             "data": {
                 "node": {
@@ -1034,6 +1059,8 @@ class IntegrationContractTests(unittest.TestCase):
                     },
                     "content": {
                         "__typename": "DraftIssue",
+                        "title": "Syvert × WebEnvoy integration governance baseline",
+                        "body": "跨仓协调主题；以 Integration Project 为协调真相源。",
                     },
                 }
             }
@@ -1046,7 +1073,68 @@ class IntegrationContractTests(unittest.TestCase):
             payload = fetch_integration_ref_live_state("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test")
 
         self.assertEqual(payload["source"], "project_item")
-        self.assertIn("必须绑定到可核查的 Issue 内容", payload["error"])
+        self.assertEqual(payload["error"], "")
+        self.assertEqual(payload["content_type"], "draft_issue")
+        self.assertEqual(payload["content_title"], "Syvert × WebEnvoy integration governance baseline")
+        self.assertEqual(payload["status"], "review")
+        self.assertEqual(payload["joint_acceptance"], "ready")
+
+    def test_fetch_integration_ref_live_state_rejects_project_item_without_supported_content(self) -> None:
+        graphql_payload = {
+            "data": {
+                "node": {
+                    "__typename": "ProjectV2Item",
+                    "isArchived": False,
+                    "fieldValues": {
+                        "nodes": [
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "Review",
+                                "field": {"name": "Status"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "parallel",
+                                "field": {"name": "Dependency Order"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "ready",
+                                "field": {"name": "Joint Acceptance"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "reviewing",
+                                "field": {"name": "Contract Status"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "joint",
+                                "field": {"name": "Owner Repo"},
+                            },
+                        ]
+                    },
+                    "project": {
+                        "url": "https://github.com/orgs/MC-and-his-Agents/projects/3",
+                        "number": 3,
+                        "title": "Syvert × WebEnvoy Integration",
+                        "owner": {"login": "MC-and-his-Agents"},
+                    },
+                    "content": {
+                        "__typename": "PullRequest",
+                    },
+                }
+            }
+        }
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value.returncode = 0
+            run_mock.return_value.stdout = json.dumps(graphql_payload)
+            run_mock.return_value.stderr = ""
+
+            payload = fetch_integration_ref_live_state("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test")
+
+        self.assertEqual(payload["source"], "project_item")
+        self.assertIn("Issue / DraftIssue 内容", payload["error"])
 
     def test_fetch_integration_ref_live_state_rejects_non_canonical_project_item(self) -> None:
         graphql_payload = {

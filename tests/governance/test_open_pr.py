@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
-from scripts.common import CommandError
-from scripts.open_pr import build_body, build_issue_summary, parse_args, validate_current_worktree_binding, validate_pr_preflight
+from scripts.common import CommandError, default_github_repo, normalize_integration_ref_for_comparison, parse_github_repo_from_remote_url
+from scripts.open_pr import (
+    build_body,
+    build_issue_summary,
+    extract_issue_canonical_integration_fields,
+    extract_issue_summary_sections,
+    parse_args,
+    validate_current_worktree_binding,
+    validate_integration_args,
+    validate_pr_preflight,
+)
 
 
 def write_exec_plan(
@@ -134,6 +145,811 @@ def write_decision(repo: Path, path: str, *, issue: str, item_key: str) -> None:
 
 
 class OpenPrPreflightTests(unittest.TestCase):
+    def test_parse_github_repo_from_remote_url_supports_https_and_ssh(self) -> None:
+        self.assertEqual(
+            parse_github_repo_from_remote_url("https://github.com/MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
+        self.assertEqual(
+            parse_github_repo_from_remote_url("git@github.com:MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
+        self.assertEqual(
+            parse_github_repo_from_remote_url("ssh://git@github.com/MC-and-his-Agents/Syvert.git"),
+            "MC-and-his-Agents/Syvert",
+        )
+
+    @patch("scripts.common.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_normalize_integration_ref_for_comparison_resolves_local_issue_against_repo_slug(self, default_repo_mock) -> None:
+        normalized = normalize_integration_ref_for_comparison("#12")
+
+        self.assertEqual(normalized, "issue:mc-and-his-agents/syvert#12")
+        default_repo_mock.assert_called_once_with()
+
+    @patch("scripts.common.run")
+    def test_default_github_repo_ignores_env_and_remote_drift_without_explicit_override(self, run_mock) -> None:
+        default_github_repo.cache_clear()
+        try:
+            with patch.dict(
+                "scripts.common.os.environ",
+                {"GITHUB_REPOSITORY": "fork-owner/Syvert", "SYVERT_GITHUB_REPO": ""},
+                clear=True,
+            ):
+                run_mock.return_value = subprocess.CompletedProcess(
+                    args=["git", "config", "--get", "remote.origin.url"],
+                    returncode=0,
+                    stdout="git@github.com:MC-and-his-Agents/WebEnvoy.git\n",
+                    stderr="",
+                )
+                self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert")
+        finally:
+            default_github_repo.cache_clear()
+
+        run_mock.assert_not_called()
+
+    def test_default_github_repo_accepts_explicit_syvert_override(self) -> None:
+        default_github_repo.cache_clear()
+        try:
+            with patch.dict(
+                "scripts.common.os.environ",
+                {"SYVERT_GITHUB_REPO": "MC-and-his-Agents/Syvert-Shadow"},
+                clear=True,
+            ):
+                self.assertEqual(default_github_repo(), "MC-and-his-Agents/Syvert-Shadow")
+        finally:
+            default_github_repo.cache_clear()
+
+    def test_normalize_integration_ref_for_comparison_normalizes_project_item_variants(self) -> None:
+        with_view = "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test"
+        reordered_query = "https://github.com/orgs/MC-and-his-Agents/projects/3?itemId=PVTI_test&pane=issue"
+
+        self.assertEqual(
+            normalize_integration_ref_for_comparison(with_view),
+            "project-item:mc-and-his-agents/3#PVTI_test",
+        )
+        self.assertEqual(
+            normalize_integration_ref_for_comparison(with_view),
+            normalize_integration_ref_for_comparison(reordered_query),
+        )
+
+    def test_validate_integration_args_rejects_empty_ref_for_gated_pr(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`integration_ref` 不能为空" in error for error in errors))
+
+    def test_validate_integration_args_requires_gate_for_shared_contract_surface(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "errors",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`merge_gate` 必须为 `integration_check_required`" in error for error in errors))
+        self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
+
+    def test_validate_integration_args_requires_gate_for_shared_contract_change(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--shared-contract-changed",
+                "yes",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "none",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("共享契约" in error and "`integration_check_required`" in error for error in errors))
+
+    def test_validate_integration_args_rejects_dependency_with_none_touchpoint(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`integration_touchpoint` 不能为 `none`" in error for error in errors))
+
+    def test_validate_integration_args_requires_touchpoint_for_gated_pr(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "no",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(
+            any("`merge_gate=integration_check_required` 时，`integration_touchpoint` 不能为 `none`" in error for error in errors)
+        )
+
+    def test_validate_integration_args_rejects_uncheckable_integration_ref(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--integration-ref",
+                "later",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("可核查的具体 integration issue / item" in error for error in errors))
+
+    def test_validate_integration_args_rejects_merge_recheck_at_open_pr_time(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "yes",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("`open_pr` 阶段不得把 `integration_status_checked_before_merge` 设为 `yes`" in error for error in errors))
+
+    def test_validate_integration_args_rejects_local_only_external_integration_ref(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+                "--contract-surface",
+                "none",
+                "--joint-acceptance-needed",
+                "no",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertTrue(any("纯本仓库事项必须显式使用 `integration_ref=none`" in error for error in errors))
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "yes",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_rejects_issue_canonical_mismatch(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("`--shared-contract-changed` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        self.assertGreaterEqual(run_mock.call_count, 1)
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=json.dumps({"body": "### 摘要\n\n- no metadata"}), stderr=""),
+    )
+    def test_validate_integration_args_allows_legacy_issue_without_canonical_integration_metadata(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        run_mock.assert_called_once()
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(args=["gh"], returncode=1, stdout="", stderr="boom"),
+    )
+    def test_validate_integration_args_rejects_issue_fetch_failure_for_canonical_integration(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "none",
+                "--integration-ref",
+                "none",
+                "--external-dependency",
+                "none",
+                "--merge-gate",
+                "local_only",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("无法读取 Issue #105 的 canonical integration 元数据", errors[0])
+        run_mock.assert_called_once()
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    @patch("scripts.common.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    def test_validate_integration_args_accepts_equivalent_issue_ref_forms(self, default_repo_mock, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/Syvert/issues/12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertGreaterEqual(run_mock.call_count, 1)
+        self.assertGreaterEqual(default_repo_mock.call_count, 1)
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "https://github.com/orgs/MC-and-his-Agents/projects/3?itemId=PVTI_test&pane=issue",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_project_item_urls(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3/views/1?pane=issue&itemId=PVTI_test",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertGreaterEqual(run_mock.call_count, 1)
+
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "MC-and-his-Agents/Syvert#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_issue_and_project_item_refs(self, run_mock, fetch_live_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertGreaterEqual(run_mock.call_count, 1)
+        self.assertEqual(args.integration_ref, "MC-and-his-Agents/Syvert#12")
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_accepts_equivalent_issue_ref_for_project_item_canonical(
+        self, run_mock, fetch_live_mock
+    ) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "MC-and-his-Agents/Syvert#12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            args.integration_ref,
+            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+        )
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
+        "scripts.integration_contract.run",
+        return_value=subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "body": "\n".join(
+                        [
+                            "### integration_touchpoint",
+                            "",
+                            "active",
+                            "",
+                            "### shared_contract_changed",
+                            "",
+                            "no",
+                            "",
+                            "### integration_ref",
+                            "",
+                            "MC-and-his-Agents/Syvert#12",
+                            "",
+                            "### external_dependency",
+                            "",
+                            "both",
+                            "",
+                            "### merge_gate",
+                            "",
+                            "integration_check_required",
+                            "",
+                            "### contract_surface",
+                            "",
+                            "runtime_modes",
+                            "",
+                            "### joint_acceptance_needed",
+                            "",
+                            "yes",
+                        ]
+                    )
+                }
+            ),
+            stderr="",
+        ),
+    )
+    def test_validate_integration_args_rejects_non_equivalent_integration_ref_without_rewriting_input(self, run_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/999",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+            ]
+        )
+
+        errors = validate_integration_args(args)
+
+        self.assertIn("`--integration-ref` 与 Issue #105 中的 canonical integration 元数据不一致。", errors)
+        self.assertEqual(args.integration_ref, "https://github.com/MC-and-his-Agents/WebEnvoy/issues/999")
+        self.assertGreaterEqual(run_mock.call_count, 1)
+
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {
             "body": "\n".join(
@@ -162,6 +978,110 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("## Goal", summary)
         self.assertIn("## Scope", summary)
         self.assertIn("## Out of Scope", summary)
+
+    @patch("scripts.open_pr.default_github_repo", return_value="MC-and-his-Agents/Syvert")
+    @patch("scripts.open_pr.run")
+    def test_build_issue_summary_binds_issue_reads_to_canonical_repo(self, run_mock, default_repo_mock) -> None:
+        run_mock.return_value = type(
+            "Completed",
+            (),
+            {"returncode": 0, "stdout": json.dumps({"body": "## Goal\n\n- 对齐 contract"}), "stderr": ""},
+        )()
+
+        summary = build_issue_summary(25)
+
+        self.assertIn("## Goal", summary)
+        run_mock.assert_called_once_with(
+            ["gh", "issue", "view", "25", "--repo", "MC-and-his-Agents/Syvert", "--json", "body"],
+            cwd=ANY,
+            check=False,
+        )
+        default_repo_mock.assert_called_once_with()
+
+    def test_extract_issue_summary_sections_supports_issue_form_heading_aliases(self) -> None:
+        body = "\n".join(
+            [
+                "### 摘要",
+                "",
+                "目标：收口本轮治理改造。",
+                "",
+                "### integration_touchpoint",
+                "",
+                "none",
+                "",
+                "### 治理目标",
+                "",
+                "补齐跨仓协同插槽。",
+            ]
+        )
+
+        sections = extract_issue_summary_sections(body)
+
+        self.assertIn("Goal", sections)
+        self.assertIn("目标：收口本轮治理改造。", sections["Goal"])
+        self.assertIn("补齐跨仓协同插槽。", sections["Goal"])
+        self.assertNotIn("integration_touchpoint", sections)
+
+    def test_extract_issue_canonical_integration_fields_preserves_issue_form_metadata(self) -> None:
+        body = "\n".join(
+            [
+                "### integration_touchpoint",
+                "",
+                "active",
+                "",
+                "### shared_contract_changed",
+                "",
+                "yes",
+                "",
+                "### integration_ref",
+                "",
+                "owner/repo#12",
+                "",
+                "### merge_gate",
+                "",
+                "integration_check_required",
+            ]
+        )
+
+        payload = extract_issue_canonical_integration_fields(body)
+
+        self.assertEqual(payload["integration_touchpoint"], "active")
+        self.assertEqual(payload["shared_contract_changed"], "yes")
+        self.assertEqual(payload["integration_ref"], "owner/repo#12")
+        self.assertEqual(payload["merge_gate"], "integration_check_required")
+
+    def test_build_issue_summary_renders_chinese_issue_form_sections(self) -> None:
+        payload = {
+            "body": "\n".join(
+                [
+                    "### 摘要",
+                    "",
+                    "目标：统一执行入口。",
+                    "",
+                    "### 影响载体",
+                    "",
+                    "- WORKFLOW.md",
+                    "",
+                    "### Formal Spec 套件",
+                    "",
+                    "- spec.md",
+                ]
+            )
+        }
+
+        with patch(
+            "scripts.open_pr.run",
+            return_value=type("Completed", (), {"returncode": 0, "stdout": __import__("json").dumps(payload)})(),
+        ):
+            summary = build_issue_summary(105)
+
+        self.assertIn("## Goal", summary)
+        self.assertIn("## Scope", summary)
+        self.assertIn("## Required Outcomes", summary)
+        self.assertIn("目标：统一执行入口。", summary)
+        self.assertIn("- WORKFLOW.md", summary)
+        self.assertIn("- spec.md", summary)
+
     def test_legacy_filename_exec_plan_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -197,6 +1117,162 @@ class OpenPrPreflightTests(unittest.TestCase):
                 repo_root=repo,
             )
         self.assertEqual(errors, [])
+
+    def test_build_body_populates_integration_check_fields(self) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "yes",
+                "--integration-ref",
+                "https://github.com/MC-and-his-Agents/WebEnvoy/issues/466",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_touchpoint: active", body)
+        self.assertIn("- shared_contract_changed: yes", body)
+        self.assertIn("- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466", body)
+        self.assertIn("- merge_gate: integration_check_required", body)
+        self.assertIn("- contract_surface: runtime_modes", body)
+
+    @patch(
+        "scripts.open_pr.resolve_issue_canonical_integration",
+        return_value=(
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "MC-and-his-Agents/Syvert#12",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            None,
+        ),
+    )
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    def test_build_body_canonicalizes_equivalent_integration_ref_to_issue_carrier(self, fetch_live_mock, resolve_issue_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
+        self.assertNotIn("PVTI_same", body)
+        resolve_issue_mock.assert_called_once_with(105)
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
+
+    @patch(
+        "scripts.integration_contract.fetch_integration_ref_live_state",
+        return_value={
+            "item_id": "PVTI_same",
+            "organization": "mc-and-his-agents",
+            "project_number": "3",
+            "content_repo": "MC-and-his-Agents/Syvert",
+            "content_issue_number": "12",
+            "error": "",
+        },
+    )
+    @patch(
+        "scripts.open_pr.resolve_issue_canonical_integration",
+        return_value=(
+            {
+                "integration_touchpoint": "active",
+                "shared_contract_changed": "no",
+                "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same",
+                "external_dependency": "both",
+                "merge_gate": "integration_check_required",
+                "contract_surface": "runtime_modes",
+                "joint_acceptance_needed": "yes",
+            },
+            None,
+        ),
+    )
+    def test_build_body_canonicalizes_equivalent_issue_ref_to_project_item_carrier(self, resolve_issue_mock, fetch_live_mock) -> None:
+        args = parse_args(
+            [
+                "--class",
+                "governance",
+                "--issue",
+                "105",
+                "--integration-touchpoint",
+                "active",
+                "--shared-contract-changed",
+                "no",
+                "--integration-ref",
+                "MC-and-his-Agents/Syvert#12",
+                "--external-dependency",
+                "both",
+                "--merge-gate",
+                "integration_check_required",
+                "--contract-surface",
+                "runtime_modes",
+                "--joint-acceptance-needed",
+                "yes",
+                "--integration-status-checked-before-pr",
+                "yes",
+                "--integration-status-checked-before-merge",
+                "no",
+            ]
+        )
+
+        body = build_body(args, [])
+
+        self.assertIn("- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same", body)
+        self.assertNotIn("- integration_ref: MC-and-his-Agents/Syvert#12", body)
+        resolve_issue_mock.assert_called_once_with(105)
+        fetch_live_mock.assert_called_once_with("https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_same")
 
     def test_inactive_exec_plan_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
