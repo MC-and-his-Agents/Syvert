@@ -29,12 +29,12 @@
 
 - `#107` 保持 Draft 并冻结，不再继续修 findings 或提交 guardian；它只作为拆分母体和审查历史容器保留。
 - 当前真正需要先落地的是 `PR-A Contract Kernel`，否则 `#105` 在 `main` 上没有 active bootstrap contract，后续替代 PR 无法通过受控入口。
-- 当前 PR-A 必须只声明 contract kernel 与最小 bootstrap contract，不提前宣称消费者、载体和 evidence 已完成。
+- 当前 PR-A 已完成 contract kernel 与最小 bootstrap contract 裁剪，并已通过本地 contract 单测与治理门禁；下一步进入 Draft PR 和仓外审查。
 
 ## 下一步动作
 
-- 从 `#107` 母体裁出 contract kernel 与最小 bootstrap contract，形成独立分支和 Draft PR。
-- 运行 `tests.governance.test_integration_contract`、`workflow_guard --mode pre-commit` 与 `governance_gate --mode ci`，确保第一批能独立成立。
+- 为当前分支创建 Draft PR，并将其声明为 `#107` 的 replacement PR-A。
+- 在同一 head 上等待 reviewer、GitHub checks 与 guardian 收口，再执行受控合并。
 - PR-A 合并后，再按同一 `Issue #105` 串行推进 PR-B、PR-C、PR-D。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -48,7 +48,9 @@
 
 ## 已验证项
 
-- 待本轮 contract kernel 裁剪完成后补记。
+- 已执行：`python3 -m unittest tests.governance.test_integration_contract`
+- 已执行：`python3 scripts/workflow_guard.py --mode pre-commit`
+- 已执行：`python3 scripts/governance_gate.py --mode ci --base-sha origin/main --head-sha HEAD --head-ref issue-105-integration-governance-baseline-contract-kernel`
 
 ## 未决风险
 
@@ -62,4 +64,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 待 PR-A 首次 checkpoint 生成后补记当前 head SHA。
+- `a1fd9a375ae7e83d1845b86b981a7288066b506d`
