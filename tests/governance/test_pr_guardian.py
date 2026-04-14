@@ -350,6 +350,107 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
+    @patch(
+        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        return_value={
+            "source": "project_item",
+            "status": "blocked",
+            "dependency_order": "parallel",
+            "joint_acceptance": "ready",
+            "blocked": True,
+            "error": "",
+        },
+    )
+    def test_integration_merge_gate_errors_require_live_state_blocks_blocked_integration_ref(self, live_state_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta, require_live_state=True)
+
+        self.assertTrue(any("blocked" in item for item in errors))
+        live_state_mock.assert_called_once()
+
+    @patch(
+        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        return_value={
+            "source": "project_item",
+            "error": "无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。",
+        },
+    )
+    def test_integration_merge_gate_errors_require_live_state_fail_closed_when_ref_unreadable(self, live_state_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta, require_live_state=True)
+
+        self.assertEqual(errors, ["无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。"])
+        live_state_mock.assert_called_once()
+
+    @patch(
+        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        return_value={
+            "source": "project_item",
+            "status": "in_progress",
+            "dependency_order": "parallel",
+            "joint_acceptance": "ready",
+            "blocked": False,
+            "error": "",
+        },
+    )
+    def test_integration_merge_gate_errors_require_live_state_passes_when_ref_ready(self, live_state_mock) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: yes",
+                ]
+            )
+        }
+
+        errors = integration_merge_gate_errors(meta, require_live_state=True)
+
+        self.assertEqual(errors, [])
+        live_state_mock.assert_called_once()
+
     def test_integration_merge_gate_errors_allows_missing_section_for_legacy_pr(self) -> None:
         meta = {"body": "## 摘要\n\n- 变更目的：补齐 integration gate\n"}
 
@@ -1396,6 +1497,70 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(payload["integration_review_packet"]["issue_number"], 24)
         self.assertEqual(payload["context_notes"], ["item context drift"])
 
+    def test_build_review_context_passes_live_integration_ref_snapshot_to_review_packet(self) -> None:
+        meta = {
+            "number": 24,
+            "title": "治理: integration live snapshot",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "\n".join(
+                [
+                    "Issue: #24",
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            ),
+        }
+
+        with patch("scripts.pr_guardian.fetch_diff_stats", return_value=(["scripts/pr_guardian.py"], "1 file changed")):
+            with patch(
+                "scripts.pr_guardian.build_item_context_summary",
+                return_value=({"issue": "24", "item_key": "GOV-0024-guardian-review-context"}, [], []),
+            ):
+                with patch(
+                    "scripts.pr_guardian.resolve_issue_canonical_integration",
+                    return_value=(24, {"merge_gate": "integration_check_required"}),
+                ):
+                    with patch(
+                        "scripts.pr_guardian.fetch_issue_context",
+                        return_value={"identity": [], "summary": "", "canonical_integration": {}},
+                    ):
+                        with patch(
+                            "scripts.pr_guardian.fetch_integration_ref_live_state",
+                            return_value={
+                                "source": "project_item",
+                                "status": "in_progress",
+                                "dependency_order": "parallel",
+                                "joint_acceptance": "pending",
+                                "error": "",
+                            },
+                        ) as fetch_live_mock:
+                            with patch(
+                                "scripts.pr_guardian.build_review_packet",
+                                return_value={"issue_number": 24},
+                            ) as build_review_packet_mock:
+                                build_review_context(meta, Path("/tmp/pr-worktree"))
+
+        fetch_live_mock.assert_called_once_with(
+            "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test"
+        )
+        build_review_packet_mock.assert_called_once()
+        kwargs = build_review_packet_mock.call_args.kwargs
+        self.assertIn("integration_ref_live", kwargs)
+        self.assertEqual(kwargs["integration_ref_live"]["source"], "project_item")
+        self.assertEqual(kwargs["integration_ref_live"]["joint_acceptance"], "pending")
+
     def test_build_review_context_keeps_nested_issue_summary_from_pr_body(self) -> None:
         meta = {
             "number": 24,
@@ -1736,6 +1901,25 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
 
 class MergeIfSafeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._integration_live_state_patcher = patch(
+            "scripts.pr_guardian.fetch_integration_ref_live_state",
+            return_value={
+                "source": "project_item",
+                "status": "in_progress",
+                "dependency_order": "parallel",
+                "joint_acceptance": "ready",
+                "blocked": False,
+                "error": "",
+            },
+        )
+        self.integration_live_state_mock = self._integration_live_state_patcher.start()
+
+    def tearDown(self) -> None:
+        self._integration_live_state_patcher.stop()
+        super().tearDown()
+
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.find_latest_guardian_result")
     @patch("scripts.pr_guardian.pr_meta")
@@ -3095,6 +3279,116 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("integration merge gate 未满足", str(ctx.exception))
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.fetch_integration_ref_live_state")
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_blocks_when_live_integration_ref_joint_acceptance_not_ready(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+        fetch_live_mock,
+    ) -> None:
+        pr_meta_mock.return_value = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-live-not-ready",
+            "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        }
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-live-not-ready",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        fetch_live_mock.return_value = {
+            "source": "project_item",
+            "status": "in_progress",
+            "dependency_order": "parallel",
+            "joint_acceptance": "pending",
+            "blocked": False,
+            "error": "",
+        }
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("联合验收状态未就绪", str(ctx.exception))
+        run_mock.assert_not_called()
+        review_once_mock.assert_not_called()
+        fetch_live_mock.assert_called_once()
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+
+    @patch("scripts.pr_guardian.fetch_integration_ref_live_state")
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_blocks_when_live_integration_ref_cannot_be_read(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+        fetch_live_mock,
+    ) -> None:
+        pr_meta_mock.return_value = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-live-unreadable",
+            "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        }
+        find_result_mock.return_value = {
+            "schema_version": 1,
+            "pr_number": 1,
+            "head_sha": "sha-live-unreadable",
+            "verdict": "APPROVE",
+            "safe_to_merge": True,
+            "summary": "cached",
+            "reviewed_at": "2026-03-28T10:00:00Z",
+        }
+        fetch_live_mock.return_value = {
+            "source": "project_item",
+            "error": "无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。",
+        }
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("无法读取 `integration_ref` 指向的 project item", str(ctx.exception))
+        run_mock.assert_not_called()
+        review_once_mock.assert_not_called()
+        fetch_live_mock.assert_called_once()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 

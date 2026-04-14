@@ -22,6 +22,7 @@ from scripts.common import (
     CommandError,
     REPO_ROOT,
     bool_text,
+    default_github_repo,
     dump_json,
     ensure_parent,
     format_changed_files,
@@ -34,11 +35,13 @@ from scripts.integration_contract import (
     PR_SCOPE_FIELDS,
     build_review_packet,
     extract_issue_canonical_integration_fields,
+    fetch_integration_ref_live_state,
     field_choices,
     merge_gate_requires_integration_recheck as merge_gate_requires_integration_recheck_payload,
     parse_integration_check_payload,
     parse_pr_integration_check,
     render_review_packet_lines,
+    validate_integration_ref_live_state,
     validate_issue_fetch,
     validate_pr_integration_contract,
 )
@@ -317,19 +320,31 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
     return payload
 
 
-def integration_merge_gate_errors(meta: dict) -> list[str]:
+def integration_merge_gate_errors(meta: dict, *, require_live_state: bool = False) -> list[str]:
     body = str(meta.get("body") or "")
     issue_number, issue_canonical_integration = resolve_issue_canonical_integration(meta)
     issue_canonical_error = str(meta.get("_issue_canonical_integration_error") or "").strip()
     integration_payload = parse_pr_integration_check(body)
     if issue_canonical_error:
         return [issue_canonical_error]
-    return validate_pr_integration_contract(
+    errors = validate_pr_integration_contract(
         integration_payload,
         issue_number=issue_number,
         issue_canonical=issue_canonical_integration,
         issue_error=issue_canonical_error,
         require_merge_time_recheck=True,
+    )
+    if errors:
+        return errors
+    if not require_live_state or not merge_gate_requires_integration_recheck_payload(integration_payload):
+        return []
+    integration_ref = str(integration_payload.get("integration_ref") or "").strip()
+    live_state = fetch_integration_ref_live_state(integration_ref)
+    meta["_integration_ref_live_state"] = live_state
+    return validate_integration_ref_live_state(
+        integration_payload,
+        live_state,
+        current_repo_slug=default_github_repo(),
     )
 
 
@@ -674,6 +689,8 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     item_context, context_notes, related_paths = build_item_context_summary(meta, worktree_dir)
     issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
     issue_error = str(meta.get("_issue_canonical_integration_error") or "")
+    integration_payload = parse_pr_integration_check(body)
+    integration_ref_live = fetch_integration_ref_live_state(str(integration_payload.get("integration_ref") or "").strip()) if integration_payload else {}
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
@@ -697,6 +714,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
             issue_number=issue_number,
             issue_canonical=issue_canonical,
             issue_error=issue_error,
+            integration_ref_live=integration_ref_live,
         ),
         "changed_files": changed_files,
         "diff_stat": diff_stat,
@@ -1047,7 +1065,7 @@ def merge_if_safe(
             )
         preview_current = dict(current)
         preview_current["body"] = set_integration_status_checked_before_merge(str(current.get("body") or ""), "yes")
-        preview_errors = integration_merge_gate_errors(preview_current)
+        preview_errors = integration_merge_gate_errors(preview_current, require_live_state=True)
         if preview_errors:
             detail = "\n".join(f"- {item}" for item in preview_errors)
             raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
@@ -1100,7 +1118,7 @@ def merge_if_safe(
                 failure_context="merge 前重跑 guardian 后 PR 描述已变化",
             )
             raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
-    integration_errors = integration_merge_gate_errors(current)
+    integration_errors = integration_merge_gate_errors(current, require_live_state=True)
     if integration_errors:
         if merge_time_integration_recheck_recorded:
             restore_merge_time_integration_recheck_or_die(

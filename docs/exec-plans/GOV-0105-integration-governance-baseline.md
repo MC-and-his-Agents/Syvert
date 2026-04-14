@@ -68,4 +68,4 @@
 
 - 当前受审 head：以 PR `#107` 的 latest head 为准。
 - 当前 checkpoint 只记录 repo 内 contract 收口停点；guardian verdict 与最终 merge gate 继续绑定 latest head，而不在 exec-plan 中手写逐轮审查日志。
-- 最近一次完成的 repo 内 checkpoint：`e057102a03bdd1f43f3db916ce43b19af1e2045f`
+- 最近一次完成的 repo 内 checkpoint：`9c0fd9a7d76d79f45bd9eb9594f09e214a04650c`

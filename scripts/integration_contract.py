@@ -5,8 +5,16 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
+from urllib.parse import parse_qs, urlparse
 
-from scripts.common import REPO_ROOT, integration_ref_is_checkable, load_json, normalize_integration_ref_for_comparison, run
+from scripts.common import (
+    REPO_ROOT,
+    default_github_repo,
+    integration_ref_is_checkable,
+    load_json,
+    normalize_integration_ref_for_comparison,
+    run,
+)
 
 
 CONTRACT_PATH = REPO_ROOT / "scripts" / "policy" / "integration_contract.json"
@@ -36,6 +44,58 @@ FIELD_CHOICES = {
 REF_EXAMPLES = tuple(str(example) for example in FIELD_DEFINITIONS["integration_ref"].get("examples", []))
 CONTRACT_SOURCE_MACHINE_READABLE = str(RAW_CONTRACT["canonical_source"]["machine_readable"])
 CONTRACT_SOURCE_MODULE = str(RAW_CONTRACT["canonical_source"]["python_module"])
+INTEGRATION_PROJECT_ITEM_QUERY = """
+query($id: ID!) {
+  node(id: $id) {
+    __typename
+    ... on ProjectV2Item {
+      id
+      isArchived
+      fieldValues(first: 100) {
+        nodes {
+          __typename
+          ... on ProjectV2ItemFieldSingleSelectValue {
+            name
+            field { ... on ProjectV2FieldCommon { name } }
+          }
+          ... on ProjectV2ItemFieldTextValue {
+            text
+            field { ... on ProjectV2FieldCommon { name } }
+          }
+          ... on ProjectV2ItemFieldNumberValue {
+            number
+            field { ... on ProjectV2FieldCommon { name } }
+          }
+          ... on ProjectV2ItemFieldDateValue {
+            date
+            field { ... on ProjectV2FieldCommon { name } }
+          }
+        }
+      }
+      project {
+        url
+        number
+        title
+        owner {
+          __typename
+          ... on Organization { login }
+          ... on User { login }
+        }
+      }
+      content {
+        __typename
+        ... on Issue {
+          number
+          state
+          title
+          url
+          repository { nameWithOwner }
+        }
+      }
+    }
+  }
+}
+""".strip()
 
 
 def field_names(scope: str) -> tuple[str, ...]:
@@ -377,6 +437,279 @@ def merge_gate_requires_integration_recheck(payload: Mapping[str, str]) -> bool:
     return str(payload.get("merge_gate") or "").strip().lower() == "integration_check_required"
 
 
+def parse_issue_ref(integration_ref: str) -> tuple[str, int] | None:
+    ref = integration_ref.strip()
+    local_match = re.match(r"^#(\d+)$", ref)
+    if local_match:
+        return default_github_repo(), int(local_match.group(1))
+
+    repo_match = re.match(r"^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+)$", ref)
+    if repo_match:
+        return repo_match.group(1), int(repo_match.group(2))
+
+    url_match = re.match(r"^https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/(\d+)$", ref)
+    if url_match:
+        return url_match.group(1), int(url_match.group(2))
+    return None
+
+
+def parse_project_item_ref(integration_ref: str) -> tuple[str, str, str] | None:
+    parsed = urlparse(integration_ref.strip())
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
+        return None
+    if len(path_parts) < 4 or path_parts[0] != "orgs" or path_parts[2] != "projects":
+        return None
+    item_ids = parse_qs(parsed.query).get("itemId", [])
+    if not item_ids:
+        return None
+    return path_parts[1], path_parts[3], item_ids[0]
+
+
+def value_from_project_item_node(node: Mapping[str, object]) -> str:
+    typename = str(node.get("__typename") or "")
+    if typename == "ProjectV2ItemFieldSingleSelectValue":
+        return str(node.get("name") or "").strip()
+    if typename == "ProjectV2ItemFieldTextValue":
+        return str(node.get("text") or "").strip()
+    if typename == "ProjectV2ItemFieldNumberValue":
+        number = node.get("number")
+        return "" if number is None else str(number).strip()
+    if typename == "ProjectV2ItemFieldDateValue":
+        return str(node.get("date") or "").strip()
+    return ""
+
+
+def normalize_label_value(value: str) -> str:
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def extract_label_value(labels: Iterable[str], prefixes: tuple[str, ...]) -> str:
+    for label in labels:
+        candidate = label.strip().lower()
+        for prefix in prefixes:
+            if candidate.startswith(prefix):
+                return normalize_label_value(candidate[len(prefix) :])
+    return ""
+
+
+def repo_name_from_slug(slug: str) -> str:
+    if "/" not in slug:
+        return slug.strip().lower()
+    return slug.split("/", 1)[1].strip().lower()
+
+
+def fetch_issue_integration_ref_live_state(integration_ref: str, repo_slug: str, issue_number: int) -> dict[str, object]:
+    completed = run(
+        [
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            repo_slug,
+            "--json",
+            "number,title,state,url,labels",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "issue",
+            "error": f"无法读取 `integration_ref` 指向的 issue `{repo_slug}#{issue_number}`，拒绝继续。",
+        }
+
+    payload = json.loads(completed.stdout or "{}")
+    labels_payload = payload.get("labels") or []
+    labels: list[str] = []
+    if isinstance(labels_payload, list):
+        for item in labels_payload:
+            if isinstance(item, dict):
+                name = str(item.get("name") or "").strip()
+                if name:
+                    labels.append(name)
+            elif isinstance(item, str):
+                name = item.strip()
+                if name:
+                    labels.append(name)
+
+    status_label = extract_label_value(labels, ("status:", "integration_status:", "integration-status:"))
+    dependency_order = extract_label_value(labels, ("dependency_order:", "dependency-order:", "dependency:"))
+    joint_acceptance = extract_label_value(labels, ("joint_acceptance:", "joint-acceptance:"))
+    contract_status = extract_label_value(labels, ("contract_status:", "contract-status:"))
+    owner_repo = extract_label_value(labels, ("owner_repo:", "owner-repo:"))
+
+    blocked = any(label.strip().lower() in {"blocked", "status:blocked", "integration:blocked"} for label in labels)
+    status = status_label or str(payload.get("state") or "").strip().lower()
+    if status in {"open", "closed"}:
+        status = "done" if status == "closed" else "in_progress"
+
+    return {
+        "integration_ref": integration_ref,
+        "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+        "source": "issue",
+        "url": str(payload.get("url") or "").strip(),
+        "title": str(payload.get("title") or "").strip(),
+        "status": status,
+        "dependency_order": dependency_order,
+        "joint_acceptance": joint_acceptance,
+        "contract_status": contract_status,
+        "owner_repo": owner_repo,
+        "blocked": blocked,
+        "error": "",
+    }
+
+
+def fetch_project_item_integration_ref_live_state(
+    integration_ref: str,
+    organization: str,
+    project_number: str,
+    item_id: str,
+) -> dict[str, object]:
+    completed = run(
+        [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={INTEGRATION_PROJECT_ITEM_QUERY}",
+            "-F",
+            f"id={item_id}",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "project_item",
+            "error": f"无法读取 `integration_ref` 指向的 project item `{item_id}`，拒绝继续。",
+        }
+
+    payload = json.loads(completed.stdout or "{}")
+    node = ((payload.get("data") or {}).get("node") or {}) if isinstance(payload, dict) else {}
+    if str(node.get("__typename") or "") != "ProjectV2Item":
+        return {
+            "integration_ref": integration_ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+            "source": "project_item",
+            "error": f"`integration_ref` 指向对象不是可读的 ProjectV2Item（itemId={item_id}），拒绝继续。",
+        }
+
+    field_nodes = ((node.get("fieldValues") or {}).get("nodes") or []) if isinstance(node, dict) else []
+    fields: dict[str, str] = {}
+    if isinstance(field_nodes, list):
+        for raw_node in field_nodes:
+            if not isinstance(raw_node, dict):
+                continue
+            field_name = str(((raw_node.get("field") or {}).get("name") or "")).strip()
+            if not field_name:
+                continue
+            fields[field_name.lower()] = value_from_project_item_node(raw_node)
+
+    project = node.get("project") or {}
+    project_url = str((project or {}).get("url") or "").strip()
+    status = normalize_label_value(fields.get("status", ""))
+    dependency_order = normalize_label_value(fields.get("dependency order", ""))
+    joint_acceptance = normalize_label_value(fields.get("joint acceptance", ""))
+    contract_status = normalize_label_value(fields.get("contract status", ""))
+    owner_repo = normalize_label_value(fields.get("owner repo", ""))
+    blocked = status == "blocked"
+
+    return {
+        "integration_ref": integration_ref,
+        "normalized_ref": normalize_integration_ref_for_comparison(integration_ref),
+        "source": "project_item",
+        "url": integration_ref,
+        "project_url": project_url,
+        "project_title": str((project or {}).get("title") or "").strip(),
+        "project_number": str((project or {}).get("number") or project_number).strip(),
+        "organization": organization.lower(),
+        "item_id": item_id,
+        "status": status,
+        "dependency_order": dependency_order,
+        "joint_acceptance": joint_acceptance,
+        "contract_status": contract_status,
+        "owner_repo": owner_repo,
+        "blocked": blocked,
+        "error": "",
+    }
+
+
+def fetch_integration_ref_live_state(integration_ref: str) -> dict[str, object]:
+    ref = integration_ref.strip()
+    if not ref:
+        return {}
+    if not integration_ref_is_checkable(ref):
+        return {
+            "integration_ref": ref,
+            "normalized_ref": normalize_integration_ref_for_comparison(ref),
+            "source": "unknown",
+            "error": "`integration_ref` 不是可核查的 issue / project item 引用，拒绝继续。",
+        }
+
+    issue_ref = parse_issue_ref(ref)
+    if issue_ref:
+        repo_slug, issue_number = issue_ref
+        return fetch_issue_integration_ref_live_state(ref, repo_slug, issue_number)
+
+    project_item_ref = parse_project_item_ref(ref)
+    if project_item_ref:
+        organization, project_number, item_id = project_item_ref
+        return fetch_project_item_integration_ref_live_state(ref, organization, project_number, item_id)
+
+    return {
+        "integration_ref": ref,
+        "normalized_ref": normalize_integration_ref_for_comparison(ref),
+        "source": "unknown",
+        "error": "`integration_ref` 格式无法解析为 issue / project item，拒绝继续。",
+    }
+
+
+def validate_integration_ref_live_state(
+    payload: Mapping[str, str],
+    live_state: Mapping[str, object],
+    *,
+    current_repo_slug: str | None = None,
+) -> list[str]:
+    if not merge_gate_requires_integration_recheck(payload):
+        return []
+    integration_ref = str(payload.get("integration_ref") or "").strip()
+    if not integration_ref or not integration_ref_is_checkable(integration_ref):
+        return []
+    if not live_state:
+        return ["无法读取 `integration_ref` 当前状态，拒绝继续。"]
+
+    errors: list[str] = []
+    error_text = str(live_state.get("error") or "").strip()
+    if error_text:
+        return [error_text]
+
+    if bool(live_state.get("blocked")):
+        errors.append("`integration_ref` 当前状态为 `blocked`，拒绝继续。")
+
+    dependency_order = normalize_label_value(str(live_state.get("dependency_order") or ""))
+    repo_name = repo_name_from_slug(current_repo_slug or default_github_repo())
+    if dependency_order == "webenvoy_first" and repo_name == "syvert":
+        errors.append("`integration_ref` 的依赖顺序要求 `webenvoy_first`，当前仓库不得先合并。")
+    if dependency_order == "syvert_first" and repo_name == "webenvoy":
+        errors.append("`integration_ref` 的依赖顺序要求 `syvert_first`，当前仓库不得先合并。")
+
+    if str(payload.get("joint_acceptance_needed") or "").strip().lower() == "yes":
+        joint_acceptance = normalize_label_value(str(live_state.get("joint_acceptance") or ""))
+        if not joint_acceptance:
+            errors.append("`joint_acceptance_needed=yes`，但无法从 `integration_ref` 读取联合验收状态，拒绝继续。")
+        elif joint_acceptance == "failed":
+            errors.append("`integration_ref` 联合验收状态为 `failed`，拒绝继续。")
+        elif joint_acceptance not in {"ready", "passed"}:
+            errors.append(f"`integration_ref` 联合验收状态未就绪（当前 `{joint_acceptance}`），拒绝继续。")
+    return errors
+
+
 def validate_issue_canonical_payload(payload: Mapping[str, str]) -> list[str]:
     errors: list[str] = []
     merge_gate = str(payload.get("merge_gate") or "").strip().lower()
@@ -471,6 +804,7 @@ def build_review_packet(
     issue_number: int | None,
     issue_canonical: Mapping[str, str],
     issue_error: str | None,
+    integration_ref_live: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     pr_payload = parse_pr_integration_check(body)
     issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
@@ -501,6 +835,18 @@ def build_review_packet(
         issue_error=packet_issue_error,
         require_merge_time_recheck=False,
     )
+    packet_integration_ref_live = dict(integration_ref_live or {})
+    integration_ref_live_errors = (
+        validate_integration_ref_live_state(
+            pr_payload,
+            packet_integration_ref_live,
+            current_repo_slug=default_github_repo(),
+        )
+        if integration_ref_live is not None
+        else []
+    )
+    if integration_ref_live_errors:
+        merge_validation_errors = [*merge_validation_errors, *[item for item in integration_ref_live_errors if item not in merge_validation_errors]]
     return {
         "contract_sources": [
             CONTRACT_SOURCE_MACHINE_READABLE,
@@ -515,6 +861,8 @@ def build_review_packet(
         "comparison_errors": comparison_errors,
         "merge_gate": str(pr_payload.get("merge_gate") or "").strip().lower() if pr_payload else "",
         "merge_gate_requires_recheck": merge_gate_requires_integration_recheck(pr_payload) if pr_payload else False,
+        "integration_ref_live": packet_integration_ref_live,
+        "integration_ref_live_errors": integration_ref_live_errors,
         "merge_validation_errors": merge_validation_errors,
     }
 
@@ -552,6 +900,29 @@ def render_review_packet_lines(packet: Mapping[str, object]) -> list[str]:
         lines.extend([f"  - {item}" for item in comparison_errors])
     else:
         lines.append("- canonical_mismatches: none")
+    integration_ref_live = packet.get("integration_ref_live") or {}
+    if integration_ref_live:
+        lines.append("- integration_ref_live:")
+        for key in (
+            "source",
+            "status",
+            "dependency_order",
+            "joint_acceptance",
+            "contract_status",
+            "owner_repo",
+            "url",
+            "project_url",
+            "error",
+        ):
+            value = str(integration_ref_live.get(key) or "").strip()
+            if value:
+                lines.append(f"  - {key}: {value}")
+    else:
+        lines.append("- integration_ref_live: none")
+    integration_ref_live_errors = packet.get("integration_ref_live_errors") or []
+    if integration_ref_live_errors:
+        lines.append("- integration_ref_live_validation:")
+        lines.extend([f"  - {item}" for item in integration_ref_live_errors])
     merge_validation_errors = packet.get("merge_validation_errors") or []
     if merge_validation_errors:
         lines.append("- merge_gate_validation:")

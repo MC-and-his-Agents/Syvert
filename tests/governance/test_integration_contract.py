@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.common import REPO_ROOT, normalize_integration_ref_for_comparison
 from scripts.integration_contract import (
@@ -12,6 +13,7 @@ from scripts.integration_contract import (
     ISSUE_SCOPE_FIELDS,
     PR_SCOPE_FIELDS,
     build_review_packet,
+    fetch_integration_ref_live_state,
     extract_issue_canonical_integration_fields,
     field_choices,
     markdown_section_label,
@@ -20,6 +22,7 @@ from scripts.integration_contract import (
     render_issue_form_guidance_lines,
     render_pr_template_guidance_lines,
     render_review_packet_lines,
+    validate_integration_ref_live_state,
     validate_issue_canonical_payload,
     validate_pr_merge_gate_payload,
 )
@@ -247,6 +250,108 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn(expected_error, rendered)
         self.assertNotIn("canonical_mismatches: none", rendered)
         self.assertNotIn("merge_gate_validation: ok", rendered)
+
+    def test_build_review_packet_includes_integration_ref_live_snapshot_when_provided(self) -> None:
+        packet = build_review_packet(
+            "\n".join(
+                [
+                    "## integration_check",
+                    "",
+                    "- integration_touchpoint: active",
+                    "- shared_contract_changed: no",
+                    "- integration_ref: https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                    "- external_dependency: both",
+                    "- merge_gate: integration_check_required",
+                    "- contract_surface: runtime_modes",
+                    "- joint_acceptance_needed: yes",
+                    "- integration_status_checked_before_pr: yes",
+                    "- integration_status_checked_before_merge: no",
+                ]
+            ),
+            issue_number=105,
+            issue_canonical={},
+            issue_error="",
+            integration_ref_live={
+                "source": "project_item",
+                "status": "in_progress",
+                "dependency_order": "parallel",
+                "joint_acceptance": "ready",
+                "contract_status": "reviewing",
+                "url": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+                "error": "",
+            },
+        )
+
+        rendered = "\n".join(render_review_packet_lines(packet))
+        self.assertEqual(packet["integration_ref_live"]["source"], "project_item")
+        self.assertEqual(packet["integration_ref_live_errors"], [])
+        self.assertIn("integration_ref_live:", rendered)
+        self.assertIn("joint_acceptance: ready", rendered)
+
+    def test_validate_integration_ref_live_state_blocks_blocked_status(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "blocked",
+                "dependency_order": "parallel",
+                "joint_acceptance": "ready",
+                "blocked": True,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("blocked" in item for item in errors))
+
+    def test_validate_integration_ref_live_state_blocks_unready_joint_acceptance(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "in_progress",
+                "dependency_order": "parallel",
+                "joint_acceptance": "pending",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("联合验收状态未就绪" in item for item in errors))
+
+    def test_fetch_integration_ref_live_state_returns_error_for_unreadable_issue(self) -> None:
+        with patch("scripts.integration_contract.run") as run_mock:
+            run_mock.return_value.returncode = 1
+            run_mock.return_value.stdout = ""
+            run_mock.return_value.stderr = "not found"
+
+            payload = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(payload["source"], "issue")
+        self.assertIn("无法读取", payload["error"])
 
     def test_validate_pr_merge_gate_payload_keeps_legacy_compatibility_decision_outside_payload_validation(self) -> None:
         payload = {
