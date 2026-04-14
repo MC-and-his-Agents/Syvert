@@ -744,7 +744,7 @@ class OpenPrPreflightTests(unittest.TestCase):
             stderr="",
         ),
     )
-    def test_validate_integration_args_rejects_cross_form_issue_and_project_item_refs(self, run_mock, fetch_live_mock) -> None:
+    def test_validate_integration_args_accepts_equivalent_issue_and_project_item_refs(self, run_mock, fetch_live_mock) -> None:
         args = parse_args(
             [
                 "--class",
@@ -772,12 +772,9 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         errors = validate_integration_args(args)
 
-        self.assertEqual(
-            errors,
-            ["`--integration-ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
-        )
+        self.assertEqual(errors, [])
         self.assertGreaterEqual(run_mock.call_count, 1)
-        fetch_live_mock.assert_not_called()
+        self.assertGreaterEqual(fetch_live_mock.call_count, 2)
 
     def test_build_issue_summary_extracts_minimal_high_value_issue_context(self) -> None:
         payload = {

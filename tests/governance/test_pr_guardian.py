@@ -865,7 +865,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             },
         ),
     )
-    def test_integration_merge_gate_errors_rejects_cross_form_issue_and_project_item_refs(
+    def test_integration_merge_gate_errors_accepts_equivalent_issue_and_project_item_refs(
         self,
         resolve_issue_mock,
         fetch_live_mock,
@@ -890,12 +890,9 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         errors = integration_merge_gate_errors(meta)
 
-        self.assertEqual(
-            errors,
-            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
-        )
+        self.assertEqual(errors, [])
         resolve_issue_mock.assert_called_once_with(meta)
-        fetch_live_mock.assert_not_called()
+        self.assertEqual(fetch_live_mock.call_count, 2)
 
     def test_integration_merge_gate_errors_rejects_local_only_external_integration_ref(self) -> None:
         meta = {

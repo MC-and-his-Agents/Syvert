@@ -396,6 +396,7 @@ def compare_issue_and_pr_canonical(
     *,
     issue_label: str,
     field_prefix: str = "integration_check",
+    allow_live_resolution: bool = True,
 ) -> list[str]:
     errors: list[str] = []
     for field in ISSUE_SCOPE_FIELDS:
@@ -403,6 +404,26 @@ def compare_issue_and_pr_canonical(
             expected_normalized = normalize_integration_value(field, issue_canonical.get(field, ""))
             actual_normalized = normalize_integration_value(field, pr_payload.get(field, ""))
             if expected_normalized == actual_normalized:
+                continue
+            cross_form_pair = {
+                expected_normalized.split(":", 1)[0],
+                actual_normalized.split(":", 1)[0],
+            } == {"issue", "project-item"}
+            if not allow_live_resolution:
+                if cross_form_pair:
+                    continue
+                errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
+                continue
+            expected, expected_resolved, expected_static = semantic_integration_ref_identity(str(issue_canonical.get(field, "") or ""))
+            actual, actual_resolved, actual_static = semantic_integration_ref_identity(str(pr_payload.get(field, "") or ""))
+            if expected == actual:
+                continue
+            cross_form_pair = {
+                expected_static.split(":", 1)[0],
+                actual_static.split(":", 1)[0],
+            } == {"issue", "project-item"}
+            if cross_form_pair and (not expected_resolved or not actual_resolved):
+                errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
                 continue
             errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
             continue
@@ -483,6 +504,7 @@ def validate_pr_merge_gate_payload(
     issue_number: int | None,
     issue_canonical: Mapping[str, str],
     require_merge_time_recheck: bool,
+    allow_live_resolution: bool = True,
 ) -> list[str]:
     errors: list[str] = []
     merge_gate = str(payload.get("merge_gate") or "").strip().lower()
@@ -498,7 +520,14 @@ def validate_pr_merge_gate_payload(
     errors.extend(validate_enum_values(payload, "pr", prefix="integration_check"))
     if issue_canonical:
         issue_label = f"Issue #{issue_number}" if issue_number else "对应 Issue"
-        errors.extend(compare_issue_and_pr_canonical(issue_canonical, payload, issue_label=issue_label))
+        errors.extend(
+            compare_issue_and_pr_canonical(
+                issue_canonical,
+                payload,
+                issue_label=issue_label,
+                allow_live_resolution=allow_live_resolution,
+            )
+        )
 
     integration_touchpoint = str(payload.get("integration_touchpoint") or "").strip().lower()
     integration_ref = str(payload.get("integration_ref") or "").strip()
@@ -553,6 +582,7 @@ def validate_pr_integration_contract(
     issue_canonical: Mapping[str, str],
     issue_error: str | None = None,
     require_merge_time_recheck: bool,
+    allow_live_resolution: bool = True,
 ) -> list[str]:
     if issue_error:
         return [issue_error]
@@ -563,6 +593,7 @@ def validate_pr_integration_contract(
         issue_number=issue_number,
         issue_canonical=issue_canonical,
         require_merge_time_recheck=require_merge_time_recheck,
+        allow_live_resolution=allow_live_resolution,
     )
 
 
@@ -1148,7 +1179,12 @@ def build_review_packet(
     elif missing_pr_error:
         comparison_errors = [missing_pr_error]
     elif issue_canonical and pr_payload:
-        comparison_errors = compare_issue_and_pr_canonical(issue_canonical, pr_payload, issue_label=issue_label)
+        comparison_errors = compare_issue_and_pr_canonical(
+            issue_canonical,
+            pr_payload,
+            issue_label=issue_label,
+            allow_live_resolution=False,
+        )
     else:
         comparison_errors = []
     normalized_issue = {
@@ -1167,6 +1203,7 @@ def build_review_packet(
         issue_canonical=issue_canonical,
         issue_error=packet_issue_error,
         require_merge_time_recheck=False,
+        allow_live_resolution=False,
     )
     packet_integration_ref_live = dict(integration_ref_live or {})
     return {
