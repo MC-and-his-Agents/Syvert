@@ -201,6 +201,11 @@ def default_github_repo() -> str:
     configured = os.environ.get("SYVERT_GITHUB_REPO", "").strip()
     if configured and re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", configured):
         return configured
+    completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
+    if completed.returncode == 0:
+        parsed = parse_github_repo_from_remote_url(completed.stdout.strip())
+        if parsed:
+            return parsed
     return CANONICAL_GITHUB_REPO
 
 

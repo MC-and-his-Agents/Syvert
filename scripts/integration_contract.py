@@ -294,24 +294,13 @@ def normalize_integration_value(field: str, value: str) -> str:
 
 
 def semantic_integration_ref_key(value: str) -> str:
-    normalized = normalize_integration_ref_for_comparison(value)
-    if normalized in {"", "none"}:
-        return normalized
-    live_state = fetch_integration_ref_live_state(value)
-    if str(live_state.get("error") or "").strip():
-        return normalized
-    item_id = str(live_state.get("item_id") or "").strip()
-    organization = str(live_state.get("organization") or "").strip().lower()
-    project_number = str(live_state.get("project_number") or "").strip()
-    if item_id and organization and project_number:
-        return f"project-item:{organization}/{project_number}#{item_id}"
-    return normalized
+    return normalize_integration_ref_for_comparison(value)
 
 
 def normalize_integration_value_for_packet(field: str, value: str) -> str:
     raw = str(value or "").strip()
     if field == "integration_ref":
-        return semantic_integration_ref_key(raw)
+        return normalize_integration_value(field, raw)
     return normalize_integration_value(field, raw)
 
 
@@ -365,12 +354,8 @@ def compare_issue_and_pr_canonical(
 ) -> list[str]:
     errors: list[str] = []
     for field in ISSUE_SCOPE_FIELDS:
-        if field == "integration_ref":
-            expected = semantic_integration_ref_key(str(issue_canonical.get(field, "") or ""))
-            actual = semantic_integration_ref_key(str(pr_payload.get(field, "") or ""))
-        else:
-            expected = normalize_integration_value(field, issue_canonical.get(field, ""))
-            actual = normalize_integration_value(field, pr_payload.get(field, ""))
+        expected = normalize_integration_value(field, issue_canonical.get(field, ""))
+        actual = normalize_integration_value(field, pr_payload.get(field, ""))
         if expected != actual:
             errors.append(f"`{field_prefix}.{field}` 与 {issue_label} 中的 canonical integration 元数据不一致。")
     return errors

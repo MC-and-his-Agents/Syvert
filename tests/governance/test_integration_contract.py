@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.common import REPO_ROOT, normalize_integration_ref_for_comparison
+from scripts.common import REPO_ROOT, default_github_repo, normalize_integration_ref_for_comparison
 from scripts.integration_contract import (
     CONTRACT_SOURCE_MACHINE_READABLE,
     CONTRACT_SOURCE_MODULE,
@@ -180,11 +180,8 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertEqual(packet["merge_validation_errors"], [])
         self.assertTrue(packet["merge_gate_requires_recheck"])
 
-    @patch(
-        "scripts.integration_contract.fetch_integration_ref_live_state",
-        return_value={"item_id": "PVTI_same", "organization": "mc-and-his-agents", "project_number": "3", "error": ""},
-    )
-    def test_build_review_packet_collapses_equivalent_issue_and_project_item_refs(self, fetch_live_mock) -> None:
+    @patch("scripts.integration_contract.fetch_integration_ref_live_state")
+    def test_build_review_packet_treats_issue_and_project_item_refs_as_distinct_canonical_forms(self, fetch_live_mock) -> None:
         packet = build_review_packet(
             "\n".join(
                 [
@@ -214,10 +211,27 @@ class IntegrationContractTests(unittest.TestCase):
             issue_error="",
         )
 
-        self.assertEqual(packet["comparison_errors"], [])
-        self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
+        self.assertEqual(
+            packet["comparison_errors"],
+            ["`integration_check.integration_ref` 与 Issue #105 中的 canonical integration 元数据不一致。"],
+        )
+        self.assertEqual(packet["normalized_issue_canonical"]["integration_ref"], "issue:mc-and-his-agents/syvert#12")
         self.assertEqual(packet["normalized_pr_canonical"]["integration_ref"], "project-item:mc-and-his-agents/3#PVTI_same")
-        self.assertGreaterEqual(fetch_live_mock.call_count, 2)
+        fetch_live_mock.assert_not_called()
+
+    def test_default_github_repo_uses_origin_remote_when_env_missing(self) -> None:
+        default_github_repo.cache_clear()
+        with patch.dict("os.environ", {}, clear=True), patch("scripts.common.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=["git"],
+                returncode=0,
+                stdout="git@github.com:MC-and-his-Agents/WebEnvoy.git\n",
+                stderr="",
+            )
+
+            self.assertEqual(default_github_repo(), "MC-and-his-Agents/WebEnvoy")
+
+        default_github_repo.cache_clear()
 
     def test_build_review_packet_rejects_missing_pr_canonical_when_issue_declares_contract(self) -> None:
         packet = build_review_packet(
@@ -440,6 +454,64 @@ class IntegrationContractTests(unittest.TestCase):
         )
 
         self.assertTrue(any("dependency_order" in item for item in errors))
+
+    def test_validate_integration_ref_live_state_blocks_webenvoy_first_for_syvert(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "review",
+                "dependency_order": "webenvoy_first",
+                "joint_acceptance": "ready",
+                "owner_repo": "joint",
+                "contract_status": "reviewing",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/Syvert",
+        )
+
+        self.assertTrue(any("webenvoy_first" in item for item in errors))
+
+    def test_validate_integration_ref_live_state_blocks_syvert_first_for_webenvoy(self) -> None:
+        payload = {
+            "integration_touchpoint": "active",
+            "shared_contract_changed": "no",
+            "integration_ref": "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_test",
+            "external_dependency": "both",
+            "merge_gate": "integration_check_required",
+            "contract_surface": "runtime_modes",
+            "joint_acceptance_needed": "yes",
+            "integration_status_checked_before_pr": "yes",
+            "integration_status_checked_before_merge": "yes",
+        }
+        errors = validate_integration_ref_live_state(
+            payload,
+            {
+                "source": "project_item",
+                "status": "review",
+                "dependency_order": "syvert_first",
+                "joint_acceptance": "ready",
+                "owner_repo": "joint",
+                "contract_status": "reviewing",
+                "blocked": False,
+                "error": "",
+            },
+            current_repo_slug="MC-and-his-Agents/WebEnvoy",
+        )
+
+        self.assertTrue(any("syvert_first" in item for item in errors))
 
     def test_fetch_integration_ref_live_state_returns_error_for_unreadable_issue(self) -> None:
         with patch("scripts.integration_contract.run") as run_mock:
@@ -707,6 +779,7 @@ class IntegrationContractTests(unittest.TestCase):
             "data": {
                 "node": {
                     "__typename": "ProjectV2Item",
+                    "isArchived": False,
                     "fieldValues": {
                         "nodes": [
                             {
@@ -724,12 +797,22 @@ class IntegrationContractTests(unittest.TestCase):
                                 "name": "ready",
                                 "field": {"name": "Joint Acceptance"},
                             },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "reviewing",
+                                "field": {"name": "Contract Status"},
+                            },
+                            {
+                                "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                "name": "joint",
+                                "field": {"name": "Owner Repo"},
+                            },
                         ]
                     },
                     "project": {
                         "url": "https://github.com/orgs/another-owner/projects/3",
                         "number": 3,
-                        "title": "Integration",
+                        "title": "Syvert × WebEnvoy Integration",
                         "owner": {"login": "another-owner"},
                     },
                 }
