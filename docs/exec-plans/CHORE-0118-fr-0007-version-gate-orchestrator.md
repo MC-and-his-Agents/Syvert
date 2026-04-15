@@ -43,6 +43,10 @@
 - GitHub 侧当前已对齐：
   - `#118` 正文已更新为 `进行中（PR #122）`
   - 父 FR `#67` 正文已补齐 `#118/#119/#120/#121` 四个子 Work Item
+- guardian 首轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项 contract 修复：
+  - `v0.2.0` reference pair 固定为 `xhs` / `douyin`
+  - orchestrator 对 source report 做 source-specific 复验，不再信任伪造 pass wrapper
+  - harness verdict 与 runtime 观测的一致性改为强校验
 
 ## 下一步动作
 
@@ -74,8 +78,16 @@
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 19 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：guardian 修复后复跑，`Ran 25 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：`Ran 66 tests`，`OK`
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 首轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 拒绝非 `xhs` / `douyin` 的完整 reference pair
+    - orchestrator 不再接受缺 source-specific 关键字段的伪造 pass report
+    - harness `pass` / `legal_failure` / `execution_precondition_not_met` 与 runtime 观测的一致性改为 fail-closed
 - `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
   - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`

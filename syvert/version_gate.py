@@ -15,9 +15,13 @@ FAIL_VERDICT = "fail"
 _HARNESS_ALLOWED_VERDICTS = frozenset(
     {"pass", "legal_failure", "contract_violation", "execution_precondition_not_met"}
 )
+_HARNESS_LEGAL_FAILURE_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "platform"})
 _OBSERVED_RUNTIME_STATUSES = frozenset({"success", "failed"})
 _REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})
 _REAL_REGRESSION_EXPECTED_OUTCOMES = frozenset({"success", "allowed_failure"})
+_FROZEN_REFERENCE_PAIR_BY_VERSION = {
+    "v0.2.0": ("xhs", "douyin"),
+}
 _REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
     {
         "core_runtime",
@@ -119,6 +123,7 @@ def validate_real_adapter_regression_source_report(
     source = SOURCE_REAL_ADAPTER_REGRESSION
     failures: list[dict[str, Any]] = []
     expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
+    _enforce_frozen_reference_pair(version, expected_reference_pair, source, failures)
     payload = _require_mapping(report, source, "invalid_real_adapter_regression_report", failures)
     evidence_refs = _normalize_evidence_refs(
         payload.get("evidence_refs"),
@@ -387,6 +392,7 @@ def orchestrate_version_gate(
         code="invalid_reference_pair",
         message="version gate requires a complete reference pair",
     )
+    _enforce_frozen_reference_pair(version, normalized_reference_pair, SOURCE_VERSION_GATE, failures)
     if not _is_non_empty_string(version):
         failures.append(
             _failure(
@@ -398,17 +404,22 @@ def orchestrate_version_gate(
 
     source_reports = {
         SOURCE_HARNESS: _normalize_existing_source_report(
-            harness_report, SOURCE_HARNESS, version=version
+            harness_report,
+            SOURCE_HARNESS,
+            version=version,
+            gate_reference_pair=normalized_reference_pair,
         ),
         SOURCE_REAL_ADAPTER_REGRESSION: _normalize_existing_source_report(
             real_adapter_regression_report,
             SOURCE_REAL_ADAPTER_REGRESSION,
             version=version,
+            gate_reference_pair=normalized_reference_pair,
         ),
         SOURCE_PLATFORM_LEAKAGE: _normalize_existing_source_report(
             platform_leakage_report,
             SOURCE_PLATFORM_LEAKAGE,
             version=version,
+            gate_reference_pair=normalized_reference_pair,
         ),
     }
 
@@ -449,126 +460,171 @@ def _normalize_existing_source_report(
     expected_source: str,
     *,
     version: str,
+    gate_reference_pair: Sequence[str] | None,
 ) -> dict[str, Any]:
     if not isinstance(report, Mapping):
-        synthetic = _failure(
-            expected_source,
-            "missing_source_report",
-            "version gate requires all mandatory source reports",
-        )
-        return _source_report(
+        return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
-            verdict=FAIL_VERDICT,
             summary=f"{expected_source} source report is missing",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
+            failure=_failure(
+                expected_source,
+                "missing_source_report",
+                "version gate requires all mandatory source reports",
+            ),
         )
 
     source = report.get("source")
     if source != expected_source:
-        synthetic = _failure(
-            expected_source,
-            "source_mismatch",
-            "source report name does not match expected source",
-            details={"actual_source": source},
-        )
-        return _source_report(
+        return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
-            verdict=FAIL_VERDICT,
             summary=f"{expected_source} source report is invalid",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
+            failure=_failure(
+                expected_source,
+                "source_mismatch",
+                "source report name does not match expected source",
+                details={"actual_source": source},
+            ),
         )
 
     report_version = report.get("version")
-    report_verdict = report.get("verdict")
-    if report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
-        synthetic = _failure(
-            expected_source,
-            "invalid_source_verdict",
-            "source report verdict must be `pass` or `fail`",
-            details={"actual_verdict": report_verdict},
-        )
-        return _source_report(
-            source=expected_source,
-            version=version,
-            verdict=FAIL_VERDICT,
-            summary=f"{expected_source} source report is invalid",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
-        )
-    evidence_refs = report.get("evidence_refs")
-    if not _is_string_sequence(evidence_refs) or not evidence_refs:
-        synthetic = _failure(
-            expected_source,
-            "missing_source_evidence_refs",
-            "source report must carry non-empty evidence refs",
-        )
-        return _source_report(
-            source=expected_source,
-            version=version,
-            verdict=FAIL_VERDICT,
-            summary=f"{expected_source} source report is missing evidence refs",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
-        )
-
-    details = report.get("details")
-    if not isinstance(details, Mapping):
-        synthetic = _failure(
-            expected_source,
-            "invalid_source_details",
-            "source report details must be a mapping",
-        )
-        return _source_report(
-            source=expected_source,
-            version=version,
-            verdict=FAIL_VERDICT,
-            summary=f"{expected_source} source report is invalid",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
-        )
-    report_failures = details.get("failures")
-    if not isinstance(report_failures, list):
-        synthetic = _failure(
-            expected_source,
-            "missing_source_failures",
-            "source report details must carry a failures list",
-        )
-        return _source_report(
-            source=expected_source,
-            version=version,
-            verdict=FAIL_VERDICT,
-            summary=f"{expected_source} source report is invalid",
-            evidence_refs=[],
-            details={"failures": [synthetic]},
-        )
-
-    normalized_details = dict(details)
-    normalized_failures = [
-        _normalize_failure_entry(entry, expected_source) for entry in report_failures
-    ]
     if report_version != version:
-        normalized_failures.append(
-            _failure(
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report version mismatch",
+            failure=_failure(
                 expected_source,
                 "source_report_version_mismatch",
                 "source report version does not match orchestrated version",
                 details={"expected_version": version, "actual_version": report_version},
-            )
+            ),
         )
-    normalized_details["failures"] = normalized_failures
-    return {
-        "source": expected_source,
-        "version": version,
-        "verdict": FAIL_VERDICT if normalized_failures else report_verdict,
-        "summary": str(report.get("summary") or "").strip()
-        or f"{expected_source} source report verdict: {report_verdict}",
-        "evidence_refs": list(evidence_refs),
-        "details": normalized_details,
-    }
+    report_verdict = report.get("verdict")
+    if report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report is invalid",
+            failure=_failure(
+                expected_source,
+                "invalid_source_verdict",
+                "source report verdict must be `pass` or `fail`",
+                details={"actual_verdict": report_verdict},
+            ),
+        )
+    evidence_refs = report.get("evidence_refs")
+    if not _is_string_sequence(evidence_refs) or not evidence_refs:
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report is missing evidence refs",
+            failure=_failure(
+                expected_source,
+                "missing_source_evidence_refs",
+                "source report must carry non-empty evidence refs",
+            ),
+        )
+
+    details = report.get("details")
+    if not isinstance(details, Mapping):
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report is invalid",
+            failure=_failure(
+                expected_source,
+                "invalid_source_details",
+                "source report details must be a mapping",
+            ),
+        )
+    report_failures = details.get("failures")
+    if not isinstance(report_failures, list):
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report is invalid",
+            failure=_failure(
+                expected_source,
+                "missing_source_failures",
+                "source report details must carry a failures list",
+            ),
+        )
+
+    if expected_source == SOURCE_HARNESS:
+        raw_required_sample_ids = details.get("required_sample_ids")
+        raw_validation_results = details.get("validation_results")
+        if raw_required_sample_ids is None or raw_validation_results is None:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                summary=f"{expected_source} source report is incomplete",
+                failure=_failure(
+                    expected_source,
+                    "missing_harness_details",
+                    "harness source report must carry required_sample_ids and validation_results",
+                ),
+            )
+        return build_harness_source_report(
+            raw_validation_results,
+            raw_required_sample_ids,
+            version=version,
+        )
+
+    if expected_source == SOURCE_REAL_ADAPTER_REGRESSION:
+        raw_reference_pair = details.get("reference_pair")
+        raw_operation = details.get("operation")
+        raw_adapter_results = details.get("adapter_results")
+        if raw_reference_pair is None or raw_operation is None or raw_adapter_results is None:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                summary=f"{expected_source} source report is incomplete",
+                failure=_failure(
+                    expected_source,
+                    "missing_real_regression_details",
+                    "real adapter regression source report must carry reference_pair, operation and adapter_results",
+                ),
+            )
+        return validate_real_adapter_regression_source_report(
+            {
+                "version": version,
+                "reference_pair": raw_reference_pair,
+                "operation": raw_operation,
+                "adapter_results": raw_adapter_results,
+                "evidence_refs": evidence_refs,
+            },
+            version=version,
+            reference_pair=gate_reference_pair or raw_reference_pair,
+            operation=str(raw_operation),
+        )
+
+    raw_boundary_scope = details.get("boundary_scope")
+    raw_report_verdict = details.get("report_verdict")
+    raw_findings = details.get("findings")
+    if raw_boundary_scope is None or raw_report_verdict is None or raw_findings is None:
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            summary=f"{expected_source} source report is incomplete",
+            failure=_failure(
+                expected_source,
+                "missing_platform_leakage_details",
+                "platform leakage source report must carry boundary_scope, report_verdict and findings",
+            ),
+        )
+    return validate_platform_leakage_source_report(
+        {
+            "version": version,
+            "boundary_scope": raw_boundary_scope,
+            "verdict": raw_report_verdict,
+            "summary": str(report.get("summary") or "").strip(),
+            "findings": raw_findings,
+            "evidence_refs": evidence_refs,
+        },
+        version=version,
+    )
 
 
 def _normalize_required_sample_ids(
@@ -700,6 +756,74 @@ def _normalize_harness_validation_results(
         )
         if observed_error is not None and normalized_observed_error is None:
             continue
+
+        if verdict == "pass":
+            if observed_status != "success" or normalized_observed_error is not None:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "inconsistent_pass_observation",
+                        "harness pass verdict must observe success without runtime error",
+                        details={"sample_id": sample_id},
+                    )
+                )
+                continue
+        elif verdict == "legal_failure":
+            if observed_status != "failed" or normalized_observed_error is None:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "inconsistent_legal_failure_observation",
+                        "harness legal_failure verdict must observe failed runtime envelope with error",
+                        details={"sample_id": sample_id},
+                    )
+                )
+                continue
+            if normalized_observed_error["category"] not in _HARNESS_LEGAL_FAILURE_ALLOWED_ERROR_CATEGORIES:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "unsupported_legal_failure_category",
+                        "harness legal_failure verdict must align to approved runtime error categories",
+                        details={
+                            "sample_id": sample_id,
+                            "category": normalized_observed_error["category"],
+                        },
+                    )
+                )
+                continue
+        elif verdict == "execution_precondition_not_met":
+            if observed_status is not None or normalized_observed_error is not None:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "inconsistent_precondition_observation",
+                        "execution_precondition_not_met must not carry runtime observation",
+                        details={"sample_id": sample_id},
+                    )
+                )
+                continue
+        else:
+            if observed_status == "success" and normalized_observed_error is not None:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "contract_violation_success_with_error",
+                        "contract_violation with success observation cannot carry runtime error",
+                        details={"sample_id": sample_id},
+                    )
+                )
+                continue
+            if observed_status == "failed" and normalized_observed_error is None:
+                failures.append(
+                    _failure(
+                        SOURCE_HARNESS,
+                        "contract_violation_failed_without_error",
+                        "contract_violation with failed observation must carry runtime error",
+                        details={"sample_id": sample_id},
+                    )
+                )
+                continue
 
         normalized_results.append(
             {
@@ -1142,6 +1266,23 @@ def _source_report(
     }
 
 
+def _synthetic_failed_source_report(
+    *,
+    source: str,
+    version: str,
+    summary: str,
+    failure: Mapping[str, Any],
+) -> dict[str, Any]:
+    return _source_report(
+        source=source,
+        version=version,
+        verdict=FAIL_VERDICT,
+        summary=summary,
+        evidence_refs=[],
+        details={"failures": [_normalize_failure_entry(failure, source)]},
+    )
+
+
 def _failure(
     source: str,
     code: str,
@@ -1163,6 +1304,26 @@ def _is_non_empty_string(value: Any) -> bool:
 
 def _is_string_sequence(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(_is_non_empty_string(item) for item in value)
+
+
+def _enforce_frozen_reference_pair(
+    version: str,
+    reference_pair: Sequence[str],
+    source: str,
+    failures: list[dict[str, Any]],
+) -> None:
+    expected_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
+    if expected_pair is None:
+        return
+    if tuple(reference_pair) != expected_pair:
+        failures.append(
+            _failure(
+                source,
+                "reference_pair_not_frozen_for_version",
+                "reference pair does not match the formal-spec frozen adapters for this version",
+                details={"expected_reference_pair": list(expected_pair), "actual_reference_pair": list(reference_pair)},
+            )
+        )
 
 
 __all__ = [
