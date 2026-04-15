@@ -9,64 +9,66 @@
 - sprint：`integration-governance`
 - 关联 spec：无（治理联动事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`
-- 关联 PR：`#116`
+- 关联 PR：`#117`
 - active 收口事项：`GOV-0105-integration-governance-baseline`
 
 ## 目标
 
-- 把 `WORKFLOW.md`、`code_review.md`、PR template 与 issue forms 收口到仓库内唯一的 canonical integration contract 上，让 carrier 侧不再维护第二套 integration 规则。
-- 明确 `Phase` 不是 canonical integration metadata carrier，并把 integration metadata 的合法落点限制在 FR / Work Item / governance issue 与 PR `integration_check`。
-- 保持 `Syvert` 继续作为本地执行真相源，并在已完成 PR-B consumer wiring 的前提上，为后续 PR-D evidence / rollout 收口提供稳定的 carrier 基线。
+- 把 GOV-0105 的 repo 内治理终态收口到“一份 canonical integration contract + 一份独立 rollout evidence”。
+- 让 ADR 只保留 repo 内 single-source contract 决策，让 active `exec-plan` 只保留当前 docs closeout round 的停点、风险、验证与下一步。
+- 把 owner 级 GitHub Project、labels、backfill 与 replacement chain 事实集中记录到独立 evidence 文档，不再写回 contract 主体。
 
 ## 范围
 
-- 已合并的 PR-A 只纳入：`scripts/policy/integration_contract.json`、`scripts/integration_contract.py`、`scripts/common.py` 中与 integration contract 直接相关的最小辅助逻辑、`tests/governance/test_integration_contract.py`，以及当前 bootstrap contract 文档。
-- 已合并的 PR-B 纳入：`open_pr / pr_guardian / merge_pr / governance_status` 的共享消费链路、对应治理测试，以及保证该链路在独立 worktree 上可执行的最小兼容修正。
-- 当前 PR-C 纳入：`WORKFLOW.md`、`code_review.md`、PR template、issue forms 的 carrier alignment，以及保证这些 carrier 与 canonical contract 顺序 / 角色一致的最小一致性测试。
-- 后续 PR-D 再纳入：platform evidence 与本事项最终叙事收口。
-- 本次不纳入：自动 bot / 自动同步系统、新的产品仓库、跨仓实现代码、对现有 `Phase / FR / sprint` 语义做统一改造。
+- 当前 PR-D 只纳入：`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`、本 `exec-plan` 与 `docs/governance-rollouts/GOV-0105-platform-evidence.md`。
+- 本次负责：清理 ADR / `exec-plan` 中仍残留的批次叙事与外部 rollout 事实，并为外部 GitHub rollout 建立独立 evidence 入口。
+- 本次不纳入：`WORKFLOW.md`、`code_review.md`、PR template、issue forms、`open_pr / pr_guardian / merge_pr / governance_status`、共享 contract 内核、外部系统自动同步。
 
 ## 当前停点
 
-- `#107` 保持 Draft 并冻结，不再继续修 findings 或提交 guardian；它只作为拆分母体和审查历史容器保留。
-- `PR-A Contract Kernel` 已合并到 `main`，当前仓库内 canonical integration contract 已成为后续替代 PR 的 bootstrap truth source。
-- `PR-B Consumer Wiring` 已合并到 `main`，当前仓库内运行时治理链路已统一到 canonical integration contract。
-- 当前真正需要收口的是 `PR-C Carrier Alignment`，即让 `WORKFLOW.md`、`code_review.md`、PR template 与 issue forms 只暴露 canonical carrier，不再维护第二套 integration 规则，并明确 `Phase` carve-out。
-- 当前 PR-C 已以 Draft PR `#116` 打开；本地门禁与 GitHub checks 已通过，当前停点转为 reviewer / guardian 对 `#116` latest head 的收口。
+- `PR-A/#114`、`PR-B/#115`、`PR-C/#116` 已合并到 `main`，仓库内 canonical integration contract、运行时治理链路与 carrier 已经完成收口。
+- 当前剩余 repo 内动作是 `PR-D Evidence / Rollout`：把外部 GitHub rollout 事实移出 ADR / active `exec-plan` 主体，并单独落盘为 rollout evidence。
+- `PR-D/#117` 已以 Draft 形式打开，当前 docs closeout 内容、最小门禁验证与 GitHub evidence capture 已完成，停点转为 guardian / merge gate 收口。
+- `#107` 仍保持冻结的 superseded closeout 候选状态，等待替代链完全收口后补 replacement chain 并关闭。
 
 ## 下一步动作
 
-- 在同一 head 上等待 reviewer 与 guardian 收口，再执行 `#116` 的受控合并。
-- `#116` 合并后，再按同一 `Issue #105` 推进 PR-D 并在最后关闭 `#107`。
+- 在当前 head 上收口 guardian findings，并保持 ADR / `exec-plan` / rollout evidence 三者叙事一致。
+- 待 guardian 给出 `APPROVE + safe_to_merge=true` 且 checks 全绿后，将 `#117` 从 Draft 转为 Ready 并通过 `merge_pr.py` 受控合并。
+- PR-D 合并后，在 `#107` 补 replacement chain comment 并关闭为 superseded；必要时在 `#105` 补最终收口说明。
 
 ## 当前 checkpoint 推进的 release 目标
 
-- 让 canonical integration contract 从“运行时治理链路已统一”推进到“carrier 已完成对齐”，使 workflow / review / template / issue forms 不再各自维护第二套 integration 语义。
+- 让 GOV-0105 从“carrier 已对齐”推进到“repo 内 contract 主体与 repo 外 rollout evidence 已彻底分离”的最终治理终态。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
-- 角色：替代链路的第三批 `PR-C Carrier Alignment`。
-- 阻塞：在 PR-C 合并前，workflow / review / template / issue forms 仍未完全对齐 canonical carrier；`Phase` 仍缺少明确的 integration metadata carve-out，PR-D 也还无法在稳定 carrier 基线之上完成最终 evidence 收口。
+- 角色：替代链路的第四批 `PR-D Evidence / Rollout` docs closeout round。
+- 阻塞：在 docs closeout 完成前，ADR / active `exec-plan` 仍带有批次性叙事；`#107` 也还不能按完整 replacement chain 关闭为 superseded。
 
 ## 已验证项
 
-- 已执行：`python3 -m unittest tests.governance.test_integration_carriers`
 - 已执行：`python3 scripts/workflow_guard.py --mode pre-commit`
 - 已执行：`python3 scripts/docs_guard.py --mode ci`
+- 已执行：`python3 scripts/open_pr.py --class governance --issue 105 --item-key GOV-0105-integration-governance-baseline --item-type GOV --release governance-baseline --sprint integration-governance --title "docs(governance): 收口 GOV-0105 rollout evidence" --base main --closing refs --draft --integration-touchpoint active --shared-contract-changed yes --integration-ref "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_lADOECSWpc4BUdmRzgpwYyM" --external-dependency both --merge-gate integration_check_required --contract-surface runtime_modes --joint-acceptance-needed yes --integration-status-checked-before-pr yes --integration-status-checked-before-merge no --dry-run`
+- 已执行：`gh issue view 105 --repo MC-and-his-Agents/Syvert --json url,state,labels,projectItems,body`
+- 已执行：`gh issue view 107 --repo MC-and-his-Agents/Syvert --json url,state,title`
+- 已执行：`gh pr view 114 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 115 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 116 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 117 --repo MC-and-his-Agents/Syvert --json url,state,isDraft,title`
 
 ## 未决风险
 
-- 若 PR-C 再继续夹带 evidence rollout 或运行时治理逻辑，scope 会再次膨胀，guardian finding 也会重新跨层连锁。
-- `main` 在替代链路推进期间继续前进；每一批 PR 在进入 guardian 和 merge 前都必须基于最新 `origin/main` 重跑本地门禁。
-- 由于当前 issue 已声明 canonical integration 字段，后续所有替代 PR 都必须完整对齐 contract，不允许退回 legacy 路径。
-- 当前 PR-C 仍在 carrier 收口阶段，因此 reviewer / guardian 应聚焦 carrier 是否与 canonical contract 一致，而不是重新解释运行时 integration 语义。
-- reviewer 阶段不能把外部 integration project 的 live-state 漂移升级为审查阻断；相关 live-state 只允许出现在运行时治理链路与 merge gate 入口。
+- 若 ADR / `exec-plan` 再次回写外部 GitHub rollout 事实，repo 内 contract 主体会重新失焦。
+- rollout evidence 文档若不在合并前刷新到最新 GitHub 状态，`#107` 的 replacement chain 与 `#105` 的外部 evidence 可能与 live state 漂移。
+- 当前分支使用自定义 GOV-0105 split worktree；在 PR-D 合并后必须按分支是否仍存在分别清理 worktree、state 与 branch。
 
 ## 回滚方式
 
-- 如需回滚，使用独立 revert PR 撤销 carrier alignment 与对应一致性测试，让 `#105` 回退到“运行时治理链路已统一，但 carrier 尚未完全对齐”的状态。
+- 如需回滚，使用独立 revert PR 撤销本批 docs-only closeout，让 ADR / `exec-plan` 与 rollout evidence 恢复到 PR-C 合并后的状态；该回滚不影响 runtime tooling 或 carrier 行为。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次完成 PR-C carrier alignment 代码收口并同步验证证据的 checkpoint：`8debbd9fd776f94bf66d9aa431a85241172f7d72`
-- 当前 PR 审查态以 `#116` 的 latest head 为准；本轮最小验证集与 guardian 必须绑定同一 latest head，不得继续复用旧批次的验证摘要。
+- 最近一次完成 PR-D docs closeout 内容收口并同步外部 evidence capture 的 checkpoint：`3cbaab775acc363e39c5dff97768e6192683119a`
+- 当前 PR 审查态如继续产生 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR `#117` 的 latest head。
