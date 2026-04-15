@@ -693,7 +693,7 @@ def _normalize_existing_source_report(
                     "harness source report required_sample_ids must be a string list without duplicates",
                 ),
             )
-        if list(normalized_required_sample_ids) != list(gate_required_harness_sample_ids):
+        if sorted(normalized_required_sample_ids) != sorted(gate_required_harness_sample_ids):
             return _synthetic_failed_source_report(
                 source=expected_source,
                 version=version,
@@ -1835,7 +1835,7 @@ def _normalize_real_regression_surface(
     if frozen_surface is None:
         return None
     normalized_operation = raw_operation.strip() if _is_non_empty_string(raw_operation) else ""
-    if normalized_operation == frozen_surface["semantic_operation"] and not _is_non_empty_string(raw_target_type):
+    if normalized_operation == frozen_surface["semantic_operation"] and raw_target_type is None:
         normalized_target_type = str(frozen_surface["target_type"])
     else:
         normalized_target_type = raw_target_type.strip() if _is_non_empty_string(raw_target_type) else ""
