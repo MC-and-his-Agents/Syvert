@@ -128,7 +128,16 @@ def validate_real_adapter_regression_source_report(
     expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
     _enforce_frozen_reference_pair(version, expected_reference_pair, source, failures)
     expected_operation = _frozen_real_regression_operation(version)
-    if operation != expected_operation:
+    if expected_operation is None:
+        failures.append(
+            _failure(
+                source,
+                "missing_frozen_operation_for_version",
+                "real adapter regression operation is not frozen for this version and must fail closed",
+                details={"version": version},
+            )
+        )
+    elif operation != expected_operation:
         failures.append(
             _failure(
                 source,
@@ -157,7 +166,7 @@ def validate_real_adapter_regression_source_report(
         )
 
     payload_operation = payload.get("operation")
-    if payload_operation != expected_operation:
+    if expected_operation is not None and payload_operation != expected_operation:
         failures.append(
             _failure(
                 source,
@@ -289,7 +298,7 @@ def validate_real_adapter_regression_source_report(
         evidence_refs=evidence_refs,
         details={
             "reference_pair": expected_reference_pair,
-            "operation": operation,
+            "operation": operation if _is_non_empty_string(operation) else "",
             "adapter_results": adapter_results,
             "failures": failures,
         },
@@ -487,6 +496,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is missing",
             failure=_failure(
                 expected_source,
@@ -500,6 +510,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is invalid",
             failure=_failure(
                 expected_source,
@@ -514,6 +525,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report version mismatch",
             failure=_failure(
                 expected_source,
@@ -527,6 +539,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is invalid",
             failure=_failure(
                 expected_source,
@@ -540,6 +553,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is missing evidence refs",
             failure=_failure(
                 expected_source,
@@ -553,6 +567,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is invalid",
             failure=_failure(
                 expected_source,
@@ -565,6 +580,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is invalid",
             failure=_failure(
                 expected_source,
@@ -572,6 +588,7 @@ def _normalize_existing_source_report(
                 "source report details must carry a failures list",
             ),
         )
+    report_summary = str(report.get("summary") or "").strip()
 
     if expected_source == SOURCE_HARNESS:
         raw_required_sample_ids = details.get("required_sample_ids")
@@ -580,6 +597,7 @@ def _normalize_existing_source_report(
             return _synthetic_failed_source_report(
                 source=expected_source,
                 version=version,
+                gate_reference_pair=gate_reference_pair,
                 summary=f"{expected_source} source report is incomplete",
                 failure=_failure(
                     expected_source,
@@ -594,6 +612,8 @@ def _normalize_existing_source_report(
         )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
+            input_verdict=report_verdict,
+            input_summary=report_summary,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -605,6 +625,7 @@ def _normalize_existing_source_report(
             return _synthetic_failed_source_report(
                 source=expected_source,
                 version=version,
+                gate_reference_pair=gate_reference_pair,
                 summary=f"{expected_source} source report is incomplete",
                 failure=_failure(
                     expected_source,
@@ -622,10 +643,12 @@ def _normalize_existing_source_report(
             },
             version=version,
             reference_pair=gate_reference_pair or raw_reference_pair,
-            operation=_frozen_real_regression_operation(version),
+            operation=raw_operation,
         )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
+            input_verdict=report_verdict,
+            input_summary=report_summary,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -636,6 +659,7 @@ def _normalize_existing_source_report(
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
+            gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is incomplete",
             failure=_failure(
                 expected_source,
@@ -656,6 +680,8 @@ def _normalize_existing_source_report(
     )
     return _merge_rebuilt_source_report_with_input_failures(
         rebuilt_report,
+        input_verdict=report_verdict,
+        input_summary=report_summary,
         normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
     )
 
@@ -1273,7 +1299,7 @@ def _normalize_failure_entry(entry: Any, source: str) -> dict[str, Any]:
     message = entry.get("message")
     details = entry.get("details")
     return _failure(
-        str(entry.get("source") or source),
+        source,
         code if _is_non_empty_string(code) else "invalid_failure_code",
         message if _is_non_empty_string(message) else "failure entry is missing message",
         details=details if isinstance(details, Mapping) else {},
@@ -1287,16 +1313,34 @@ def _normalize_failure_entries(entries: list[Any], source: str) -> list[dict[str
 def _merge_rebuilt_source_report_with_input_failures(
     rebuilt_report: Mapping[str, Any],
     *,
+    input_verdict: str,
+    input_summary: str,
     normalized_report_failures: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     rebuilt_details = dict(rebuilt_report.get("details") or {})
     rebuilt_failures = list(rebuilt_details.get("failures") or [])
     if normalized_report_failures:
         rebuilt_failures = list(normalized_report_failures) + rebuilt_failures
+    if input_verdict == FAIL_VERDICT and not rebuilt_failures:
+        rebuilt_failures = [
+            _failure(
+                str(rebuilt_report.get("source") or SOURCE_VERSION_GATE),
+                "upstream_failed_source_report",
+                "source report entered version gate with failed verdict but no explicit failure payload",
+            )
+        ]
     rebuilt_details["failures"] = rebuilt_failures
     merged_report = dict(rebuilt_report)
     merged_report["details"] = rebuilt_details
-    if rebuilt_failures:
+    failure_summary = _failed_source_summary(
+        str(merged_report.get("source") or SOURCE_VERSION_GATE),
+        str(merged_report.get("version") or ""),
+    )
+    if input_verdict == FAIL_VERDICT:
+        merged_report["summary"] = input_summary or failure_summary
+    elif rebuilt_failures:
+        merged_report["summary"] = failure_summary
+    if input_verdict == FAIL_VERDICT or rebuilt_failures:
         merged_report["verdict"] = FAIL_VERDICT
     return merged_report
 
@@ -1324,16 +1368,23 @@ def _synthetic_failed_source_report(
     *,
     source: str,
     version: str,
+    gate_reference_pair: Sequence[str] | None,
     summary: str,
     failure: Mapping[str, Any],
 ) -> dict[str, Any]:
+    normalized_failure = _normalize_failure_entry(failure, source)
     return _source_report(
         source=source,
         version=version,
         verdict=FAIL_VERDICT,
         summary=summary,
-        evidence_refs=[],
-        details={"failures": [_normalize_failure_entry(failure, source)]},
+        evidence_refs=[f"synthetic:{source}:{normalized_failure['code']}"],
+        details=_synthetic_source_report_details(
+            source,
+            version=version,
+            gate_reference_pair=gate_reference_pair,
+            failures=[normalized_failure],
+        ),
     )
 
 
@@ -1388,8 +1439,45 @@ def _enforce_frozen_reference_pair(
         )
 
 
-def _frozen_real_regression_operation(version: str) -> str:
-    return _FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION.get(version, "content_detail_by_url")
+def _frozen_real_regression_operation(version: str) -> str | None:
+    return _FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION.get(version)
+
+
+def _failed_source_summary(source: str, version: str) -> str:
+    normalized_version = version or "unknown"
+    return f"{source} failed for version `{normalized_version}`"
+
+
+def _synthetic_source_report_details(
+    source: str,
+    *,
+    version: str,
+    gate_reference_pair: Sequence[str] | None,
+    failures: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    details = {"failures": list(failures)}
+    if source == SOURCE_HARNESS:
+        return {
+            "required_sample_ids": [],
+            "observed_sample_ids": [],
+            "validation_results": [],
+            **details,
+        }
+    if source == SOURCE_REAL_ADAPTER_REGRESSION:
+        return {
+            "reference_pair": list(gate_reference_pair or []),
+            "operation": _frozen_real_regression_operation(version) or "",
+            "adapter_results": [],
+            **details,
+        }
+    if source == SOURCE_PLATFORM_LEAKAGE:
+        return {
+            "boundary_scope": [],
+            "report_verdict": FAIL_VERDICT,
+            "findings": [],
+            **details,
+        }
+    return details
 
 
 __all__ = [
