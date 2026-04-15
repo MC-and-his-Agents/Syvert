@@ -9,7 +9,7 @@
 - sprint：`integration-governance`
 - 关联 spec：无（治理联动事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0105-integration-governance-baseline.md`
-- 关联 PR：当前 `PR-D Evidence / Rollout` docs closeout round（创建后以 GitHub PR 元数据为准）
+- 关联 PR：`#117`
 - active 收口事项：`GOV-0105-integration-governance-baseline`
 
 ## 目标
@@ -51,6 +51,12 @@
 - 已执行：`python3 scripts/workflow_guard.py --mode pre-commit`
 - 已执行：`python3 scripts/docs_guard.py --mode ci`
 - 已执行：`python3 scripts/open_pr.py --class governance --issue 105 --item-key GOV-0105-integration-governance-baseline --item-type GOV --release governance-baseline --sprint integration-governance --title "docs(governance): 收口 GOV-0105 rollout evidence" --base main --closing refs --draft --integration-touchpoint active --shared-contract-changed yes --integration-ref "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_lADOECSWpc4BUdmRzgpwYyM" --external-dependency both --merge-gate integration_check_required --contract-surface runtime_modes --joint-acceptance-needed yes --integration-status-checked-before-pr yes --integration-status-checked-before-merge no --dry-run`
+- 已执行：`gh issue view 105 --repo MC-and-his-Agents/Syvert --json url,state,labels,projectItems,body`
+- 已执行：`gh issue view 107 --repo MC-and-his-Agents/Syvert --json url,state,title`
+- 已执行：`gh pr view 114 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 115 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 116 --repo MC-and-his-Agents/Syvert --json url,mergedAt,title`
+- 已执行：`gh pr view 117 --repo MC-and-his-Agents/Syvert --json url,state,isDraft,title`
 
 ## 未决风险
 
@@ -65,4 +71,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 最近一次完成 PR-D docs closeout 内容收口并同步最小门禁证据的 checkpoint：`25fbe5168aa6cfb8536384633e27efbdf7f48da5`
-- 当前 PR 审查态如继续产生新的 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR 的 latest head。
+- 当前 PR 审查态如继续产生新的 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR `#117` 的 latest head。
