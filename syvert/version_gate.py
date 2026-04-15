@@ -727,6 +727,7 @@ def _normalize_existing_source_report(
             rebuilt_report,
             input_verdict=report_verdict,
             input_summary=report_summary,
+            input_evidence_refs=evidence_refs,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -789,6 +790,7 @@ def _normalize_existing_source_report(
             rebuilt_report,
             input_verdict=report_verdict,
             input_summary=report_summary,
+            input_evidence_refs=evidence_refs,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -822,6 +824,7 @@ def _normalize_existing_source_report(
         rebuilt_report,
         input_verdict=report_verdict,
         input_summary=report_summary,
+        input_evidence_refs=evidence_refs,
         normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
     )
 
@@ -1276,6 +1279,13 @@ def _normalize_leakage_findings(
     failures: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     if raw_findings is None:
+        failures.append(
+            _failure(
+                source,
+                "missing_leakage_findings",
+                "platform leakage report must carry findings",
+            )
+        )
         return []
     if isinstance(raw_findings, (str, bytes)) or not isinstance(raw_findings, Iterable):
         failures.append(
@@ -1490,6 +1500,7 @@ def _merge_rebuilt_source_report_with_input_failures(
     *,
     input_verdict: str,
     input_summary: str,
+    input_evidence_refs: Sequence[str],
     normalized_report_failures: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     rebuilt_details = dict(rebuilt_report.get("details") or {})
@@ -1517,6 +1528,8 @@ def _merge_rebuilt_source_report_with_input_failures(
         merged_report["summary"] = failure_summary
     if input_verdict == FAIL_VERDICT or rebuilt_failures:
         merged_report["verdict"] = FAIL_VERDICT
+    if input_verdict == FAIL_VERDICT and input_evidence_refs:
+        merged_report["evidence_refs"] = list(input_evidence_refs)
     return merged_report
 
 

@@ -578,6 +578,15 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
+    def test_platform_leakage_rejects_missing_findings_field(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload.pop("findings")
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("missing_leakage_findings", {item["code"] for item in report["details"]["failures"]})
+
     def test_platform_leakage_rejects_empty_version(self) -> None:
         report = validate_platform_leakage_source_report(
             {
@@ -1200,6 +1209,37 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertIn("invalid_sample_id", {item["code"] for item in report["failures"]})
         self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_preserves_failed_harness_evidence_refs(self) -> None:
+        malformed_harness_report = build_harness_source_report(
+            [
+                {
+                    "verdict": "pass",
+                    "reason": {"code": "ok", "message": "ok"},
+                    "observed_status": "success",
+                    "observed_error": None,
+                }
+            ],
+            required_sample_ids=["sample-success"],
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=malformed_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["source_reports"]["harness"]["evidence_refs"], ["synthetic:harness:invalid_sample_id"])
 
     def test_orchestrator_deduplicates_failed_harness_failures(self) -> None:
         failed_harness_report = build_harness_source_report(
