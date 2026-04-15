@@ -366,16 +366,17 @@ def validate_platform_leakage_source_report(
         )
 
     findings = _normalize_leakage_findings(payload.get("findings"), source, failures)
-    payload_verdict = payload.get("verdict")
-    if payload_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
-        failures.append(
-            _failure(
-                source,
-                "invalid_leakage_verdict",
-                "platform leakage report verdict must be `pass` or `fail`",
-                details={"actual_verdict": payload_verdict},
-            )
-        )
+    payload_verdict = _normalize_allowed_string(
+        payload.get("verdict"),
+        source=source,
+        field_name="verdict",
+        allowed_values=frozenset({PASS_VERDICT, FAIL_VERDICT}),
+        failures=failures,
+        code="invalid_leakage_verdict",
+        message="platform leakage report verdict must be `pass` or `fail`",
+        actual_key="actual_verdict",
+    )
+    if payload_verdict is None:
         payload_verdict = FAIL_VERDICT
 
     if payload_verdict == PASS_VERDICT and findings:
@@ -551,7 +552,7 @@ def _normalize_existing_source_report(
             ),
         )
     report_verdict = report.get("verdict")
-    if report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
+    if not _is_non_empty_string(report_verdict) or report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
@@ -775,16 +776,17 @@ def _normalize_harness_validation_results(
             continue
         seen_sample_ids.add(sample_id)
 
-        verdict = result.get("verdict")
-        if verdict not in _HARNESS_ALLOWED_VERDICTS:
-            failures.append(
-                _failure(
-                    SOURCE_HARNESS,
-                    "invalid_harness_verdict",
-                    "harness validation result verdict is unsupported",
-                    details={"sample_id": sample_id, "verdict": verdict},
-                )
-            )
+        verdict = _normalize_allowed_string(
+            result.get("verdict"),
+            source=SOURCE_HARNESS,
+            field_name="verdict",
+            allowed_values=_HARNESS_ALLOWED_VERDICTS,
+            failures=failures,
+            code="invalid_harness_verdict",
+            message="harness validation result verdict is unsupported",
+            details={"sample_id": sample_id},
+        )
+        if verdict is None:
             continue
 
         reason = result.get("reason")
@@ -812,16 +814,19 @@ def _normalize_harness_validation_results(
             continue
 
         observed_status = result.get("observed_status")
-        if observed_status is not None and observed_status not in _OBSERVED_RUNTIME_STATUSES:
-            failures.append(
-                _failure(
-                    SOURCE_HARNESS,
-                    "invalid_observed_status",
-                    "harness validation result observed_status is unsupported",
-                    details={"sample_id": sample_id, "observed_status": observed_status},
-                )
+        if observed_status is not None:
+            observed_status = _normalize_allowed_string(
+                observed_status,
+                source=SOURCE_HARNESS,
+                field_name="observed_status",
+                allowed_values=_OBSERVED_RUNTIME_STATUSES,
+                failures=failures,
+                code="invalid_observed_status",
+                message="harness validation result observed_status is unsupported",
+                details={"sample_id": sample_id},
             )
-            continue
+            if observed_status is None:
+                continue
 
         observed_error = result.get("observed_error")
         normalized_observed_error = _normalize_observed_error(
@@ -1071,29 +1076,31 @@ def _normalize_regression_cases(
             )
             continue
         seen_case_ids.add(case_id)
-        expected_outcome = entry.get("expected_outcome")
-        observed_status = entry.get("observed_status")
+        expected_outcome = _normalize_allowed_string(
+            entry.get("expected_outcome"),
+            source=source,
+            field_name="expected_outcome",
+            allowed_values=_REAL_REGRESSION_EXPECTED_OUTCOMES,
+            failures=failures,
+            code="invalid_expected_outcome",
+            message="adapter regression case expected_outcome is unsupported",
+            details={"adapter_key": adapter_key, "case_id": case_id},
+        )
+        if expected_outcome is None:
+            continue
+        observed_status = _normalize_allowed_string(
+            entry.get("observed_status"),
+            source=source,
+            field_name="observed_status",
+            allowed_values=_OBSERVED_RUNTIME_STATUSES,
+            failures=failures,
+            code="invalid_observed_status",
+            message="adapter regression case observed_status is unsupported",
+            details={"adapter_key": adapter_key, "case_id": case_id},
+        )
+        if observed_status is None:
+            continue
         observed_error_category = entry.get("observed_error_category")
-        if expected_outcome not in _REAL_REGRESSION_EXPECTED_OUTCOMES:
-            failures.append(
-                _failure(
-                    source,
-                    "invalid_expected_outcome",
-                    "adapter regression case expected_outcome is unsupported",
-                    details={"adapter_key": adapter_key, "case_id": case_id},
-                )
-            )
-            continue
-        if observed_status not in _OBSERVED_RUNTIME_STATUSES:
-            failures.append(
-                _failure(
-                    source,
-                    "invalid_observed_status",
-                    "adapter regression case observed_status is unsupported",
-                    details={"adapter_key": adapter_key, "case_id": case_id},
-                )
-            )
-            continue
         if observed_status == "success" and observed_error_category is not None:
             failures.append(
                 _failure(
@@ -1439,13 +1446,13 @@ def _failure(
     code: str,
     message: str,
     *,
-    details: Mapping[str, Any] | None = None,
+    details: Any = None,
 ) -> dict[str, Any]:
     return {
         "source": source,
         "code": code,
         "message": message,
-        "details": dict(details or {}),
+        "details": _sanitize_failure_details(details),
     }
 
 
@@ -1567,6 +1574,29 @@ def _sanitize_failure_details(raw_details: Any) -> dict[str, Any]:
     if not isinstance(raw_details, Mapping):
         return {}
     return {str(key): _sanitize_json_like(value) for key, value in raw_details.items()}
+
+
+def _normalize_allowed_string(
+    raw_value: Any,
+    *,
+    source: str,
+    field_name: str,
+    allowed_values: frozenset[str],
+    failures: list[dict[str, Any]],
+    code: str,
+    message: str,
+    details: Mapping[str, Any] | None = None,
+    actual_key: str | None = None,
+) -> str | None:
+    failure_details = dict(details or {})
+    failure_details[actual_key or field_name] = raw_value
+    if not _is_non_empty_string(raw_value):
+        failures.append(_failure(source, code, message, details=failure_details))
+        return None
+    if raw_value not in allowed_values:
+        failures.append(_failure(source, code, message, details=failure_details))
+        return None
+    return raw_value
 
 
 def _sanitize_json_like(value: Any) -> Any:

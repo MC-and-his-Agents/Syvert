@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 import syvert.version_gate as version_gate_module
@@ -175,6 +176,48 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_harness_verdict", {item["code"] for item in report["details"]["failures"]})
+
+    def test_harness_rejects_unhashable_verdict_fail_closed(self) -> None:
+        malformed = [
+            {
+                "sample_id": "sample-success",
+                "verdict": {"bad": 1},
+                "reason": {"code": "unknown", "message": "unknown"},
+                "observed_status": "success",
+                "observed_error": None,
+            }
+        ]
+
+        report = build_harness_source_report(
+            malformed,
+            required_sample_ids=["sample-success"],
+            version="v0.2.0",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_harness_verdict", {item["code"] for item in report["details"]["failures"]})
+        json.dumps(report)
+
+    def test_harness_rejects_unhashable_observed_status_fail_closed(self) -> None:
+        malformed = [
+            {
+                "sample_id": "sample-success",
+                "verdict": "pass",
+                "reason": {"code": "ok", "message": "ok"},
+                "observed_status": {"bad": 1},
+                "observed_error": None,
+            }
+        ]
+
+        report = build_harness_source_report(
+            malformed,
+            required_sample_ids=["sample-success"],
+            version="v0.2.0",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_observed_status", {item["code"] for item in report["details"]["failures"]})
+        json.dumps(report)
 
     def test_harness_rejects_mapping_shaped_required_sample_ids(self) -> None:
         report = build_harness_source_report(
@@ -388,6 +431,34 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("invalid_evidence_refs", {item["code"] for item in report["details"]["failures"]})
         self.assertTrue(report["evidence_refs"])
 
+    def test_real_regression_rejects_unhashable_case_enums(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["adapter_results"][0]["cases"][0]["expected_outcome"] = {"bad": 1}
+        payload["adapter_results"][1]["cases"][0]["observed_status"] = {"bad": 2}
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_expected_outcome", {item["code"] for item in report["details"]["failures"]})
+        self.assertIn("invalid_observed_status", {item["code"] for item in report["details"]["failures"]})
+        json.dumps(report)
+
+    def test_real_regression_fail_closed_output_is_json_serializable(self) -> None:
+        report = validate_real_adapter_regression_source_report(
+            self.valid_real_adapter_regression_payload(),
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            operation={"bad": {1, 2}},
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("operation_not_frozen_for_version", {item["code"] for item in report["details"]["failures"]})
+        json.dumps(report)
+
     def test_platform_leakage_failure_is_preserved(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["verdict"] = "fail"
@@ -446,6 +517,16 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertEqual(report["version"], "unknown")
         self.assertIn("missing_version", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_unhashable_verdict_fail_closed(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["verdict"] = {"bad": {1, 2}}
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_leakage_verdict", {item["code"] for item in report["details"]["failures"]})
+        json.dumps(report)
 
     def test_platform_leakage_rejects_mapping_shaped_boundary_scope(self) -> None:
         payload = self.valid_platform_leakage_payload()
@@ -991,6 +1072,33 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("forged_non_json_failure", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_rejects_unhashable_source_report_verdict(self) -> None:
+        forged_harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+        forged_harness_report["verdict"] = {"bad": 1}
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=forged_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_source_verdict", {item["code"] for item in report["failures"]})
+        json.dumps(report)
 
     def test_orchestrator_preserves_real_regression_validator_failure_reason(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
