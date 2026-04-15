@@ -707,6 +707,22 @@ def _normalize_existing_source_report(
                     },
                 ),
             )
+        if report_verdict == PASS_VERDICT and list(evidence_refs) != rebuilt_report["evidence_refs"]:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "harness_evidence_refs_mismatch",
+                    "harness source report evidence_refs must match the deterministic builder output",
+                    details={
+                        "expected_evidence_refs": rebuilt_report["evidence_refs"],
+                        "actual_evidence_refs": list(evidence_refs),
+                    },
+                ),
+            )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
             input_verdict=report_verdict,

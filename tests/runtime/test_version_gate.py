@@ -1040,6 +1040,32 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("harness_observed_sample_ids_mismatch", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_rejects_harness_report_with_forged_evidence_refs(self) -> None:
+        forged_harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+        forged_harness_report["evidence_refs"] = ["forged:1"]
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=forged_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("harness_evidence_refs_mismatch", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_preserves_failed_harness_source_report(self) -> None:
         failed_harness_report = build_harness_source_report(
             [
