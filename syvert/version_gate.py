@@ -551,19 +551,24 @@ def _normalize_existing_source_report(
                 details={"expected_version": version, "actual_version": report_version},
             ),
         )
-    report_verdict = report.get("verdict")
-    if not _is_non_empty_string(report_verdict) or report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
+    report_verdict_failures: list[dict[str, Any]] = []
+    report_verdict = _normalize_allowed_string(
+        report.get("verdict"),
+        source=expected_source,
+        field_name="verdict",
+        allowed_values=frozenset({PASS_VERDICT, FAIL_VERDICT}),
+        failures=report_verdict_failures,
+        code="invalid_source_verdict",
+        message="source report verdict must be `pass` or `fail`",
+        actual_key="actual_verdict",
+    )
+    if report_verdict is None:
         return _synthetic_failed_source_report(
             source=expected_source,
             version=version,
             gate_reference_pair=gate_reference_pair,
             summary=f"{expected_source} source report is invalid",
-            failure=_failure(
-                expected_source,
-                "invalid_source_verdict",
-                "source report verdict must be `pass` or `fail`",
-                details={"actual_verdict": report_verdict},
-            ),
+            failure=report_verdict_failures[0],
         )
     evidence_refs = report.get("evidence_refs")
     if not _is_string_sequence(evidence_refs) or not evidence_refs:
