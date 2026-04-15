@@ -46,6 +46,8 @@ class VersionGateTests(unittest.TestCase):
             set(report["source_reports"]),
             {"harness", "real_adapter_regression", "platform_leakage"},
         )
+        for source, source_report in report["source_reports"].items():
+            self.assert_source_report_contract_shape(source, source_report)
 
     def test_harness_contract_violation_fails_closed(self) -> None:
         results = self.valid_harness_results()
@@ -486,6 +488,40 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertEqual(report["version"], "unknown")
         self.assertTrue(report["reference_pair"])
+        for source, source_report in report["source_reports"].items():
+            self.assert_source_report_contract_shape(source, source_report)
+
+    def test_public_source_reports_remain_contract_shaped_on_fail_closed_paths(self) -> None:
+        harness_report = build_harness_source_report(
+            [
+                {
+                    "verdict": "pass",
+                    "reason": {"code": "ok", "message": "ok"},
+                    "observed_status": "success",
+                    "observed_error": None,
+                }
+            ],
+            required_sample_ids=["sample-success"],
+            version="",
+        )
+        self.assert_source_report_contract_shape("harness", harness_report)
+
+        real_regression_report = validate_real_adapter_regression_source_report(
+            self.valid_real_adapter_regression_payload(),
+            version="",
+            reference_pair=["xhs", "douyin"],
+        )
+        self.assert_source_report_contract_shape("real_adapter_regression", real_regression_report)
+
+        platform_leakage_report = validate_platform_leakage_source_report(
+            {
+                **self.valid_platform_leakage_payload(),
+                "version": "",
+                "evidence_refs": [],
+            },
+            version="",
+        )
+        self.assert_source_report_contract_shape("platform_leakage", platform_leakage_report)
 
     def test_orchestrator_fails_closed_for_invalid_reference_pair(self) -> None:
         report = orchestrate_version_gate(
@@ -1274,6 +1310,31 @@ class VersionGateTests(unittest.TestCase):
             "findings": [],
             "evidence_refs": ["leakage:scan:1"],
         }
+
+    def assert_source_report_contract_shape(self, source: str, report: dict[str, object]) -> None:
+        self.assertEqual(report["source"], source)
+        self.assertIn(report["verdict"], {"pass", "fail"})
+        self.assertTrue(report["version"])
+        self.assertTrue(report["summary"])
+        self.assertTrue(report["evidence_refs"])
+        self.assertIsInstance(report["details"], dict)
+        self.assertIn("failures", report["details"])
+        self.assertIsInstance(report["details"]["failures"], list)
+
+        if source == "harness":
+            self.assertTrue(
+                {"required_sample_ids", "observed_sample_ids", "validation_results", "failures"}.issubset(
+                    report["details"]
+                )
+            )
+        elif source == "real_adapter_regression":
+            self.assertTrue(
+                {"reference_pair", "operation", "adapter_results", "failures"}.issubset(report["details"])
+            )
+        elif source == "platform_leakage":
+            self.assertTrue(
+                {"boundary_scope", "report_verdict", "findings", "failures"}.issubset(report["details"])
+            )
 
 
 if __name__ == "__main__":
