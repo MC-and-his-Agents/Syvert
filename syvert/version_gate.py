@@ -20,8 +20,12 @@ _HARNESS_LEGAL_FAILURE_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "u
 _OBSERVED_RUNTIME_STATUSES = frozenset({"success", "failed"})
 _REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})
 _REAL_REGRESSION_EXPECTED_OUTCOMES = frozenset({"success", "allowed_failure"})
-_FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION = {
-    "v0.2.0": "content_detail_by_url",
+_FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION = {
+    "v0.2.0": {
+        "semantic_operation": "content_detail_by_url",
+        "target_type": "url",
+        "accepted_operations": ("content_detail_by_url", "content_detail"),
+    },
 }
 _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
@@ -125,6 +129,7 @@ def validate_real_adapter_regression_source_report(
     version: str,
     reference_pair: Sequence[str] | Iterable[str],
     operation: str = "content_detail_by_url",
+    target_type: str | None = None,
 ) -> dict[str, Any]:
     source = SOURCE_REAL_ADAPTER_REGRESSION
     canonical_version = _canonical_version(version)
@@ -139,24 +144,26 @@ def validate_real_adapter_regression_source_report(
         )
     expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
     _enforce_frozen_reference_pair(version, expected_reference_pair, source, failures)
-    expected_operation = _frozen_real_regression_operation(version)
-    if expected_operation is None:
+    frozen_surface = _frozen_real_regression_surface(version)
+    if frozen_surface is None:
         failures.append(
             _failure(
                 source,
                 "missing_frozen_operation_for_version",
-                "real adapter regression operation is not frozen for this version and must fail closed",
+                "real adapter regression operation surface is not frozen for this version and must fail closed",
                 details={"version": version},
             )
         )
-    elif operation != expected_operation:
-        failures.append(
-            _failure(
-                source,
-                "operation_not_frozen_for_version",
-                "real adapter regression validator operation must match the formal-spec frozen operation",
-                details={"expected_operation": expected_operation, "actual_operation": operation},
-            )
+        expected_surface = None
+    else:
+        expected_surface = _normalize_real_regression_surface(
+            operation,
+            target_type,
+            version=version,
+            source=source,
+            failures=failures,
+            code="operation_not_frozen_for_version",
+            message="real adapter regression validator operation surface must match the formal-spec approved regression surface",
         )
     payload = _require_mapping(report, source, "invalid_real_adapter_regression_report", failures)
     evidence_refs = _normalize_evidence_refs(
@@ -177,15 +184,17 @@ def validate_real_adapter_regression_source_report(
             )
         )
 
-    payload_operation = payload.get("operation")
-    if expected_operation is not None and payload_operation != expected_operation:
-        failures.append(
-            _failure(
-                source,
-                "operation_mismatch",
-                "real adapter regression report operation does not match required operation",
-                details={"expected_operation": expected_operation, "actual_operation": payload_operation},
-            )
+    if frozen_surface is None:
+        payload_surface = None
+    else:
+        payload_surface = _normalize_real_regression_surface(
+            payload.get("operation"),
+            payload.get("target_type"),
+            version=version,
+            source=source,
+            failures=failures,
+            code="operation_mismatch",
+            message="real adapter regression report operation surface does not match the formal-spec approved regression surface",
         )
 
     payload_reference_pair = _normalize_reference_pair(
@@ -311,7 +320,25 @@ def validate_real_adapter_regression_source_report(
         evidence_refs=evidence_refs,
         details={
             "reference_pair": _canonical_reference_pair(version, expected_reference_pair),
-            "operation": expected_operation or (operation if _is_non_empty_string(operation) else ""),
+            "operation": (
+                payload_surface["operation"]
+                if payload_surface is not None
+                else expected_surface["operation"]
+                if expected_surface is not None
+                else frozen_surface["semantic_operation"]
+                if frozen_surface is not None
+                else ""
+            ),
+            "target_type": (
+                payload_surface["target_type"]
+                if payload_surface is not None
+                else expected_surface["target_type"]
+                if expected_surface is not None
+                else frozen_surface["target_type"]
+                if frozen_surface is not None
+                else ""
+            ),
+            "semantic_operation": frozen_surface["semantic_operation"] if frozen_surface is not None else "",
             "adapter_results": adapter_results,
             "failures": failures,
         },
@@ -645,6 +672,41 @@ def _normalize_existing_source_report(
             raw_required_sample_ids,
             version=version,
         )
+        normalized_observed_sample_ids = _normalize_harness_observed_sample_ids(
+            raw_observed_sample_ids,
+            expected_source,
+            version=version,
+            gate_reference_pair=gate_reference_pair,
+        )
+        if normalized_observed_sample_ids is None:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "invalid_harness_observed_sample_ids",
+                    "harness source report observed_sample_ids must be a string list without duplicates",
+                ),
+            )
+        rebuilt_observed_sample_ids = rebuilt_report["details"]["observed_sample_ids"]
+        if sorted(normalized_observed_sample_ids) != rebuilt_observed_sample_ids:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "harness_observed_sample_ids_mismatch",
+                    "harness source report observed_sample_ids must match validation_results",
+                    details={
+                        "expected_observed_sample_ids": rebuilt_observed_sample_ids,
+                        "actual_observed_sample_ids": normalized_observed_sample_ids,
+                    },
+                ),
+            )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
             input_verdict=report_verdict,
@@ -655,6 +717,7 @@ def _normalize_existing_source_report(
     if expected_source == SOURCE_REAL_ADAPTER_REGRESSION:
         raw_reference_pair = details.get("reference_pair")
         raw_operation = details.get("operation")
+        raw_target_type = details.get("target_type")
         raw_adapter_results = details.get("adapter_results")
         if raw_reference_pair is None or raw_operation is None or raw_adapter_results is None:
             return _synthetic_failed_source_report(
@@ -673,12 +736,14 @@ def _normalize_existing_source_report(
                 "version": version,
                 "reference_pair": raw_reference_pair,
                 "operation": raw_operation,
+                "target_type": raw_target_type,
                 "adapter_results": raw_adapter_results,
                 "evidence_refs": evidence_refs,
             },
             version=version,
             reference_pair=gate_reference_pair or raw_reference_pair,
             operation=raw_operation,
+            target_type=raw_target_type,
         )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
@@ -1510,8 +1575,8 @@ def _enforce_frozen_reference_pair(
         )
 
 
-def _frozen_real_regression_operation(version: str) -> str | None:
-    return _FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION.get(version)
+def _frozen_real_regression_surface(version: str) -> Mapping[str, Any] | None:
+    return _FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION.get(version)
 
 
 def _canonical_version(version: str) -> str:
@@ -1548,9 +1613,12 @@ def _synthetic_source_report_details(
             **details,
         }
     if source == SOURCE_REAL_ADAPTER_REGRESSION:
+        frozen_surface = _frozen_real_regression_surface(version) or {}
         return {
             "reference_pair": list(gate_reference_pair or []),
-            "operation": _frozen_real_regression_operation(version) or "",
+            "operation": str(frozen_surface.get("semantic_operation") or ""),
+            "target_type": str(frozen_surface.get("target_type") or ""),
+            "semantic_operation": str(frozen_surface.get("semantic_operation") or ""),
             "adapter_results": [],
             **details,
         }
@@ -1592,6 +1660,68 @@ def _sanitize_failure_details(raw_details: Any) -> dict[str, Any]:
     if not isinstance(raw_details, Mapping):
         return {}
     return {str(key): _sanitize_json_like(value) for key, value in raw_details.items()}
+
+
+def _normalize_harness_observed_sample_ids(
+    raw_observed_sample_ids: Any,
+    source: str,
+    *,
+    version: str,
+    gate_reference_pair: Sequence[str] | None,
+) -> list[str] | None:
+    if not isinstance(raw_observed_sample_ids, list):
+        return None
+    observed_sample_ids: list[str] = []
+    seen: set[str] = set()
+    for value in raw_observed_sample_ids:
+        if not _is_non_empty_string(value) or value in seen:
+            return None
+        seen.add(value)
+        observed_sample_ids.append(value)
+    return observed_sample_ids
+
+
+def _normalize_real_regression_surface(
+    raw_operation: Any,
+    raw_target_type: Any,
+    *,
+    version: str,
+    source: str,
+    failures: list[dict[str, Any]],
+    code: str,
+    message: str,
+) -> dict[str, str] | None:
+    frozen_surface = _frozen_real_regression_surface(version)
+    if frozen_surface is None:
+        return None
+    normalized_operation = raw_operation.strip() if _is_non_empty_string(raw_operation) else ""
+    if normalized_operation == frozen_surface["semantic_operation"] and not _is_non_empty_string(raw_target_type):
+        normalized_target_type = str(frozen_surface["target_type"])
+    else:
+        normalized_target_type = raw_target_type.strip() if _is_non_empty_string(raw_target_type) else ""
+    if (
+        normalized_operation not in frozen_surface["accepted_operations"]
+        or normalized_target_type != frozen_surface["target_type"]
+    ):
+        failures.append(
+            _failure(
+                source,
+                code,
+                message,
+                details={
+                    "expected_semantic_operation": frozen_surface["semantic_operation"],
+                    "expected_target_type": frozen_surface["target_type"],
+                    "actual_operation": raw_operation,
+                    "actual_target_type": raw_target_type,
+                },
+            )
+        )
+        return None
+    return {
+        "operation": normalized_operation,
+        "target_type": normalized_target_type,
+        "semantic_operation": str(frozen_surface["semantic_operation"]),
+    }
 
 
 def _normalize_allowed_string(
