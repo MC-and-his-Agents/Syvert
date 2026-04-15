@@ -971,7 +971,7 @@ def _normalize_observed_error(
         "category": category,
         "code": code,
         "message": message,
-        "details": dict(details),
+        "details": _sanitize_failure_details(details),
     }
 
 

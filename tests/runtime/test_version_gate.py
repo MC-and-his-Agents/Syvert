@@ -249,6 +249,19 @@ class VersionGateTests(unittest.TestCase):
             ],
         )
 
+    def test_harness_accepted_report_is_json_serializable_with_non_json_observed_error_details(self) -> None:
+        results = self.valid_harness_results()
+        results[1]["observed_error"]["details"] = {"nested_set": {1, 2}}
+
+        report = build_harness_source_report(
+            results,
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        json.dumps(report)
+
     def test_real_regression_missing_reference_adapter_fails_closed(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
         payload["adapter_results"] = [payload["adapter_results"][0]]
@@ -504,6 +517,31 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("unsupported_leakage_finding_boundary", {item["code"] for item in report["details"]["failures"]})
         self.assertNotIn("adapter_private_note", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_pass_report_with_findings(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["findings"] = [
+            {
+                "code": "shared_result_contract_leak",
+                "message": "platform-only field leaked into shared result contract",
+                "boundary": "shared_result_contract",
+                "evidence_ref": "leakage:shared-result:1",
+            }
+        ]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("pass_report_with_findings", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_missing_boundary_scope(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = payload["boundary_scope"][:-1]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("missing_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
     def test_platform_leakage_rejects_empty_version(self) -> None:
         report = validate_platform_leakage_source_report(
@@ -811,6 +849,57 @@ class VersionGateTests(unittest.TestCase):
             "missing_real_regression_details",
             {item["code"] for item in report["failures"]},
         )
+
+    def test_orchestrator_rejects_source_mismatch(self) -> None:
+        forged_harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+        forged_harness_report["source"] = "platform_leakage"
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=forged_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("source_mismatch", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_rejects_source_report_version_mismatch(self) -> None:
+        forged_harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.1",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=forged_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("source_report_version_mismatch", {item["code"] for item in report["failures"]})
 
     def test_orchestrator_preserves_failed_harness_source_report(self) -> None:
         failed_harness_report = build_harness_source_report(
@@ -1300,6 +1389,33 @@ class VersionGateTests(unittest.TestCase):
                 {item["source"] for item in report["failures"]}
             )
         )
+
+    def test_orchestrator_pass_result_is_json_serializable_with_non_json_harness_observed_error_details(self) -> None:
+        harness_results = self.valid_harness_results()
+        harness_results[1]["observed_error"]["details"] = {"nested_set": {1, 2}}
+        harness_report = build_harness_source_report(
+            harness_results,
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        json.dumps(report)
 
     def test_harness_builder_consumes_real_fr0006_output(self) -> None:
         validation_results = run_contract_harness_automation()
