@@ -74,12 +74,15 @@
 - 当前进入系统性收口阶段：
   - 不再按单条 guardian finding 追补，而是按统一结果模型不变量补齐元测试
   - active exec-plan 的 checkpoint 绑定改为“最近一次 runtime-affecting code head”，metadata-only head 通过 PR live head 与验证记录追溯，不再把 metadata commit 自身伪装成新的代码 checkpoint
+- 针对当前 remote head 上一次 guardian 暴露的两项根因，当前本地代码 head 已补齐收口：
+  - nested failure `details` 改为先做 JSON-safe 归一化，`_dedupe_failures()` 也对不可信输入做兜底序列化，避免 orchestrator 被 malformed upstream payload 直接打崩
+  - platform leakage finding 的 `boundary` 改为强制绑定 `formal spec` 允许的固定边界集合，拒绝越界的实现细节边界
 
 ## 下一步动作
 
-- 新增 `syvert.version_gate` 模块，冻结三类 source report 的最小消费 contract 与顶层 orchestration 入口。
-- 新增 `tests/runtime/test_version_gate.py`，覆盖 pass、三类来源失败、malformed payload、缺失输入与 fail-closed 场景。
-- 维持当前 PR `#122` 的验证证据与 active exec-plan 一致，并等待 reviewer / guardian / merge gate。
+- 同步当前本地代码 head 的 checkpoint、验证记录与 PR 证据链。
+- 复跑 implementation PR 所需治理门禁与 runtime 测试，确认范围、契约和 fail-closed 语义未回退。
+- 发起 guardian 复审，并在 `safe_to_merge=true` 且治理状态一致后执行受控合并。
 
 ## 实现补充结果模型工件
 
@@ -209,6 +212,10 @@
   - 结果：系统性收口阶段复跑，`Ran 51 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：系统性收口阶段复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：不可信输入收口修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：不可信输入收口修复后复跑，`Ran 119 tests`，`OK`
 
 ## 未决风险
 
@@ -222,5 +229,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f718d2d354891f06de679b668827be2bf3f6b74d`
+- `29c55db2f5c5100146cfccf9c7114f7629d68b7f`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
