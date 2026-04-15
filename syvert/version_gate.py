@@ -1314,6 +1314,14 @@ def _enforce_frozen_reference_pair(
 ) -> None:
     expected_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
     if expected_pair is None:
+        failures.append(
+            _failure(
+                source,
+                "missing_frozen_reference_pair_for_version",
+                "reference pair is not frozen for this version and must fail closed",
+                details={"version": version},
+            )
+        )
         return
     if set(reference_pair) != set(expected_pair):
         failures.append(

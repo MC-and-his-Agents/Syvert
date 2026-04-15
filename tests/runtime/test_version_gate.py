@@ -232,6 +232,22 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "pass")
 
+    def test_real_regression_rejects_unknown_version_without_frozen_pair(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["version"] = "v0.2.1"
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.1",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "missing_frozen_reference_pair_for_version",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
     def test_real_regression_missing_success_coverage_fails_closed(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
         payload["adapter_results"][0]["cases"] = [
@@ -404,6 +420,39 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_reference_pair", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_rejects_unknown_version_without_frozen_pair(self) -> None:
+        report = orchestrate_version_gate(
+            version="v0.2.1",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.1",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                {
+                    **self.valid_real_adapter_regression_payload(),
+                    "version": "v0.2.1",
+                },
+                version="v0.2.1",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                {
+                    **self.valid_platform_leakage_payload(),
+                    "version": "v0.2.1",
+                },
+                version="v0.2.1",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertFalse(report["safe_to_release"])
+        self.assertIn(
+            "missing_frozen_reference_pair_for_version",
+            {item["code"] for item in report["failures"]},
+        )
 
     def test_orchestrator_rejects_non_frozen_reference_pair(self) -> None:
         report = orchestrate_version_gate(
