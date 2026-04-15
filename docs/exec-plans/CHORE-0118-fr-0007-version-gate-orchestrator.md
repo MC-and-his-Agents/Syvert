@@ -220,7 +220,7 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `syvert/version_gate.py`、`tests/runtime/test_version_gate.py` 与当前 active exec-plan 的增量修改。
 
-## 最近一次 runtime-affecting checkpoint 对应的 head SHA
+## 最近一次 checkpoint 对应的 head SHA
 
 - `f718d2d354891f06de679b668827be2bf3f6b74d`
-- 说明：该 checkpoint 绑定当前最新的代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
+- 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
