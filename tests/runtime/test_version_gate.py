@@ -9,10 +9,21 @@ from tests.runtime.contract_harness.automation import run_contract_harness_autom
 
 from syvert.version_gate import (
     build_harness_source_report,
-    orchestrate_version_gate,
+    orchestrate_version_gate as _orchestrate_version_gate,
     validate_platform_leakage_source_report,
     validate_real_adapter_regression_source_report,
 )
+
+
+def orchestrate_version_gate(**kwargs: object) -> dict[str, object]:
+    if "required_harness_sample_ids" not in kwargs:
+        harness_report = kwargs.get("harness_report")
+        if isinstance(harness_report, dict):
+            details = harness_report.get("details")
+            required_sample_ids = details.get("required_sample_ids") if isinstance(details, dict) else None
+            if isinstance(required_sample_ids, list):
+                kwargs["required_harness_sample_ids"] = required_sample_ids
+    return _orchestrate_version_gate(**kwargs)
 
 
 class VersionGateTests(unittest.TestCase):
@@ -1677,6 +1688,32 @@ class VersionGateTests(unittest.TestCase):
                 {item["code"] for item in report["details"]["failures"]}
             )
         )
+
+    def test_orchestrator_rejects_truncated_harness_required_sample_baseline(self) -> None:
+        validation_results = run_contract_harness_automation()
+        truncated_report = build_harness_source_report(
+            validation_results[:1],
+            required_sample_ids=["success-full-envelope"],
+            version="v0.2.0",
+        )
+
+        report = _orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=truncated_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("harness_required_sample_ids_mismatch", {item["code"] for item in report["failures"]})
 
     def test_harness_rejects_legal_failure_with_success_observation(self) -> None:
         malformed = [

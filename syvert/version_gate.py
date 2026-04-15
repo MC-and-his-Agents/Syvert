@@ -30,6 +30,14 @@ _FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION = {
 _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
+_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION = {
+    "v0.2.0": (
+        "success-full-envelope",
+        "legal-failure-platform-envelope",
+        "contract-violation-missing-normalized",
+        "execution-precondition-not-met",
+    ),
+}
 _REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
     {
         "core_runtime",
@@ -456,6 +464,7 @@ def orchestrate_version_gate(
     harness_report: Mapping[str, Any] | None,
     real_adapter_regression_report: Mapping[str, Any] | None,
     platform_leakage_report: Mapping[str, Any] | None,
+    required_harness_sample_ids: Sequence[str] | Iterable[str] | None = None,
 ) -> dict[str, Any]:
     canonical_version = _canonical_version(version)
     failures: list[dict[str, Any]] = []
@@ -475,6 +484,11 @@ def orchestrate_version_gate(
                 "version gate requires non-empty version",
             )
         )
+    normalized_required_harness_sample_ids = _resolve_gate_required_harness_sample_ids(
+        required_harness_sample_ids,
+        version=version,
+        failures=failures,
+    )
 
     source_reports = {
         SOURCE_HARNESS: _normalize_existing_source_report(
@@ -482,18 +496,21 @@ def orchestrate_version_gate(
             SOURCE_HARNESS,
             version=canonical_version,
             gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
+            gate_required_harness_sample_ids=normalized_required_harness_sample_ids,
         ),
         SOURCE_REAL_ADAPTER_REGRESSION: _normalize_existing_source_report(
             real_adapter_regression_report,
             SOURCE_REAL_ADAPTER_REGRESSION,
             version=canonical_version,
             gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
+            gate_required_harness_sample_ids=normalized_required_harness_sample_ids,
         ),
         SOURCE_PLATFORM_LEAKAGE: _normalize_existing_source_report(
             platform_leakage_report,
             SOURCE_PLATFORM_LEAKAGE,
             version=canonical_version,
             gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
+            gate_required_harness_sample_ids=normalized_required_harness_sample_ids,
         ),
     }
 
@@ -535,6 +552,7 @@ def _normalize_existing_source_report(
     *,
     version: str,
     gate_reference_pair: Sequence[str] | None,
+    gate_required_harness_sample_ids: Sequence[str],
 ) -> dict[str, Any]:
     if not isinstance(report, Mapping):
         return _synthetic_failed_source_report(
@@ -667,9 +685,38 @@ def _normalize_existing_source_report(
                     "harness source report must carry required_sample_ids, observed_sample_ids and validation_results",
                 ),
             )
+        normalized_required_sample_ids = _normalize_report_required_sample_ids(raw_required_sample_ids)
+        if normalized_required_sample_ids is None:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "invalid_required_sample_ids",
+                    "harness source report required_sample_ids must be a string list without duplicates",
+                ),
+            )
+        if list(normalized_required_sample_ids) != list(gate_required_harness_sample_ids):
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "harness_required_sample_ids_mismatch",
+                    "harness source report required_sample_ids must match the version-gate required sample baseline",
+                    details={
+                        "expected_required_sample_ids": list(gate_required_harness_sample_ids),
+                        "actual_required_sample_ids": list(normalized_required_sample_ids),
+                    },
+                ),
+            )
         rebuilt_report = build_harness_source_report(
             raw_validation_results,
-            raw_required_sample_ids,
+            gate_required_harness_sample_ids,
             version=version,
         )
         normalized_observed_sample_ids = _normalize_harness_observed_sample_ids(
@@ -1713,6 +1760,51 @@ def _sanitize_failure_details(raw_details: Any) -> dict[str, Any]:
     if not isinstance(raw_details, Mapping):
         return {}
     return {str(key): _sanitize_json_like(value) for key, value in raw_details.items()}
+
+
+def _resolve_gate_required_harness_sample_ids(
+    required_harness_sample_ids: Sequence[str] | Iterable[str] | None,
+    *,
+    version: str,
+    failures: list[dict[str, Any]],
+) -> list[str]:
+    if required_harness_sample_ids is None:
+        frozen_sample_ids = _FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get(version)
+        if frozen_sample_ids is None:
+            failures.append(
+                _failure(
+                    SOURCE_VERSION_GATE,
+                    "missing_frozen_harness_sample_ids_for_version",
+                    "harness required sample baseline is not frozen for this version and must fail closed",
+                    details={"version": version},
+                )
+            )
+            return []
+        return list(frozen_sample_ids)
+    normalized_sample_ids = _normalize_report_required_sample_ids(required_harness_sample_ids)
+    if normalized_sample_ids is None:
+        failures.append(
+            _failure(
+                SOURCE_VERSION_GATE,
+                "invalid_required_harness_sample_ids",
+                "version gate required_harness_sample_ids must be a string list without duplicates",
+            )
+        )
+        return []
+    return normalized_sample_ids
+
+
+def _normalize_report_required_sample_ids(raw_required_sample_ids: Any) -> list[str] | None:
+    if not isinstance(raw_required_sample_ids, list):
+        return None
+    required_sample_ids: list[str] = []
+    seen: set[str] = set()
+    for value in raw_required_sample_ids:
+        if not _is_non_empty_string(value) or value in seen:
+            return None
+        seen.add(value)
+        required_sample_ids.append(value)
+    return required_sample_ids
 
 
 def _normalize_harness_observed_sample_ids(
