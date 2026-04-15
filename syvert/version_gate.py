@@ -392,6 +392,16 @@ def validate_platform_leakage_source_report(
                 details={"missing_boundaries": missing_boundaries},
             )
         )
+    unexpected_boundaries = sorted(set(boundaries) - _REQUIRED_LEAKAGE_BOUNDARIES)
+    if unexpected_boundaries:
+        failures.append(
+            _failure(
+                source,
+                "unexpected_boundary_scope",
+                "platform leakage report must not carry boundaries outside the fixed leakage contract",
+                details={"unexpected_boundaries": unexpected_boundaries},
+            )
+        )
 
     findings = _normalize_leakage_findings(payload.get("findings"), source, failures)
     payload_verdict = _normalize_allowed_string(
@@ -1763,8 +1773,8 @@ def _resolve_gate_required_harness_sample_ids(
     version: str,
     failures: list[dict[str, Any]],
 ) -> list[str]:
+    frozen_sample_ids = _FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get(version)
     if required_harness_sample_ids is None:
-        frozen_sample_ids = _FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get(version)
         if frozen_sample_ids is None:
             failures.append(
                 _failure(
@@ -1786,6 +1796,19 @@ def _resolve_gate_required_harness_sample_ids(
             )
         )
         return []
+    if frozen_sample_ids is not None and sorted(normalized_sample_ids) != sorted(frozen_sample_ids):
+        failures.append(
+            _failure(
+                SOURCE_VERSION_GATE,
+                "required_harness_sample_ids_not_frozen_for_version",
+                "version gate required_harness_sample_ids must match the frozen baseline for this version",
+                details={
+                    "expected_required_sample_ids": list(frozen_sample_ids),
+                    "actual_required_sample_ids": list(normalized_sample_ids),
+                },
+            )
+        )
+        return list(frozen_sample_ids)
     return normalized_sample_ids
 
 

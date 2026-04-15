@@ -604,6 +604,15 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
+    def test_platform_leakage_rejects_unexpected_boundary_scope(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = [*payload["boundary_scope"], "adapter_private_impl"]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("unexpected_boundary_scope", {item["code"] for item in report["details"]["failures"]})
+
     def test_platform_leakage_rejects_missing_findings_field(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload.pop("findings")
@@ -1772,6 +1781,41 @@ class VersionGateTests(unittest.TestCase):
         )
 
         self.assertEqual(report["verdict"], "pass")
+
+    def test_public_orchestrator_rejects_required_harness_sample_ids_override_when_frozen(self) -> None:
+        original = version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get("v0.2.0")
+        version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION["v0.2.0"] = (
+            "sample-success",
+            "sample-legal-failure",
+        )
+        try:
+            report = _orchestrate_version_gate(
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+                harness_report=build_harness_source_report(
+                    self.valid_harness_results(),
+                    required_sample_ids=["sample-success", "sample-legal-failure"],
+                    version="v0.2.0",
+                ),
+                real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                    self.valid_real_adapter_regression_payload(),
+                    version="v0.2.0",
+                    reference_pair=["xhs", "douyin"],
+                ),
+                platform_leakage_report=validate_platform_leakage_source_report(
+                    self.valid_platform_leakage_payload(),
+                    version="v0.2.0",
+                ),
+                required_harness_sample_ids=["sample-success"],
+            )
+        finally:
+            if original is None:
+                version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.pop("v0.2.0", None)
+            else:
+                version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION["v0.2.0"] = original
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("required_harness_sample_ids_not_frozen_for_version", {item["code"] for item in report["failures"]})
 
     def test_harness_rejects_legal_failure_with_success_observation(self) -> None:
         malformed = [
