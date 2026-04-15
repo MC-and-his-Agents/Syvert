@@ -1,8 +1,8 @@
-# FR-0007 Version Gate Result Model
+# CHORE-0118 Version Gate Result Model
 
-本文件冻结 `#118` 引入的统一 version gate / source report 结果模型，供 closeout、release gate 与后续 `FR-0007` 子事项实现直接消费。
+本文件冻结 `#118` 已落地的统一 version gate / source report 结果模型，供 closeout、release gate 与后续 `FR-0007` 子事项实现直接消费。
 
-本文件不改写 [spec.md](./../spec.md) 的 requirement；它只把当前实现已落地且需要被下游稳定消费的结果字段、来源归因与 fail-closed 语义显式化。
+本文件不改写 [`spec.md`](../../specs/FR-0007-release-gate-and-regression-checks/spec.md) 的 requirement；它只把当前实现已落地且需要被下游稳定消费的结果字段、来源归因与 fail-closed 语义显式化。
 
 ## 1. top-level version gate result
 

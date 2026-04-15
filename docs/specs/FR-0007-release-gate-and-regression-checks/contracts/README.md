@@ -35,7 +35,3 @@
    - 禁止平台专属、只服务单一平台或会导致共享层分叉的语义进入 Core 主路径、共享输入模型、共享错误模型、adapter registry 共享契约、共享结果 contract（含 `raw` / `normalized` 的共享结果语义）与 gate 共享判定逻辑
 
 如需增加更细的 gate payload 结构、结果格式或执行协议，应在后续实现 Work Item 中补充独立契约文档，并保持与本 requirement 一致。
-
-## 实现补充契约
-
-- [`version-gate-result-model.md`](./version-gate-result-model.md)：`#118` 引入的统一 version gate / source report 结果模型，供 closeout、release gate 与后续 `FR-0007` 子事项实现直接消费。

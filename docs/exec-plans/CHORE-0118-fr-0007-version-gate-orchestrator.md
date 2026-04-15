@@ -59,13 +59,20 @@
 - guardian 第六轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项收口：
   - orchestrator 不再把已有失败 source report 洗回 `pass`
   - `validate_platform_leakage_source_report()` 对空版本标识改为 fail-closed
-  - 新增 `contracts/version-gate-result-model.md`，为统一 version gate / source report 结果模型提供可审查 contract artifact
+  - 新增 implementation-side result model artifact，为统一 version gate / source report 结果模型提供可审查 contract artifact
 
 ## 下一步动作
 
 - 新增 `syvert.version_gate` 模块，冻结三类 source report 的最小消费 contract 与顶层 orchestration 入口。
 - 新增 `tests/runtime/test_version_gate.py`，覆盖 pass、三类来源失败、malformed payload、缺失输入与 fail-closed 场景。
 - 维持当前 PR `#122` 的验证证据与 active exec-plan 一致，并等待 reviewer / guardian / merge gate。
+
+## 实现补充结果模型工件
+
+- 工件路径：`docs/exec-plans/artifacts/CHORE-0118-version-gate-result-model.md`
+- 语义边界：
+  - 该工件只冻结 `#118` 已落地实现的稳定消费面，用于 closeout、release gate 与后续 `FR-0007` 子事项复用。
+  - 该工件不改写 `docs/specs/FR-0007-release-gate-and-regression-checks/spec.md` 或 `plan.md` 的 formal requirement。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -152,6 +159,16 @@
   - 结果：`#118` 当前状态已更新为 `进行中（PR #122）`
 - `gh issue edit 67 --body ...`
   - 结果：父 FR `#67` 已补齐 `#118/#119/#120/#121` 子 Work Item 列表
+- `git push origin issue-118-fr-0007-gate`
+  - 结果：已推送 `1955673 fix(runtime): 收紧版本 gate 收口语义`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：当前 head 复跑，`Ran 37 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：当前 head 复跑，`Ran 66 tests`，`OK`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head 复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head 首次复跑因 `docs/specs/**` 中新增 implementation-side artifact 失败；已调整 artifact 承载位置，待复跑
 
 ## 未决风险
 
@@ -165,5 +182,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2b506bc23dc3bf52d9a1114986a6ff41f3b18a09`
-- 说明：该 checkpoint 对应第六轮 guardian 修复前的最新 metadata head；下一次提交将把 source-level failure 保留、platform leakage 空版本 fail-closed 与 unified result model contract artifact 一并纳入新的代码/文档 checkpoint。
+- `1955673e1ac5ee76cefd4cd2d53d9fbc9262fdde`
+- 说明：该 checkpoint 对应第六轮 guardian 修复后的最新代码 head；当前收口仅调整 implementation-side artifact 的承载位置，以满足 implementation PR 的 `pr_scope_guard` 范围约束。
