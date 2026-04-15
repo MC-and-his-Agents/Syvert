@@ -44,6 +44,7 @@ def build_harness_source_report(
     *,
     version: str,
 ) -> dict[str, Any]:
+    canonical_version = _canonical_version(version)
     failures: list[dict[str, Any]] = []
     normalized_required = _normalize_required_sample_ids(required_sample_ids, failures)
     normalized_results = _normalize_harness_validation_results(validation_results, failures)
@@ -105,7 +106,7 @@ def build_harness_source_report(
     )
     return _source_report(
         source=SOURCE_HARNESS,
-        version=version,
+        version=canonical_version,
         verdict=PASS_VERDICT if not failures else FAIL_VERDICT,
         summary=summary,
         evidence_refs=evidence_refs,
@@ -126,7 +127,16 @@ def validate_real_adapter_regression_source_report(
     operation: str = "content_detail_by_url",
 ) -> dict[str, Any]:
     source = SOURCE_REAL_ADAPTER_REGRESSION
+    canonical_version = _canonical_version(version)
     failures: list[dict[str, Any]] = []
+    if not _is_non_empty_string(version):
+        failures.append(
+            _failure(
+                source,
+                "missing_version",
+                "real adapter regression source report requires non-empty version",
+            )
+        )
     expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
     _enforce_frozen_reference_pair(version, expected_reference_pair, source, failures)
     expected_operation = _frozen_real_regression_operation(version)
@@ -295,13 +305,13 @@ def validate_real_adapter_regression_source_report(
     )
     return _source_report(
         source=source,
-        version=version,
+        version=canonical_version,
         verdict=PASS_VERDICT if not failures else FAIL_VERDICT,
         summary=summary,
         evidence_refs=evidence_refs,
         details={
-            "reference_pair": expected_reference_pair,
-            "operation": operation if _is_non_empty_string(operation) else "",
+            "reference_pair": _canonical_reference_pair(version, expected_reference_pair),
+            "operation": expected_operation or (operation if _is_non_empty_string(operation) else ""),
             "adapter_results": adapter_results,
             "failures": failures,
         },
@@ -314,6 +324,7 @@ def validate_platform_leakage_source_report(
     version: str,
 ) -> dict[str, Any]:
     source = SOURCE_PLATFORM_LEAKAGE
+    canonical_version = _canonical_version(version)
     failures: list[dict[str, Any]] = []
     if not _is_non_empty_string(version):
         failures.append(
@@ -397,7 +408,7 @@ def validate_platform_leakage_source_report(
 
     return _source_report(
         source=source,
-        version=version,
+        version=canonical_version,
         verdict=PASS_VERDICT if not normalized_failures else FAIL_VERDICT,
         summary=summary,
         evidence_refs=evidence_refs,
@@ -418,6 +429,7 @@ def orchestrate_version_gate(
     real_adapter_regression_report: Mapping[str, Any] | None,
     platform_leakage_report: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    canonical_version = _canonical_version(version)
     failures: list[dict[str, Any]] = []
     normalized_reference_pair = _normalize_reference_pair(
         reference_pair,
@@ -440,20 +452,20 @@ def orchestrate_version_gate(
         SOURCE_HARNESS: _normalize_existing_source_report(
             harness_report,
             SOURCE_HARNESS,
-            version=version,
-            gate_reference_pair=normalized_reference_pair,
+            version=canonical_version,
+            gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
         ),
         SOURCE_REAL_ADAPTER_REGRESSION: _normalize_existing_source_report(
             real_adapter_regression_report,
             SOURCE_REAL_ADAPTER_REGRESSION,
-            version=version,
-            gate_reference_pair=normalized_reference_pair,
+            version=canonical_version,
+            gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
         ),
         SOURCE_PLATFORM_LEAKAGE: _normalize_existing_source_report(
             platform_leakage_report,
             SOURCE_PLATFORM_LEAKAGE,
-            version=version,
-            gate_reference_pair=normalized_reference_pair,
+            version=canonical_version,
+            gate_reference_pair=_canonical_reference_pair(version, normalized_reference_pair),
         ),
     }
 
@@ -474,13 +486,13 @@ def orchestrate_version_gate(
         failing_sources.append(SOURCE_VERSION_GATE)
 
     summary = (
-        f"version gate passed for version `{version}`"
+        f"version gate passed for version `{canonical_version}`"
         if verdict == PASS_VERDICT
-        else f"version gate failed for version `{version or 'unknown'}` via {', '.join(sorted(set(failing_sources)))}"
+        else f"version gate failed for version `{canonical_version}` via {', '.join(sorted(set(failing_sources)))}"
     )
     return {
-        "version": version,
-        "reference_pair": normalized_reference_pair,
+        "version": canonical_version,
+        "reference_pair": _canonical_reference_pair(version, normalized_reference_pair),
         "verdict": verdict,
         "safe_to_release": verdict == PASS_VERDICT,
         "summary": summary,
@@ -1395,16 +1407,17 @@ def _synthetic_failed_source_report(
     summary: str,
     failure: Mapping[str, Any],
 ) -> dict[str, Any]:
+    canonical_version = _canonical_version(version)
     normalized_failure = _normalize_failure_entry(failure, source)
     return _source_report(
         source=source,
-        version=version,
+        version=canonical_version,
         verdict=FAIL_VERDICT,
         summary=summary,
         evidence_refs=[f"synthetic:{source}:{normalized_failure['code']}"],
         details=_synthetic_source_report_details(
             source,
-            version=version,
+            version=canonical_version,
             gate_reference_pair=gate_reference_pair,
             failures=[normalized_failure],
         ),
@@ -1464,6 +1477,19 @@ def _enforce_frozen_reference_pair(
 
 def _frozen_real_regression_operation(version: str) -> str | None:
     return _FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION.get(version)
+
+
+def _canonical_version(version: str) -> str:
+    return version.strip() if _is_non_empty_string(version) else "unknown"
+
+
+def _canonical_reference_pair(version: str, reference_pair: Sequence[str]) -> list[str]:
+    if reference_pair:
+        return list(reference_pair)
+    frozen_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
+    if frozen_pair:
+        return list(frozen_pair)
+    return ["unknown"]
 
 
 def _failed_source_summary(source: str, version: str) -> str:

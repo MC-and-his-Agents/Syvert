@@ -104,6 +104,16 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_reason_fields", {item["code"] for item in report["details"]["failures"]})
 
+    def test_harness_fail_closed_output_keeps_non_empty_version(self) -> None:
+        report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["version"], "unknown")
+
     def test_harness_rejects_missing_reason_message(self) -> None:
         malformed = [
             {
@@ -240,6 +250,7 @@ class VersionGateTests(unittest.TestCase):
             {item["code"] for item in report["details"]["failures"]},
         )
         self.assertIn("operation_mismatch", {item["code"] for item in report["details"]["failures"]})
+        self.assertEqual(report["details"]["operation"], "content_detail_by_url")
 
     def test_real_regression_accepts_reordered_frozen_reference_pair(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
@@ -272,6 +283,17 @@ class VersionGateTests(unittest.TestCase):
             "missing_frozen_operation_for_version",
             {item["code"] for item in report["details"]["failures"]},
         )
+
+    def test_real_regression_rejects_empty_version(self) -> None:
+        report = validate_real_adapter_regression_source_report(
+            self.valid_real_adapter_regression_payload(),
+            version="",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["version"], "unknown")
+        self.assertIn("missing_version", {item["code"] for item in report["details"]["failures"]})
 
     def test_real_regression_rejects_unknown_version_without_frozen_operation(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
@@ -402,6 +424,7 @@ class VersionGateTests(unittest.TestCase):
         )
 
         self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["version"], "unknown")
         self.assertIn("missing_version", {item["code"] for item in report["details"]["failures"]})
 
     def test_platform_leakage_rejects_mapping_shaped_boundary_scope(self) -> None:
@@ -436,6 +459,33 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertFalse(report["safe_to_release"])
         self.assertIn("missing_version", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_fail_closed_output_keeps_non_empty_version_and_reference_pair(self) -> None:
+        report = orchestrate_version_gate(
+            version="",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                {
+                    **self.valid_platform_leakage_payload(),
+                    "version": "",
+                },
+                version="",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["version"], "unknown")
+        self.assertTrue(report["reference_pair"])
 
     def test_orchestrator_fails_closed_for_invalid_reference_pair(self) -> None:
         report = orchestrate_version_gate(
