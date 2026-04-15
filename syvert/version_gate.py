@@ -718,8 +718,15 @@ def _normalize_existing_source_report(
         raw_reference_pair = details.get("reference_pair")
         raw_operation = details.get("operation")
         raw_target_type = details.get("target_type")
+        raw_semantic_operation = details.get("semantic_operation")
         raw_adapter_results = details.get("adapter_results")
-        if raw_reference_pair is None or raw_operation is None or raw_adapter_results is None:
+        if (
+            raw_reference_pair is None
+            or raw_operation is None
+            or raw_target_type is None
+            or raw_semantic_operation is None
+            or raw_adapter_results is None
+        ):
             return _synthetic_failed_source_report(
                 source=expected_source,
                 version=version,
@@ -728,7 +735,7 @@ def _normalize_existing_source_report(
                 failure=_failure(
                     expected_source,
                     "missing_real_regression_details",
-                    "real adapter regression source report must carry reference_pair, operation and adapter_results",
+                    "real adapter regression source report must carry reference_pair, operation, target_type, semantic_operation and adapter_results",
                 ),
             )
         rebuilt_report = validate_real_adapter_regression_source_report(
@@ -745,6 +752,23 @@ def _normalize_existing_source_report(
             operation=raw_operation,
             target_type=raw_target_type,
         )
+        rebuilt_details = rebuilt_report["details"]
+        if raw_semantic_operation != rebuilt_details["semantic_operation"]:
+            return _synthetic_failed_source_report(
+                source=expected_source,
+                version=version,
+                gate_reference_pair=gate_reference_pair,
+                summary=f"{expected_source} source report is invalid",
+                failure=_failure(
+                    expected_source,
+                    "real_regression_semantic_operation_mismatch",
+                    "real adapter regression source report semantic_operation must match the normalized regression surface",
+                    details={
+                        "expected_semantic_operation": rebuilt_details["semantic_operation"],
+                        "actual_semantic_operation": raw_semantic_operation,
+                    },
+                ),
+            )
         return _merge_rebuilt_source_report_with_input_failures(
             rebuilt_report,
             input_verdict=report_verdict,

@@ -1231,6 +1231,34 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "fail")
         self.assertIn("invalid_report_reference_pair", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_rejects_real_regression_report_missing_projection_details(self) -> None:
+        forged_report = validate_real_adapter_regression_source_report(
+            self.valid_real_adapter_regression_payload(),
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+        forged_report["details"].pop("target_type")
+        forged_report["details"].pop("semantic_operation")
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=forged_report,
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "fail")
+        self.assertIn("missing_real_regression_details", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_rewrites_forged_failure_source_to_expected_source(self) -> None:
         forged_harness_report = build_harness_source_report(
             self.valid_harness_results(),
@@ -1428,6 +1456,8 @@ class VersionGateTests(unittest.TestCase):
             "details": {
                 "reference_pair": ["xhs", "douyin"],
                 "operation": "creator_detail",
+                "target_type": "url",
+                "semantic_operation": "content_detail_by_url",
                 "adapter_results": self.valid_real_adapter_regression_payload()["adapter_results"],
                 "failures": [],
             },
