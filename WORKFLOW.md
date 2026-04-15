@@ -82,6 +82,14 @@ codex:
 - 不应把与当前判断无关的历史讨论、相邻事项材料或整仓重复探索默认塞给 reviewer / guardian。
 - 若要补充额外上下文，必须以“消除当前阻断或验证当前 head 风险”为目的，而不是让审查器无限制二次侦察。
 
+## integration carriers
+
+- canonical integration contract 的单一真相源固定为 [`scripts/policy/integration_contract.json`](./scripts/policy/integration_contract.json) 与 [`scripts/integration_contract.py`](./scripts/integration_contract.py)。
+- `WORKFLOW.md`、[`code_review.md`](./code_review.md)、[`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 与 `.github/ISSUE_TEMPLATE/*` 只暴露 carrier 与消费时机，不在各自文件中重复维护另一套 integration 字段枚举、触发条件或组合约束。
+- 默认只查看当前仓库 project；仅当上位 issue / work item 的 canonical integration 元数据显示该事项触及跨仓共享契约、跨仓依赖、联合验收或共享 contract surface 时，才查看 `integration_ref` 指向的 owner 级 integration issue / item。
+- `open_pr` 负责把 issue / work item 与 PR carrier 对齐到 canonical integration contract；reviewer、guardian、`merge_pr` 与 `governance_status` 只消费同一 contract 结果，不再各自定义第二套 integration 规则。
+- `Phase` 只承载阶段目标与上位范围，不是执行入口，也不是 canonical integration metadata carrier。跨仓 integration 元数据只能落在 FR / Work Item / governance issue 与 PR `integration_check` 中。
+
 ## stop conditions
 
 - 缺少必需输入（Issue、事项上下文、formal spec 或 bootstrap contract）。

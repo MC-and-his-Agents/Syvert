@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Syvert Repo Workflow Contract
+    url: https://github.com/MC-and-his-Agents/Syvert/blob/main/WORKFLOW.md
+    about: 先阅读仓库 workflow 与治理约束，再选择对应 issue form。

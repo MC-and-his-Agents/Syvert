@@ -26,6 +26,15 @@
 
 若现有输入已足以判断，不应把上述文档清单整段视为每次审查都必须重新阅读的固定前置步骤，也不应把它们整段再次注入 reviewer prompt。
 
+## integration carriers
+
+- canonical integration contract 的单一真相源固定为 [`scripts/policy/integration_contract.json`](./scripts/policy/integration_contract.json) 与 [`scripts/integration_contract.py`](./scripts/integration_contract.py)。
+- reviewer 只需要检查两件事：
+  - PR carrier 与上位 issue / work item 的 canonical integration 元数据一致。
+  - 当前 diff 是否正确实现了受该 contract 约束的行为、边界与风险控制。
+- merge-time integration recheck 属于 merge gate，不属于 reviewer 先验完成项。若 `merge_gate=integration_check_required`，reviewer 只需确认 PR 已暴露 canonical `integration_check` carrier，最终实时复核由 guardian / `merge_pr` 消费同一 contract 完成。
+- owner project / labels / issue backfill 只属于 rollout evidence，不能代替当前 `integration_ref` 的 live-state 证明。
+
 ## 工件完整性检查
 
 工件完整性检查只回答“当前 PR 是否具备进入审查的最小输入”，不等于 `APPROVE`。

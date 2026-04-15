@@ -1,0 +1,125 @@
+name: FR
+description: 创建或更新需要 formal spec / FR 容器承接的事项。
+title: "[FR-XXXX] "
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 摘要
+      description: 说明当前 FR 要解决的目标、非目标和阶段边界。
+      placeholder: |
+        目标：
+        非目标：
+        当前阶段：
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_artifacts
+    attributes:
+      label: Formal Spec 套件
+      description: 列出本 FR 需要承接的 formal spec / contract / 风险工件。
+      placeholder: |
+        spec.md:
+        plan.md:
+        contracts/:
+        data-model.md:
+        risks.md:
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        Canonical integration contract source: `scripts/policy/integration_contract.json` / `scripts/integration_contract.py`
+        - 按 canonical contract 填写以下字段。
+        - `merge_gate` 的触发条件、`integration_ref` 的合法格式与 legacy 兼容规则，以 canonical contract 为准。
+        - 纯本仓库事项必须显式收口为 local-only 组合；跨仓事项必须按 contract 进入 integration gate。
+
+  - type: checkboxes
+    id: integration_guardrails
+    attributes:
+      label: Integration Guardrails
+      options:
+        - label: 我已按 canonical integration contract 核对本 FR，当前填写值不存在互相冲突的元数据。
+          required: true
+
+  - type: dropdown
+    id: integration_touchpoint
+    attributes:
+      label: integration_touchpoint
+      description: 纯本仓库事项默认选 `none`；会影响跨仓共享契约时选 `check_required` 或 `active`。
+      options:
+        - none
+        - check_required
+        - active
+        - blocked
+        - resolved
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shared_contract_changed
+    attributes:
+      label: shared_contract_changed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_ref
+    attributes:
+      label: integration_ref
+      description: 填具体 integration issue / item 链接或编号；合法格式与归一规则见 canonical contract。纯本仓库事项写 `none`。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: external_dependency
+    attributes:
+      label: external_dependency
+      options:
+        - none
+        - syvert
+        - webenvoy
+        - both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: merge_gate
+    attributes:
+      label: merge_gate
+      description: 纯本仓库事项选 `local_only`；跨仓事项选 `integration_check_required`。
+      options:
+        - local_only
+        - integration_check_required
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_surface
+    attributes:
+      label: contract_surface
+      options:
+        - none
+        - execution_provider
+        - ids_trace
+        - errors
+        - raw_normalized
+        - diagnostics_observability
+        - runtime_modes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: joint_acceptance_needed
+    attributes:
+      label: joint_acceptance_needed
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true

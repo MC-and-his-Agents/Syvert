@@ -20,6 +20,7 @@
 - 本事项按四个串行 PR 收口：`PR-A Contract Kernel`、`PR-B Consumer Wiring`、`PR-C Carrier Alignment`、`PR-D Evidence / Rollout`。
 - 第一批必须先把 `Issue + decision + exec-plan` 的 bootstrap contract 落到 `main`，后续三个 PR 才能在同一事项上下文下继续通过受控入口推进。
 - 两个仓库的 issue / PR / review / workflow 载体最终都只消费 canonical integration contract，不再各自维护第二套 integration 枚举或组合约束。
+- `PR-C Carrier Alignment` 负责把 `WORKFLOW.md`、`code_review.md`、PR template 与 issue forms 收口到同一 carrier 集合，并明确 `Phase` 不是 canonical integration metadata carrier。
 - 纯本仓库事项保持 `integration_touchpoint=none`；触及共享契约、跨仓依赖或联合验收时，必须显式绑定 integration ref。
 - 外部 GitHub Project、labels 与 issue backfill 只作为 rollout evidence，不再写入 repo 内 contract 主体。
 
