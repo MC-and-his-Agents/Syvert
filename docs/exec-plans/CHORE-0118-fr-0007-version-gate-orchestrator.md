@@ -9,7 +9,7 @@
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#122`
 - 状态：`active`
 - active 收口事项：`CHORE-0118-fr-0007-version-gate-orchestrator`
 
@@ -38,13 +38,17 @@
 - 当前执行分支：`issue-118-fr-0007-gate`
 - `FR-0007` formal spec 已作为当前 Work Item 的 formal input 入库，`open_pr` 对 `CHORE` implementation 项要求 active exec-plan 显式绑定 formal spec。
 - 仓内尚无版本级 gate / release gate 现成实现；`FR-0006` 当前已提供可复用的 harness validation 输出，但仍停留在样例级 verdict 层。
-- 当前代码已新增 `syvert.version_gate` 与 `tests/runtime/test_version_gate.py`，并通过相关 runtime 测试；下一步是把当前 head 固化为 commit，再重跑 `pr_scope_guard` / `open_pr --dry-run`。
+- 当前代码已新增 `syvert.version_gate` 与 `tests/runtime/test_version_gate.py`，并通过相关 runtime 测试。
+- 当前受审 PR：`#122`
+- GitHub 侧当前已对齐：
+  - `#118` 正文已更新为 `进行中（PR #122）`
+  - 父 FR `#67` 正文已补齐 `#118/#119/#120/#121` 四个子 Work Item
 
 ## 下一步动作
 
 - 新增 `syvert.version_gate` 模块，冻结三类 source report 的最小消费 contract 与顶层 orchestration 入口。
 - 新增 `tests/runtime/test_version_gate.py`，覆盖 pass、三类来源失败、malformed payload、缺失输入与 fail-closed 场景。
-- 运行相关 runtime 测试与受控 `open_pr --class implementation --dry-run`，确认 formal input、事项上下文、验证证据与实现一致。
+- 维持当前 PR `#122` 的验证证据与 active exec-plan 一致，并等待 reviewer / guardian / merge gate。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -74,6 +78,18 @@
   - 结果：`Ran 66 tests`，`OK`
 - `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
   - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --integration-touchpoint check_required --shared-contract-changed yes --integration-ref MC-and-his-Agents/Syvert#67 --external-dependency none --merge-gate integration_check_required --contract-surface raw_normalized --joint-acceptance-needed no --integration-status-checked-before-pr yes`
+  - 结果：已创建 PR `#122`
+- `gh pr edit 122 --body ...`
+  - 结果：PR 描述已补齐目标、主要改动、风险、验证与 integration carrier
+- `gh issue edit 118 --body ...`
+  - 结果：`#118` 当前状态已更新为 `进行中（PR #122）`
+- `gh issue edit 67 --body ...`
+  - 结果：父 FR `#67` 已补齐 `#118/#119/#120/#121` 子 Work Item 列表
 
 ## 未决风险
 
@@ -87,5 +103,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ec73e84eba2e0bc20d38c3d364c0e81a798ef19c`
-- 说明：当前 checkpoint 为进入 `#118` 独立 worktree 后的初始执行基线；后续形成可验证改动后再刷新。
+- `0ce10b35f9c4b06a876f1ffbb0ad00f34606d96a`
+- 说明：该 checkpoint 已覆盖 `version_gate` 模块、测试、active exec-plan、PR `#122` 与当前 GitHub 文案收口；后续仅剩 reviewer / guardian / merge gate 审查链路。
