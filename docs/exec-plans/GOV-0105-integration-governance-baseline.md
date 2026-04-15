@@ -28,13 +28,13 @@
 
 - `PR-A/#114`、`PR-B/#115`、`PR-C/#116` 已合并到 `main`，仓库内 canonical integration contract、运行时治理链路与 carrier 已经完成收口。
 - 当前剩余 repo 内动作是 `PR-D Evidence / Rollout`：把外部 GitHub rollout 事实移出 ADR / active `exec-plan` 主体，并单独落盘为 rollout evidence。
+- `PR-D/#117` 已以 Draft 形式打开，当前 docs closeout 内容、最小门禁验证与 GitHub evidence capture 已完成，停点转为 guardian / merge gate 收口。
 - `#107` 仍保持冻结的 superseded closeout 候选状态，等待替代链完全收口后补 replacement chain 并关闭。
 
 ## 下一步动作
 
-- 完成 ADR、`exec-plan` 与 rollout evidence 文档改写。
-- 运行 `python3 scripts/workflow_guard.py --mode pre-commit` 与 `python3 scripts/docs_guard.py --mode ci`。
-- 通过 `open_pr.py` 开 Draft PR，收口 checks、guardian 与 merge gate 后合并。
+- 在当前 head 上收口 guardian findings，并保持 ADR / `exec-plan` / rollout evidence 三者叙事一致。
+- 待 guardian 给出 `APPROVE + safe_to_merge=true` 且 checks 全绿后，将 `#117` 从 Draft 转为 Ready 并通过 `merge_pr.py` 受控合并。
 - PR-D 合并后，在 `#107` 补 replacement chain comment 并关闭为 superseded；必要时在 `#105` 补最终收口说明。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -70,5 +70,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次完成 PR-D docs closeout 内容收口并同步最小门禁证据的 checkpoint：`25fbe5168aa6cfb8536384633e27efbdf7f48da5`
-- 当前 PR 审查态如继续产生新的 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR `#117` 的 latest head。
+- 最近一次完成 PR-D docs closeout 内容收口并同步外部 evidence capture 的 checkpoint：`3cbaab775acc363e39c5dff97768e6192683119a`
+- 当前 PR 审查态如继续产生 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR `#117` 的 latest head。

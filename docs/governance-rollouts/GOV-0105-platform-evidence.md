@@ -37,7 +37,7 @@
 - `integration_ref` 当前指向 owner 级 project item，live state 已可由 merge gate / `governance_status` 读取。
 - `#107` 当前状态：`OPEN`；待 replacement chain 完整后关闭为 superseded。
 - `#114` / `#115` / `#116` 已分别在 `2026-04-14T10:04:20Z`、`2026-04-14T17:28:37Z`、`2026-04-15T02:19:22Z` 合并。
-- `#117` 为当前 `PR-D Evidence / Rollout` docs closeout PR，当前状态：`OPEN`、`Draft=true`。
+- 在 `2026-04-15T02:56:55Z` 的采集快照中，`#117` 为当前 `PR-D Evidence / Rollout` docs closeout PR，状态为 `OPEN`、`Draft=true`。
 
 ## Backfill
 
