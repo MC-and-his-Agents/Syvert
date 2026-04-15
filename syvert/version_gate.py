@@ -1190,6 +1190,16 @@ def _normalize_leakage_findings(
                 )
             )
             continue
+        if boundary not in _REQUIRED_LEAKAGE_BOUNDARIES:
+            failures.append(
+                _failure(
+                    source,
+                    "unsupported_leakage_finding_boundary",
+                    "platform leakage finding boundary must stay within the shared leakage boundary contract",
+                    details={"code": code, "boundary": boundary},
+                )
+            )
+            continue
         if not _is_non_empty_string(evidence_ref):
             failures.append(
                 _failure(
@@ -1332,12 +1342,12 @@ def _normalize_failure_entry(entry: Any, source: str) -> dict[str, Any]:
         return _failure(source, "invalid_failure_entry", "failure entry must be a mapping")
     code = entry.get("code")
     message = entry.get("message")
-    details = entry.get("details")
+    details = _sanitize_failure_details(entry.get("details"))
     return _failure(
         source,
         code if _is_non_empty_string(code) else "invalid_failure_code",
         message if _is_non_empty_string(message) else "failure entry is missing message",
-        details=details if isinstance(details, Mapping) else {},
+        details=details,
     )
 
 
@@ -1545,12 +1555,33 @@ def _dedupe_failures(failures: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     deduped: list[dict[str, Any]] = []
     seen: set[str] = set()
     for failure in failures:
-        key = json.dumps(failure, sort_keys=True, ensure_ascii=False)
+        key = json.dumps(failure, sort_keys=True, ensure_ascii=False, default=str)
         if key in seen:
             continue
         seen.add(key)
         deduped.append(dict(failure))
     return deduped
+
+
+def _sanitize_failure_details(raw_details: Any) -> dict[str, Any]:
+    if not isinstance(raw_details, Mapping):
+        return {}
+    return {str(key): _sanitize_json_like(value) for key, value in raw_details.items()}
+
+
+def _sanitize_json_like(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _sanitize_json_like(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_json_like(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_json_like(item) for item in value]
+    if isinstance(value, set):
+        sanitized_items = [_sanitize_json_like(item) for item in value]
+        return sorted(sanitized_items, key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False, default=str))
+    return str(value)
 
 
 __all__ = [
