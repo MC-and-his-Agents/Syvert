@@ -127,6 +127,16 @@ def validate_real_adapter_regression_source_report(
     failures: list[dict[str, Any]] = []
     expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
     _enforce_frozen_reference_pair(version, expected_reference_pair, source, failures)
+    expected_operation = _frozen_real_regression_operation(version)
+    if operation != expected_operation:
+        failures.append(
+            _failure(
+                source,
+                "operation_not_frozen_for_version",
+                "real adapter regression validator operation must match the formal-spec frozen operation",
+                details={"expected_operation": expected_operation, "actual_operation": operation},
+            )
+        )
     payload = _require_mapping(report, source, "invalid_real_adapter_regression_report", failures)
     evidence_refs = _normalize_evidence_refs(
         payload.get("evidence_refs"),
@@ -147,13 +157,13 @@ def validate_real_adapter_regression_source_report(
         )
 
     payload_operation = payload.get("operation")
-    if payload_operation != operation:
+    if payload_operation != expected_operation:
         failures.append(
             _failure(
                 source,
                 "operation_mismatch",
                 "real adapter regression report operation does not match required operation",
-                details={"expected_operation": operation, "actual_operation": payload_operation},
+                details={"expected_operation": expected_operation, "actual_operation": payload_operation},
             )
         )
 

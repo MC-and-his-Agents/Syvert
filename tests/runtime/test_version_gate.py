@@ -220,6 +220,24 @@ class VersionGateTests(unittest.TestCase):
             {item["code"] for item in report["details"]["failures"]},
         )
 
+    def test_real_regression_rejects_non_frozen_operation_at_public_entry(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["operation"] = "creator_detail"
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            operation="creator_detail",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "operation_not_frozen_for_version",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+        self.assertIn("operation_mismatch", {item["code"] for item in report["details"]["failures"]})
+
     def test_real_regression_accepts_reordered_frozen_reference_pair(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
         payload["reference_pair"] = ["douyin", "xhs"]
