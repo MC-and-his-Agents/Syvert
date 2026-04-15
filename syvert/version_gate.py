@@ -583,6 +583,19 @@ def _normalize_existing_source_report(
                 "source report must carry non-empty evidence refs",
             ),
         )
+    report_summary = str(report.get("summary") or "").strip()
+    if not report_summary:
+        return _synthetic_failed_source_report(
+            source=expected_source,
+            version=version,
+            gate_reference_pair=gate_reference_pair,
+            summary=f"{expected_source} source report is invalid",
+            failure=_failure(
+                expected_source,
+                "missing_source_summary",
+                "source report must carry non-empty summary",
+            ),
+        )
 
     details = report.get("details")
     if not isinstance(details, Mapping):
@@ -610,12 +623,12 @@ def _normalize_existing_source_report(
                 "source report details must carry a failures list",
             ),
         )
-    report_summary = str(report.get("summary") or "").strip()
 
     if expected_source == SOURCE_HARNESS:
         raw_required_sample_ids = details.get("required_sample_ids")
+        raw_observed_sample_ids = details.get("observed_sample_ids")
         raw_validation_results = details.get("validation_results")
-        if raw_required_sample_ids is None or raw_validation_results is None:
+        if raw_required_sample_ids is None or raw_observed_sample_ids is None or raw_validation_results is None:
             return _synthetic_failed_source_report(
                 source=expected_source,
                 version=version,
@@ -624,7 +637,7 @@ def _normalize_existing_source_report(
                 failure=_failure(
                     expected_source,
                     "missing_harness_details",
-                    "harness source report must carry required_sample_ids and validation_results",
+                    "harness source report must carry required_sample_ids, observed_sample_ids and validation_results",
                 ),
             )
         rebuilt_report = build_harness_source_report(
