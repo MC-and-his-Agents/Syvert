@@ -359,6 +359,18 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
 
+    def test_platform_leakage_rejects_empty_version(self) -> None:
+        report = validate_platform_leakage_source_report(
+            {
+                **self.valid_platform_leakage_payload(),
+                "version": "",
+            },
+            version="",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("missing_version", {item["code"] for item in report["details"]["failures"]})
+
     def test_platform_leakage_rejects_mapping_shaped_boundary_scope(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["boundary_scope"] = {"core_runtime": True}
@@ -551,6 +563,76 @@ class VersionGateTests(unittest.TestCase):
             "missing_real_regression_details",
             {item["code"] for item in report["failures"]},
         )
+
+    def test_orchestrator_preserves_failed_harness_source_report(self) -> None:
+        failed_harness_report = build_harness_source_report(
+            [
+                {
+                    "sample_id": "sample-valid",
+                    "verdict": "pass",
+                    "reason": {"code": "success_envelope_observed", "message": "success"},
+                    "observed_status": "success",
+                    "observed_error": None,
+                },
+                {
+                    "sample_id": "sample-success",
+                    "verdict": "pass",
+                    "reason": {"code": "success_envelope_observed", "message": "success"},
+                    "observed_status": "broken",
+                    "observed_error": None,
+                }
+            ],
+            required_sample_ids=["sample-valid", "sample-success"],
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=failed_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["harness"]["verdict"], "fail")
+        self.assertIn("invalid_observed_status", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_preserves_failed_real_regression_source_report(self) -> None:
+        failed_real_regression_report = validate_real_adapter_regression_source_report(
+            {
+                **self.valid_real_adapter_regression_payload(),
+                "reference_pair": {"forged": True},
+            },
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=failed_real_regression_report,
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "fail")
+        self.assertIn("invalid_report_reference_pair", {item["code"] for item in report["failures"]})
 
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
         forged_report = {

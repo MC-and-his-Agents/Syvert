@@ -303,6 +303,14 @@ def validate_platform_leakage_source_report(
 ) -> dict[str, Any]:
     source = SOURCE_PLATFORM_LEAKAGE
     failures: list[dict[str, Any]] = []
+    if not _is_non_empty_string(version):
+        failures.append(
+            _failure(
+                source,
+                "missing_version",
+                "platform leakage source report requires non-empty version",
+            )
+        )
     payload = _require_mapping(report, source, "invalid_platform_leakage_report", failures)
     evidence_refs = _normalize_evidence_refs(
         payload.get("evidence_refs"),
@@ -579,10 +587,14 @@ def _normalize_existing_source_report(
                     "harness source report must carry required_sample_ids and validation_results",
                 ),
             )
-        return build_harness_source_report(
+        rebuilt_report = build_harness_source_report(
             raw_validation_results,
             raw_required_sample_ids,
             version=version,
+        )
+        return _merge_rebuilt_source_report_with_input_failures(
+            rebuilt_report,
+            normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
     if expected_source == SOURCE_REAL_ADAPTER_REGRESSION:
@@ -600,7 +612,7 @@ def _normalize_existing_source_report(
                     "real adapter regression source report must carry reference_pair, operation and adapter_results",
                 ),
             )
-        return validate_real_adapter_regression_source_report(
+        rebuilt_report = validate_real_adapter_regression_source_report(
             {
                 "version": version,
                 "reference_pair": raw_reference_pair,
@@ -611,6 +623,10 @@ def _normalize_existing_source_report(
             version=version,
             reference_pair=gate_reference_pair or raw_reference_pair,
             operation=_frozen_real_regression_operation(version),
+        )
+        return _merge_rebuilt_source_report_with_input_failures(
+            rebuilt_report,
+            normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
     raw_boundary_scope = details.get("boundary_scope")
@@ -627,7 +643,7 @@ def _normalize_existing_source_report(
                 "platform leakage source report must carry boundary_scope, report_verdict and findings",
             ),
         )
-    return validate_platform_leakage_source_report(
+    rebuilt_report = validate_platform_leakage_source_report(
         {
             "version": version,
             "boundary_scope": raw_boundary_scope,
@@ -637,6 +653,10 @@ def _normalize_existing_source_report(
             "evidence_refs": evidence_refs,
         },
         version=version,
+    )
+    return _merge_rebuilt_source_report_with_input_failures(
+        rebuilt_report,
+        normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
     )
 
 
@@ -1258,6 +1278,27 @@ def _normalize_failure_entry(entry: Any, source: str) -> dict[str, Any]:
         message if _is_non_empty_string(message) else "failure entry is missing message",
         details=details if isinstance(details, Mapping) else {},
     )
+
+
+def _normalize_failure_entries(entries: list[Any], source: str) -> list[dict[str, Any]]:
+    return [_normalize_failure_entry(entry, source) for entry in entries]
+
+
+def _merge_rebuilt_source_report_with_input_failures(
+    rebuilt_report: Mapping[str, Any],
+    *,
+    normalized_report_failures: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    rebuilt_details = dict(rebuilt_report.get("details") or {})
+    rebuilt_failures = list(rebuilt_details.get("failures") or [])
+    if normalized_report_failures:
+        rebuilt_failures = list(normalized_report_failures) + rebuilt_failures
+    rebuilt_details["failures"] = rebuilt_failures
+    merged_report = dict(rebuilt_report)
+    merged_report["details"] = rebuilt_details
+    if rebuilt_failures:
+        merged_report["verdict"] = FAIL_VERDICT
+    return merged_report
 
 
 def _source_report(

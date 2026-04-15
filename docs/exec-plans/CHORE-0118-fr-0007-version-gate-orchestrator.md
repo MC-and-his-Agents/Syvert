@@ -56,6 +56,10 @@
   - real regression 在 orchestrator 二次校验时改为强制绑定 `content_detail_by_url` 最小矩阵，不再回显 source report 自报 `operation`
 - guardian 第五轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
   - 公开 `validate_real_adapter_regression_source_report()` 入口本身也改为强制绑定 `content_detail_by_url` 最小矩阵
+- guardian 第六轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项收口：
+  - orchestrator 不再把已有失败 source report 洗回 `pass`
+  - `validate_platform_leakage_source_report()` 对空版本标识改为 fail-closed
+  - 新增 `contracts/version-gate-result-model.md`，为统一 version gate / source report 结果模型提供可审查 contract artifact
 
 ## 下一步动作
 
@@ -97,8 +101,14 @@
   - 结果：第四轮 guardian 修复后复跑，`Ran 33 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：第五轮 guardian 修复后复跑，`Ran 34 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第六轮 guardian 修复后复跑，`Ran 37 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：`Ran 66 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/spec_guard.py --all`
+  - 结果：通过
 - `python3 scripts/pr_guardian.py review 122`
   - 结果：guardian 首轮返回 `REQUEST_CHANGES`
   - 已修复阻断：
@@ -122,6 +132,12 @@
   - 结果：guardian 第五轮返回 `REQUEST_CHANGES`
   - 已修复阻断：
     - 公开 `validate_real_adapter_regression_source_report()` 入口不再接受未冻结 `operation`
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第六轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - orchestrator 不再把已有失败 source report 洗回 `pass`
+    - platform leakage 空版本标识改为 fail-closed
+    - 统一 version gate 结果模型已补齐可审查 contract artifact
 - `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
   - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
@@ -149,5 +165,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9b5bd4a90161c446f0f7509e178179b34d40ef2b`
-- 说明：该 checkpoint 已覆盖 guardian 五轮前的全部代码修复；当前 follow-up 仅用于把 active exec-plan 与最新代码 checkpoint、PR `#122` 及审查证据对齐，不再改动运行时代码。
+- `2b506bc23dc3bf52d9a1114986a6ff41f3b18a09`
+- 说明：该 checkpoint 对应第六轮 guardian 修复前的最新 metadata head；下一次提交将把 source-level failure 保留、platform leakage 空版本 fail-closed 与 unified result model contract artifact 一并纳入新的代码/文档 checkpoint。
