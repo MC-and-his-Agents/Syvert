@@ -1,0 +1,1173 @@
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
+
+
+SOURCE_HARNESS = "harness"
+SOURCE_REAL_ADAPTER_REGRESSION = "real_adapter_regression"
+SOURCE_PLATFORM_LEAKAGE = "platform_leakage"
+SOURCE_VERSION_GATE = "version_gate"
+
+PASS_VERDICT = "pass"
+FAIL_VERDICT = "fail"
+
+_HARNESS_ALLOWED_VERDICTS = frozenset(
+    {"pass", "legal_failure", "contract_violation", "execution_precondition_not_met"}
+)
+_OBSERVED_RUNTIME_STATUSES = frozenset({"success", "failed"})
+_REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})
+_REAL_REGRESSION_EXPECTED_OUTCOMES = frozenset({"success", "allowed_failure"})
+_REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
+    {
+        "core_runtime",
+        "shared_input_model",
+        "shared_error_model",
+        "adapter_registry",
+        "shared_result_contract",
+        "version_gate_logic",
+    }
+)
+
+
+def build_harness_source_report(
+    validation_results: Sequence[Mapping[str, Any]] | Iterable[Mapping[str, Any]],
+    required_sample_ids: Sequence[str] | Iterable[str],
+    *,
+    version: str,
+) -> dict[str, Any]:
+    failures: list[dict[str, Any]] = []
+    normalized_required = _normalize_required_sample_ids(required_sample_ids, failures)
+    normalized_results = _normalize_harness_validation_results(validation_results, failures)
+
+    result_index = {result["sample_id"]: result for result in normalized_results}
+    missing_sample_ids = [sample_id for sample_id in normalized_required if sample_id not in result_index]
+    if missing_sample_ids:
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "missing_required_harness_samples",
+                "required harness sample set is incomplete",
+                details={"missing_sample_ids": missing_sample_ids},
+            )
+        )
+
+    for result in normalized_results:
+        verdict = result["verdict"]
+        if verdict == "contract_violation":
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "contract_violation_observed",
+                    "harness observed contract violation",
+                    details={
+                        "sample_id": result["sample_id"],
+                        "reason": dict(result["reason"]),
+                    },
+                )
+            )
+        elif verdict == "execution_precondition_not_met":
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "execution_precondition_not_met_observed",
+                    "harness execution precondition is not met",
+                    details={
+                        "sample_id": result["sample_id"],
+                        "reason": dict(result["reason"]),
+                    },
+                )
+            )
+
+    evidence_refs = [f"harness_validation:{sample_id}" for sample_id in sorted(result_index)]
+    if not _is_non_empty_string(version):
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "missing_version",
+                "harness source report requires non-empty version",
+            )
+        )
+
+    summary = (
+        f"harness passed for version `{version}` with {len(normalized_results)} validated samples"
+        if not failures
+        else f"harness failed for version `{version or 'unknown'}`"
+    )
+    return _source_report(
+        source=SOURCE_HARNESS,
+        version=version,
+        verdict=PASS_VERDICT if not failures else FAIL_VERDICT,
+        summary=summary,
+        evidence_refs=evidence_refs,
+        details={
+            "required_sample_ids": list(normalized_required),
+            "observed_sample_ids": sorted(result_index),
+            "validation_results": normalized_results,
+            "failures": failures,
+        },
+    )
+
+
+def validate_real_adapter_regression_source_report(
+    report: Mapping[str, Any] | None,
+    *,
+    version: str,
+    reference_pair: Sequence[str] | Iterable[str],
+    operation: str = "content_detail_by_url",
+) -> dict[str, Any]:
+    source = SOURCE_REAL_ADAPTER_REGRESSION
+    failures: list[dict[str, Any]] = []
+    expected_reference_pair = _normalize_reference_pair(reference_pair, source, failures)
+    payload = _require_mapping(report, source, "invalid_real_adapter_regression_report", failures)
+    evidence_refs = _normalize_evidence_refs(
+        payload.get("evidence_refs"),
+        source=source,
+        field_name="evidence_refs",
+        failures=failures,
+    )
+
+    payload_version = payload.get("version")
+    if payload_version != version:
+        failures.append(
+            _failure(
+                source,
+                "version_mismatch",
+                "real adapter regression report version does not match gate version",
+                details={"expected_version": version, "actual_version": payload_version},
+            )
+        )
+
+    payload_operation = payload.get("operation")
+    if payload_operation != operation:
+        failures.append(
+            _failure(
+                source,
+                "operation_mismatch",
+                "real adapter regression report operation does not match required operation",
+                details={"expected_operation": operation, "actual_operation": payload_operation},
+            )
+        )
+
+    payload_reference_pair = _normalize_reference_pair(
+        payload.get("reference_pair"),
+        source,
+        failures,
+        code="invalid_report_reference_pair",
+        message="real adapter regression report must carry a complete reference pair",
+    )
+    if payload_reference_pair and sorted(payload_reference_pair) != sorted(expected_reference_pair):
+        failures.append(
+            _failure(
+                source,
+                "reference_pair_mismatch",
+                "real adapter regression report reference pair does not match gate reference pair",
+                details={
+                    "expected_reference_pair": expected_reference_pair,
+                    "actual_reference_pair": payload_reference_pair,
+                },
+            )
+        )
+
+    adapter_results = _normalize_adapter_results(payload.get("adapter_results"), source, failures)
+    adapters_by_key = {entry["adapter_key"]: entry for entry in adapter_results}
+    for adapter_key in expected_reference_pair:
+        adapter_result = adapters_by_key.get(adapter_key)
+        if adapter_result is None:
+            failures.append(
+                _failure(
+                    source,
+                    "missing_adapter_result",
+                    "real adapter regression report is missing adapter coverage",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+            continue
+        cases = adapter_result["cases"]
+        success_covered = False
+        failure_covered = False
+        for case in cases:
+            expected_outcome = case["expected_outcome"]
+            observed_status = case["observed_status"]
+            observed_error_category = case["observed_error_category"]
+            case_details = {"adapter_key": adapter_key, "case_id": case["case_id"]}
+            if expected_outcome == "success":
+                if observed_status == "success":
+                    success_covered = True
+                    continue
+                failures.append(
+                    _failure(
+                        source,
+                        "expected_success_not_observed",
+                        "real adapter regression expected success but observed failure",
+                        details=case_details,
+                    )
+                )
+                continue
+            if observed_status != "failed":
+                failures.append(
+                    _failure(
+                        source,
+                        "expected_failure_not_observed",
+                        "real adapter regression expected allowed failure but observed success",
+                        details=case_details,
+                    )
+                )
+                continue
+            if observed_error_category not in _REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES:
+                failures.append(
+                    _failure(
+                        source,
+                        "disallowed_failure_category",
+                        "real adapter regression observed failure category outside allowed set",
+                        details={
+                            **case_details,
+                            "observed_error_category": observed_error_category,
+                        },
+                    )
+                )
+                continue
+            failure_covered = True
+        if not success_covered:
+            failures.append(
+                _failure(
+                    source,
+                    "missing_success_coverage",
+                    "real adapter regression is missing at least one successful case",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+        if not failure_covered:
+            failures.append(
+                _failure(
+                    source,
+                    "missing_allowed_failure_coverage",
+                    "real adapter regression is missing at least one allowed failure case",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+
+    unexpected_adapters = sorted(set(adapters_by_key) - set(expected_reference_pair))
+    if unexpected_adapters:
+        failures.append(
+            _failure(
+                source,
+                "unexpected_adapter_results",
+                "real adapter regression report carries unexpected adapter coverage",
+                details={"unexpected_adapter_keys": unexpected_adapters},
+            )
+        )
+
+    summary = (
+        f"real adapter regression passed for version `{version}`"
+        if not failures
+        else f"real adapter regression failed for version `{version}`"
+    )
+    return _source_report(
+        source=source,
+        version=version,
+        verdict=PASS_VERDICT if not failures else FAIL_VERDICT,
+        summary=summary,
+        evidence_refs=evidence_refs,
+        details={
+            "reference_pair": expected_reference_pair,
+            "operation": operation,
+            "adapter_results": adapter_results,
+            "failures": failures,
+        },
+    )
+
+
+def validate_platform_leakage_source_report(
+    report: Mapping[str, Any] | None,
+    *,
+    version: str,
+) -> dict[str, Any]:
+    source = SOURCE_PLATFORM_LEAKAGE
+    failures: list[dict[str, Any]] = []
+    payload = _require_mapping(report, source, "invalid_platform_leakage_report", failures)
+    evidence_refs = _normalize_evidence_refs(
+        payload.get("evidence_refs"),
+        source=source,
+        field_name="evidence_refs",
+        failures=failures,
+    )
+
+    payload_version = payload.get("version")
+    if payload_version != version:
+        failures.append(
+            _failure(
+                source,
+                "version_mismatch",
+                "platform leakage report version does not match gate version",
+                details={"expected_version": version, "actual_version": payload_version},
+            )
+        )
+
+    boundaries = _normalize_boundaries(payload.get("boundary_scope"), source, failures)
+    missing_boundaries = sorted(_REQUIRED_LEAKAGE_BOUNDARIES - set(boundaries))
+    if missing_boundaries:
+        failures.append(
+            _failure(
+                source,
+                "missing_boundary_scope",
+                "platform leakage report does not cover the full required boundary scope",
+                details={"missing_boundaries": missing_boundaries},
+            )
+        )
+
+    findings = _normalize_leakage_findings(payload.get("findings"), source, failures)
+    payload_verdict = payload.get("verdict")
+    if payload_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
+        failures.append(
+            _failure(
+                source,
+                "invalid_leakage_verdict",
+                "platform leakage report verdict must be `pass` or `fail`",
+                details={"actual_verdict": payload_verdict},
+            )
+        )
+        payload_verdict = FAIL_VERDICT
+
+    if payload_verdict == PASS_VERDICT and findings:
+        failures.append(
+            _failure(
+                source,
+                "pass_report_with_findings",
+                "platform leakage pass report cannot carry findings",
+            )
+        )
+    if payload_verdict == FAIL_VERDICT and not findings:
+        failures.append(
+            _failure(
+                source,
+                "failure_report_without_findings",
+                "platform leakage failure report must carry findings",
+            )
+        )
+
+    gate_failures = list(findings) if payload_verdict == FAIL_VERDICT else []
+    normalized_failures = failures + gate_failures
+    summary = str(payload.get("summary") or "").strip()
+    if not summary:
+        summary = (
+            f"platform leakage passed for version `{version}`"
+            if not normalized_failures
+            else f"platform leakage failed for version `{version}`"
+        )
+
+    return _source_report(
+        source=source,
+        version=version,
+        verdict=PASS_VERDICT if not normalized_failures else FAIL_VERDICT,
+        summary=summary,
+        evidence_refs=evidence_refs,
+        details={
+            "boundary_scope": boundaries,
+            "report_verdict": payload_verdict,
+            "findings": findings,
+            "failures": normalized_failures,
+        },
+    )
+
+
+def orchestrate_version_gate(
+    *,
+    version: str,
+    reference_pair: Sequence[str] | Iterable[str],
+    harness_report: Mapping[str, Any] | None,
+    real_adapter_regression_report: Mapping[str, Any] | None,
+    platform_leakage_report: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    failures: list[dict[str, Any]] = []
+    normalized_reference_pair = _normalize_reference_pair(
+        reference_pair,
+        SOURCE_VERSION_GATE,
+        failures,
+        code="invalid_reference_pair",
+        message="version gate requires a complete reference pair",
+    )
+    if not _is_non_empty_string(version):
+        failures.append(
+            _failure(
+                SOURCE_VERSION_GATE,
+                "missing_version",
+                "version gate requires non-empty version",
+            )
+        )
+
+    source_reports = {
+        SOURCE_HARNESS: _normalize_existing_source_report(
+            harness_report, SOURCE_HARNESS, version=version
+        ),
+        SOURCE_REAL_ADAPTER_REGRESSION: _normalize_existing_source_report(
+            real_adapter_regression_report,
+            SOURCE_REAL_ADAPTER_REGRESSION,
+            version=version,
+        ),
+        SOURCE_PLATFORM_LEAKAGE: _normalize_existing_source_report(
+            platform_leakage_report,
+            SOURCE_PLATFORM_LEAKAGE,
+            version=version,
+        ),
+    }
+
+    for report in source_reports.values():
+        failures.extend(report["details"]["failures"])
+        if report["verdict"] != PASS_VERDICT and not report["details"]["failures"]:
+            failures.append(
+                _failure(
+                    report["source"],
+                    "source_report_failed_without_reason",
+                    "source report failed without explicit failure payload",
+                )
+            )
+
+    verdict = PASS_VERDICT if not failures else FAIL_VERDICT
+    failing_sources = [source for source, report in source_reports.items() if report["verdict"] != PASS_VERDICT]
+    if failures and not failing_sources and any(item["source"] == SOURCE_VERSION_GATE for item in failures):
+        failing_sources.append(SOURCE_VERSION_GATE)
+
+    summary = (
+        f"version gate passed for version `{version}`"
+        if verdict == PASS_VERDICT
+        else f"version gate failed for version `{version or 'unknown'}` via {', '.join(sorted(set(failing_sources)))}"
+    )
+    return {
+        "version": version,
+        "reference_pair": normalized_reference_pair,
+        "verdict": verdict,
+        "safe_to_release": verdict == PASS_VERDICT,
+        "summary": summary,
+        "source_reports": source_reports,
+        "failures": failures,
+    }
+
+
+def _normalize_existing_source_report(
+    report: Mapping[str, Any] | None,
+    expected_source: str,
+    *,
+    version: str,
+) -> dict[str, Any]:
+    if not isinstance(report, Mapping):
+        synthetic = _failure(
+            expected_source,
+            "missing_source_report",
+            "version gate requires all mandatory source reports",
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is missing",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+
+    source = report.get("source")
+    if source != expected_source:
+        synthetic = _failure(
+            expected_source,
+            "source_mismatch",
+            "source report name does not match expected source",
+            details={"actual_source": source},
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is invalid",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+
+    report_version = report.get("version")
+    report_verdict = report.get("verdict")
+    if report_verdict not in {PASS_VERDICT, FAIL_VERDICT}:
+        synthetic = _failure(
+            expected_source,
+            "invalid_source_verdict",
+            "source report verdict must be `pass` or `fail`",
+            details={"actual_verdict": report_verdict},
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is invalid",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+    evidence_refs = report.get("evidence_refs")
+    if not _is_string_sequence(evidence_refs) or not evidence_refs:
+        synthetic = _failure(
+            expected_source,
+            "missing_source_evidence_refs",
+            "source report must carry non-empty evidence refs",
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is missing evidence refs",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+
+    details = report.get("details")
+    if not isinstance(details, Mapping):
+        synthetic = _failure(
+            expected_source,
+            "invalid_source_details",
+            "source report details must be a mapping",
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is invalid",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+    report_failures = details.get("failures")
+    if not isinstance(report_failures, list):
+        synthetic = _failure(
+            expected_source,
+            "missing_source_failures",
+            "source report details must carry a failures list",
+        )
+        return _source_report(
+            source=expected_source,
+            version=version,
+            verdict=FAIL_VERDICT,
+            summary=f"{expected_source} source report is invalid",
+            evidence_refs=[],
+            details={"failures": [synthetic]},
+        )
+
+    normalized_details = dict(details)
+    normalized_failures = [
+        _normalize_failure_entry(entry, expected_source) for entry in report_failures
+    ]
+    if report_version != version:
+        normalized_failures.append(
+            _failure(
+                expected_source,
+                "source_report_version_mismatch",
+                "source report version does not match orchestrated version",
+                details={"expected_version": version, "actual_version": report_version},
+            )
+        )
+    normalized_details["failures"] = normalized_failures
+    return {
+        "source": expected_source,
+        "version": version,
+        "verdict": FAIL_VERDICT if normalized_failures else report_verdict,
+        "summary": str(report.get("summary") or "").strip()
+        or f"{expected_source} source report verdict: {report_verdict}",
+        "evidence_refs": list(evidence_refs),
+        "details": normalized_details,
+    }
+
+
+def _normalize_required_sample_ids(
+    raw_sample_ids: Sequence[str] | Iterable[str],
+    failures: list[dict[str, Any]],
+) -> list[str]:
+    sample_ids = _normalize_string_list(
+        raw_sample_ids,
+        source=SOURCE_HARNESS,
+        field_name="required_sample_ids",
+        failures=failures,
+        code="invalid_required_sample_ids",
+        message="required harness sample ids must be a non-empty string sequence",
+    )
+    if not sample_ids:
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "empty_required_sample_ids",
+                "required harness sample ids cannot be empty",
+            )
+        )
+    return sample_ids
+
+
+def _normalize_harness_validation_results(
+    validation_results: Sequence[Mapping[str, Any]] | Iterable[Mapping[str, Any]],
+    failures: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if isinstance(validation_results, (str, bytes)) or not isinstance(validation_results, Iterable):
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "invalid_validation_results",
+                "harness validation results must be an iterable of mappings",
+            )
+        )
+        return []
+
+    normalized_results: list[dict[str, Any]] = []
+    seen_sample_ids: set[str] = set()
+    for index, result in enumerate(validation_results):
+        if not isinstance(result, Mapping):
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_validation_result_entry",
+                    "harness validation result entry must be a mapping",
+                    details={"index": index},
+                )
+            )
+            continue
+        sample_id = result.get("sample_id")
+        if not _is_non_empty_string(sample_id):
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_sample_id",
+                    "harness validation result must carry non-empty sample_id",
+                    details={"index": index},
+                )
+            )
+            continue
+        if sample_id in seen_sample_ids:
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "duplicate_sample_id",
+                    "harness validation results cannot repeat sample_id",
+                    details={"sample_id": sample_id},
+                )
+            )
+            continue
+        seen_sample_ids.add(sample_id)
+
+        verdict = result.get("verdict")
+        if verdict not in _HARNESS_ALLOWED_VERDICTS:
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_harness_verdict",
+                    "harness validation result verdict is unsupported",
+                    details={"sample_id": sample_id, "verdict": verdict},
+                )
+            )
+            continue
+
+        reason = result.get("reason")
+        if not isinstance(reason, Mapping):
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_reason_object",
+                    "harness validation result must carry reason.code and reason.message",
+                    details={"sample_id": sample_id},
+                )
+            )
+            continue
+        reason_code = reason.get("code")
+        reason_message = reason.get("message")
+        if not _is_non_empty_string(reason_code) or not _is_non_empty_string(reason_message):
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_reason_fields",
+                    "harness validation result reason must carry non-empty code and message",
+                    details={"sample_id": sample_id},
+                )
+            )
+            continue
+
+        observed_status = result.get("observed_status")
+        if observed_status is not None and observed_status not in _OBSERVED_RUNTIME_STATUSES:
+            failures.append(
+                _failure(
+                    SOURCE_HARNESS,
+                    "invalid_observed_status",
+                    "harness validation result observed_status is unsupported",
+                    details={"sample_id": sample_id, "observed_status": observed_status},
+                )
+            )
+            continue
+
+        observed_error = result.get("observed_error")
+        normalized_observed_error = _normalize_observed_error(
+            observed_error,
+            sample_id=sample_id,
+            failures=failures,
+        )
+        if observed_error is not None and normalized_observed_error is None:
+            continue
+
+        normalized_results.append(
+            {
+                "sample_id": sample_id,
+                "verdict": verdict,
+                "reason": {
+                    "code": reason_code,
+                    "message": reason_message,
+                },
+                "observed_status": observed_status,
+                "observed_error": normalized_observed_error,
+            }
+        )
+    return normalized_results
+
+
+def _normalize_observed_error(
+    observed_error: Any,
+    *,
+    sample_id: str,
+    failures: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if observed_error is None:
+        return None
+    if not isinstance(observed_error, Mapping):
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "invalid_observed_error",
+                "harness validation result observed_error must be a mapping or null",
+                details={"sample_id": sample_id},
+            )
+        )
+        return None
+    category = observed_error.get("category")
+    code = observed_error.get("code")
+    message = observed_error.get("message")
+    details = observed_error.get("details")
+    if not _is_non_empty_string(category) or not _is_non_empty_string(code) or not _is_non_empty_string(message):
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "invalid_observed_error_fields",
+                "harness validation result observed_error must carry non-empty category/code/message",
+                details={"sample_id": sample_id},
+            )
+        )
+        return None
+    if not isinstance(details, Mapping):
+        failures.append(
+            _failure(
+                SOURCE_HARNESS,
+                "invalid_observed_error_details",
+                "harness validation result observed_error.details must be a mapping",
+                details={"sample_id": sample_id},
+            )
+        )
+        return None
+    return {
+        "category": category,
+        "code": code,
+        "message": message,
+        "details": dict(details),
+    }
+
+
+def _normalize_adapter_results(
+    raw_adapter_results: Any,
+    source: str,
+    failures: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if isinstance(raw_adapter_results, (str, bytes)) or not isinstance(raw_adapter_results, Iterable):
+        failures.append(
+            _failure(
+                source,
+                "invalid_adapter_results",
+                "real adapter regression report must carry iterable adapter_results",
+            )
+        )
+        return []
+
+    normalized_results: list[dict[str, Any]] = []
+    seen_adapter_keys: set[str] = set()
+    for entry in raw_adapter_results:
+        if not isinstance(entry, Mapping):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_adapter_result_entry",
+                    "adapter_results entry must be a mapping",
+                )
+            )
+            continue
+        adapter_key = entry.get("adapter_key")
+        if not _is_non_empty_string(adapter_key):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_adapter_key",
+                    "adapter result must carry non-empty adapter_key",
+                )
+            )
+            continue
+        if adapter_key in seen_adapter_keys:
+            failures.append(
+                _failure(
+                    source,
+                    "duplicate_adapter_key",
+                    "adapter_results cannot repeat adapter_key",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+            continue
+        seen_adapter_keys.add(adapter_key)
+        cases = _normalize_regression_cases(entry.get("cases"), source, failures, adapter_key=adapter_key)
+        normalized_results.append({"adapter_key": adapter_key, "cases": cases})
+    return normalized_results
+
+
+def _normalize_regression_cases(
+    raw_cases: Any,
+    source: str,
+    failures: list[dict[str, Any]],
+    *,
+    adapter_key: str,
+) -> list[dict[str, Any]]:
+    if isinstance(raw_cases, (str, bytes)) or not isinstance(raw_cases, Iterable):
+        failures.append(
+            _failure(
+                source,
+                "invalid_adapter_cases",
+                "adapter result must carry iterable cases",
+                details={"adapter_key": adapter_key},
+            )
+        )
+        return []
+
+    normalized_cases: list[dict[str, Any]] = []
+    seen_case_ids: set[str] = set()
+    for entry in raw_cases:
+        if not isinstance(entry, Mapping):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_case_entry",
+                    "adapter regression case must be a mapping",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+            continue
+        case_id = entry.get("case_id")
+        if not _is_non_empty_string(case_id):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_case_id",
+                    "adapter regression case must carry non-empty case_id",
+                    details={"adapter_key": adapter_key},
+                )
+            )
+            continue
+        if case_id in seen_case_ids:
+            failures.append(
+                _failure(
+                    source,
+                    "duplicate_case_id",
+                    "adapter regression cases cannot repeat case_id",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
+        seen_case_ids.add(case_id)
+        expected_outcome = entry.get("expected_outcome")
+        observed_status = entry.get("observed_status")
+        observed_error_category = entry.get("observed_error_category")
+        if expected_outcome not in _REAL_REGRESSION_EXPECTED_OUTCOMES:
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_expected_outcome",
+                    "adapter regression case expected_outcome is unsupported",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
+        if observed_status not in _OBSERVED_RUNTIME_STATUSES:
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_observed_status",
+                    "adapter regression case observed_status is unsupported",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
+        if observed_status == "success" and observed_error_category is not None:
+            failures.append(
+                _failure(
+                    source,
+                    "success_case_with_error_category",
+                    "successful regression case cannot carry observed_error_category",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
+        if observed_status == "failed" and not _is_non_empty_string(observed_error_category):
+            failures.append(
+                _failure(
+                    source,
+                    "failed_case_without_error_category",
+                    "failed regression case must carry observed_error_category",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
+        normalized_cases.append(
+            {
+                "case_id": case_id,
+                "expected_outcome": expected_outcome,
+                "observed_status": observed_status,
+                "observed_error_category": observed_error_category,
+            }
+        )
+    return normalized_cases
+
+
+def _normalize_boundaries(
+    raw_boundaries: Any,
+    source: str,
+    failures: list[dict[str, Any]],
+) -> list[str]:
+    return _normalize_string_list(
+        raw_boundaries,
+        source=source,
+        field_name="boundary_scope",
+        failures=failures,
+        code="invalid_boundary_scope",
+        message="platform leakage report boundary_scope must be a non-empty string sequence",
+    )
+
+
+def _normalize_leakage_findings(
+    raw_findings: Any,
+    source: str,
+    failures: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if raw_findings is None:
+        return []
+    if isinstance(raw_findings, (str, bytes)) or not isinstance(raw_findings, Iterable):
+        failures.append(
+            _failure(
+                source,
+                "invalid_leakage_findings",
+                "platform leakage report findings must be iterable",
+            )
+        )
+        return []
+    normalized_findings: list[dict[str, Any]] = []
+    for entry in raw_findings:
+        if not isinstance(entry, Mapping):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_leakage_finding_entry",
+                    "platform leakage finding must be a mapping",
+                )
+            )
+            continue
+        code = entry.get("code")
+        message = entry.get("message")
+        boundary = entry.get("boundary")
+        evidence_ref = entry.get("evidence_ref")
+        if not _is_non_empty_string(code) or not _is_non_empty_string(message):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_leakage_finding_fields",
+                    "platform leakage finding must carry non-empty code and message",
+                )
+            )
+            continue
+        if not _is_non_empty_string(boundary):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_leakage_finding_boundary",
+                    "platform leakage finding must carry non-empty boundary",
+                    details={"code": code},
+                )
+            )
+            continue
+        if not _is_non_empty_string(evidence_ref):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_leakage_finding_evidence_ref",
+                    "platform leakage finding must carry non-empty evidence_ref",
+                    details={"code": code},
+                )
+            )
+            continue
+        normalized_findings.append(
+            _failure(
+                source,
+                code,
+                message,
+                details={"boundary": boundary, "evidence_ref": evidence_ref},
+            )
+        )
+    return normalized_findings
+
+
+def _normalize_reference_pair(
+    raw_reference_pair: Sequence[str] | Iterable[str],
+    source: str,
+    failures: list[dict[str, Any]],
+    *,
+    code: str = "invalid_reference_pair",
+    message: str = "reference pair must be a non-empty string sequence",
+) -> list[str]:
+    reference_pair = _normalize_string_list(
+        raw_reference_pair,
+        source=source,
+        field_name="reference_pair",
+        failures=failures,
+        code=code,
+        message=message,
+    )
+    if not reference_pair:
+        failures.append(_failure(source, code, message))
+    return reference_pair
+
+
+def _normalize_evidence_refs(
+    raw_evidence_refs: Any,
+    *,
+    source: str,
+    field_name: str,
+    failures: list[dict[str, Any]],
+) -> list[str]:
+    evidence_refs = _normalize_string_list(
+        raw_evidence_refs,
+        source=source,
+        field_name=field_name,
+        failures=failures,
+        code="invalid_evidence_refs",
+        message=f"{source} report must carry non-empty evidence refs",
+    )
+    if not evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "missing_evidence_refs",
+                f"{source} report must carry non-empty evidence refs",
+            )
+        )
+    return evidence_refs
+
+
+def _normalize_string_list(
+    raw_values: Any,
+    *,
+    source: str,
+    field_name: str,
+    failures: list[dict[str, Any]],
+    code: str,
+    message: str,
+) -> list[str]:
+    if isinstance(raw_values, (str, bytes)) or not isinstance(raw_values, Iterable):
+        failures.append(_failure(source, code, message, details={"field": field_name}))
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        if not _is_non_empty_string(value):
+            failures.append(_failure(source, code, message, details={"field": field_name}))
+            return []
+        if value in seen:
+            failures.append(
+                _failure(
+                    source,
+                    f"duplicate_{field_name}",
+                    f"{field_name} cannot contain duplicates",
+                )
+            )
+            return []
+        seen.add(value)
+        normalized.append(value)
+    return normalized
+
+
+def _require_mapping(
+    raw_value: Any,
+    source: str,
+    code: str,
+    failures: list[dict[str, Any]],
+) -> Mapping[str, Any]:
+    if not isinstance(raw_value, Mapping):
+        failures.append(
+            _failure(
+                source,
+                code,
+                f"{source} report must be a mapping",
+            )
+        )
+        return {}
+    return raw_value
+
+
+def _normalize_failure_entry(entry: Any, source: str) -> dict[str, Any]:
+    if not isinstance(entry, Mapping):
+        return _failure(source, "invalid_failure_entry", "failure entry must be a mapping")
+    code = entry.get("code")
+    message = entry.get("message")
+    details = entry.get("details")
+    return _failure(
+        str(entry.get("source") or source),
+        code if _is_non_empty_string(code) else "invalid_failure_code",
+        message if _is_non_empty_string(message) else "failure entry is missing message",
+        details=details if isinstance(details, Mapping) else {},
+    )
+
+
+def _source_report(
+    *,
+    source: str,
+    version: str,
+    verdict: str,
+    summary: str,
+    evidence_refs: Sequence[str],
+    details: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "version": version,
+        "verdict": verdict,
+        "summary": summary,
+        "evidence_refs": list(evidence_refs),
+        "details": dict(details),
+    }
+
+
+def _failure(
+    source: str,
+    code: str,
+    message: str,
+    *,
+    details: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "code": code,
+        "message": message,
+        "details": dict(details or {}),
+    }
+
+
+def _is_non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _is_string_sequence(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(_is_non_empty_string(item) for item in value)
+
+
+__all__ = [
+    "build_harness_source_report",
+    "orchestrate_version_gate",
+    "validate_platform_leakage_source_report",
+    "validate_real_adapter_regression_source_report",
+]
