@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -383,7 +384,7 @@ def validate_platform_leakage_source_report(
             )
         )
 
-    gate_failures = list(findings) if payload_verdict == FAIL_VERDICT else []
+    gate_failures = [_failure_from_leakage_finding(source, finding) for finding in findings] if payload_verdict == FAIL_VERDICT else []
     normalized_failures = failures + gate_failures
     evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=normalized_failures)
     summary = str(payload.get("summary") or "").strip()
@@ -1188,12 +1189,12 @@ def _normalize_leakage_findings(
             )
             continue
         normalized_findings.append(
-            _failure(
-                source,
-                code,
-                message,
-                details={"boundary": boundary, "evidence_ref": evidence_ref},
-            )
+            {
+                "code": code,
+                "message": message,
+                "boundary": boundary,
+                "evidence_ref": evidence_ref,
+            }
         )
     return normalized_findings
 
@@ -1342,7 +1343,7 @@ def _merge_rebuilt_source_report_with_input_failures(
     rebuilt_details = dict(rebuilt_report.get("details") or {})
     rebuilt_failures = list(rebuilt_details.get("failures") or [])
     if normalized_report_failures:
-        rebuilt_failures = list(normalized_report_failures) + rebuilt_failures
+        rebuilt_failures = _dedupe_failures(list(normalized_report_failures) + rebuilt_failures)
     if input_verdict == FAIL_VERDICT and not rebuilt_failures:
         rebuilt_failures = [
             _failure(
@@ -1500,6 +1501,30 @@ def _synthetic_source_report_details(
             **details,
         }
     return details
+
+
+def _failure_from_leakage_finding(source: str, finding: Mapping[str, Any]) -> dict[str, Any]:
+    return _failure(
+        source,
+        str(finding.get("code") or "invalid_leakage_finding_fields"),
+        str(finding.get("message") or "platform leakage finding is invalid"),
+        details={
+            "boundary": str(finding.get("boundary") or ""),
+            "evidence_ref": str(finding.get("evidence_ref") or ""),
+        },
+    )
+
+
+def _dedupe_failures(failures: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for failure in failures:
+        key = json.dumps(failure, sort_keys=True, ensure_ascii=False)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(dict(failure))
+    return deduped
 
 
 __all__ = [

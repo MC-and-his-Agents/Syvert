@@ -762,6 +762,33 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("invalid_sample_id", {item["code"] for item in report["failures"]})
         self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_deduplicates_failed_harness_failures(self) -> None:
+        failed_harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure", "sample-missing"],
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=failed_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(
+            sum(1 for item in report["failures"] if item["code"] == "missing_required_harness_samples"),
+            1,
+        )
+
     def test_orchestrator_preserves_failed_real_regression_source_report(self) -> None:
         failed_real_regression_report = validate_real_adapter_regression_source_report(
             {
@@ -881,6 +908,42 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["failures"]})
         self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_round_trips_failed_platform_leakage_report(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["verdict"] = "fail"
+        payload["findings"] = [
+            {
+                "code": "platform_branch_in_core",
+                "message": "platform-specific branch leaked into core runtime",
+                "boundary": "core_runtime",
+                "evidence_ref": "leakage:core-runtime:1",
+            }
+        ]
+        failed_platform_leakage_report = validate_platform_leakage_source_report(
+            payload,
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=failed_platform_leakage_report,
+        )
+
+        self.assertIn("platform_branch_in_core", {item["code"] for item in report["failures"]})
+        self.assertNotIn("invalid_leakage_finding_boundary", {item["code"] for item in report["failures"]})
+        self.assertNotIn("failure_report_without_findings", {item["code"] for item in report["failures"]})
 
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
         forged_report = {
