@@ -1192,7 +1192,7 @@ def _normalize_string_list(
     code: str,
     message: str,
 ) -> list[str]:
-    if isinstance(raw_values, (str, bytes)) or not isinstance(raw_values, Iterable):
+    if isinstance(raw_values, (str, bytes, Mapping)) or not isinstance(raw_values, Iterable):
         failures.append(_failure(source, code, message, details={"field": field_name}))
         return []
     normalized: list[str] = []
@@ -1315,7 +1315,7 @@ def _enforce_frozen_reference_pair(
     expected_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
     if expected_pair is None:
         return
-    if tuple(reference_pair) != expected_pair:
+    if set(reference_pair) != set(expected_pair):
         failures.append(
             _failure(
                 source,

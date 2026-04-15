@@ -161,6 +161,16 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_harness_verdict", {item["code"] for item in report["details"]["failures"]})
 
+    def test_harness_rejects_mapping_shaped_required_sample_ids(self) -> None:
+        report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids={"sample-success": True},
+            version="v0.2.0",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_required_sample_ids", {item["code"] for item in report["details"]["failures"]})
+
     def test_harness_builder_generates_deterministic_evidence_refs(self) -> None:
         results = [
             self.valid_harness_results()[1],
@@ -209,6 +219,18 @@ class VersionGateTests(unittest.TestCase):
             "reference_pair_not_frozen_for_version",
             {item["code"] for item in report["details"]["failures"]},
         )
+
+    def test_real_regression_accepts_reordered_frozen_reference_pair(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["reference_pair"] = ["douyin", "xhs"]
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["douyin", "xhs"],
+        )
+
+        self.assertEqual(report["verdict"], "pass")
 
     def test_real_regression_missing_success_coverage_fails_closed(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
@@ -263,6 +285,19 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("disallowed_failure_category", {item["code"] for item in report["details"]["failures"]})
 
+    def test_real_regression_rejects_mapping_shaped_evidence_refs(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["evidence_refs"] = {"forged:1": True}
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+
     def test_platform_leakage_failure_is_preserved(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["verdict"] = "fail"
@@ -289,6 +324,15 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_mapping_shaped_boundary_scope(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = {"core_runtime": True}
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
     def test_orchestrator_fails_closed_for_missing_version(self) -> None:
         report = orchestrate_version_gate(
@@ -336,6 +380,29 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertFalse(report["safe_to_release"])
+        self.assertIn("invalid_reference_pair", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_rejects_mapping_shaped_reference_pair(self) -> None:
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair={"xhs": True, "douyin": True},
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_reference_pair", {item["code"] for item in report["failures"]})
 
     def test_orchestrator_rejects_non_frozen_reference_pair(self) -> None:

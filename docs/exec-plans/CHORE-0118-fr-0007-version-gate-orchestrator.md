@@ -47,6 +47,9 @@
   - `v0.2.0` reference pair 固定为 `xhs` / `douyin`
   - orchestrator 对 source report 做 source-specific 复验，不再信任伪造 pass wrapper
   - harness verdict 与 runtime 观测的一致性改为强校验
+- guardian 第二轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项 contract 修复：
+  - frozen reference pair 改为按集合而非顺序匹配
+  - `reference_pair` / `evidence_refs` / `boundary_scope` / `required_sample_ids` 等字符串序列字段改为拒绝 mapping-shaped malformed payload
 
 ## 下一步动作
 
@@ -80,6 +83,8 @@
   - 结果：`Ran 19 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：guardian 修复后复跑，`Ran 25 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第二轮 guardian 修复后复跑，`Ran 30 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：`Ran 66 tests`，`OK`
 - `python3 scripts/pr_guardian.py review 122`
@@ -88,6 +93,11 @@
     - 拒绝非 `xhs` / `douyin` 的完整 reference pair
     - orchestrator 不再接受缺 source-specific 关键字段的伪造 pass report
     - harness `pass` / `legal_failure` / `execution_precondition_not_met` 与 runtime 观测的一致性改为 fail-closed
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第二轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - frozen reference pair 改为顺序无关
+    - 所有经 `_normalize_string_list()` 进入的字符串序列字段都拒绝 mapping-shaped malformed payload
 - `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
   - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
