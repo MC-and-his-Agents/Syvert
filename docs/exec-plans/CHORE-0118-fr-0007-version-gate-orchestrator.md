@@ -71,6 +71,9 @@
 - guardian 第九轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项收口：
   - failing platform leakage report 在 validator -> orchestrator 往返路径上保持 finding 形状稳定，不再被二次污染
   - 已失败 source report 经 orchestrator 复验后，相同 failure 不再重复累计
+- 当前进入系统性收口阶段：
+  - 不再按单条 guardian finding 追补，而是按统一结果模型不变量补齐元测试
+  - active exec-plan 的 checkpoint 绑定改为“最近一次 runtime-affecting code head”，metadata-only head 通过 PR live head 与验证记录追溯，不再把 metadata commit 自身伪装成新的代码 checkpoint
 
 ## 下一步动作
 
@@ -200,6 +203,12 @@
   - 结果：第九轮 guardian 修复后复跑，`Ran 47 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：第九轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：系统性收口阶段复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：系统性收口阶段复跑，`Ran 51 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：系统性收口阶段复跑，`Ran 66 tests`，`OK`
 
 ## 未决风险
 
@@ -211,7 +220,7 @@
 
 - 如需回滚，使用独立 revert PR 撤销本事项对 `syvert/version_gate.py`、`tests/runtime/test_version_gate.py` 与当前 active exec-plan 的增量修改。
 
-## 最近一次 checkpoint 对应的 head SHA
+## 最近一次 runtime-affecting checkpoint 对应的 head SHA
 
-- `f89255975e1650f4a0ab024f7869bf86498ed89d`
-- 说明：该 checkpoint 对应第九轮 guardian 修复后的最新代码 head；当前 metadata 收口仅同步 implementation-side result model artifact 与 active exec-plan 的验证证据、guardian 轮次与 checkpoint 记录。
+- `f718d2d354891f06de679b668827be2bf3f6b74d`
+- 说明：该 checkpoint 绑定当前最新的代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
