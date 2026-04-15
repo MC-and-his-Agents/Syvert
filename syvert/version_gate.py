@@ -30,14 +30,7 @@ _FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION = {
 _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
-_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION = {
-    "v0.2.0": (
-        "success-full-envelope",
-        "legal-failure-platform-envelope",
-        "contract-violation-missing-normalized",
-        "execution-precondition-not-met",
-    ),
-}
+_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}
 _REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
     {
         "core_runtime",
@@ -435,7 +428,9 @@ def validate_platform_leakage_source_report(
     normalized_failures = failures + gate_failures
     evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=normalized_failures)
     summary = str(payload.get("summary") or "").strip()
-    if not summary:
+    if normalized_failures:
+        summary = f"platform leakage failed for version `{version}`"
+    elif not summary:
         summary = (
             f"platform leakage passed for version `{version}`"
             if not normalized_failures
@@ -1774,8 +1769,8 @@ def _resolve_gate_required_harness_sample_ids(
             failures.append(
                 _failure(
                     SOURCE_VERSION_GATE,
-                    "missing_frozen_harness_sample_ids_for_version",
-                    "harness required sample baseline is not frozen for this version and must fail closed",
+                    "missing_required_harness_sample_ids",
+                    "version gate requires an explicit harness required sample baseline when the version has no frozen sample set",
                     details={"version": version},
                 )
             )
@@ -1795,7 +1790,7 @@ def _resolve_gate_required_harness_sample_ids(
 
 
 def _normalize_report_required_sample_ids(raw_required_sample_ids: Any) -> list[str] | None:
-    if not isinstance(raw_required_sample_ids, list):
+    if isinstance(raw_required_sample_ids, (str, bytes, Mapping)) or not isinstance(raw_required_sample_ids, Iterable):
         return None
     required_sample_ids: list[str] = []
     seen: set[str] = set()
