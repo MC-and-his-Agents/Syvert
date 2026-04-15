@@ -14,9 +14,9 @@
 
 ## 目标
 
-- 把 `open_pr / pr_guardian / merge_pr / governance_status` 全部接到仓库内唯一的 canonical integration contract 上，让 issue / PR / reviewer / guardian / merge gate 真正消费同一份真相源。
-- reviewer packet 在本批只消费 canonical issue/PR contract 对比与本地工件；`integration_ref` 的 live-state 证据改由 `governance_status` 状态面展示，并继续只在 merge gate 阶段作为阻断条件强制执行。
-- 保持 `Syvert` 继续作为本地执行真相源，并为当前 PR-C / 后续 PR-D 的 carrier alignment 与 evidence 收口提供稳定的运行时治理链路。
+- 把 `WORKFLOW.md`、`code_review.md`、PR template 与 issue forms 收口到仓库内唯一的 canonical integration contract 上，让 carrier 侧不再维护第二套 integration 规则。
+- 明确 `Phase` 不是 canonical integration metadata carrier，并把 integration metadata 的合法落点限制在 FR / Work Item / governance issue 与 PR `integration_check`。
+- 保持 `Syvert` 继续作为本地执行真相源，并在已完成 PR-B consumer wiring 的前提上，为后续 PR-D evidence / rollout 收口提供稳定的 carrier 基线。
 
 ## 范围
 
@@ -41,7 +41,7 @@
 
 ## 当前 checkpoint 推进的 release 目标
 
-- 让 canonical integration contract 从“内核已存在”推进到“所有核心消费者已接线”，使 reviewer / guardian / merge gate 的运行时决策不再各自维护第二套 integration 语义。
+- 让 canonical integration contract 从“运行时治理链路已统一”推进到“carrier 已完成对齐”，使 workflow / review / template / issue forms 不再各自维护第二套 integration 语义。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
