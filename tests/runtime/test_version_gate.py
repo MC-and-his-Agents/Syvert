@@ -142,6 +142,7 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_sample_id", {item["code"] for item in report["details"]["failures"]})
+        self.assertTrue(report["evidence_refs"])
 
     def test_harness_rejects_unknown_verdict(self) -> None:
         malformed = [
@@ -361,6 +362,7 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+        self.assertTrue(report["evidence_refs"])
 
     def test_platform_leakage_failure_is_preserved(self) -> None:
         payload = self.valid_platform_leakage_payload()
@@ -388,6 +390,7 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+        self.assertTrue(report["evidence_refs"])
 
     def test_platform_leakage_rejects_empty_version(self) -> None:
         report = validate_platform_leakage_source_report(
@@ -727,6 +730,38 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["source_reports"]["harness"]["verdict"], "fail")
         self.assertEqual(report["source_reports"]["harness"]["summary"], "harness failed for version `v0.2.0`")
 
+    def test_orchestrator_preserves_malformed_harness_failure_reason(self) -> None:
+        malformed_harness_report = build_harness_source_report(
+            [
+                {
+                    "verdict": "pass",
+                    "reason": {"code": "ok", "message": "ok"},
+                    "observed_status": "success",
+                    "observed_error": None,
+                }
+            ],
+            required_sample_ids=["sample-success"],
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=malformed_harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertIn("invalid_sample_id", {item["code"] for item in report["failures"]})
+        self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_preserves_failed_real_regression_source_report(self) -> None:
         failed_real_regression_report = validate_real_adapter_regression_source_report(
             {
@@ -792,6 +827,60 @@ class VersionGateTests(unittest.TestCase):
         ]
         self.assertEqual(len(forged_failures), 1)
         self.assertEqual(forged_failures[0]["source"], "harness")
+
+    def test_orchestrator_preserves_real_regression_validator_failure_reason(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["evidence_refs"] = {"forged:1": True}
+        failed_real_regression_report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=failed_real_regression_report,
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertIn("invalid_evidence_refs", {item["code"] for item in report["failures"]})
+        self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_preserves_platform_leakage_validator_failure_reason(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["evidence_refs"] = []
+        failed_platform_leakage_report = validate_platform_leakage_source_report(
+            payload,
+            version="v0.2.0",
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=failed_platform_leakage_report,
+        )
+
+        self.assertIn("missing_evidence_refs", {item["code"] for item in report["failures"]})
+        self.assertNotIn("missing_source_evidence_refs", {item["code"] for item in report["failures"]})
 
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
         forged_report = {

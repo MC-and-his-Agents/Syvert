@@ -95,6 +95,7 @@ def build_harness_source_report(
                 "harness source report requires non-empty version",
             )
         )
+    evidence_refs = _finalize_evidence_refs(evidence_refs, source=SOURCE_HARNESS, failures=failures)
 
     summary = (
         f"harness passed for version `{version}` with {len(normalized_results)} validated samples"
@@ -285,6 +286,7 @@ def validate_real_adapter_regression_source_report(
             )
         )
 
+    evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=failures)
     summary = (
         f"real adapter regression passed for version `{version}`"
         if not failures
@@ -383,6 +385,7 @@ def validate_platform_leakage_source_report(
 
     gate_failures = list(findings) if payload_verdict == FAIL_VERDICT else []
     normalized_failures = failures + gate_failures
+    evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=normalized_failures)
     summary = str(payload.get("summary") or "").strip()
     if not summary:
         summary = (
@@ -1240,6 +1243,25 @@ def _normalize_evidence_refs(
             )
         )
     return evidence_refs
+
+
+def _finalize_evidence_refs(
+    evidence_refs: Sequence[str],
+    *,
+    source: str,
+    failures: Sequence[Mapping[str, Any]],
+) -> list[str]:
+    if evidence_refs:
+        return list(evidence_refs)
+    failure_code = next(
+        (
+            str(item.get("code"))
+            for item in failures
+            if isinstance(item, Mapping) and _is_non_empty_string(item.get("code"))
+        ),
+        "missing_evidence_refs",
+    )
+    return [f"synthetic:{source}:{failure_code}"]
 
 
 def _normalize_string_list(
