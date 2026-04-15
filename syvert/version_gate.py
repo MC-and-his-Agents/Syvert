@@ -19,6 +19,9 @@ _HARNESS_LEGAL_FAILURE_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "u
 _OBSERVED_RUNTIME_STATUSES = frozenset({"success", "failed"})
 _REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})
 _REAL_REGRESSION_EXPECTED_OUTCOMES = frozenset({"success", "allowed_failure"})
+_FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION = {
+    "v0.2.0": "content_detail_by_url",
+}
 _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
@@ -597,7 +600,7 @@ def _normalize_existing_source_report(
             },
             version=version,
             reference_pair=gate_reference_pair or raw_reference_pair,
-            operation=str(raw_operation),
+            operation=_frozen_real_regression_operation(version),
         )
 
     raw_boundary_scope = details.get("boundary_scope")
@@ -1332,6 +1335,10 @@ def _enforce_frozen_reference_pair(
                 details={"expected_reference_pair": list(expected_pair), "actual_reference_pair": list(reference_pair)},
             )
         )
+
+
+def _frozen_real_regression_operation(version: str) -> str:
+    return _FROZEN_REAL_REGRESSION_OPERATION_BY_VERSION.get(version, "content_detail_by_url")
 
 
 __all__ = [

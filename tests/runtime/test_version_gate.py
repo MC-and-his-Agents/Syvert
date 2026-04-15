@@ -534,6 +534,40 @@ class VersionGateTests(unittest.TestCase):
             {item["code"] for item in report["failures"]},
         )
 
+    def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
+        forged_report = {
+            "source": "real_adapter_regression",
+            "version": "v0.2.0",
+            "verdict": "pass",
+            "summary": "forged",
+            "evidence_refs": ["regression:forged:1"],
+            "details": {
+                "reference_pair": ["xhs", "douyin"],
+                "operation": "creator_detail",
+                "adapter_results": self.valid_real_adapter_regression_payload()["adapter_results"],
+                "failures": [],
+            },
+        }
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=forged_report,
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "fail")
+        self.assertIn("operation_mismatch", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_revalidates_source_specific_platform_leakage_contract(self) -> None:
         forged_report = {
             "source": "platform_leakage",
