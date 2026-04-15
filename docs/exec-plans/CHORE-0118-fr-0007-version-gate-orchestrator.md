@@ -92,11 +92,14 @@
   - `real_adapter_regression` source report ingress 现在要求 `target_type` 与 `semantic_operation` 齐备并与重建结果一致，不再把缺字段 envelope 隐式补形为可信 `pass`
 - merge-if-safe 再次复查又返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 harness 追溯性收口：
   - harness ingress 对 `evidence_refs` 现在要求与 builder 的确定性输出一致；对已失败且携带原始 failure code 的 report 则保留其 failure-specific evidence，不再被重建结果覆盖
+- 最新一轮 guardian 复查又返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项结果模型一致性收口：
+  - `platform_leakage` validator 对缺失 `findings` 改为直接 fail-closed，不再在 `verdict=pass` 时被静默洗成通过
+  - 已失败 harness source report 经 orchestrator 复验后继续保留原始 failure-specific `evidence_refs`，避免 evidence ref 与 failure code 的追溯链漂移
 
 ## 下一步动作
 
 - 同步当前本地代码 head 的 checkpoint、验证记录与 PR 证据链。
-- 将 merge-if-safe 再次复查暴露的 harness 追溯性修复推送到当前 PR head。
+- 将最新一轮 guardian 复查暴露的结果模型一致性修复推送到当前 PR head。
 - 发起 guardian 复审，并在 `safe_to_merge=true` 且治理状态一致后执行受控合并。
 
 ## 实现补充结果模型工件
@@ -339,6 +342,24 @@
   - 结果：merge-if-safe 再次复查修复后复跑，`通过`
 - `python3 scripts/spec_guard.py --all`
   - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：最新一轮 guardian 复查修复后复跑，`Ran 75 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：最新一轮 guardian 复查修复后复跑，`Ran 141 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
 
 ## 未决风险
 
@@ -352,5 +373,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `63e9c6f8d2fcdca4d245910df634a20bf2808b58`
+- `a0050fa2a5cb6cca9252ff1a582abd066dc284df`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
