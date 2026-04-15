@@ -97,11 +97,15 @@
   - 已失败 harness source report 经 orchestrator 复验后继续保留原始 failure-specific `evidence_refs`，避免 evidence ref 与 failure code 的追溯链漂移
 - 最新 guardian 复查继续返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项版本级基线收口：
   - harness required sample set 已从 source report 自报值提升为 version gate 自己冻结/显式传入的基线，`v0.2.0` 下若上游截断 required set，将直接 fail-closed
+- 最新 guardian 复查继续返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项入口契约收口：
+  - `required_harness_sample_ids` 缺失时改为直接 fail-closed，而不是隐式猜测版本基线
+  - `required_harness_sample_ids` 的公开类型与实现对齐为通用 `Sequence/Iterable`，`tuple/list` 等价输入不再被误拒
+  - `platform_leakage` 在出现失败时强制输出失败语义摘要，不再保留“checks are clean”这类通过语义
 
 ## 下一步动作
 
 - 同步当前本地代码 head 的 checkpoint、验证记录与 PR 证据链。
-- 将最新 guardian 复查暴露的版本级 harness 基线修复推送到当前 PR head。
+- 将最新 guardian 复查暴露的入口契约修复推送到当前 PR head。
 - 发起 guardian 复审，并在 `safe_to_merge=true` 且治理状态一致后执行受控合并。
 
 ## 实现补充结果模型工件
@@ -380,6 +384,24 @@
   - 结果：版本级 harness 基线修复后复跑，`通过`
 - `python3 scripts/spec_guard.py --all`
   - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：入口契约修复后复跑，`Ran 77 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：入口契约修复后复跑，`Ran 143 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：入口契约修复后复跑，`通过`
 
 ## 未决风险
 
@@ -393,5 +415,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `a8bc01a7bcfc247b4764befdd60d51f47b082443`
+- `e9fdcf77dd14a24254c3c52152b1f5cd71f06920`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
