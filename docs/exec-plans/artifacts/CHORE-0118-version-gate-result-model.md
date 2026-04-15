@@ -56,6 +56,7 @@
   - 必须包含 `failures`
 
 若 source report 在进入 orchestrator 前已经被判定为 `fail`，其 `details.failures` 不得在编排层被抹除或洗回 `pass`。
+synthetic fail-closed source report 也必须保持同一 envelope 形状，并提供确定性的内部 evidence ref。
 
 ## 3. harness source details
 
@@ -147,6 +148,7 @@
 - source report 缺 `details.failures`
 - harness 输入 malformed 或 verdict/观测不一致
 - real regression 使用未冻结 reference pair 或未冻结 operation
+- real regression 所在版本缺少 formal-spec 冻结的 operation
 - platform leakage 缺边界、缺 findings 依据或结果不可追溯
 - 未知版本缺少 formal-spec 冻结的 reference pair
 
