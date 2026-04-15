@@ -52,6 +52,8 @@
   - `reference_pair` / `evidence_refs` / `boundary_scope` / `required_sample_ids` 等字符串序列字段改为拒绝 mapping-shaped malformed payload
 - guardian 第三轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
   - 未知版本在缺少 formal-spec 冻结 reference pair 时改为 fail-closed
+- guardian 第四轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
+  - real regression 在 orchestrator 二次校验时改为强制绑定 `content_detail_by_url` 最小矩阵，不再回显 source report 自报 `operation`
 
 ## 下一步动作
 
@@ -89,6 +91,8 @@
   - 结果：第二轮 guardian 修复后复跑，`Ran 30 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：第三轮 guardian 修复后复跑，`Ran 32 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第四轮 guardian 修复后复跑，`Ran 33 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：`Ran 66 tests`，`OK`
 - `python3 scripts/pr_guardian.py review 122`
@@ -106,6 +110,10 @@
   - 结果：guardian 第三轮返回 `REQUEST_CHANGES`
   - 已修复阻断：
     - 未知版本在缺少 formal-spec 冻结 reference pair 时改为 fail-closed
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第四轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - real regression 在 orchestrator 二次校验时不再接受 forged `operation`
 - `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
   - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
@@ -133,5 +141,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `97f08629de35a7576f5e5e4d16605bc1f1ffab58`
-- 说明：该 checkpoint 已覆盖 guardian 三轮前的全部代码修复；当前 follow-up 仅用于把 active exec-plan 与最新代码 checkpoint、PR `#122` 及审查证据对齐，不再改动运行时代码。
+- `a20427293cd7c3fb40d2c4e23359f7292c5d4868`
+- 说明：该 checkpoint 已覆盖 guardian 四轮前的全部代码修复；当前 follow-up 仅用于把 active exec-plan 与最新代码 checkpoint、PR `#122` 及审查证据对齐，不再改动运行时代码。
