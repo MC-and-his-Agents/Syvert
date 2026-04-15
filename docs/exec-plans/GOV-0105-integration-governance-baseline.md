@@ -68,5 +68,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 最近一次完成 PR-C carrier alignment 代码收口并同步验证证据的 checkpoint：`8debbd9fd776f94bf66d9aa431a85241172f7d72`
-- 当前 PR 审查态以 `#116` 的 latest head 为准；本轮最小验证集与 guardian 必须绑定同一 latest head，不得继续复用旧批次的验证摘要。
+- 最近一次完成 PR-C carrier alignment 收口、补强 carrier 与运行时解析器兼容性测试并同步验证证据的 checkpoint：`71030f6802d8db6336ff7228530943aae58d9891`
+- 当前 PR 审查态与本轮最小验证集均绑定 `#116` 的 latest head `71030f6802d8db6336ff7228530943aae58d9891`；guardian 与 merge gate 不得继续复用旧 checkpoint 的验证摘要。
