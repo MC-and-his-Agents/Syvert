@@ -48,7 +48,9 @@
 
 ## 已验证项
 
-- 待本轮 docs 变更完成后刷新。
+- 已执行：`python3 scripts/workflow_guard.py --mode pre-commit`
+- 已执行：`python3 scripts/docs_guard.py --mode ci`
+- 已执行：`python3 scripts/open_pr.py --class governance --issue 105 --item-key GOV-0105-integration-governance-baseline --item-type GOV --release governance-baseline --sprint integration-governance --title "docs(governance): 收口 GOV-0105 rollout evidence" --base main --closing refs --draft --integration-touchpoint active --shared-contract-changed yes --integration-ref "https://github.com/orgs/MC-and-his-Agents/projects/3?pane=issue&itemId=PVTI_lADOECSWpc4BUdmRzgpwYyM" --external-dependency both --merge-gate integration_check_required --contract-surface runtime_modes --joint-acceptance-needed yes --integration-status-checked-before-pr yes --integration-status-checked-before-merge no --dry-run`
 
 ## 未决风险
 
@@ -62,5 +64,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 当前 docs closeout round 的内容 checkpoint 将在本批文档收口与最小门禁验证完成后刷新到最新 head。
-- 本轮 guardian 与 merge gate 必须绑定当前 docs closeout PR 的 latest head，不得继续复用 `#116` 收口阶段的审查态摘要。
+- 最近一次完成 PR-D docs closeout 内容收口并同步最小门禁证据的 checkpoint：`25fbe5168aa6cfb8536384633e27efbdf7f48da5`
+- 当前 PR 审查态如继续产生新的 review / merge gate 元数据补充，可保留该 checkpoint，并由 guardian 与 merge gate 绑定当前 docs closeout PR 的 latest head。
