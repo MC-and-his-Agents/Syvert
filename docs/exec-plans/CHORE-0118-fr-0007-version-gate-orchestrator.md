@@ -68,6 +68,9 @@
 - guardian 第八轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项收口：
   - 三个公开 source builder / validator 在 fail-closed 时统一补齐确定性 `evidence_refs`
   - malformed source report 经 validator 再进入 orchestrator 时，原始 failure code 不再被 `missing_source_evidence_refs` 覆盖
+- guardian 第九轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项收口：
+  - failing platform leakage report 在 validator -> orchestrator 往返路径上保持 finding 形状稳定，不再被二次污染
+  - 已失败 source report 经 orchestrator 复验后，相同 failure 不再重复累计
 
 ## 下一步动作
 
@@ -191,6 +194,12 @@
   - 结果：第八轮 guardian 修复后复跑，`Ran 45 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：第八轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第九轮 guardian 修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第九轮 guardian 修复后复跑，`Ran 47 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第九轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
 
 ## 未决风险
 
@@ -204,5 +213,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2e309b7dd9e25fddc9f1729c64d039a0853fe612`
-- 说明：该 checkpoint 对应第八轮 guardian 修复后的最新代码 head；当前 metadata 收口仅同步 implementation-side result model artifact 与 active exec-plan 的验证证据、guardian 轮次与 checkpoint 记录。
+- `f89255975e1650f4a0ab024f7869bf86498ed89d`
+- 说明：该 checkpoint 对应第九轮 guardian 修复后的最新代码 head；当前 metadata 收口仅同步 implementation-side result model artifact 与 active exec-plan 的验证证据、guardian 轮次与 checkpoint 记录。
