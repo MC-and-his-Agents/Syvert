@@ -74,14 +74,14 @@
 - 当前进入系统性收口阶段：
   - 不再按单条 guardian finding 追补，而是按统一结果模型不变量补齐元测试
   - active exec-plan 的 checkpoint 绑定改为“最近一次 runtime-affecting code head”，metadata-only head 通过 PR live head 与验证记录追溯，不再把 metadata commit 自身伪装成新的代码 checkpoint
-- 针对当前 remote head 上一次 guardian 暴露的两项根因，当前本地代码 head 已补齐收口：
-  - nested failure `details` 改为先做 JSON-safe 归一化，`_dedupe_failures()` 也对不可信输入做兜底序列化，避免 orchestrator 被 malformed upstream payload 直接打崩
-  - platform leakage finding 的 `boundary` 改为强制绑定 `formal spec` 允许的固定边界集合，拒绝越界的实现细节边界
+- guardian 第十轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项根因收口：
+  - enum / status / verdict 一类字段的公开入口校验已统一改为“先验形、再验值”，覆盖 builder / validator / orchestrator 的 source report verdict 消费面；对非字符串或不可哈希输入一律 fail-closed，不再由 membership check 直接抛 `TypeError`
+  - `_failure()` 已改为在构造点统一做 JSON-safe `details` 归一化，保证 fail-closed source report / version verdict 仍可被 closeout 和 release gate 直接序列化消费
 
 ## 下一步动作
 
 - 同步当前本地代码 head 的 checkpoint、验证记录与 PR 证据链。
-- 复跑 implementation PR 所需治理门禁与 runtime 测试，确认范围、契约和 fail-closed 语义未回退。
+- 将第十轮 guardian 根因修复推送到当前 PR head。
 - 发起 guardian 复审，并在 `safe_to_merge=true` 且治理状态一致后执行受控合并。
 
 ## 实现补充结果模型工件
@@ -216,6 +216,24 @@
   - 结果：不可信输入收口修复后复跑，`通过`
 - `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：不可信输入收口修复后复跑，`Ran 119 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第十轮 guardian 根因修复后复跑，`Ran 59 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第十轮 guardian 根因修复后复跑，`Ran 125 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
 
 ## 未决风险
 
@@ -229,5 +247,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `29c55db2f5c5100146cfccf9c7114f7629d68b7f`
+- `ae4e88bb27f418556ed92a07041ce67f9775c501`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
