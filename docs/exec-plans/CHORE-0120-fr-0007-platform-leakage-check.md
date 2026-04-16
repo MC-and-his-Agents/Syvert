@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`1fd8e259024bee16e1f691d5cfcf3356024760ec`
+- 当前受审 runtime head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`1fd8e259024bee16e1f691d5cfcf3356024760ec`
+- 当前 runtime-affecting 实现 checkpoint：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -84,7 +84,8 @@
     - 共享 carrier 不再把不确定性洗成单一路径；`bucket` 若可能同时指向 `normalized` 与 `raw`，平台字段写入会按 fail-closed 处理，`raw.platform` 也不会再被 `normalized.platform` 的允许边界冲掉
     - 间接 key 现在按结构化 key-signal 解析而不是整句字符串兜底；`platform_key = "platform"`、`key = f"{current_platform}_extra"` 只有在真实共享 carrier / `error.details` 上被消费时才会命中 fail-closed，同时不会再把无关 `raw_value["xhs_extra"]` 或跨作用域局部变量误报成平台泄漏
     - URL / selector / signature fragment 命中面已恢复为独立规则，但不再恢复会误伤 `xhs-main` / `xhs_extra` 的宽泛字符串字段扫描
-  - 当前已提交的运行时语义锚定在实现 checkpoint `1fd8e259024bee16e1f691d5cfcf3356024760ec`
+    - `origin/main` 合入 `#119` 后，`version_gate.py` 里的冻结 reference pair 与真实回归 case matrix 现在一起进入 `version_gate_logic` 允许例外；主干自己的 `FR-0007` 冻结矩阵不会再被平台泄漏扫描误报成 `platform_specific_field_leak`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
   - 当前剩余动作只包括：补 metadata-only follow-up 追账，把 PR / issue 当前事实与验证记录绑定到同一 runtime checkpoint，再重发 guardian；若通过，再进入 merge gate
 
 ## 实现要点
@@ -120,6 +121,8 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `3dff2b2ea514e3b3d153d1bb243cc9616098df2c` 上通过，`Ran 223 tests`，`OK (skipped=6)`；已包含 `origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5` 的 `#119` 主干真相
 - `python3 -m py_compile syvert/platform_leakage.py tests/runtime/test_platform_leakage.py`
   - 结果：在 checkpoint `1fd8e259024bee16e1f691d5cfcf3356024760ec` 上通过
 - `python3 -m unittest tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_allows_raw_prefixed_local_name_without_real_alias tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_platform_branch_variant_compare tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_does_not_report_normalized_alias_from_another_function_scope tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_ifexp_error_details_alias_branch tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_indirect_normalized_platform_get_branch tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_indirect_error_details_platform_subscript_branch tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_ifexp_platform_alias_branch tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_walrus_then_later_error_details_alias_branch tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_allows_walrus_then_later_error_details_platform_write tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_mixed_raw_normalized_alias_platform_write tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_computed_platform_specific_shared_result_key tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_detects_computed_platform_specific_error_details_key tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_fail_closes_on_dead_branch_alias_union`
@@ -181,7 +184,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`1fd8e259024bee16e1f691d5cfcf3356024760ec`
-- 最近一次重跑目标测试的 head：`1fd8e259024bee16e1f691d5cfcf3356024760ec`
-- 当前受审 runtime head：`1fd8e259024bee16e1f691d5cfcf3356024760ec`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `1fd8e259024bee16e1f691d5cfcf3356024760ec`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+- 最近一次重跑目标测试的 head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+- 当前受审 runtime head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `3dff2b2ea514e3b3d153d1bb243cc9616098df2c`，不得把 follow-up 误记为新的运行时真相
