@@ -38,7 +38,7 @@
 - 当前受审 PR：`#124`
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
 - 当前 runtime-affecting 实现 checkpoint：`22617661a06dcfa9584a1e068c2cd604aab7c8bf`
-- 当前 metadata-only follow-up：回填本 exec-plan 对 guardian P1 修复后的 checkpoint / 验证追踪，不改运行时语义。
+- 当前 metadata-only follow-up：当前分支最新 head（仅回填 guardian P1 修复后的 exec-plan checkpoint / 验证追踪，不改运行时语义）。
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper。
 - 当前实现已在公开入口对冻结 `xhs` / `douyin` reference adapter 执行 fail-closed 身份 / 来源校验，仅接受真实 `XhsAdapter` / `DouyinAdapter` 及其允许的 hermetic 实例。
@@ -46,8 +46,8 @@
 
 ## 下一步动作
 
-- 推送当前修复 head，并在后续 guardian 前同步 PR body 对 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint 与当前 metadata-only head 的对应关系。
-- 本轮按用户要求只完成 bugfix、测试、exec-plan 追账与推送，不执行 guardian / merge。
+- 在当前 metadata-only head 上同步 PR body / issue body 当前事实，并明确 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint 与当前受审 head 的对应关系。
+- 重新发起 guardian 审查；若审查通过，再进入 merge gate。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -100,7 +100,6 @@
 - 若回归执行器绕过 `execute_task()` 直接消费 adapter 私有返回值，会破坏共享 envelope 与错误分类边界。
 - 若 success / allowed failure 矩阵缺任一 adapter 或缺任一 case，source report 将被 gate fail-closed。
 - 若测试 wrapper 隐式补齐 `reference_pair`、surface 或 evidence refs，会复现 A 项已修过的入口洗白问题。
-- 若 guardian / merge 前的 PR body 未同步记录本次 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint，仍会出现 head / exec-plan / PR body 对象不一致风险。
 
 ## 回滚方式
 
