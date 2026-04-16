@@ -259,14 +259,19 @@ def _build_allowed_exception_lines(relative_name: str, source_text: str) -> froz
     except SyntaxError:
         return frozenset()
 
+    allowed_names = {
+        "_FROZEN_REFERENCE_PAIR_BY_VERSION",
+        "_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION",
+    }
+    allowed_lines: set[int] = set()
     for node in module.body:
         if not isinstance(node, ast.Assign):
             continue
         for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == "_FROZEN_REFERENCE_PAIR_BY_VERSION":
-                return frozenset(range(node.lineno, getattr(node, "end_lineno", node.lineno) + 1))
+            if isinstance(target, ast.Name) and target.id in allowed_names:
+                allowed_lines.update(range(node.lineno, getattr(node, "end_lineno", node.lineno) + 1))
 
-    return frozenset()
+    return frozenset(allowed_lines)
 
 
 def _scan_file(
