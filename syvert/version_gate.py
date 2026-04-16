@@ -27,6 +27,34 @@ _FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION = {
         "accepted_operations": ("content_detail_by_url", "content_detail"),
     },
 }
+_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION = {
+    "v0.2.0": {
+        "xhs": (
+            {
+                "case_id": "xhs-success",
+                "expected_outcome": "success",
+                "evidence_ref": "regression:xhs:success",
+            },
+            {
+                "case_id": "xhs-invalid-input",
+                "expected_outcome": "allowed_failure",
+                "evidence_ref": "regression:xhs:invalid-input",
+            },
+        ),
+        "douyin": (
+            {
+                "case_id": "douyin-success",
+                "expected_outcome": "success",
+                "evidence_ref": "regression:douyin:success",
+            },
+            {
+                "case_id": "douyin-platform",
+                "expected_outcome": "allowed_failure",
+                "evidence_ref": "regression:douyin:platform",
+            },
+        ),
+    },
+}
 _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
@@ -166,6 +194,7 @@ def validate_real_adapter_regression_source_report(
             code="operation_not_frozen_for_version",
             message="real adapter regression validator operation surface must match the formal-spec approved regression surface",
         )
+    frozen_case_matrix = _frozen_real_regression_case_matrix(version)
     payload = _require_mapping(report, source, "invalid_real_adapter_regression_report", failures)
     evidence_refs = _normalize_evidence_refs(
         payload.get("evidence_refs"),
@@ -241,6 +270,7 @@ def validate_real_adapter_regression_source_report(
 
     adapter_results = _normalize_adapter_results(payload.get("adapter_results"), source, failures)
     adapters_by_key = {entry["adapter_key"]: entry for entry in adapter_results}
+    case_evidence_refs = _frozen_real_regression_evidence_refs(version)
     for adapter_key in expected_reference_pair:
         adapter_result = adapters_by_key.get(adapter_key)
         if adapter_result is None:
@@ -254,6 +284,39 @@ def validate_real_adapter_regression_source_report(
             )
             continue
         cases = adapter_result["cases"]
+        expected_cases = frozen_case_matrix.get(adapter_key) if frozen_case_matrix is not None else None
+        if expected_cases is None:
+            failures.append(
+                _failure(
+                    source,
+                    "missing_frozen_case_matrix_for_version",
+                    "real adapter regression case matrix is not frozen for this version and must fail closed",
+                    details={"version": version, "adapter_key": adapter_key},
+                )
+            )
+        else:
+            actual_case_matrix = [
+                {
+                    "case_id": case["case_id"],
+                    "expected_outcome": case["expected_outcome"],
+                    "evidence_ref": case["evidence_ref"],
+                }
+                for case in cases
+            ]
+            expected_case_matrix = [dict(item) for item in expected_cases]
+            if actual_case_matrix != expected_case_matrix:
+                failures.append(
+                    _failure(
+                        source,
+                        "case_matrix_mismatch",
+                        "real adapter regression report case matrix must match the frozen version-bound matrix",
+                        details={
+                            "adapter_key": adapter_key,
+                            "expected_cases": expected_case_matrix,
+                            "actual_cases": actual_case_matrix,
+                        },
+                    )
+                )
         success_covered = False
         failure_covered = False
         for case in cases:
@@ -328,6 +391,21 @@ def validate_real_adapter_regression_source_report(
             )
         )
 
+    if case_evidence_refs and evidence_refs != case_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "case_evidence_refs_mismatch",
+                "real adapter regression report evidence_refs must match the per-case evidence trace",
+                details={
+                    "expected_evidence_refs": case_evidence_refs,
+                    "actual_evidence_refs": evidence_refs,
+                },
+            )
+        )
+
+    if case_evidence_refs:
+        evidence_refs = case_evidence_refs
     evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=failures)
     summary = (
         f"real adapter regression passed for version `{version}`"
@@ -863,7 +941,7 @@ def _normalize_existing_source_report(
             rebuilt_report,
             input_verdict=report_verdict,
             input_summary=report_summary,
-            input_evidence_refs=evidence_refs,
+            input_evidence_refs=rebuilt_report.get("evidence_refs") or evidence_refs,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -1299,6 +1377,17 @@ def _normalize_regression_cases(
         )
         if observed_status is None:
             continue
+        evidence_ref = entry.get("evidence_ref")
+        if not _is_non_empty_string(evidence_ref):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_case_evidence_ref",
+                    "adapter regression case must carry non-empty evidence_ref",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
         observed_error_category = entry.get("observed_error_category")
         if observed_status == "success" and observed_error_category is not None:
             failures.append(
@@ -1323,6 +1412,7 @@ def _normalize_regression_cases(
         normalized_cases.append(
             {
                 "case_id": case_id,
+                "evidence_ref": evidence_ref,
                 "expected_outcome": expected_outcome,
                 "observed_status": observed_status,
                 "observed_error_category": observed_error_category,
@@ -1703,6 +1793,22 @@ def _enforce_frozen_reference_pair(
 
 def _frozen_real_regression_surface(version: str) -> Mapping[str, Any] | None:
     return _FROZEN_REAL_REGRESSION_SURFACE_BY_VERSION.get(version)
+
+
+def _frozen_real_regression_case_matrix(version: str) -> Mapping[str, Sequence[Mapping[str, str]]] | None:
+    return _FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION.get(version)
+
+
+def _frozen_real_regression_evidence_refs(version: str) -> list[str]:
+    frozen_case_matrix = _FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION.get(version)
+    frozen_reference_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
+    if frozen_case_matrix is None or frozen_reference_pair is None:
+        return []
+    evidence_refs: list[str] = []
+    for adapter_key in frozen_reference_pair:
+        for case in frozen_case_matrix.get(adapter_key, ()):
+            evidence_refs.append(str(case["evidence_ref"]))
+    return evidence_refs
 
 
 def _canonical_version(version: str) -> str:
