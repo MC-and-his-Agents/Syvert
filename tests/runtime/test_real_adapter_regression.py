@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from syvert.adapters.douyin import DouyinAdapter, DouyinSessionConfig
 from syvert.adapters.xhs import XhsAdapter, XhsSessionConfig
@@ -155,6 +156,23 @@ class RealAdapterRegressionTests(unittest.TestCase):
         )
         self.assertIn(
             "invalid_reference_adapter_identity",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
+    def test_run_real_adapter_regression_fails_closed_when_reference_surface_drifts(self) -> None:
+        with mock.patch.object(XhsAdapter, "supported_targets", frozenset({"url", "keyword"})):
+            report = run_real_adapter_regression(
+                version="v0.2.0",
+                adapters=self.hermetic_adapters(),
+            )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(
+            report["evidence_refs"],
+            ["real_adapter_regression:binding:xhs:unexpected_reference_adapter_surface"],
+        )
+        self.assertIn(
+            "unexpected_reference_adapter_surface",
             {item["code"] for item in report["details"]["failures"]},
         )
 

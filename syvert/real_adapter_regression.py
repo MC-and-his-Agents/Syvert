@@ -17,12 +17,23 @@ _REFERENCE_ADAPTER_TYPES = {
     "xhs": XhsAdapter,
     "douyin": DouyinAdapter,
 }
-_FROZEN_REFERENCE_ADAPTER_FIELDS = (
-    "adapter_key",
-    "supported_capabilities",
-    "supported_targets",
-    "supported_collection_modes",
-)
+_FROZEN_REFERENCE_ADAPTER_FIELDS = ("adapter_key", "supported_capabilities", "supported_targets", "supported_collection_modes")
+_FROZEN_REFERENCE_ADAPTER_SURFACE_BY_VERSION = {
+    "v0.2.0": {
+        "xhs": {
+            "adapter_key": "xhs",
+            "supported_capabilities": frozenset({"content_detail"}),
+            "supported_targets": frozenset({"url"}),
+            "supported_collection_modes": frozenset({"hybrid"}),
+        },
+        "douyin": {
+            "adapter_key": "douyin",
+            "supported_capabilities": frozenset({"content_detail"}),
+            "supported_targets": frozenset({"url"}),
+            "supported_collection_modes": frozenset({"hybrid"}),
+        },
+    }
+}
 _DISALLOWED_REFERENCE_ADAPTER_OVERRIDES = frozenset(
     {
         "execute",
@@ -78,7 +89,7 @@ def build_real_adapter_regression_payload(
     version: str,
     adapters: Mapping[str, Any],
 ) -> dict[str, Any]:
-    reference_adapters = resolve_reference_adapters(adapters)
+    reference_adapters = resolve_reference_adapters(version=version, adapters=adapters)
     evidence_refs: list[str] = []
     adapter_results: list[dict[str, Any]] = []
 
@@ -129,7 +140,7 @@ def run_real_adapter_regression(
     )
 
 
-def resolve_reference_adapters(adapters: Mapping[str, Any]) -> dict[str, object]:
+def resolve_reference_adapters(*, version: str, adapters: Mapping[str, Any]) -> dict[str, object]:
     if not isinstance(adapters, Mapping):
         raise ReferenceAdapterBindingError(
             code="invalid_reference_adapter_mapping",
@@ -138,6 +149,13 @@ def resolve_reference_adapters(adapters: Mapping[str, Any]) -> dict[str, object]
         )
 
     validated: dict[str, object] = {}
+    frozen_surface = _FROZEN_REFERENCE_ADAPTER_SURFACE_BY_VERSION.get(version)
+    if frozen_surface is None:
+        raise ReferenceAdapterBindingError(
+            code="missing_frozen_reference_adapter_surface",
+            message="real adapter regression 缺少版本绑定的冻结 reference adapter surface",
+            details={"version": version},
+        )
     for adapter_key, expected_type in _REFERENCE_ADAPTER_TYPES.items():
         adapter = adapters.get(adapter_key)
         if adapter is None:
@@ -156,7 +174,11 @@ def resolve_reference_adapters(adapters: Mapping[str, Any]) -> dict[str, object]
                     "actual_adapter_type": type(adapter).__name__,
                 },
             )
-        validate_reference_adapter_surface(adapter_key=adapter_key, adapter=adapter, expected_type=expected_type)
+        validate_reference_adapter_surface(
+            adapter_key=adapter_key,
+            adapter=adapter,
+            frozen_surface=frozen_surface[adapter_key],
+        )
         validated[adapter_key] = adapter
     return validated
 
@@ -165,10 +187,10 @@ def validate_reference_adapter_surface(
     *,
     adapter_key: str,
     adapter: object,
-    expected_type: type[object],
+    frozen_surface: Mapping[str, Any],
 ) -> None:
     for field_name in _FROZEN_REFERENCE_ADAPTER_FIELDS:
-        expected_value = getattr(expected_type, field_name)
+        expected_value = frozen_surface[field_name]
         actual_value = getattr(adapter, field_name, None)
         if actual_value != expected_value:
             raise ReferenceAdapterBindingError(
