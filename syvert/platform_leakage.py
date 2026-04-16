@@ -99,6 +99,10 @@ _AST_MATCH_MAPPING = getattr(ast, "MatchMapping", None)
 _AST_MATCH_STAR = getattr(ast, "MatchStar", None)
 _EMPTY_KEY_SIGNAL: tuple[frozenset[str], bool] = (frozenset(), False)
 _MAX_POSITION = (10**9, 10**9)
+_VERSION_LITERAL_RE = re.compile(r"^v[0-9]+(?:\.[0-9]+)*$")
+_REAL_REGRESSION_CASE_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
+_REAL_REGRESSION_EVIDENCE_REF_RE = re.compile(r"^regression:(?P<adapter>[a-z0-9_-]+):[a-z0-9][a-z0-9-]*$")
+_REAL_REGRESSION_ALLOWED_OUTCOMES = frozenset({"success", "allowed_failure"})
 
 
 def build_platform_leakage_payload(
@@ -260,19 +264,75 @@ def _build_allowed_exception_statements(relative_name: str, source_text: str) ->
     except (SyntaxError, ValueError):
         return frozenset()
 
-    allowed_names = {
-        "_FROZEN_REFERENCE_PAIR_BY_VERSION",
-        "_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION",
-    }
     allowed_statements: set[tuple[int, int, int, int]] = set()
     for node in module.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id in allowed_names:
-                allowed_statements.add(_statement_identity(node))
+        if _assignment_matches_allowed_version_gate_exception(node):
+            allowed_statements.add(_statement_identity(node))
 
     return frozenset(allowed_statements)
+
+
+def _assignment_matches_allowed_version_gate_exception(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+        return False
+    target = node.targets[0]
+    if not isinstance(target, ast.Name):
+        return False
+    try:
+        literal_value = ast.literal_eval(node.value)
+    except (ValueError, SyntaxError):
+        return False
+    if target.id == "_FROZEN_REFERENCE_PAIR_BY_VERSION":
+        return _is_allowed_frozen_reference_pair_value(literal_value)
+    if target.id == "_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION":
+        return _is_allowed_frozen_real_regression_case_matrix_value(literal_value)
+    return False
+
+
+def _is_allowed_frozen_reference_pair_value(value: Any) -> bool:
+    if not isinstance(value, dict) or not value:
+        return False
+    for version, pair in value.items():
+        if not isinstance(version, str) or _VERSION_LITERAL_RE.match(version) is None:
+            return False
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            return False
+        if not all(isinstance(item, str) and _is_common_platform_literal(item) for item in pair):
+            return False
+    return True
+
+
+def _is_allowed_frozen_real_regression_case_matrix_value(value: Any) -> bool:
+    if not isinstance(value, dict) or not value:
+        return False
+    for version, adapters in value.items():
+        if not isinstance(version, str) or _VERSION_LITERAL_RE.match(version) is None:
+            return False
+        if not isinstance(adapters, dict) or not adapters:
+            return False
+        for adapter, cases in adapters.items():
+            if not isinstance(adapter, str) or not _is_common_platform_literal(adapter):
+                return False
+            if not isinstance(cases, (tuple, list)) or not cases:
+                return False
+            for case in cases:
+                if not isinstance(case, dict) or set(case) != {"case_id", "expected_outcome", "evidence_ref"}:
+                    return False
+                case_id = case["case_id"]
+                expected_outcome = case["expected_outcome"]
+                evidence_ref = case["evidence_ref"]
+                if not isinstance(case_id, str) or _REAL_REGRESSION_CASE_ID_RE.match(case_id) is None:
+                    return False
+                if not case_id.startswith(f"{adapter}-"):
+                    return False
+                if expected_outcome not in _REAL_REGRESSION_ALLOWED_OUTCOMES:
+                    return False
+                if not isinstance(evidence_ref, str):
+                    return False
+                match = _REAL_REGRESSION_EVIDENCE_REF_RE.match(evidence_ref)
+                if match is None or match.group("adapter") != adapter:
+                    return False
+    return True
 
 
 def _scan_file(
@@ -1059,7 +1119,8 @@ def _function_has_single_platform_semantic(
     defaults = list(getattr(args, "defaults", ()))
     defaults.extend(default for default in getattr(args, "kw_defaults", ()) if default is not None)
     return any(
-        _expr_has_shared_platform_semantic(
+        _expr_contains_platform_marker(default)
+        or _expr_has_shared_platform_semantic(
             default,
             function_source,
             platform_aliases=platform_aliases,

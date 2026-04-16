@@ -43,6 +43,33 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["details"]["report_verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
         self.assertEqual(report["details"]["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
+        self.assertGreaterEqual(len(report["evidence_refs"]), len(SCAN_TARGETS))
+        self.assertTrue(all(ref.startswith("platform_leakage:") for ref in report["evidence_refs"]))
+
+    def test_run_check_reports_boundary_and_evidence_trace_for_all_shared_boundaries(self) -> None:
+        report = self.run_with_fixture(
+            {},
+            append_files={
+                "syvert/runtime.py": (
+                    '\ndef _guardian_core_probe(default_mode="https://douyin.com"):\n    return default_mode\n'
+                    '\nclass TaskInput:\n    default_mode = "xhs_only"\n'
+                    '\ndef failure_envelope(default_mode="https://douyin.com"):\n    return default_mode\n'
+                    '\ndef validate_success_payload(default_mode="https://douyin.com"):\n    return {"ok": True}\n'
+                ),
+                "syvert/registry.py": '\ndef _guardian_registry_probe(default_mode="xhs_only"):\n    return default_mode\n',
+                "syvert/version_gate.py": '\ndef _guardian_gate_probe(default_mode="https://douyin.com"):\n    return default_mode\n',
+            },
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(report["details"]["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, set(DEFAULT_BOUNDARY_SCOPE))
+        self.assertTrue(report["evidence_refs"])
+        self.assertTrue(all(ref.startswith("platform_leakage:") for ref in report["evidence_refs"]))
+        finding_refs = {item["evidence_ref"] for item in report["details"]["findings"]}
+        self.assertEqual(len(finding_refs), len(report["details"]["findings"]))
+        self.assertTrue(finding_refs.issubset(set(report["evidence_refs"])))
+        self.assertTrue(all(ref.count(":") >= 3 for ref in finding_refs))
 
     def test_run_check_fails_closed_when_boundary_scope_is_incomplete(self) -> None:
         report = run_platform_leakage_check(
@@ -107,6 +134,8 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+        self.assertTrue(report["evidence_refs"])
+        self.assertTrue({item["evidence_ref"] for item in report["details"]["findings"]}.issubset(set(report["evidence_refs"])))
 
     def test_run_check_detects_hardcoded_platform_branch_with_adapter_alias(self) -> None:
         report = self.run_with_fixture(
@@ -961,6 +990,30 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_fragment_in_function_default(self) -> None:
+        report = self.run_with_fixture(
+            {},
+            append_files={
+                "syvert/runtime.py": '\ndef _guardian_probe(default_mode="https://douyin.com"):\n    return default_mode\n',
+            },
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_unapproved_fragment_in_frozen_reference_pair_assignment(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '    "v0.2.0": ("xhs", "douyin"),\n',
+                    '    "v0.2.0": ("xhs", "douyin", "xhslink.com"),\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
     def test_run_check_detects_match_guard_platform_branch(self) -> None:
         if getattr(ast, "Match", None) is None:
