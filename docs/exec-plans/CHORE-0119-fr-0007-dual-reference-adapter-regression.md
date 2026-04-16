@@ -37,16 +37,17 @@
 - 当前执行分支：`issue-119-fr-0007`
 - 当前受审 PR：`#124`
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
-- 当前 test-only follow-up head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
+- 当前 runtime-affecting 实现 checkpoint：`22617661a06dcfa9584a1e068c2cd604aab7c8bf`
+- 当前 metadata-only follow-up：回填本 exec-plan 对 guardian P1 修复后的 checkpoint / 验证追踪，不改运行时语义。
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper。
-- 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归；额外补强了缺 success 覆盖、缺 allowed failure 覆盖、缺 evidence refs 的 fail-closed 断言。
+- 当前实现已在公开入口对冻结 `xhs` / `douyin` reference adapter 执行 fail-closed 身份 / 来源校验，仅接受真实 `XhsAdapter` / `DouyinAdapter` 及其允许的 hermetic 实例。
+- 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归；本轮额外补了 shape-compatible spoofed adapter 冒充冻结 reference adapter 时的 fail-closed 回归。
 
 ## 下一步动作
 
-- 更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
-- 进入 guardian / merge gate；若后续只发生 metadata-only 追账，不再刷新 runtime checkpoint。
+- 复跑 `docs_guard` / `commit_check` / `pr_scope_guard`，并把验证记录绑定到当前 metadata-only head。
+- 本轮按用户要求只完成 bugfix、测试与推送，不执行 guardian / merge。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -83,12 +84,17 @@
   - 结果：当前 metadata-only head 已复跑，通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：当前 metadata-only head 已复跑，`PR scope` 校验通过。
+- `python3 -m unittest tests.runtime.test_real_adapter_regression`
+  - 结果：`Ran 11 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：`Ran 86 tests`，`OK`
 
 ## 未决风险
 
 - 若回归执行器绕过 `execute_task()` 直接消费 adapter 私有返回值，会破坏共享 envelope 与错误分类边界。
 - 若 success / allowed failure 矩阵缺任一 adapter 或缺任一 case，source report 将被 gate fail-closed。
 - 若测试 wrapper 隐式补齐 `reference_pair`、surface 或 evidence refs，会复现 A 项已修过的入口洗白问题。
+- 若 guardian / merge 前的 PR body 未同步记录本次 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint，仍会出现 head / exec-plan / PR body 对象不一致风险。
 
 ## 回滚方式
 
@@ -96,6 +102,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
-- 最近一次重跑目标测试的代码 head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
-- 当前 metadata-only head：`当前分支最新 head（仅回填 exec-plan checkpoint / 验证追踪，不改运行时语义）`
+- 实现 checkpoint：`22617661a06dcfa9584a1e068c2cd604aab7c8bf`
+- 当前 metadata-only head：`当前分支最新 head（仅回填 guardian P1 修复后的 exec-plan checkpoint / 验证追踪，不改运行时语义）`
