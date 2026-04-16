@@ -541,6 +541,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_specific_shared_error_details_field_via_tuple_unpack_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    details, _ = (error.details, None)\n    details["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_platform_specific_shared_result_field_via_normalized_alias(self) -> None:
         report = self.run_with_fixture(
             {
@@ -560,6 +573,19 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    bucket = payload["normalized"]\n    bucket["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_via_tuple_unpack_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    _, bucket = (None, normalized)\n    bucket["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )

@@ -733,13 +733,13 @@ def _build_shared_result_container_histories(
             scope=scope,
             position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
-        container_names = _root_shared_result_container_names(
-            value,
-            shared_result_container_aliases=container_aliases,
-        )
         scope_history = histories.setdefault(scope, {})
         branch_local = _is_branch_local_assignment(node, parent_index, scope)
-        for target in targets:
+        for target, target_value in _assignment_target_value_pairs(targets, value):
+            container_names = _root_shared_result_container_names(
+                target_value,
+                shared_result_container_aliases=container_aliases,
+            )
             for name in _assignment_target_names(target):
                 scope_history.setdefault(name, []).append(
                     ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), container_names, branch_local)
@@ -766,18 +766,37 @@ def _build_error_details_histories(
             scope=scope,
             position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
-        error_details_paths = _possible_error_details_paths(
-            value,
-            error_details_aliases=error_details_aliases,
-        )
         scope_history = histories.setdefault(scope, {})
         branch_local = _is_branch_local_assignment(node, parent_index, scope)
-        for target in targets:
+        for target, target_value in _assignment_target_value_pairs(targets, value):
+            error_details_paths = _possible_error_details_paths(
+                target_value,
+                error_details_aliases=error_details_aliases,
+            )
             for name in _assignment_target_names(target):
                 scope_history.setdefault(name, []).append(
                     ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), error_details_paths, branch_local)
                 )
     return histories
+
+
+def _assignment_target_value_pairs(targets: Sequence[ast.expr], value: ast.AST) -> tuple[tuple[ast.expr, ast.AST], ...]:
+    if len(targets) == 1:
+        paired = tuple(_pair_assignment_target_value(targets[0], value))
+        if paired:
+            return paired
+    return tuple((target, value) for target in targets)
+
+
+def _pair_assignment_target_value(target: ast.expr, value: ast.AST) -> tuple[tuple[ast.expr, ast.AST], ...]:
+    if isinstance(target, (ast.Tuple, ast.List)) and isinstance(value, (ast.Tuple, ast.List)):
+        if len(target.elts) != len(value.elts):
+            return ((target, value),)
+        pairs: list[tuple[ast.expr, ast.AST]] = []
+        for target_item, value_item in zip(target.elts, value.elts):
+            pairs.extend(_pair_assignment_target_value(target_item, value_item))
+        return tuple(pairs)
+    return ((target, value),)
 
 
 def _materialize_shared_result_container_aliases(
