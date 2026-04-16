@@ -103,6 +103,9 @@
   - `platform_leakage` 在出现失败时强制输出失败语义摘要，不再保留“checks are clean”这类通过语义
 - guardian 最新一轮针对 `88422ed` 的复查再次返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项公开消费路径证据：
   - 新增 `run_contract_harness_automation()` 真实输出经 `build_harness_source_report()` 后再进入公开 `orchestrate_version_gate()` 的端到端回归测试，并显式传入 `required_harness_sample_ids`，不再只覆盖 builder 层或依赖测试 wrapper 自动补齐 baseline
+- guardian 随后的复查继续暴露两项根因缺口；当前已按审查结论补齐两项收口：
+  - `validate_real_adapter_regression_source_report()` 现在会显式比对 caller 请求的 `operation/target_type` 与 payload 自带 surface；即便两者共享同一 semantic operation，只要 public surface 形状不一致就 fail-closed
+  - `tests/runtime/test_version_gate.py` 中的测试入口不再从 `harness_report.details.required_sample_ids` 偷偷回填 baseline；固定 fixture 路径改为显式固定测试基线，特殊样本集场景则单独显式传入 `required_harness_sample_ids`
 
 ## 下一步动作
 
@@ -422,6 +425,24 @@
   - 结果：真实 harness 编排证据修复后复跑，`通过`
 - `python3 scripts/spec_guard.py --all`
   - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`Ran 84 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`Ran 150 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
 
 ## 未决风险
 
@@ -435,5 +456,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1ff7066320188154e82e11bbffc33accabc7adee`
+- `9117a8ecefbb0259f22b81970e2ec6d338dfb07c`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
