@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：
+- 关联 PR：`#123`
 - 状态：`active`
 - active 收口事项：`CHORE-0120-fr-0007-platform-leakage-check`
 
@@ -45,8 +45,10 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
-  - 当前 PR latest head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
-  - 当前 head 为 metadata-only follow-up；运行时语义仍锚定在实现 checkpoint `f7de3de924745cce410f2fdad7de7b7021f90bbc`
+  - 受审 PR 已创建：`#123`
+  - 当前 PR latest head / 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
+  - 运行时语义仍锚定在实现 checkpoint `f7de3de924745cce410f2fdad7de7b7021f90bbc`
+  - 下一步动作：在当前 head 上发起 guardian 审查，并通过 merge gate 收口；本 worktree 不执行 merge
 
 ## 实现要点
 
@@ -80,11 +82,11 @@
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`已校验 2 条提交信息，全部通过。`
+  - 结果：当前 metadata-only head 已复跑，通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`PR scope 校验通过。`
+  - 结果：当前 metadata-only head 已复跑，`PR scope` 校验通过。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`docs-guard 通过。`
+  - 结果：当前 metadata-only head 已复跑，`docs-guard` 通过。
 
 ## 未决风险
 
@@ -99,6 +101,6 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
-- 最近一次重跑目标测试的 head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
-- 最近一次门禁复跑的 head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
-- 当前 metadata-only head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
+- 最近一次重跑目标测试的 head：`当前分支最新 head（metadata-only follow-up）`
+- 最近一次门禁复跑的 head：`当前分支最新 head（metadata-only follow-up）`
+- 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
