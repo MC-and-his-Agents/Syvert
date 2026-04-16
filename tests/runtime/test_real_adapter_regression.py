@@ -124,6 +124,57 @@ class RealAdapterRegressionTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_adapter_result", {item["code"] for item in report["details"]["failures"]})
 
+    def test_validate_real_adapter_regression_rejects_missing_success_coverage(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload["adapter_results"][0]["cases"] = [payload["adapter_results"][0]["cases"][1]]
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("missing_success_coverage", {item["code"] for item in report["details"]["failures"]})
+
+    def test_validate_real_adapter_regression_rejects_missing_allowed_failure_coverage(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload["adapter_results"][1]["cases"] = [payload["adapter_results"][1]["cases"][0]]
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "missing_allowed_failure_coverage",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
+    def test_validate_real_adapter_regression_rejects_missing_evidence_refs(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload.pop("evidence_refs")
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+
     def test_validate_real_adapter_regression_rejects_operation_surface_mismatch(self) -> None:
         payload = build_real_adapter_regression_payload(
             version="v0.2.0",
