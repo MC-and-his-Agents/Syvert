@@ -543,6 +543,22 @@ def validate_platform_leakage_source_report(
                 "platform leakage failure report must carry findings",
             )
         )
+    missing_finding_evidence_refs = sorted(
+        {
+            str(finding["evidence_ref"])
+            for finding in findings
+            if str(finding["evidence_ref"]) not in evidence_refs
+        }
+    )
+    if missing_finding_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "finding_evidence_ref_missing_from_evidence_refs",
+                "platform leakage findings must be traceable from top-level evidence_refs",
+                details={"missing_evidence_refs": missing_finding_evidence_refs},
+            )
+        )
 
     gate_failures = [_failure_from_leakage_finding(source, finding) for finding in findings] if payload_verdict == FAIL_VERDICT else []
     normalized_failures = failures + gate_failures

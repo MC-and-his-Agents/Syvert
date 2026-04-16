@@ -1657,6 +1657,7 @@ def _expr_contains_disallowed_shared_field(
     if isinstance(node, ast.Call):
         return _call_contains_disallowed_shared_field(
             node,
+            path=path,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
             key_signals=key_signals,
@@ -1720,36 +1721,66 @@ def _dict_contains_disallowed_shared_field(
 def _call_contains_disallowed_shared_field(
     node: ast.Call,
     *,
+    path: tuple[str, ...],
     shared_result_container_aliases: Mapping[str, frozenset[str]],
     error_details_aliases: Mapping[str, frozenset[str]],
     key_signals: Mapping[str, tuple[frozenset[str], bool]],
     platform_aliases: frozenset[str],
 ) -> bool:
-    if not isinstance(node.func, ast.Attribute):
-        return False
-    container_paths = _possible_shared_field_carrier_paths(
-        node.func.value,
+    carrier_paths: frozenset[tuple[str, ...]] = frozenset({path}) if path else frozenset()
+    if isinstance(node.func, ast.Attribute):
+        carrier_paths = carrier_paths.union(
+            _possible_shared_field_carrier_paths(
+                node.func.value,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+            )
+        )
+        if carrier_paths and node.func.attr == "setdefault":
+            if not node.args:
+                return False
+            signal = _key_signal_for_expr(
+                node.args[0],
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            )
+            return any(_signal_causes_disallowed_shared_field(carrier_path, signal) for carrier_path in carrier_paths)
+        if carrier_paths and node.func.attr == "update":
+            if _call_arguments_contain_disallowed_shared_field(
+                node,
+                carrier_paths=carrier_paths,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ):
+                return True
+    if carrier_paths and _call_arguments_contain_disallowed_shared_field(
+        node,
+        carrier_paths=carrier_paths,
         shared_result_container_aliases=shared_result_container_aliases,
         error_details_aliases=error_details_aliases,
-    )
-    if not container_paths:
-        return False
-    if node.func.attr == "setdefault":
-        if not node.args:
-            return False
-        signal = _key_signal_for_expr(
-            node.args[0],
-            key_signals=key_signals,
-            platform_aliases=platform_aliases,
-        )
-        return any(_signal_causes_disallowed_shared_field(path, signal) for path in container_paths)
-    if node.func.attr != "update":
-        return False
+        key_signals=key_signals,
+        platform_aliases=platform_aliases,
+    ):
+        return True
+    return False
+
+
+def _call_arguments_contain_disallowed_shared_field(
+    node: ast.Call,
+    *,
+    carrier_paths: frozenset[tuple[str, ...]],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
+) -> bool:
     for argument in node.args:
-        for path in container_paths:
+        for carrier_path in carrier_paths:
             if _expr_contains_disallowed_shared_field(
                 argument,
-                path=path,
+                path=carrier_path,
                 shared_result_container_aliases=shared_result_container_aliases,
                 error_details_aliases=error_details_aliases,
                 key_signals=key_signals,
@@ -1757,15 +1788,16 @@ def _call_contains_disallowed_shared_field(
             ):
                 return True
     for keyword in node.keywords:
+        keyword_paths = tuple(carrier_paths)
         if keyword.arg is not None:
             signal = (frozenset({keyword.arg}), False)
-            if any(_signal_causes_disallowed_shared_field(path, signal) for path in container_paths):
+            if any(_signal_causes_disallowed_shared_field(carrier_path, signal) for carrier_path in carrier_paths):
                 return True
-            continue
-        for path in container_paths:
+            keyword_paths = tuple(carrier_path + (keyword.arg,) for carrier_path in carrier_paths)
+        for keyword_path in keyword_paths:
             if _expr_contains_disallowed_shared_field(
                 keyword.value,
-                path=path,
+                path=keyword_path,
                 shared_result_container_aliases=shared_result_container_aliases,
                 error_details_aliases=error_details_aliases,
                 key_signals=key_signals,

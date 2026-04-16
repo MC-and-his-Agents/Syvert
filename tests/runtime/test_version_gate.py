@@ -621,6 +621,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:core-runtime:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:core-runtime:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -638,6 +639,26 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
         self.assertTrue(report["evidence_refs"])
 
+    def test_platform_leakage_rejects_finding_evidence_ref_missing_from_evidence_refs(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["verdict"] = "fail"
+        payload["findings"] = [
+            {
+                "code": "platform_branch_in_core",
+                "message": "platform branch leaked into core runtime",
+                "boundary": "core_runtime",
+                "evidence_ref": "leakage:core-runtime:missing",
+            }
+        ]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "finding_evidence_ref_missing_from_evidence_refs",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
     def test_platform_leakage_rejects_out_of_scope_boundary(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["verdict"] = "fail"
@@ -649,6 +670,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:adapter-private:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:adapter-private:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -666,6 +688,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:shared-result:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:shared-result:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -1666,6 +1689,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:core-runtime:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:core-runtime:1"]
         failed_platform_leakage_report = validate_platform_leakage_source_report(
             payload,
             version="v0.2.0",
@@ -1943,6 +1967,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:shared-result:1",
             }
         ]
+        leakage_payload["evidence_refs"] = [*leakage_payload["evidence_refs"], "leakage:shared-result:1"]
         leakage_report = validate_platform_leakage_source_report(
             leakage_payload,
             version="v0.2.0",

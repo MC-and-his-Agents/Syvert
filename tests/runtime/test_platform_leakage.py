@@ -542,6 +542,32 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_specific_shared_result_field_in_dict_keyword_initializer(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized = dict(xhs_user_id="1")\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_in_dict_keyword_unpack(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized = dict(**{"xhs_user_id": "1"})\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_platform_specific_shared_error_details_field(self) -> None:
         report = self.run_with_fixture(
             {
