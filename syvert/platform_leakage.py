@@ -416,6 +416,23 @@ def _scan_file(
                 )
             )
             continue
+        if _statement_has_hardcoded_platform_branch(
+            node,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+        ):
+            findings.append(
+                _finding(
+                    code="hardcoded_platform_branch",
+                    message=f"hardcoded platform branch leaked into shared layer at `{relative_name}:{line_number}`",
+                    boundary=boundary,
+                    evidence_ref=evidence_ref,
+                )
+            )
+            continue
+
         if _statement_has_platform_specific_field(
             statement_source,
             node,
@@ -428,23 +445,6 @@ def _scan_file(
                 _finding(
                     code="platform_specific_field_leak",
                     message=f"platform-specific field leaked into shared layer at `{relative_name}:{line_number}`",
-                    boundary=boundary,
-                    evidence_ref=evidence_ref,
-                )
-            )
-            continue
-
-        if _statement_has_hardcoded_platform_branch(
-            node,
-            platform_aliases=platform_aliases,
-            shared_result_container_aliases=shared_result_container_aliases,
-            error_details_aliases=error_details_aliases,
-            key_signals=key_signals,
-        ):
-            findings.append(
-                _finding(
-                    code="hardcoded_platform_branch",
-                    message=f"hardcoded platform branch leaked into shared layer at `{relative_name}:{line_number}`",
                     boundary=boundary,
                     evidence_ref=evidence_ref,
                 )
