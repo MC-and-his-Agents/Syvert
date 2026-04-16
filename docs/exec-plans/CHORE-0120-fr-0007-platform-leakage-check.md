@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`6d76864e52249c633f8c9f9ee31c669edb93e67c`
+- 当前受审 runtime head：`41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`6d76864e52249c633f8c9f9ee31c669edb93e67c`
+- 当前 runtime-affecting 实现 checkpoint：`41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -87,7 +87,8 @@
     - URL / selector / signature fragment 命中面已恢复为独立规则，但不再恢复会误伤 `xhs-main` / `xhs_extra` 的宽泛字符串字段扫描
     - `origin/main` 合入 `#119` 后，`version_gate.py` 里的冻结 reference pair 与真实回归 case matrix 现在一起进入 `version_gate_logic` 允许例外；主干自己的 `FR-0007` 冻结矩阵不会再被平台泄漏扫描误报成 `platform_specific_field_leak`
     - `version_gate_logic` 的允许例外已从“行号白名单”收紧为精确 AST 语句白名单；冻结常量所在行后的分号语句不再被一并豁免，`SHARED_ROUTING = ("xhs", "douyin")` 这类同线平台语义也会按 fail-closed 命中
-  - 当前已提交的运行时语义锚定在实现 checkpoint `6d76864e52249c633f8c9f9ee31c669edb93e67c`
+    - 共享语义字符串与平台分支变体的 fail-closed 范围已进一步收紧；`DEFAULT_SHARED_MODE = "xhs_only"` 这类平台名片段共享语义和 `adapter_key == "xhs_cn"` 一类区域后缀分支现在也会稳定命中，而不再依赖精确平台字面量或有限后缀白名单
+  - 当前已提交的运行时语义锚定在实现 checkpoint `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
   - metadata-only follow-up 已完成，当前 PR 最新 head 只承载 exec-plan / PR body / issue body / 验证记录追账，不改 runtime 语义
   - 当前剩余动作只包括：重发 guardian；若通过，再进入 merge gate
 
@@ -124,6 +125,8 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3` 上通过，`Ran 230 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的平台名片段共享语义与平台变体分支 blocker
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `6d76864e52249c633f8c9f9ee31c669edb93e67c` 上通过，`Ran 226 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的冻结常量同线分号绕过 blocker
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -191,7 +194,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`6d76864e52249c633f8c9f9ee31c669edb93e67c`
-- 最近一次重跑目标测试的 head：`6d76864e52249c633f8c9f9ee31c669edb93e67c`
-- 当前受审 runtime head：`6d76864e52249c633f8c9f9ee31c669edb93e67c`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `6d76864e52249c633f8c9f9ee31c669edb93e67c`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
+- 最近一次重跑目标测试的 head：`41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
+- 当前受审 runtime head：`41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3`，不得把 follow-up 误记为新的运行时真相
