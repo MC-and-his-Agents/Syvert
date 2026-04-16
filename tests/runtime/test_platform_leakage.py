@@ -224,6 +224,32 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_startswith_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    if adapter_key.startswith("xhs"):\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_carrier_branch_without_inline_literal(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    if normalized.get("platform") == current_platform:\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_expression_statement_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
@@ -373,6 +399,28 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_allows_neutral_single_character_shared_result_field(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    return {"normalized": {"x": 1}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_fail_closes_on_malformed_repo_root(self) -> None:
+        report = run_platform_leakage_check(
+            version="v0.2.0",
+            repo_root="\0bad",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("scan_target_unreadable", {item["code"] for item in report["details"]["findings"]})
 
     def test_run_check_detects_shared_platform_semantic_in_return_value(self) -> None:
         report = self.run_with_fixture(

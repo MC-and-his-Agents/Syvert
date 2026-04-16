@@ -164,7 +164,7 @@ def _scan_shared_boundaries(repo_root: str | Path) -> tuple[list[dict[str, str]]
                 )
             )
             continue
-        except OSError:
+        except (OSError, ValueError):
             findings.append(
                 _finding(
                     code="scan_target_unreadable",
@@ -193,7 +193,7 @@ def _scan_shared_boundaries(repo_root: str | Path) -> tuple[list[dict[str, str]]
 def _coerce_repo_root(repo_root: str | Path) -> Path | None:
     try:
         return Path(repo_root)
-    except TypeError:
+    except (TypeError, ValueError, OSError):
         return None
 
 
@@ -561,6 +561,8 @@ def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
 
 
 def _expr_has_platform_literal_compare(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+    if isinstance(node, ast.Call) and _call_has_platform_branch_signal(node, platform_aliases=platform_aliases):
+        return True
     if isinstance(node, ast.Compare):
         current = node.left
         for operator, comparator in zip(node.ops, node.comparators):
@@ -575,6 +577,7 @@ def _expr_has_platform_literal_compare(node: ast.AST, *, platform_aliases: froze
     return any(
         _expr_has_platform_literal_compare(child, platform_aliases=platform_aliases)
         for child in ast.iter_child_nodes(node)
+        if not (isinstance(node, ast.stmt) and isinstance(child, ast.stmt))
     )
 
 
@@ -586,6 +589,14 @@ def _compare_pair_has_platform_literal(
     platform_aliases: frozenset[str],
 ) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
+        if (
+            _expr_is_explicit_platform_carrier(left, platform_aliases=platform_aliases)
+            and _expr_is_platformish(right, platform_aliases=platform_aliases)
+        ) or (
+            _expr_is_explicit_platform_carrier(right, platform_aliases=platform_aliases)
+            and _expr_is_platformish(left, platform_aliases=platform_aliases)
+        ):
+            return True
         return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_literal(right)) or (
             _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_literal(left)
         )
@@ -628,6 +639,53 @@ def _call_is_platformish(node: ast.Call, *, platform_aliases: frozenset[str]) ->
         return False
     first_arg = node.args[0]
     return any(_identifier_matches(literal, _PLATFORM_IDENTIFIER_RE) for literal in _string_literals(first_arg))
+
+
+def _call_has_platform_branch_signal(node: ast.Call, *, platform_aliases: frozenset[str]) -> bool:
+    if not isinstance(node.func, ast.Attribute):
+        return False
+    if node.func.attr not in {"startswith", "endswith", "removeprefix", "removesuffix"}:
+        return False
+    if not _expr_is_platformish(node.func.value, platform_aliases=platform_aliases):
+        return False
+    return any(_expr_contains_platform_literal(argument) for argument in node.args)
+
+
+def _expr_is_explicit_platform_carrier(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+    if isinstance(node, ast.Attribute):
+        return node.attr == "platform" and _is_normalized_container(node.value, platform_aliases=platform_aliases)
+    if isinstance(node, ast.Subscript):
+        return any(literal == "platform" for literal in _string_literals(node.slice)) and (
+            _is_normalized_container(node.value, platform_aliases=platform_aliases)
+            or _is_error_details_container(node.value)
+        )
+    if isinstance(node, ast.Call):
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "get" or not node.args:
+            return False
+        if not any(literal == "platform" for literal in _string_literals(node.args[0])):
+            return False
+        return _is_normalized_container(node.func.value, platform_aliases=platform_aliases) or _is_error_details_container(
+            node.func.value
+        )
+    return False
+
+
+def _is_normalized_container(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "normalized"
+    if isinstance(node, ast.Subscript):
+        return any(literal == "normalized" for literal in _string_literals(node.slice))
+    if isinstance(node, ast.Attribute):
+        return node.attr == "normalized"
+    return False
+
+
+def _is_error_details_container(node: ast.AST) -> bool:
+    if isinstance(node, ast.Attribute):
+        return node.attr == "details" and isinstance(node.value, ast.Name) and node.value.id == "error"
+    if isinstance(node, ast.Subscript):
+        return any(literal == "details" for literal in _string_literals(node.slice))
+    return False
 
 
 def _expr_contains_string_literal(node: ast.AST) -> bool:
@@ -709,7 +767,7 @@ def _is_disallowed_shared_result_field_path(path: tuple[str, ...]) -> bool:
     if len(path) < 2 or path[0] not in {"normalized", "raw"}:
         return False
     field_name = path[-1].lower()
-    if field_name == "platform":
+    if field_name in {"platform", "x"}:
         return False
     if _COMMON_PLATFORM_NAME_RE.search(field_name) is not None or _string_literal_has_platform_specific_fragment(field_name):
         return True
