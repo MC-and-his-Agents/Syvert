@@ -449,6 +449,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
 
+    def test_run_check_allows_adapter_error_details_platform_subscript_write(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_error.details["platform"] = "xhs"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
     def test_run_check_detects_function_decorator_platform_metadata(self) -> None:
         report = self.run_with_fixture(
             {
@@ -524,6 +537,19 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_does_not_whitelist_plain_details_container(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    payload["details"]["platform"] = "xhs"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
 
     def test_run_check_detects_platform_specific_raw_field_via_neutral_alias(self) -> None:
         report = self.run_with_fixture(

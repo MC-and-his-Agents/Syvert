@@ -87,6 +87,7 @@ _PLATFORM_BRANCH_VARIANT_RE = re.compile(
     r"(?:[-_](?:main|prod|production|stage|staging|dev|test))?$"
 )
 _PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter|adapter_key|platform|platforms|platform_key|reference_pair)(?:_|$)")
+_ERROR_CONTAINER_RE = re.compile(r"(?:^|_)(?:error|adapter_error|runtime_error|contract_error)(?:_|$)")
 _SHARED_RESULT_CONTAINER_RE = re.compile(r"(?:^|_)(normalized|raw)(?:_|$)")
 _AST_MATCH = getattr(ast, "Match", None)
 _AST_MATCH_VALUE = getattr(ast, "MatchValue", None)
@@ -1133,9 +1134,21 @@ def _is_error_details_container(
     if isinstance(node, ast.Name):
         return node.id in error_details_aliases
     if isinstance(node, ast.Attribute):
-        return node.attr == "details" and isinstance(node.value, ast.Name) and node.value.id == "error"
+        return node.attr == "details" and _is_error_container(node.value)
     if isinstance(node, ast.Subscript):
-        return any(literal == "details" for literal in _string_literals(node.slice))
+        return any(literal == "details" for literal in _string_literals(node.slice)) and _is_error_container(node.value)
+    return False
+
+
+def _is_error_container(node: ast.AST) -> bool:
+    if isinstance(node, ast.Name):
+        return _identifier_matches(node.id, _ERROR_CONTAINER_RE)
+    if isinstance(node, ast.Attribute):
+        return _identifier_matches(node.attr, _ERROR_CONTAINER_RE) or _is_error_container(node.value)
+    if isinstance(node, ast.Subscript):
+        return any(_identifier_matches(literal, _ERROR_CONTAINER_RE) for literal in _string_literals(node.slice)) or _is_error_container(
+            node.value
+        )
     return False
 
 
