@@ -234,6 +234,35 @@ class RealAdapterRegressionTests(unittest.TestCase):
             {item["code"] for item in report["details"]["failures"]},
         )
 
+    def test_run_real_adapter_regression_fails_closed_when_douyin_binding_alias_wraps_default_page_state_recovery(self) -> None:
+        alias = default_page_state_transport
+        adapters = self.hermetic_adapters()
+        adapters["douyin"] = DouyinAdapter(
+            session_provider=lambda path: DouyinSessionConfig(
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+                verify_fp="verify-1",
+                ms_token="ms-token-1",
+                webid="webid-1",
+                sign_base_url="http://127.0.0.1:8000",
+                timeout_seconds=5,
+            ),
+            sign_transport=lambda base_url, payload, timeout_seconds: {"a_bogus": "signed-1"},
+            detail_transport=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("detail-failed")),
+            page_state_transport=lambda **kwargs: alias(**kwargs),
+        )
+
+        report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=adapters,
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "non_hermetic_reference_adapter_binding",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
     def test_validate_real_adapter_regression_rejects_missing_observed_error_category(self) -> None:
         payload = build_real_adapter_regression_payload(
             version="v0.2.0",

@@ -342,10 +342,13 @@ def _references_default_page_state_transport(value: Any, *, _seen: set[int] | No
     code = getattr(value, "__code__", None)
     globals_dict = getattr(value, "__globals__", None)
     if code is not None and isinstance(globals_dict, Mapping):
-        if (
-            "default_page_state_transport" in getattr(code, "co_names", ())
-            and globals_dict.get("default_page_state_transport") is default_page_state_transport
-        ):
-            return True
+        for name in getattr(code, "co_names", ()):
+            if name not in globals_dict:
+                continue
+            referenced_value = globals_dict[name]
+            if referenced_value is default_page_state_transport:
+                return True
+            if referenced_value is not value and _references_default_page_state_transport(referenced_value, _seen=_seen):
+                return True
 
     return False
