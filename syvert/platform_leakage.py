@@ -294,13 +294,25 @@ def _scan_file(
 
     findings: list[dict[str, str]] = []
     platform_aliases = _collect_platform_aliases(module)
-    shared_result_container_aliases = _collect_shared_result_container_aliases(module)
-    error_details_aliases = _collect_error_details_aliases(module)
+    parent_index = _build_parent_index(module)
+    shared_result_container_histories = _build_shared_result_container_histories(module, parent_index)
+    error_details_histories = _build_error_details_histories(module, parent_index)
     for node in ast.walk(module):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             line_number = getattr(node, "lineno", None)
             if line_number is None:
                 continue
+            current_scope = _enclosing_scope(node, parent_index)
+            shared_result_container_aliases = _materialize_shared_result_container_aliases(
+                shared_result_container_histories,
+                scope=current_scope,
+                line_number=line_number,
+            )
+            error_details_aliases = _materialize_error_details_aliases(
+                error_details_histories,
+                scope=current_scope,
+                line_number=line_number,
+            )
             statement_lines = _statement_line_numbers(node)
             if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
                 continue
@@ -327,6 +339,17 @@ def _scan_file(
         line_number = getattr(node, "lineno", None)
         if line_number is None:
             continue
+        current_scope = _enclosing_scope(node, parent_index)
+        shared_result_container_aliases = _materialize_shared_result_container_aliases(
+            shared_result_container_histories,
+            scope=current_scope,
+            line_number=line_number,
+        )
+        error_details_aliases = _materialize_error_details_aliases(
+            error_details_histories,
+            scope=current_scope,
+            line_number=line_number,
+        )
 
         statement_lines = _statement_line_numbers(node)
         if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
@@ -372,6 +395,8 @@ def _scan_file(
             node,
             statement_source,
             platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
         ):
             findings.append(
                 _finding(
@@ -395,6 +420,129 @@ def _statement_source_segment(source_text: str, node: ast.AST) -> str:
     return ast.get_source_segment(source_text, node) or ""
 
 
+def _build_parent_index(module: ast.AST) -> dict[ast.AST, ast.AST]:
+    parent_index: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(module):
+        for child in ast.iter_child_nodes(parent):
+            parent_index[child] = parent
+    return parent_index
+
+
+def _enclosing_scope(node: ast.AST, parent_index: Mapping[ast.AST, ast.AST]) -> ast.AST:
+    current = node
+    while True:
+        parent = parent_index.get(current)
+        if parent is None:
+            return current
+        if isinstance(parent, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef)):
+            return parent
+        current = parent
+
+
+def _assignment_value_and_targets(node: ast.AST) -> tuple[ast.AST | None, Sequence[ast.expr]]:
+    if isinstance(node, ast.Assign):
+        return node.value, node.targets
+    if isinstance(node, ast.AnnAssign) and node.value is not None:
+        return node.value, [node.target]
+    return None, ()
+
+
+def _build_shared_result_container_histories(
+    module: ast.AST,
+    parent_index: Mapping[ast.AST, ast.AST],
+) -> dict[ast.AST, dict[str, list[tuple[int, str | None]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[int, str | None]]]] = {}
+    assignment_nodes = sorted(
+        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
+        key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
+    )
+    for node in assignment_nodes:
+        value, targets = _assignment_value_and_targets(node)
+        if value is None:
+            continue
+        scope = _enclosing_scope(node, parent_index)
+        container_aliases = _materialize_shared_result_container_aliases(
+            histories,
+            scope=scope,
+            line_number=getattr(node, "lineno", 0),
+        )
+        container_name = _root_shared_result_container_name(
+            value,
+            shared_result_container_aliases=container_aliases,
+        )
+        scope_history = histories.setdefault(scope, {})
+        for target in targets:
+            for name in _assignment_target_names(target):
+                scope_history.setdefault(name, []).append((getattr(node, "lineno", 0), container_name))
+    return histories
+
+
+def _build_error_details_histories(
+    module: ast.AST,
+    parent_index: Mapping[ast.AST, ast.AST],
+) -> dict[ast.AST, dict[str, list[tuple[int, bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[int, bool]]]] = {}
+    assignment_nodes = sorted(
+        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
+        key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
+    )
+    for node in assignment_nodes:
+        value, targets = _assignment_value_and_targets(node)
+        if value is None:
+            continue
+        scope = _enclosing_scope(node, parent_index)
+        error_details_aliases = _materialize_error_details_aliases(
+            histories,
+            scope=scope,
+            line_number=getattr(node, "lineno", 0),
+        )
+        is_error_details_alias = _is_error_details_container(
+            value,
+            error_details_aliases=error_details_aliases,
+        )
+        scope_history = histories.setdefault(scope, {})
+        for target in targets:
+            for name in _assignment_target_names(target):
+                scope_history.setdefault(name, []).append((getattr(node, "lineno", 0), is_error_details_alias))
+    return histories
+
+
+def _materialize_shared_result_container_aliases(
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[int, str | None]]]],
+    *,
+    scope: ast.AST,
+    line_number: int,
+) -> dict[str, str]:
+    alias_map: dict[str, str] = {}
+    for name, events in histories.get(scope, {}).items():
+        resolved = _resolve_alias_event(events, line_number)
+        if isinstance(resolved, str):
+            alias_map[name] = resolved
+    return alias_map
+
+
+def _materialize_error_details_aliases(
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[int, bool]]]],
+    *,
+    scope: ast.AST,
+    line_number: int,
+) -> frozenset[str]:
+    aliases: set[str] = set()
+    for name, events in histories.get(scope, {}).items():
+        if _resolve_alias_event(events, line_number) is True:
+            aliases.add(name)
+    return frozenset(aliases)
+
+
+def _resolve_alias_event(events: Sequence[tuple[int, Any]], line_number: int) -> Any:
+    resolved = None
+    for event_line, value in events:
+        if event_line >= line_number:
+            break
+        resolved = value
+    return resolved
+
+
 def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
     aliases: set[str] = set()
     changed = True
@@ -416,64 +564,6 @@ def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
                 continue
 
             if not _expr_is_platformish(value, platform_aliases=frozenset(aliases)):
-                continue
-            for target in targets:
-                for name in _assignment_target_names(target):
-                    if name not in aliases:
-                        aliases.add(name)
-                        changed = True
-    return frozenset(aliases)
-
-
-def _collect_shared_result_container_aliases(module: ast.AST) -> dict[str, str]:
-    aliases: dict[str, str] = {}
-    changed = True
-    while changed:
-        changed = False
-        for node in ast.walk(module):
-            value = None
-            targets: Sequence[ast.expr] = ()
-            if isinstance(node, ast.Assign):
-                value = node.value
-                targets = node.targets
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                value = node.value
-                targets = [node.target]
-            else:
-                continue
-
-            container_name = _root_shared_result_container_name(
-                value,
-                shared_result_container_aliases=aliases,
-            )
-            if container_name is None:
-                continue
-            for target in targets:
-                for name in _assignment_target_names(target):
-                    if aliases.get(name) != container_name:
-                        aliases[name] = container_name
-                        changed = True
-    return aliases
-
-
-def _collect_error_details_aliases(module: ast.AST) -> frozenset[str]:
-    aliases: set[str] = set()
-    changed = True
-    while changed:
-        changed = False
-        for node in ast.walk(module):
-            value = None
-            targets: Sequence[ast.expr] = ()
-            if isinstance(node, ast.Assign):
-                value = node.value
-                targets = node.targets
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                value = node.value
-                targets = [node.target]
-            else:
-                continue
-
-            if not _is_error_details_container(value, error_details_aliases=frozenset(aliases)):
                 continue
             for target in targets:
                 for name in _assignment_target_names(target):
@@ -544,6 +634,8 @@ def _statement_has_single_platform_semantic(
     statement_source: str,
     *,
     platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
 ) -> bool:
     if isinstance(node, ast.Assign):
         return _assignment_has_single_platform_semantic(
@@ -551,6 +643,8 @@ def _statement_has_single_platform_semantic(
             node.value,
             statement_source,
             platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
         )
     if isinstance(node, ast.AnnAssign) and node.value is not None:
         return _assignment_has_single_platform_semantic(
@@ -558,6 +652,8 @@ def _statement_has_single_platform_semantic(
             node.value,
             statement_source,
             platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
         )
     if isinstance(node, ast.AugAssign):
         return _assignment_has_single_platform_semantic(
@@ -565,6 +661,8 @@ def _statement_has_single_platform_semantic(
             node.value,
             statement_source,
             platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
         )
     if isinstance(node, ast.Return) and node.value is not None:
         return _expr_has_shared_platform_semantic(
@@ -589,9 +687,21 @@ def _assignment_has_single_platform_semantic(
     statement_source: str,
     *,
     platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
 ) -> bool:
     if _expr_has_platform_literal_compare(value, platform_aliases=platform_aliases):
         return True
+
+    if targets and all(
+        _target_is_approved_platform_carrier(
+            target,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        )
+        for target in targets
+    ):
+        return False
 
     if _expr_contains_unapproved_platform_literal(value):
         return True
@@ -631,6 +741,30 @@ def _function_has_single_platform_semantic(
             platform_aliases=platform_aliases,
         )
         for default in defaults
+    )
+
+
+def _target_is_approved_platform_carrier(
+    target: ast.expr,
+    *,
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
+) -> bool:
+    if isinstance(target, ast.Attribute):
+        return target.attr == "platform" and _is_normalized_container(
+            target.value,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
+    if not isinstance(target, ast.Subscript):
+        return False
+    if not any(literal == "platform" for literal in _string_literals(target.slice)):
+        return False
+    return _is_normalized_container(
+        target.value,
+        shared_result_container_aliases=shared_result_container_aliases,
+    ) or _is_error_details_container(
+        target.value,
+        error_details_aliases=error_details_aliases,
     )
 
 

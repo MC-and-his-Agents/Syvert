@@ -410,12 +410,38 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
 
+    def test_run_check_allows_normalized_platform_carrier_subscript_write(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized["platform"] = "xhs"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
     def test_run_check_allows_error_details_platform_carrier_write(self) -> None:
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    payload = {"error": {"details": {"platform": "xhs"}}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_allows_error_details_platform_carrier_subscript_write(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    details = error.details\n    details["platform"] = "xhs"\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )
@@ -578,6 +604,37 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_does_not_report_reassigned_error_details_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    details = error.details\n    details = {}\n    if details.get("platform") == current_platform:\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_does_not_report_normalized_alias_from_another_function_scope(self) -> None:
+        report = self.run_with_fixture(
+            {},
+            append_files={
+                "syvert/runtime.py": (
+                    "\n\ndef seeded_bucket(payload):\n"
+                    '    bucket = payload["normalized"]\n'
+                    "    return bucket\n"
+                    "\n\ndef unrelated_scope(bucket):\n"
+                    '    bucket["xhs_extra"] = "1"\n'
+                    "    return bucket\n"
+                )
+            },
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
 
     def test_run_check_detects_normalized_mapping_match_branch(self) -> None:
         if getattr(ast, "Match", None) is None:
@@ -767,6 +824,7 @@ class PlatformLeakageTests(unittest.TestCase):
         replacements: dict[str, tuple[str, str]],
         *,
         extra_files: dict[str, str] | None = None,
+        append_files: dict[str, str] | None = None,
     ) -> dict[str, object]:
         with tempfile.TemporaryDirectory() as temp_dir:
             fixture_root = Path(temp_dir)
@@ -779,6 +837,7 @@ class PlatformLeakageTests(unittest.TestCase):
                 if old:
                     self.assertIn(old, contents)
                     contents = contents.replace(old, new, 1)
+                contents += (append_files or {}).get(relative_name, "")
                 target_path.write_text(contents, encoding="utf-8")
 
             for relative_name, contents in (extra_files or {}).items():
