@@ -36,7 +36,7 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
+- 当前 runtime-affecting 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -45,20 +45,19 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
-  - 已修复 guardian 第二轮指出的两类 false negative：
-    - 平台泄漏扫描从物理行匹配提升到 AST/语句级判定，多行 `if` / 比较 / 赋值不再可绕过
-    - 平台名字面量检测不再只识别 `xhs` / `douyin`，对共享层平台字面量走通用检测，同时保留 `normalized.platform`、统一 `error.details`、冻结 reference pair 的精确豁免
+  - 已修复 guardian 最新阻断：
+    - 平台泄漏扫描不再只看 `if` / `match` / 赋值；`return` / `raise` / 任意表达式语句中的 `adapter_key == "xhs"` 一类比较也会直接命中 `hardcoded_platform_branch`
+    - 目标文件 AST parse 失败时，不再退回“只扫平台字段”的低保真路径，而是产出 `scan_parse_failure` finding 并显式 fail-closed
   - 受审 PR 已创建：`#123`
-  - 当前 PR latest head / 当前 metadata-only head：`当前分支最新 head（本次 exec-plan metadata-only follow-up）`
-  - 运行时语义仍锚定在实现 checkpoint `9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
-  - 下一步动作：在当前 metadata-only head 复跑验证与门禁，并把同一对象事实同步回 PR/guardian 上下文；本 worktree 不执行 guardian / merge
+  - 运行时语义当前锚定在实现 checkpoint `0f3b1b71a0664527804e078198630732890c8c28`
+  - 本 worktree 的剩余动作只包含 exec-plan 追账、验证复跑与推送；guardian / merge 留在后续集成回合执行
 
 ## 实现要点
 
 - 新增 `syvert.platform_leakage`，固定 `boundary_scope` 为六个共享边界，并把 caller 输入与 payload surface 绑定到同一份 boundary scope。
 - 扫描结果直接输出为 `platform_leakage` source report payload，再由公开 validator 收口。
 - 当前实现把平台泄漏命中面固定在三类 AST/语句级 finding：
-  - 平台上下文里的硬编码分支 / 比较
+  - 平台上下文里的硬编码分支 / 比较，包括 `if` / `match` / `return` / `raise` / 任意表达式语句
   - 平台专属字段渗入共享层
   - 带共享语义语境的平台字面量赋值
 - 新增独立 runtime 测试，覆盖：
@@ -82,27 +81,9 @@
 - `python3 -m py_compile syvert/platform_leakage.py tests/runtime/test_platform_leakage.py tests/runtime/test_version_gate.py`
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_platform_leakage`
-  - 结果：`Ran 8 tests`，`OK`
+  - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，覆盖 clean pass、boundary fail-closed、三类 expression-level 平台比较命中、parse failure fail-closed 与排除边界用例。
 - `python3 -m unittest tests.runtime.test_version_gate`
-  - 结果：`Ran 85 tests`，`OK`
-- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：`Ran 141 tests`，`OK`
-- `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过
-- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 metadata-only head 已复跑，通过。
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 metadata-only head 已复跑，`PR scope` 校验通过。
-- `python3 scripts/docs_guard.py --mode ci`
-  - 结果：当前 metadata-only head 已复跑，`docs-guard` 通过。
-- `python3 -m unittest tests.runtime.test_platform_leakage`
-  - 结果：实现 checkpoint 后已复跑通过；metadata-only follow-up 后将以当前 head 再跑一次。
-- `python3 -m unittest tests.runtime.test_version_gate`
-  - 结果：实现 checkpoint 后已复跑通过；metadata-only follow-up 后将以当前 head 再跑一次。
-- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：将在当前 metadata-only head 复跑，确保验证记录与 PR latest head 对齐。
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：将在当前 metadata-only head 复跑，确保验证记录与 PR latest head 对齐。
+  - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，并新增 parse failure 经 `run_platform_leakage_check()` 收口进 orchestrator 的回归。
 
 ## 未决风险
 
@@ -116,7 +97,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
-- 最近一次重跑目标测试的 head：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
-- 最近一次门禁复跑的 head：`待当前 metadata-only head 复跑`
-- 当前 metadata-only head：`当前分支最新 head（本次 exec-plan metadata-only follow-up）`
+- 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
+- 最近一次重跑目标测试的 head：`0f3b1b71a0664527804e078198630732890c8c28`
