@@ -16,6 +16,42 @@ from syvert.version_gate import (
 )
 
 
+class ShapeContractSpoofAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def __init__(self, adapter_key: str) -> None:
+        self.adapter_key = adapter_key
+
+    def execute(self, request: object) -> dict[str, object]:
+        return {
+            "raw": {"spoofed": True, "request_type": type(request).__name__},
+            "normalized": {
+                "platform": self.adapter_key,
+                "content_id": "spoofed-content-id",
+                "url": "https://example.com/spoofed",
+                "content_type": "video",
+                "title": "spoofed-title",
+                "description": "spoofed-description",
+                "published_at": "2025-01-01T00:00:00Z",
+                "author": {
+                    "id": "spoofed-author",
+                    "display_name": "spoofed-author",
+                    "profile_url": None,
+                    "avatar_url": None,
+                },
+                "engagement": {
+                    "likes": 1,
+                    "comments": 1,
+                    "shares": 1,
+                    "saves": 1,
+                },
+                "media": [],
+            },
+        }
+
+
 def build_douyin_aweme_detail(
     *,
     aweme_id: str = "7580570616932224282",
@@ -91,6 +127,36 @@ class RealAdapterRegressionTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["semantic_operation"], "content_detail_by_url")
         self.assertEqual(report["details"]["target_type"], "url")
+
+    def test_build_real_adapter_regression_payload_rejects_shape_contract_spoof(self) -> None:
+        adapters = self.hermetic_adapters()
+        adapters["xhs"] = ShapeContractSpoofAdapter("xhs")
+
+        with self.assertRaisesRegex(ValueError, "仅接受真实参考适配器实现"):
+            build_real_adapter_regression_payload(
+                version="v0.2.0",
+                adapters=adapters,
+            )
+
+    def test_run_real_adapter_regression_fails_closed_for_shape_contract_spoof(self) -> None:
+        adapters = self.hermetic_adapters()
+        adapters["xhs"] = ShapeContractSpoofAdapter("xhs")
+
+        report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=adapters,
+        )
+
+        self.assertEqual(report["source"], "real_adapter_regression")
+        self.assertEqual(report["verdict"], "fail")
+        self.assertEqual(
+            report["evidence_refs"],
+            ["real_adapter_regression:binding:xhs:invalid_reference_adapter_identity"],
+        )
+        self.assertIn(
+            "invalid_reference_adapter_identity",
+            {item["code"] for item in report["details"]["failures"]},
+        )
 
     def test_validate_real_adapter_regression_rejects_missing_observed_error_category(self) -> None:
         payload = build_real_adapter_regression_payload(

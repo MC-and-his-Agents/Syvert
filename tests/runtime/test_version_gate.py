@@ -1897,6 +1897,39 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "pass")
 
+    def test_public_orchestrator_fails_closed_when_real_regression_uses_spoofed_adapter(self) -> None:
+        harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+        regression_report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=self.spoofed_real_regression_adapters(),
+        )
+        leakage_report = validate_platform_leakage_source_report(
+            self.valid_platform_leakage_payload(),
+            version="v0.2.0",
+        )
+
+        report = version_gate_module.orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=harness_report,
+            real_adapter_regression_report=regression_report,
+            platform_leakage_report=leakage_report,
+            required_harness_sample_ids=["sample-success", "sample-legal-failure"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "invalid_reference_adapter_identity",
+            {
+                item["code"]
+                for item in report["source_reports"]["real_adapter_regression"]["details"]["failures"]
+            },
+        )
+
     def test_public_orchestrator_rejects_required_harness_sample_ids_override_when_frozen(self) -> None:
         original = version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get("v0.2.0")
         version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION["v0.2.0"] = (
@@ -2180,6 +2213,16 @@ class VersionGateTests(unittest.TestCase):
             ),
         )
         return {"xhs": xhs_adapter, "douyin": douyin_adapter}
+
+    @staticmethod
+    def spoofed_real_regression_adapters() -> dict[str, object]:
+        from tests.runtime.test_real_adapter_regression import (
+            ShapeContractSpoofAdapter,
+        )
+
+        adapters = VersionGateTests.hermetic_real_regression_adapters()
+        adapters["xhs"] = ShapeContractSpoofAdapter("xhs")
+        return adapters
 
 
 if __name__ == "__main__":
