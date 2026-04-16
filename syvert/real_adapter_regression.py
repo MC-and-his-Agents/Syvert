@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from syvert.adapters.douyin import DouyinAdapter
+from syvert.adapters.douyin import DouyinAdapter, default_page_state_transport
 from syvert.adapters.xhs import XhsAdapter
 from syvert.runtime import TaskInput, TaskRequest, execute_task
 from syvert.version_gate import validate_real_adapter_regression_source_report
@@ -179,6 +179,7 @@ def resolve_reference_adapters(*, version: str, adapters: Mapping[str, Any]) -> 
             adapter=adapter,
             frozen_surface=frozen_surface[adapter_key],
         )
+        validate_reference_adapter_runtime_binding(adapter_key=adapter_key, adapter=adapter)
         validated[adapter_key] = adapter
     return validated
 
@@ -216,6 +217,17 @@ def validate_reference_adapter_surface(
                     "overridden_fields": overridden_fields,
                 },
             )
+
+
+def validate_reference_adapter_runtime_binding(*, adapter_key: str, adapter: object) -> None:
+    if adapter_key != "douyin":
+        return
+    if getattr(adapter, "_page_state_transport", None) is default_page_state_transport:
+        raise ReferenceAdapterBindingError(
+            code="non_hermetic_reference_adapter_binding",
+            message="real adapter regression 的 douyin allowed-failure case 必须禁用默认 browser recovery",
+            details={"adapter_key": adapter_key, "field": "_page_state_transport"},
+        )
 
 
 def build_regression_case_from_envelope(

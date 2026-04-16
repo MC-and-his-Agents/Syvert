@@ -7,6 +7,7 @@ import syvert.version_gate as version_gate_module
 
 from tests.runtime.contract_harness.automation import run_contract_harness_automation
 
+from syvert.runtime import PlatformAdapterError
 from syvert.real_adapter_regression import run_real_adapter_regression
 
 from syvert.version_gate import (
@@ -2210,6 +2211,13 @@ class VersionGateTests(unittest.TestCase):
                 {"status_code": 0, "aweme_detail": build_douyin_aweme_detail()}
                 if kwargs["params"]["aweme_id"] == "7580570616932224282"
                 else (_ for _ in ()).throw(RuntimeError("detail-failed"))
+            ),
+            page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                PlatformAdapterError(
+                    code="douyin_browser_target_tab_missing",
+                    message="browser recovery disabled for hermetic regression",
+                    details={},
+                )
             ),
         )
         return {"xhs": xhs_adapter, "douyin": douyin_adapter}
