@@ -1713,6 +1713,62 @@ class VersionGateTests(unittest.TestCase):
             )
         )
 
+    def test_public_orchestrator_consumes_real_harness_output_end_to_end(self) -> None:
+        validation_results = run_contract_harness_automation()
+        required_sample_ids = [result["sample_id"] for result in validation_results]
+        harness_report = build_harness_source_report(
+            validation_results,
+            required_sample_ids=required_sample_ids,
+            version="v0.2.0",
+        )
+
+        report = version_gate_module.orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=harness_report,
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+            required_harness_sample_ids=required_sample_ids,
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertFalse(report["safe_to_release"])
+        self.assertEqual(report["summary"], "version gate failed for version `v0.2.0` via harness")
+        self.assertEqual(
+            set(report["source_reports"]),
+            {"harness", "real_adapter_regression", "platform_leakage"},
+        )
+        self.assertTrue(
+            {"harness"}.issubset({item["source"] for item in report["failures"]})
+        )
+
+        orchestrated_harness_report = report["source_reports"]["harness"]
+        self.assertEqual(orchestrated_harness_report["verdict"], "fail")
+        self.assertEqual(
+            orchestrated_harness_report["details"]["required_sample_ids"],
+            required_sample_ids,
+        )
+        self.assertEqual(
+            orchestrated_harness_report["details"]["observed_sample_ids"],
+            sorted(required_sample_ids),
+        )
+        self.assertEqual(
+            orchestrated_harness_report["evidence_refs"],
+            harness_report["evidence_refs"],
+        )
+        self.assertTrue(
+            {"contract_violation_observed", "execution_precondition_not_met_observed"}.issubset(
+                {item["code"] for item in orchestrated_harness_report["details"]["failures"]}
+            )
+        )
+
     def test_public_orchestrator_requires_explicit_harness_required_sample_baseline(self) -> None:
         report = _orchestrate_version_gate(
             version="v0.2.0",
