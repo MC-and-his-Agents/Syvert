@@ -36,9 +36,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准
+- 当前受审 runtime head：`0acf7d791fe62b385331c642908fc7a8a9e6321e`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
+- 当前 runtime-affecting 实现 checkpoint：`0acf7d791fe62b385331c642908fc7a8a9e6321e`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -52,10 +52,12 @@
     - 目标文件 AST parse 失败时，不再退回“只扫平台字段”的低保真路径，而是产出 `scan_parse_failure` finding 并显式 fail-closed
     - 共享层平台集合/常量现在按 fail-closed 处理，`SUPPORTED_PLATFORMS = {"xhs", "douyin"}` 一类平台集合常量不再漏报
     - 共享层字符串字面量中的平台特定 selector / url / signature 片段现在按 fail-closed 处理，不再只依赖字段名命中
-  - 当前已提交的运行时语义锚定在实现 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
-  - 当前 metadata-only follow-up：待本次 exec-plan / PR / issue 同步提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准；metadata-only follow-up 只回填 guardian 修复后的 checkpoint / 验证追踪，不改运行时语义
-  - 本 worktree 已把 guardian 新增阻断收口为最小运行时增量：共享平台语义检查已扩展到返回值与函数默认参数；docstring 等说明性文本已从 `platform_specific_field_leak` 扫描对象中排除
-  - 本 worktree 的剩余动作是把当前验证结果绑定到实现 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e`，随后重新发起 guardian / merge
+    - 平台比较主体不再局限于 `adapter_key/platform/reference_pair` 白名单；`adapter == "xhs"` 这类语义等价别名也会 fail-closed 命中
+    - 硬编码平台分支只接受真实平台 marker，不再把 `adapter_key == "unknown"` 这类任意字符串比较误判成平台泄漏
+    - 平台特定错误说明已进入共享语义扫描；`raise RuntimeError("xhs only")` 这类平台专属错误解释会被 fail-closed 命中
+    - docstring 等说明性文本不再进入平台特定字段扫描面，避免把研究性或注释性字符串误判为共享层泄漏
+  - 当前已提交的运行时语义锚定在实现 checkpoint `0acf7d791fe62b385331c642908fc7a8a9e6321e`
+  - 当前剩余动作只包括：把 exec-plan / PR / issue 当前事实同步到同一对象后重发 guardian；若通过，再进入 merge gate
 
 ## 实现要点
 
@@ -72,6 +74,9 @@
   - 多行平台分支与非 `xhs` / `douyin` 平台字面量
   - `SUPPORTED_PLATFORMS` 一类共享平台集合常量
   - 共享平台语义出现在 return value 与函数默认参数时的 fail-closed
+  - `adapter == "xhs"` 一类平台比较别名
+  - `adapter_key == "unknown"` 不应误报
+  - `raise RuntimeError("xhs only")` 一类平台特定错误说明
   - selector / url / signature 字符串碎片
   - docstring 说明文本不参与平台泄漏判定
   - adapter 私有实现与 research 文档不进入扫描面
@@ -101,6 +106,8 @@
   - 结果：在 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52` 上通过，`Ran 109 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate`
   - 结果：在 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e` 上通过，`Ran 112 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate`
+  - 结果：在 checkpoint `0acf7d791fe62b385331c642908fc7a8a9e6321e` 上通过，`Ran 115 tests`，`OK`
 
 ## 未决风险
 
@@ -114,7 +121,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
-- 最近一次重跑目标测试的 head：`5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
-- 当前 metadata head：待本次 exec-plan follow-up 提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准
-- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准；不得把 metadata-only follow-up 误记为新的 runtime checkpoint
+- 实现 checkpoint：`0acf7d791fe62b385331c642908fc7a8a9e6321e`
+- 最近一次重跑目标测试的 head：`0acf7d791fe62b385331c642908fc7a8a9e6321e`
+- 当前受审 runtime head：`0acf7d791fe62b385331c642908fc7a8a9e6321e`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `0acf7d791fe62b385331c642908fc7a8a9e6321e`，不得把 follow-up 误记为新的运行时真相
