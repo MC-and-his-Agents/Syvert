@@ -101,12 +101,14 @@
   - `required_harness_sample_ids` 缺失时改为直接 fail-closed，而不是隐式猜测版本基线
   - `required_harness_sample_ids` 的公开类型与实现对齐为通用 `Sequence/Iterable`，`tuple/list` 等价输入不再被误拒
   - `platform_leakage` 在出现失败时强制输出失败语义摘要，不再保留“checks are clean”这类通过语义
+- guardian 最新一轮针对 `88422ed` 的复查再次返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项公开消费路径证据：
+  - 新增 `run_contract_harness_automation()` 真实输出经 `build_harness_source_report()` 后再进入公开 `orchestrate_version_gate()` 的端到端回归测试，并显式传入 `required_harness_sample_ids`，不再只覆盖 builder 层或依赖测试 wrapper 自动补齐 baseline
 
 ## 下一步动作
 
-- 同步当前本地代码 head 的 checkpoint、验证记录与 PR 证据链。
-- 将最新 guardian 复查暴露的入口契约修复推送到当前 PR head。
-- 发起 guardian 复审，并在 `safe_to_merge=true` 且治理状态一致后执行受控合并。
+- 等待当前 PR head 的 GitHub checks 复绿。
+- 发起 guardian 复审，确认最新代码头与当前 PR body 绑定的 `APPROVE + safe_to_merge=true`。
+- 若 guardian 通过，则执行 `merge-if-safe --confirm-integration-recheck` 完成受控合并。
 
 ## 实现补充结果模型工件
 
@@ -402,6 +404,24 @@
   - 结果：入口契约修复后复跑，`通过`
 - `python3 scripts/spec_guard.py --all`
   - 结果：入口契约修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：真实 harness 编排证据修复后复跑，`Ran 82 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：真实 harness 编排证据修复后复跑，`Ran 148 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
 
 ## 未决风险
 
@@ -415,5 +435,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e9fdcf77dd14a24254c3c52152b1f5cd71f06920`
+- `1ff7066320188154e82e11bbffc33accabc7adee`
 - 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
