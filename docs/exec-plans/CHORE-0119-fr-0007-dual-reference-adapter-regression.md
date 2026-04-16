@@ -44,7 +44,6 @@
 
 ## 下一步动作
 
-- 由主线程在当前 metadata follow-up head 上补跑 `commit_check` / `pr_scope_guard`。
 - 创建受控 PR，更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
 - 进入 guardian / merge gate；若后续只发生 metadata-only 追账，不再刷新 runtime checkpoint。
 
@@ -79,9 +78,10 @@
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 187 tests`，`OK`
-- 待补跑：
-  - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：`已校验 2 条提交信息，全部通过。`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：`PR class: implementation`，`变更类别: docs, implementation`，`PR scope 校验通过。`
 
 ## 未决风险
 
