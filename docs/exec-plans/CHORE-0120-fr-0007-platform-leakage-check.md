@@ -36,9 +36,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`4302646960fa9163ba2ac302f2f0754da9c724e4`
+- 当前受审 runtime head：`6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`4302646960fa9163ba2ac302f2f0754da9c724e4`
+- 当前 runtime-affecting 实现 checkpoint：`6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -59,11 +59,13 @@
     - `aweme-detail` / `a_bogus` / `douyin-browser` 这类平台碎片不再误报为 `hardcoded_platform_branch`，但仍会作为 `platform_specific_field_leak` 保持 fail-closed
     - 平台别名传播现在按 fail-closed 处理，`current = adapter_key; if current == "xhs"` 这类中性 alias 分支不再漏报
     - loop target 的平台别名传播现在也按 fail-closed 处理，`for current in [adapter_key]: if current == "xhs"` 不再绕过分支检测
+    - 非字面量平台分支现在按 fail-closed 处理，`adapter_key.startswith("xhs")` 与 `normalized.get("platform") == current_platform` 这类不再绕过 `hardcoded_platform_branch`
     - 普通常量名里的单平台共享语义现在按 fail-closed 处理，`PRIMARY = "xhs"` 这类不再依赖语义关键字命中
     - 共享 `raw/normalized` 结果里的 generic 平台专属字段现在按 fail-closed 处理，`normalized["xhs_extra"]` 一类不会再绕过字段泄漏检测
+    - malformed `repo_root` 现在会以 `scan_target_unreadable` fail-closed 收口，不再抛异常中断检查；neutral 单字符字段 `normalized["x"]` 也不再被误判成平台泄漏
     - 平台特定错误说明已进入共享语义扫描；`raise RuntimeError("xhs only")` 这类平台专属错误解释会被 fail-closed 命中
     - docstring 等说明性文本不再进入平台特定字段扫描面，避免把研究性或注释性字符串误判为共享层泄漏
-  - 当前已提交的运行时语义锚定在实现 checkpoint `4302646960fa9163ba2ac302f2f0754da9c724e4`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
   - 当前剩余动作只包括：把 exec-plan / PR / issue 当前事实同步到同一对象后重发 guardian；若通过，再进入 merge gate
 
 ## 实现要点
@@ -125,6 +127,8 @@
   - 结果：在 checkpoint `1979bafd014495cb7cf866edd31b1118358ec17e` 上通过，`Ran 168 tests`，`OK (skipped=3)`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `4302646960fa9163ba2ac302f2f0754da9c724e4` 上通过，`Ran 171 tests`，`OK (skipped=3)`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `6f273d30d050fa8ce47c6d22df4ad953de42ab4a` 上通过，`Ran 175 tests`，`OK (skipped=3)`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
@@ -144,7 +148,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`4302646960fa9163ba2ac302f2f0754da9c724e4`
-- 最近一次重跑目标测试的 head：`4302646960fa9163ba2ac302f2f0754da9c724e4`
-- 当前受审 runtime head：`4302646960fa9163ba2ac302f2f0754da9c724e4`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `4302646960fa9163ba2ac302f2f0754da9c724e4`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
+- 最近一次重跑目标测试的 head：`6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
+- 当前受审 runtime head：`6f273d30d050fa8ce47c6d22df4ad953de42ab4a`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `6f273d30d050fa8ce47c6d22df4ad953de42ab4a`，不得把 follow-up 误记为新的运行时真相
