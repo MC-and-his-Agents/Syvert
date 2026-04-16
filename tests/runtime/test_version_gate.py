@@ -1411,6 +1411,48 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "fail")
         self.assertIn("invalid_report_reference_pair", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_rebinds_failed_real_regression_evidence_refs_to_frozen_case_order(self) -> None:
+        forged_real_regression_report = validate_real_adapter_regression_source_report(
+            self.valid_real_adapter_regression_payload(),
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+        forged_real_regression_report["verdict"] = "fail"
+        forged_real_regression_report["summary"] = "forged failed regression report"
+        forged_real_regression_report["evidence_refs"] = [
+            "regression:douyin:platform",
+            "regression:xhs:success",
+        ]
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=forged_real_regression_report,
+            platform_leakage_report=validate_platform_leakage_source_report(
+                self.valid_platform_leakage_payload(),
+                version="v0.2.0",
+            ),
+        )
+
+        source_report = report["source_reports"]["real_adapter_regression"]
+        self.assertEqual(source_report["verdict"], "fail")
+        self.assertEqual(
+            source_report["evidence_refs"],
+            [
+                "regression:xhs:success",
+                "regression:xhs:invalid-input",
+                "regression:douyin:success",
+                "regression:douyin:platform",
+            ],
+        )
+        self.assertNotEqual(source_report["evidence_refs"], forged_real_regression_report["evidence_refs"])
+        self.assertIn("case_evidence_refs_mismatch", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_rejects_real_regression_report_missing_projection_details(self) -> None:
         forged_report = validate_real_adapter_regression_source_report(
             self.valid_real_adapter_regression_payload(),

@@ -270,7 +270,7 @@ def validate_real_adapter_regression_source_report(
 
     adapter_results = _normalize_adapter_results(payload.get("adapter_results"), source, failures)
     adapters_by_key = {entry["adapter_key"]: entry for entry in adapter_results}
-    case_evidence_refs = [case["evidence_ref"] for entry in adapter_results for case in entry["cases"]]
+    case_evidence_refs = _frozen_real_regression_evidence_refs(version)
     for adapter_key in expected_reference_pair:
         adapter_result = adapters_by_key.get(adapter_key)
         if adapter_result is None:
@@ -941,7 +941,7 @@ def _normalize_existing_source_report(
             rebuilt_report,
             input_verdict=report_verdict,
             input_summary=report_summary,
-            input_evidence_refs=evidence_refs,
+            input_evidence_refs=rebuilt_report.get("evidence_refs") or evidence_refs,
             normalized_report_failures=_normalize_failure_entries(report_failures, expected_source),
         )
 
@@ -1797,6 +1797,18 @@ def _frozen_real_regression_surface(version: str) -> Mapping[str, Any] | None:
 
 def _frozen_real_regression_case_matrix(version: str) -> Mapping[str, Sequence[Mapping[str, str]]] | None:
     return _FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION.get(version)
+
+
+def _frozen_real_regression_evidence_refs(version: str) -> list[str]:
+    frozen_case_matrix = _FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION.get(version)
+    frozen_reference_pair = _FROZEN_REFERENCE_PAIR_BY_VERSION.get(version)
+    if frozen_case_matrix is None or frozen_reference_pair is None:
+        return []
+    evidence_refs: list[str] = []
+    for adapter_key in frozen_reference_pair:
+        for case in frozen_case_matrix.get(adapter_key, ()):
+            evidence_refs.append(str(case["evidence_ref"]))
+    return evidence_refs
 
 
 def _canonical_version(version: str) -> str:
