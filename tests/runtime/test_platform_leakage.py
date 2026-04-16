@@ -335,6 +335,45 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
 
+    def test_run_check_allows_normalized_platform_carrier_write(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    return {"normalized": {"platform": "xhs"}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_allows_error_details_platform_carrier_write(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    payload = {"error": {"details": {"platform": "xhs"}}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_detects_platform_specific_shared_result_field(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    return {"normalized": {"xhs_extra": "1"}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_shared_platform_semantic_in_return_value(self) -> None:
         report = self.run_with_fixture(
             {

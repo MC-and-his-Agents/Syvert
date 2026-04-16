@@ -419,6 +419,8 @@ def _assignment_target_names(target: ast.expr) -> tuple[str, ...]:
 
 
 def _statement_has_platform_specific_field(statement_source: str, node: ast.AST) -> bool:
+    if _expr_contains_shared_result_platform_field(node):
+        return True
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
         return True
     return any(_string_literal_has_platform_specific_fragment(literal) for literal in _string_literals(node))
@@ -490,10 +492,10 @@ def _assignment_has_single_platform_semantic(
     if _expr_has_platform_literal_compare(value, platform_aliases=platform_aliases):
         return True
 
-    if _expr_contains_platform_literal(value):
+    if _expr_contains_unapproved_platform_literal(value):
         return True
 
-    if any(_expr_is_platformish(target, platform_aliases=platform_aliases) for target in targets) and _expr_contains_platform_literal(value):
+    if any(_expr_is_platformish(target, platform_aliases=platform_aliases) for target in targets) and _expr_contains_unapproved_platform_literal(value):
         return True
 
     return _statement_has_semantic_platform_literal(statement_source, value)
@@ -535,7 +537,7 @@ def _statement_has_semantic_platform_literal(statement_source: str, value: ast.A
     normalized_source = statement_source.lower().replace("_", " ")
     if _SEMANTIC_CONTEXT_RE.search(normalized_source) is None:
         return False
-    return any(_is_common_platform_literal(literal) for literal in _string_literals(value))
+    return _expr_contains_unapproved_platform_literal(value)
 
 
 def _match_has_platform_literal_branch(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
@@ -634,6 +636,94 @@ def _expr_contains_string_literal(node: ast.AST) -> bool:
 
 def _expr_contains_platform_literal(node: ast.AST) -> bool:
     return any(_is_common_platform_literal(literal) for literal in _string_literals(node))
+
+
+def _expr_contains_unapproved_platform_literal(node: ast.AST, *, path: tuple[str, ...] = ()) -> bool:
+    if isinstance(node, ast.Dict):
+        return _dict_contains_unapproved_platform_literal(node, path=path)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return any(_expr_contains_unapproved_platform_literal(item, path=path) for item in node.elts)
+    return _expr_contains_platform_literal(node)
+
+
+def _dict_contains_unapproved_platform_literal(node: ast.Dict, *, path: tuple[str, ...]) -> bool:
+    for key, value in zip(node.keys, node.values):
+        key_name = _single_string_literal(key)
+        next_path = path + ((key_name,) if key_name is not None else ())
+        if key_name is not None and _is_approved_platform_carrier_path(next_path):
+            continue
+        if _expr_contains_unapproved_platform_literal(value, path=next_path):
+            return True
+    return False
+
+
+def _expr_contains_shared_result_platform_field(node: ast.AST, *, path: tuple[str, ...] = ()) -> bool:
+    if isinstance(node, ast.Dict):
+        return _dict_contains_shared_result_platform_field(node, path=path)
+    if isinstance(node, ast.Subscript):
+        return _subscript_contains_shared_result_platform_field(node, path=path)
+    return any(_expr_contains_shared_result_platform_field(child, path=path) for child in ast.iter_child_nodes(node))
+
+
+def _dict_contains_shared_result_platform_field(node: ast.Dict, *, path: tuple[str, ...]) -> bool:
+    for key, value in zip(node.keys, node.values):
+        key_name = _single_string_literal(key)
+        next_path = path + ((key_name,) if key_name is not None else ())
+        if key_name is not None and _is_disallowed_shared_result_field_path(next_path):
+            return True
+        if _expr_contains_shared_result_platform_field(value, path=next_path):
+            return True
+    return False
+
+
+def _subscript_contains_shared_result_platform_field(node: ast.Subscript, *, path: tuple[str, ...]) -> bool:
+    container_name = _root_shared_result_container_name(node.value)
+    if container_name is None:
+        return False
+    for literal in _string_literals(node.slice):
+        if _is_disallowed_shared_result_field_path((container_name, literal)):
+            return True
+    return False
+
+
+def _root_shared_result_container_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name) and node.id in {"normalized", "raw"}:
+        return node.id
+    if isinstance(node, ast.Subscript):
+        for literal in _string_literals(node.slice):
+            if literal in {"normalized", "raw"}:
+                return literal
+    if isinstance(node, ast.Attribute) and node.attr in {"normalized", "raw"}:
+        return node.attr
+    return None
+
+
+def _is_approved_platform_carrier_path(path: tuple[str, ...]) -> bool:
+    return path in {
+        ("normalized", "platform"),
+        ("error", "details", "platform"),
+    }
+
+
+def _is_disallowed_shared_result_field_path(path: tuple[str, ...]) -> bool:
+    if len(path) < 2 or path[0] not in {"normalized", "raw"}:
+        return False
+    field_name = path[-1].lower()
+    if field_name == "platform":
+        return False
+    if _COMMON_PLATFORM_NAME_RE.search(field_name) is not None or _string_literal_has_platform_specific_fragment(field_name):
+        return True
+    return any(
+        field_name == literal or field_name.startswith(f"{literal}_") or field_name.startswith(f"{literal}-")
+        for literal in _COMMON_PLATFORM_LITERALS
+    )
+
+
+def _single_string_literal(node: ast.AST | None) -> str | None:
+    literals = _string_literals(node) if node is not None else ()
+    if len(literals) != 1:
+        return None
+    return literals[0]
 
 
 def _expr_contains_platform_marker(node: ast.AST) -> bool:
