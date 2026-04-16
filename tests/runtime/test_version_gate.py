@@ -7,6 +7,8 @@ import syvert.version_gate as version_gate_module
 
 from tests.runtime.contract_harness.automation import run_contract_harness_automation
 
+from syvert.real_adapter_regression import run_real_adapter_regression
+
 from syvert.version_gate import (
     build_harness_source_report,
     orchestrate_version_gate as _orchestrate_version_gate,
@@ -1868,6 +1870,33 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "pass")
 
+    def test_public_orchestrator_consumes_real_adapter_regression_output_end_to_end(self) -> None:
+        harness_report = build_harness_source_report(
+            self.valid_harness_results(),
+            required_sample_ids=["sample-success", "sample-legal-failure"],
+            version="v0.2.0",
+        )
+        regression_report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=self.hermetic_real_regression_adapters(),
+        )
+        leakage_report = validate_platform_leakage_source_report(
+            self.valid_platform_leakage_payload(),
+            version="v0.2.0",
+        )
+
+        report = version_gate_module.orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=harness_report,
+            real_adapter_regression_report=regression_report,
+            platform_leakage_report=leakage_report,
+            required_harness_sample_ids=["sample-success", "sample-legal-failure"],
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["source_reports"]["real_adapter_regression"]["verdict"], "pass")
+
     def test_public_orchestrator_rejects_required_harness_sample_ids_override_when_frozen(self) -> None:
         original = version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION.get("v0.2.0")
         version_gate_module._FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION["v0.2.0"] = (
@@ -2071,6 +2100,86 @@ class VersionGateTests(unittest.TestCase):
             self.assertTrue(
                 {"boundary_scope", "report_verdict", "findings", "failures"}.issubset(report["details"])
             )
+
+    @staticmethod
+    def hermetic_real_regression_adapters() -> dict[str, object]:
+        from tests.runtime.test_real_adapter_regression import (
+            build_douyin_aweme_detail,
+        )
+        from syvert.adapters.douyin import DouyinAdapter, DouyinSessionConfig
+        from syvert.adapters.xhs import XhsAdapter, XhsSessionConfig
+
+        xhs_adapter = XhsAdapter(
+            session_provider=lambda path: XhsSessionConfig(
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+                sign_base_url="http://127.0.0.1:8000",
+                timeout_seconds=7,
+            ),
+            sign_transport=lambda base_url, payload, timeout_seconds: {
+                "x_s": "signed-x-s",
+                "x_t": "signed-x-t",
+                "x_s_common": "signed-x-s-common",
+                "x_b3_traceid": "trace-1",
+            },
+            detail_transport=lambda **kwargs: {
+                "success": True,
+                "data": {
+                    "items": [
+                        {
+                            "note_card": {
+                                "note_id": "66fad51c000000001b0224b8",
+                                "type": "video",
+                                "title": "测试标题",
+                                "desc": "测试正文",
+                                "time": 1712304300,
+                                "user": {
+                                    "user_id": "user-1",
+                                    "nickname": "作者甲",
+                                    "avatar": "https://cdn.example/avatar.jpg",
+                                },
+                                "interact_info": {
+                                    "liked_count": "11",
+                                    "comment_count": "12",
+                                    "share_count": "13",
+                                    "collected_count": "14",
+                                },
+                                "image_list": [
+                                    {"url_default": "https://cdn.example/image-1.jpg"},
+                                    {"url_default": "https://cdn.example/image-2.jpg"},
+                                ],
+                                "video": {
+                                    "consumer": {
+                                        "origin_video_key": "video-key-1",
+                                    }
+                                },
+                                "cover": {
+                                    "url_default": "https://cdn.example/cover.jpg",
+                                },
+                            }
+                        }
+                    ]
+                },
+            },
+        )
+        douyin_adapter = DouyinAdapter(
+            session_provider=lambda path: DouyinSessionConfig(
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+                verify_fp="verify-1",
+                ms_token="ms-token-1",
+                webid="webid-1",
+                sign_base_url="http://127.0.0.1:8000",
+                timeout_seconds=5,
+            ),
+            sign_transport=lambda base_url, payload, timeout_seconds: {"a_bogus": "signed-1"},
+            detail_transport=lambda **kwargs: (
+                {"status_code": 0, "aweme_detail": build_douyin_aweme_detail()}
+                if kwargs["params"]["aweme_id"] == "7580570616932224282"
+                else (_ for _ in ()).throw(RuntimeError("detail-failed"))
+            ),
+        )
+        return {"xhs": xhs_adapter, "douyin": douyin_adapter}
 
 
 if __name__ == "__main__":
