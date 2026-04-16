@@ -102,6 +102,18 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("boundary_scope_order_mismatch", {item["code"] for item in report["details"]["failures"]})
 
+    def test_run_check_fails_closed_when_boundary_scope_is_set_shaped(self) -> None:
+        report = run_platform_leakage_check(
+            version="v0.2.0",
+            repo_root=REPO_ROOT,
+            boundary_scope=set(DEFAULT_BOUNDARY_SCOPE),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        failure_codes = {item["code"] for item in report["details"]["failures"]}
+        self.assertIn("invalid_boundary_scope", failure_codes)
+        self.assertNotIn("boundary_scope_order_mismatch", failure_codes)
+
     def test_run_check_detects_hardcoded_platform_branch(self) -> None:
         report = self.run_with_fixture(
             {

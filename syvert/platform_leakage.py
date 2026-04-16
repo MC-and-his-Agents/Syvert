@@ -218,10 +218,9 @@ def _coerce_boundary_scope_input(
         return list(DEFAULT_BOUNDARY_SCOPE)
     if isinstance(boundary_scope, (str, bytes, Mapping)):
         return boundary_scope
-    try:
+    if isinstance(boundary_scope, Sequence):
         return list(boundary_scope)
-    except TypeError:
-        return boundary_scope
+    return boundary_scope
 
 
 def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
