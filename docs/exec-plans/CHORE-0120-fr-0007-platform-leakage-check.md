@@ -36,6 +36,7 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
+- 当前 runtime-affecting 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -44,7 +45,7 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
-  - 待主线程基于当前 worktree diff 创建提交、更新 PR body / issue body，并发起 guardian
+  - 当前待补一笔 exec-plan metadata follow-up，用于把 checkpoint / 验证追踪绑定到当前实现 head
 
 ## 实现要点
 
@@ -73,9 +74,23 @@
   - 结果：`Ran 8 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 85 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：`Ran 138 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
-- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 worktree 尚未生成新提交，脚本返回 `未检测到需要校验的提交信息。`
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 worktree 尚未生成新提交，脚本返回 `当前分支相对基线没有变更，无法创建或校验 PR。`
+
+## 未决风险
+
+- 若扫描范围扩展到 adapter 私有实现、browser bridge 或 research 文档，会把允许的平台语义误判成共享层泄漏。
+- 若把共享层中的 `xhs` / `douyin` 字面量一概视为 finding，会误伤 `normalized.platform`、统一 `error.details` 和冻结 reference pair。
+- 若 caller `boundary_scope` 与 payload 自带 `boundary_scope` 不保持同一对象，版本 gate ingress 会出现 surface 洗白风险。
+
+## 回滚方式
+
+- 如需回滚，使用独立 revert PR 撤销本事项对 `syvert/platform_leakage.py`、相关测试与本 exec-plan 的增量修改。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
+- 最近一次重跑目标测试的代码 head：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
+- 当前 metadata-only head：`当前分支最新 head（仅回填 exec-plan checkpoint / 验证追踪，不改运行时语义）`
