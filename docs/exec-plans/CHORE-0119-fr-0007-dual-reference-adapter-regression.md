@@ -22,11 +22,12 @@
 
 - 本次纳入：
   - `syvert/real_adapter_regression.py`
+  - `syvert/version_gate.py` 中仅限 `real_adapter_regression` source report ingress / canonical evidence 绑定的最小增量修复
   - `tests/runtime/test_real_adapter_regression.py`
   - `tests/runtime/test_version_gate.py`
   - 当前 active exec-plan
 - 本次不纳入：
-  - `syvert/version_gate.py` 结果模型重定义
+  - `syvert/version_gate.py` 结果模型重定义或其他 source contract 改写
   - 平台泄漏检查器本体
   - release / sprint 索引更新
   - `FR-0004/0005/0006` contract 重定义
@@ -36,10 +37,10 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-119-fr-0007`
 - 当前执行分支：`issue-119-fr-0007`
 - 当前受审 PR：`#124`
-- 当前受审 runtime head：`1b3ab37a613ff8c9091d27bb6685fff8a4da1d81`
+- 当前受审 runtime head：`3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28`
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`1b3ab37a613ff8c9091d27bb6685fff8a4da1d81`
-- 当前 metadata-only follow-up 只允许同步 artifact / exec-plan / PR / issue 当前事实，不得改写 `1b3ab37a613ff8c9091d27bb6685fff8a4da1d81` 这条 runtime 真相。
+- 当前 runtime-affecting 实现 checkpoint：`3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28`
+- 当前 metadata-only follow-up 只允许同步 artifact / exec-plan / PR / issue 当前事实，不得改写 `3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28` 这条 runtime 真相。
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper；这里的 “real adapter regression” 固定指真实 `XhsAdapter` / `DouyinAdapter` 类实例穿过公开 runtime 边界执行，而不是 live network 真实性证明。
 - 当前实现已在公开入口对冻结 `xhs` / `douyin` reference adapter 执行 fail-closed 身份 / 来源校验，仅接受真实 `XhsAdapter` / `DouyinAdapter` 及其允许的 hermetic transport seam 注入实例，不接受 fake/stub adapter。
@@ -47,8 +48,10 @@
 - 当前实现已把 douyin allowed-failure case 收紧为 hermetic 失败路径：默认 browser page-state recovery 绑定会被 fail-closed 拒绝，测试与 gate 接入都显式注入确定性失败的 `page_state_transport`。
 - 当前实现已把默认 browser recovery 的包装 / 转发调用一起纳入 fail-closed 检查，避免 wrapper 逃逸默认 `page_state_transport` 绑定限制。
 - 当前实现已把默认 browser recovery 的别名转发调用一起纳入递归检测，避免 `alias = default_page_state_transport; lambda **kwargs: alias(**kwargs)` 这类绑定绕过 hermetic 约束。
+- 当前实现已把持有默认 browser recovery 的 callable instance wrapper 一起纳入递归检测，避免 `page_state_transport=Wrapper(default_page_state_transport)` 这类对象包装绕过 hermetic 约束。
 - 当前实现已把逐 case `evidence_ref` 纳入真实回归公开 contract，并要求顶层 `evidence_refs` 与冻结矩阵的逐 case 证据绑定完全一致，缺失或错绑均 fail-closed。
 - 当前实现已把 orchestrator 对 failed real-regression source report 的顶层 `evidence_refs` 回写收紧到重建后的冻结矩阵顺序，避免 failed verdict 携带非 canonical 证据绑定穿过 ingress。
+- 当前实现已把 `run_real_adapter_regression()` 的 binding-failure source report 顶层 `evidence_refs` 收紧到冻结矩阵 canonical order，不再发布单条 binding ref 作为顶层证据绑定。
 - 当前实现已把冻结矩阵本身纳入 validator contract：每个 adapter 的 `case_id` / `expected_outcome` / `evidence_ref` 都必须与 `v0.2.0` 冻结矩阵完全一致，不能只满足粗粒度 coverage。
 - 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归；本轮额外补了 shape-compatible spoofed adapter 冒充冻结 reference adapter 时的 fail-closed 回归。
 - 本轮新增了真实 reference adapter 类属性漂移时必须 fail-closed 的回归测试。
@@ -60,7 +63,7 @@
 
 ## 下一步动作
 
-- 在当前 PR / issue 当前事实中同步 `1b3ab37a613ff8c9091d27bb6685fff8a4da1d81` runtime checkpoint、artifact 收口与最新验证记录。
+- 在当前 PR / issue 当前事实中同步 `3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28` runtime checkpoint、artifact 收口与最新验证记录。
 - 重新发起 guardian 审查；若审查通过，再进入 merge gate。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -114,6 +117,10 @@
   - 结果：在 checkpoint `1b3ab37a613ff8c9091d27bb6685fff8a4da1d81` 上通过，`Ran 108 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：在 checkpoint `1b3ab37a613ff8c9091d27bb6685fff8a4da1d81` 上通过，`Ran 201 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
+  - 结果：在 checkpoint `3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28` 上通过，`Ran 109 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在 checkpoint `3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28` 上通过，`Ran 202 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
@@ -133,5 +140,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`1b3ab37a613ff8c9091d27bb6685fff8a4da1d81`
-- 当前受审 runtime head：`1b3ab37a613ff8c9091d27bb6685fff8a4da1d81`
+- 实现 checkpoint：`3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28`
+- 当前受审 runtime head：`3ee05f4f038e8a1bdd8e5013ee6d1a8701e46f28`
