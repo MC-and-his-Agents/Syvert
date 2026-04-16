@@ -82,7 +82,12 @@ _COMMON_PLATFORM_LITERALS = frozenset(
 _COMMON_PLATFORM_NAME_RE = re.compile(
     r"\b(?:bilibili|douyin|facebook|instagram|kuaishou|reddit|threads|tiktok|twitter|weibo|xhs|xiaohongshu|youtube|zhihu)\b"
 )
+_PLATFORM_BRANCH_VARIANT_RE = re.compile(
+    r"^(?:bilibili|douyin|facebook|instagram|kuaishou|reddit|threads|tiktok|twitter|weibo|xhs|xiaohongshu|youtube|zhihu)"
+    r"(?:[-_](?:main|prod|production|stage|staging|dev|test))?$"
+)
 _PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter|adapter_key|platform|platforms|platform_key|reference_pair)(?:_|$)")
+_SHARED_RESULT_CONTAINER_RE = re.compile(r"(?:^|_)(normalized|raw)(?:_|$)")
 _AST_MATCH = getattr(ast, "Match", None)
 _AST_MATCH_VALUE = getattr(ast, "MatchValue", None)
 _AST_MATCH_SINGLETON = getattr(ast, "MatchSingleton", None)
@@ -548,7 +553,7 @@ def _match_has_platform_literal_branch(node: ast.AST, *, platform_aliases: froze
 
 def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
     if _AST_MATCH_VALUE is not None and isinstance(pattern, _AST_MATCH_VALUE):
-        return _expr_contains_platform_literal(pattern.value)
+        return _expr_contains_platform_branch_literal(pattern.value)
     if _AST_MATCH_SINGLETON is not None and isinstance(pattern, _AST_MATCH_SINGLETON):
         return False
     if _AST_MATCH_SEQUENCE is not None and isinstance(pattern, _AST_MATCH_SEQUENCE):
@@ -597,12 +602,12 @@ def _compare_pair_has_platform_literal(
             and _expr_is_platformish(left, platform_aliases=platform_aliases)
         ):
             return True
-        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_literal(right)) or (
-            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_literal(left)
+        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_branch_literal(right)) or (
+            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_branch_literal(left)
         )
     if isinstance(operator, (ast.In, ast.NotIn)):
-        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_literal(right)) or (
-            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_literal(left)
+        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_branch_literal(right)) or (
+            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_branch_literal(left)
         )
     return False
 
@@ -648,7 +653,7 @@ def _call_has_platform_branch_signal(node: ast.Call, *, platform_aliases: frozen
         return False
     if not _expr_is_platformish(node.func.value, platform_aliases=platform_aliases):
         return False
-    return any(_expr_contains_platform_literal(argument) for argument in node.args)
+    return any(_expr_contains_platform_branch_literal(argument) for argument in node.args)
 
 
 def _expr_is_explicit_platform_carrier(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
@@ -694,6 +699,15 @@ def _expr_contains_string_literal(node: ast.AST) -> bool:
 
 def _expr_contains_platform_literal(node: ast.AST) -> bool:
     return any(_is_common_platform_literal(literal) for literal in _string_literals(node))
+
+
+def _expr_contains_platform_branch_literal(node: ast.AST) -> bool:
+    return any(_string_literal_is_platform_branch_literal(literal) for literal in _string_literals(node))
+
+
+def _string_literal_is_platform_branch_literal(value: str) -> bool:
+    lowered = value.lower()
+    return _is_common_platform_literal(lowered) or _PLATFORM_BRANCH_VARIANT_RE.match(lowered) is not None
 
 
 def _expr_contains_unapproved_platform_literal(node: ast.AST, *, path: tuple[str, ...] = ()) -> bool:
@@ -745,8 +759,12 @@ def _subscript_contains_shared_result_platform_field(node: ast.Subscript, *, pat
 
 
 def _root_shared_result_container_name(node: ast.AST) -> str | None:
-    if isinstance(node, ast.Name) and node.id in {"normalized", "raw"}:
-        return node.id
+    if isinstance(node, ast.Name):
+        if node.id in {"normalized", "raw"}:
+            return node.id
+        match = _SHARED_RESULT_CONTAINER_RE.search(node.id)
+        if match is not None:
+            return match.group(1)
     if isinstance(node, ast.Subscript):
         for literal in _string_literals(node.slice):
             if literal in {"normalized", "raw"}:

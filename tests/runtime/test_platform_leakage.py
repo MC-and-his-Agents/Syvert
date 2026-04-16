@@ -400,6 +400,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_specific_shared_result_field_via_normalized_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized_payload = payload["normalized"]\n    normalized_payload["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_allows_neutral_single_character_shared_result_field(self) -> None:
         report = self.run_with_fixture(
             {
@@ -421,6 +434,34 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("scan_target_unreadable", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_branch_variant_compare(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    if adapter_key == "xhs-main":\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_branch_variant_match(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    match adapter_key:\n        case "douyin-prod":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
     def test_run_check_detects_shared_platform_semantic_in_return_value(self) -> None:
         report = self.run_with_fixture(
