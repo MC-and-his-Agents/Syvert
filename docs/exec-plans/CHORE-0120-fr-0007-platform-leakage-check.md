@@ -52,10 +52,10 @@
     - 目标文件 AST parse 失败时，不再退回“只扫平台字段”的低保真路径，而是产出 `scan_parse_failure` finding 并显式 fail-closed
     - 共享层平台集合/常量现在按 fail-closed 处理，`SUPPORTED_PLATFORMS = {"xhs", "douyin"}` 一类平台集合常量不再漏报
     - 共享层字符串字面量中的平台特定 selector / url / signature 片段现在按 fail-closed 处理，不再只依赖字段名命中
-  - 当前已提交的运行时语义锚定在实现 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
   - 当前 metadata-only follow-up：待本次 exec-plan / PR / issue 同步提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准；metadata-only follow-up 只回填 guardian 修复后的 checkpoint / 验证追踪，不改运行时语义
-  - 本 worktree 已把 guardian 新增阻断收口为最小运行时增量：平台集合/常量与 selector / url / signature 字符串碎片两类新增 fail-closed 判定已进入共享层扫描器与回归测试
-  - 本 worktree 的剩余动作是把当前验证结果绑定到实现 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`，随后重新发起 guardian / merge
+  - 本 worktree 已把 guardian 新增阻断收口为最小运行时增量：共享平台语义检查已扩展到返回值与函数默认参数；docstring 等说明性文本已从 `platform_specific_field_leak` 扫描对象中排除
+  - 本 worktree 的剩余动作是把当前验证结果绑定到实现 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e`，随后重新发起 guardian / merge
 
 ## 实现要点
 
@@ -71,7 +71,9 @@
   - 三类 finding 的命中行为
   - 多行平台分支与非 `xhs` / `douyin` 平台字面量
   - `SUPPORTED_PLATFORMS` 一类共享平台集合常量
+  - 共享平台语义出现在 return value 与函数默认参数时的 fail-closed
   - selector / url / signature 字符串碎片
+  - docstring 说明文本不参与平台泄漏判定
   - adapter 私有实现与 research 文档不进入扫描面
 - 在 `test_version_gate` 补真实 checker 输出进入 orchestrator 的接入回归，覆盖共享平台集合常量经公开入口被收口。
 
@@ -97,6 +99,8 @@
   - 结果：在 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52` 上通过
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate`
   - 结果：在 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52` 上通过，`Ran 109 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate`
+  - 结果：在 checkpoint `5b1a93a443b78672fd1bd98a4309c05e85d9de8e` 上通过，`Ran 112 tests`，`OK`
 
 ## 未决风险
 
@@ -110,7 +114,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
-- 最近一次重跑目标测试的 head：`bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
+- 实现 checkpoint：`5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
+- 最近一次重跑目标测试的 head：`5b1a93a443b78672fd1bd98a4309c05e85d9de8e`
 - 当前 metadata head：待本次 exec-plan follow-up 提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准
 - 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准；不得把 metadata-only follow-up 误记为新的 runtime checkpoint
