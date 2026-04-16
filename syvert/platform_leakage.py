@@ -1704,8 +1704,39 @@ def _key_signal_for_expr(
         return (
             frozenset(),
             any(
-                isinstance(value, ast.FormattedValue) and _expr_is_platformish(value.value, platform_aliases=platform_aliases)
+                isinstance(value, ast.FormattedValue)
+                and _expr_contains_platform_dynamic_component(
+                    value.value,
+                    key_signals=key_signals,
+                    platform_aliases=platform_aliases,
+                )
                 for value in node.values
+            ),
+        )
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and _expr_contains_string_literal(node.left):
+        return (
+            frozenset(),
+            _expr_contains_platform_dynamic_component(
+                node.right,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ),
+        )
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "format"
+        and _expr_contains_string_literal(node.func.value)
+    ):
+        return (
+            frozenset(),
+            any(
+                _expr_contains_platform_dynamic_component(
+                    argument,
+                    key_signals=key_signals,
+                    platform_aliases=platform_aliases,
+                )
+                for argument in (*node.args, *(keyword.value for keyword in node.keywords))
             ),
         )
     return _EMPTY_KEY_SIGNAL
@@ -1716,6 +1747,40 @@ def _merge_key_signals(
     right: tuple[frozenset[str], bool],
 ) -> tuple[frozenset[str], bool]:
     return (left[0].union(right[0]), left[1] or right[1])
+
+
+def _expr_contains_platform_dynamic_component(
+    node: ast.AST,
+    *,
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
+) -> bool:
+    if _expr_is_platformish(node, platform_aliases=platform_aliases):
+        return True
+    if _expr_contains_unapproved_platform_literal(node):
+        return True
+    if isinstance(node, ast.Name):
+        signal = key_signals.get(node.id, _EMPTY_KEY_SIGNAL)
+        return signal[1] or any(_is_common_platform_literal(literal) for literal in signal[0])
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return any(
+            _expr_contains_platform_dynamic_component(
+                item,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            )
+            for item in node.elts
+        )
+    if isinstance(node, ast.Dict):
+        return any(
+            _expr_contains_platform_dynamic_component(
+                value,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            )
+            for value in node.values
+        )
+    return False
 
 
 def _key_signal_matches_platform(signal: tuple[frozenset[str], bool]) -> bool:

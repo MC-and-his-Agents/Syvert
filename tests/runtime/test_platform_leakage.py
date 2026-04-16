@@ -768,12 +768,38 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_percent_formatted_platform_specific_shared_result_key(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    key = "%s_extra" % current_platform\n    normalized[key] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_computed_platform_specific_error_details_key(self) -> None:
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    key = f"{current_platform}_extra"\n    details = error.details\n    details[key] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_dot_format_platform_specific_error_details_key(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    key = "{}_extra".format(current_platform)\n    details = error.details\n    details[key] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )
