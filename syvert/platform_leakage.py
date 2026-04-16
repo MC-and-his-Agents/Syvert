@@ -172,6 +172,7 @@ def _scan_shared_boundaries(repo_root: str | Path) -> tuple[list[dict[str, str]]
                 relative_name,
                 source_text,
                 boundary_resolver,
+                default_boundary=default_boundary,
                 allowed_exception_lines=allowed_exception_lines,
             )
         )
@@ -254,17 +255,25 @@ def _scan_file(
     source_text: str,
     boundary_resolver: Any,
     *,
+    default_boundary: str,
     allowed_exception_lines: frozenset[int],
 ) -> list[dict[str, str]]:
     try:
         module = ast.parse(source_text)
-    except SyntaxError:
-        return _scan_lines_fallback(
-            relative_name,
-            source_text,
-            boundary_resolver,
-            allowed_exception_lines=allowed_exception_lines,
-        )
+    except SyntaxError as exc:
+        line_number = exc.lineno or 1
+        boundary = boundary_resolver(line_number) if callable(boundary_resolver) else default_boundary
+        return [
+            _finding(
+                code="scan_parse_failure",
+                message=(
+                    f"platform leakage scan target `{relative_name}` cannot be parsed "
+                    f"at line {line_number} and must fail closed"
+                ),
+                boundary=boundary or default_boundary,
+                evidence_ref=f"platform_leakage:{boundary or default_boundary}:{relative_name}:{line_number}:parse-failure",
+            )
+        ]
 
     findings: list[dict[str, str]] = []
     for node in ast.walk(module):
@@ -319,32 +328,6 @@ def _scan_file(
     return findings
 
 
-def _scan_lines_fallback(
-    relative_name: str,
-    source_text: str,
-    boundary_resolver: Any,
-    *,
-    allowed_exception_lines: frozenset[int],
-) -> list[dict[str, str]]:
-    findings: list[dict[str, str]] = []
-    for line_number, line in enumerate(source_text.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or line_number in allowed_exception_lines:
-            continue
-        if not _PLATFORM_FIELD_RE.search(stripped):
-            continue
-        boundary = boundary_resolver(line_number)
-        findings.append(
-            _finding(
-                code="platform_specific_field_leak",
-                message=f"platform-specific field leaked into shared layer at `{relative_name}:{line_number}`",
-                boundary=boundary,
-                evidence_ref=f"platform_leakage:{boundary}:{relative_name}:{line_number}",
-            )
-        )
-    return findings
-
-
 def _statement_line_numbers(node: ast.AST) -> range:
     line_number = getattr(node, "lineno", 0)
     end_line_number = getattr(node, "end_lineno", line_number)
@@ -364,7 +347,7 @@ def _statement_has_hardcoded_platform_branch(node: ast.stmt) -> bool:
         return _expr_has_platform_literal_compare(node.test)
     if _AST_MATCH is not None and isinstance(node, _AST_MATCH):
         return _match_has_platform_literal_branch(node)
-    return False
+    return _expr_has_platform_literal_compare(node)
 
 
 def _statement_has_single_platform_semantic(node: ast.stmt, statement_source: str) -> bool:
