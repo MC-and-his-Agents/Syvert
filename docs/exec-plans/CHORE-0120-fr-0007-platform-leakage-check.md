@@ -36,7 +36,7 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
+- 当前 runtime-affecting 实现 checkpoint：`8ab04c2abc06691ccc271e861b701d226b9831bd`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -45,9 +45,10 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
+  - 已修复 guardian 指出的两类 false negative：`normalized.platform` / `error.details` 不再按整行豁免，frozen reference pair 只对白名单常量定义生效
   - 受审 PR 已创建：`#123`
   - 当前 PR latest head / 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
-  - 运行时语义仍锚定在实现 checkpoint `f7de3de924745cce410f2fdad7de7b7021f90bbc`
+  - 运行时语义仍锚定在实现 checkpoint `8ab04c2abc06691ccc271e861b701d226b9831bd`
   - 下一步动作：在当前 head 上发起 guardian 审查，并通过 merge gate 收口；本 worktree 不执行 merge
 
 ## 实现要点
@@ -78,7 +79,7 @@
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 85 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：`Ran 138 tests`，`OK`
+  - 结果：`Ran 141 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
@@ -100,7 +101,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
-- 最近一次重跑目标测试的 head：`当前分支最新 head（metadata-only follow-up）`
+- 实现 checkpoint：`8ab04c2abc06691ccc271e861b701d226b9831bd`
+- 最近一次重跑目标测试的 head：`8ab04c2abc06691ccc271e861b701d226b9831bd`
 - 最近一次门禁复跑的 head：`当前分支最新 head（metadata-only follow-up）`
 - 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
