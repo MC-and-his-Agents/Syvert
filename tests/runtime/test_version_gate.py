@@ -15,15 +15,12 @@ from syvert.version_gate import (
 )
 
 
+DEFAULT_REQUIRED_HARNESS_SAMPLE_IDS = ["sample-success", "sample-legal-failure"]
+
+
 def orchestrate_version_gate(**kwargs: object) -> dict[str, object]:
-    if "required_harness_sample_ids" not in kwargs:
-        harness_report = kwargs.get("harness_report")
-        if isinstance(harness_report, dict):
-            details = harness_report.get("details")
-            required_sample_ids = details.get("required_sample_ids") if isinstance(details, dict) else None
-            if isinstance(required_sample_ids, list):
-                kwargs["required_harness_sample_ids"] = required_sample_ids
-    return _orchestrate_version_gate(**kwargs)
+    kwargs.setdefault("required_harness_sample_ids", DEFAULT_REQUIRED_HARNESS_SAMPLE_IDS)
+    return version_gate_module.orchestrate_version_gate(**kwargs)
 
 
 class VersionGateTests(unittest.TestCase):
@@ -350,6 +347,35 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["details"]["operation"], "content_detail")
         self.assertEqual(report["details"]["target_type"], "url")
         self.assertEqual(report["details"]["semantic_operation"], "content_detail_by_url")
+
+    def test_real_regression_rejects_projected_payload_when_public_entry_expects_semantic_surface(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["operation"] = "content_detail"
+        payload["target_type"] = "url"
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            operation="content_detail_by_url",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("operation_surface_mismatch", {item["code"] for item in report["details"]["failures"]})
+
+    def test_real_regression_rejects_semantic_payload_when_public_entry_expects_projected_surface(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            operation="content_detail",
+            target_type="url",
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("operation_surface_mismatch", {item["code"] for item in report["details"]["failures"]})
 
     def test_real_regression_rejects_projected_operation_without_target_type(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
@@ -1145,6 +1171,7 @@ class VersionGateTests(unittest.TestCase):
                 self.valid_platform_leakage_payload(),
                 version="v0.2.0",
             ),
+            required_harness_sample_ids=["sample-valid", "sample-success"],
         )
 
         self.assertEqual(report["verdict"], "fail")
@@ -1240,6 +1267,7 @@ class VersionGateTests(unittest.TestCase):
                 self.valid_platform_leakage_payload(),
                 version="v0.2.0",
             ),
+            required_harness_sample_ids=["sample-success"],
         )
 
         self.assertIn("invalid_sample_id", {item["code"] for item in report["failures"]})
@@ -1272,6 +1300,7 @@ class VersionGateTests(unittest.TestCase):
                 self.valid_platform_leakage_payload(),
                 version="v0.2.0",
             ),
+            required_harness_sample_ids=["sample-success"],
         )
 
         self.assertEqual(report["source_reports"]["harness"]["evidence_refs"], ["synthetic:harness:invalid_sample_id"])
@@ -1296,6 +1325,7 @@ class VersionGateTests(unittest.TestCase):
                 self.valid_platform_leakage_payload(),
                 version="v0.2.0",
             ),
+            required_harness_sample_ids=["sample-success", "sample-legal-failure", "sample-missing"],
         )
 
         self.assertEqual(

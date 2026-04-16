@@ -197,6 +197,27 @@ def validate_real_adapter_regression_source_report(
             code="operation_mismatch",
             message="real adapter regression report operation surface does not match the formal-spec approved regression surface",
         )
+    if (
+        expected_surface is not None
+        and payload_surface is not None
+        and (
+            expected_surface["operation"] != payload_surface["operation"]
+            or expected_surface["target_type"] != payload_surface["target_type"]
+        )
+    ):
+        failures.append(
+            _failure(
+                source,
+                "operation_surface_mismatch",
+                "real adapter regression report operation surface does not match the requested gate surface",
+                details={
+                    "expected_operation": expected_surface["operation"],
+                    "actual_operation": payload_surface["operation"],
+                    "expected_target_type": expected_surface["target_type"],
+                    "actual_target_type": payload_surface["target_type"],
+                },
+            )
+        )
 
     payload_reference_pair = _normalize_reference_pair(
         payload.get("reference_pair"),
