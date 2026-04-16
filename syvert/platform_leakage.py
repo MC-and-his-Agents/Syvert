@@ -286,6 +286,7 @@ def _scan_file(
         ]
 
     findings: list[dict[str, str]] = []
+    platform_aliases = _collect_platform_aliases(module)
     for node in ast.walk(module):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             line_number = getattr(node, "lineno", None)
@@ -297,7 +298,11 @@ def _scan_file(
             boundary = boundary_resolver(line_number)
             evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
             function_source = _statement_source_segment(source_text, node)
-            if _function_has_single_platform_semantic(node, function_source):
+            if _function_has_single_platform_semantic(
+                node,
+                function_source,
+                platform_aliases=platform_aliases,
+            ):
                 findings.append(
                     _finding(
                         code="single_platform_shared_semantic",
@@ -334,7 +339,7 @@ def _scan_file(
             )
             continue
 
-        if _statement_has_hardcoded_platform_branch(node):
+        if _statement_has_hardcoded_platform_branch(node, platform_aliases=platform_aliases):
             findings.append(
                 _finding(
                     code="hardcoded_platform_branch",
@@ -345,7 +350,11 @@ def _scan_file(
             )
             continue
 
-        if _statement_has_single_platform_semantic(node, statement_source):
+        if _statement_has_single_platform_semantic(
+            node,
+            statement_source,
+            platform_aliases=platform_aliases,
+        ):
             findings.append(
                 _finding(
                     code="single_platform_shared_semantic",
@@ -368,33 +377,103 @@ def _statement_source_segment(source_text: str, node: ast.AST) -> str:
     return ast.get_source_segment(source_text, node) or ""
 
 
+def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
+    aliases: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(module):
+            value = None
+            targets: Sequence[ast.expr] = ()
+            if isinstance(node, ast.Assign):
+                value = node.value
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                value = node.value
+                targets = [node.target]
+            else:
+                continue
+
+            if not _expr_is_platformish(value, platform_aliases=frozenset(aliases)):
+                continue
+            for target in targets:
+                for name in _assignment_target_names(target):
+                    if name not in aliases:
+                        aliases.add(name)
+                        changed = True
+    return frozenset(aliases)
+
+
+def _assignment_target_names(target: ast.expr) -> tuple[str, ...]:
+    if isinstance(target, ast.Name):
+        return (target.id,)
+    if isinstance(target, (ast.Tuple, ast.List)):
+        names: list[str] = []
+        for item in target.elts:
+            names.extend(_assignment_target_names(item))
+        return tuple(names)
+    return ()
+
+
 def _statement_has_platform_specific_field(statement_source: str, node: ast.AST) -> bool:
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
         return True
     return any(_string_literal_has_platform_specific_fragment(literal) for literal in _string_literals(node))
 
 
-def _statement_has_hardcoded_platform_branch(node: ast.stmt) -> bool:
+def _statement_has_hardcoded_platform_branch(
+    node: ast.stmt,
+    *,
+    platform_aliases: frozenset[str],
+) -> bool:
     if isinstance(node, ast.If):
-        return _expr_has_platform_literal_compare(node.test)
+        return _expr_has_platform_literal_compare(node.test, platform_aliases=platform_aliases)
     if _AST_MATCH is not None and isinstance(node, _AST_MATCH):
-        return _match_has_platform_literal_branch(node)
-    return _expr_has_platform_literal_compare(node)
+        return _match_has_platform_literal_branch(node, platform_aliases=platform_aliases)
+    return _expr_has_platform_literal_compare(node, platform_aliases=platform_aliases)
 
 
-def _statement_has_single_platform_semantic(node: ast.stmt, statement_source: str) -> bool:
+def _statement_has_single_platform_semantic(
+    node: ast.stmt,
+    statement_source: str,
+    *,
+    platform_aliases: frozenset[str],
+) -> bool:
     if isinstance(node, ast.Assign):
-        return _assignment_has_single_platform_semantic(node.targets, node.value, statement_source)
+        return _assignment_has_single_platform_semantic(
+            node.targets,
+            node.value,
+            statement_source,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.AnnAssign) and node.value is not None:
-        return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
+        return _assignment_has_single_platform_semantic(
+            [node.target],
+            node.value,
+            statement_source,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.AugAssign):
-        return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
+        return _assignment_has_single_platform_semantic(
+            [node.target],
+            node.value,
+            statement_source,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.Return) and node.value is not None:
-        return _expr_has_shared_platform_semantic(node.value, statement_source)
+        return _expr_has_shared_platform_semantic(
+            node.value,
+            statement_source,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.Raise) and node.exc is not None:
         return _expr_contains_platform_marker(node.exc)
     if isinstance(node, ast.Expr):
-        return _expr_has_shared_platform_semantic(node.value, statement_source)
+        return _expr_has_shared_platform_semantic(
+            node.value,
+            statement_source,
+            platform_aliases=platform_aliases,
+        )
     return False
 
 
@@ -402,29 +481,51 @@ def _assignment_has_single_platform_semantic(
     targets: Sequence[ast.expr],
     value: ast.expr,
     statement_source: str,
+    *,
+    platform_aliases: frozenset[str],
 ) -> bool:
-    if _expr_has_platform_literal_compare(value):
+    if _expr_has_platform_literal_compare(value, platform_aliases=platform_aliases):
         return True
 
-    if any(_expr_is_platformish(target) for target in targets) and _expr_contains_platform_literal(value):
+    if _expr_contains_platform_literal(value):
+        return True
+
+    if any(_expr_is_platformish(target, platform_aliases=platform_aliases) for target in targets) and _expr_contains_platform_literal(value):
         return True
 
     return _statement_has_semantic_platform_literal(statement_source, value)
 
 
-def _expr_has_shared_platform_semantic(value: ast.AST, statement_source: str) -> bool:
-    if _expr_has_platform_literal_compare(value):
+def _expr_has_shared_platform_semantic(
+    value: ast.AST,
+    statement_source: str,
+    *,
+    platform_aliases: frozenset[str],
+) -> bool:
+    if _expr_has_platform_literal_compare(value, platform_aliases=platform_aliases):
         return True
     return _statement_has_semantic_platform_literal(statement_source, value)
 
 
-def _function_has_single_platform_semantic(node: ast.AST, function_source: str) -> bool:
+def _function_has_single_platform_semantic(
+    node: ast.AST,
+    function_source: str,
+    *,
+    platform_aliases: frozenset[str],
+) -> bool:
     args = getattr(node, "args", None)
     if args is None:
         return False
     defaults = list(getattr(args, "defaults", ()))
     defaults.extend(default for default in getattr(args, "kw_defaults", ()) if default is not None)
-    return any(_expr_has_shared_platform_semantic(default, function_source) for default in defaults)
+    return any(
+        _expr_has_shared_platform_semantic(
+            default,
+            function_source,
+            platform_aliases=platform_aliases,
+        )
+        for default in defaults
+    )
 
 
 def _statement_has_semantic_platform_literal(statement_source: str, value: ast.AST) -> bool:
@@ -434,8 +535,8 @@ def _statement_has_semantic_platform_literal(statement_source: str, value: ast.A
     return any(_is_common_platform_literal(literal) for literal in _string_literals(value))
 
 
-def _match_has_platform_literal_branch(node: ast.AST) -> bool:
-    if not _expr_is_platformish(node.subject):
+def _match_has_platform_literal_branch(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+    if not _expr_is_platformish(node.subject, platform_aliases=platform_aliases):
         return False
     return any(_pattern_contains_platform_literal(case.pattern) for case in node.cases)
 
@@ -454,50 +555,67 @@ def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
     return False
 
 
-def _expr_has_platform_literal_compare(node: ast.AST) -> bool:
+def _expr_has_platform_literal_compare(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
     if isinstance(node, ast.Compare):
         current = node.left
         for operator, comparator in zip(node.ops, node.comparators):
-            if _compare_pair_has_platform_literal(current, comparator, operator):
+            if _compare_pair_has_platform_literal(
+                current,
+                comparator,
+                operator,
+                platform_aliases=platform_aliases,
+            ):
                 return True
             current = comparator
-    return any(_expr_has_platform_literal_compare(child) for child in ast.iter_child_nodes(node))
+    return any(
+        _expr_has_platform_literal_compare(child, platform_aliases=platform_aliases)
+        for child in ast.iter_child_nodes(node)
+    )
 
 
-def _compare_pair_has_platform_literal(left: ast.AST, right: ast.AST, operator: ast.AST) -> bool:
+def _compare_pair_has_platform_literal(
+    left: ast.AST,
+    right: ast.AST,
+    operator: ast.AST,
+    *,
+    platform_aliases: frozenset[str],
+) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
-        return (_expr_is_platformish(left) and _expr_contains_platform_literal(right)) or (
-            _expr_is_platformish(right) and _expr_contains_platform_literal(left)
+        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_literal(right)) or (
+            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_literal(left)
         )
     if isinstance(operator, (ast.In, ast.NotIn)):
-        return (_expr_is_platformish(left) and _expr_contains_platform_literal(right)) or (
-            _expr_is_platformish(right) and _expr_contains_platform_literal(left)
+        return (_expr_is_platformish(left, platform_aliases=platform_aliases) and _expr_contains_platform_literal(right)) or (
+            _expr_is_platformish(right, platform_aliases=platform_aliases) and _expr_contains_platform_literal(left)
         )
     return False
 
 
-def _expr_is_platformish(node: ast.AST) -> bool:
+def _expr_is_platformish(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
     if isinstance(node, ast.Name):
-        return _identifier_matches(node.id, _PLATFORM_IDENTIFIER_RE)
+        return node.id in platform_aliases or _identifier_matches(node.id, _PLATFORM_IDENTIFIER_RE)
     if isinstance(node, ast.Attribute):
-        return _identifier_matches(node.attr, _PLATFORM_IDENTIFIER_RE) or _expr_is_platformish(node.value)
+        return _identifier_matches(node.attr, _PLATFORM_IDENTIFIER_RE) or _expr_is_platformish(
+            node.value,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.Subscript):
-        return _subscript_is_platformish(node)
+        return _subscript_is_platformish(node, platform_aliases=platform_aliases)
     if isinstance(node, ast.Call):
-        return _call_is_platformish(node)
+        return _call_is_platformish(node, platform_aliases=platform_aliases)
     if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
-        return any(_expr_is_platformish(item) for item in node.elts)
+        return any(_expr_is_platformish(item, platform_aliases=platform_aliases) for item in node.elts)
     return False
 
 
-def _subscript_is_platformish(node: ast.Subscript) -> bool:
-    if _expr_is_platformish(node.value):
+def _subscript_is_platformish(node: ast.Subscript, *, platform_aliases: frozenset[str]) -> bool:
+    if _expr_is_platformish(node.value, platform_aliases=platform_aliases):
         return True
     return any(_identifier_matches(literal, _PLATFORM_IDENTIFIER_RE) for literal in _string_literals(node.slice))
 
 
-def _call_is_platformish(node: ast.Call) -> bool:
-    if _expr_is_platformish(node.func):
+def _call_is_platformish(node: ast.Call, *, platform_aliases: frozenset[str]) -> bool:
+    if _expr_is_platformish(node.func, platform_aliases=platform_aliases):
         return True
     if not isinstance(node.func, ast.Attribute) or node.func.attr != "get":
         return False

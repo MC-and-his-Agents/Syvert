@@ -198,6 +198,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
+    def test_run_check_detects_alias_wrapped_platform_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    current = adapter_key\n    if current == "xhs":\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_expression_statement_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
@@ -294,6 +307,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_detects_plain_single_platform_constant(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '_REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})\n',
+                    '_REAL_REGRESSION_ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "platform"})\nPRIMARY = "xhs"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
 
     def test_run_check_detects_shared_platform_semantic_in_return_value(self) -> None:
         report = self.run_with_fixture(
