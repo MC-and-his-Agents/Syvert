@@ -79,7 +79,10 @@ _COMMON_PLATFORM_LITERALS = frozenset(
         "zhihu",
     }
 )
-_PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter_key|platform|platforms|platform_key|reference_pair)(?:_|$)")
+_COMMON_PLATFORM_NAME_RE = re.compile(
+    r"\b(?:bilibili|douyin|facebook|instagram|kuaishou|reddit|threads|tiktok|twitter|weibo|xhs|xiaohongshu|youtube|zhihu)\b"
+)
+_PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter|adapter_key|platform|platforms|platform_key|reference_pair)(?:_|$)")
 _AST_MATCH = getattr(ast, "Match", None)
 _AST_MATCH_VALUE = getattr(ast, "MatchValue", None)
 _AST_MATCH_SINGLETON = getattr(ast, "MatchSingleton", None)
@@ -388,6 +391,8 @@ def _statement_has_single_platform_semantic(node: ast.stmt, statement_source: st
         return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
     if isinstance(node, ast.Return) and node.value is not None:
         return _expr_has_shared_platform_semantic(node.value, statement_source)
+    if isinstance(node, ast.Raise) and node.exc is not None:
+        return _expr_contains_platform_marker(node.exc)
     if isinstance(node, ast.Expr):
         return _expr_has_shared_platform_semantic(node.value, statement_source)
     return False
@@ -461,12 +466,12 @@ def _expr_has_platform_literal_compare(node: ast.AST) -> bool:
 
 def _compare_pair_has_platform_literal(left: ast.AST, right: ast.AST, operator: ast.AST) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
-        return (_expr_is_platformish(left) and _expr_contains_string_literal(right)) or (
-            _expr_is_platformish(right) and _expr_contains_string_literal(left)
+        return (_expr_is_platformish(left) and _expr_contains_platform_marker(right)) or (
+            _expr_is_platformish(right) and _expr_contains_platform_marker(left)
         )
     if isinstance(operator, (ast.In, ast.NotIn)):
-        return (_expr_is_platformish(left) and _expr_contains_string_literal(right)) or (
-            _expr_is_platformish(right) and _expr_contains_string_literal(left)
+        return (_expr_is_platformish(left) and _expr_contains_platform_marker(right)) or (
+            _expr_is_platformish(right) and _expr_contains_platform_marker(left)
         )
     return False
 
@@ -510,6 +515,13 @@ def _expr_contains_platform_literal(node: ast.AST) -> bool:
     return any(_is_common_platform_literal(literal) for literal in _string_literals(node))
 
 
+def _expr_contains_platform_marker(node: ast.AST) -> bool:
+    return any(
+        _string_literal_has_platform_marker(literal)
+        for literal in _string_literals(node)
+    )
+
+
 def _string_literals(node: ast.AST) -> tuple[str, ...]:
     literals: list[str] = []
     for child in ast.walk(node):
@@ -532,6 +544,11 @@ def _identifier_matches(value: str, pattern: re.Pattern[str]) -> bool:
 
 def _string_literal_has_platform_specific_fragment(value: str) -> bool:
     return _PLATFORM_STRING_FRAGMENT_RE.search(value.lower()) is not None
+
+
+def _string_literal_has_platform_marker(value: str) -> bool:
+    lowered = value.lower()
+    return _is_common_platform_literal(lowered) or _COMMON_PLATFORM_NAME_RE.search(lowered) is not None or _string_literal_has_platform_specific_fragment(lowered)
 
 
 def _finding(*, code: str, message: str, boundary: str, evidence_ref: str) -> dict[str, str]:

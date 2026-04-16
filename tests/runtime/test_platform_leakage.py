@@ -97,6 +97,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
+    def test_run_check_detects_hardcoded_platform_branch_with_adapter_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter = adapter_key\n    if adapter == "xhs":\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
     def test_run_check_detects_return_expression_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
@@ -110,6 +124,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_does_not_report_non_platform_string_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    if adapter_key == "unknown":\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
 
     def test_run_check_detects_raise_expression_platform_compare(self) -> None:
         report = self.run_with_fixture(
@@ -201,6 +228,20 @@ class PlatformLeakageTests(unittest.TestCase):
                     "    adapter_key, capability = extract_request_context(request)\n",
                     "    adapter_key, capability = extract_request_context(request)\n"
                     '    return {"default_platform": "xhs"}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_detects_shared_platform_semantic_in_raise_message(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    raise RuntimeError("xhs only")\n',
                 )
             }
         )
