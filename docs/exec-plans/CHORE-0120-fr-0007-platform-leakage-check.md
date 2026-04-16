@@ -36,7 +36,7 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`8ab04c2abc06691ccc271e861b701d226b9831bd`
+- 当前 runtime-affecting 实现 checkpoint：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -45,20 +45,27 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
-  - 已修复 guardian 指出的两类 false negative：`normalized.platform` / `error.details` 不再按整行豁免，frozen reference pair 只对白名单常量定义生效
+  - 已修复 guardian 第二轮指出的两类 false negative：
+    - 平台泄漏扫描从物理行匹配提升到 AST/语句级判定，多行 `if` / 比较 / 赋值不再可绕过
+    - 平台名字面量检测不再只识别 `xhs` / `douyin`，对共享层平台字面量走通用检测，同时保留 `normalized.platform`、统一 `error.details`、冻结 reference pair 的精确豁免
   - 受审 PR 已创建：`#123`
-  - 当前 PR latest head / 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
-  - 运行时语义仍锚定在实现 checkpoint `8ab04c2abc06691ccc271e861b701d226b9831bd`
-  - 下一步动作：在当前 head 上发起 guardian 审查，并通过 merge gate 收口；本 worktree 不执行 merge
+  - 当前 PR latest head / 当前 metadata-only head：`当前分支最新 head（本次 exec-plan metadata-only follow-up）`
+  - 运行时语义仍锚定在实现 checkpoint `9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
+  - 下一步动作：在当前 metadata-only head 复跑验证与门禁，并把同一对象事实同步回 PR/guardian 上下文；本 worktree 不执行 guardian / merge
 
 ## 实现要点
 
 - 新增 `syvert.platform_leakage`，固定 `boundary_scope` 为六个共享边界，并把 caller 输入与 payload surface 绑定到同一份 boundary scope。
 - 扫描结果直接输出为 `platform_leakage` source report payload，再由公开 validator 收口。
+- 当前实现把平台泄漏命中面固定在三类 AST/语句级 finding：
+  - 平台上下文里的硬编码分支 / 比较
+  - 平台专属字段渗入共享层
+  - 带共享语义语境的平台字面量赋值
 - 新增独立 runtime 测试，覆盖：
   - 真实共享层扫描 clean pass
   - caller boundary scope 缺项 / 越界 fail-closed
   - 三类 finding 的命中行为
+  - 多行平台分支与非 `xhs` / `douyin` 平台字面量
   - adapter 私有实现与 research 文档不进入扫描面
 - 在 `test_version_gate` 补一条真实 checker 输出进入 orchestrator 的接入回归。
 
@@ -88,6 +95,14 @@
   - 结果：当前 metadata-only head 已复跑，`PR scope` 校验通过。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前 metadata-only head 已复跑，`docs-guard` 通过。
+- `python3 -m unittest tests.runtime.test_platform_leakage`
+  - 结果：实现 checkpoint 后已复跑通过；metadata-only follow-up 后将以当前 head 再跑一次。
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：实现 checkpoint 后已复跑通过；metadata-only follow-up 后将以当前 head 再跑一次。
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：将在当前 metadata-only head 复跑，确保验证记录与 PR latest head 对齐。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：将在当前 metadata-only head 复跑，确保验证记录与 PR latest head 对齐。
 
 ## 未决风险
 
@@ -101,7 +116,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`8ab04c2abc06691ccc271e861b701d226b9831bd`
-- 最近一次重跑目标测试的 head：`8ab04c2abc06691ccc271e861b701d226b9831bd`
-- 最近一次门禁复跑的 head：`当前分支最新 head（metadata-only follow-up）`
-- 当前 metadata-only head：`当前分支最新 head（metadata-only follow-up）`
+- 实现 checkpoint：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
+- 最近一次重跑目标测试的 head：`9dcac07d18498985c1e7274650e4cb2fd8d5ab38`
+- 最近一次门禁复跑的 head：`待当前 metadata-only head 复跑`
+- 当前 metadata-only head：`当前分支最新 head（本次 exec-plan metadata-only follow-up）`
