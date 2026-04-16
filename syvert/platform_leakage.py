@@ -98,6 +98,7 @@ _AST_MATCH_AS = getattr(ast, "MatchAs", None)
 _AST_MATCH_MAPPING = getattr(ast, "MatchMapping", None)
 _AST_MATCH_STAR = getattr(ast, "MatchStar", None)
 _EMPTY_KEY_SIGNAL: tuple[frozenset[str], bool] = (frozenset(), False)
+_MAX_POSITION = (10**9, 10**9)
 
 
 def build_platform_leakage_payload(
@@ -229,7 +230,7 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
 
     try:
         module = ast.parse(source_text)
-    except SyntaxError:
+    except (SyntaxError, ValueError):
         return lambda _line_number: "core_runtime"
 
     ranges: list[tuple[int, int, str]] = []
@@ -256,7 +257,7 @@ def _build_allowed_exception_statements(relative_name: str, source_text: str) ->
 
     try:
         module = ast.parse(source_text)
-    except SyntaxError:
+    except (SyntaxError, ValueError):
         return frozenset()
 
     allowed_names = {
@@ -284,8 +285,8 @@ def _scan_file(
 ) -> list[dict[str, str]]:
     try:
         module = ast.parse(source_text)
-    except SyntaxError as exc:
-        line_number = exc.lineno or 1
+    except (SyntaxError, ValueError) as exc:
+        line_number = getattr(exc, "lineno", None) or 1
         boundary = boundary_resolver(line_number) if callable(boundary_resolver) else default_boundary
         return [
             _finding(
@@ -576,7 +577,16 @@ def _materialize_platform_aliases(
     position: tuple[int, int],
 ) -> frozenset[str]:
     aliases: set[str] = set()
-    for name, events in histories.get(scope, {}).items():
+    candidate_names = set(histories.get(scope, {}).keys())
+    candidate_names.update(_module_scope_history(histories).keys())
+    for name in candidate_names:
+        events = _events_with_module_inheritance(
+            histories,
+            scope=scope,
+            name=name,
+            empty_value=False,
+            resolve=lambda module_events: _resolve_boolean_alias(module_events, _MAX_POSITION),
+        )
         if _resolve_boolean_alias(events, position):
             aliases.add(name)
     return frozenset(aliases)
@@ -628,7 +638,16 @@ def _materialize_key_signals(
     position: tuple[int, int],
 ) -> dict[str, tuple[frozenset[str], bool]]:
     signals: dict[str, tuple[frozenset[str], bool]] = {}
-    for name, events in histories.get(scope, {}).items():
+    candidate_names = set(histories.get(scope, {}).keys())
+    candidate_names.update(_module_scope_history(histories).keys())
+    for name in candidate_names:
+        events = _events_with_module_inheritance(
+            histories,
+            scope=scope,
+            name=name,
+            empty_value=_EMPTY_KEY_SIGNAL,
+            resolve=lambda module_events: _resolve_key_signal(module_events, _MAX_POSITION),
+        )
         resolved = _resolve_key_signal(events, position)
         if resolved != _EMPTY_KEY_SIGNAL:
             signals[name] = resolved
@@ -708,7 +727,16 @@ def _materialize_shared_result_container_aliases(
     position: tuple[int, int],
 ) -> dict[str, frozenset[str]]:
     alias_map: dict[str, frozenset[str]] = {}
-    for name, events in histories.get(scope, {}).items():
+    candidate_names = set(histories.get(scope, {}).keys())
+    candidate_names.update(_module_scope_history(histories).keys())
+    for name in candidate_names:
+        events = _events_with_module_inheritance(
+            histories,
+            scope=scope,
+            name=name,
+            empty_value=frozenset(),
+            resolve=lambda module_events: _resolve_container_aliases(module_events, _MAX_POSITION),
+        )
         resolved = _resolve_container_aliases(events, position)
         if resolved:
             alias_map[name] = resolved
@@ -722,11 +750,47 @@ def _materialize_error_details_aliases(
     position: tuple[int, int],
 ) -> dict[str, frozenset[str]]:
     aliases: dict[str, frozenset[str]] = {}
-    for name, events in histories.get(scope, {}).items():
+    candidate_names = set(histories.get(scope, {}).keys())
+    candidate_names.update(_module_scope_history(histories).keys())
+    for name in candidate_names:
+        events = _events_with_module_inheritance(
+            histories,
+            scope=scope,
+            name=name,
+            empty_value=frozenset(),
+            resolve=lambda module_events: _resolve_path_aliases(module_events, _MAX_POSITION),
+        )
         resolved = _resolve_path_aliases(events, position)
         if resolved:
             aliases[name] = resolved
     return aliases
+
+
+def _module_scope_history(histories: Mapping[ast.AST, Mapping[str, Sequence[Any]]]) -> Mapping[str, Sequence[Any]]:
+    for history_scope, scope_history in histories.items():
+        if isinstance(history_scope, ast.Module):
+            return scope_history
+    return {}
+
+
+def _events_with_module_inheritance(
+    histories: Mapping[ast.AST, Mapping[str, Sequence[Any]]],
+    *,
+    scope: ast.AST,
+    name: str,
+    empty_value: Any,
+    resolve: Any,
+) -> Sequence[Any]:
+    local_events = tuple(histories.get(scope, {}).get(name, ()))
+    if isinstance(scope, ast.Module):
+        return local_events
+    module_events = tuple(_module_scope_history(histories).get(name, ()))
+    if not module_events:
+        return local_events
+    inherited_value = resolve(module_events)
+    if inherited_value == empty_value:
+        return local_events
+    return (((-1, -1), inherited_value, False), *local_events)
 
 
 def _resolve_container_aliases(
@@ -1442,6 +1506,8 @@ def _dict_contains_unapproved_platform_literal(node: ast.Dict, *, path: tuple[st
     for key, value in zip(node.keys, node.values):
         key_name = _single_string_literal(key)
         next_path = path + ((key_name,) if key_name is not None else ())
+        if key_name is not None and _string_literal_has_platform_semantic_name(key_name) and not _is_approved_platform_carrier_path(next_path):
+            return True
         if key_name is not None and _is_approved_platform_carrier_path(next_path):
             continue
         if _expr_contains_unapproved_platform_literal(value, path=next_path):

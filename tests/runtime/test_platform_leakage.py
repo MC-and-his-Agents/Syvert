@@ -642,6 +642,23 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_module_scoped_platform_key_alias_branch(self) -> None:
+        report = self.run_with_fixture(
+            {},
+            append_files={
+                "syvert/runtime.py": (
+                    "\n\nGLOBAL_PLATFORM_KEY = \"platform\"\n"
+                    "\n\ndef module_alias_branch(normalized, current_platform):\n"
+                    "    if normalized.get(GLOBAL_PLATFORM_KEY) == current_platform:\n"
+                    "        return None\n"
+                    "    return normalized\n"
+                )
+            },
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_indirect_error_details_platform_subscript_branch(self) -> None:
         report = self.run_with_fixture(
             {
@@ -1063,6 +1080,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
+    def test_run_check_detects_shared_platform_semantic_in_dict_key(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    DEFAULT_SHARED_MODE = {"douyin": 1}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
     def test_run_check_detects_platform_specific_url_fragment(self) -> None:
         report = self.run_with_fixture(
             {
@@ -1214,6 +1245,20 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertEqual(report["details"]["report_verdict"], "fail")
+        self.assertEqual({item["code"] for item in report["details"]["findings"]}, {"scan_parse_failure"})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_fails_closed_on_parse_value_error(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    "    adapter_key, capability = extract_request_context(request)\n    bad = '" + "\0" + "'\n",
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
         self.assertEqual({item["code"] for item in report["details"]["findings"]}, {"scan_parse_failure"})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
