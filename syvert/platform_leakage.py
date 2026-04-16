@@ -49,12 +49,36 @@ _RUNTIME_SYMBOL_BOUNDARIES = {
     "unsupported_error": "shared_error_model",
 }
 
-_PLATFORM_TOKEN_RE = re.compile(r"\b(xhs|douyin)\b")
 _PLATFORM_FIELD_RE = re.compile(r"\b(note_id|aweme_id|sign_base_url|sec_uid|xsec_token|web_rid)\b")
-_BRANCH_KEYWORD_RE = re.compile(r"\b(if|elif|case|match)\b")
 _SEMANTIC_CONTEXT_RE = re.compile(
     r"\b(default|semantic|operation|registry|runtime|contract|shared|surface|capability|target|collection_mode|mode)\b"
 )
+_COMMON_PLATFORM_LITERALS = frozenset(
+    {
+        "bilibili",
+        "douyin",
+        "facebook",
+        "instagram",
+        "kuaishou",
+        "reddit",
+        "threads",
+        "tiktok",
+        "twitter",
+        "weibo",
+        "x",
+        "xhs",
+        "xiaohongshu",
+        "youtube",
+        "zhihu",
+    }
+)
+_PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter_key|platform|platform_key|reference_pair)(?:_|$)")
+_AST_MATCH = getattr(ast, "Match", None)
+_AST_MATCH_VALUE = getattr(ast, "MatchValue", None)
+_AST_MATCH_SINGLETON = getattr(ast, "MatchSingleton", None)
+_AST_MATCH_SEQUENCE = getattr(ast, "MatchSequence", None)
+_AST_MATCH_OR = getattr(ast, "MatchOr", None)
+_AST_MATCH_AS = getattr(ast, "MatchAs", None)
 
 
 def build_platform_leakage_payload(
@@ -232,22 +256,35 @@ def _scan_file(
     *,
     allowed_exception_lines: frozenset[int],
 ) -> list[dict[str, str]]:
-    findings: list[dict[str, str]] = []
-    for line_number, line in enumerate(source_text.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if _is_allowed_exception(
+    try:
+        module = ast.parse(source_text)
+    except SyntaxError:
+        return _scan_lines_fallback(
             relative_name,
-            stripped,
-            line_number=line_number,
+            source_text,
+            boundary_resolver,
             allowed_exception_lines=allowed_exception_lines,
+        )
+
+    findings: list[dict[str, str]] = []
+    for node in ast.walk(module):
+        if not isinstance(node, ast.stmt) or isinstance(
+            node,
+            (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Module),
         ):
+            continue
+        line_number = getattr(node, "lineno", None)
+        if line_number is None:
+            continue
+
+        statement_lines = _statement_line_numbers(node)
+        if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
             continue
 
         boundary = boundary_resolver(line_number)
         evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
-        if _PLATFORM_FIELD_RE.search(stripped):
+        statement_source = _statement_source_segment(source_text, node)
+        if _statement_has_platform_specific_field(statement_source):
             findings.append(
                 _finding(
                     code="platform_specific_field_leak",
@@ -258,11 +295,7 @@ def _scan_file(
             )
             continue
 
-        platform_match = _PLATFORM_TOKEN_RE.search(stripped)
-        if platform_match is None:
-            continue
-
-        if _BRANCH_KEYWORD_RE.search(stripped):
+        if _statement_has_hardcoded_platform_branch(node):
             findings.append(
                 _finding(
                     code="hardcoded_platform_branch",
@@ -273,7 +306,7 @@ def _scan_file(
             )
             continue
 
-        if "=" in stripped or _SEMANTIC_CONTEXT_RE.search(stripped):
+        if _statement_has_single_platform_semantic(node, statement_source):
             findings.append(
                 _finding(
                     code="single_platform_shared_semantic",
@@ -286,22 +319,176 @@ def _scan_file(
     return findings
 
 
-def _is_allowed_exception(
+def _scan_lines_fallback(
     relative_name: str,
-    stripped_line: str,
+    source_text: str,
+    boundary_resolver: Any,
     *,
-    line_number: int,
     allowed_exception_lines: frozenset[int],
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    for line_number, line in enumerate(source_text.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or line_number in allowed_exception_lines:
+            continue
+        if not _PLATFORM_FIELD_RE.search(stripped):
+            continue
+        boundary = boundary_resolver(line_number)
+        findings.append(
+            _finding(
+                code="platform_specific_field_leak",
+                message=f"platform-specific field leaked into shared layer at `{relative_name}:{line_number}`",
+                boundary=boundary,
+                evidence_ref=f"platform_leakage:{boundary}:{relative_name}:{line_number}",
+            )
+        )
+    return findings
+
+
+def _statement_line_numbers(node: ast.AST) -> range:
+    line_number = getattr(node, "lineno", 0)
+    end_line_number = getattr(node, "end_lineno", line_number)
+    return range(line_number, end_line_number + 1)
+
+
+def _statement_source_segment(source_text: str, node: ast.AST) -> str:
+    return ast.get_source_segment(source_text, node) or ""
+
+
+def _statement_has_platform_specific_field(statement_source: str) -> bool:
+    return _PLATFORM_FIELD_RE.search(statement_source) is not None
+
+
+def _statement_has_hardcoded_platform_branch(node: ast.stmt) -> bool:
+    if isinstance(node, ast.If):
+        return _expr_has_platform_literal_compare(node.test)
+    if _AST_MATCH is not None and isinstance(node, _AST_MATCH):
+        return _match_has_platform_literal_branch(node)
+    return False
+
+
+def _statement_has_single_platform_semantic(node: ast.stmt, statement_source: str) -> bool:
+    if isinstance(node, ast.Assign):
+        return _assignment_has_single_platform_semantic(node.targets, node.value, statement_source)
+    if isinstance(node, ast.AnnAssign) and node.value is not None:
+        return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
+    if isinstance(node, ast.AugAssign):
+        return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
+    return False
+
+
+def _assignment_has_single_platform_semantic(
+    targets: Sequence[ast.expr],
+    value: ast.expr,
+    statement_source: str,
 ) -> bool:
-    if line_number in allowed_exception_lines:
+    if _expr_has_platform_literal_compare(value):
         return True
 
-    if "normalized.platform" in stripped_line:
-        return _PLATFORM_TOKEN_RE.search(stripped_line) is None and _PLATFORM_FIELD_RE.search(stripped_line) is None
-    if "error.details" in stripped_line:
-        return _PLATFORM_TOKEN_RE.search(stripped_line) is None and _PLATFORM_FIELD_RE.search(stripped_line) is None
+    if any(_expr_is_platformish(target) for target in targets) and _expr_contains_platform_literal(value):
+        return True
 
+    return _statement_has_semantic_platform_literal(statement_source, value)
+
+
+def _statement_has_semantic_platform_literal(statement_source: str, value: ast.AST) -> bool:
+    normalized_source = statement_source.lower().replace("_", " ")
+    if _SEMANTIC_CONTEXT_RE.search(normalized_source) is None:
+        return False
+    return any(_is_common_platform_literal(literal) for literal in _string_literals(value))
+
+
+def _match_has_platform_literal_branch(node: ast.AST) -> bool:
+    if not _expr_is_platformish(node.subject):
+        return False
+    return any(_pattern_contains_platform_literal(case.pattern) for case in node.cases)
+
+
+def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
+    if _AST_MATCH_VALUE is not None and isinstance(pattern, _AST_MATCH_VALUE):
+        return _expr_contains_string_literal(pattern.value)
+    if _AST_MATCH_SINGLETON is not None and isinstance(pattern, _AST_MATCH_SINGLETON):
+        return False
+    if _AST_MATCH_SEQUENCE is not None and isinstance(pattern, _AST_MATCH_SEQUENCE):
+        return any(_pattern_contains_platform_literal(item) for item in pattern.patterns)
+    if _AST_MATCH_OR is not None and isinstance(pattern, _AST_MATCH_OR):
+        return any(_pattern_contains_platform_literal(item) for item in pattern.patterns)
+    if _AST_MATCH_AS is not None and isinstance(pattern, _AST_MATCH_AS):
+        return pattern.pattern is not None and _pattern_contains_platform_literal(pattern.pattern)
     return False
+
+
+def _expr_has_platform_literal_compare(node: ast.AST) -> bool:
+    if isinstance(node, ast.Compare):
+        current = node.left
+        for operator, comparator in zip(node.ops, node.comparators):
+            if _compare_pair_has_platform_literal(current, comparator, operator):
+                return True
+            current = comparator
+    return any(_expr_has_platform_literal_compare(child) for child in ast.iter_child_nodes(node))
+
+
+def _compare_pair_has_platform_literal(left: ast.AST, right: ast.AST, operator: ast.AST) -> bool:
+    if isinstance(operator, (ast.Eq, ast.NotEq)):
+        return (_expr_is_platformish(left) and _expr_contains_string_literal(right)) or (
+            _expr_is_platformish(right) and _expr_contains_string_literal(left)
+        )
+    if isinstance(operator, (ast.In, ast.NotIn)):
+        return (_expr_is_platformish(left) and _expr_contains_string_literal(right)) or (
+            _expr_is_platformish(right) and _expr_contains_string_literal(left)
+        )
+    return False
+
+
+def _expr_is_platformish(node: ast.AST) -> bool:
+    if isinstance(node, ast.Name):
+        return _PLATFORM_IDENTIFIER_RE.search(node.id) is not None
+    if isinstance(node, ast.Attribute):
+        return _PLATFORM_IDENTIFIER_RE.search(node.attr) is not None or _expr_is_platformish(node.value)
+    if isinstance(node, ast.Subscript):
+        return _subscript_is_platformish(node)
+    if isinstance(node, ast.Call):
+        return _call_is_platformish(node)
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return any(_expr_is_platformish(item) for item in node.elts)
+    return False
+
+
+def _subscript_is_platformish(node: ast.Subscript) -> bool:
+    if _expr_is_platformish(node.value):
+        return True
+    return any(_PLATFORM_IDENTIFIER_RE.search(literal) is not None for literal in _string_literals(node.slice))
+
+
+def _call_is_platformish(node: ast.Call) -> bool:
+    if _expr_is_platformish(node.func):
+        return True
+    if not isinstance(node.func, ast.Attribute) or node.func.attr != "get":
+        return False
+    if not node.args:
+        return False
+    first_arg = node.args[0]
+    return any(_PLATFORM_IDENTIFIER_RE.search(literal) is not None for literal in _string_literals(first_arg))
+
+
+def _expr_contains_string_literal(node: ast.AST) -> bool:
+    return bool(_string_literals(node))
+
+
+def _expr_contains_platform_literal(node: ast.AST) -> bool:
+    return any(_is_common_platform_literal(literal) for literal in _string_literals(node))
+
+
+def _string_literals(node: ast.AST) -> tuple[str, ...]:
+    literals: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Constant) and isinstance(child.value, str) and child.value:
+            literals.append(child.value)
+    return tuple(literals)
+
+
+def _is_common_platform_literal(value: str) -> bool:
+    return value.lower() in _COMMON_PLATFORM_LITERALS
 
 
 def _finding(*, code: str, message: str, boundary: str, evidence_ref: str) -> dict[str, str]:
