@@ -142,7 +142,15 @@ def _scan_shared_boundaries(repo_root: str | Path) -> tuple[list[dict[str, str]]
             continue
 
         boundary_resolver = _build_boundary_resolver(relative_name, source_text)
-        findings.extend(_scan_file(relative_name, source_text, boundary_resolver))
+        allowed_exception_lines = _build_allowed_exception_lines(relative_name, source_text)
+        findings.extend(
+            _scan_file(
+                relative_name,
+                source_text,
+                boundary_resolver,
+                allowed_exception_lines=allowed_exception_lines,
+            )
+        )
 
     return findings, evidence_refs
 
@@ -198,13 +206,43 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
     return resolve
 
 
-def _scan_file(relative_name: str, source_text: str, boundary_resolver: Any) -> list[dict[str, str]]:
+def _build_allowed_exception_lines(relative_name: str, source_text: str) -> frozenset[int]:
+    if relative_name != "syvert/version_gate.py":
+        return frozenset()
+
+    try:
+        module = ast.parse(source_text)
+    except SyntaxError:
+        return frozenset()
+
+    for node in module.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "_FROZEN_REFERENCE_PAIR_BY_VERSION":
+                return frozenset(range(node.lineno, getattr(node, "end_lineno", node.lineno) + 1))
+
+    return frozenset()
+
+
+def _scan_file(
+    relative_name: str,
+    source_text: str,
+    boundary_resolver: Any,
+    *,
+    allowed_exception_lines: frozenset[int],
+) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for line_number, line in enumerate(source_text.splitlines(), start=1):
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if _is_allowed_exception(relative_name, stripped):
+        if _is_allowed_exception(
+            relative_name,
+            stripped,
+            line_number=line_number,
+            allowed_exception_lines=allowed_exception_lines,
+        ):
             continue
 
         boundary = boundary_resolver(line_number)
@@ -248,18 +286,22 @@ def _scan_file(relative_name: str, source_text: str, boundary_resolver: Any) -> 
     return findings
 
 
-def _is_allowed_exception(relative_name: str, stripped_line: str) -> bool:
+def _is_allowed_exception(
+    relative_name: str,
+    stripped_line: str,
+    *,
+    line_number: int,
+    allowed_exception_lines: frozenset[int],
+) -> bool:
+    if line_number in allowed_exception_lines:
+        return True
+
     if "normalized.platform" in stripped_line:
-        return True
+        return _PLATFORM_TOKEN_RE.search(stripped_line) is None and _PLATFORM_FIELD_RE.search(stripped_line) is None
     if "error.details" in stripped_line:
-        return True
-    return (
-        relative_name == "syvert/version_gate.py"
-        and "_FROZEN_REFERENCE_PAIR_BY_VERSION" in stripped_line
-        or relative_name == "syvert/version_gate.py"
-        and '"xhs"' in stripped_line
-        and '"douyin"' in stripped_line
-    )
+        return _PLATFORM_TOKEN_RE.search(stripped_line) is None and _PLATFORM_FIELD_RE.search(stripped_line) is None
+
+    return False
 
 
 def _finding(*, code: str, message: str, boundary: str, evidence_ref: str) -> dict[str, str]:

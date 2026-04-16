@@ -78,6 +78,32 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
         self.assertIn("core_runtime", {item["boundary"] for item in report["details"]["findings"]})
 
+    def test_run_check_does_not_whitelist_normalized_platform_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    if normalized.platform == "xhs":\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_does_not_whitelist_error_details_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    if error.details.get("platform") == "douyin":\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_platform_specific_field_leak(self) -> None:
         report = self.run_with_fixture(
             {
@@ -98,6 +124,20 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/version_gate.py": (
                     "FAIL_VERDICT = \"fail\"\n",
                     'FAIL_VERDICT = "fail"\nDEFAULT_SHARED_RUNTIME = "xhs"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
+
+    def test_run_check_does_not_whitelist_reference_pair_outside_frozen_constant(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    'FAIL_VERDICT = "fail"\n',
+                    'FAIL_VERDICT = "fail"\nSHARED_ROUTING = ("xhs", "douyin")\n',
                 )
             }
         )
