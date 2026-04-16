@@ -986,6 +986,14 @@ def _statement_has_platform_specific_field(
     key_signals: Mapping[str, tuple[frozenset[str], bool]],
     platform_aliases: frozenset[str],
 ) -> bool:
+    if _assignment_contains_disallowed_shared_field(
+        node,
+        shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
+        key_signals=key_signals,
+        platform_aliases=platform_aliases,
+    ):
+        return True
     if _expr_contains_disallowed_shared_field(
         node,
         shared_result_container_aliases=shared_result_container_aliases,
@@ -997,6 +1005,35 @@ def _statement_has_platform_specific_field(
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
         return True
     return any(_string_literal_has_platform_specific_fragment(literal) for literal in _string_literals(node))
+
+
+def _assignment_contains_disallowed_shared_field(
+    node: ast.AST,
+    *,
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
+) -> bool:
+    value, targets = _assignment_value_and_targets(node)
+    if value is None:
+        return False
+    for target in targets:
+        for path in _possible_shared_field_carrier_paths(
+            target,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        ):
+            if _expr_contains_disallowed_shared_field(
+                value,
+                path=path,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ):
+                return True
+    return False
 
 
 def _statement_has_hardcoded_platform_branch(

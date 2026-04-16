@@ -1610,7 +1610,7 @@ def _normalize_string_list(
     code: str,
     message: str,
 ) -> list[str]:
-    if isinstance(raw_values, (str, bytes, Mapping)) or not isinstance(raw_values, Iterable):
+    if isinstance(raw_values, (str, bytes, Mapping)) or not isinstance(raw_values, Sequence):
         failures.append(_failure(source, code, message, details={"field": field_name}))
         return []
     normalized: list[str] = []

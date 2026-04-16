@@ -18,6 +18,7 @@ SCAN_TARGETS = (
     "syvert/registry.py",
     "syvert/version_gate.py",
 )
+EXPECTED_SCAN_REFS = {f"platform_leakage:scan:{target}" for target in SCAN_TARGETS}
 
 
 class PlatformLeakageTests(unittest.TestCase):
@@ -30,7 +31,7 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(payload["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
         self.assertEqual(payload["verdict"], "pass")
         self.assertEqual(payload["findings"], [])
-        self.assertGreaterEqual(len(payload["evidence_refs"]), len(SCAN_TARGETS))
+        self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
 
     def test_run_check_passes_for_current_shared_files(self) -> None:
         report = run_platform_leakage_check(
@@ -43,7 +44,7 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["details"]["report_verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
         self.assertEqual(report["details"]["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
-        self.assertGreaterEqual(len(report["evidence_refs"]), len(SCAN_TARGETS))
+        self.assertEqual(set(report["evidence_refs"]), EXPECTED_SCAN_REFS)
         self.assertTrue(all(ref.startswith("platform_leakage:") for ref in report["evidence_refs"]))
 
     def test_run_check_reports_boundary_and_evidence_trace_for_all_shared_boundaries(self) -> None:
@@ -521,6 +522,19 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    return {"normalized": {"xhs_extra": "1"}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_in_dict_initializer(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    platform_key = f"{platform}_id"\n    normalized = {platform_key: "1"}\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )
