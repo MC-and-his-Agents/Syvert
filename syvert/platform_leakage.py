@@ -391,6 +391,9 @@ def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
             elif isinstance(node, ast.AnnAssign) and node.value is not None:
                 value = node.value
                 targets = [node.target]
+            elif isinstance(node, (ast.For, ast.AsyncFor)):
+                value = node.iter
+                targets = [node.target]
             else:
                 continue
 

@@ -211,6 +211,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_loop_alias_platform_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    for current in [adapter_key]:\n        if current == "xhs":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_expression_statement_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
