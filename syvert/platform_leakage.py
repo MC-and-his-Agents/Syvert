@@ -185,14 +185,14 @@ def _scan_shared_boundaries(repo_root: str | Path) -> tuple[list[dict[str, str]]
             continue
 
         boundary_resolver = _build_boundary_resolver(relative_name, source_text)
-        allowed_exception_lines = _build_allowed_exception_lines(relative_name, source_text)
+        allowed_exception_statements = _build_allowed_exception_statements(relative_name, source_text)
         findings.extend(
             _scan_file(
                 relative_name,
                 source_text,
                 boundary_resolver,
                 default_boundary=default_boundary,
-                allowed_exception_lines=allowed_exception_lines,
+                allowed_exception_statements=allowed_exception_statements,
             )
         )
 
@@ -250,7 +250,7 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
     return resolve
 
 
-def _build_allowed_exception_lines(relative_name: str, source_text: str) -> frozenset[int]:
+def _build_allowed_exception_statements(relative_name: str, source_text: str) -> frozenset[tuple[int, int, int, int]]:
     if relative_name != "syvert/version_gate.py":
         return frozenset()
 
@@ -263,15 +263,15 @@ def _build_allowed_exception_lines(relative_name: str, source_text: str) -> froz
         "_FROZEN_REFERENCE_PAIR_BY_VERSION",
         "_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION",
     }
-    allowed_lines: set[int] = set()
+    allowed_statements: set[tuple[int, int, int, int]] = set()
     for node in module.body:
         if not isinstance(node, ast.Assign):
             continue
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id in allowed_names:
-                allowed_lines.update(range(node.lineno, getattr(node, "end_lineno", node.lineno) + 1))
+                allowed_statements.add(_statement_identity(node))
 
-    return frozenset(allowed_lines)
+    return frozenset(allowed_statements)
 
 
 def _scan_file(
@@ -280,7 +280,7 @@ def _scan_file(
     boundary_resolver: Any,
     *,
     default_boundary: str,
-    allowed_exception_lines: frozenset[int],
+    allowed_exception_statements: frozenset[tuple[int, int, int, int]],
 ) -> list[dict[str, str]]:
     try:
         module = ast.parse(source_text)
@@ -331,8 +331,7 @@ def _scan_file(
                 scope=current_scope,
                 position=(line_number, getattr(node, "col_offset", 0)),
             )
-            statement_lines = _statement_line_numbers(node)
-            if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
+            if _statement_identity(node) in allowed_exception_statements:
                 continue
             boundary = boundary_resolver(line_number)
             evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
@@ -393,8 +392,7 @@ def _scan_file(
             position=(line_number, getattr(node, "col_offset", 0)),
         )
 
-        statement_lines = _statement_line_numbers(node)
-        if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
+        if _statement_identity(node) in allowed_exception_statements:
             continue
 
         boundary = boundary_resolver(line_number)
@@ -475,6 +473,15 @@ def _statement_line_numbers(node: ast.AST) -> range:
     line_number = getattr(node, "lineno", 0)
     end_line_number = getattr(node, "end_lineno", line_number)
     return range(line_number, end_line_number + 1)
+
+
+def _statement_identity(node: ast.AST) -> tuple[int, int, int, int]:
+    return (
+        getattr(node, "lineno", 0),
+        getattr(node, "col_offset", 0),
+        getattr(node, "end_lineno", getattr(node, "lineno", 0)),
+        getattr(node, "end_col_offset", 0),
+    )
 
 
 def _statement_source_segment(source_text: str, node: ast.AST) -> str:

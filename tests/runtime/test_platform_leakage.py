@@ -1137,6 +1137,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
 
+    def test_run_check_does_not_whitelist_semicolon_statement_on_frozen_reference_pair_line(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    "}\n_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}\n",
+                    '}; SHARED_ROUTING = ("xhs", "douyin")\n_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
+
     def test_run_check_fails_closed_on_parse_failure(self) -> None:
         report = self.run_with_fixture(
             {
