@@ -86,7 +86,8 @@
     - URL / selector / signature fragment 命中面已恢复为独立规则，但不再恢复会误伤 `xhs-main` / `xhs_extra` 的宽泛字符串字段扫描
     - `origin/main` 合入 `#119` 后，`version_gate.py` 里的冻结 reference pair 与真实回归 case matrix 现在一起进入 `version_gate_logic` 允许例外；主干自己的 `FR-0007` 冻结矩阵不会再被平台泄漏扫描误报成 `platform_specific_field_leak`
   - 当前已提交的运行时语义锚定在实现 checkpoint `3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
-  - 当前剩余动作只包括：补 metadata-only follow-up 追账，把 PR / issue 当前事实与验证记录绑定到同一 runtime checkpoint，再重发 guardian；若通过，再进入 merge gate
+  - metadata-only follow-up 已完成，当前 PR 最新 head 只承载 exec-plan / PR body / issue body / 验证记录追账，不改 runtime 语义
+  - 当前剩余动作只包括：重发 guardian；若通过，再进入 merge gate
 
 ## 实现要点
 
