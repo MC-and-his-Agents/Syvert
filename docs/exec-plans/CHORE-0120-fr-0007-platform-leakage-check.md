@@ -35,6 +35,8 @@
 
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
+- 当前受审 PR：`#123`
+- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
 - 当前 runtime-affecting 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
 - 当前实现约束：
@@ -48,9 +50,9 @@
   - 已修复 guardian 最新阻断：
     - 平台泄漏扫描不再只看 `if` / `match` / 赋值；`return` / `raise` / 任意表达式语句中的 `adapter_key == "xhs"` 一类比较也会直接命中 `hardcoded_platform_branch`
     - 目标文件 AST parse 失败时，不再退回“只扫平台字段”的低保真路径，而是产出 `scan_parse_failure` finding 并显式 fail-closed
-  - 受审 PR 已创建：`#123`
   - 运行时语义当前锚定在实现 checkpoint `0f3b1b71a0664527804e078198630732890c8c28`
-  - 本 worktree 的剩余动作只包含 exec-plan 追账、验证复跑与推送；guardian / merge 留在后续集成回合执行
+  - 当前 metadata-only follow-up 只回填 exec-plan / PR / issue 的当前事实，不改运行时语义；当前受审 head 由 PR `#123` 正文验证区块与 guardian state 绑定
+  - 本 worktree 的剩余动作只包含当前受审 head 的门禁复跑与元数据同步；guardian / merge 留在后续集成回合执行
 
 ## 实现要点
 
@@ -84,6 +86,8 @@
   - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，覆盖 clean pass、boundary fail-closed、三类 expression-level 平台比较命中、parse failure fail-closed 与排除边界用例。
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，并新增 parse failure 经 `run_platform_leakage_check()` 收口进 orchestrator 的回归。
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，`Ran 149 tests`，`OK`
 
 ## 未决风险
 
@@ -99,3 +103,4 @@
 
 - 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
 - 最近一次重跑目标测试的 head：`0f3b1b71a0664527804e078198630732890c8c28`
+- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准
