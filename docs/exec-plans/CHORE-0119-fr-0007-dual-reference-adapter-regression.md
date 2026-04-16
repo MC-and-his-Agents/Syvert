@@ -46,8 +46,8 @@
 
 ## 下一步动作
 
-- 复跑 `docs_guard` / `commit_check` / `pr_scope_guard`，并把验证记录绑定到当前 metadata-only head。
-- 本轮按用户要求只完成 bugfix、测试与推送，不执行 guardian / merge。
+- 推送当前修复 head，并在后续 guardian 前同步 PR body 对 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint 与当前 metadata-only head 的对应关系。
+- 本轮按用户要求只完成 bugfix、测试、exec-plan 追账与推送，不执行 guardian / merge。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -88,6 +88,12 @@
   - 结果：`Ran 11 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 86 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：当前 metadata-only head 复跑，通过。
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 metadata-only head 复跑，通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 metadata-only head 复跑，`PR scope` 校验通过。
 
 ## 未决风险
 
