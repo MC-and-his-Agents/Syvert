@@ -64,6 +64,16 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("unexpected_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
+    def test_run_check_fails_closed_when_boundary_scope_order_differs(self) -> None:
+        report = run_platform_leakage_check(
+            version="v0.2.0",
+            repo_root=REPO_ROOT,
+            boundary_scope=list(reversed(DEFAULT_BOUNDARY_SCOPE)),
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("boundary_scope_order_mismatch", {item["code"] for item in report["details"]["failures"]})
+
     def test_run_check_detects_hardcoded_platform_branch(self) -> None:
         report = self.run_with_fixture(
             {
@@ -250,6 +260,32 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_carrier_alias_branch_without_inline_literal(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    carrier = normalized\n    if carrier.get("platform") == current_platform:\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_error_details_alias_branch_without_inline_literal(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    details = error.details\n    if details.get("platform") == current_platform:\n        return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_expression_statement_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
@@ -413,12 +449,77 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_specific_shared_result_field_via_neutral_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    bucket = payload["normalized"]\n    bucket["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_raw_field_via_neutral_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    bucket = payload["raw"]\n    bucket["douyin_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_via_update(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized.update({"xhs_extra": "1"})\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_via_setdefault(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    normalized.setdefault("xhs_extra", "1")\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_allows_neutral_single_character_shared_result_field(self) -> None:
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    return {"normalized": {"x": 1}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_allows_neutral_x_prefixed_shared_result_field(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    return {"normalized": {"x_trace": 1}}\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )
@@ -456,6 +557,36 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    adapter_key, capability = extract_request_context(request)\n    match adapter_key:\n        case "douyin-prod":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_match_guard_platform_branch(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    match adapter_key:\n        case current if current == "xhs":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_normalized_mapping_match_branch(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    match normalized:\n        case {"platform": "xhs"}:\n            return None\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )

@@ -691,6 +691,15 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("unexpected_boundary_scope", {item["code"] for item in report["details"]["failures"]})
 
+    def test_platform_leakage_rejects_boundary_scope_order_mismatch(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = list(reversed(payload["boundary_scope"]))
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("boundary_scope_order_mismatch", {item["code"] for item in report["details"]["failures"]})
+
     def test_platform_leakage_rejects_missing_findings_field(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload.pop("findings")

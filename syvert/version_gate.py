@@ -59,16 +59,15 @@ _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
 _FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}
-_REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
-    {
-        "core_runtime",
-        "shared_input_model",
-        "shared_error_model",
-        "adapter_registry",
-        "shared_result_contract",
-        "version_gate_logic",
-    }
+_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE = (
+    "core_runtime",
+    "shared_input_model",
+    "shared_error_model",
+    "adapter_registry",
+    "shared_result_contract",
+    "version_gate_logic",
 )
+_REQUIRED_LEAKAGE_BOUNDARIES = frozenset(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE)
 
 
 def build_harness_source_report(
@@ -499,6 +498,18 @@ def validate_platform_leakage_source_report(
                 "unexpected_boundary_scope",
                 "platform leakage report must not carry boundaries outside the fixed leakage contract",
                 details={"unexpected_boundaries": unexpected_boundaries},
+            )
+        )
+    if not missing_boundaries and not unexpected_boundaries and boundaries != list(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE):
+        failures.append(
+            _failure(
+                source,
+                "boundary_scope_order_mismatch",
+                "platform leakage report boundary_scope must match the frozen boundary order",
+                details={
+                    "expected_boundary_scope": list(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE),
+                    "actual_boundary_scope": boundaries,
+                },
             )
         )
 

@@ -94,6 +94,8 @@ _AST_MATCH_SINGLETON = getattr(ast, "MatchSingleton", None)
 _AST_MATCH_SEQUENCE = getattr(ast, "MatchSequence", None)
 _AST_MATCH_OR = getattr(ast, "MatchOr", None)
 _AST_MATCH_AS = getattr(ast, "MatchAs", None)
+_AST_MATCH_MAPPING = getattr(ast, "MatchMapping", None)
+_AST_MATCH_STAR = getattr(ast, "MatchStar", None)
 
 
 def build_platform_leakage_payload(
@@ -292,6 +294,8 @@ def _scan_file(
 
     findings: list[dict[str, str]] = []
     platform_aliases = _collect_platform_aliases(module)
+    shared_result_container_aliases = _collect_shared_result_container_aliases(module)
+    error_details_aliases = _collect_error_details_aliases(module)
     for node in ast.walk(module):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             line_number = getattr(node, "lineno", None)
@@ -333,7 +337,11 @@ def _scan_file(
         statement_source = _statement_source_segment(source_text, node)
         if _is_docstring_statement(node):
             continue
-        if _statement_has_platform_specific_field(statement_source, node):
+        if _statement_has_platform_specific_field(
+            statement_source,
+            node,
+            shared_result_container_aliases=shared_result_container_aliases,
+        ):
             findings.append(
                 _finding(
                     code="platform_specific_field_leak",
@@ -344,7 +352,12 @@ def _scan_file(
             )
             continue
 
-        if _statement_has_hardcoded_platform_branch(node, platform_aliases=platform_aliases):
+        if _statement_has_hardcoded_platform_branch(
+            node,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        ):
             findings.append(
                 _finding(
                     code="hardcoded_platform_branch",
@@ -412,6 +425,64 @@ def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
     return frozenset(aliases)
 
 
+def _collect_shared_result_container_aliases(module: ast.AST) -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(module):
+            value = None
+            targets: Sequence[ast.expr] = ()
+            if isinstance(node, ast.Assign):
+                value = node.value
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                value = node.value
+                targets = [node.target]
+            else:
+                continue
+
+            container_name = _root_shared_result_container_name(
+                value,
+                shared_result_container_aliases=aliases,
+            )
+            if container_name is None:
+                continue
+            for target in targets:
+                for name in _assignment_target_names(target):
+                    if aliases.get(name) != container_name:
+                        aliases[name] = container_name
+                        changed = True
+    return aliases
+
+
+def _collect_error_details_aliases(module: ast.AST) -> frozenset[str]:
+    aliases: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(module):
+            value = None
+            targets: Sequence[ast.expr] = ()
+            if isinstance(node, ast.Assign):
+                value = node.value
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                value = node.value
+                targets = [node.target]
+            else:
+                continue
+
+            if not _is_error_details_container(value, error_details_aliases=frozenset(aliases)):
+                continue
+            for target in targets:
+                for name in _assignment_target_names(target):
+                    if name not in aliases:
+                        aliases.add(name)
+                        changed = True
+    return frozenset(aliases)
+
+
 def _assignment_target_names(target: ast.expr) -> tuple[str, ...]:
     if isinstance(target, ast.Name):
         return (target.id,)
@@ -423,8 +494,16 @@ def _assignment_target_names(target: ast.expr) -> tuple[str, ...]:
     return ()
 
 
-def _statement_has_platform_specific_field(statement_source: str, node: ast.AST) -> bool:
-    if _expr_contains_shared_result_platform_field(node):
+def _statement_has_platform_specific_field(
+    statement_source: str,
+    node: ast.AST,
+    *,
+    shared_result_container_aliases: Mapping[str, str],
+) -> bool:
+    if _expr_contains_shared_result_platform_field(
+        node,
+        shared_result_container_aliases=shared_result_container_aliases,
+    ):
         return True
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
         return True
@@ -435,12 +514,29 @@ def _statement_has_hardcoded_platform_branch(
     node: ast.stmt,
     *,
     platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
 ) -> bool:
     if isinstance(node, ast.If):
-        return _expr_has_platform_literal_compare(node.test, platform_aliases=platform_aliases)
+        return _expr_has_platform_literal_compare(
+            node.test,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        )
     if _AST_MATCH is not None and isinstance(node, _AST_MATCH):
-        return _match_has_platform_literal_branch(node, platform_aliases=platform_aliases)
-    return _expr_has_platform_literal_compare(node, platform_aliases=platform_aliases)
+        return _match_has_platform_literal_branch(
+            node,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        )
+    return _expr_has_platform_literal_compare(
+        node,
+        platform_aliases=platform_aliases,
+        shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
+    )
 
 
 def _statement_has_single_platform_semantic(
@@ -545,10 +641,49 @@ def _statement_has_semantic_platform_literal(statement_source: str, value: ast.A
     return _expr_contains_unapproved_platform_literal(value)
 
 
-def _match_has_platform_literal_branch(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
-    if not _expr_is_platformish(node.subject, platform_aliases=platform_aliases):
-        return False
-    return any(_pattern_contains_platform_literal(case.pattern) for case in node.cases)
+def _match_has_platform_literal_branch(
+    node: ast.AST,
+    *,
+    platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
+) -> bool:
+    subject_is_platformish = _expr_is_platformish(node.subject, platform_aliases=platform_aliases)
+    subject_is_explicit_carrier = _expr_is_explicit_platform_carrier(
+        node.subject,
+        platform_aliases=platform_aliases,
+        shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
+    )
+    subject_is_platform_container = _is_normalized_container(
+        node.subject,
+        shared_result_container_aliases=shared_result_container_aliases,
+    ) or _is_error_details_container(
+        node.subject,
+        error_details_aliases=error_details_aliases,
+    )
+
+    for case in node.cases:
+        case_platform_aliases = set(platform_aliases)
+        if subject_is_platformish or subject_is_explicit_carrier:
+            case_platform_aliases.update(_pattern_capture_names(case.pattern))
+        if subject_is_platform_container:
+            case_platform_aliases.update(_pattern_platform_capture_names(case.pattern))
+
+        if subject_is_platformish and _pattern_contains_platform_literal(case.pattern):
+            return True
+        if subject_is_platform_container and _pattern_contains_platform_mapping_literal(case.pattern):
+            return True
+        if case.guard is None:
+            continue
+        if _expr_has_platform_literal_compare(
+            case.guard,
+            platform_aliases=frozenset(case_platform_aliases),
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        ):
+            return True
+    return False
 
 
 def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
@@ -562,10 +697,66 @@ def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
         return any(_pattern_contains_platform_literal(item) for item in pattern.patterns)
     if _AST_MATCH_AS is not None and isinstance(pattern, _AST_MATCH_AS):
         return pattern.pattern is not None and _pattern_contains_platform_literal(pattern.pattern)
+    if _AST_MATCH_MAPPING is not None and isinstance(pattern, _AST_MATCH_MAPPING):
+        return any(_pattern_contains_platform_literal(item) for item in pattern.patterns)
     return False
 
 
-def _expr_has_platform_literal_compare(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+def _pattern_capture_names(pattern: ast.AST) -> frozenset[str]:
+    names: set[str] = set()
+    for child in ast.walk(pattern):
+        if _AST_MATCH_AS is not None and isinstance(child, _AST_MATCH_AS) and child.name:
+            names.add(child.name)
+        if _AST_MATCH_STAR is not None and isinstance(child, _AST_MATCH_STAR) and child.name:
+            names.add(child.name)
+    return frozenset(names)
+
+
+def _pattern_platform_capture_names(pattern: ast.AST) -> frozenset[str]:
+    if _AST_MATCH_MAPPING is not None and isinstance(pattern, _AST_MATCH_MAPPING):
+        names: set[str] = set()
+        for key, value_pattern in zip(pattern.keys, pattern.patterns):
+            if any(literal == "platform" for literal in _string_literals(key)):
+                names.update(_pattern_capture_names(value_pattern))
+            names.update(_pattern_platform_capture_names(value_pattern))
+        return frozenset(names)
+    if _AST_MATCH_SEQUENCE is not None and isinstance(pattern, _AST_MATCH_SEQUENCE):
+        return frozenset().union(*(_pattern_platform_capture_names(item) for item in pattern.patterns))
+    if _AST_MATCH_OR is not None and isinstance(pattern, _AST_MATCH_OR):
+        return frozenset().union(*(_pattern_platform_capture_names(item) for item in pattern.patterns))
+    if _AST_MATCH_AS is not None and isinstance(pattern, _AST_MATCH_AS) and pattern.pattern is not None:
+        return _pattern_platform_capture_names(pattern.pattern)
+    return frozenset()
+
+
+def _pattern_contains_platform_mapping_literal(pattern: ast.AST) -> bool:
+    if _AST_MATCH_MAPPING is not None and isinstance(pattern, _AST_MATCH_MAPPING):
+        for key, value_pattern in zip(pattern.keys, pattern.patterns):
+            if any(literal == "platform" for literal in _string_literals(key)) and _pattern_contains_platform_literal(
+                value_pattern
+            ):
+                return True
+            if _pattern_contains_platform_mapping_literal(value_pattern):
+                return True
+        return False
+    if _AST_MATCH_SEQUENCE is not None and isinstance(pattern, _AST_MATCH_SEQUENCE):
+        return any(_pattern_contains_platform_mapping_literal(item) for item in pattern.patterns)
+    if _AST_MATCH_OR is not None and isinstance(pattern, _AST_MATCH_OR):
+        return any(_pattern_contains_platform_mapping_literal(item) for item in pattern.patterns)
+    if _AST_MATCH_AS is not None and isinstance(pattern, _AST_MATCH_AS) and pattern.pattern is not None:
+        return _pattern_contains_platform_mapping_literal(pattern.pattern)
+    return False
+
+
+def _expr_has_platform_literal_compare(
+    node: ast.AST,
+    *,
+    platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str] | None = None,
+    error_details_aliases: frozenset[str] | None = None,
+) -> bool:
+    shared_result_container_aliases = shared_result_container_aliases or {}
+    error_details_aliases = error_details_aliases or frozenset()
     if isinstance(node, ast.Call) and _call_has_platform_branch_signal(node, platform_aliases=platform_aliases):
         return True
     if isinstance(node, ast.Compare):
@@ -576,11 +767,18 @@ def _expr_has_platform_literal_compare(node: ast.AST, *, platform_aliases: froze
                 comparator,
                 operator,
                 platform_aliases=platform_aliases,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
             ):
                 return True
             current = comparator
     return any(
-        _expr_has_platform_literal_compare(child, platform_aliases=platform_aliases)
+        _expr_has_platform_literal_compare(
+            child,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        )
         for child in ast.iter_child_nodes(node)
         if not (isinstance(node, ast.stmt) and isinstance(child, ast.stmt))
     )
@@ -592,13 +790,25 @@ def _compare_pair_has_platform_literal(
     operator: ast.AST,
     *,
     platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
 ) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
         if (
-            _expr_is_explicit_platform_carrier(left, platform_aliases=platform_aliases)
+            _expr_is_explicit_platform_carrier(
+                left,
+                platform_aliases=platform_aliases,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+            )
             and _expr_is_platformish(right, platform_aliases=platform_aliases)
         ) or (
-            _expr_is_explicit_platform_carrier(right, platform_aliases=platform_aliases)
+            _expr_is_explicit_platform_carrier(
+                right,
+                platform_aliases=platform_aliases,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+            )
             and _expr_is_platformish(left, platform_aliases=platform_aliases)
         ):
             return True
@@ -656,28 +866,56 @@ def _call_has_platform_branch_signal(node: ast.Call, *, platform_aliases: frozen
     return any(_expr_contains_platform_branch_literal(argument) for argument in node.args)
 
 
-def _expr_is_explicit_platform_carrier(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+def _expr_is_explicit_platform_carrier(
+    node: ast.AST,
+    *,
+    platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str] | None = None,
+    error_details_aliases: frozenset[str] | None = None,
+) -> bool:
+    shared_result_container_aliases = shared_result_container_aliases or {}
+    error_details_aliases = error_details_aliases or frozenset()
     if isinstance(node, ast.Attribute):
-        return node.attr == "platform" and _is_normalized_container(node.value, platform_aliases=platform_aliases)
+        return node.attr == "platform" and _is_normalized_container(
+            node.value,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
     if isinstance(node, ast.Subscript):
         return any(literal == "platform" for literal in _string_literals(node.slice)) and (
-            _is_normalized_container(node.value, platform_aliases=platform_aliases)
-            or _is_error_details_container(node.value)
+            _is_normalized_container(
+                node.value,
+                shared_result_container_aliases=shared_result_container_aliases,
+            )
+            or _is_error_details_container(
+                node.value,
+                error_details_aliases=error_details_aliases,
+            )
         )
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Attribute) or node.func.attr != "get" or not node.args:
             return False
         if not any(literal == "platform" for literal in _string_literals(node.args[0])):
             return False
-        return _is_normalized_container(node.func.value, platform_aliases=platform_aliases) or _is_error_details_container(
-            node.func.value
+        return _is_normalized_container(
+            node.func.value,
+            shared_result_container_aliases=shared_result_container_aliases,
+        ) or _is_error_details_container(
+            node.func.value,
+            error_details_aliases=error_details_aliases,
         )
     return False
 
 
-def _is_normalized_container(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+def _is_normalized_container(
+    node: ast.AST,
+    *,
+    shared_result_container_aliases: Mapping[str, str] | None = None,
+) -> bool:
+    shared_result_container_aliases = shared_result_container_aliases or {}
     if isinstance(node, ast.Name):
-        return node.id == "normalized"
+        if node.id == "normalized":
+            return True
+        return shared_result_container_aliases.get(node.id) == "normalized"
     if isinstance(node, ast.Subscript):
         return any(literal == "normalized" for literal in _string_literals(node.slice))
     if isinstance(node, ast.Attribute):
@@ -685,7 +923,14 @@ def _is_normalized_container(node: ast.AST, *, platform_aliases: frozenset[str])
     return False
 
 
-def _is_error_details_container(node: ast.AST) -> bool:
+def _is_error_details_container(
+    node: ast.AST,
+    *,
+    error_details_aliases: frozenset[str] | None = None,
+) -> bool:
+    error_details_aliases = error_details_aliases or frozenset()
+    if isinstance(node, ast.Name):
+        return node.id in error_details_aliases
     if isinstance(node, ast.Attribute):
         return node.attr == "details" and isinstance(node.value, ast.Name) and node.value.id == "error"
     if isinstance(node, ast.Subscript):
@@ -729,27 +974,113 @@ def _dict_contains_unapproved_platform_literal(node: ast.Dict, *, path: tuple[st
     return False
 
 
-def _expr_contains_shared_result_platform_field(node: ast.AST, *, path: tuple[str, ...] = ()) -> bool:
+def _expr_contains_shared_result_platform_field(
+    node: ast.AST,
+    *,
+    path: tuple[str, ...] = (),
+    shared_result_container_aliases: Mapping[str, str] | None = None,
+) -> bool:
+    shared_result_container_aliases = shared_result_container_aliases or {}
     if isinstance(node, ast.Dict):
-        return _dict_contains_shared_result_platform_field(node, path=path)
+        return _dict_contains_shared_result_platform_field(
+            node,
+            path=path,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
+    if isinstance(node, ast.Call):
+        return _call_contains_shared_result_platform_field(
+            node,
+            path=path,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
     if isinstance(node, ast.Subscript):
-        return _subscript_contains_shared_result_platform_field(node, path=path)
-    return any(_expr_contains_shared_result_platform_field(child, path=path) for child in ast.iter_child_nodes(node))
+        return _subscript_contains_shared_result_platform_field(
+            node,
+            path=path,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
+    return any(
+        _expr_contains_shared_result_platform_field(
+            child,
+            path=path,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
+        for child in ast.iter_child_nodes(node)
+    )
 
 
-def _dict_contains_shared_result_platform_field(node: ast.Dict, *, path: tuple[str, ...]) -> bool:
+def _dict_contains_shared_result_platform_field(
+    node: ast.Dict,
+    *,
+    path: tuple[str, ...],
+    shared_result_container_aliases: Mapping[str, str],
+) -> bool:
     for key, value in zip(node.keys, node.values):
         key_name = _single_string_literal(key)
         next_path = path + ((key_name,) if key_name is not None else ())
         if key_name is not None and _is_disallowed_shared_result_field_path(next_path):
             return True
-        if _expr_contains_shared_result_platform_field(value, path=next_path):
+        if _expr_contains_shared_result_platform_field(
+            value,
+            path=next_path,
+            shared_result_container_aliases=shared_result_container_aliases,
+        ):
             return True
     return False
 
 
-def _subscript_contains_shared_result_platform_field(node: ast.Subscript, *, path: tuple[str, ...]) -> bool:
-    container_name = _root_shared_result_container_name(node.value)
+def _call_contains_shared_result_platform_field(
+    node: ast.Call,
+    *,
+    path: tuple[str, ...],
+    shared_result_container_aliases: Mapping[str, str],
+) -> bool:
+    if not isinstance(node.func, ast.Attribute):
+        return False
+    container_name = _root_shared_result_container_name(
+        node.func.value,
+        shared_result_container_aliases=shared_result_container_aliases,
+    )
+    if container_name is None:
+        return False
+    if node.func.attr == "setdefault":
+        if not node.args:
+            return False
+        return any(
+            _is_disallowed_shared_result_field_path((container_name, literal))
+            for literal in _string_literals(node.args[0])
+        )
+    if node.func.attr != "update":
+        return False
+    for argument in node.args:
+        if _expr_contains_shared_result_platform_field(
+            argument,
+            path=(container_name,),
+            shared_result_container_aliases=shared_result_container_aliases,
+        ):
+            return True
+    for keyword in node.keywords:
+        if keyword.arg is not None and _is_disallowed_shared_result_field_path((container_name, keyword.arg)):
+            return True
+        if keyword.arg is None and _expr_contains_shared_result_platform_field(
+            keyword.value,
+            path=(container_name,),
+            shared_result_container_aliases=shared_result_container_aliases,
+        ):
+            return True
+    return False
+
+
+def _subscript_contains_shared_result_platform_field(
+    node: ast.Subscript,
+    *,
+    path: tuple[str, ...],
+    shared_result_container_aliases: Mapping[str, str],
+) -> bool:
+    container_name = _root_shared_result_container_name(
+        node.value,
+        shared_result_container_aliases=shared_result_container_aliases,
+    )
     if container_name is None:
         return False
     for literal in _string_literals(node.slice):
@@ -758,10 +1089,18 @@ def _subscript_contains_shared_result_platform_field(node: ast.Subscript, *, pat
     return False
 
 
-def _root_shared_result_container_name(node: ast.AST) -> str | None:
+def _root_shared_result_container_name(
+    node: ast.AST,
+    *,
+    shared_result_container_aliases: Mapping[str, str] | None = None,
+) -> str | None:
+    shared_result_container_aliases = shared_result_container_aliases or {}
     if isinstance(node, ast.Name):
         if node.id in {"normalized", "raw"}:
             return node.id
+        aliased_container = shared_result_container_aliases.get(node.id)
+        if aliased_container is not None:
+            return aliased_container
         match = _SHARED_RESULT_CONTAINER_RE.search(node.id)
         if match is not None:
             return match.group(1)
@@ -790,7 +1129,7 @@ def _is_disallowed_shared_result_field_path(path: tuple[str, ...]) -> bool:
     if _COMMON_PLATFORM_NAME_RE.search(field_name) is not None or _string_literal_has_platform_specific_fragment(field_name):
         return True
     return any(
-        field_name == literal or field_name.startswith(f"{literal}_") or field_name.startswith(f"{literal}-")
+        literal != "x" and (field_name == literal or field_name.startswith(f"{literal}_") or field_name.startswith(f"{literal}-"))
         for literal in _COMMON_PLATFORM_LITERALS
     )
 
