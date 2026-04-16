@@ -257,14 +257,14 @@ def build_reference_adapter_binding_failure_report(
     version: str,
     error: ReferenceAdapterBindingError,
 ) -> dict[str, Any]:
-    evidence_refs = [build_reference_adapter_binding_evidence_ref(error)]
+    binding_evidence_ref = build_reference_adapter_binding_evidence_ref(error)
     report = validate_real_adapter_regression_source_report(
         {
             "version": version,
             "reference_pair": list(_REFERENCE_PAIR),
             "operation": _SEMANTIC_OPERATION,
             "target_type": _TARGET_TYPE,
-            "evidence_refs": evidence_refs,
+            "evidence_refs": [binding_evidence_ref],
             "adapter_results": [],
         },
         version=version,
@@ -276,7 +276,6 @@ def build_reference_adapter_binding_failure_report(
     failures.extend(report["details"]["failures"])
     report["verdict"] = "fail"
     report["summary"] = f"real adapter regression failed for version `{version or 'unknown'}`"
-    report["evidence_refs"] = evidence_refs
     report["details"] = {
         **report["details"],
         "failures": failures,
@@ -320,6 +319,12 @@ def _references_default_page_state_transport(value: Any, *, _seen: set[int] | No
             _references_default_page_state_transport(item, _seen=_seen)
             for item in (*value.args, *(value.keywords or {}).values())
         )
+
+    instance_dict = getattr(value, "__dict__", None)
+    if isinstance(instance_dict, Mapping):
+        for item in instance_dict.values():
+            if _references_default_page_state_transport(item, _seen=_seen):
+                return True
 
     wrapped = getattr(value, "__wrapped__", None)
     if wrapped is not None and _references_default_page_state_transport(wrapped, _seen=_seen):

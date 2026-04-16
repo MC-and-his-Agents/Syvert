@@ -93,6 +93,15 @@ def build_douyin_aweme_detail(
     }
 
 
+def canonical_regression_evidence_refs() -> list[str]:
+    return [
+        "regression:xhs:success",
+        "regression:xhs:invalid-input",
+        "regression:douyin:success",
+        "regression:douyin:platform",
+    ]
+
+
 class RealAdapterRegressionTests(unittest.TestCase):
     def test_build_real_adapter_regression_payload_emits_frozen_matrix(self) -> None:
         payload = build_real_adapter_regression_payload(
@@ -153,10 +162,7 @@ class RealAdapterRegressionTests(unittest.TestCase):
 
         self.assertEqual(report["source"], "real_adapter_regression")
         self.assertEqual(report["verdict"], "fail")
-        self.assertEqual(
-            report["evidence_refs"],
-            ["real_adapter_regression:binding:xhs:invalid_reference_adapter_identity"],
-        )
+        self.assertEqual(report["evidence_refs"], canonical_regression_evidence_refs())
         self.assertIn(
             "invalid_reference_adapter_identity",
             {item["code"] for item in report["details"]["failures"]},
@@ -170,10 +176,7 @@ class RealAdapterRegressionTests(unittest.TestCase):
             )
 
         self.assertEqual(report["verdict"], "fail")
-        self.assertEqual(
-            report["evidence_refs"],
-            ["real_adapter_regression:binding:xhs:unexpected_reference_adapter_surface"],
-        )
+        self.assertEqual(report["evidence_refs"], canonical_regression_evidence_refs())
         self.assertIn(
             "unexpected_reference_adapter_surface",
             {item["code"] for item in report["details"]["failures"]},
@@ -205,6 +208,7 @@ class RealAdapterRegressionTests(unittest.TestCase):
             "non_hermetic_reference_adapter_binding",
             {item["code"] for item in report["details"]["failures"]},
         )
+        self.assertEqual(report["evidence_refs"], canonical_regression_evidence_refs())
 
     def test_run_real_adapter_regression_fails_closed_when_douyin_binding_wraps_default_page_state_recovery(self) -> None:
         adapters = self.hermetic_adapters()
@@ -233,6 +237,43 @@ class RealAdapterRegressionTests(unittest.TestCase):
             "non_hermetic_reference_adapter_binding",
             {item["code"] for item in report["details"]["failures"]},
         )
+        self.assertEqual(report["evidence_refs"], canonical_regression_evidence_refs())
+
+    def test_run_real_adapter_regression_fails_closed_when_douyin_binding_callable_wraps_default_page_state_recovery(self) -> None:
+        class Wrapper:
+            def __init__(self, transport: object) -> None:
+                self.transport = transport
+
+            def __call__(self, **kwargs: object) -> object:
+                return self.transport(**kwargs)
+
+        adapters = self.hermetic_adapters()
+        adapters["douyin"] = DouyinAdapter(
+            session_provider=lambda path: DouyinSessionConfig(
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+                verify_fp="verify-1",
+                ms_token="ms-token-1",
+                webid="webid-1",
+                sign_base_url="http://127.0.0.1:8000",
+                timeout_seconds=5,
+            ),
+            sign_transport=lambda base_url, payload, timeout_seconds: {"a_bogus": "signed-1"},
+            detail_transport=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("detail-failed")),
+            page_state_transport=Wrapper(default_page_state_transport),
+        )
+
+        report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=adapters,
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "non_hermetic_reference_adapter_binding",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+        self.assertEqual(report["evidence_refs"], canonical_regression_evidence_refs())
 
     def test_run_real_adapter_regression_fails_closed_when_douyin_binding_alias_wraps_default_page_state_recovery(self) -> None:
         alias = default_page_state_transport
