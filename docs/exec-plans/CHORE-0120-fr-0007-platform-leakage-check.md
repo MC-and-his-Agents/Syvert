@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+- 当前受审 runtime head：`591e0f03486e7638f2227d914b66a34f0e7440c8`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+- 当前 runtime-affecting 实现 checkpoint：`591e0f03486e7638f2227d914b66a34f0e7440c8`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -83,9 +83,10 @@
     - `platform_alias`、`normalized/raw` carrier 与 `error.details` carrier 现在统一按同作用域 may-alias 历史回放；`IfExp`、walrus 赋值与后续跨语句复用都会被纳入同一份 alias 解析，而跨函数污染与直线重绑定继续保持 pass
     - 共享 carrier 不再把不确定性洗成单一路径；`bucket` 若可能同时指向 `normalized` 与 `raw`，平台字段写入会按 fail-closed 处理，`raw.platform` 也不会再被 `normalized.platform` 的允许边界冲掉
     - 间接 key 现在按结构化 key-signal 解析而不是整句字符串兜底；`platform_key = "platform"`、`key = f"{current_platform}_extra"` 只有在真实共享 carrier / `error.details` 上被消费时才会命中 fail-closed，同时不会再把无关 `raw_value["xhs_extra"]` 或跨作用域局部变量误报成平台泄漏
+    - 动态字符串构造的 fail-closed 范围已扩到 `%` 格式化与 `.format(...)`；`"%s_extra" % current_platform` 与 `"{}_extra".format(current_platform)` 进入 `normalized` / `error.details` 时也不会再绕过共享字段泄漏检测
     - URL / selector / signature fragment 命中面已恢复为独立规则，但不再恢复会误伤 `xhs-main` / `xhs_extra` 的宽泛字符串字段扫描
     - `origin/main` 合入 `#119` 后，`version_gate.py` 里的冻结 reference pair 与真实回归 case matrix 现在一起进入 `version_gate_logic` 允许例外；主干自己的 `FR-0007` 冻结矩阵不会再被平台泄漏扫描误报成 `platform_specific_field_leak`
-  - 当前已提交的运行时语义锚定在实现 checkpoint `3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `591e0f03486e7638f2227d914b66a34f0e7440c8`
   - metadata-only follow-up 已完成，当前 PR 最新 head 只承载 exec-plan / PR body / issue body / 验证记录追账，不改 runtime 语义
   - 当前剩余动作只包括：重发 guardian；若通过，再进入 merge gate
 
@@ -122,6 +123,8 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `591e0f03486e7638f2227d914b66a34f0e7440c8` 上通过，`Ran 225 tests`，`OK (skipped=6)`；已覆盖 `%` 格式化与 `.format(...)` 动态 key 的 guardian blocker 修复
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `3dff2b2ea514e3b3d153d1bb243cc9616098df2c` 上通过，`Ran 223 tests`，`OK (skipped=6)`；已包含 `origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5` 的 `#119` 主干真相
 - `python3 -m py_compile syvert/platform_leakage.py tests/runtime/test_platform_leakage.py`
@@ -185,7 +188,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
-- 最近一次重跑目标测试的 head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
-- 当前受审 runtime head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `3dff2b2ea514e3b3d153d1bb243cc9616098df2c`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`591e0f03486e7638f2227d914b66a34f0e7440c8`
+- 最近一次重跑目标测试的 head：`591e0f03486e7638f2227d914b66a34f0e7440c8`
+- 当前受审 runtime head：`591e0f03486e7638f2227d914b66a34f0e7440c8`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `591e0f03486e7638f2227d914b66a34f0e7440c8`，不得把 follow-up 误记为新的运行时真相
