@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`43f4eeb1b1b974d3251cfaba0b92997b98956303`
+- 当前受审 runtime head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`43f4eeb1b1b974d3251cfaba0b92997b98956303`
+- 当前 runtime-affecting 实现 checkpoint：`23b9dbc096178c0234d04d065fb6cafe58962c46`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -99,7 +99,8 @@
     - `dict(...)` / `dict(**...)` 这类调用形态现在也会继续递归 key/value，`normalized = dict(xhs_user_id="1")` 与 `normalized = dict(**{"xhs_user_id": "1"})` 不会再绕过共享字段泄漏检测
     - 平台泄漏 source report 现在强制 `finding.evidence_ref` 必须回填到顶层 `evidence_refs`，证据追溯闭环不再只靠约定
     - checker 入口现在只会把真正的有序 `Sequence` 归一为 `list`；`set(DEFAULT_BOUNDARY_SCOPE)` 这类无序输入不会再被预处理洗成 `boundary_scope_order_mismatch`
-  - 当前已提交的运行时语义锚定在实现 checkpoint `43f4eeb1b1b974d3251cfaba0b92997b98956303`
+    - `Sequence` 约束现在局部下沉到 `boundary_scope` 校验路径，不再通过公共 string-list helper 连带收紧 `required_sample_ids`、`reference_pair` 与 `evidence_refs`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `23b9dbc096178c0234d04d065fb6cafe58962c46`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -137,7 +138,7 @@
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：在 checkpoint `43f4eeb1b1b974d3251cfaba0b92997b98956303` 上通过，`Ran 244 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归、tuple/list 解包载体传播修复、shared result 动态 key 初始化与 `dict(...)` 调用路径收口、`boundary_scope` 有序 sequence 校验、`finding.evidence_ref -> evidence_refs` 闭环校验，以及 checker 入口对 set-shaped boundary_scope 的 fail-closed 收口，并保持平台变体 `match` 分支归类优先级修复继续通过
+  - 结果：在 checkpoint `23b9dbc096178c0234d04d065fb6cafe58962c46` 上通过，`Ran 244 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归、tuple/list 解包载体传播修复、shared result 动态 key 初始化与 `dict(...)` 调用路径收口、`boundary_scope` 有序 sequence 校验、`finding.evidence_ref -> evidence_refs` 闭环校验、checker 入口对 set-shaped boundary_scope 的 fail-closed 收口，以及 Sequence 约束局部下沉后的兼容性回归保护，并保持平台变体 `match` 分支归类优先级修复继续通过
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3` 上通过，`Ran 230 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的平台名片段共享语义与平台变体分支 blocker
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -207,7 +208,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`43f4eeb1b1b974d3251cfaba0b92997b98956303`
-- 最近一次重跑目标测试的 head：`43f4eeb1b1b974d3251cfaba0b92997b98956303`
-- 当前受审 runtime head：`43f4eeb1b1b974d3251cfaba0b92997b98956303`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `43f4eeb1b1b974d3251cfaba0b92997b98956303`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`23b9dbc096178c0234d04d065fb6cafe58962c46`
+- 最近一次重跑目标测试的 head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
+- 当前受审 runtime head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `23b9dbc096178c0234d04d065fb6cafe58962c46`，不得把 follow-up 误记为新的运行时真相
