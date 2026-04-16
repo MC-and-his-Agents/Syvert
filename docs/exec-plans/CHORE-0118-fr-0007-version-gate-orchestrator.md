@@ -1,0 +1,460 @@
+# CHORE-0118-fr-0007-version-gate-orchestrator 执行计划
+
+## 关联信息
+
+- item_key：`CHORE-0118-fr-0007-version-gate-orchestrator`
+- Issue：`#118`
+- item_type：`CHORE`
+- release：`v0.2.0`
+- sprint：`2026-S15`
+- 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
+- 关联 decision：
+- 关联 PR：`#122`
+- 状态：`active`
+- active 收口事项：`CHORE-0118-fr-0007-version-gate-orchestrator`
+
+## 目标
+
+- 在 `FR-0007` 范围内落地版本 gate orchestration 与统一结果模型。
+- 让版本级 gate 能统一消费 harness、双参考适配器真实回归、平台泄漏检查三类输入，并对缺失输入、结果不完整或结论不可信保持 fail-closed。
+- 为后续 closeout / release gate 提供可直接消费且可追溯的统一 verdict / summary。
+
+## 范围
+
+- 本次纳入：
+  - `syvert/version_gate.py`
+  - `tests/runtime/test_version_gate.py`
+  - `docs/exec-plans/artifacts/CHORE-0118-version-gate-result-model.md`
+  - 当前 active `exec-plan`
+- 本次不纳入：
+  - 双参考适配器真实回归执行器本体
+  - 平台泄漏检查器本体
+  - `FR-0004` / `FR-0005` / `FR-0006` formal spec 或 contract 重定义
+  - `v0.3.0+` 能力扩展
+  - `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md` 的旧叙事清理
+
+## 当前停点
+
+- 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-118-fr-0007-gate`
+- 当前执行分支：`issue-118-fr-0007-gate`
+- `FR-0007` formal spec 已作为当前 Work Item 的 formal input 入库，`open_pr` 对 `CHORE` implementation 项要求 active exec-plan 显式绑定 formal spec。
+- 仓内尚无版本级 gate / release gate 现成实现；`FR-0006` 当前已提供可复用的 harness validation 输出，但仍停留在样例级 verdict 层。
+- 当前代码已新增 `syvert.version_gate` 与 `tests/runtime/test_version_gate.py`，并通过相关 runtime 测试。
+- 当前受审 PR：`#122`
+- GitHub 侧当前已对齐：
+  - `#118` 正文已更新为 `进行中（PR #122）`
+  - 父 FR `#67` 正文已补齐 `#118/#119/#120/#121` 四个子 Work Item
+- guardian 首轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项 contract 修复：
+  - `v0.2.0` reference pair 固定为 `xhs` / `douyin`
+  - orchestrator 对 source report 做 source-specific 复验，不再信任伪造 pass wrapper
+  - harness verdict 与 runtime 观测的一致性改为强校验
+- guardian 第二轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项 contract 修复：
+  - frozen reference pair 改为按集合而非顺序匹配
+  - `reference_pair` / `evidence_refs` / `boundary_scope` / `required_sample_ids` 等字符串序列字段改为拒绝 mapping-shaped malformed payload
+- guardian 第三轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
+  - 未知版本在缺少 formal-spec 冻结 reference pair 时改为 fail-closed
+- guardian 第四轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
+  - real regression 在 orchestrator 二次校验时改为强制绑定 `content_detail_by_url` 最小矩阵，不再回显 source report 自报 `operation`
+- guardian 第五轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 contract 修复：
+  - 公开 `validate_real_adapter_regression_source_report()` 入口本身也改为强制绑定 `content_detail_by_url` 最小矩阵
+- guardian 第六轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项收口：
+  - orchestrator 不再把已有失败 source report 洗回 `pass`
+  - `validate_platform_leakage_source_report()` 对空版本标识改为 fail-closed
+  - 新增 implementation-side result model artifact，为统一 version gate / source report 结果模型提供可审查 contract artifact
+- guardian 第七轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐四项收口：
+  - source report envelope 已标记 `fail` 时，不再因空 failure payload 被洗回 `pass`
+  - 嵌套 failure 的 `source` 归因改为强制绑定外层 source report
+  - synthetic fail-closed source report 改为维持非空 `evidence_refs` 与 source-specific `details` 形状
+  - real regression 缺少 formal-spec 冻结 operation 的版本改为 fail-closed
+- guardian 第八轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项收口：
+  - 三个公开 source builder / validator 在 fail-closed 时统一补齐确定性 `evidence_refs`
+  - malformed source report 经 validator 再进入 orchestrator 时，原始 failure code 不再被 `missing_source_evidence_refs` 覆盖
+- guardian 第九轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项收口：
+  - failing platform leakage report 在 validator -> orchestrator 往返路径上保持 finding 形状稳定，不再被二次污染
+  - 已失败 source report 经 orchestrator 复验后，相同 failure 不再重复累计
+- 当前进入系统性收口阶段：
+  - 不再按单条 guardian finding 追补，而是按统一结果模型不变量补齐元测试
+  - active exec-plan 的 checkpoint 绑定改为“最近一次 runtime-affecting code head”，metadata-only head 通过 PR live head 与验证记录追溯，不再把 metadata commit 自身伪装成新的代码 checkpoint
+- guardian 第十轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项根因收口：
+  - enum / status / verdict 一类字段的公开入口校验已统一改为“先验形、再验值”，覆盖 builder / validator / orchestrator 的 source report verdict 消费面；对非字符串或不可哈希输入一律 fail-closed，不再由 membership check 直接抛 `TypeError`
+  - `_failure()` 已改为在构造点统一做 JSON-safe `details` 归一化，保证 fail-closed source report / version verdict 仍可被 closeout 和 release gate 直接序列化消费
+- guardian 第十一轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项根因收口：
+  - harness `observed_error.details` 已与 failure details 使用同一条 JSON-safe 归一化路径，accepted harness report 与顶层 version gate pass/fail verdict 都可稳定序列化
+  - guardian 点名缺失的 `source/source-version mismatch`、platform leakage `pass-with-findings`、`missing-boundary-scope` 等直接行为证据已补齐到 runtime 测试面
+- guardian 第十二轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项入口完整性收口：
+  - source report ingress 对空 `summary` 改为直接 fail-closed，不再把上游不完整 envelope 重建为 clean pass
+  - harness source report ingress 对缺失 `observed_sample_ids` 改为直接 fail-closed，避免编排入口替不完整上游结果补形
+- guardian 第十三轮审查已返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项 contract 收口：
+  - harness ingress 对 `observed_sample_ids` 改为执行真实校验，既拒绝 malformed 形状，也拒绝与 `validation_results` 不一致的内容，不再 fail-open
+  - real-adapter regression 的允许面已从单一字面 `content_detail_by_url` 收口为 formal-spec 允许的语义面：共享 operation，或 `FR-0004` 批准的 `content_detail + target_type=url` 投影
+  - active exec-plan 已把 implementation-side result model artifact 显式纳入范围与回滚面，避免 PR 范围、contract artifact 与回滚面脱节
+- merge-if-safe 前置 guardian 复查再次返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 ingress contract 收口：
+  - `real_adapter_regression` source report ingress 现在要求 `target_type` 与 `semantic_operation` 齐备并与重建结果一致，不再把缺字段 envelope 隐式补形为可信 `pass`
+- merge-if-safe 再次复查又返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项 harness 追溯性收口：
+  - harness ingress 对 `evidence_refs` 现在要求与 builder 的确定性输出一致；对已失败且携带原始 failure code 的 report 则保留其 failure-specific evidence，不再被重建结果覆盖
+- 最新一轮 guardian 复查又返回 `REQUEST_CHANGES`；当前已按审查结论补齐两项结果模型一致性收口：
+  - `platform_leakage` validator 对缺失 `findings` 改为直接 fail-closed，不再在 `verdict=pass` 时被静默洗成通过
+  - 已失败 harness source report 经 orchestrator 复验后继续保留原始 failure-specific `evidence_refs`，避免 evidence ref 与 failure code 的追溯链漂移
+- 最新 guardian 复查继续返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项版本级基线收口：
+  - harness required sample set 已从 source report 自报值提升为 version gate 自己冻结/显式传入的基线，`v0.2.0` 下若上游截断 required set，将直接 fail-closed
+- 最新 guardian 复查继续返回 `REQUEST_CHANGES`；当前已按审查结论补齐三项入口契约收口：
+  - `required_harness_sample_ids` 缺失时改为直接 fail-closed，而不是隐式猜测版本基线
+  - `required_harness_sample_ids` 的公开类型与实现对齐为通用 `Sequence/Iterable`，`tuple/list` 等价输入不再被误拒
+  - `platform_leakage` 在出现失败时强制输出失败语义摘要，不再保留“checks are clean”这类通过语义
+- guardian 最新一轮针对 `88422ed` 的复查再次返回 `REQUEST_CHANGES`；当前已按审查结论补齐一项公开消费路径证据：
+  - 新增 `run_contract_harness_automation()` 真实输出经 `build_harness_source_report()` 后再进入公开 `orchestrate_version_gate()` 的端到端回归测试，并显式传入 `required_harness_sample_ids`，不再只覆盖 builder 层或依赖测试 wrapper 自动补齐 baseline
+- guardian 随后的复查继续暴露两项根因缺口；当前已按审查结论补齐两项收口：
+  - `validate_real_adapter_regression_source_report()` 现在会显式比对 caller 请求的 `operation/target_type` 与 payload 自带 surface；即便两者共享同一 semantic operation，只要 public surface 形状不一致就 fail-closed
+  - `tests/runtime/test_version_gate.py` 中的测试入口不再从 `harness_report.details.required_sample_ids` 偷偷回填 baseline；固定 fixture 路径改为显式固定测试基线，特殊样本集场景则单独显式传入 `required_harness_sample_ids`
+
+## 下一步动作
+
+- 等待当前 PR head 的 GitHub checks 复绿。
+- 发起 guardian 复审，确认最新代码头与当前 PR body 绑定的 `APPROVE + safe_to_merge=true`。
+- 若 guardian 通过，则执行 `merge-if-safe --confirm-integration-recheck` 完成受控合并。
+
+## 实现补充结果模型工件
+
+- 工件路径：`docs/exec-plans/artifacts/CHORE-0118-version-gate-result-model.md`
+- 语义边界：
+  - 该工件只冻结 `#118` 已落地实现的稳定消费面，用于 closeout、release gate 与后续 `FR-0007` 子事项复用。
+  - 该工件不改写 `docs/specs/FR-0007-release-gate-and-regression-checks/spec.md` 或 `plan.md` 的 formal requirement。
+
+## 当前 checkpoint 推进的 release 目标
+
+- 为 `v0.2.0` 提供可复用的版本 gate 编排层，使 `FR-0007` 的三类固定 gate 可以在不改写 formal spec 的前提下统一收口。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`FR-0007` implementation A 项，负责 orchestration 与统一 verdict model。
+- 阻塞：
+  - 不能越界实现真实回归执行器本体或平台泄漏检查器本体。
+  - 必须保持 `open_pr` 所需的 formal spec 绑定与 active exec-plan 一致。
+
+## 已验证项
+
+- 已阅读：`AGENTS.md`
+- 已阅读：`WORKFLOW.md`
+- 已阅读：`docs/AGENTS.md`
+- 已阅读：`docs/process/delivery-funnel.md`
+- 已阅读：`docs/specs/FR-0007-release-gate-and-regression-checks/`
+- 已核对：`scripts/open_pr.py` 对 `CHORE` implementation 项会校验 active exec-plan 的 formal spec 绑定
+- 已创建 worktree：`python3 scripts/create_worktree.py --issue 118 --class implementation`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：通过
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：`Ran 19 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：guardian 修复后复跑，`Ran 25 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第二轮 guardian 修复后复跑，`Ran 30 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第三轮 guardian 修复后复跑，`Ran 32 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第四轮 guardian 修复后复跑，`Ran 33 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第五轮 guardian 修复后复跑，`Ran 34 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第六轮 guardian 修复后复跑，`Ran 37 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：`Ran 66 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/spec_guard.py --all`
+  - 结果：通过
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 首轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 拒绝非 `xhs` / `douyin` 的完整 reference pair
+    - orchestrator 不再接受缺 source-specific 关键字段的伪造 pass report
+    - harness `pass` / `legal_failure` / `execution_precondition_not_met` 与 runtime 观测的一致性改为 fail-closed
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第二轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - frozen reference pair 改为顺序无关
+    - 所有经 `_normalize_string_list()` 进入的字符串序列字段都拒绝 mapping-shaped malformed payload
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第三轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 未知版本在缺少 formal-spec 冻结 reference pair 时改为 fail-closed
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第四轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - real regression 在 orchestrator 二次校验时不再接受 forged `operation`
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第五轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 公开 `validate_real_adapter_regression_source_report()` 入口不再接受未冻结 `operation`
+- `python3 scripts/pr_guardian.py review 122`
+  - 结果：guardian 第六轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - orchestrator 不再把已有失败 source report 洗回 `pass`
+    - platform leakage 空版本标识改为 fail-closed
+    - 统一 version gate 结果模型已补齐可审查 contract artifact
+- `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --dry-run`
+  - 结果：已生成 PR carrier 草稿；待当前 head commit 后再结合 `pr_scope_guard` 重跑
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：`通过`
+- `python3 scripts/open_pr.py --class implementation --issue 118 --item-key CHORE-0118-fr-0007-version-gate-orchestrator --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'feat(runtime): 落地 FR-0007 版本 gate 编排' --closing fixes --integration-touchpoint check_required --shared-contract-changed yes --integration-ref MC-and-his-Agents/Syvert#67 --external-dependency none --merge-gate integration_check_required --contract-surface raw_normalized --joint-acceptance-needed no --integration-status-checked-before-pr yes`
+  - 结果：已创建 PR `#122`
+- `gh pr edit 122 --body ...`
+  - 结果：PR 描述已补齐目标、主要改动、风险、验证与 integration carrier
+- `gh issue edit 118 --body ...`
+  - 结果：`#118` 当前状态已更新为 `进行中（PR #122）`
+- `gh issue edit 67 --body ...`
+  - 结果：父 FR `#67` 已补齐 `#118/#119/#120/#121` 子 Work Item 列表
+- `git push origin issue-118-fr-0007-gate`
+  - 结果：已推送 `1955673 fix(runtime): 收紧版本 gate 收口语义`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：当前 head 复跑，`Ran 37 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：当前 head 复跑，`Ran 66 tests`，`OK`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head 复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head 首次复跑因 `docs/specs/**` 中新增 implementation-side artifact 失败；已调整 artifact 承载位置，待复跑
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：artifact 收口到 `docs/exec-plans/**` 后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第七轮 guardian 修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第七轮 guardian 修复后复跑，`Ran 42 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第七轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第八轮 guardian 修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第八轮 guardian 修复后复跑，`Ran 45 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第八轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第九轮 guardian 修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第九轮 guardian 修复后复跑，`Ran 47 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第九轮 guardian 修复后复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：系统性收口阶段复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：系统性收口阶段复跑，`Ran 51 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：系统性收口阶段复跑，`Ran 66 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：不可信输入收口修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：不可信输入收口修复后复跑，`Ran 119 tests`，`OK`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第十轮 guardian 根因修复后复跑，`Ran 59 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第十轮 guardian 根因修复后复跑，`Ran 125 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：第十轮 guardian 根因修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第十一轮 guardian 根因修复后复跑，`Ran 65 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第十一轮 guardian 根因修复后复跑，`Ran 131 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：第十一轮 guardian 根因修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第十二轮 guardian 根因修复后复跑，`Ran 67 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第十二轮 guardian 根因修复后复跑，`Ran 133 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：第十二轮 guardian 根因修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：第十三轮 guardian 根因修复后复跑，`Ran 71 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：第十三轮 guardian 根因修复后复跑，`Ran 137 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：第十三轮 guardian 根因修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`Ran 72 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`Ran 138 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：merge-if-safe 前置 guardian 修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：merge-if-safe 再次复查修复后复跑，`Ran 73 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：merge-if-safe 再次复查修复后复跑，`Ran 139 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：merge-if-safe 再次复查修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：最新一轮 guardian 复查修复后复跑，`Ran 75 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：最新一轮 guardian 复查修复后复跑，`Ran 141 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：最新一轮 guardian 复查修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：版本级 harness 基线修复后复跑，`Ran 76 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：版本级 harness 基线修复后复跑，`Ran 142 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：版本级 harness 基线修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：入口契约修复后复跑，`Ran 77 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：入口契约修复后复跑，`Ran 143 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：入口契约修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：真实 harness 编排证据修复后复跑，`Ran 82 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：真实 harness 编排证据修复后复跑，`Ran 148 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：真实 harness 编排证据修复后复跑，`通过`
+- `python3 -m py_compile syvert/version_gate.py tests/runtime/test_version_gate.py`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`Ran 84 tests`，`OK`
+- `python3 -m unittest tests.runtime.test_version_gate tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`Ran 150 tests`，`OK`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD --head-ref issue-118-fr-0007-gate`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：回归 surface 与测试入口契约修复后复跑，`通过`
+
+## 未决风险
+
+- 若 harness 输入 contract 只校验“存在 `reason` 字段”，会把 malformed payload 误判为可信输入。
+- 若统一 report 不冻结 evidence refs 生成规则，后续 closeout / release gate 将无法稳定追溯。
+- 若把 source-level 失败来源压平成单一结论，会削弱 `FR-0007` 要求的三类来源区分能力。
+
+## 回滚方式
+
+- 如需回滚，使用独立 revert PR 撤销本事项对 `syvert/version_gate.py`、`tests/runtime/test_version_gate.py`、`docs/exec-plans/artifacts/CHORE-0118-version-gate-result-model.md` 与当前 active exec-plan 的增量修改。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `9117a8ecefbb0259f22b81970e2ec6d338dfb07c`
+- 说明：该 checkpoint 绑定当前最新的 runtime-affecting 代码/测试语义提交；后续若仅追加 exec-plan / artifact 同步类 metadata commit，则通过 PR live head 与本节验证记录追溯，不再把 metadata-only head 伪装成新的代码 checkpoint。
