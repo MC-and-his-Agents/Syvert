@@ -97,6 +97,7 @@ _AST_MATCH_OR = getattr(ast, "MatchOr", None)
 _AST_MATCH_AS = getattr(ast, "MatchAs", None)
 _AST_MATCH_MAPPING = getattr(ast, "MatchMapping", None)
 _AST_MATCH_STAR = getattr(ast, "MatchStar", None)
+_EMPTY_KEY_SIGNAL: tuple[frozenset[str], bool] = (frozenset(), False)
 
 
 def build_platform_leakage_payload(
@@ -294,8 +295,9 @@ def _scan_file(
         ]
 
     findings: list[dict[str, str]] = []
-    platform_aliases = _collect_platform_aliases(module)
     parent_index = _build_parent_index(module)
+    platform_alias_histories = _build_platform_alias_histories(module, parent_index)
+    key_signal_histories = _build_key_signal_histories(module, parent_index, platform_alias_histories)
     shared_result_container_histories = _build_shared_result_container_histories(module, parent_index)
     error_details_histories = _build_error_details_histories(module, parent_index)
     for node in ast.walk(module):
@@ -304,6 +306,16 @@ def _scan_file(
             if line_number is None:
                 continue
             current_scope = _enclosing_scope(node, parent_index)
+            platform_aliases = _materialize_platform_aliases(
+                platform_alias_histories,
+                scope=current_scope,
+                position=(line_number, getattr(node, "col_offset", 0)),
+            )
+            key_signals = _materialize_key_signals(
+                key_signal_histories,
+                scope=current_scope,
+                position=(line_number, getattr(node, "col_offset", 0)),
+            )
             shared_result_container_aliases = _materialize_shared_result_container_aliases(
                 shared_result_container_histories,
                 scope=current_scope,
@@ -355,6 +367,16 @@ def _scan_file(
         if line_number is None:
             continue
         current_scope = _enclosing_scope(node, parent_index)
+        platform_aliases = _materialize_platform_aliases(
+            platform_alias_histories,
+            scope=current_scope,
+            position=(line_number, getattr(node, "col_offset", 0)),
+        )
+        key_signals = _materialize_key_signals(
+            key_signal_histories,
+            scope=current_scope,
+            position=(line_number, getattr(node, "col_offset", 0)),
+        )
         shared_result_container_aliases = _materialize_shared_result_container_aliases(
             shared_result_container_histories,
             scope=current_scope,
@@ -394,6 +416,9 @@ def _scan_file(
             statement_source,
             node,
             shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         ):
             findings.append(
                 _finding(
@@ -410,6 +435,7 @@ def _scan_file(
             platform_aliases=platform_aliases,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
         ):
             findings.append(
                 _finding(
@@ -469,21 +495,141 @@ def _enclosing_scope(node: ast.AST, parent_index: Mapping[ast.AST, ast.AST]) -> 
         current = parent
 
 
+def _is_branch_local_assignment(node: ast.AST, parent_index: Mapping[ast.AST, ast.AST], scope: ast.AST) -> bool:
+    current = node
+    branch_types: tuple[type[ast.AST], ...] = tuple(
+        branch_type
+        for branch_type in (ast.If, ast.For, ast.AsyncFor, ast.While, _AST_MATCH, ast.Try)
+        if branch_type is not None
+    )
+    while True:
+        parent = parent_index.get(current)
+        if parent is None or parent is scope:
+            return False
+        if isinstance(parent, branch_types):
+            return True
+        current = parent
+
+
 def _assignment_value_and_targets(node: ast.AST) -> tuple[ast.AST | None, Sequence[ast.expr]]:
     if isinstance(node, ast.Assign):
         return node.value, node.targets
     if isinstance(node, ast.AnnAssign) and node.value is not None:
         return node.value, [node.target]
+    if isinstance(node, ast.NamedExpr):
+        return node.value, [node.target]
+    if isinstance(node, (ast.For, ast.AsyncFor)):
+        return node.iter, [node.target]
     return None, ()
+
+
+def _build_platform_alias_histories(
+    module: ast.AST,
+    parent_index: Mapping[ast.AST, ast.AST],
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool, bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool, bool]]]] = {}
+    assignment_nodes = sorted(
+        (
+            node
+            for node in ast.walk(module)
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr, ast.For, ast.AsyncFor))
+        ),
+        key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
+    )
+    for node in assignment_nodes:
+        value, targets = _assignment_value_and_targets(node)
+        if value is None:
+            continue
+        scope = _enclosing_scope(node, parent_index)
+        platform_aliases = _materialize_platform_aliases(
+            histories,
+            scope=scope,
+            position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
+        )
+        is_platform_alias = _expr_is_platformish(value, platform_aliases=platform_aliases)
+        scope_history = histories.setdefault(scope, {})
+        branch_local = isinstance(node, (ast.For, ast.AsyncFor)) or _is_branch_local_assignment(node, parent_index, scope)
+        for target in targets:
+            for name in _assignment_target_names(target):
+                scope_history.setdefault(name, []).append(
+                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), is_platform_alias, branch_local)
+                )
+    return histories
+
+
+def _materialize_platform_aliases(
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], bool, bool]]]],
+    *,
+    scope: ast.AST,
+    position: tuple[int, int],
+) -> frozenset[str]:
+    aliases: set[str] = set()
+    for name, events in histories.get(scope, {}).items():
+        if _resolve_boolean_alias(events, position):
+            aliases.add(name)
+    return frozenset(aliases)
+
+
+def _build_key_signal_histories(
+    module: ast.AST,
+    parent_index: Mapping[ast.AST, ast.AST],
+    platform_alias_histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], bool, bool]]]],
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], tuple[frozenset[str], bool], bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], tuple[frozenset[str], bool], bool]]]] = {}
+    assignment_nodes = sorted(
+        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))),
+        key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
+    )
+    for node in assignment_nodes:
+        value, targets = _assignment_value_and_targets(node)
+        if value is None:
+            continue
+        scope = _enclosing_scope(node, parent_index)
+        position = (getattr(node, "lineno", 0), getattr(node, "col_offset", 0))
+        platform_aliases = _materialize_platform_aliases(
+            platform_alias_histories,
+            scope=scope,
+            position=position,
+        )
+        key_signals = _materialize_key_signals(
+            histories,
+            scope=scope,
+            position=position,
+        )
+        signal = _key_signal_for_expr(
+            value,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
+        )
+        scope_history = histories.setdefault(scope, {})
+        branch_local = _is_branch_local_assignment(node, parent_index, scope)
+        for target in targets:
+            for name in _assignment_target_names(target):
+                scope_history.setdefault(name, []).append((position, signal, branch_local))
+    return histories
+
+
+def _materialize_key_signals(
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], tuple[frozenset[str], bool], bool]]]],
+    *,
+    scope: ast.AST,
+    position: tuple[int, int],
+) -> dict[str, tuple[frozenset[str], bool]]:
+    signals: dict[str, tuple[frozenset[str], bool]] = {}
+    for name, events in histories.get(scope, {}).items():
+        resolved = _resolve_key_signal(events, position)
+        if resolved != _EMPTY_KEY_SIGNAL:
+            signals[name] = resolved
+    return signals
 
 
 def _build_shared_result_container_histories(
     module: ast.AST,
     parent_index: Mapping[ast.AST, ast.AST],
-) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], str | None]]]]:
-    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], str | None]]]] = {}
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], frozenset[str], bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], frozenset[str], bool]]]] = {}
     assignment_nodes = sorted(
-        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
+        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))),
         key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
     )
     for node in assignment_nodes:
@@ -496,15 +642,16 @@ def _build_shared_result_container_histories(
             scope=scope,
             position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
-        container_name = _root_shared_result_container_name(
+        container_names = _root_shared_result_container_names(
             value,
             shared_result_container_aliases=container_aliases,
         )
         scope_history = histories.setdefault(scope, {})
+        branch_local = _is_branch_local_assignment(node, parent_index, scope)
         for target in targets:
             for name in _assignment_target_names(target):
                 scope_history.setdefault(name, []).append(
-                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), container_name)
+                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), container_names, branch_local)
                 )
     return histories
 
@@ -512,10 +659,10 @@ def _build_shared_result_container_histories(
 def _build_error_details_histories(
     module: ast.AST,
     parent_index: Mapping[ast.AST, ast.AST],
-) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool]]]]:
-    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool]]]] = {}
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], frozenset[str], bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], frozenset[str], bool]]]] = {}
     assignment_nodes = sorted(
-        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
+        (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))),
         key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
     )
     for node in assignment_nodes:
@@ -528,53 +675,110 @@ def _build_error_details_histories(
             scope=scope,
             position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
-        is_error_details_alias = _is_error_details_container(
+        error_details_paths = _possible_error_details_paths(
             value,
             error_details_aliases=error_details_aliases,
         )
         scope_history = histories.setdefault(scope, {})
+        branch_local = _is_branch_local_assignment(node, parent_index, scope)
         for target in targets:
             for name in _assignment_target_names(target):
                 scope_history.setdefault(name, []).append(
-                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), is_error_details_alias)
+                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), error_details_paths, branch_local)
                 )
     return histories
 
 
 def _materialize_shared_result_container_aliases(
-    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], str | None]]]],
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], frozenset[str], bool]]]],
     *,
     scope: ast.AST,
     position: tuple[int, int],
-) -> dict[str, str]:
-    alias_map: dict[str, str] = {}
+) -> dict[str, frozenset[str]]:
+    alias_map: dict[str, frozenset[str]] = {}
     for name, events in histories.get(scope, {}).items():
-        resolved = _resolve_alias_event(events, position)
-        if isinstance(resolved, str):
+        resolved = _resolve_container_aliases(events, position)
+        if resolved:
             alias_map[name] = resolved
     return alias_map
 
 
 def _materialize_error_details_aliases(
-    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], bool]]]],
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], frozenset[str], bool]]]],
     *,
     scope: ast.AST,
     position: tuple[int, int],
-) -> frozenset[str]:
-    aliases: set[str] = set()
+) -> dict[str, frozenset[str]]:
+    aliases: dict[str, frozenset[str]] = {}
     for name, events in histories.get(scope, {}).items():
-        if _resolve_alias_event(events, position) is True:
-            aliases.add(name)
-    return frozenset(aliases)
+        resolved = _resolve_path_aliases(events, position)
+        if resolved:
+            aliases[name] = resolved
+    return aliases
 
 
-def _resolve_alias_event(events: Sequence[tuple[tuple[int, int], Any]], position: tuple[int, int]) -> Any:
-    resolved = None
-    for event_position, value in events:
+def _resolve_container_aliases(
+    events: Sequence[tuple[tuple[int, int], frozenset[str], bool]],
+    position: tuple[int, int],
+) -> frozenset[str]:
+    active_values: set[str] = set()
+    for event_position, value, branch_local in events:
         if event_position >= position:
             break
-        resolved = value
-    return resolved
+        if branch_local:
+            active_values.update(value)
+            continue
+        active_values = set(value)
+    return frozenset(active_values)
+
+
+def _resolve_boolean_alias(
+    events: Sequence[tuple[tuple[int, int], bool, bool]],
+    position: tuple[int, int],
+) -> bool:
+    active_values: set[bool] = set()
+    for event_position, value, branch_local in events:
+        if event_position >= position:
+            break
+        if branch_local:
+            active_values.add(value)
+            continue
+        active_values = {value}
+    return True in active_values
+
+
+def _resolve_path_aliases(
+    events: Sequence[tuple[tuple[int, int], frozenset[str], bool]],
+    position: tuple[int, int],
+) -> frozenset[str]:
+    active_values: set[str] = set()
+    for event_position, value, branch_local in events:
+        if event_position >= position:
+            break
+        if branch_local:
+            active_values.update(value)
+            continue
+        active_values = set(value)
+    return frozenset(active_values)
+
+
+def _resolve_key_signal(
+    events: Sequence[tuple[tuple[int, int], tuple[frozenset[str], bool], bool]],
+    position: tuple[int, int],
+) -> tuple[frozenset[str], bool]:
+    active_literals: frozenset[str] = frozenset()
+    active_dynamic = False
+    for event_position, value, branch_local in events:
+        if event_position >= position:
+            break
+        literals, dynamic = value
+        if branch_local:
+            active_literals = active_literals.union(literals)
+            active_dynamic = active_dynamic or dynamic
+            continue
+        active_literals = literals
+        active_dynamic = dynamic
+    return (active_literals, active_dynamic)
 
 
 def _collect_platform_aliases(module: ast.AST) -> frozenset[str]:
@@ -622,11 +826,17 @@ def _statement_has_platform_specific_field(
     statement_source: str,
     node: ast.AST,
     *,
-    shared_result_container_aliases: Mapping[str, str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
 ) -> bool:
-    if _expr_contains_shared_result_platform_field(
+    if _expr_contains_disallowed_shared_field(
         node,
         shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
+        key_signals=key_signals,
+        platform_aliases=platform_aliases,
     ):
         return True
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
@@ -638,8 +848,9 @@ def _statement_has_hardcoded_platform_branch(
     node: ast.stmt,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
 ) -> bool:
     if isinstance(node, ast.If):
         return _expr_has_platform_literal_compare(
@@ -647,6 +858,7 @@ def _statement_has_hardcoded_platform_branch(
             platform_aliases=platform_aliases,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
         )
     if _AST_MATCH is not None and isinstance(node, _AST_MATCH):
         return _match_has_platform_literal_branch(
@@ -654,12 +866,14 @@ def _statement_has_hardcoded_platform_branch(
             platform_aliases=platform_aliases,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
         )
     return _expr_has_platform_literal_compare(
         node,
         platform_aliases=platform_aliases,
         shared_result_container_aliases=shared_result_container_aliases,
         error_details_aliases=error_details_aliases,
+        key_signals=key_signals,
     )
 
 
@@ -668,8 +882,8 @@ def _statement_has_single_platform_semantic(
     statement_source: str,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
 ) -> bool:
     if isinstance(node, ast.Assign):
         return _assignment_has_single_platform_semantic(
@@ -721,8 +935,8 @@ def _assignment_has_single_platform_semantic(
     statement_source: str,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
 ) -> bool:
     if _expr_has_platform_literal_compare(value, platform_aliases=platform_aliases):
         return True
@@ -782,8 +996,8 @@ def _definition_has_platform_metadata(
     node: ast.AST,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
 ) -> bool:
     metadata_nodes: list[ast.AST] = list(getattr(node, "decorator_list", ()))
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -805,6 +1019,7 @@ def _definition_has_platform_metadata(
             platform_aliases=platform_aliases,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals={},
         )
         or _expr_contains_unapproved_platform_literal(metadata_node)
         or _expr_contains_platform_marker(metadata_node)
@@ -815,13 +1030,14 @@ def _definition_has_platform_metadata(
 def _target_is_approved_platform_carrier(
     target: ast.expr,
     *,
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
 ) -> bool:
     if isinstance(target, ast.Attribute):
         return target.attr == "platform" and _is_normalized_container(
             target.value,
             shared_result_container_aliases=shared_result_container_aliases,
+            require_definite=True,
         )
     if not isinstance(target, ast.Subscript):
         return False
@@ -830,9 +1046,11 @@ def _target_is_approved_platform_carrier(
     return _is_normalized_container(
         target.value,
         shared_result_container_aliases=shared_result_container_aliases,
+        require_definite=True,
     ) or _is_error_details_container(
         target.value,
         error_details_aliases=error_details_aliases,
+        require_definite=True,
     )
 
 
@@ -847,8 +1065,9 @@ def _match_has_platform_literal_branch(
     node: ast.AST,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
 ) -> bool:
     subject_is_platformish = _expr_is_platformish(node.subject, platform_aliases=platform_aliases)
     subject_is_explicit_carrier = _expr_is_explicit_platform_carrier(
@@ -856,6 +1075,7 @@ def _match_has_platform_literal_branch(
         platform_aliases=platform_aliases,
         shared_result_container_aliases=shared_result_container_aliases,
         error_details_aliases=error_details_aliases,
+        key_signals=key_signals,
     )
     subject_is_platform_container = _is_normalized_container(
         node.subject,
@@ -883,6 +1103,7 @@ def _match_has_platform_literal_branch(
             platform_aliases=frozenset(case_platform_aliases),
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
         ):
             return True
     return False
@@ -954,11 +1175,13 @@ def _expr_has_platform_literal_compare(
     node: ast.AST,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str] | None = None,
-    error_details_aliases: frozenset[str] | None = None,
+    shared_result_container_aliases: Mapping[str, frozenset[str]] | None = None,
+    error_details_aliases: Mapping[str, frozenset[str]] | None = None,
+    key_signals: Mapping[str, tuple[frozenset[str], bool]] | None = None,
 ) -> bool:
     shared_result_container_aliases = shared_result_container_aliases or {}
-    error_details_aliases = error_details_aliases or frozenset()
+    error_details_aliases = error_details_aliases or {}
+    key_signals = key_signals or {}
     if isinstance(node, ast.Call) and _call_has_platform_branch_signal(node, platform_aliases=platform_aliases):
         return True
     if isinstance(node, ast.Compare):
@@ -971,6 +1194,7 @@ def _expr_has_platform_literal_compare(
                 platform_aliases=platform_aliases,
                 shared_result_container_aliases=shared_result_container_aliases,
                 error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
             ):
                 return True
             current = comparator
@@ -980,6 +1204,7 @@ def _expr_has_platform_literal_compare(
             platform_aliases=platform_aliases,
             shared_result_container_aliases=shared_result_container_aliases,
             error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
         )
         for child in ast.iter_child_nodes(node)
         if not (isinstance(node, ast.stmt) and isinstance(child, ast.stmt))
@@ -992,8 +1217,9 @@ def _compare_pair_has_platform_literal(
     operator: ast.AST,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str],
-    error_details_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
 ) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
         if (
@@ -1002,6 +1228,7 @@ def _compare_pair_has_platform_literal(
                 platform_aliases=platform_aliases,
                 shared_result_container_aliases=shared_result_container_aliases,
                 error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
             )
             and _expr_is_platformish(right, platform_aliases=platform_aliases)
         ) or (
@@ -1010,6 +1237,7 @@ def _compare_pair_has_platform_literal(
                 platform_aliases=platform_aliases,
                 shared_result_container_aliases=shared_result_container_aliases,
                 error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
             )
             and _expr_is_platformish(left, platform_aliases=platform_aliases)
         ):
@@ -1025,6 +1253,13 @@ def _compare_pair_has_platform_literal(
 
 
 def _expr_is_platformish(node: ast.AST, *, platform_aliases: frozenset[str]) -> bool:
+    if isinstance(node, ast.NamedExpr):
+        return _expr_is_platformish(node.value, platform_aliases=platform_aliases)
+    if isinstance(node, ast.IfExp):
+        return _expr_is_platformish(node.body, platform_aliases=platform_aliases) or _expr_is_platformish(
+            node.orelse,
+            platform_aliases=platform_aliases,
+        )
     if isinstance(node, ast.Name):
         return node.id in platform_aliases or _identifier_matches(node.id, _PLATFORM_IDENTIFIER_RE)
     if isinstance(node, ast.Attribute):
@@ -1072,18 +1307,26 @@ def _expr_is_explicit_platform_carrier(
     node: ast.AST,
     *,
     platform_aliases: frozenset[str],
-    shared_result_container_aliases: Mapping[str, str] | None = None,
-    error_details_aliases: frozenset[str] | None = None,
+    shared_result_container_aliases: Mapping[str, frozenset[str]] | None = None,
+    error_details_aliases: Mapping[str, frozenset[str]] | None = None,
+    key_signals: Mapping[str, tuple[frozenset[str], bool]] | None = None,
 ) -> bool:
     shared_result_container_aliases = shared_result_container_aliases or {}
-    error_details_aliases = error_details_aliases or frozenset()
+    error_details_aliases = error_details_aliases or {}
+    key_signals = key_signals or {}
     if isinstance(node, ast.Attribute):
         return node.attr == "platform" and _is_normalized_container(
             node.value,
             shared_result_container_aliases=shared_result_container_aliases,
         )
     if isinstance(node, ast.Subscript):
-        return any(literal == "platform" for literal in _string_literals(node.slice)) and (
+        return _key_signal_matches_platform(
+            _key_signal_for_expr(
+                node.slice,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            )
+        ) and (
             _is_normalized_container(
                 node.value,
                 shared_result_container_aliases=shared_result_container_aliases,
@@ -1096,7 +1339,13 @@ def _expr_is_explicit_platform_carrier(
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Attribute) or node.func.attr != "get" or not node.args:
             return False
-        if not any(literal == "platform" for literal in _string_literals(node.args[0])):
+        if not _key_signal_matches_platform(
+            _key_signal_for_expr(
+                node.args[0],
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            )
+        ):
             return False
         return _is_normalized_container(
             node.func.value,
@@ -1111,33 +1360,33 @@ def _expr_is_explicit_platform_carrier(
 def _is_normalized_container(
     node: ast.AST,
     *,
-    shared_result_container_aliases: Mapping[str, str] | None = None,
+    shared_result_container_aliases: Mapping[str, frozenset[str]] | None = None,
+    require_definite: bool = False,
 ) -> bool:
     shared_result_container_aliases = shared_result_container_aliases or {}
-    if isinstance(node, ast.Name):
-        if node.id == "normalized":
-            return True
-        return shared_result_container_aliases.get(node.id) == "normalized"
-    if isinstance(node, ast.Subscript):
-        return any(literal == "normalized" for literal in _string_literals(node.slice))
-    if isinstance(node, ast.Attribute):
-        return node.attr == "normalized"
-    return False
+    container_names = _root_shared_result_container_names(
+        node,
+        shared_result_container_aliases=shared_result_container_aliases,
+    )
+    if require_definite:
+        return container_names == frozenset({"normalized"})
+    return "normalized" in container_names
 
 
 def _is_error_details_container(
     node: ast.AST,
     *,
-    error_details_aliases: frozenset[str] | None = None,
+    error_details_aliases: Mapping[str, frozenset[str]] | None = None,
+    require_definite: bool = False,
 ) -> bool:
-    error_details_aliases = error_details_aliases or frozenset()
-    if isinstance(node, ast.Name):
-        return node.id in error_details_aliases
-    if isinstance(node, ast.Attribute):
-        return node.attr == "details" and _is_error_container(node.value)
-    if isinstance(node, ast.Subscript):
-        return any(literal == "details" for literal in _string_literals(node.slice)) and _is_error_container(node.value)
-    return False
+    error_details_aliases = error_details_aliases or {}
+    paths = _possible_error_details_paths(
+        node,
+        error_details_aliases=error_details_aliases,
+    )
+    if require_definite:
+        return paths == frozenset({"error.details"})
+    return "error.details" in paths
 
 
 def _is_error_container(node: ast.AST) -> bool:
@@ -1188,140 +1437,295 @@ def _dict_contains_unapproved_platform_literal(node: ast.Dict, *, path: tuple[st
     return False
 
 
-def _expr_contains_shared_result_platform_field(
+def _expr_contains_disallowed_shared_field(
     node: ast.AST,
     *,
     path: tuple[str, ...] = (),
-    shared_result_container_aliases: Mapping[str, str] | None = None,
+    shared_result_container_aliases: Mapping[str, frozenset[str]] | None = None,
+    error_details_aliases: Mapping[str, frozenset[str]] | None = None,
+    key_signals: Mapping[str, tuple[frozenset[str], bool]] | None = None,
+    platform_aliases: frozenset[str] | None = None,
 ) -> bool:
     shared_result_container_aliases = shared_result_container_aliases or {}
+    error_details_aliases = error_details_aliases or {}
+    key_signals = key_signals or {}
+    platform_aliases = platform_aliases or frozenset()
     if isinstance(node, ast.Dict):
-        return _dict_contains_shared_result_platform_field(
+        return _dict_contains_disallowed_shared_field(
             node,
             path=path,
             shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         )
     if isinstance(node, ast.Call):
-        return _call_contains_shared_result_platform_field(
+        return _call_contains_disallowed_shared_field(
             node,
-            path=path,
             shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         )
     if isinstance(node, ast.Subscript):
-        return _subscript_contains_shared_result_platform_field(
+        return _subscript_contains_disallowed_shared_field(
             node,
-            path=path,
             shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         )
     return any(
-        _expr_contains_shared_result_platform_field(
+        _expr_contains_disallowed_shared_field(
             child,
             path=path,
             shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         )
         for child in ast.iter_child_nodes(node)
     )
 
 
-def _dict_contains_shared_result_platform_field(
+def _dict_contains_disallowed_shared_field(
     node: ast.Dict,
     *,
     path: tuple[str, ...],
-    shared_result_container_aliases: Mapping[str, str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
 ) -> bool:
     for key, value in zip(node.keys, node.values):
-        key_name = _single_string_literal(key)
-        next_path = path + ((key_name,) if key_name is not None else ())
-        if key_name is not None and _is_disallowed_shared_result_field_path(next_path):
+        signal = _key_signal_for_expr(
+            key,
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
+        )
+        if path and _signal_causes_disallowed_shared_field(path, signal):
             return True
-        if _expr_contains_shared_result_platform_field(
+        exact_literals, dynamic_platform_key = signal
+        next_paths = [path]
+        if not dynamic_platform_key and len(exact_literals) == 1:
+            next_paths = [path + (next(iter(exact_literals)),)]
+        for next_path in next_paths:
+            if _expr_contains_disallowed_shared_field(
             value,
-            path=next_path,
-            shared_result_container_aliases=shared_result_container_aliases,
-        ):
-            return True
+                path=next_path,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ):
+                return True
     return False
 
 
-def _call_contains_shared_result_platform_field(
+def _call_contains_disallowed_shared_field(
     node: ast.Call,
     *,
-    path: tuple[str, ...],
-    shared_result_container_aliases: Mapping[str, str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
 ) -> bool:
     if not isinstance(node.func, ast.Attribute):
         return False
-    container_name = _root_shared_result_container_name(
+    container_paths = _possible_shared_field_carrier_paths(
         node.func.value,
         shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
     )
-    if container_name is None:
+    if not container_paths:
         return False
     if node.func.attr == "setdefault":
         if not node.args:
             return False
-        return any(
-            _is_disallowed_shared_result_field_path((container_name, literal))
-            for literal in _string_literals(node.args[0])
+        signal = _key_signal_for_expr(
+            node.args[0],
+            key_signals=key_signals,
+            platform_aliases=platform_aliases,
         )
+        return any(_signal_causes_disallowed_shared_field(path, signal) for path in container_paths)
     if node.func.attr != "update":
         return False
     for argument in node.args:
-        if _expr_contains_shared_result_platform_field(
-            argument,
-            path=(container_name,),
-            shared_result_container_aliases=shared_result_container_aliases,
-        ):
-            return True
+        for path in container_paths:
+            if _expr_contains_disallowed_shared_field(
+                argument,
+                path=path,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ):
+                return True
     for keyword in node.keywords:
-        if keyword.arg is not None and _is_disallowed_shared_result_field_path((container_name, keyword.arg)):
-            return True
-        if keyword.arg is None and _expr_contains_shared_result_platform_field(
-            keyword.value,
-            path=(container_name,),
-            shared_result_container_aliases=shared_result_container_aliases,
-        ):
-            return True
+        if keyword.arg is not None:
+            signal = (frozenset({keyword.arg}), False)
+            if any(_signal_causes_disallowed_shared_field(path, signal) for path in container_paths):
+                return True
+            continue
+        for path in container_paths:
+            if _expr_contains_disallowed_shared_field(
+                keyword.value,
+                path=path,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+                key_signals=key_signals,
+                platform_aliases=platform_aliases,
+            ):
+                return True
     return False
 
 
-def _subscript_contains_shared_result_platform_field(
+def _subscript_contains_disallowed_shared_field(
     node: ast.Subscript,
     *,
-    path: tuple[str, ...],
-    shared_result_container_aliases: Mapping[str, str],
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
 ) -> bool:
-    container_name = _root_shared_result_container_name(
+    container_paths = _possible_shared_field_carrier_paths(
         node.value,
         shared_result_container_aliases=shared_result_container_aliases,
+        error_details_aliases=error_details_aliases,
     )
-    if container_name is None:
+    if not container_paths:
         return False
-    for literal in _string_literals(node.slice):
-        if _is_disallowed_shared_result_field_path((container_name, literal)):
-            return True
-    return False
+    signal = _key_signal_for_expr(
+        node.slice,
+        key_signals=key_signals,
+        platform_aliases=platform_aliases,
+    )
+    return any(_signal_causes_disallowed_shared_field(path, signal) for path in container_paths)
 
 
-def _root_shared_result_container_name(
+def _root_shared_result_container_names(
     node: ast.AST,
     *,
-    shared_result_container_aliases: Mapping[str, str] | None = None,
-) -> str | None:
+    shared_result_container_aliases: Mapping[str, frozenset[str]] | None = None,
+) -> frozenset[str]:
     shared_result_container_aliases = shared_result_container_aliases or {}
+    if isinstance(node, ast.NamedExpr):
+        return _root_shared_result_container_names(
+            node.value,
+            shared_result_container_aliases=shared_result_container_aliases,
+        )
+    if isinstance(node, ast.IfExp):
+        return _root_shared_result_container_names(
+            node.body,
+            shared_result_container_aliases=shared_result_container_aliases,
+        ).union(
+            _root_shared_result_container_names(
+                node.orelse,
+                shared_result_container_aliases=shared_result_container_aliases,
+            )
+        )
     if isinstance(node, ast.Name):
         if node.id in {"normalized", "raw"}:
-            return node.id
-        aliased_container = shared_result_container_aliases.get(node.id)
-        if aliased_container is not None:
-            return aliased_container
+            return frozenset({node.id})
+        return shared_result_container_aliases.get(node.id, frozenset())
     if isinstance(node, ast.Subscript):
-        for literal in _string_literals(node.slice):
-            if literal in {"normalized", "raw"}:
-                return literal
+        container_names = {literal for literal in _string_literals(node.slice) if literal in {"normalized", "raw"}}
+        if container_names:
+            return frozenset(container_names)
     if isinstance(node, ast.Attribute) and node.attr in {"normalized", "raw"}:
-        return node.attr
-    return None
+        return frozenset({node.attr})
+    return frozenset()
+
+
+def _possible_error_details_paths(
+    node: ast.AST,
+    *,
+    error_details_aliases: Mapping[str, frozenset[str]] | None = None,
+) -> frozenset[str]:
+    error_details_aliases = error_details_aliases or {}
+    if isinstance(node, ast.NamedExpr):
+        return _possible_error_details_paths(node.value, error_details_aliases=error_details_aliases)
+    if isinstance(node, ast.IfExp):
+        return _possible_error_details_paths(node.body, error_details_aliases=error_details_aliases).union(
+            _possible_error_details_paths(node.orelse, error_details_aliases=error_details_aliases)
+        )
+    if isinstance(node, ast.Name):
+        return error_details_aliases.get(node.id, frozenset())
+    if isinstance(node, ast.Attribute):
+        if node.attr == "details" and _is_error_container(node.value):
+            return frozenset({"error.details"})
+        return frozenset()
+    if isinstance(node, ast.Subscript):
+        if any(literal == "details" for literal in _string_literals(node.slice)) and _is_error_container(node.value):
+            return frozenset({"error.details"})
+    return frozenset()
+
+
+def _possible_shared_field_carrier_paths(
+    node: ast.AST,
+    *,
+    shared_result_container_aliases: Mapping[str, frozenset[str]],
+    error_details_aliases: Mapping[str, frozenset[str]],
+) -> frozenset[tuple[str, ...]]:
+    paths = {(container_name,) for container_name in _root_shared_result_container_names(
+        node,
+        shared_result_container_aliases=shared_result_container_aliases,
+    )}
+    if _is_error_details_container(node, error_details_aliases=error_details_aliases):
+        paths.add(("error", "details"))
+    return frozenset(paths)
+
+
+def _key_signal_for_expr(
+    node: ast.AST | None,
+    *,
+    key_signals: Mapping[str, tuple[frozenset[str], bool]],
+    platform_aliases: frozenset[str],
+) -> tuple[frozenset[str], bool]:
+    if node is None:
+        return _EMPTY_KEY_SIGNAL
+    if isinstance(node, ast.NamedExpr):
+        return _key_signal_for_expr(node.value, key_signals=key_signals, platform_aliases=platform_aliases)
+    if isinstance(node, ast.IfExp):
+        return _merge_key_signals(
+            _key_signal_for_expr(node.body, key_signals=key_signals, platform_aliases=platform_aliases),
+            _key_signal_for_expr(node.orelse, key_signals=key_signals, platform_aliases=platform_aliases),
+        )
+    if isinstance(node, ast.Name):
+        return key_signals.get(node.id, _EMPTY_KEY_SIGNAL)
+    if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value:
+        return (frozenset({node.value}), False)
+    if isinstance(node, ast.JoinedStr):
+        return (
+            frozenset(),
+            any(
+                isinstance(value, ast.FormattedValue) and _expr_is_platformish(value.value, platform_aliases=platform_aliases)
+                for value in node.values
+            ),
+        )
+    return _EMPTY_KEY_SIGNAL
+
+
+def _merge_key_signals(
+    left: tuple[frozenset[str], bool],
+    right: tuple[frozenset[str], bool],
+) -> tuple[frozenset[str], bool]:
+    return (left[0].union(right[0]), left[1] or right[1])
+
+
+def _key_signal_matches_platform(signal: tuple[frozenset[str], bool]) -> bool:
+    return "platform" in signal[0]
+
+
+def _signal_causes_disallowed_shared_field(path: tuple[str, ...], signal: tuple[frozenset[str], bool]) -> bool:
+    literals, dynamic_platform_key = signal
+    if dynamic_platform_key and _is_shared_field_carrier_path(path):
+        return True
+    return any(_is_disallowed_shared_result_field_path(path + (literal,)) for literal in literals)
+
+
+def _is_shared_field_carrier_path(path: tuple[str, ...]) -> bool:
+    return (len(path) >= 1 and path[0] in {"normalized", "raw"}) or (len(path) >= 2 and path[:2] == ("error", "details"))
 
 
 def _is_approved_platform_carrier_path(path: tuple[str, ...]) -> bool:
@@ -1332,15 +1736,44 @@ def _is_approved_platform_carrier_path(path: tuple[str, ...]) -> bool:
 
 
 def _is_disallowed_shared_result_field_path(path: tuple[str, ...]) -> bool:
+    if len(path) >= 3 and path[:2] == ("error", "details"):
+        return _is_disallowed_shared_field_name(path[-1]) and path[-1].lower() != "platform"
     if len(path) < 2 or path[0] not in {"normalized", "raw"}:
         return False
     field_name = path[-1].lower()
-    if field_name in {"platform", "x"}:
+    if field_name == "x":
         return False
-    if _COMMON_PLATFORM_NAME_RE.search(field_name) is not None or _string_literal_has_platform_specific_fragment(field_name):
+    if field_name == "platform":
+        return path[0] == "raw"
+    return _is_disallowed_shared_field_name(field_name)
+
+
+def _is_disallowed_shared_field_name(field_name: str) -> bool:
+    normalized_field_name = field_name.lower()
+    if normalized_field_name in {"platform", "x"}:
+        return False
+    if _COMMON_PLATFORM_NAME_RE.search(normalized_field_name) is not None or _string_literal_has_platform_specific_fragment(
+        normalized_field_name
+    ):
         return True
     return any(
-        literal != "x" and (field_name == literal or field_name.startswith(f"{literal}_") or field_name.startswith(f"{literal}-"))
+        literal != "x"
+        and (
+            normalized_field_name == literal
+            or normalized_field_name.startswith(f"{literal}_")
+            or normalized_field_name.startswith(f"{literal}-")
+        )
+        for literal in _COMMON_PLATFORM_LITERALS
+    )
+
+
+def _is_disallowed_field_key_literal(field_name: str) -> bool:
+    normalized_field_name = field_name.lower()
+    if _string_literal_has_platform_specific_fragment(normalized_field_name):
+        return True
+    return any(
+        literal != "x"
+        and (normalized_field_name.startswith(f"{literal}_") or normalized_field_name.startswith(f"{literal}-"))
         for literal in _COMMON_PLATFORM_LITERALS
     )
 
