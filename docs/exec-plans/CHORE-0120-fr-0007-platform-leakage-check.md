@@ -22,8 +22,10 @@
 
 - 本次纳入：
   - `syvert/platform_leakage.py`
+  - `syvert/version_gate.py`
   - `tests/runtime/test_platform_leakage.py`
   - `tests/runtime/test_version_gate.py`
+  - `docs/exec-plans/artifacts/CHORE-0118-version-gate-result-model.md`
   - 当前 active `exec-plan`
 - 本次不纳入：
   - adapter 私有实现
@@ -36,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
+- 当前受审 runtime head：`75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
 - 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
+- 当前 runtime-affecting 实现 checkpoint：`75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -77,7 +79,8 @@
     - 函数 / 类元数据位置现在进入共享语义扫描面；decorator、base class、annotation 里的平台语义不再因为 `FunctionDef` / `ClassDef` 提前 `continue` 而绕过
     - alias 历史现在按稳定语句顺序绑定，不再只看 `lineno`；`bucket = payload["normalized"]; bucket["xhs_extra"] = "1"` 这类同一行 semicolon 写法会按 fail-closed 命中
     - `raw_value` / `normalized_value` 这类普通局部变量名不再因为名称包含 `raw/normalized` 被误当成共享结果 carrier
-  - 当前已提交的运行时语义锚定在实现 checkpoint `c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
+    - `error.details` 允许边界现在只认真实共享错误 envelope：`adapter_error.details["platform"] = "xhs"` 会保持 pass，而 `payload["details"]["platform"] = "xhs"` 不再被误当成已批准 carrier
+  - 当前已提交的运行时语义锚定在实现 checkpoint `75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
   - 当前剩余动作只包括：把 exec-plan / PR / issue 当前事实同步到同一对象后重发 guardian；若通过，再进入 merge gate
 
 ## 实现要点
@@ -144,11 +147,11 @@
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `a1217f4c5bbf867bafe70217edf13f85205c283b` 上通过，`Ran 178 tests`，`OK (skipped=4)`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：在 checkpoint `c282d6a3b7efbffcaea4a54b0c8a64b881472a3c` 上通过，`Ran 197 tests`，`OK (skipped=6)`
+  - 结果：在 checkpoint `75c6a8de70458f6b3b28bc2adb810fd0cc277ca6` 上通过，`Ran 199 tests`，`OK (skipped=6)`
 - 对抗性探测：`carrier = normalized; if carrier.get("platform") == current_platform`、`details = error.details; if details.get("platform") == current_platform`、`bucket = payload["normalized"]; bucket["xhs_extra"] = "1"`、`bucket = payload["raw"]; bucket["douyin_extra"] = "1"`、`normalized.update({"xhs_extra": "1"})`、`normalized.setdefault("xhs_extra", "1")`
-  - 结果：全部在 checkpoint `c282d6a3b7efbffcaea4a54b0c8a64b881472a3c` 上按预期 fail-closed 收口；`{"normalized": {"x_trace": 1}}` 保持 pass；反转 `boundary_scope` 顺序会命中 `boundary_scope_order_mismatch`
-- 误报回归：`normalized["platform"] = "xhs"`、`details = error.details; details["platform"] = "xhs"`、`details = error.details; details = {}; if details.get("platform") == current_platform`、先在一个函数里绑定 `bucket = payload["normalized"]`、再在另一个函数里写 `bucket["xhs_extra"] = "1"`、`raw_value = {}; raw_value["xhs_extra"] = "1"`
-  - 结果：全部在 checkpoint `c282d6a3b7efbffcaea4a54b0c8a64b881472a3c` 上保持 pass，说明 alias 绑定、允许 carrier 写入与普通局部变量名没有被过度收紧
+  - 结果：全部在 checkpoint `75c6a8de70458f6b3b28bc2adb810fd0cc277ca6` 上按预期 fail-closed 收口；反转 `boundary_scope` 顺序会命中 `boundary_scope_order_mismatch`
+- 误报回归：`normalized["platform"] = "xhs"`、`details = error.details; details["platform"] = "xhs"`、`adapter_error.details["platform"] = "xhs"`、`details = error.details; details = {}; if details.get("platform") == current_platform`、先在一个函数里绑定 `bucket = payload["normalized"]`、再在另一个函数里写 `bucket["xhs_extra"] = "1"`、`raw_value = {}; raw_value["xhs_extra"] = "1"`
+  - 结果：全部在 checkpoint `75c6a8de70458f6b3b28bc2adb810fd0cc277ca6` 上保持 pass，说明 alias 绑定、允许 carrier 写入、真实 `error.details` 边界与普通局部变量名没有被过度收紧
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
@@ -168,7 +171,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
-- 最近一次重跑目标测试的 head：`c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
-- 当前受审 runtime head：`c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `c282d6a3b7efbffcaea4a54b0c8a64b881472a3c`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
+- 最近一次重跑目标测试的 head：`75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
+- 当前受审 runtime head：`75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `75c6a8de70458f6b3b28bc2adb810fd0cc277ca6`，不得把 follow-up 误记为新的运行时真相
