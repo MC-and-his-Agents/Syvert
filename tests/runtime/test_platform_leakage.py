@@ -449,6 +449,30 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
 
+    def test_run_check_detects_function_decorator_platform_metadata(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "def default_task_id_factory() -> str:\n",
+                    '@platform_only("xhs")\ndef default_task_id_factory() -> str:\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_class_metadata_platform_semantic(self) -> None:
+        report = self.run_with_fixture(
+            {},
+            append_files={
+                "syvert/runtime.py": '\n\n@platform_only("xhs")\nclass PlatformRuntime:\n    pass\n',
+            },
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_platform_specific_shared_result_field(self) -> None:
         report = self.run_with_fixture(
             {
@@ -481,6 +505,19 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    bucket = payload["normalized"]\n    bucket["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_platform_specific_shared_result_field_via_same_line_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    bucket = payload["normalized"]; bucket["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )
@@ -546,6 +583,19 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/runtime.py": (
                     "    adapter_key, capability = extract_request_context(request)\n",
                     '    return {"normalized": {"x_trace": 1}}\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_allows_raw_prefixed_local_name_without_real_alias(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    raw_value = {}\n    raw_value["xhs_extra"] = "1"\n\n    adapter_key, capability = extract_request_context(request)\n',
                 )
             }
         )

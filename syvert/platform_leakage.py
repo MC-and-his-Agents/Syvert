@@ -306,12 +306,12 @@ def _scan_file(
             shared_result_container_aliases = _materialize_shared_result_container_aliases(
                 shared_result_container_histories,
                 scope=current_scope,
-                line_number=line_number,
+                position=(line_number, getattr(node, "col_offset", 0)),
             )
             error_details_aliases = _materialize_error_details_aliases(
                 error_details_histories,
                 scope=current_scope,
-                line_number=line_number,
+                position=(line_number, getattr(node, "col_offset", 0)),
             )
             statement_lines = _statement_line_numbers(node)
             if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
@@ -332,9 +332,23 @@ def _scan_file(
                         evidence_ref=evidence_ref,
                     )
                 )
+            elif _definition_has_platform_metadata(
+                node,
+                platform_aliases=platform_aliases,
+                shared_result_container_aliases=shared_result_container_aliases,
+                error_details_aliases=error_details_aliases,
+            ):
+                findings.append(
+                    _finding(
+                        code="single_platform_shared_semantic",
+                        message=f"single-platform shared semantic leaked into shared layer at `{relative_name}:{line_number}`",
+                        boundary=boundary,
+                        evidence_ref=evidence_ref,
+                    )
+                )
             continue
 
-        if not isinstance(node, ast.stmt) or isinstance(node, (ast.ClassDef, ast.Module)):
+        if not isinstance(node, ast.stmt) or isinstance(node, ast.Module):
             continue
         line_number = getattr(node, "lineno", None)
         if line_number is None:
@@ -343,12 +357,12 @@ def _scan_file(
         shared_result_container_aliases = _materialize_shared_result_container_aliases(
             shared_result_container_histories,
             scope=current_scope,
-            line_number=line_number,
+            position=(line_number, getattr(node, "col_offset", 0)),
         )
         error_details_aliases = _materialize_error_details_aliases(
             error_details_histories,
             scope=current_scope,
-            line_number=line_number,
+            position=(line_number, getattr(node, "col_offset", 0)),
         )
 
         statement_lines = _statement_line_numbers(node)
@@ -359,6 +373,21 @@ def _scan_file(
         evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
         statement_source = _statement_source_segment(source_text, node)
         if _is_docstring_statement(node):
+            continue
+        if isinstance(node, ast.ClassDef) and _definition_has_platform_metadata(
+            node,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        ):
+            findings.append(
+                _finding(
+                    code="single_platform_shared_semantic",
+                    message=f"single-platform shared semantic leaked into shared layer at `{relative_name}:{line_number}`",
+                    boundary=boundary,
+                    evidence_ref=evidence_ref,
+                )
+            )
             continue
         if _statement_has_platform_specific_field(
             statement_source,
@@ -450,8 +479,8 @@ def _assignment_value_and_targets(node: ast.AST) -> tuple[ast.AST | None, Sequen
 def _build_shared_result_container_histories(
     module: ast.AST,
     parent_index: Mapping[ast.AST, ast.AST],
-) -> dict[ast.AST, dict[str, list[tuple[int, str | None]]]]:
-    histories: dict[ast.AST, dict[str, list[tuple[int, str | None]]]] = {}
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], str | None]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], str | None]]]] = {}
     assignment_nodes = sorted(
         (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
         key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
@@ -464,7 +493,7 @@ def _build_shared_result_container_histories(
         container_aliases = _materialize_shared_result_container_aliases(
             histories,
             scope=scope,
-            line_number=getattr(node, "lineno", 0),
+            position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
         container_name = _root_shared_result_container_name(
             value,
@@ -473,15 +502,17 @@ def _build_shared_result_container_histories(
         scope_history = histories.setdefault(scope, {})
         for target in targets:
             for name in _assignment_target_names(target):
-                scope_history.setdefault(name, []).append((getattr(node, "lineno", 0), container_name))
+                scope_history.setdefault(name, []).append(
+                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), container_name)
+                )
     return histories
 
 
 def _build_error_details_histories(
     module: ast.AST,
     parent_index: Mapping[ast.AST, ast.AST],
-) -> dict[ast.AST, dict[str, list[tuple[int, bool]]]]:
-    histories: dict[ast.AST, dict[str, list[tuple[int, bool]]]] = {}
+) -> dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool]]]]:
+    histories: dict[ast.AST, dict[str, list[tuple[tuple[int, int], bool]]]] = {}
     assignment_nodes = sorted(
         (node for node in ast.walk(module) if isinstance(node, (ast.Assign, ast.AnnAssign))),
         key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0)),
@@ -494,7 +525,7 @@ def _build_error_details_histories(
         error_details_aliases = _materialize_error_details_aliases(
             histories,
             scope=scope,
-            line_number=getattr(node, "lineno", 0),
+            position=(getattr(node, "lineno", 0), getattr(node, "col_offset", 0)),
         )
         is_error_details_alias = _is_error_details_container(
             value,
@@ -503,41 +534,43 @@ def _build_error_details_histories(
         scope_history = histories.setdefault(scope, {})
         for target in targets:
             for name in _assignment_target_names(target):
-                scope_history.setdefault(name, []).append((getattr(node, "lineno", 0), is_error_details_alias))
+                scope_history.setdefault(name, []).append(
+                    ((getattr(node, "lineno", 0), getattr(node, "col_offset", 0)), is_error_details_alias)
+                )
     return histories
 
 
 def _materialize_shared_result_container_aliases(
-    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[int, str | None]]]],
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], str | None]]]],
     *,
     scope: ast.AST,
-    line_number: int,
+    position: tuple[int, int],
 ) -> dict[str, str]:
     alias_map: dict[str, str] = {}
     for name, events in histories.get(scope, {}).items():
-        resolved = _resolve_alias_event(events, line_number)
+        resolved = _resolve_alias_event(events, position)
         if isinstance(resolved, str):
             alias_map[name] = resolved
     return alias_map
 
 
 def _materialize_error_details_aliases(
-    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[int, bool]]]],
+    histories: Mapping[ast.AST, Mapping[str, Sequence[tuple[tuple[int, int], bool]]]],
     *,
     scope: ast.AST,
-    line_number: int,
+    position: tuple[int, int],
 ) -> frozenset[str]:
     aliases: set[str] = set()
     for name, events in histories.get(scope, {}).items():
-        if _resolve_alias_event(events, line_number) is True:
+        if _resolve_alias_event(events, position) is True:
             aliases.add(name)
     return frozenset(aliases)
 
 
-def _resolve_alias_event(events: Sequence[tuple[int, Any]], line_number: int) -> Any:
+def _resolve_alias_event(events: Sequence[tuple[tuple[int, int], Any]], position: tuple[int, int]) -> Any:
     resolved = None
-    for event_line, value in events:
-        if event_line >= line_number:
+    for event_position, value in events:
+        if event_position >= position:
             break
         resolved = value
     return resolved
@@ -741,6 +774,40 @@ def _function_has_single_platform_semantic(
             platform_aliases=platform_aliases,
         )
         for default in defaults
+    )
+
+
+def _definition_has_platform_metadata(
+    node: ast.AST,
+    *,
+    platform_aliases: frozenset[str],
+    shared_result_container_aliases: Mapping[str, str],
+    error_details_aliases: frozenset[str],
+) -> bool:
+    metadata_nodes: list[ast.AST] = list(getattr(node, "decorator_list", ()))
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        args = node.args
+        metadata_nodes.extend(arg.annotation for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs) if arg.annotation is not None)
+        if args.vararg is not None and args.vararg.annotation is not None:
+            metadata_nodes.append(args.vararg.annotation)
+        if args.kwarg is not None and args.kwarg.annotation is not None:
+            metadata_nodes.append(args.kwarg.annotation)
+        if node.returns is not None:
+            metadata_nodes.append(node.returns)
+    elif isinstance(node, ast.ClassDef):
+        metadata_nodes.extend(node.bases)
+        metadata_nodes.extend(keyword.value for keyword in node.keywords)
+
+    return any(
+        _expr_has_platform_literal_compare(
+            metadata_node,
+            platform_aliases=platform_aliases,
+            shared_result_container_aliases=shared_result_container_aliases,
+            error_details_aliases=error_details_aliases,
+        )
+        or _expr_contains_unapproved_platform_literal(metadata_node)
+        or _expr_contains_platform_marker(metadata_node)
+        for metadata_node in metadata_nodes
     )
 
 
@@ -1235,9 +1302,6 @@ def _root_shared_result_container_name(
         aliased_container = shared_result_container_aliases.get(node.id)
         if aliased_container is not None:
             return aliased_container
-        match = _SHARED_RESULT_CONTAINER_RE.search(node.id)
-        if match is not None:
-            return match.group(1)
     if isinstance(node, ast.Subscript):
         for literal in _string_literals(node.slice):
             if literal in {"normalized", "raw"}:
