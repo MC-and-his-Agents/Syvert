@@ -50,9 +50,12 @@
   - 已修复 guardian 最新阻断：
     - 平台泄漏扫描不再只看 `if` / `match` / 赋值；`return` / `raise` / 任意表达式语句中的 `adapter_key == "xhs"` 一类比较也会直接命中 `hardcoded_platform_branch`
     - 目标文件 AST parse 失败时，不再退回“只扫平台字段”的低保真路径，而是产出 `scan_parse_failure` finding 并显式 fail-closed
-  - 运行时语义当前锚定在实现 checkpoint `0f3b1b71a0664527804e078198630732890c8c28`
-  - 当前 metadata-only follow-up 只回填 exec-plan / PR / issue 的当前事实，不改运行时语义；当前受审 head 由 PR `#123` 正文验证区块与 guardian state 绑定
-  - 本 worktree 的剩余动作只包含当前受审 head 的门禁复跑与元数据同步；guardian / merge 留在后续集成回合执行
+    - 共享层平台集合/常量现在按 fail-closed 处理，`SUPPORTED_PLATFORMS = {"xhs", "douyin"}` 一类平台集合常量不再漏报
+    - 共享层字符串字面量中的平台特定 selector / url / signature 片段现在按 fail-closed 处理，不再只依赖字段名命中
+  - 当前已提交的运行时语义锚定在实现 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
+  - 当前 metadata-only follow-up：待本次 exec-plan / PR / issue 同步提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准；metadata-only follow-up 只回填 guardian 修复后的 checkpoint / 验证追踪，不改运行时语义
+  - 本 worktree 已把 guardian 新增阻断收口为最小运行时增量：平台集合/常量与 selector / url / signature 字符串碎片两类新增 fail-closed 判定已进入共享层扫描器与回归测试
+  - 本 worktree 的剩余动作是把当前验证结果绑定到实现 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`，随后重新发起 guardian / merge
 
 ## 实现要点
 
@@ -60,15 +63,17 @@
 - 扫描结果直接输出为 `platform_leakage` source report payload，再由公开 validator 收口。
 - 当前实现把平台泄漏命中面固定在三类 AST/语句级 finding：
   - 平台上下文里的硬编码分支 / 比较，包括 `if` / `match` / `return` / `raise` / 任意表达式语句
-  - 平台专属字段渗入共享层
-  - 带共享语义语境的平台字面量赋值
+  - 平台专属字段或平台特定 selector / url / signature 字符串碎片渗入共享层
+  - 带共享语义语境的平台字面量赋值，以及显式平台集合/常量
 - 新增独立 runtime 测试，覆盖：
   - 真实共享层扫描 clean pass
   - caller boundary scope 缺项 / 越界 fail-closed
   - 三类 finding 的命中行为
   - 多行平台分支与非 `xhs` / `douyin` 平台字面量
+  - `SUPPORTED_PLATFORMS` 一类共享平台集合常量
+  - selector / url / signature 字符串碎片
   - adapter 私有实现与 research 文档不进入扫描面
-- 在 `test_version_gate` 补一条真实 checker 输出进入 orchestrator 的接入回归。
+- 在 `test_version_gate` 补真实 checker 输出进入 orchestrator 的接入回归，覆盖共享平台集合常量经公开入口被收口。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -88,6 +93,10 @@
   - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，并新增 parse failure 经 `run_platform_leakage_check()` 收口进 orchestrator 的回归。
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `0f3b1b71a0664527804e078198630732890c8c28` 上通过，`Ran 149 tests`，`OK`
+- `python3 -m py_compile syvert/platform_leakage.py tests/runtime/test_platform_leakage.py tests/runtime/test_version_gate.py`
+  - 结果：在 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52` 上通过
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate`
+  - 结果：在 checkpoint `bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52` 上通过，`Ran 109 tests`，`OK`
 
 ## 未决风险
 
@@ -101,6 +110,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`0f3b1b71a0664527804e078198630732890c8c28`
-- 最近一次重跑目标测试的 head：`0f3b1b71a0664527804e078198630732890c8c28`
-- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准
+- 实现 checkpoint：`bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
+- 最近一次重跑目标测试的 head：`bee9b5ff32a533c2e43fdf6cfe66dba12d2c2f52`
+- 当前 metadata head：待本次 exec-plan follow-up 提交后，以 PR `#123` 正文验证区块中的 `headRefOid` 为准
+- 当前受审 head：以 PR `#123` 正文验证区块中的 `headRefOid` 为准；不得把 metadata-only follow-up 误记为新的 runtime checkpoint
