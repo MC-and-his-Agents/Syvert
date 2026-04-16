@@ -383,6 +383,22 @@ class RealAdapterRegressionTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("case_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
 
+    def test_validate_real_adapter_regression_rejects_frozen_case_matrix_drift(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload["adapter_results"][1]["cases"][1]["case_id"] = "douyin-alt-platform"
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("case_matrix_mismatch", {item["code"] for item in report["details"]["failures"]})
+
     def test_validate_real_adapter_regression_rejects_operation_surface_mismatch(self) -> None:
         payload = build_real_adapter_regression_payload(
             version="v0.2.0",
