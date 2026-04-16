@@ -97,4 +97,4 @@
 
 - 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
 - 最近一次重跑目标测试的代码 head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
-- 当前 metadata-only head：`待本次 exec-plan 追账提交后回填`
+- 当前 metadata-only head：`当前分支最新 head（仅回填 exec-plan checkpoint / 验证追踪，不改运行时语义）`
