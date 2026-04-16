@@ -50,6 +50,13 @@ _RUNTIME_SYMBOL_BOUNDARIES = {
 }
 
 _PLATFORM_FIELD_RE = re.compile(r"\b(note_id|aweme_id|sign_base_url|sec_uid|xsec_token|web_rid)\b")
+_PLATFORM_STRING_FRAGMENT_RE = re.compile(
+    r"(?:"
+    r"xiaohongshu\.com|xhslink\.com|douyin\.com|iesdouyin\.com|v\.douyin\.com|"
+    r"x-bogus|a_bogus|_signature|x-signature|mstoken|"
+    r"data-xhs-|note-item|aweme-detail|aweme-|douyin-"
+    r")"
+)
 _SEMANTIC_CONTEXT_RE = re.compile(
     r"\b(default|semantic|operation|registry|runtime|contract|shared|surface|capability|target|collection_mode|mode)\b"
 )
@@ -72,7 +79,7 @@ _COMMON_PLATFORM_LITERALS = frozenset(
         "zhihu",
     }
 )
-_PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter_key|platform|platform_key|reference_pair)(?:_|$)")
+_PLATFORM_IDENTIFIER_RE = re.compile(r"(?:^|_)(adapter_key|platform|platforms|platform_key|reference_pair)(?:_|$)")
 _AST_MATCH = getattr(ast, "Match", None)
 _AST_MATCH_VALUE = getattr(ast, "MatchValue", None)
 _AST_MATCH_SINGLETON = getattr(ast, "MatchSingleton", None)
@@ -293,7 +300,7 @@ def _scan_file(
         boundary = boundary_resolver(line_number)
         evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
         statement_source = _statement_source_segment(source_text, node)
-        if _statement_has_platform_specific_field(statement_source):
+        if _statement_has_platform_specific_field(statement_source, node):
             findings.append(
                 _finding(
                     code="platform_specific_field_leak",
@@ -338,8 +345,10 @@ def _statement_source_segment(source_text: str, node: ast.AST) -> str:
     return ast.get_source_segment(source_text, node) or ""
 
 
-def _statement_has_platform_specific_field(statement_source: str) -> bool:
-    return _PLATFORM_FIELD_RE.search(statement_source) is not None
+def _statement_has_platform_specific_field(statement_source: str, node: ast.AST) -> bool:
+    if _PLATFORM_FIELD_RE.search(statement_source) is not None:
+        return True
+    return any(_string_literal_has_platform_specific_fragment(literal) for literal in _string_literals(node))
 
 
 def _statement_has_hardcoded_platform_branch(node: ast.stmt) -> bool:
@@ -425,9 +434,9 @@ def _compare_pair_has_platform_literal(left: ast.AST, right: ast.AST, operator: 
 
 def _expr_is_platformish(node: ast.AST) -> bool:
     if isinstance(node, ast.Name):
-        return _PLATFORM_IDENTIFIER_RE.search(node.id) is not None
+        return _identifier_matches(node.id, _PLATFORM_IDENTIFIER_RE)
     if isinstance(node, ast.Attribute):
-        return _PLATFORM_IDENTIFIER_RE.search(node.attr) is not None or _expr_is_platformish(node.value)
+        return _identifier_matches(node.attr, _PLATFORM_IDENTIFIER_RE) or _expr_is_platformish(node.value)
     if isinstance(node, ast.Subscript):
         return _subscript_is_platformish(node)
     if isinstance(node, ast.Call):
@@ -440,7 +449,7 @@ def _expr_is_platformish(node: ast.AST) -> bool:
 def _subscript_is_platformish(node: ast.Subscript) -> bool:
     if _expr_is_platformish(node.value):
         return True
-    return any(_PLATFORM_IDENTIFIER_RE.search(literal) is not None for literal in _string_literals(node.slice))
+    return any(_identifier_matches(literal, _PLATFORM_IDENTIFIER_RE) for literal in _string_literals(node.slice))
 
 
 def _call_is_platformish(node: ast.Call) -> bool:
@@ -451,7 +460,7 @@ def _call_is_platformish(node: ast.Call) -> bool:
     if not node.args:
         return False
     first_arg = node.args[0]
-    return any(_PLATFORM_IDENTIFIER_RE.search(literal) is not None for literal in _string_literals(first_arg))
+    return any(_identifier_matches(literal, _PLATFORM_IDENTIFIER_RE) for literal in _string_literals(first_arg))
 
 
 def _expr_contains_string_literal(node: ast.AST) -> bool:
@@ -472,6 +481,14 @@ def _string_literals(node: ast.AST) -> tuple[str, ...]:
 
 def _is_common_platform_literal(value: str) -> bool:
     return value.lower() in _COMMON_PLATFORM_LITERALS
+
+
+def _identifier_matches(value: str, pattern: re.Pattern[str]) -> bool:
+    return pattern.search(value.lower()) is not None
+
+
+def _string_literal_has_platform_specific_fragment(value: str) -> bool:
+    return _PLATFORM_STRING_FRAGMENT_RE.search(value.lower()) is not None
 
 
 def _finding(*, code: str, message: str, boundary: str, evidence_ref: str) -> dict[str, str]:

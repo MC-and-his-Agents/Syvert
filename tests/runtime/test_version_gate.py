@@ -1857,6 +1857,49 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "fail")
         self.assertIn("scan_parse_failure", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_round_trips_checker_detected_shared_platform_collection(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture_root = Path(temp_dir)
+            for relative_name in ("syvert/runtime.py", "syvert/registry.py", "syvert/version_gate.py"):
+                source_path = repo_root / relative_name
+                target_path = fixture_root / relative_name
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                contents = source_path.read_text(encoding="utf-8")
+                if relative_name == "syvert/runtime.py":
+                    contents = contents.replace(
+                        'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n',
+                        'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n'
+                        'SUPPORTED_PLATFORMS = {"xhs", "douyin"}\n',
+                        1,
+                    )
+                target_path.write_text(contents, encoding="utf-8")
+
+            leakage_report = run_platform_leakage_check(
+                version="v0.2.0",
+                repo_root=fixture_root,
+            )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_failures_keep_source_distinction(self) -> None:
         harness_report = build_harness_source_report(
             self.valid_harness_results(),

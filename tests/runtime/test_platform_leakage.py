@@ -179,6 +179,63 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"adapter_registry"})
 
+    def test_run_check_detects_shared_platform_collection_constant(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n',
+                    'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n'
+                    'SUPPORTED_PLATFORMS = {"xhs", "douyin"}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_detects_platform_specific_url_fragment(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/registry.py": (
+                    "MISSING = object()\n",
+                    'MISSING = object()\nSHARED_ENDPOINT = "https://www.douyin.com/aweme/v1/web/detail"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"adapter_registry"})
+
+    def test_run_check_detects_platform_specific_selector_fragment(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/registry.py": (
+                    "MISSING = object()\n",
+                    'MISSING = object()\nDETAIL_SELECTOR = "[data-xhs-note-id] .note-item"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"adapter_registry"})
+
+    def test_run_check_detects_platform_specific_signature_fragment(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/registry.py": (
+                    "MISSING = object()\n",
+                    'MISSING = object()\nSHARED_SIGNATURE = "X-Bogus"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"adapter_registry"})
+
     def test_run_check_detects_single_platform_shared_semantic(self) -> None:
         report = self.run_with_fixture(
             {
