@@ -36,15 +36,17 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-119-fr-0007`
 - 当前执行分支：`issue-119-fr-0007`
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
+- 当前 runtime-affecting 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
+- 当前 test-only follow-up head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper。
-- 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归。
+- 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归；额外补强了缺 success 覆盖、缺 allowed failure 覆盖、缺 evidence refs 的 fail-closed 断言。
 
 ## 下一步动作
 
-- 在当前 worktree 提交实现 commit，并把本 exec-plan checkpoint 绑定到该 runtime-affecting head。
-- 由主线程创建受控 PR，更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
-- 在 commit 之后补跑 `pr_scope_guard`，再进入 PR / guardian / merge gate。
+- 由主线程在当前 metadata follow-up head 上补跑 `commit_check` / `pr_scope_guard`。
+- 创建受控 PR，更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
+- 进入 guardian / merge gate；若后续只发生 metadata-only 追账，不再刷新 runtime checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -68,15 +70,18 @@
 - `python3 -m py_compile syvert/real_adapter_regression.py tests/runtime/test_real_adapter_regression.py tests/runtime/test_version_gate.py`
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_real_adapter_regression`
-  - 结果：`Ran 6 tests`，`OK`
+  - 结果：`Ran 9 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 85 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 93 tests`，`OK`
-- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 worktree 尚无提交，脚本返回 `未检测到需要校验的提交信息。`
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 worktree 尚无提交，脚本返回 `当前分支相对基线没有变更，无法创建或校验 PR。`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：`Ran 187 tests`，`OK`
+- 待补跑：
+  - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
 
 ## 未决风险
 
@@ -90,6 +95,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`待当前代码提交后回填`
-- 最近一次重跑目标测试的代码 head：`未提交工作树（基线 HEAD 为 eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479）`
-- 当前 metadata-only head：`无`
+- 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
+- 最近一次重跑目标测试的代码 head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
+- 当前 metadata-only head：`待本次 exec-plan 追账提交后回填`
