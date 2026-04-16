@@ -1453,6 +1453,16 @@ def _normalize_boundaries(
     source: str,
     failures: list[dict[str, Any]],
 ) -> list[str]:
+    if isinstance(raw_boundaries, (str, bytes, Mapping)) or not isinstance(raw_boundaries, Sequence):
+        failures.append(
+            _failure(
+                source,
+                "invalid_boundary_scope",
+                "platform leakage report boundary_scope must be a non-empty string sequence",
+                details={"field": "boundary_scope"},
+            )
+        )
+        return []
     return _normalize_string_list(
         raw_boundaries,
         source=source,
@@ -1626,7 +1636,7 @@ def _normalize_string_list(
     code: str,
     message: str,
 ) -> list[str]:
-    if isinstance(raw_values, (str, bytes, Mapping)) or not isinstance(raw_values, Sequence):
+    if isinstance(raw_values, (str, bytes, Mapping)) or not isinstance(raw_values, Iterable):
         failures.append(_failure(source, code, message, details={"field": field_name}))
         return []
     normalized: list[str] = []
