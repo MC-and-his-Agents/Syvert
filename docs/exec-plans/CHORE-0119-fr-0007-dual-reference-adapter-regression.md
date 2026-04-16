@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：
+- 关联 PR：`#124`
 - 状态：`active`
 - active 收口事项：`CHORE-0119-fr-0007-dual-reference-adapter-regression`
 
@@ -35,6 +35,7 @@
 
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-119-fr-0007`
 - 当前执行分支：`issue-119-fr-0007`
+- 当前受审 PR：`#124`
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
 - 当前 runtime-affecting 实现 checkpoint：`51aec72b34fac8508c30f917536cda6d5de177b1`
 - 当前 test-only follow-up head：`61ea9177e43eced21938dfb9478c1e055a925d7a`
@@ -44,7 +45,7 @@
 
 ## 下一步动作
 
-- 创建受控 PR，更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
+- 更新 `#119` issue / PR body 当前事实，并在发 guardian 前核对 head / exec-plan / PR body / 验证记录一致性。
 - 进入 guardian / merge gate；若后续只发生 metadata-only 追账，不再刷新 runtime checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -79,9 +80,9 @@
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 187 tests`，`OK`
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：`已校验 2 条提交信息，全部通过。`
+  - 结果：当前 metadata-only head 已复跑，通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：`PR class: implementation`，`变更类别: docs, implementation`，`PR scope 校验通过。`
+  - 结果：当前 metadata-only head 已复跑，`PR scope` 校验通过。
 
 ## 未决风险
 
