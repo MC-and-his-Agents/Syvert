@@ -1418,7 +1418,7 @@ def _expr_contains_string_literal(node: ast.AST) -> bool:
 
 
 def _expr_contains_platform_literal(node: ast.AST) -> bool:
-    return any(_is_common_platform_literal(literal) for literal in _string_literals(node))
+    return any(_string_literal_has_platform_semantic_name(literal) for literal in _string_literals(node))
 
 
 def _expr_contains_platform_branch_literal(node: ast.AST) -> bool:
@@ -1427,7 +1427,7 @@ def _expr_contains_platform_branch_literal(node: ast.AST) -> bool:
 
 def _string_literal_is_platform_branch_literal(value: str) -> bool:
     lowered = value.lower()
-    return _is_common_platform_literal(lowered) or _PLATFORM_BRANCH_VARIANT_RE.match(lowered) is not None
+    return _is_common_platform_literal(lowered) or _PLATFORM_BRANCH_VARIANT_RE.match(lowered) is not None or _string_literal_has_platform_semantic_name(value)
 
 
 def _expr_contains_unapproved_platform_literal(node: ast.AST, *, path: tuple[str, ...] = ()) -> bool:
@@ -1879,6 +1879,14 @@ def _string_literals(node: ast.AST) -> tuple[str, ...]:
 
 def _is_common_platform_literal(value: str) -> bool:
     return value.lower() in _COMMON_PLATFORM_LITERALS
+
+
+def _string_literal_has_platform_semantic_name(value: str) -> bool:
+    normalized = value.lower().replace("_", " ").replace("-", " ")
+    return any(
+        part in _COMMON_PLATFORM_LITERALS and part != "x"
+        for part in normalized.split()
+    )
 
 
 def _is_docstring_statement(node: ast.stmt) -> bool:

@@ -627,10 +627,7 @@ class PlatformLeakageTests(unittest.TestCase):
         )
 
         self.assertEqual(report["verdict"], "fail")
-        self.assertTrue(
-            {"platform_specific_field_leak", "single_platform_shared_semantic"}
-            & {item["code"] for item in report["details"]["findings"]}
-        )
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
 
     def test_run_check_detects_indirect_normalized_platform_get_branch(self) -> None:
         report = self.run_with_fixture(
@@ -920,6 +917,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
+    def test_run_check_detects_platform_branch_variant_compare_with_region_suffix(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    if adapter_key == "xhs_cn":\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_platform_branch_variant_match(self) -> None:
         if getattr(ast, "Match", None) is None:
             self.skipTest("pattern matching is unavailable in this Python runtime")
@@ -1039,6 +1049,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
+    def test_run_check_detects_shared_platform_semantic_with_platform_variant_fragment(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    DEFAULT_SHARED_MODE = "xhs_only"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
     def test_run_check_detects_platform_specific_url_fragment(self) -> None:
         report = self.run_with_fixture(
             {
@@ -1123,6 +1147,19 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
 
+    def test_run_check_allows_frozen_real_regression_case_matrix_constant(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '                "evidence_ref": "regression:xhs:success",\n',
+                    '                "evidence_ref": "regression:xhs:baseline-success",\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
     def test_run_check_does_not_whitelist_reference_pair_outside_frozen_constant(self) -> None:
         report = self.run_with_fixture(
             {
@@ -1143,6 +1180,20 @@ class PlatformLeakageTests(unittest.TestCase):
                 "syvert/version_gate.py": (
                     "}\n_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}\n",
                     '}; SHARED_ROUTING = ("xhs", "douyin")\n_FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
+
+    def test_run_check_does_not_whitelist_semicolon_statement_on_frozen_case_matrix_line(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '    },\n}\n_FROZEN_REFERENCE_PAIR_BY_VERSION = {\n',
+                    '    },\n}; SHARED_ROUTING = ("xhs", "douyin")\n_FROZEN_REFERENCE_PAIR_BY_VERSION = {\n',
                 )
             }
         )
