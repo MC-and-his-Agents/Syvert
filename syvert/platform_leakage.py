@@ -284,10 +284,28 @@ def _scan_file(
 
     findings: list[dict[str, str]] = []
     for node in ast.walk(module):
-        if not isinstance(node, ast.stmt) or isinstance(
-            node,
-            (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Module),
-        ):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            line_number = getattr(node, "lineno", None)
+            if line_number is None:
+                continue
+            statement_lines = _statement_line_numbers(node)
+            if statement_lines and all(line in allowed_exception_lines for line in statement_lines):
+                continue
+            boundary = boundary_resolver(line_number)
+            evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
+            function_source = _statement_source_segment(source_text, node)
+            if _function_has_single_platform_semantic(node, function_source):
+                findings.append(
+                    _finding(
+                        code="single_platform_shared_semantic",
+                        message=f"single-platform shared semantic leaked into shared layer at `{relative_name}:{line_number}`",
+                        boundary=boundary,
+                        evidence_ref=evidence_ref,
+                    )
+                )
+            continue
+
+        if not isinstance(node, ast.stmt) or isinstance(node, (ast.ClassDef, ast.Module)):
             continue
         line_number = getattr(node, "lineno", None)
         if line_number is None:
@@ -300,6 +318,8 @@ def _scan_file(
         boundary = boundary_resolver(line_number)
         evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
         statement_source = _statement_source_segment(source_text, node)
+        if _is_docstring_statement(node):
+            continue
         if _statement_has_platform_specific_field(statement_source, node):
             findings.append(
                 _finding(
@@ -366,6 +386,10 @@ def _statement_has_single_platform_semantic(node: ast.stmt, statement_source: st
         return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
     if isinstance(node, ast.AugAssign):
         return _assignment_has_single_platform_semantic([node.target], node.value, statement_source)
+    if isinstance(node, ast.Return) and node.value is not None:
+        return _expr_has_shared_platform_semantic(node.value, statement_source)
+    if isinstance(node, ast.Expr):
+        return _expr_has_shared_platform_semantic(node.value, statement_source)
     return False
 
 
@@ -381,6 +405,21 @@ def _assignment_has_single_platform_semantic(
         return True
 
     return _statement_has_semantic_platform_literal(statement_source, value)
+
+
+def _expr_has_shared_platform_semantic(value: ast.AST, statement_source: str) -> bool:
+    if _expr_has_platform_literal_compare(value):
+        return True
+    return _statement_has_semantic_platform_literal(statement_source, value)
+
+
+def _function_has_single_platform_semantic(node: ast.AST, function_source: str) -> bool:
+    args = getattr(node, "args", None)
+    if args is None:
+        return False
+    defaults = list(getattr(args, "defaults", ()))
+    defaults.extend(default for default in getattr(args, "kw_defaults", ()) if default is not None)
+    return any(_expr_has_shared_platform_semantic(default, function_source) for default in defaults)
 
 
 def _statement_has_semantic_platform_literal(statement_source: str, value: ast.AST) -> bool:
@@ -481,6 +520,10 @@ def _string_literals(node: ast.AST) -> tuple[str, ...]:
 
 def _is_common_platform_literal(value: str) -> bool:
     return value.lower() in _COMMON_PLATFORM_LITERALS
+
+
+def _is_docstring_statement(node: ast.stmt) -> bool:
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
 
 
 def _identifier_matches(value: str, pattern: re.Pattern[str]) -> bool:

@@ -194,6 +194,35 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
+    def test_run_check_detects_shared_platform_semantic_in_return_value(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    "    adapter_key, capability = extract_request_context(request)\n"
+                    '    return {"default_platform": "xhs"}\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
+    def test_run_check_detects_shared_platform_semantic_in_function_default(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "def extract_request_context(request: Any) -> tuple[str, str]:\n",
+                    'def extract_request_context(request: Any, default_platform: str = "xhs") -> tuple[str, str]:\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
+
     def test_run_check_detects_platform_specific_url_fragment(self) -> None:
         report = self.run_with_fixture(
             {
@@ -207,6 +236,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"adapter_registry"})
+
+    def test_run_check_ignores_docstring_platform_fragments(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "def extract_request_context(request: Any) -> tuple[str, str]:\n",
+                    'def extract_request_context(request: Any) -> tuple[str, str]:\n'
+                    '    """see https://www.douyin.com/aweme/v1/web/detail and selector .note-item"""\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
 
     def test_run_check_detects_platform_specific_selector_fragment(self) -> None:
         report = self.run_with_fixture(
