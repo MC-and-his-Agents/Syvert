@@ -38,18 +38,20 @@
 - 当前受审 PR：`#124`
 - 当前受审 head：以 PR `#124` 正文验证区块中的 `headRefOid` 为准
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`07def852594eb652d8d8e9fd80c288772cbb4814`
+- 当前 runtime-affecting 实现 checkpoint：`1d1b0492500ff58f047eba53b565c897befe2959`
 - 当前 metadata-only follow-up：由 PR `#124` 正文验证区块中的 `headRefOid` 与 guardian state 绑定；本文件只回填 guardian P1 修复后的 checkpoint / 验证追踪，不自举当前受审 head SHA。
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper。
 - 当前实现已在公开入口对冻结 `xhs` / `douyin` reference adapter 执行 fail-closed 身份 / 来源校验，仅接受真实 `XhsAdapter` / `DouyinAdapter` 及其允许的 hermetic 实例。
 - 当前实现已把 reference adapter 公开 surface 的冻结基线改为独立版本常量，不再读取当前类属性，避免适配器类定义漂移被误当成合法新基线。
+- 当前实现已把 douyin allowed-failure case 收紧为 hermetic 失败路径：默认 browser page-state recovery 绑定会被 fail-closed 拒绝，测试与 gate 接入都显式注入确定性失败的 `page_state_transport`。
 - 当前测试已补齐 payload 组装、fail-closed 行为，以及 source report 经 `orchestrate_version_gate()` 收口的端到端回归；本轮额外补了 shape-compatible spoofed adapter 冒充冻结 reference adapter 时的 fail-closed 回归。
 - 本轮新增了真实 reference adapter 类属性漂移时必须 fail-closed 的回归测试。
+- 本轮新增了 douyin 默认 browser recovery 绑定必须 fail-closed 的回归测试。
 
 ## 下一步动作
 
-- 在当前受审 head 上同步 PR body / issue body 当前事实，并明确 `07def852594eb652d8d8e9fd80c288772cbb4814` runtime checkpoint 与当前受审 head 的对应关系。
+- 在当前受审 head 上同步 PR body / issue body 当前事实，并明确 `1d1b0492500ff58f047eba53b565c897befe2959` runtime checkpoint 与当前受审 head 的对应关系。
 - 重新发起 guardian 审查；若审查通过，再进入 merge gate。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -92,7 +94,7 @@
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 86 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
-  - 结果：`Ran 98 tests`，`OK`
+  - 结果：`Ran 99 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
@@ -112,5 +114,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`07def852594eb652d8d8e9fd80c288772cbb4814`
+- 实现 checkpoint：`1d1b0492500ff58f047eba53b565c897befe2959`
 - 当前受审 head：以 PR `#124` 正文验证区块中的 `headRefOid` 为准
