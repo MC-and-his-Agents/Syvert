@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`54017afe10e47f071207a0745358a6bc2ff4c3c9`
+- 当前受审 runtime head：`a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`54017afe10e47f071207a0745358a6bc2ff4c3c9`
+- 当前 runtime-affecting 实现 checkpoint：`a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -90,7 +90,10 @@
     - 共享语义字符串与平台分支变体的 fail-closed 范围已进一步收紧；`DEFAULT_SHARED_MODE = "xhs_only"` 这类平台名片段共享语义和 `adapter_key == "xhs_cn"` 一类区域后缀分支现在也会稳定命中，而不再依赖精确平台字面量或有限后缀白名单
     - 模块级 `platform_alias` / `key_signal` / carrier 历史现在会向函数作用域 fail-closed 继承，`GLOBAL_PLATFORM_KEY = "platform"` 一类模块常量在函数体里不会再漏检；dict key 的平台语义和 `ast.parse` 的 `ValueError` 也已纳入统一 fail-closed 收口
     - 平台变体分支的归类优先级现在固定先于字段泄漏，`match adapter_key: case "douyin-prod"` 不会再被降级成 `platform_specific_field_leak`
-  - 当前已提交的运行时语义锚定在实现 checkpoint `54017afe10e47f071207a0745358a6bc2ff4c3c9`
+    - `version_gate_logic` 允许例外现在按冻结常量的结构化字面值校验收紧，不再按“命中目标名就整句白名单”；`xhslink.com` 一类越界片段会重新进入 fail-closed 扫描，而受控的回归 `evidence_ref` 仍保持允许
+    - 函数默认参数现在单独补齐平台片段检测，`default_mode="https://douyin.com"` 会命中 `single_platform_shared_semantic`，但 `return {"normalized": {"x": 1}}` 一类中性共享结果字段不会被误伤
+    - 六个共享边界的命中级证据与 `evidence_ref` 形状现在都有显式回归；fail-closed finding 必须把 `evidence_ref` 回填到顶层 `evidence_refs`
+  - 当前已提交的运行时语义锚定在实现 checkpoint `a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -128,7 +131,7 @@
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：在 checkpoint `54017afe10e47f071207a0745358a6bc2ff4c3c9` 上通过，`Ran 233 tests`，`OK (skipped=6)`；已覆盖平台变体 `match` 分支归类优先级修复，并保持 guardian 指出的模块级语义继承、dict key 平台语义与 parse `ValueError` blocker 回归通过
+  - 结果：在 checkpoint `a0aaaa7e522c9268928d2a5d44e11b73b5ff5428` 上通过，`Ran 236 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归，并保持平台变体 `match` 分支归类优先级修复继续通过
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3` 上通过，`Ran 230 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的平台名片段共享语义与平台变体分支 blocker
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -198,7 +201,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`54017afe10e47f071207a0745358a6bc2ff4c3c9`
-- 最近一次重跑目标测试的 head：`54017afe10e47f071207a0745358a6bc2ff4c3c9`
-- 当前受审 runtime head：`54017afe10e47f071207a0745358a6bc2ff4c3c9`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `54017afe10e47f071207a0745358a6bc2ff4c3c9`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
+- 最近一次重跑目标测试的 head：`a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
+- 当前受审 runtime head：`a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `a0aaaa7e522c9268928d2a5d44e11b73b5ff5428`，不得把 follow-up 误记为新的运行时真相
