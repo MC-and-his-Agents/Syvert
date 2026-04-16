@@ -45,7 +45,8 @@
   - 已新增 `syvert.platform_leakage`，固定扫描 `runtime.py` / `registry.py` / `version_gate.py`
   - 已补 `tests/runtime/test_platform_leakage.py`
   - 已在 `tests/runtime/test_version_gate.py` 增加真实 checker 输出进入 orchestrator 的接入回归
-  - 当前待补一笔 exec-plan metadata follow-up，用于把 checkpoint / 验证追踪绑定到当前实现 head
+  - 当前 PR latest head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
+  - 当前 head 为 metadata-only follow-up；运行时语义仍锚定在实现 checkpoint `f7de3de924745cce410f2fdad7de7b7021f90bbc`
 
 ## 实现要点
 
@@ -78,6 +79,12 @@
   - 结果：`Ran 138 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`已校验 2 条提交信息，全部通过。`
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`PR scope 校验通过。`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：当前 head `9cb980ec279dc0acead69bc00589060ba40c2e0c` 复跑，`docs-guard 通过。`
 
 ## 未决风险
 
@@ -92,5 +99,6 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 实现 checkpoint：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
-- 最近一次重跑目标测试的代码 head：`f7de3de924745cce410f2fdad7de7b7021f90bbc`
-- 当前 metadata-only head：`当前分支最新 head（仅回填 exec-plan checkpoint / 验证追踪，不改运行时语义）`
+- 最近一次重跑目标测试的 head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
+- 最近一次门禁复跑的 head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
+- 当前 metadata-only head：`9cb980ec279dc0acead69bc00589060ba40c2e0c`
