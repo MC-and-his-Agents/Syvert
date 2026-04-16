@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 
+from syvert.platform_leakage import run_platform_leakage_check
 import syvert.version_gate as version_gate_module
 
 from tests.runtime.contract_harness.automation import run_contract_harness_automation
@@ -1736,6 +1738,34 @@ class VersionGateTests(unittest.TestCase):
             "missing_platform_leakage_details",
             {item["code"] for item in report["failures"]},
         )
+
+    def test_orchestrator_accepts_platform_leakage_checker_output(self) -> None:
+        leakage_report = run_platform_leakage_check(
+            version="v0.2.0",
+            repo_root=Path(__file__).resolve().parents[2],
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["source"], "platform_leakage")
+        self.assertEqual(leakage_report["verdict"], "pass")
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "pass")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["findings"], [])
 
     def test_orchestrator_failures_keep_source_distinction(self) -> None:
         harness_report = build_harness_source_report(
