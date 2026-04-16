@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`3963d61fe5e5f85ca625177cacf66480c0b917a0`
+- 当前受审 runtime head：`f6526843ac134a71203771e164b6de6220f131d8`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`3963d61fe5e5f85ca625177cacf66480c0b917a0`
+- 当前 runtime-affecting 实现 checkpoint：`f6526843ac134a71203771e164b6de6220f131d8`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -94,7 +94,9 @@
     - 函数默认参数现在单独补齐平台片段检测，`default_mode="https://douyin.com"` 会命中 `single_platform_shared_semantic`，但 `return {"normalized": {"x": 1}}` 一类中性共享结果字段不会被误伤
     - 六个共享边界的命中级证据与 `evidence_ref` 形状现在都有显式回归；fail-closed finding 必须把 `evidence_ref` 回填到顶层 `evidence_refs`
     - shared-result 与 `error.details` carrier 现在支持 tuple/list 按位解包传播，`_, bucket = (None, normalized)` 与 `details, _ = (error.details, None)` 不会再把共享字段泄漏洗成 pass
-  - 当前已提交的运行时语义锚定在实现 checkpoint `3963d61fe5e5f85ca625177cacf66480c0b917a0`
+    - shared result 的字典初始化现在也会继承 carrier path，`normalized = {platform_key: "1"}` 一类动态 key 写入不会再绕过 `platform_specific_field_leak`
+    - `boundary_scope` 的公共 contract 现在收紧为有序 string sequence；`set` 这类无序 iterable 会稳定按 `invalid_boundary_scope` fail-closed，而不是漂移成顺序错误
+  - 当前已提交的运行时语义锚定在实现 checkpoint `f6526843ac134a71203771e164b6de6220f131d8`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -132,7 +134,7 @@
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
-  - 结果：在 checkpoint `3963d61fe5e5f85ca625177cacf66480c0b917a0` 上通过，`Ran 238 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归、以及 tuple/list 解包载体传播修复，并保持平台变体 `match` 分支归类优先级修复继续通过
+  - 结果：在 checkpoint `f6526843ac134a71203771e164b6de6220f131d8` 上通过，`Ran 240 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归、tuple/list 解包载体传播修复、shared result 动态 key 初始化收口、以及 `boundary_scope` 有序 sequence 校验，并保持平台变体 `match` 分支归类优先级修复继续通过
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `41a97ec6dad3a4bd88349d7c8a59e7cf84865cc3` 上通过，`Ran 230 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的平台名片段共享语义与平台变体分支 blocker
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -202,7 +204,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`3963d61fe5e5f85ca625177cacf66480c0b917a0`
-- 最近一次重跑目标测试的 head：`3963d61fe5e5f85ca625177cacf66480c0b917a0`
-- 当前受审 runtime head：`3963d61fe5e5f85ca625177cacf66480c0b917a0`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `3963d61fe5e5f85ca625177cacf66480c0b917a0`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`f6526843ac134a71203771e164b6de6220f131d8`
+- 最近一次重跑目标测试的 head：`f6526843ac134a71203771e164b6de6220f131d8`
+- 当前受审 runtime head：`f6526843ac134a71203771e164b6de6220f131d8`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `f6526843ac134a71203771e164b6de6220f131d8`，不得把 follow-up 误记为新的运行时真相
