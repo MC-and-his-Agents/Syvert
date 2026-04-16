@@ -326,6 +326,15 @@ def _references_default_page_state_transport(value: Any, *, _seen: set[int] | No
             if _references_default_page_state_transport(item, _seen=_seen):
                 return True
 
+    if getattr(value, "__code__", None) is None and getattr(value, "__func__", None) is None:
+        class_dict = getattr(type(value), "__dict__", None)
+        if isinstance(class_dict, Mapping):
+            for name, item in class_dict.items():
+                if name in {"__dict__", "__doc__", "__module__", "__weakref__"}:
+                    continue
+                if _references_default_page_state_transport(item, _seen=_seen):
+                    return True
+
     wrapped = getattr(value, "__wrapped__", None)
     if wrapped is not None and _references_default_page_state_transport(wrapped, _seen=_seen):
         return True
