@@ -39,7 +39,7 @@
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
 - 当前受审 runtime head：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
-- 基线真相：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
+- 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
 - 当前 runtime-affecting 实现 checkpoint：`3dff2b2ea514e3b3d153d1bb243cc9616098df2c`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
