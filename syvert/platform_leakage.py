@@ -442,7 +442,7 @@ def _match_has_platform_literal_branch(node: ast.AST) -> bool:
 
 def _pattern_contains_platform_literal(pattern: ast.AST) -> bool:
     if _AST_MATCH_VALUE is not None and isinstance(pattern, _AST_MATCH_VALUE):
-        return _expr_contains_string_literal(pattern.value)
+        return _expr_contains_platform_literal(pattern.value)
     if _AST_MATCH_SINGLETON is not None and isinstance(pattern, _AST_MATCH_SINGLETON):
         return False
     if _AST_MATCH_SEQUENCE is not None and isinstance(pattern, _AST_MATCH_SEQUENCE):
@@ -466,12 +466,12 @@ def _expr_has_platform_literal_compare(node: ast.AST) -> bool:
 
 def _compare_pair_has_platform_literal(left: ast.AST, right: ast.AST, operator: ast.AST) -> bool:
     if isinstance(operator, (ast.Eq, ast.NotEq)):
-        return (_expr_is_platformish(left) and _expr_contains_platform_marker(right)) or (
-            _expr_is_platformish(right) and _expr_contains_platform_marker(left)
+        return (_expr_is_platformish(left) and _expr_contains_platform_literal(right)) or (
+            _expr_is_platformish(right) and _expr_contains_platform_literal(left)
         )
     if isinstance(operator, (ast.In, ast.NotIn)):
-        return (_expr_is_platformish(left) and _expr_contains_platform_marker(right)) or (
-            _expr_is_platformish(right) and _expr_contains_platform_marker(left)
+        return (_expr_is_platformish(left) and _expr_contains_platform_literal(right)) or (
+            _expr_is_platformish(right) and _expr_contains_platform_literal(left)
         )
     return False
 

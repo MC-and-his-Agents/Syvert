@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 import tempfile
 import unittest
@@ -138,6 +139,51 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
 
+    def test_run_check_does_not_report_non_platform_match_branch(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    match adapter_key:\n        case "unknown":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_does_not_report_platform_fragment_compare_branch(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    if adapter_key == "aweme-detail":\n        return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertNotIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_does_not_report_platform_fragment_match_branch(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    adapter_key, capability = extract_request_context(request)\n    match adapter_key:\n        case "a_bogus":\n            return None\n\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertNotIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
     def test_run_check_detects_raise_expression_platform_compare(self) -> None:
         report = self.run_with_fixture(
             {
@@ -179,7 +225,7 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
 
-    def test_run_check_does_not_whitelist_error_details_branch(self) -> None:
+    def test_run_check_detects_error_details_platform_branch(self) -> None:
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
@@ -191,6 +237,34 @@ class PlatformLeakageTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_detects_error_details_platform_match_branch(self) -> None:
+        if getattr(ast, "Match", None) is None:
+            self.skipTest("pattern matching is unavailable in this Python runtime")
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    match error.details.get("platform"):\n        case "douyin":\n            return None\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["details"]["findings"]})
+
+    def test_run_check_allows_error_details_platform_carrier_without_branching(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    adapter_key, capability = extract_request_context(request)\n",
+                    '    platform_name = adapter_error.details.get("platform")\n\n    adapter_key, capability = extract_request_context(request)\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["details"]["findings"], [])
 
     def test_run_check_detects_platform_specific_field_leak(self) -> None:
         report = self.run_with_fixture(
