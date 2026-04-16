@@ -241,6 +241,7 @@ def validate_real_adapter_regression_source_report(
 
     adapter_results = _normalize_adapter_results(payload.get("adapter_results"), source, failures)
     adapters_by_key = {entry["adapter_key"]: entry for entry in adapter_results}
+    case_evidence_refs = [case["evidence_ref"] for entry in adapter_results for case in entry["cases"]]
     for adapter_key in expected_reference_pair:
         adapter_result = adapters_by_key.get(adapter_key)
         if adapter_result is None:
@@ -328,6 +329,21 @@ def validate_real_adapter_regression_source_report(
             )
         )
 
+    if case_evidence_refs and evidence_refs != case_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "case_evidence_refs_mismatch",
+                "real adapter regression report evidence_refs must match the per-case evidence trace",
+                details={
+                    "expected_evidence_refs": case_evidence_refs,
+                    "actual_evidence_refs": evidence_refs,
+                },
+            )
+        )
+
+    if case_evidence_refs:
+        evidence_refs = case_evidence_refs
     evidence_refs = _finalize_evidence_refs(evidence_refs, source=source, failures=failures)
     summary = (
         f"real adapter regression passed for version `{version}`"
@@ -1299,6 +1315,17 @@ def _normalize_regression_cases(
         )
         if observed_status is None:
             continue
+        evidence_ref = entry.get("evidence_ref")
+        if not _is_non_empty_string(evidence_ref):
+            failures.append(
+                _failure(
+                    source,
+                    "invalid_case_evidence_ref",
+                    "adapter regression case must carry non-empty evidence_ref",
+                    details={"adapter_key": adapter_key, "case_id": case_id},
+                )
+            )
+            continue
         observed_error_category = entry.get("observed_error_category")
         if observed_status == "success" and observed_error_category is not None:
             failures.append(
@@ -1323,6 +1350,7 @@ def _normalize_regression_cases(
         normalized_cases.append(
             {
                 "case_id": case_id,
+                "evidence_ref": evidence_ref,
                 "expected_outcome": expected_outcome,
                 "observed_status": observed_status,
                 "observed_error_category": observed_error_category,

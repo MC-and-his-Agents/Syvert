@@ -471,6 +471,7 @@ class VersionGateTests(unittest.TestCase):
         payload["adapter_results"][0]["cases"] = [
             {
                 "case_id": "xhs-invalid-input",
+                "evidence_ref": "regression:xhs:invalid-input",
                 "expected_outcome": "allowed_failure",
                 "observed_status": "failed",
                 "observed_error_category": "invalid_input",
@@ -491,6 +492,7 @@ class VersionGateTests(unittest.TestCase):
         payload["adapter_results"][0]["cases"] = [
             {
                 "case_id": "xhs-success",
+                "evidence_ref": "regression:xhs:success",
                 "expected_outcome": "success",
                 "observed_status": "success",
                 "observed_error_category": None,
@@ -532,6 +534,37 @@ class VersionGateTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_evidence_refs", {item["code"] for item in report["details"]["failures"]})
         self.assertTrue(report["evidence_refs"])
+
+    def test_real_regression_rejects_missing_case_evidence_ref(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["adapter_results"][0]["cases"][0]["evidence_ref"] = ""
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_case_evidence_ref", {item["code"] for item in report["details"]["failures"]})
+
+    def test_real_regression_rejects_case_evidence_mismatch(self) -> None:
+        payload = self.valid_real_adapter_regression_payload()
+        payload["evidence_refs"] = [
+            "regression:xhs:success",
+            "regression:douyin:success",
+            "regression:xhs:invalid-input",
+            "regression:douyin:platform",
+        ]
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("case_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
 
     def test_real_regression_rejects_unhashable_case_enums(self) -> None:
         payload = self.valid_real_adapter_regression_payload()
@@ -2060,12 +2093,14 @@ class VersionGateTests(unittest.TestCase):
                     "cases": [
                         {
                             "case_id": "xhs-success",
+                            "evidence_ref": "regression:xhs:success",
                             "expected_outcome": "success",
                             "observed_status": "success",
                             "observed_error_category": None,
                         },
                         {
                             "case_id": "xhs-invalid-input",
+                            "evidence_ref": "regression:xhs:invalid-input",
                             "expected_outcome": "allowed_failure",
                             "observed_status": "failed",
                             "observed_error_category": "invalid_input",
@@ -2077,12 +2112,14 @@ class VersionGateTests(unittest.TestCase):
                     "cases": [
                         {
                             "case_id": "douyin-success",
+                            "evidence_ref": "regression:douyin:success",
                             "expected_outcome": "success",
                             "observed_status": "success",
                             "observed_error_category": None,
                         },
                         {
                             "case_id": "douyin-platform",
+                            "evidence_ref": "regression:douyin:platform",
                             "expected_outcome": "allowed_failure",
                             "observed_status": "failed",
                             "observed_error_category": "platform",

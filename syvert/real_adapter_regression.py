@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from collections.abc import Mapping
 from typing import Any
 
@@ -222,7 +223,7 @@ def validate_reference_adapter_surface(
 def validate_reference_adapter_runtime_binding(*, adapter_key: str, adapter: object) -> None:
     if adapter_key != "douyin":
         return
-    if getattr(adapter, "_page_state_transport", None) is default_page_state_transport:
+    if _references_default_page_state_transport(getattr(adapter, "_page_state_transport", None)):
         raise ReferenceAdapterBindingError(
             code="non_hermetic_reference_adapter_binding",
             message="real adapter regression 的 douyin allowed-failure case 必须禁用默认 browser recovery",
@@ -244,6 +245,7 @@ def build_regression_case_from_envelope(
             observed_error_category = category
     return {
         "case_id": str(case_definition["case_id"]),
+        "evidence_ref": str(case_definition["evidence_ref"]),
         "expected_outcome": str(case_definition["expected_outcome"]),
         "observed_status": observed_status,
         "observed_error_category": observed_error_category,
@@ -300,3 +302,50 @@ def _normalize_identity_value(value: Any) -> Any:
     if isinstance(value, frozenset):
         return sorted(value)
     return value
+
+
+def _references_default_page_state_transport(value: Any, *, _seen: set[int] | None = None) -> bool:
+    if value is default_page_state_transport:
+        return True
+
+    if _seen is None:
+        _seen = set()
+    object_id = id(value)
+    if object_id in _seen:
+        return False
+    _seen.add(object_id)
+
+    if isinstance(value, functools.partial):
+        return _references_default_page_state_transport(value.func, _seen=_seen) or any(
+            _references_default_page_state_transport(item, _seen=_seen)
+            for item in (*value.args, *(value.keywords or {}).values())
+        )
+
+    wrapped = getattr(value, "__wrapped__", None)
+    if wrapped is not None and _references_default_page_state_transport(wrapped, _seen=_seen):
+        return True
+
+    bound_func = getattr(value, "__func__", None)
+    if bound_func is not None and _references_default_page_state_transport(bound_func, _seen=_seen):
+        return True
+
+    closure = getattr(value, "__closure__", None)
+    if closure:
+        for cell in closure:
+            try:
+                cell_value = cell.cell_contents
+            except ValueError:
+                continue
+            if _references_default_page_state_transport(cell_value, _seen=_seen):
+                return True
+
+    code = getattr(value, "__code__", None)
+    globals_dict = getattr(value, "__globals__", None)
+    if code is not None and isinstance(globals_dict, Mapping):
+        if (
+            "default_page_state_transport" in getattr(code, "co_names", ())
+            and globals_dict.get("default_page_state_transport") is default_page_state_transport
+        ):
+            return True
+
+    return False

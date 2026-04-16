@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from syvert.adapters.douyin import DouyinAdapter, DouyinSessionConfig
+from syvert.adapters.douyin import DouyinAdapter, DouyinSessionConfig, default_page_state_transport
 from syvert.adapters.xhs import XhsAdapter, XhsSessionConfig
 from syvert.runtime import PlatformAdapterError
 from syvert.real_adapter_regression import (
@@ -115,6 +115,8 @@ class RealAdapterRegressionTests(unittest.TestCase):
         )
         self.assertEqual(payload["adapter_results"][0]["adapter_key"], "xhs")
         self.assertEqual(payload["adapter_results"][1]["adapter_key"], "douyin")
+        self.assertEqual(payload["adapter_results"][0]["cases"][0]["evidence_ref"], "regression:xhs:success")
+        self.assertEqual(payload["adapter_results"][1]["cases"][1]["evidence_ref"], "regression:douyin:platform")
         self.assertEqual(payload["adapter_results"][0]["cases"][0]["observed_status"], "success")
         self.assertEqual(payload["adapter_results"][0]["cases"][1]["observed_error_category"], "invalid_input")
         self.assertEqual(payload["adapter_results"][1]["cases"][1]["observed_error_category"], "platform")
@@ -191,6 +193,34 @@ class RealAdapterRegressionTests(unittest.TestCase):
             ),
             sign_transport=lambda base_url, payload, timeout_seconds: {"a_bogus": "signed-1"},
             detail_transport=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("detail-failed")),
+        )
+
+        report = run_real_adapter_regression(
+            version="v0.2.0",
+            adapters=adapters,
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "non_hermetic_reference_adapter_binding",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
+    def test_run_real_adapter_regression_fails_closed_when_douyin_binding_wraps_default_page_state_recovery(self) -> None:
+        adapters = self.hermetic_adapters()
+        adapters["douyin"] = DouyinAdapter(
+            session_provider=lambda path: DouyinSessionConfig(
+                cookies="a=1; b=2",
+                user_agent="Mozilla/5.0 TestAgent",
+                verify_fp="verify-1",
+                ms_token="ms-token-1",
+                webid="webid-1",
+                sign_base_url="http://127.0.0.1:8000",
+                timeout_seconds=5,
+            ),
+            sign_transport=lambda base_url, payload, timeout_seconds: {"a_bogus": "signed-1"},
+            detail_transport=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("detail-failed")),
+            page_state_transport=lambda **kwargs: default_page_state_transport(**kwargs),
         )
 
         report = run_real_adapter_regression(
@@ -286,6 +316,43 @@ class RealAdapterRegressionTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
+
+    def test_validate_real_adapter_regression_rejects_missing_case_evidence_ref(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload["adapter_results"][1]["cases"][1]["evidence_ref"] = ""
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("invalid_case_evidence_ref", {item["code"] for item in report["details"]["failures"]})
+
+    def test_validate_real_adapter_regression_rejects_misbound_case_evidence_refs(self) -> None:
+        payload = build_real_adapter_regression_payload(
+            version="v0.2.0",
+            adapters=self.hermetic_adapters(),
+        )
+        payload["evidence_refs"] = [
+            "regression:xhs:success",
+            "regression:xhs:invalid-input",
+            "regression:douyin:platform",
+            "regression:douyin:success",
+        ]
+
+        report = validate_real_adapter_regression_source_report(
+            payload,
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("case_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
 
     def test_validate_real_adapter_regression_rejects_operation_surface_mismatch(self) -> None:
         payload = build_real_adapter_regression_payload(
