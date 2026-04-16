@@ -36,9 +36,10 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-119-fr-0007`
 - 当前执行分支：`issue-119-fr-0007`
 - 当前受审 PR：`#124`
+- 当前受审 head：以 PR `#124` 正文验证区块中的 `headRefOid` 为准
 - 基线真相源：`origin/main@eb5bbc3d0bf0dc5b91fe64a8a63aa24c34ba8479`
-- 当前 runtime-affecting 实现 checkpoint：`22617661a06dcfa9584a1e068c2cd604aab7c8bf`
-- 当前 metadata-only follow-up：当前分支最新 head（仅回填 guardian P1 修复后的 exec-plan checkpoint / 验证追踪，不改运行时语义）。
+- 当前 runtime-affecting 实现 checkpoint：`2261766ca67bcf9a011ef01ad7f0300bba180950`
+- 当前 metadata-only follow-up：由 PR `#124` 正文验证区块中的 `headRefOid` 与 guardian state 绑定；本文件只回填 guardian P1 修复后的 checkpoint / 验证追踪，不自举当前受审 head SHA。
 - 当前实现已新增双参考适配器回归执行器模块，固定执行 `xhs` / `douyin` 的 success + allowed failure 矩阵。
 - 当前实现只通过 `syvert.runtime.execute_task` 观察公开 runtime envelope，不直读 adapter 私有 helper。
 - 当前实现已在公开入口对冻结 `xhs` / `douyin` reference adapter 执行 fail-closed 身份 / 来源校验，仅接受真实 `XhsAdapter` / `DouyinAdapter` 及其允许的 hermetic 实例。
@@ -46,7 +47,7 @@
 
 ## 下一步动作
 
-- 在当前 metadata-only head 上同步 PR body / issue body 当前事实，并明确 `22617661a06dcfa9584a1e068c2cd604aab7c8bf` runtime checkpoint 与当前受审 head 的对应关系。
+- 在当前受审 head 上同步 PR body / issue body 当前事实，并明确 `2261766ca67bcf9a011ef01ad7f0300bba180950` runtime checkpoint 与当前受审 head 的对应关系。
 - 重新发起 guardian 审查；若审查通过，再进入 merge gate。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -89,11 +90,11 @@
 - `python3 -m unittest tests.runtime.test_version_gate`
   - 结果：`Ran 86 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：当前 metadata-only head 复跑，通过。
+  - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 metadata-only head 复跑，通过。
+  - 结果：当前受审 head 复跑，通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：当前 metadata-only head 复跑，`PR scope` 校验通过。
+  - 结果：当前受审 head 复跑，`PR scope` 校验通过。
 
 ## 未决风险
 
@@ -107,5 +108,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`22617661a06dcfa9584a1e068c2cd604aab7c8bf`
-- 当前 metadata-only head：`当前分支最新 head（仅回填 guardian P1 修复后的 exec-plan checkpoint / 验证追踪，不改运行时语义）`
+- 实现 checkpoint：`2261766ca67bcf9a011ef01ad7f0300bba180950`
+- 当前受审 head：以 PR `#124` 正文验证区块中的 `headRefOid` 为准
