@@ -33,6 +33,27 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(payload["findings"], [])
         self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
 
+    def test_build_payload_fails_closed_on_set_shaped_boundary_scope(self) -> None:
+        payload = build_platform_leakage_payload(
+            version="v0.2.0",
+            repo_root=REPO_ROOT,
+            boundary_scope=set(DEFAULT_BOUNDARY_SCOPE),
+        )
+
+        self.assertEqual(payload["verdict"], "fail")
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
+
+    def test_build_payload_fails_closed_on_empty_version(self) -> None:
+        payload = build_platform_leakage_payload(
+            version="",
+            repo_root=REPO_ROOT,
+        )
+
+        self.assertEqual(payload["verdict"], "fail")
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
+
     def test_run_check_passes_for_current_shared_files(self) -> None:
         report = run_platform_leakage_check(
             version="v0.2.0",

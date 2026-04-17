@@ -144,8 +144,9 @@ def build_platform_leakage_payload(
 ) -> dict[str, Any]:
     findings, scan_refs = _scan_shared_boundaries(repo_root)
     evidence_refs = sorted({*scan_refs, *(finding["evidence_ref"] for finding in findings)})
-    verdict = "fail" if findings else "pass"
     checked_boundary_scope = _coerce_boundary_scope_input(boundary_scope)
+    builder_inputs_valid = _is_non_empty_string_value(version) and _is_frozen_boundary_scope_input(checked_boundary_scope)
+    verdict = "fail" if findings or not builder_inputs_valid else "pass"
     return {
         "version": version,
         "boundary_scope": checked_boundary_scope,
@@ -252,6 +253,14 @@ def _coerce_boundary_scope_input(
     if isinstance(boundary_scope, Sequence):
         return list(boundary_scope)
     return boundary_scope
+
+
+def _is_non_empty_string_value(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _is_frozen_boundary_scope_input(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes, Mapping)) and list(value) == list(DEFAULT_BOUNDARY_SCOPE)
 
 
 def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:

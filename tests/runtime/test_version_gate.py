@@ -639,6 +639,23 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
         self.assertTrue(report["evidence_refs"])
 
+    def test_platform_leakage_rejects_forged_clean_scan_refs(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["evidence_refs"] = ["anything-at-all"]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_leakage_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
+        self.assertEqual(
+            report["evidence_refs"],
+            [
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
+        )
+
     def test_platform_leakage_rejects_finding_evidence_ref_missing_from_evidence_refs(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["verdict"] = "fail"
@@ -2407,7 +2424,11 @@ class VersionGateTests(unittest.TestCase):
             "verdict": "pass",
             "summary": "platform leakage checks are clean",
             "findings": [],
-            "evidence_refs": ["leakage:scan:1"],
+            "evidence_refs": [
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
         }
 
     def assert_source_report_contract_shape(self, source: str, report: dict[str, object]) -> None:

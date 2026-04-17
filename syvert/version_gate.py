@@ -68,6 +68,14 @@ _REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE = (
     "version_gate_logic",
 )
 _REQUIRED_LEAKAGE_BOUNDARIES = frozenset(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE)
+_REQUIRED_LEAKAGE_SCAN_REFS = tuple(
+    f"platform_leakage:scan:{target}"
+    for target in (
+        "syvert/runtime.py",
+        "syvert/registry.py",
+        "syvert/version_gate.py",
+    )
+)
 
 
 def build_harness_source_report(
@@ -559,6 +567,21 @@ def validate_platform_leakage_source_report(
                 details={"missing_evidence_refs": missing_finding_evidence_refs},
             )
         )
+
+    expected_evidence_refs = sorted({*_REQUIRED_LEAKAGE_SCAN_REFS, *(str(finding["evidence_ref"]) for finding in findings)})
+    if sorted(evidence_refs) != expected_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "platform_leakage_evidence_refs_mismatch",
+                "platform leakage report evidence_refs must prove the frozen scan targets and finding traces",
+                details={
+                    "expected_evidence_refs": expected_evidence_refs,
+                    "actual_evidence_refs": evidence_refs,
+                },
+            )
+        )
+        evidence_refs = expected_evidence_refs
 
     gate_failures = [_failure_from_leakage_finding(source, finding) for finding in findings] if payload_verdict == FAIL_VERDICT else []
     normalized_failures = failures + gate_failures
