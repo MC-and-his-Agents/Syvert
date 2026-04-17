@@ -125,6 +125,21 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_result_contract"})
 
+    def test_run_check_maps_exception_failure_return_to_shared_error_model(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    '                str(error) or error.__class__.__name__,\n',
+                    '                str(error) or error.__class__.__name__,\n'
+                    '                details={"xhs_extra": "1"},\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_error_model"})
+
     def test_run_check_fails_closed_when_boundary_scope_is_incomplete(self) -> None:
         report = run_platform_leakage_check(
             version="v0.2.0",

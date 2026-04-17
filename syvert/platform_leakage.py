@@ -309,14 +309,40 @@ def _collect_runtime_statement_boundary_overrides(module: ast.Module) -> list[tu
     for node in module.body:
         if not isinstance(node, ast.FunctionDef) or node.name != "execute_task":
             continue
-        end_line = getattr(node, "end_lineno", node.lineno)
-        for statement in node.body:
-            if isinstance(statement, ast.Try) and any(
-                isinstance(name, ast.Name) and name.id == "payload" for name in ast.walk(statement)
-            ):
-                ranges.append((statement.lineno, end_line, "shared_result_contract"))
-                break
+        for statement in sorted(
+            (child for child in ast.walk(node) if isinstance(child, ast.Return)),
+            key=lambda child: (child.lineno, getattr(child, "end_lineno", child.lineno)),
+        ):
+            boundary = _classify_execute_task_return_boundary(statement)
+            if boundary is None:
+                continue
+            ranges.append((statement.lineno, getattr(statement, "end_lineno", statement.lineno), boundary))
     return ranges
+
+
+def _classify_execute_task_return_boundary(statement: ast.Return) -> str | None:
+    if _is_failure_envelope_return(statement):
+        return "shared_error_model"
+    if _is_success_envelope_return(statement):
+        return "shared_result_contract"
+    return None
+
+
+def _is_failure_envelope_return(statement: ast.Return) -> bool:
+    value = statement.value
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id == "failure_envelope"
+    )
+
+
+def _is_success_envelope_return(statement: ast.Return) -> bool:
+    value = statement.value
+    if not isinstance(value, ast.Dict):
+        return False
+    keys = {key.value for key in value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
+    return {"raw", "normalized"}.issubset(keys)
 
 
 def _build_allowed_exception_statements(relative_name: str, source_text: str) -> frozenset[tuple[int, int, int, int]]:
