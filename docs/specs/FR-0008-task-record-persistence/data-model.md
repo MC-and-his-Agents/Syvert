@@ -7,7 +7,7 @@
 - 实体：`TaskRequestSnapshot`
   - 用途：持久化任务在进入执行路径时的共享请求快照，供查询与恢复链路回读
 - 实体：`TaskTerminalResult`
-  - 用途：承载任务终态时的共享 envelope；其语义继续受既有 Core contract 约束
+  - 用途：承载任务终态时的共享 envelope；其语义继续受既有 Core contract 约束，`envelope.status` 是唯一终态结果状态真相源
 - 实体：`TaskLogEntry`
   - 用途：承载 append-only 生命周期日志，表达任务在 admission、执行与收口阶段的最小事件
 
@@ -42,8 +42,7 @@
 - `TaskTerminalResult`
   - `envelope`
     - 约束：必须是 JSON-safe；成功态继续复用 success envelope，失败态继续复用 failed envelope
-  - `status`
-    - 约束：只能为 `success` 或 `failed`，并与 `TaskRecord.status` 的终态一致
+    - 约束：`envelope.status` 只能为 `success` 或 `failed`，并与 `TaskRecord.status` 的终态一致
 - `TaskLogEntry`
   - `sequence`
     - 约束：单调递增；用于证明日志顺序可信
