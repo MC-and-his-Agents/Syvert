@@ -34,12 +34,17 @@
 
 - `#137` 已作为 `FR-0008` formal spec 的真实执行入口建立独立 worktree，执行分支为 `issue-137-fr-0008-formal-spec`。
 - `FR-0008` formal spec 套件、`v0.3.0` release 索引与 `2026-S16` sprint 索引已在当前分支首次落盘。
-- 当前 checkpoint `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2` 已冻结任务状态、终态结果、执行日志、共享序列化与本地持久化边界，并把 `FR-0008` 与 `FR-0009` 查询 surface 明确分离。
+- guardian 首轮审查已返回 `REQUEST_CHANGES`，指出两项 formal spec 自相矛盾：
+  - 是否把“尚未通过共享 admission”的失败纳入 `TaskRecord` 生命周期
+  - `TaskTerminalResult` 是否额外引入重复的 `status` 轴
+- 当前 checkpoint `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2` 已按 guardian 结论收口：
+  - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
+  - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
 
 ## 下一步动作
 
-- 基于当前 checkpoint 运行 `governance_gate`、`open_pr --dry-run` 与受控推送。
-- 通过受控入口创建 spec PR，并同步 `#137` / `#127` 的 GitHub 执行语义。
+- 推送当前 head，等待 `PR #145` checks 重新绑定到最新提交。
+- 基于当前 checkpoint 重跑 guardian，确认已消除 formal spec 阻断。
 - 在 guardian / checks 通过后，用受控 merge 完成 PR 收口并关闭 `#137`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -79,6 +84,13 @@
   - 结果：通过。
 - `git commit -m 'docs(spec): 冻结 FR-0008 任务记录与持久化 formal spec'`
   - 结果：已生成 checkpoint `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2`
+- `python3 scripts/pr_guardian.py review 145`
+  - 结果：guardian 首轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 共享 admission 拒绝不再被错误写入 `TaskRecord` 生命周期
+    - `TaskTerminalResult` 不再额外持久化 shadow `status`
+- `git commit -m 'docs(spec): 收紧 FR-0008 持久化生命周期契约'`
+  - 结果：已生成 checkpoint `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2`
 
 ## 未决风险
 
@@ -91,4 +103,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2`
+- `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2`
