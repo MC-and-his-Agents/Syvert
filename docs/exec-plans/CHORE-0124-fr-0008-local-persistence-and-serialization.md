@@ -37,6 +37,7 @@
 - 当前分支已把 `LocalTaskRecordStore`、runtime durable 接线与回归测试落到 worktree，并通过当前受审 PR `#148` 进入 implementation 审查。
 - 当前受审实现 head 为 `1cebdf36fc807a056294f8d184540df3770617a2`，已把 accepted / running / completion 三段 durable 写入、冲突/无效化处理、accepted/running 幂等重放与默认本地 store 路径接入到 `execute_task_with_record()`。
 - 当前工作树允许追加 metadata-only review sync；这类 follow-up 只回写 exec-plan / 验证追账，不再引入新的 runtime/store/test 语义。
+- PR `#148` 已于 `2026-04-17T16:49:02Z` 合入主干，merge commit 为 `b6ebf00dce8cb0182b81b077fb1255270f1ee803`；当前文档仅保留本地持久化实现轮次的历史执行记录。
 
 ## 下一步动作
 

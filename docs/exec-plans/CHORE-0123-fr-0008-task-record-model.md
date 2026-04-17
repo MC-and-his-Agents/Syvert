@@ -8,7 +8,7 @@
 - release：`v0.3.0`
 - sprint：`2026-S16`
 - 关联 spec：`docs/specs/FR-0008-task-record-persistence/`
-- 关联 PR：
+- 关联 PR：`#147`
 - active 收口事项：`CHORE-0123-fr-0008-task-record-model`
 
 ## 目标
@@ -36,6 +36,7 @@
 - `FR-0008` formal spec 已由 PR `#145` 合入主干，当前实现入口切到真实 Work Item `#138`。
 - 当前 runtime 仍只返回 success / failed envelope，尚未在共享主路径中构建可回读的 `TaskRecord` 聚合。
 - 现有 pre-accepted 失败（invalid request / unsupported capability / unsupported target_type / unsupported collection_mode / registry failure 等）必须继续停留在 durable task history 边界之外。
+- PR `#147` 已于 `2026-04-17T12:46:32Z` 合入主干，merge commit 为 `b912c369d745b0579e4e6d38bcf35c08845bc006`；当前文档仅保留共享模型实现轮次的历史执行记录。
 
 ## 下一步动作
 
