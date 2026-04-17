@@ -59,15 +59,22 @@ _FROZEN_REFERENCE_PAIR_BY_VERSION = {
     "v0.2.0": ("xhs", "douyin"),
 }
 _FROZEN_HARNESS_REQUIRED_SAMPLE_IDS_BY_VERSION: dict[str, tuple[str, ...]] = {}
-_REQUIRED_LEAKAGE_BOUNDARIES = frozenset(
-    {
-        "core_runtime",
-        "shared_input_model",
-        "shared_error_model",
-        "adapter_registry",
-        "shared_result_contract",
-        "version_gate_logic",
-    }
+_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE = (
+    "core_runtime",
+    "shared_input_model",
+    "shared_error_model",
+    "adapter_registry",
+    "shared_result_contract",
+    "version_gate_logic",
+)
+_REQUIRED_LEAKAGE_BOUNDARIES = frozenset(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE)
+_REQUIRED_LEAKAGE_SCAN_REFS = tuple(
+    f"platform_leakage:scan:{target}"
+    for target in (
+        "syvert/runtime.py",
+        "syvert/registry.py",
+        "syvert/version_gate.py",
+    )
 )
 
 
@@ -501,6 +508,18 @@ def validate_platform_leakage_source_report(
                 details={"unexpected_boundaries": unexpected_boundaries},
             )
         )
+    if not missing_boundaries and not unexpected_boundaries and boundaries != list(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE):
+        failures.append(
+            _failure(
+                source,
+                "boundary_scope_order_mismatch",
+                "platform leakage report boundary_scope must match the frozen boundary order",
+                details={
+                    "expected_boundary_scope": list(_REQUIRED_LEAKAGE_BOUNDARY_SEQUENCE),
+                    "actual_boundary_scope": boundaries,
+                },
+            )
+        )
 
     findings = _normalize_leakage_findings(payload.get("findings"), source, failures)
     payload_verdict = _normalize_allowed_string(
@@ -532,6 +551,37 @@ def validate_platform_leakage_source_report(
                 "platform leakage failure report must carry findings",
             )
         )
+    missing_finding_evidence_refs = sorted(
+        {
+            str(finding["evidence_ref"])
+            for finding in findings
+            if str(finding["evidence_ref"]) not in evidence_refs
+        }
+    )
+    if missing_finding_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "finding_evidence_ref_missing_from_evidence_refs",
+                "platform leakage findings must be traceable from top-level evidence_refs",
+                details={"missing_evidence_refs": missing_finding_evidence_refs},
+            )
+        )
+
+    expected_evidence_refs = sorted({*_REQUIRED_LEAKAGE_SCAN_REFS, *(str(finding["evidence_ref"]) for finding in findings)})
+    if sorted(evidence_refs) != expected_evidence_refs:
+        failures.append(
+            _failure(
+                source,
+                "platform_leakage_evidence_refs_mismatch",
+                "platform leakage report evidence_refs must prove the frozen scan targets and finding traces",
+                details={
+                    "expected_evidence_refs": expected_evidence_refs,
+                    "actual_evidence_refs": evidence_refs,
+                },
+            )
+        )
+        evidence_refs = expected_evidence_refs
 
     gate_failures = [_failure_from_leakage_finding(source, finding) for finding in findings] if payload_verdict == FAIL_VERDICT else []
     normalized_failures = failures + gate_failures
@@ -1426,6 +1476,16 @@ def _normalize_boundaries(
     source: str,
     failures: list[dict[str, Any]],
 ) -> list[str]:
+    if isinstance(raw_boundaries, (str, bytes, Mapping)) or not isinstance(raw_boundaries, Sequence):
+        failures.append(
+            _failure(
+                source,
+                "invalid_boundary_scope",
+                "platform leakage report boundary_scope must be a non-empty string sequence",
+                details={"field": "boundary_scope"},
+            )
+        )
+        return []
     return _normalize_string_list(
         raw_boundaries,
         source=source,
@@ -1691,7 +1751,11 @@ def _merge_rebuilt_source_report_with_input_failures(
         merged_report["summary"] = failure_summary
     if input_verdict == FAIL_VERDICT or rebuilt_failures:
         merged_report["verdict"] = FAIL_VERDICT
-    if input_verdict == FAIL_VERDICT and input_evidence_refs:
+    if (
+        input_verdict == FAIL_VERDICT
+        and input_evidence_refs
+        and str(merged_report.get("source") or "") != SOURCE_PLATFORM_LEAKAGE
+    ):
         merged_report["evidence_refs"] = list(input_evidence_refs)
     return merged_report
 

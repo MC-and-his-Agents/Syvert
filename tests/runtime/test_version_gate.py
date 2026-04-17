@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import tempfile
 import unittest
 
+from syvert.platform_leakage import run_platform_leakage_check
 import syvert.version_gate as version_gate_module
 
 from tests.runtime.contract_harness.automation import run_contract_harness_automation
@@ -618,6 +621,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:core-runtime:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:core-runtime:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -635,6 +639,43 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("missing_evidence_refs", {item["code"] for item in report["details"]["failures"]})
         self.assertTrue(report["evidence_refs"])
 
+    def test_platform_leakage_rejects_forged_clean_scan_refs(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["evidence_refs"] = ["anything-at-all"]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("platform_leakage_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
+        self.assertEqual(
+            report["evidence_refs"],
+            [
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
+        )
+
+    def test_platform_leakage_rejects_finding_evidence_ref_missing_from_evidence_refs(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["verdict"] = "fail"
+        payload["findings"] = [
+            {
+                "code": "platform_branch_in_core",
+                "message": "platform branch leaked into core runtime",
+                "boundary": "core_runtime",
+                "evidence_ref": "leakage:core-runtime:missing",
+            }
+        ]
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn(
+            "finding_evidence_ref_missing_from_evidence_refs",
+            {item["code"] for item in report["details"]["failures"]},
+        )
+
     def test_platform_leakage_rejects_out_of_scope_boundary(self) -> None:
         payload = self.valid_platform_leakage_payload()
         payload["verdict"] = "fail"
@@ -646,6 +687,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:adapter-private:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:adapter-private:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -663,6 +705,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:shared-result:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:shared-result:1"]
 
         report = validate_platform_leakage_source_report(payload, version="v0.2.0")
 
@@ -687,6 +730,15 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("unexpected_boundary_scope", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_boundary_scope_order_mismatch(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = list(reversed(payload["boundary_scope"]))
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("boundary_scope_order_mismatch", {item["code"] for item in report["details"]["failures"]})
 
     def test_platform_leakage_rejects_missing_findings_field(self) -> None:
         payload = self.valid_platform_leakage_payload()
@@ -728,6 +780,17 @@ class VersionGateTests(unittest.TestCase):
 
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("invalid_boundary_scope", {item["code"] for item in report["details"]["failures"]})
+
+    def test_platform_leakage_rejects_set_shaped_boundary_scope(self) -> None:
+        payload = self.valid_platform_leakage_payload()
+        payload["boundary_scope"] = set(payload["boundary_scope"])
+
+        report = validate_platform_leakage_source_report(payload, version="v0.2.0")
+
+        self.assertEqual(report["verdict"], "fail")
+        failure_codes = {item["code"] for item in report["details"]["failures"]}
+        self.assertIn("invalid_boundary_scope", failure_codes)
+        self.assertNotIn("boundary_scope_order_mismatch", failure_codes)
 
     def test_orchestrator_fails_closed_for_missing_version(self) -> None:
         report = orchestrate_version_gate(
@@ -1643,6 +1706,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:core-runtime:1",
             }
         ]
+        payload["evidence_refs"] = [*payload["evidence_refs"], "leakage:core-runtime:1"]
         failed_platform_leakage_report = validate_platform_leakage_source_report(
             payload,
             version="v0.2.0",
@@ -1667,6 +1731,54 @@ class VersionGateTests(unittest.TestCase):
         self.assertIn("platform_branch_in_core", {item["code"] for item in report["failures"]})
         self.assertNotIn("invalid_leakage_finding_boundary", {item["code"] for item in report["failures"]})
         self.assertNotIn("failure_report_without_findings", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_rewrites_forged_failed_platform_leakage_evidence_refs(self) -> None:
+        forged_report = {
+            "source": "platform_leakage",
+            "version": "v0.2.0",
+            "verdict": "fail",
+            "summary": "forged failed leakage report",
+            "evidence_refs": ["forged:1", "leakage:core-runtime:1"],
+            "details": {
+                "boundary_scope": self.valid_platform_leakage_payload()["boundary_scope"],
+                "report_verdict": "fail",
+                "findings": [
+                    {
+                        "code": "platform_branch_in_core",
+                        "message": "platform-specific branch leaked into core runtime",
+                        "boundary": "core_runtime",
+                        "evidence_ref": "leakage:core-runtime:1",
+                    }
+                ],
+                "failures": [],
+            },
+        }
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=forged_report,
+        )
+
+        self.assertEqual(
+            report["source_reports"]["platform_leakage"]["evidence_refs"],
+            [
+                "leakage:core-runtime:1",
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
+        )
 
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
         forged_report = {
@@ -1737,6 +1849,166 @@ class VersionGateTests(unittest.TestCase):
             {item["code"] for item in report["failures"]},
         )
 
+    def test_orchestrator_accepts_platform_leakage_checker_output(self) -> None:
+        leakage_report = run_platform_leakage_check(
+            version="v0.2.0",
+            repo_root=Path(__file__).resolve().parents[2],
+        )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["source"], "platform_leakage")
+        self.assertEqual(leakage_report["verdict"], "pass")
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "pass")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["findings"], [])
+
+    def test_orchestrator_round_trips_checker_detected_multiline_platform_branch(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture_root = Path(temp_dir)
+            for relative_name in ("syvert/runtime.py", "syvert/registry.py", "syvert/version_gate.py"):
+                source_path = repo_root / relative_name
+                target_path = fixture_root / relative_name
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                contents = source_path.read_text(encoding="utf-8")
+                if relative_name == "syvert/runtime.py":
+                    contents = contents.replace(
+                        "    adapter_key, capability = extract_request_context(request)\n",
+                        '    adapter_key, capability = extract_request_context(request)\n'
+                        "    if (\n"
+                        "        adapter_key\n"
+                        '        == "weibo"\n'
+                        "    ):\n"
+                        "        return None\n\n",
+                        1,
+                    )
+                target_path.write_text(contents, encoding="utf-8")
+
+            leakage_report = run_platform_leakage_check(
+                version="v0.2.0",
+                repo_root=fixture_root,
+            )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "fail")
+        self.assertIn("hardcoded_platform_branch", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_round_trips_checker_parse_failure(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture_root = Path(temp_dir)
+            for relative_name in ("syvert/runtime.py", "syvert/registry.py", "syvert/version_gate.py"):
+                source_path = repo_root / relative_name
+                target_path = fixture_root / relative_name
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                contents = source_path.read_text(encoding="utf-8")
+                if relative_name == "syvert/runtime.py":
+                    contents = contents.replace(
+                        "    adapter_key, capability = extract_request_context(request)\n",
+                        "    adapter_key, capability = extract_request_context(request)\n    if (\n",
+                        1,
+                    )
+                target_path.write_text(contents, encoding="utf-8")
+
+            leakage_report = run_platform_leakage_check(
+                version="v0.2.0",
+                repo_root=fixture_root,
+            )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "fail")
+        self.assertIn("scan_parse_failure", {item["code"] for item in report["failures"]})
+
+    def test_orchestrator_round_trips_checker_detected_shared_platform_collection(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture_root = Path(temp_dir)
+            for relative_name in ("syvert/runtime.py", "syvert/registry.py", "syvert/version_gate.py"):
+                source_path = repo_root / relative_name
+                target_path = fixture_root / relative_name
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                contents = source_path.read_text(encoding="utf-8")
+                if relative_name == "syvert/runtime.py":
+                    contents = contents.replace(
+                        'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n',
+                        'ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}\n'
+                        'SUPPORTED_PLATFORMS = {"xhs", "douyin"}\n',
+                        1,
+                    )
+                target_path.write_text(contents, encoding="utf-8")
+
+            leakage_report = run_platform_leakage_check(
+                version="v0.2.0",
+                repo_root=fixture_root,
+            )
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=leakage_report,
+        )
+
+        self.assertEqual(leakage_report["verdict"], "fail")
+        self.assertEqual(report["source_reports"]["platform_leakage"]["details"]["report_verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["failures"]})
+
     def test_orchestrator_failures_keep_source_distinction(self) -> None:
         harness_report = build_harness_source_report(
             self.valid_harness_results(),
@@ -1760,6 +2032,7 @@ class VersionGateTests(unittest.TestCase):
                 "evidence_ref": "leakage:shared-result:1",
             }
         ]
+        leakage_payload["evidence_refs"] = [*leakage_payload["evidence_refs"], "leakage:shared-result:1"]
         leakage_report = validate_platform_leakage_source_report(
             leakage_payload,
             version="v0.2.0",
@@ -2199,7 +2472,11 @@ class VersionGateTests(unittest.TestCase):
             "verdict": "pass",
             "summary": "platform leakage checks are clean",
             "findings": [],
-            "evidence_refs": ["leakage:scan:1"],
+            "evidence_refs": [
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
         }
 
     def assert_source_report_contract_shape(self, source: str, report: dict[str, object]) -> None:
