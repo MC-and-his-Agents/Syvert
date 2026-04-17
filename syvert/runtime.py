@@ -386,6 +386,8 @@ def finalize_task_execution_result(
             task_record_store.mark_invalid(task_id, stage="completion", reason=str(error))
         except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
             invalidation_details["invalidation_reason"] = str(invalidation_error)
+        if preserve_envelope_on_record_error and task_record_store is None:
+            return TaskExecutionResult(dict(envelope), None)
         return TaskExecutionResult(
             failure_envelope(
                 task_id,

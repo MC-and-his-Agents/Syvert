@@ -438,7 +438,7 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["code"], "envelope_not_json_serializable")
         self.assertIsNone(outcome.task_record)
 
-    def test_execute_task_fails_closed_when_task_record_cannot_close(self) -> None:
+    def test_execute_task_preserves_public_envelope_when_task_record_fails_to_close(self) -> None:
         envelope = execute_task(
             TaskRequest(
                 adapter_key="stub",
@@ -449,10 +449,10 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             task_id_factory=lambda: "task-record-8",
         )
 
-        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["status"], "success")
         self.assertEqual(envelope["task_id"], "task-record-8")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "envelope_not_json_serializable")
+        self.assertIn("raw", envelope)
+        self.assertEqual(type(envelope["raw"]["bad"]).__name__, "object")
 
     def test_execute_task_with_record_accepts_offset_utc_timestamp_in_success_payload(self) -> None:
         outcome = execute_task_with_record(
