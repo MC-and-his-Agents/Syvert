@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Iterator, Tuple
 import unittest
+from unittest import mock
 
 from syvert.adapters.douyin import DouyinAdapter
 from syvert.adapters.xhs import XhsAdapter
@@ -17,6 +20,23 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
 )
+
+
+class TaskRecordStoreEnvMixin:
+    def setUp(self) -> None:
+        super().setUp()
+        self._task_record_store_dir = tempfile.TemporaryDirectory()
+        self._task_record_store_patcher = mock.patch.dict(
+            os.environ,
+            {"SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name},
+            clear=False,
+        )
+        self._task_record_store_patcher.start()
+
+    def tearDown(self) -> None:
+        self._task_record_store_patcher.stop()
+        self._task_record_store_dir.cleanup()
+        super().tearDown()
 
 
 @dataclass(frozen=True)
@@ -305,7 +325,7 @@ class MissingExecuteAdapter:
     supported_collection_modes = frozenset({"hybrid"})
 
 
-class RuntimeExecutionTests(unittest.TestCase):
+class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
         request = TaskRequest(
