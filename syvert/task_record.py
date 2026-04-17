@@ -17,6 +17,7 @@ SHARED_CAPABILITIES = frozenset({"content_detail_by_url"})
 SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
+ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
 
@@ -547,9 +548,14 @@ def validate_failed_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     error = envelope.get("error")
     if not isinstance(error, Mapping):
         raise TaskRecordContractError("failed TaskTerminalResult.envelope.error 必须是对象")
-    require_string(error.get("category"), field="result.envelope.error.category")
+    category = require_string(error.get("category"), field="result.envelope.error.category")
     require_string(error.get("code"), field="result.envelope.error.code")
     require_string(error.get("message"), field="result.envelope.error.message")
+    details = error.get("details")
+    if not isinstance(details, Mapping):
+        raise TaskRecordContractError("result.envelope.error.details 必须存在且为对象")
+    if category not in ALLOWED_ERROR_CATEGORIES:
+        raise TaskRecordContractError("result.envelope.error.category 不在允许值范围内")
 
 
 def normalize_json_value(value: Any, *, field: str) -> Any:

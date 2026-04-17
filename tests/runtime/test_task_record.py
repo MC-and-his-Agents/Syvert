@@ -270,6 +270,38 @@ class TaskRecordCodecTests(unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_rejects_failed_envelope_without_details_during_round_trip_load(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/3cf"),
+            ),
+            adapters={"stub": PlatformFailureAdapter()},
+            task_id_factory=lambda: "task-record-3cf",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        del payload["result"]["envelope"]["error"]["details"]
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_failed_envelope_with_invalid_category_during_round_trip_load(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/3cg"),
+            ),
+            adapters={"stub": PlatformFailureAdapter()},
+            task_id_factory=lambda: "task-record-3cg",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        payload["result"]["envelope"]["error"]["category"] = "broken"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
     def test_rejects_untrusted_timeline_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
