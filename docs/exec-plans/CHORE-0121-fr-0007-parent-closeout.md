@@ -47,9 +47,9 @@
 
 ## 下一步动作
 
-- 新增 `FR-0007` requirement container，把 `#79/#118/#119/#120` 历史执行轮次与 `#121` closeout 入口收敛到同一条仓内证据链。
-- 同步 `docs/releases/v0.2.0.md` 与 `docs/sprints/2026-S15.md`，把 `FR-0007` 从 formal spec 入口推进到 implementation + parent closeout 完成的最终叙事。
-- 通过 docs PR 收口 `#121`，合并后修正 GitHub `#121` / `#67` 正文并关闭；若 `#63` 关闭条件届时全部满足，再关闭 `#63`。
+- 在当前受审 PR `#125` 上完成 guardian / merge gate。
+- 合并后修正 GitHub `#121` / `#67` 正文并关闭；若 `#63` 关闭条件届时全部满足，再关闭 `#63`。
+- 独立区分 GitHub merge 真相与本地 branch/worktree 清理真相，避免把收尾问题误判成 closeout 未完成。
 
 ## 当前 checkpoint 推进的 release 目标
 
