@@ -15,7 +15,7 @@ from syvert.task_record import (
     finish_task_record,
     start_task_record,
 )
-from syvert.task_record_store import TaskRecordStore, TaskRecordStoreError
+from syvert.task_record_store import TaskRecordStore, TaskRecordStoreError, default_task_record_store
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_DETAIL = "content_detail"
@@ -129,6 +129,7 @@ def execute_task_internal(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None = None,
 ) -> TaskExecutionResult:
+    store = task_record_store if task_record_store is not None else default_task_record_store()
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
     if task_id_error is not None:
@@ -270,7 +271,7 @@ def execute_task_internal(
         capability,
         record,
         stage="accepted",
-        task_record_store=task_record_store,
+        task_record_store=store,
     )
     if persistence_error is not None:
         return persistence_error
@@ -295,7 +296,7 @@ def execute_task_internal(
         capability,
         record,
         stage="running",
-        task_record_store=task_record_store,
+        task_record_store=store,
     )
     if persistence_error is not None:
         return persistence_error
@@ -314,7 +315,7 @@ def execute_task_internal(
                 record,
                 envelope,
                 preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-                task_record_store=task_record_store,
+                task_record_store=store,
             )
     except PlatformAdapterError as error:
         envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
@@ -325,7 +326,7 @@ def execute_task_internal(
             record,
             envelope,
             preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-            task_record_store=task_record_store,
+            task_record_store=store,
         )
     except Exception as error:
         envelope = failure_envelope(
@@ -344,7 +345,7 @@ def execute_task_internal(
             record,
             envelope,
             preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-            task_record_store=task_record_store,
+            task_record_store=store,
         )
 
     envelope = {
@@ -362,7 +363,7 @@ def execute_task_internal(
         record,
         envelope,
         preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-        task_record_store=task_record_store,
+        task_record_store=store,
     )
 
 
@@ -379,7 +380,12 @@ def finalize_task_execution_result(
     try:
         terminal_record = finish_task_record(record, envelope)
     except TaskRecordContractError as error:
-        if preserve_envelope_on_record_error:
+        invalidation_details: dict[str, Any] = {}
+        try:
+            task_record_store.mark_invalid(task_id, stage="completion", reason=str(error))
+        except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
+            invalidation_details["invalidation_reason"] = str(invalidation_error)
+        if preserve_envelope_on_record_error and task_record_store is None:
             return TaskExecutionResult(dict(envelope), None)
         return TaskExecutionResult(
             failure_envelope(
@@ -389,7 +395,7 @@ def finalize_task_execution_result(
                 runtime_contract_error(
                     "envelope_not_json_serializable",
                     "共享终态结果无法收口为 JSON-safe TaskRecord",
-                    details={"reason": str(error)},
+                    details={"reason": str(error), **invalidation_details},
                 ),
             ),
             None,

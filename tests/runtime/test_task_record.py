@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
+from unittest import mock
 
 from syvert.runtime import TaskInput, TaskRequest, execute_task, execute_task_with_record
 from syvert.task_record import (
@@ -12,6 +15,23 @@ from syvert.task_record import (
     task_record_from_dict,
     task_record_to_dict,
 )
+
+
+class TaskRecordStoreEnvMixin:
+    def setUp(self) -> None:
+        super().setUp()
+        self._task_record_store_dir = tempfile.TemporaryDirectory()
+        self._task_record_store_patcher = mock.patch.dict(
+            os.environ,
+            {"SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name},
+            clear=False,
+        )
+        self._task_record_store_patcher.start()
+
+    def tearDown(self) -> None:
+        self._task_record_store_patcher.stop()
+        self._task_record_store_dir.cleanup()
+        super().tearDown()
 
 
 class SuccessfulAdapter:
@@ -151,7 +171,7 @@ class OffsetTimestampSuccessAdapter:
         }
 
 
-class TaskRecordCodecTests(unittest.TestCase):
+class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
@@ -332,7 +352,7 @@ class TaskRecordCodecTests(unittest.TestCase):
             )
 
 
-class RuntimeTaskRecordTests(unittest.TestCase):
+class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_with_record_keeps_preaccepted_failure_outside_durable_history(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
@@ -395,7 +415,7 @@ class RuntimeTaskRecordTests(unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["code"], "envelope_not_json_serializable")
         self.assertIsNone(outcome.task_record)
 
-    def test_execute_task_preserves_public_envelope_when_task_record_fails_to_close(self) -> None:
+    def test_execute_task_fails_closed_when_task_record_cannot_close(self) -> None:
         envelope = execute_task(
             TaskRequest(
                 adapter_key="stub",
@@ -406,10 +426,10 @@ class RuntimeTaskRecordTests(unittest.TestCase):
             task_id_factory=lambda: "task-record-8",
         )
 
-        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["task_id"], "task-record-8")
-        self.assertIn("raw", envelope)
-        self.assertEqual(type(envelope["raw"]["bad"]).__name__, "object")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "envelope_not_json_serializable")
 
     def test_execute_task_with_record_accepts_offset_utc_timestamp_in_success_payload(self) -> None:
         outcome = execute_task_with_record(

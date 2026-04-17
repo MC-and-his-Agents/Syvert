@@ -1,8 +1,28 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
+from unittest import mock
 
 from syvert.runtime import TaskInput, TaskRequest, execute_task
+
+
+class TaskRecordStoreEnvMixin:
+    def setUp(self) -> None:
+        super().setUp()
+        self._task_record_store_dir = tempfile.TemporaryDirectory()
+        self._task_record_store_patcher = mock.patch.dict(
+            os.environ,
+            {"SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name},
+            clear=False,
+        )
+        self._task_record_store_patcher.start()
+
+    def tearDown(self) -> None:
+        self._task_record_store_patcher.stop()
+        self._task_record_store_dir.cleanup()
+        super().tearDown()
 
 
 class SuccessfulAdapter:
@@ -52,7 +72,7 @@ class UnsupportedCapabilityAdapter:
         raise AssertionError("execute should not be called")
 
 
-class ExecutorTests(unittest.TestCase):
+class ExecutorTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_returns_unsupported_failure_when_adapter_is_missing(self) -> None:
         request = TaskRequest(
             adapter_key="missing",

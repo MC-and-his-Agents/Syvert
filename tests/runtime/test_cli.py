@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -55,6 +56,27 @@ class SuccessfulAdapter:
 
 
 class CliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._task_record_store_dir = tempfile.TemporaryDirectory()
+        self._task_record_store_patcher = mock.patch.dict(
+            os.environ,
+            {"SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name},
+            clear=False,
+        )
+        self._task_record_store_patcher.start()
+
+    def tearDown(self) -> None:
+        self._task_record_store_patcher.stop()
+        self._task_record_store_dir.cleanup()
+        super().tearDown()
+
+    def subprocess_env(self) -> dict[str, str]:
+        return {
+            "PYTHONPATH": str(REPO_ROOT),
+            "SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name,
+        }
+
     def test_cli_wrapper_help_exits_zero(self) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "syvert.cli", "--help"],
@@ -68,7 +90,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("usage:", result.stdout)
 
     def test_cli_fails_closed_for_missing_required_arguments(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,
@@ -93,7 +115,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
     def test_cli_parse_failure_preserves_adapter_key_from_equals_syntax(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,
@@ -116,7 +138,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
     def test_cli_parse_failure_does_not_consume_next_flag_as_adapter_value(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,
@@ -142,7 +164,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
     def test_cli_module_path_can_load_adapter_source(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,
@@ -408,7 +430,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "adapter_not_found")
 
     def test_cli_loader_failure_returns_machine_readable_failure(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,
@@ -493,7 +515,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "invalid_task_id")
 
     def test_cli_fails_closed_when_success_envelope_is_not_json_serializable(self) -> None:
-        env = dict(**{"PYTHONPATH": str(REPO_ROOT)})
+        env = self.subprocess_env()
         result = subprocess.run(
             [
                 sys.executable,

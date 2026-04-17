@@ -70,6 +70,9 @@ class LocalTaskRecordStore:
         return self.root / f"{quote(task_id, safe='')}.invalid.json"
 
     def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        record_path = self.record_path(task_id)
+        if record_path.exists():
+            record_path.unlink()
         marker = self.invalid_marker_path(task_id)
         payload = {"task_id": task_id, "stage": stage, "reason": reason}
         self._write_json_atomic(marker, payload)
