@@ -60,7 +60,7 @@
 ## 生命周期
 
 - 创建：
-  - 当任务通过共享 admission、拿到合法 `task_id` 且 `accepted` 记录与请求快照已被可靠序列化/写入时，创建 `TaskRecord`
+  - 当任务通过共享 admission、共享 pre-execution 校验、拿到合法 `task_id` 且 `accepted` 记录与请求快照已被可靠序列化/写入时，创建 `TaskRecord`
   - 初始状态固定为 `accepted`
 - 更新：
   - 任务进入 adapter 执行阶段时，状态更新为 `running`
