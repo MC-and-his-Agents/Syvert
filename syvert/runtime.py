@@ -285,6 +285,31 @@ def execute_task_internal(
         record = persisted_record
 
     try:
+        record = start_task_record(record)
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("invalid_task_record", str(error)),
+            ),
+            None,
+        )
+    persisted_record, persistence_error = persist_task_record(
+        task_id,
+        adapter_key,
+        capability,
+        record,
+        stage="running",
+        task_record_store=store,
+    )
+    if persistence_error is not None:
+        return persistence_error
+    if persisted_record is not None:
+        record = persisted_record
+
+    try:
         payload = declaration.adapter.execute(adapter_request)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
@@ -358,45 +383,8 @@ def finalize_task_execution_result(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None,
 ) -> TaskExecutionResult:
-    active_record = record
-    if record.status == "accepted":
-        try:
-            active_record = start_task_record(record)
-        except TaskRecordContractError as error:
-            invalidation_details: dict[str, Any] = {}
-            try:
-                task_record_store.mark_invalid(task_id, stage="running", reason=str(error))
-            except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
-                invalidation_details["invalidation_reason"] = str(invalidation_error)
-            if preserve_envelope_on_record_error and task_record_store is None:
-                return TaskExecutionResult(dict(envelope), None)
-            return TaskExecutionResult(
-                failure_envelope(
-                    task_id,
-                    adapter_key,
-                    capability,
-                    runtime_contract_error(
-                        "invalid_task_record",
-                        str(error),
-                        details=invalidation_details,
-                    ),
-                ),
-                None,
-            )
-        persisted_record, persistence_error = persist_task_record(
-            task_id,
-            adapter_key,
-            capability,
-            active_record,
-            stage="running",
-            task_record_store=task_record_store,
-        )
-        if persistence_error is not None:
-            return persistence_error
-        if persisted_record is not None:
-            active_record = persisted_record
     try:
-        terminal_record = finish_task_record(active_record, envelope)
+        terminal_record = finish_task_record(record, envelope)
     except TaskRecordContractError as error:
         invalidation_details: dict[str, Any] = {}
         try:

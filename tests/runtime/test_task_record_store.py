@@ -58,6 +58,19 @@ class SuccessfulAdapter:
         }
 
 
+class RunningVisibleAdapter(SuccessfulAdapter):
+    def __init__(self, store: LocalTaskRecordStore, expected_task_id: str) -> None:
+        super().__init__()
+        self.store = store
+        self.expected_task_id = expected_task_id
+
+    def execute(self, request):
+        visible = self.store.load(self.expected_task_id)
+        if visible.status != "running":
+            raise AssertionError(f"expected running, got {visible.status}")
+        return super().execute(request)
+
+
 class PlatformFailureAdapter:
     adapter_key = "stub"
     supported_capabilities = frozenset({"content_detail"})
@@ -221,7 +234,7 @@ class TaskRecordStoreTests(unittest.TestCase):
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
-    def test_runtime_fails_closed_when_running_persistence_fails_after_adapter_execution(self) -> None:
+    def test_runtime_fails_closed_before_adapter_execute_when_running_persistence_fails(self) -> None:
         adapter = SuccessfulAdapter()
         outcome = execute_task_with_record(
             TaskRequest(
@@ -238,7 +251,7 @@ class TaskRecordStoreTests(unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
         self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
-        self.assertEqual(adapter.calls, 1)
+        self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
     def test_runtime_rejects_conflicting_replay_without_invalidating_existing_record(self) -> None:
@@ -270,6 +283,27 @@ class TaskRecordStoreTests(unittest.TestCase):
             self.assertEqual(second.envelope["status"], "failed")
             self.assertEqual(second.envelope["error"]["code"], "task_record_conflict")
             self.assertEqual(store.load("task-store-conflict"), first.task_record)
+
+    def test_running_checkpoint_is_visible_when_adapter_execution_begins(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            task_id = "task-store-running-visible"
+            adapter = RunningVisibleAdapter(store, task_id)
+
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-running-visible"),
+                ),
+                adapters={"stub": adapter},
+                task_id_factory=lambda: task_id,
+                task_record_store=store,
+            )
+
+            self.assertEqual(outcome.envelope["status"], "success")
+            self.assertEqual(adapter.calls, 1)
+            self.assertEqual(store.load(task_id).status, "succeeded")
 
     def test_runtime_fails_closed_when_terminal_persistence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
