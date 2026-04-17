@@ -42,7 +42,7 @@
   - post-admission 共享失败是否一律纳入 durable `TaskRecord`
   - 读侧是否会拒绝生命周期不完整的持久化历史
 - guardian 第三轮审查继续返回 `REQUEST_CHANGES`，指出 `FR-0008` 对 pre-`accepted` admission/pre-execution 失败与 post-`accepted` durable failure 的边界仍未和上游 `FR-0004` / `FR-0005` contract 完全对齐。
-- 当前 checkpoint `1f3b8330cd6415c8efc2d89563444692228ad3f4` 已按前三轮 guardian 结论收口：
+- 当前 checkpoint `1f3b833555de3e8e4f74ea0d0de075aa67ae099c` 已按前三轮 guardian 结论收口：
   - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
   - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
   - 初始 `accepted` 建档失败被明确为进入后续共享执行前的 fail-closed 阻断
@@ -114,7 +114,7 @@
     - `accepted` 只在共享 admission 与共享 pre-execution 校验全部通过后创建
     - unsupported capability / target_type / collection_mode、registry / declaration 失败等上游 pre-execution 失败被明确留在 pre-`accepted` 边界之外
 - `git commit -m 'docs(spec): 对齐 FR-0008 与上游 admission 边界'`
-  - 结果：已生成 checkpoint `1f3b8330cd6415c8efc2d89563444692228ad3f4`
+  - 结果：已生成 checkpoint `1f3b833555de3e8e4f74ea0d0de075aa67ae099c`
 
 ## 未决风险
 
@@ -127,4 +127,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1f3b8330cd6415c8efc2d89563444692228ad3f4`
+- `1f3b833555de3e8e4f74ea0d0de075aa67ae099c`
