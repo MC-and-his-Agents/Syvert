@@ -400,6 +400,29 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertIn("raw", envelope)
         self.assertIn("normalized", envelope)
 
+    def test_execute_task_preserves_stateless_replay_for_fixed_task_id(self) -> None:
+        first = execute_task(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/6b"),
+            ),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-6b",
+        )
+        second = execute_task(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/6b"),
+            ),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-6b",
+        )
+
+        self.assertEqual(first["status"], "success")
+        self.assertEqual(second["status"], "success")
+
     def test_execute_task_with_record_fails_closed_when_terminal_envelope_is_not_json_serializable(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

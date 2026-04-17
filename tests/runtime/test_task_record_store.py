@@ -114,6 +114,11 @@ class BrokenInvalidationLocalStore(TerminalFailingLocalStore):
         return super()._write_json_atomic(path, payload)
 
 
+class BrokenInvalidationAndDeleteLocalStore(BrokenInvalidationLocalStore):
+    def _delete_record_file(self, path) -> None:
+        raise OSError("record-delete-broken")
+
+
 class TaskRecordStoreTests(unittest.TestCase):
     def test_runtime_can_persist_and_reload_success_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -152,10 +157,10 @@ class TaskRecordStoreTests(unittest.TestCase):
             self.assertIsNotNone(outcome.task_record)
             self.assertEqual(store.load("task-store-2"), outcome.task_record)
 
-    def test_core_default_path_persists_without_explicit_store_argument(self) -> None:
+    def test_execute_task_with_record_uses_default_store_path_without_explicit_store_argument(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with mock.patch.dict(os.environ, {"SYVERT_TASK_RECORD_STORE_DIR": temp_dir}, clear=False):
-                envelope = execute_task(
+                outcome = execute_task_with_record(
                     TaskRequest(
                         adapter_key="stub",
                         capability="content_detail_by_url",
@@ -165,9 +170,36 @@ class TaskRecordStoreTests(unittest.TestCase):
                     task_id_factory=lambda: "task-store-default",
                 )
 
-            self.assertEqual(envelope["status"], "success")
+            self.assertEqual(outcome.envelope["status"], "success")
             persisted = LocalTaskRecordStore(Path(temp_dir)).load("task-store-default")
             self.assertEqual(persisted.status, "succeeded")
+
+    def test_execute_task_remains_stateless_for_fixed_task_id_replays(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.dict(os.environ, {"SYVERT_TASK_RECORD_STORE_DIR": temp_dir}, clear=False):
+                first = execute_task(
+                    TaskRequest(
+                        adapter_key="stub",
+                        capability="content_detail_by_url",
+                        input=TaskInput(url="https://example.com/post/store-stateless"),
+                    ),
+                    adapters={"stub": SuccessfulAdapter()},
+                    task_id_factory=lambda: "task-store-stateless",
+                )
+                second = execute_task(
+                    TaskRequest(
+                        adapter_key="stub",
+                        capability="content_detail_by_url",
+                        input=TaskInput(url="https://example.com/post/store-stateless"),
+                    ),
+                    adapters={"stub": SuccessfulAdapter()},
+                    task_id_factory=lambda: "task-store-stateless",
+                )
+
+            self.assertEqual(first["status"], "success")
+            self.assertEqual(second["status"], "success")
+            with self.assertRaises(FileNotFoundError):
+                LocalTaskRecordStore(Path(temp_dir)).load("task-store-stateless")
 
     def test_runtime_fails_closed_before_adapter_execute_when_accepted_persistence_fails(self) -> None:
         adapter = SuccessfulAdapter()
@@ -229,10 +261,47 @@ class TaskRecordStoreTests(unittest.TestCase):
 
             self.assertEqual(outcome.envelope["status"], "failed")
             self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
-            self.assertIn("invalidation_reason", outcome.envelope["error"]["details"])
             self.assertEqual(adapter.calls, 1)
             with self.assertRaises((TaskRecordStoreError, FileNotFoundError)):
                 store.load("task-store-4b")
+
+    def test_runtime_poison_stale_record_when_marker_and_delete_both_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            adapter = SuccessfulAdapter()
+            store = BrokenInvalidationAndDeleteLocalStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-4c"),
+                ),
+                adapters={"stub": adapter},
+                task_id_factory=lambda: "task-store-4c",
+                task_record_store=store,
+            )
+
+            self.assertEqual(outcome.envelope["status"], "failed")
+            self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+            with self.assertRaises(TaskRecordStoreError):
+                store.load("task-store-4c")
+
+    def test_store_rejects_reuse_of_invalidated_task_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            snapshot = TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/post/store-5b",
+                collection_mode="hybrid",
+            )
+            accepted = create_task_record("task-store-5b", snapshot, occurred_at="2026-04-17T12:00:00Z")
+
+            store.write(accepted)
+            store.mark_invalid("task-store-5b", stage="completion", reason="boom")
+
+            with self.assertRaises(TaskRecordStoreError):
+                store.write(accepted)
 
     def test_store_rejects_non_accepted_first_write(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

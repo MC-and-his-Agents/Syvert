@@ -112,12 +112,13 @@ def execute_task_with_record(
     task_id_factory: Callable[[], str] | None = None,
     task_record_store: TaskRecordStore | None = None,
 ) -> TaskExecutionResult:
+    store = task_record_store if task_record_store is not None else default_task_record_store()
     return execute_task_internal(
         request,
         adapters=adapters,
         task_id_factory=task_id_factory,
         preserve_envelope_on_record_error=False,
-        task_record_store=task_record_store,
+        task_record_store=store,
     )
 
 
@@ -129,7 +130,7 @@ def execute_task_internal(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None = None,
 ) -> TaskExecutionResult:
-    store = task_record_store if task_record_store is not None else default_task_record_store()
+    store = task_record_store
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
     if task_id_error is not None:
@@ -385,8 +386,6 @@ def finalize_task_execution_result(
             task_record_store.mark_invalid(task_id, stage="completion", reason=str(error))
         except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
             invalidation_details["invalidation_reason"] = str(invalidation_error)
-        if preserve_envelope_on_record_error and task_record_store is None:
-            return TaskExecutionResult(dict(envelope), None)
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -409,8 +408,6 @@ def finalize_task_execution_result(
         task_record_store=task_record_store,
     )
     if persistence_error is not None:
-        if preserve_envelope_on_record_error and task_record_store is None:
-            return TaskExecutionResult(dict(envelope), None)
         return persistence_error
     return TaskExecutionResult(dict(envelope), persisted_record or terminal_record)
 

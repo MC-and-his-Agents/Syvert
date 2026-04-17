@@ -42,6 +42,9 @@ class LocalTaskRecordStore:
     root: Path
 
     def write(self, record: TaskRecord) -> TaskRecord:
+        invalid_marker = self.invalid_marker_path(record.task_id)
+        if invalid_marker.exists():
+            raise TaskRecordStoreError(f"本地任务记录 `{record.task_id}` 已因持久化失败被标记为无效")
         path = self.record_path(record.task_id)
         existing = self._try_load_existing(record.task_id, path)
         candidate = reconcile_persisted_record(existing, record)
@@ -49,7 +52,6 @@ class LocalTaskRecordStore:
             return existing
         payload = task_record_to_dict(candidate)
         self._write_json_atomic(path, payload)
-        self._clear_invalid_marker(record.task_id)
         return candidate
 
     def load(self, task_id: str) -> TaskRecord:
@@ -71,11 +73,32 @@ class LocalTaskRecordStore:
 
     def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
         record_path = self.record_path(task_id)
-        if record_path.exists():
-            record_path.unlink()
         marker = self.invalid_marker_path(task_id)
         payload = {"task_id": task_id, "stage": stage, "reason": reason}
-        self._write_json_atomic(marker, payload)
+        marker_error: Exception | None = None
+        try:
+            self._write_json_atomic(marker, payload)
+        except (TaskRecordStoreError, OSError) as error:
+            marker_error = error
+
+        delete_error: Exception | None = None
+        if record_path.exists():
+            try:
+                self._delete_record_file(record_path)
+            except OSError as error:
+                delete_error = error
+
+        if marker_error is None or not record_path.exists():
+            return
+
+        try:
+            self._write_json_atomic(record_path, payload)
+            return
+        except (TaskRecordStoreError, OSError) as poison_error:
+            raise TaskRecordStoreError(
+                f"无法将本地任务记录 `{task_id}` 标记为无效: "
+                f"marker={marker_error}; delete={delete_error}; poison={poison_error}"
+            ) from poison_error
 
     def _try_load_existing(self, task_id: str, path: Path) -> TaskRecord | None:
         if not path.exists():
@@ -113,10 +136,8 @@ class LocalTaskRecordStore:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
 
-    def _clear_invalid_marker(self, task_id: str) -> None:
-        marker = self.invalid_marker_path(task_id)
-        if marker.exists():
-            marker.unlink()
+    def _delete_record_file(self, path: Path) -> None:
+        path.unlink()
 
 
 def default_task_record_store() -> LocalTaskRecordStore:
