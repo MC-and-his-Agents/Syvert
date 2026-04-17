@@ -8,7 +8,7 @@
 - release：`v0.3.0`
 - sprint：`2026-S16`
 - 关联 spec：`docs/specs/FR-0008-task-record-persistence/`
-- 关联 PR：
+- 关联 PR：`#149`
 - 状态：`active`
 - active 收口事项：`CHORE-0125-fr-0008-parent-closeout`
 
@@ -41,6 +41,7 @@
 - `#140` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-140-chore-fr-0008`。
 - 当前实质 closeout checkpoint 为 `3840abaef51b6706a6167192c2a725bef8a1ce2a`，已首次落盘 requirement container、parent closeout exec-plan、release/sprint 对齐与 `#145/#147/#148` 主干回链。
 - 当前受审 PR：`#149`
+- 当前受审 docs head：`bd948d9cd45033f60cfdd3d0e850c70509fa620c`
 
 ## 下一步动作
 
@@ -93,7 +94,17 @@
 - `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
   - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过
 - `python3 scripts/open_pr.py --class docs --issue 140 --item-key CHORE-0125-fr-0008-parent-closeout --item-type CHORE --release v0.3.0 --sprint 2026-S16 --title 'docs(closeout): 收口 FR-0008 父事项' --closing fixes --dry-run`
-  - 结果：通过；当前受审 PR 为 `#149 https://github.com/MC-and-his-Agents/Syvert/pull/149`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过；当前受审 PR 为 `#149 https://github.com/MC-and-his-Agents/Syvert/pull/149`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在当前受审 docs head `bd948d9cd45033f60cfdd3d0e850c70509fa620c` 上通过
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在当前受审 docs head `bd948d9cd45033f60cfdd3d0e850c70509fa620c` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-140-chore-fr-0008`
+  - 结果：在当前受审 docs head `bd948d9cd45033f60cfdd3d0e850c70509fa620c` 上通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 docs head `bd948d9cd45033f60cfdd3d0e850c70509fa620c` 上通过，`PR class=docs`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 docs head `bd948d9cd45033f60cfdd3d0e850c70509fa620c` 上通过
 
 ## closeout 证据
 
@@ -148,4 +159,7 @@
 
 - 前置完成基线：`b6ebf00dce8cb0182b81b077fb1255270f1ee803`
 - 实质 closeout checkpoint：`3840abaef51b6706a6167192c2a725bef8a1ce2a`
-- 说明：`b6ebf00...` 是 formal spec / `#138` / `#139` 已完成后的主干基线；`3840aba...` 首次落盘本轮 requirement container、parent closeout exec-plan、release/sprint 对齐与 closeout 证据。其后的 metadata-only review sync 只回写受审 head / docs 验证 / GitHub 追账，不改写 `FR-0008` closeout 语义。
+- metadata-only review sync：
+  - `df5ddf6d24004006f4aa2a078bc2287f71c01cd0`：收紧 `#140` 父项工件边界，回退跨 issue exec-plan 触碰
+  - `bd948d9cd45033f60cfdd3d0e850c70509fa620c`：补齐 `#140/#127` Project 状态收口与当前受审 head 门禁绑定
+- 说明：`b6ebf00...` 是 formal spec / `#138` / `#139` 已完成后的主干基线；`3840aba...` 首次落盘本轮 requirement container、parent closeout exec-plan、release/sprint 对齐与 closeout 证据；其后的 metadata-only review sync 只回写受审 head / docs 验证 / GitHub 追账，不改写 `FR-0008` closeout 语义。
