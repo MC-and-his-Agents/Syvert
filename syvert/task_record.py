@@ -12,6 +12,11 @@ TASK_RECORD_SCHEMA_VERSION = "v0.3.0"
 TASK_RECORD_STATUSES = frozenset({"accepted", "running", "succeeded", "failed"})
 TASK_LOG_STAGES = frozenset({"admission", "execution", "completion"})
 TASK_LOG_LEVELS = frozenset({"info", "error"})
+TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
+SHARED_CAPABILITIES = frozenset({"content_detail_by_url"})
+SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
+SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
+ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
 
@@ -302,38 +307,70 @@ def validate_task_record(record: TaskRecord) -> None:
     validate_request_snapshot(record.request)
     if record.status not in TASK_RECORD_STATUSES:
         raise TaskRecordContractError("TaskRecord.status 不在允许值范围内")
-    validate_timestamp(record.created_at, field="created_at")
-    validate_timestamp(record.updated_at, field="updated_at")
+    created_at = parse_timestamp(record.created_at, field="created_at")
+    updated_at = parse_timestamp(record.updated_at, field="updated_at")
+    if updated_at < created_at:
+        raise TaskRecordContractError("TaskRecord.updated_at 不得早于 created_at")
+    terminal_at = None
     if record.terminal_at is not None:
-        validate_timestamp(record.terminal_at, field="terminal_at")
+        terminal_at = parse_timestamp(record.terminal_at, field="terminal_at")
+        if terminal_at < updated_at:
+            raise TaskRecordContractError("TaskRecord.terminal_at 不得早于 updated_at")
     if not record.logs:
         raise TaskRecordContractError("TaskRecord.logs 不得为空")
 
     last_sequence = 0
-    seen_stages: list[str] = []
+    stage_counts = {stage: 0 for stage in TASK_LOG_STAGES}
+    previous_occurred_at: datetime | None = None
+    previous_stage_order = -1
+    final_log_at: datetime | None = None
+    final_stage: str | None = None
     for entry in record.logs:
         if isinstance(entry.sequence, bool) or not isinstance(entry.sequence, int) or entry.sequence <= 0:
             raise TaskRecordContractError("TaskLogEntry.sequence 必须为正整数")
         if entry.sequence != last_sequence + 1:
             raise TaskRecordContractError("TaskRecord.logs.sequence 必须连续递增")
         last_sequence = entry.sequence
-        validate_timestamp(entry.occurred_at, field="logs.occurred_at")
+        occurred_at = parse_timestamp(entry.occurred_at, field="logs.occurred_at")
+        if previous_occurred_at is not None and occurred_at < previous_occurred_at:
+            raise TaskRecordContractError("TaskRecord.logs.occurred_at 必须随 sequence 单调推进")
+        previous_occurred_at = occurred_at
         if entry.stage not in TASK_LOG_STAGES:
             raise TaskRecordContractError("TaskLogEntry.stage 不在允许值范围内")
+        stage_order = TASK_LOG_STAGE_ORDER[entry.stage]
+        if stage_order < previous_stage_order:
+            raise TaskRecordContractError("TaskRecord.logs.stage 顺序不可信")
+        previous_stage_order = stage_order
         if entry.level not in TASK_LOG_LEVELS:
             raise TaskRecordContractError("TaskLogEntry.level 不在允许值范围内")
         if not isinstance(entry.message, str) or not entry.message:
             raise TaskRecordContractError("TaskLogEntry.message 必须为非空字符串")
         if entry.code is not None and (not isinstance(entry.code, str) or not entry.code):
             raise TaskRecordContractError("TaskLogEntry.code 必须为非空字符串或 null")
-        seen_stages.append(entry.stage)
+        stage_counts[entry.stage] += 1
+        final_log_at = occurred_at
+        final_stage = entry.stage
 
-    if "admission" not in seen_stages:
-        raise TaskRecordContractError("TaskRecord 缺少 accepted 生命周期事件")
-    if record.status in {"running", "succeeded", "failed"} and "execution" not in seen_stages:
-        raise TaskRecordContractError("TaskRecord 缺少 execution 生命周期事件")
-    if record.status in {"succeeded", "failed"} and "completion" not in seen_stages:
-        raise TaskRecordContractError("终态 TaskRecord 缺少 completion 生命周期事件")
+    if stage_counts["admission"] != 1:
+        raise TaskRecordContractError("TaskRecord 必须且只能包含一条 accepted 生命周期事件")
+    if record.logs[0].stage != "admission":
+        raise TaskRecordContractError("TaskRecord 第一条日志必须是 accepted 生命周期事件")
+    if final_log_at is None or final_stage is None:
+        raise TaskRecordContractError("TaskRecord.logs 不得为空")
+    if final_log_at != updated_at:
+        raise TaskRecordContractError("TaskRecord.updated_at 必须等于最后一条可信日志时间")
+    if parse_timestamp(record.logs[0].occurred_at, field="logs.occurred_at") != created_at:
+        raise TaskRecordContractError("TaskRecord.created_at 必须等于 accepted 生命周期事件时间")
+
+    if record.status == "accepted":
+        if stage_counts["execution"] != 0 or stage_counts["completion"] != 0 or final_stage != "admission":
+            raise TaskRecordContractError("accepted TaskRecord 不得包含 execution/completion 生命周期事件")
+    elif record.status == "running":
+        if stage_counts["execution"] != 1 or stage_counts["completion"] != 0 or final_stage != "execution":
+            raise TaskRecordContractError("running TaskRecord 必须只包含 accepted/execution 生命周期事件")
+    else:
+        if stage_counts["execution"] != 1 or stage_counts["completion"] != 1 or final_stage != "completion":
+            raise TaskRecordContractError("终态 TaskRecord 必须包含完整且可信的生命周期事件")
 
     if record.status in {"accepted", "running"}:
         if record.terminal_at is not None or record.result is not None:
@@ -341,26 +378,43 @@ def validate_task_record(record: TaskRecord) -> None:
     else:
         if record.terminal_at is None or record.result is None:
             raise TaskRecordContractError("终态 TaskRecord 必须包含终态结果")
+        if terminal_at != updated_at:
+            raise TaskRecordContractError("终态 TaskRecord.terminal_at 必须等于最后一次可信更新")
         normalized_envelope = normalize_json_value(record.result.envelope, field="result.envelope")
         if not isinstance(normalized_envelope, dict):
             raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
         if normalized_envelope != record.result.envelope:
             raise TaskRecordContractError("TaskTerminalResult.envelope 必须预先满足 JSON-safe 约束")
+        validate_terminal_envelope_contract(record, record.result.envelope)
         status = terminal_record_status(record.result.envelope)
         if status != record.status:
             raise TaskRecordContractError("TaskRecord.status 与终态 envelope.status 不一致")
 
 
 def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
-    for field_name in ("adapter_key", "capability", "target_type", "target_value", "collection_mode"):
-        value = getattr(snapshot, field_name)
-        if not isinstance(value, str) or not value:
-            raise TaskRecordContractError(f"TaskRequestSnapshot.{field_name} 必须为非空字符串")
+    adapter_key = require_string(snapshot.adapter_key, field="TaskRequestSnapshot.adapter_key")
+    capability = require_string(snapshot.capability, field="TaskRequestSnapshot.capability")
+    target_type = require_string(snapshot.target_type, field="TaskRequestSnapshot.target_type")
+    require_string(snapshot.target_value, field="TaskRequestSnapshot.target_value")
+    collection_mode = require_string(snapshot.collection_mode, field="TaskRequestSnapshot.collection_mode")
+    if capability not in SHARED_CAPABILITIES:
+        raise TaskRecordContractError("TaskRequestSnapshot.capability 不在共享请求模型允许值范围内")
+    if target_type not in SHARED_TARGET_TYPES:
+        raise TaskRecordContractError("TaskRequestSnapshot.target_type 不在共享请求模型允许值范围内")
+    if collection_mode not in SHARED_COLLECTION_MODES:
+        raise TaskRecordContractError("TaskRequestSnapshot.collection_mode 不在共享请求模型允许值范围内")
+    if not adapter_key:
+        raise TaskRecordContractError("TaskRequestSnapshot.adapter_key 必须为非空字符串")
 
 
 def validate_timestamp(value: str, *, field: str) -> None:
     if not isinstance(value, str) or not RFC3339_UTC_RE.fullmatch(value):
         raise TaskRecordContractError(f"{field} 必须为 RFC3339 UTC 时间")
+
+
+def parse_timestamp(value: str, *, field: str) -> datetime:
+    validate_timestamp(value, field=field)
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def terminal_record_status(envelope: Mapping[str, Any]) -> str:
@@ -390,6 +444,79 @@ def require_optional_string(value: Any, *, field: str) -> str | None:
     if not isinstance(value, str) or not value:
         raise TaskRecordContractError(f"{field} 必须为非空字符串或 null")
     return value
+
+
+def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[str, Any]) -> None:
+    task_id = require_string(envelope.get("task_id"), field="result.envelope.task_id")
+    adapter_key = require_string(envelope.get("adapter_key"), field="result.envelope.adapter_key")
+    capability = require_string(envelope.get("capability"), field="result.envelope.capability")
+    if task_id != record.task_id:
+        raise TaskRecordContractError("TaskTerminalResult.envelope.task_id 与 TaskRecord.task_id 不一致")
+    if adapter_key != record.request.adapter_key:
+        raise TaskRecordContractError("TaskTerminalResult.envelope.adapter_key 与请求快照不一致")
+    if capability != record.request.capability:
+        raise TaskRecordContractError("TaskTerminalResult.envelope.capability 与请求快照不一致")
+
+    status = terminal_record_status(envelope)
+    if status == "succeeded":
+        validate_success_terminal_envelope(envelope)
+        if "error" in envelope:
+            raise TaskRecordContractError("success TaskTerminalResult.envelope 不得包含 error")
+        return
+
+    validate_failed_terminal_envelope(envelope)
+    if "raw" in envelope or "normalized" in envelope:
+        raise TaskRecordContractError("failed TaskTerminalResult.envelope 不得包含 success payload 字段")
+
+
+def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    if "raw" not in envelope:
+        raise TaskRecordContractError("success TaskTerminalResult.envelope 必须包含 raw")
+    normalized = envelope.get("normalized")
+    if not isinstance(normalized, Mapping):
+        raise TaskRecordContractError("success TaskTerminalResult.envelope.normalized 必须是对象")
+
+    required_non_empty = ("platform", "content_id", "content_type", "canonical_url")
+    for field in required_non_empty:
+        require_string(normalized.get(field), field=f"result.envelope.normalized.{field}")
+
+    if normalized["content_type"] not in ALLOWED_CONTENT_TYPES:
+        raise TaskRecordContractError("success TaskTerminalResult.envelope.normalized.content_type 不在允许值范围内")
+
+    for field in ("title", "body_text"):
+        value = normalized.get(field)
+        if not isinstance(value, str):
+            raise TaskRecordContractError(f"result.envelope.normalized.{field} 必须存在且为字符串")
+
+    published_at = normalized.get("published_at")
+    if published_at is not None:
+        validate_timestamp(published_at, field="result.envelope.normalized.published_at")
+
+    for field in ("author", "stats", "media"):
+        if not isinstance(normalized.get(field), Mapping):
+            raise TaskRecordContractError(f"result.envelope.normalized.{field} 必须存在且为对象")
+
+    author = normalized["author"]
+    stats = normalized["stats"]
+    media = normalized["media"]
+    for field in ("author_id", "display_name", "avatar_url"):
+        if field not in author:
+            raise TaskRecordContractError(f"result.envelope.normalized.author.{field} 不得缺失")
+    for field in ("like_count", "comment_count", "share_count", "collect_count"):
+        if field not in stats:
+            raise TaskRecordContractError(f"result.envelope.normalized.stats.{field} 不得缺失")
+    for field in ("cover_url", "video_url", "image_urls"):
+        if field not in media:
+            raise TaskRecordContractError(f"result.envelope.normalized.media.{field} 不得缺失")
+
+
+def validate_failed_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    error = envelope.get("error")
+    if not isinstance(error, Mapping):
+        raise TaskRecordContractError("failed TaskTerminalResult.envelope.error 必须是对象")
+    require_string(error.get("category"), field="result.envelope.error.category")
+    require_string(error.get("code"), field="result.envelope.error.code")
+    require_string(error.get("message"), field="result.envelope.error.message")
 
 
 def normalize_json_value(value: Any, *, field: str) -> Any:

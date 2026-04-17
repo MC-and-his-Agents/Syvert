@@ -96,10 +96,11 @@ def execute_task(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
-    return execute_task_with_record(
+    return execute_task_internal(
         request,
         adapters=adapters,
         task_id_factory=task_id_factory,
+        preserve_envelope_on_record_error=True,
     ).envelope
 
 
@@ -108,6 +109,21 @@ def execute_task_with_record(
     *,
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
+) -> TaskExecutionResult:
+    return execute_task_internal(
+        request,
+        adapters=adapters,
+        task_id_factory=task_id_factory,
+        preserve_envelope_on_record_error=False,
+    )
+
+
+def execute_task_internal(
+    request: TaskRequest | CoreTaskRequest,
+    *,
+    adapters: Mapping[str, Any],
+    task_id_factory: Callable[[], str] | None = None,
+    preserve_envelope_on_record_error: bool,
 ) -> TaskExecutionResult:
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
@@ -256,6 +272,7 @@ def execute_task_with_record(
                 capability,
                 record,
                 envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
             )
     except PlatformAdapterError as error:
         envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
@@ -265,6 +282,7 @@ def execute_task_with_record(
             capability,
             record,
             envelope,
+            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
         )
     except Exception as error:
         envelope = failure_envelope(
@@ -282,6 +300,7 @@ def execute_task_with_record(
             capability,
             record,
             envelope,
+            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
         )
 
     envelope = {
@@ -298,6 +317,7 @@ def execute_task_with_record(
         capability,
         record,
         envelope,
+        preserve_envelope_on_record_error=preserve_envelope_on_record_error,
     )
 
 
@@ -307,10 +327,14 @@ def finalize_task_execution_result(
     capability: str,
     record: TaskRecord,
     envelope: Mapping[str, Any],
+    *,
+    preserve_envelope_on_record_error: bool,
 ) -> TaskExecutionResult:
     try:
         return TaskExecutionResult(dict(envelope), finish_task_record(record, envelope))
     except TaskRecordContractError as error:
+        if preserve_envelope_on_record_error:
+            return TaskExecutionResult(dict(envelope), None)
         return TaskExecutionResult(
             failure_envelope(
                 task_id,

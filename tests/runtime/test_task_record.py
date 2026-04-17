@@ -199,6 +199,51 @@ class TaskRecordCodecTests(unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_rejects_terminal_envelope_mismatch_during_round_trip_load(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/3c"),
+            ),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-3c",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        payload["result"]["envelope"]["task_id"] = "task-record-other"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_untrusted_timeline_during_round_trip_load(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/3d"),
+            ),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-3d",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        payload["logs"][1]["occurred_at"] = "2026-04-17T10:29:59Z"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_snapshot_values_outside_shared_request_model(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-3e",
+                TaskRequestSnapshot(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    target_type="unsupported",
+                    target_value="https://example.com/post/3e",
+                    collection_mode="hybrid",
+                ),
+            )
+
 
 class RuntimeTaskRecordTests(unittest.TestCase):
     def test_execute_task_with_record_keeps_preaccepted_failure_outside_durable_history(self) -> None:
@@ -262,6 +307,22 @@ class RuntimeTaskRecordTests(unittest.TestCase):
         self.assertEqual(outcome.envelope["status"], "failed")
         self.assertEqual(outcome.envelope["error"]["code"], "envelope_not_json_serializable")
         self.assertIsNone(outcome.task_record)
+
+    def test_execute_task_preserves_public_envelope_when_task_record_fails_to_close(self) -> None:
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/8"),
+            ),
+            adapters={"stub": UnserializableSuccessAdapter()},
+            task_id_factory=lambda: "task-record-8",
+        )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["task_id"], "task-record-8")
+        self.assertIn("raw", envelope)
+        self.assertEqual(type(envelope["raw"]["bad"]).__name__, "object")
 
 
 if __name__ == "__main__":
