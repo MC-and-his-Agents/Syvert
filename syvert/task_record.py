@@ -509,6 +509,30 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
         if field not in media:
             raise TaskRecordContractError(f"result.envelope.normalized.media.{field} 不得缺失")
 
+    author_id = author.get("author_id")
+    display_name = author.get("display_name")
+    avatar_url = author.get("avatar_url")
+    if author_id is not None and (not isinstance(author_id, str) or not author_id):
+        raise TaskRecordContractError("result.envelope.normalized.author.author_id 必须为非空字符串或 null")
+    if display_name is not None and (not isinstance(display_name, str) or not display_name):
+        raise TaskRecordContractError("result.envelope.normalized.author.display_name 必须为非空字符串或 null")
+    if avatar_url is not None and not isinstance(avatar_url, str):
+        raise TaskRecordContractError("result.envelope.normalized.author.avatar_url 必须为字符串或 null")
+
+    for field in ("like_count", "comment_count", "share_count", "collect_count"):
+        value = stats.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            raise TaskRecordContractError(f"result.envelope.normalized.stats.{field} 必须为整数或 null")
+
+    for field in ("cover_url", "video_url"):
+        value = media.get(field)
+        if value is not None and not isinstance(value, str):
+            raise TaskRecordContractError(f"result.envelope.normalized.media.{field} 必须为字符串或 null")
+
+    image_urls = media.get("image_urls")
+    if not isinstance(image_urls, list) or not all(isinstance(item, str) for item in image_urls):
+        raise TaskRecordContractError("result.envelope.normalized.media.image_urls 必须是字符串数组")
+
 
 def validate_failed_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     error = envelope.get("error")

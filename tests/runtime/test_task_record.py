@@ -215,6 +215,24 @@ class TaskRecordCodecTests(unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_rejects_success_envelope_nested_type_drift_during_round_trip_load(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/3cc"),
+            ),
+            adapters={"stub": SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-3cc",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        payload["result"]["envelope"]["normalized"]["author"]["author_id"] = 123
+        payload["result"]["envelope"]["normalized"]["stats"]["like_count"] = "1"
+        payload["result"]["envelope"]["normalized"]["media"]["image_urls"] = [1]
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
     def test_rejects_untrusted_timeline_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
