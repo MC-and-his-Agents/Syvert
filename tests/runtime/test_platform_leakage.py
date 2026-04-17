@@ -1313,14 +1313,86 @@ class PlatformLeakageTests(unittest.TestCase):
         report = self.run_with_fixture(
             {
                 "syvert/version_gate.py": (
-                    '                "evidence_ref": "regression:xhs:success",\n',
-                    '                "evidence_ref": "regression:xhs:baseline-success",\n',
+                    '        "xhs": (\n'
+                    '            {\n'
+                    '                "case_id": "xhs-success",\n'
+                    '                "expected_outcome": "success",\n'
+                    '                "evidence_ref": "regression:xhs:success",\n'
+                    '            },\n'
+                    '            {\n'
+                    '                "case_id": "xhs-invalid-input",\n'
+                    '                "expected_outcome": "allowed_failure",\n'
+                    '                "evidence_ref": "regression:xhs:invalid-input",\n'
+                    '            },\n'
+                    '        ),\n',
+                    '        "xhs": [\n'
+                    '            {\n'
+                    '                "case_id": "xhs-success",\n'
+                    '                "expected_outcome": "success",\n'
+                    '                "evidence_ref": "regression:xhs:success",\n'
+                    '            },\n'
+                    '            {\n'
+                    '                "case_id": "xhs-invalid-input",\n'
+                    '                "expected_outcome": "allowed_failure",\n'
+                    '                "evidence_ref": "regression:xhs:invalid-input",\n'
+                    '            },\n'
+                    '        ],\n',
                 )
             }
         )
 
         self.assertEqual(report["verdict"], "pass")
         self.assertEqual(report["details"]["findings"], [])
+
+    def test_run_check_fails_closed_on_frozen_reference_pair_platform_drift(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '    "v0.2.0": ("xhs", "douyin"),\n',
+                    '    "v0.2.0": ("xhs", "youtube"),\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
+
+    def test_run_check_fails_closed_on_frozen_case_matrix_platform_drift(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/version_gate.py": (
+                    '        "douyin": (\n'
+                    '            {\n'
+                    '                "case_id": "douyin-success",\n'
+                    '                "expected_outcome": "success",\n'
+                    '                "evidence_ref": "regression:douyin:success",\n'
+                    '            },\n'
+                    '            {\n'
+                    '                "case_id": "douyin-platform",\n'
+                    '                "expected_outcome": "allowed_failure",\n'
+                    '                "evidence_ref": "regression:douyin:platform",\n'
+                    '            },\n'
+                    '        ),\n',
+                    '        "youtube": (\n'
+                    '            {\n'
+                    '                "case_id": "youtube-success",\n'
+                    '                "expected_outcome": "success",\n'
+                    '                "evidence_ref": "regression:youtube:success",\n'
+                    '            },\n'
+                    '            {\n'
+                    '                "case_id": "youtube-platform",\n'
+                    '                "expected_outcome": "allowed_failure",\n'
+                    '                "evidence_ref": "regression:youtube:platform",\n'
+                    '            },\n'
+                    '        ),\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"version_gate_logic"})
 
     def test_run_check_does_not_whitelist_reference_pair_outside_frozen_constant(self) -> None:
         report = self.run_with_fixture(

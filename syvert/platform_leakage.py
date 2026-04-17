@@ -103,6 +103,37 @@ _VERSION_LITERAL_RE = re.compile(r"^v[0-9]+(?:\.[0-9]+)*$")
 _REAL_REGRESSION_CASE_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
 _REAL_REGRESSION_EVIDENCE_REF_RE = re.compile(r"^regression:(?P<adapter>[a-z0-9_-]+):[a-z0-9][a-z0-9-]*$")
 _REAL_REGRESSION_ALLOWED_OUTCOMES = frozenset({"success", "allowed_failure"})
+_ALLOWED_FROZEN_REFERENCE_PAIR_BY_VERSION = {
+    "v0.2.0": ("xhs", "douyin"),
+}
+_ALLOWED_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION = {
+    "v0.2.0": {
+        "xhs": (
+            {
+                "case_id": "xhs-success",
+                "expected_outcome": "success",
+                "evidence_ref": "regression:xhs:success",
+            },
+            {
+                "case_id": "xhs-invalid-input",
+                "expected_outcome": "allowed_failure",
+                "evidence_ref": "regression:xhs:invalid-input",
+            },
+        ),
+        "douyin": (
+            {
+                "case_id": "douyin-success",
+                "expected_outcome": "success",
+                "evidence_ref": "regression:douyin:success",
+            },
+            {
+                "case_id": "douyin-platform",
+                "expected_outcome": "allowed_failure",
+                "evidence_ref": "regression:douyin:platform",
+            },
+        ),
+    },
+}
 
 
 def build_platform_leakage_payload(
@@ -289,49 +320,75 @@ def _assignment_matches_allowed_version_gate_exception(node: ast.AST) -> bool:
 
 
 def _is_allowed_frozen_reference_pair_value(value: Any) -> bool:
-    if not isinstance(value, dict) or not value:
-        return False
-    for version, pair in value.items():
-        if not isinstance(version, str) or _VERSION_LITERAL_RE.match(version) is None:
-            return False
-        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
-            return False
-        if not all(isinstance(item, str) and _is_common_platform_literal(item) for item in pair):
-            return False
-    return True
+    normalized = _normalize_frozen_reference_pair_value(value)
+    return normalized == _ALLOWED_FROZEN_REFERENCE_PAIR_BY_VERSION
 
 
 def _is_allowed_frozen_real_regression_case_matrix_value(value: Any) -> bool:
+    normalized = _normalize_frozen_real_regression_case_matrix_value(value)
+    return normalized == _ALLOWED_FROZEN_REAL_REGRESSION_CASE_MATRIX_BY_VERSION
+
+
+def _normalize_frozen_reference_pair_value(value: Any) -> dict[str, tuple[str, ...]] | None:
     if not isinstance(value, dict) or not value:
-        return False
+        return None
+    normalized: dict[str, tuple[str, ...]] = {}
+    for version, pair in value.items():
+        if not isinstance(version, str) or _VERSION_LITERAL_RE.match(version) is None:
+            return None
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            return None
+        if not all(isinstance(item, str) and _is_common_platform_literal(item) for item in pair):
+            return None
+        normalized[version] = tuple(pair)
+    return normalized
+
+
+def _normalize_frozen_real_regression_case_matrix_value(
+    value: Any,
+) -> dict[str, dict[str, tuple[dict[str, str], ...]]] | None:
+    if not isinstance(value, dict) or not value:
+        return None
+    normalized: dict[str, dict[str, tuple[dict[str, str], ...]]] = {}
     for version, adapters in value.items():
         if not isinstance(version, str) or _VERSION_LITERAL_RE.match(version) is None:
-            return False
+            return None
         if not isinstance(adapters, dict) or not adapters:
-            return False
+            return None
+        normalized_adapters: dict[str, tuple[dict[str, str], ...]] = {}
         for adapter, cases in adapters.items():
             if not isinstance(adapter, str) or not _is_common_platform_literal(adapter):
-                return False
+                return None
             if not isinstance(cases, (tuple, list)) or not cases:
-                return False
+                return None
+            normalized_cases: list[dict[str, str]] = []
             for case in cases:
                 if not isinstance(case, dict) or set(case) != {"case_id", "expected_outcome", "evidence_ref"}:
-                    return False
+                    return None
                 case_id = case["case_id"]
                 expected_outcome = case["expected_outcome"]
                 evidence_ref = case["evidence_ref"]
                 if not isinstance(case_id, str) or _REAL_REGRESSION_CASE_ID_RE.match(case_id) is None:
-                    return False
+                    return None
                 if not case_id.startswith(f"{adapter}-"):
-                    return False
+                    return None
                 if expected_outcome not in _REAL_REGRESSION_ALLOWED_OUTCOMES:
-                    return False
+                    return None
                 if not isinstance(evidence_ref, str):
-                    return False
+                    return None
                 match = _REAL_REGRESSION_EVIDENCE_REF_RE.match(evidence_ref)
                 if match is None or match.group("adapter") != adapter:
-                    return False
-    return True
+                    return None
+                normalized_cases.append(
+                    {
+                        "case_id": case_id,
+                        "expected_outcome": expected_outcome,
+                        "evidence_ref": evidence_ref,
+                    }
+                )
+            normalized_adapters[adapter] = tuple(normalized_cases)
+        normalized[version] = normalized_adapters
+    return normalized
 
 
 def _scan_file(
