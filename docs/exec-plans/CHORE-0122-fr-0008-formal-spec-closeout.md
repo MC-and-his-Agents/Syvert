@@ -33,13 +33,13 @@
 ## 当前停点
 
 - `#137` 已作为 `FR-0008` formal spec 的真实执行入口建立独立 worktree，执行分支为 `issue-137-fr-0008-formal-spec`。
-- 当前仓内尚无 `FR-0008` formal spec 套件、`v0.3.0` release 索引或 `2026-S16` sprint 索引；本回合需要把它们作为同一条 spec lane 首次落盘。
-- 当前 formal spec 的核心目标是冻结任务状态、终态结果、执行日志、共享序列化与本地持久化边界，并把 `FR-0008` 与 `FR-0009` 查询 surface 明确分离。
+- `FR-0008` formal spec 套件、`v0.3.0` release 索引与 `2026-S16` sprint 索引已在当前分支首次落盘。
+- 当前 checkpoint `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2` 已冻结任务状态、终态结果、执行日志、共享序列化与本地持久化边界，并把 `FR-0008` 与 `FR-0009` 查询 surface 明确分离。
 
 ## 下一步动作
 
-- 完成 `FR-0008` formal spec 套件、当前 active exec-plan 与 release / sprint 索引的落盘。
-- 运行 spec lane 最小门禁并通过受控入口创建 spec PR。
+- 基于当前 checkpoint 运行 `governance_gate`、`open_pr --dry-run` 与受控推送。
+- 通过受控入口创建 spec PR，并同步 `#137` / `#127` 的 GitHub 执行语义。
 - 在 guardian / checks 通过后，用受控 merge 完成 PR 收口并关闭 `#137`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -57,6 +57,12 @@
 
 - `gh issue view 127 --json number,title,body,state,projectItems,url`
 - `gh issue view 137 --json number,title,body,state,projectItems,url`
+- `gh issue view 128 --json number,title,body,state,url`
+- `gh issue view 140 --json number,title,body,state,url`
+- `gh issue view 141 --json number,title,body,state,url`
+- `gh issue view 142 --json number,title,body,state,url`
+- `gh issue view 143 --json number,title,body,state,url`
+- `gh issue view 144 --json number,title,body,state,url`
 - `sed -n '1,220p' vision.md`
 - `sed -n '129,180p' docs/roadmap-v0-to-v1.md`
 - `sed -n '1,260p' AGENTS.md`
@@ -65,6 +71,14 @@
 - `sed -n '1,220p' spec_review.md`
 - `python3 scripts/create_worktree.py --issue 137 --class spec`
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-137-fr-0008-formal-spec`
+- `python3 scripts/spec_guard.py --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `git commit -m 'docs(spec): 冻结 FR-0008 任务记录与持久化 formal spec'`
+  - 结果：已生成 checkpoint `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2`
 
 ## 未决风险
 
@@ -77,4 +91,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1ccd35506fe6cd8c108192be94f78334bba1e498`
+- `1f67b47e83cc38158c6b50d4f8c950ad0204d7b2`
