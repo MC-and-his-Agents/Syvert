@@ -221,6 +221,26 @@ class TaskRecordStoreTests(unittest.TestCase):
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
+    def test_runtime_fails_closed_before_adapter_execute_when_running_persistence_fails(self) -> None:
+        adapter = SuccessfulAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-3b"),
+            ),
+            adapters={"stub": adapter},
+            task_id_factory=lambda: "task-store-3b",
+            task_record_store=SelectiveFailingStore("running"),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(adapter.calls, 0)
+        self.assertIsNone(outcome.task_record)
+
     def test_runtime_fails_closed_when_terminal_persistence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             adapter = SuccessfulAdapter()
@@ -354,6 +374,57 @@ class TaskRecordStoreTests(unittest.TestCase):
             conflicting["error"]["code"] = "changed"
             with self.assertRaises((TaskRecordStoreError, TaskRecordContractError)):
                 store.write(finish_task_record(running, conflicting, occurred_at="2026-04-17T12:00:02Z"))
+
+    def test_store_rejects_terminal_write_when_running_checkpoint_was_not_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            snapshot = TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/post/store-7",
+                collection_mode="hybrid",
+            )
+            accepted = create_task_record("task-store-7", snapshot, occurred_at="2026-04-17T12:00:00Z")
+            running = start_task_record(accepted, occurred_at="2026-04-17T12:00:01Z")
+            envelope = {
+                "task_id": "task-store-7",
+                "adapter_key": "stub",
+                "capability": "content_detail_by_url",
+                "status": "success",
+                "raw": {"id": "raw-store-7"},
+                "normalized": {
+                    "platform": "stub",
+                    "content_id": "content-store-7",
+                    "content_type": "unknown",
+                    "canonical_url": "https://example.com/post/store-7",
+                    "title": "",
+                    "body_text": "",
+                    "published_at": None,
+                    "author": {
+                        "author_id": None,
+                        "display_name": None,
+                        "avatar_url": None,
+                    },
+                    "stats": {
+                        "like_count": None,
+                        "comment_count": None,
+                        "share_count": None,
+                        "collect_count": None,
+                    },
+                    "media": {
+                        "cover_url": None,
+                        "video_url": None,
+                        "image_urls": [],
+                    },
+                },
+            }
+            succeeded = finish_task_record(running, envelope, occurred_at="2026-04-17T12:00:02Z")
+
+            store.write(accepted)
+
+            with self.assertRaises(TaskRecordStoreError):
+                store.write(succeeded)
 
 
 if __name__ == "__main__":

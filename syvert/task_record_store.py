@@ -168,10 +168,9 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
         else:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordStoreError("终态任务记录缺少结果或终态时间")
-            base = existing
             if existing.status == "accepted":
-                base = start_task_record(existing, occurred_at=extract_stage_time(incoming, "execution"))
-            candidate = finish_task_record(base, incoming.result.envelope, occurred_at=incoming.terminal_at)
+                raise TaskRecordStoreError("终态任务记录落盘前必须先完成 running 持久化")
+            candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
     except TaskRecordContractError as error:
         raise TaskRecordStoreError("本地持久化记录的生命周期推进不合法") from error
 
