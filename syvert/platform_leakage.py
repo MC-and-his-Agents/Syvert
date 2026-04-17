@@ -146,14 +146,15 @@ def build_platform_leakage_payload(
     evidence_refs = sorted({*scan_refs, *(finding["evidence_ref"] for finding in findings)})
     checked_boundary_scope = _coerce_boundary_scope_input(boundary_scope)
     builder_inputs_valid = _is_non_empty_string_value(version) and _is_frozen_boundary_scope_input(checked_boundary_scope)
+    payload_boundary_scope = list(checked_boundary_scope) if builder_inputs_valid else list(DEFAULT_BOUNDARY_SCOPE)
     verdict = "fail" if findings or not builder_inputs_valid else "pass"
     return {
         "version": version,
-        "boundary_scope": checked_boundary_scope,
+        "boundary_scope": payload_boundary_scope,
         "verdict": verdict,
         "summary": (
             f"platform leakage checks failed for version `{version}`"
-            if findings
+            if findings or not builder_inputs_valid
             else f"platform leakage checks passed for version `{version}`"
         ),
         "findings": findings,
@@ -167,11 +168,15 @@ def run_platform_leakage_check(
     repo_root: str | Path,
     boundary_scope: Sequence[str] | Iterable[str] | None = None,
 ) -> dict[str, Any]:
+    raw_boundary_scope = _coerce_boundary_scope_input(boundary_scope)
     payload = build_platform_leakage_payload(
         version=version,
         repo_root=repo_root,
         boundary_scope=boundary_scope,
     )
+    if not (_is_non_empty_string_value(version) and _is_frozen_boundary_scope_input(raw_boundary_scope)):
+        payload["version"] = version
+        payload["boundary_scope"] = raw_boundary_scope
     return validate_platform_leakage_source_report(payload, version=version)
 
 

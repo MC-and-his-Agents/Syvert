@@ -41,6 +41,8 @@ class PlatformLeakageTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["verdict"], "fail")
+        self.assertEqual(payload["summary"], "platform leakage checks failed for version `v0.2.0`")
+        self.assertEqual(payload["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
         self.assertEqual(payload["findings"], [])
         self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
 
@@ -51,6 +53,8 @@ class PlatformLeakageTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["verdict"], "fail")
+        self.assertEqual(payload["summary"], "platform leakage checks failed for version ``")
+        self.assertEqual(payload["boundary_scope"], list(DEFAULT_BOUNDARY_SCOPE))
         self.assertEqual(payload["findings"], [])
         self.assertEqual(set(payload["evidence_refs"]), EXPECTED_SCAN_REFS)
 
