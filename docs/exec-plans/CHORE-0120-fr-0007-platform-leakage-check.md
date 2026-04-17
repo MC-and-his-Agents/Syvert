@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
+- 当前受审 runtime head：`a3c56ce29f43379cd3fe176ee9a35bed79f49352`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`6ccec937291a54ab956a187b1eb47b1594370fcf`
+- 当前 runtime-affecting 实现 checkpoint：`a3c56ce29f43379cd3fe176ee9a35bed79f49352`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -106,7 +106,8 @@
     - `run_platform_leakage_check()` 现在把 raw malformed input 与 canonical fail payload 分层处理：direct builder surface 保持 fail-shaped 输出，validator 入口仍能看见原始坏输入并给出 `invalid_boundary_scope` / `missing_boundary_scope` / `boundary_scope_order_mismatch` 等具体 fail-closed 原因。
     - `runtime.py` 的 boundary resolver 现在把 `normalize_request()`、`project_to_adapter_request()`、`validate_projection_axes_for_current_runtime()` 纳入 `shared_input_model`，不再把这些共享输入 contract 主路径的泄漏归回 `core_runtime`。
     - `execute_task()` 的 success envelope 组装/返回尾段现在按 `shared_result_contract` 归类，真实 `{raw, normalized}` 共享结果主路径的 finding 不会再掉回 `core_runtime`。
-  - 当前已提交的运行时语义锚定在实现 checkpoint `6ccec937291a54ab956a187b1eb47b1594370fcf`
+    - orchestrator 在 failed `platform_leakage` report 场景下不再恢复调用方自带的 `evidence_refs`；source-specific validator 重建出的 canonical scan refs + finding trace 会继续保留，forged failed trace 不会再被洗回输出。
+  - 当前已提交的运行时语义锚定在实现 checkpoint `a3c56ce29f43379cd3fe176ee9a35bed79f49352`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -143,6 +144,10 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_version_gate.VersionGateTests.test_orchestrator_round_trips_failed_platform_leakage_report tests.runtime.test_version_gate.VersionGateTests.test_orchestrator_rewrites_forged_failed_platform_leakage_evidence_refs tests.runtime.test_version_gate.VersionGateTests.test_orchestrator_preserves_failed_harness_evidence_refs`
+  - 结果：在 checkpoint `a3c56ce29f43379cd3fe176ee9a35bed79f49352` 上通过，`Ran 3 tests`，`OK`；已覆盖 guardian 指出的 failed `platform_leakage` forged trace blocker，并保留 harness 既有失败证据行为。
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `a3c56ce29f43379cd3fe176ee9a35bed79f49352` 上通过，`Ran 252 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的 forged failed `platform_leakage` trace blocker，并保持共享边界归类、builder canonical fail payload、forged clean report、共享 carrier fail-closed与 orchestrator 接入回归继续通过。
 - `python3 -m unittest tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_normalize_request_leak_to_shared_input_model tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
   - 结果：在 checkpoint `6ccec937291a54ab956a187b1eb47b1594370fcf` 上通过，`Ran 2 tests`，`OK`；已覆盖 guardian 指出的共享输入 / 共享结果主路径 boundary 归类 blocker。
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -234,7 +239,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`6ccec937291a54ab956a187b1eb47b1594370fcf`
-- 最近一次重跑目标测试的 head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
-- 当前受审 runtime head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `6ccec937291a54ab956a187b1eb47b1594370fcf`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`a3c56ce29f43379cd3fe176ee9a35bed79f49352`
+- 最近一次重跑目标测试的 head：`a3c56ce29f43379cd3fe176ee9a35bed79f49352`
+- 当前受审 runtime head：`a3c56ce29f43379cd3fe176ee9a35bed79f49352`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `a3c56ce29f43379cd3fe176ee9a35bed79f49352`，不得把 follow-up 误记为新的运行时真相
