@@ -32,11 +32,13 @@
 
 - 功能需求：
   - `v0.3.0` 范围内，每个已经通过共享 admission 并正式进入执行主路径的任务都必须生成且只生成一条持久化任务记录；该记录以 `task_id` 作为唯一聚合键。
+  - `accepted` 任务记录与请求快照的 durable 创建，是继续沿共享执行主路径推进的前置条件；如果初始建档或请求快照序列化/写入失败，执行必须在进入后续共享执行检查或 adapter 调用前 fail-closed。
   - 任务记录必须覆盖同一条执行主路径上的三个共享面：任务状态、终态结果、执行日志。后续实现可以拆成多个模块，但不能让这三类信息脱离同一个聚合根。
-  - 任务状态模型在 `v0.3.0` 的最小闭环固定为：`accepted -> running -> succeeded | failed`。`accepted` 表示任务已通过共享 admission 并进入持久化轨道；`running` 表示任务已进入 adapter 执行阶段；`succeeded` / `failed` 是唯一允许的终态。
+  - 任务状态模型在 `v0.3.0` 的最小闭环固定为：`accepted -> running -> succeeded | failed`。`accepted` 表示任务已通过共享 admission、完成初始建档并进入持久化轨道；`running` 表示任务已进入 adapter 执行阶段；`succeeded` / `failed` 是唯一允许的终态。
   - 任务状态迁移必须单向闭合；`succeeded` 与 `failed` 一旦写入，即不得在同一条任务记录上回退为非终态，也不得再追加第二个终态。
   - 终态结果必须复用同一条 Core 执行主路径产生的共享 envelope 语义：成功态继续承载 `task_id`、`adapter_key`、`capability`、`status=success`、`raw`、`normalized`；失败态继续承载 `task_id`、`adapter_key`、`capability`、`status=failed`、`error`。持久化层不得重新定义一套独立结果 schema。
-  - 执行日志必须与同一条任务记录共存，并至少能够表达 admission、开始执行、结束执行/失败收口等生命周期事件。`v0.3.0` 只要求最小共享日志结构，不要求富文本日志流、实时订阅或平台专属调试输出。
+  - 一旦任务已经进入 `accepted` 生命周期，此后同一条共享执行主路径上的失败都必须收口为 durable `failed` 任务记录；这至少包括 registry 解析失败、capability / target / collection mode 拒绝、runtime-contract 失败、adapter 执行失败、payload 校验失败与终态持久化失败。
+  - 执行日志必须与同一条任务记录共存，并至少表达该任务实际经历过的生命周期事件。所有任务记录都必须包含 `accepted` 事件；进入 `running` 之后必须包含执行开始事件；进入终态之后必须包含终态收口事件。`v0.3.0` 只要求最小共享日志结构，不要求富文本日志流、实时订阅或平台专属调试输出。
   - 共享序列化必须以同一份任务记录聚合为输入，输出 JSON-safe 的稳定表示；写入与回读都必须围绕这同一份共享表示进行，而不是由不同调用方分别维护私有序列化形状。
   - 本地稳定存储是 `v0.3.0` 的唯一持久化目标态；formal spec 允许文件、目录或嵌入式存储等不同实现，但不允许把唯一合法实现绑定到某个具体文件名、某个目录布局或某个存储引擎。
   - `FR-0009` 后续可以基于该持久化任务记录提供 CLI 查询，但不得引入与本 FR 不一致的第二套状态/结果/日志语义。
@@ -45,7 +47,7 @@
   - 请求快照必须围绕 `FR-0004` 已批准的共享请求模型表达，即可回映到 `adapter_key`、`capability`、`target_type`、`target_value` 与 `collection_mode`；不得为单一平台新增持久化专用字段。
   - 终态结果与任务状态必须保持一致：`succeeded` 只能对应成功 envelope，`failed` 只能对应失败 envelope；非终态任务记录不得伪装出终态 envelope。
   - 执行日志必须是 append-only 语义；每条日志至少要可追溯到发生时间、生命周期阶段与最小可判定消息。`raw` payload、平台私有细节或完整栈信息不是日志模型的必需字段。
-  - 序列化与反序列化必须以同一份共享 contract 为准；缺失必需字段、字段类型不合法、终态/结果不一致或日志序列不可信，都必须被判定为非法持久化记录并 fail-closed。
+  - 序列化与反序列化必须以同一份共享 contract 为准；缺失必需字段、字段类型不合法、终态/结果不一致、缺少当前状态所要求的生命周期事件，或日志序列不可信，都必须被判定为非法持久化记录并 fail-closed。
   - 持久化写入必须通过 Core 内部任务记录机制完成。CLI、adapter 或外部调用方不得绕过 Core 直接落盘“结果文件”来伪装任务已被持久化。
   - 如果终态结果、状态更新或必需日志无法被可靠序列化或可靠写入，本次执行必须 fail-closed；不得继续把该任务报告为“已成功且可查询”的持久化完成态。
   - 查询消费者只能消费已经持久化完成的共享任务记录；formal spec 不允许为查询层维护与任务记录不一致的影子状态表或影子结果 payload。
@@ -108,10 +110,11 @@ Then 该记录必须被判定为非法并 fail-closed，而不是被宽松修复
 - 异常场景：
   - 若任务记录只持久化最终结果，不持久化共享任务状态或生命周期日志，则不满足 `v0.3.0` 的闭环目标。
   - 若持久化层允许 `succeeded` 任务缺少 success envelope，或允许 `failed` 任务缺少 failure envelope，则任务状态与结果语义已经断裂。
+  - 若系统允许任务在 `accepted` 初始建档失败后继续执行，并打算事后补写历史，则违反 durable truth 自 `accepted` 开始的 contract。
   - 若外部调用方可以绕过 Core 直接写入查询结果文件，formal spec 必须把该路径视为旁路持久化，不能算作 `FR-0008` 的实现。
   - 若持久化写入失败后系统仍然把任务作为“已成功且可查询”对外暴露，则违反 fail-closed 要求。
 - 边界场景：
-  - 共享 admission 拒绝、CLI 参数解析失败或 adapter loader 失败这类“尚未进入执行主路径”的失败，不属于 `FR-0008` 要求持久化的 `TaskRecord` 生命周期；它们继续只产生共享 failed envelope，而不强制落入 durable task history。
+  - 共享 admission 拒绝、CLI 参数解析失败，或其他发生在 durable `accepted` 建档之前的失败，不属于 `FR-0008` 要求持久化的 `TaskRecord` 生命周期；它们继续只产生共享 failed envelope，而不强制落入 durable task history。
   - `FR-0008` 不要求在 `v0.3.0` 支持任务取消、重试、恢复、并发锁或分布式队列；这些不在最小状态机内。
   - `FR-0008` 不要求定义唯一的本地文件布局或数据库 schema，只要求共享序列化与稳定存储之间的契约边界保持一致。
   - `FR-0008` 可以为 `FR-0009` 提供可查询基线，但不负责定义 CLI 查询入口的参数、排序、筛选和展示细节。

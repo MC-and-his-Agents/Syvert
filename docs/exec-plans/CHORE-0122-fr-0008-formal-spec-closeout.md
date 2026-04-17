@@ -37,9 +37,14 @@
 - guardian 首轮审查已返回 `REQUEST_CHANGES`，指出两项 formal spec 自相矛盾：
   - 是否把“尚未通过共享 admission”的失败纳入 `TaskRecord` 生命周期
   - `TaskTerminalResult` 是否额外引入重复的 `status` 轴
-- 当前 checkpoint `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2` 已按 guardian 结论收口：
+- guardian 第二轮审查继续返回 `REQUEST_CHANGES`，指出三项未冻结清楚的 contract：
+  - 初始 `accepted` 建档本身是否 fail-closed
+  - post-admission 共享失败是否一律纳入 durable `TaskRecord`
+  - 读侧是否会拒绝生命周期不完整的持久化历史
+- 当前 checkpoint `f6c799cd86bae44c9eff0752562fb24b84dd8721` 已按首轮 guardian 结论收口：
   - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
   - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
+- 当前受审 head `9d93c6eee0506ce2b27cbb2d3f5c18f3d572ca23` 仅补充 guardian closeout 元数据，不改写上一 checkpoint 已冻结的 formal spec 语义。
 
 ## 下一步动作
 
@@ -89,8 +94,14 @@
   - 已修复阻断：
     - 共享 admission 拒绝不再被错误写入 `TaskRecord` 生命周期
     - `TaskTerminalResult` 不再额外持久化 shadow `status`
+- `python3 scripts/pr_guardian.py review 145`
+  - 结果：guardian 第二轮返回 `REQUEST_CHANGES`
+  - 待当前 head 收口：
+    - 初始 `accepted` 建档失败必须在进入后续执行前 fail-closed
+    - post-admission 共享失败必须统一纳入 durable `TaskRecord`
+    - 读侧必须拒绝生命周期不完整的持久化历史
 - `git commit -m 'docs(spec): 收紧 FR-0008 持久化生命周期契约'`
-  - 结果：已生成 checkpoint `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2`
+  - 结果：已生成 checkpoint `f6c799cd86bae44c9eff0752562fb24b84dd8721`
 
 ## 未决风险
 
@@ -103,4 +114,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f6c799ca80779db0711ef4f76f09d5ed7e5e95b2`
+- `f6c799cd86bae44c9eff0752562fb24b84dd8721`
+- 说明：当前受审 head 为 `9d93c6eee0506ce2b27cbb2d3f5c18f3d572ca23`，其增量只承载 guardian closeout 元数据；review / merge 仍需以该 head 的 latest guardian verdict 与 checks 为准。

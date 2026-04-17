@@ -29,7 +29,7 @@
   - `result`
     - 约束：仅 `succeeded` / `failed` 允许出现；且必须与 `status` 保持一致
   - `logs`
-    - 约束：append-only 序列；至少覆盖任务进入持久化轨道、开始执行、终态收口等生命周期事件
+    - 约束：append-only 序列；必须覆盖当前状态所要求的生命周期事件。所有任务记录都必须含 `accepted` 事件；进入 `running` 之后必须含开始执行事件；进入终态之后必须含终态收口事件
 - `TaskRequestSnapshot`
   - `adapter_key`
     - 约束：非空字符串；复用共享请求语义
@@ -60,10 +60,11 @@
 ## 生命周期
 
 - 创建：
-  - 当任务通过共享 admission、拿到合法 `task_id` 并进入持久化轨道时，创建 `TaskRecord`
+  - 当任务通过共享 admission、拿到合法 `task_id` 且 `accepted` 记录与请求快照已被可靠序列化/写入时，创建 `TaskRecord`
   - 初始状态固定为 `accepted`
 - 更新：
   - 任务进入 adapter 执行阶段时，状态更新为 `running`
+  - 一旦任务已经进入 `accepted` 生命周期，后续共享执行主路径上的失败必须把同一条记录收口为 `failed`
   - 任务完成后，状态只能进入 `succeeded` 或 `failed`
   - 每次可信状态迁移都应同步刷新 `updated_at` 并追加对应生命周期日志
 - 失效/归档：
