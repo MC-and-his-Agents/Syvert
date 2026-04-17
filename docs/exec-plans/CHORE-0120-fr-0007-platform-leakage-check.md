@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
+- 当前受审 runtime head：`ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`23b9dbc096178c0234d04d065fb6cafe58962c46`
+- 当前 runtime-affecting 实现 checkpoint：`ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -100,7 +100,8 @@
     - 平台泄漏 source report 现在强制 `finding.evidence_ref` 必须回填到顶层 `evidence_refs`，证据追溯闭环不再只靠约定
     - checker 入口现在只会把真正的有序 `Sequence` 归一为 `list`；`set(DEFAULT_BOUNDARY_SCOPE)` 这类无序输入不会再被预处理洗成 `boundary_scope_order_mismatch`
     - `Sequence` 约束现在局部下沉到 `boundary_scope` 校验路径，不再通过公共 string-list helper 连带收紧 `required_sample_ids`、`reference_pair` 与 `evidence_refs`
-  - 当前已提交的运行时语义锚定在实现 checkpoint `23b9dbc096178c0234d04d065fb6cafe58962c46`
+    - `version_gate_logic` 允许例外现在对 `v0.2.0` 冻结 reference pair 与 real regression case matrix 做定值校验，而不再只接受“常见平台名”形状；`("xhs", "youtube")` 与 `youtube` case matrix 这类漂移不会再被白名单洗成 pass，但保持相同冻结值的 tuple/list 形状仍可通过。
+  - 当前已提交的运行时语义锚定在实现 checkpoint `ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -137,6 +138,12 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_platform_leakage`
+  - 结果：在 checkpoint `ce7a487e7b70794aa62c0c53697958d5ab8e6af2` 上通过，`Ran 104 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的冻结 reference pair / case matrix 平台漂移 blocker，并保留“冻结值不变但 tuple/list 形状不同”时的允许例外回归。
+- `python3 -m unittest tests.runtime.test_version_gate`
+  - 结果：在 checkpoint `ce7a487e7b70794aa62c0c53697958d5ab8e6af2` 上通过，`Ran 97 tests`，`OK`。
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `ce7a487e7b70794aa62c0c53697958d5ab8e6af2` 上通过，`Ran 246 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的 `version_gate_logic` 冻结例外值漂移 blocker，并保持 `#119` 主干真相回归、共享 carrier fail-closed、`boundary_scope` 收紧和 orchestrator 接入回归继续通过。
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：在 checkpoint `23b9dbc096178c0234d04d065fb6cafe58962c46` 上通过，`Ran 244 tests`，`OK (skipped=6)`；已覆盖 `version_gate_logic` 结构化例外收紧、函数默认参数平台片段检测、六个共享边界命中证据与 `evidence_ref` 可追溯性回归、tuple/list 解包载体传播修复、shared result 动态 key 初始化与 `dict(...)` 调用路径收口、`boundary_scope` 有序 sequence 校验、`finding.evidence_ref -> evidence_refs` 闭环校验、checker 入口对 set-shaped boundary_scope 的 fail-closed 收口，以及 Sequence 约束局部下沉后的兼容性回归保护，并保持平台变体 `match` 分支归类优先级修复继续通过
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -208,7 +215,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`23b9dbc096178c0234d04d065fb6cafe58962c46`
-- 最近一次重跑目标测试的 head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
-- 当前受审 runtime head：`23b9dbc096178c0234d04d065fb6cafe58962c46`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `23b9dbc096178c0234d04d065fb6cafe58962c46`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
+- 最近一次重跑目标测试的 head：`ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
+- 当前受审 runtime head：`ce7a487e7b70794aa62c0c53697958d5ab8e6af2`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `ce7a487e7b70794aa62c0c53697958d5ab8e6af2`，不得把 follow-up 误记为新的运行时真相
