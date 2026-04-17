@@ -9,7 +9,7 @@ from typing import Any, Callable, Mapping, TextIO
 from syvert.runtime import (
     TaskInput,
     TaskRequest,
-    execute_task,
+    execute_task_with_record,
     failure_envelope,
     invalid_input_error,
     resolve_task_id,
@@ -86,11 +86,11 @@ def main(
         )
         err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
         return 1
-    envelope = execute_task(
+    envelope = execute_task_with_record(
         request,
         adapters=resolved_adapters,
         task_id_factory=task_id_factory,
-    )
+    ).envelope
     stream = out if envelope["status"] == "success" else err
     try:
         payload = json.dumps(envelope, ensure_ascii=False)
