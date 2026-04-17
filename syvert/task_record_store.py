@@ -75,21 +75,19 @@ class LocalTaskRecordStore:
         record_path = self.record_path(task_id)
         marker = self.invalid_marker_path(task_id)
         payload = {"task_id": task_id, "stage": stage, "reason": reason}
-        marker_error: Exception | None = None
         try:
             self._write_json_atomic(marker, payload)
+            return
         except (TaskRecordStoreError, OSError) as error:
             marker_error = error
-
-        delete_error: Exception | None = None
         if record_path.exists():
             try:
-                self._delete_record_file(record_path)
+                self._move_record_to_invalid_marker(record_path, marker)
+                return
             except OSError as error:
-                delete_error = error
-
-        if marker_error is None or not record_path.exists():
-            return
+                move_error = error
+        else:
+            move_error = None
 
         try:
             self._write_json_atomic(record_path, payload)
@@ -97,7 +95,7 @@ class LocalTaskRecordStore:
         except (TaskRecordStoreError, OSError) as poison_error:
             raise TaskRecordStoreError(
                 f"无法将本地任务记录 `{task_id}` 标记为无效: "
-                f"marker={marker_error}; delete={delete_error}; poison={poison_error}"
+                f"marker={marker_error}; move={move_error}; poison={poison_error}"
             ) from poison_error
 
     def _try_load_existing(self, task_id: str, path: Path) -> TaskRecord | None:
@@ -136,8 +134,8 @@ class LocalTaskRecordStore:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
 
-    def _delete_record_file(self, path: Path) -> None:
-        path.unlink()
+    def _move_record_to_invalid_marker(self, path: Path, marker: Path) -> None:
+        os.replace(path, marker)
 
 
 def default_task_record_store() -> LocalTaskRecordStore:
@@ -161,16 +159,20 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
         raise TaskRecordStoreError("本地持久化记录的 task_id 不一致")
 
     try:
-        if incoming.status == "accepted":
+        if existing.status == "accepted" and incoming.status == "accepted":
             candidate = existing
-        elif incoming.status == "running":
+        elif existing.status == "accepted" and incoming.status == "running":
             candidate = start_task_record(existing, occurred_at=incoming.updated_at)
-        else:
+        elif existing.status == "running" and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordStoreError("终态任务记录缺少结果或终态时间")
-            if existing.status == "accepted":
-                raise TaskRecordStoreError("终态任务记录落盘前必须先完成 running 持久化")
             candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
+        elif existing.status in {"succeeded", "failed"} and incoming.status in {"succeeded", "failed"}:
+            if incoming.result is None or incoming.terminal_at is None:
+                raise TaskRecordStoreError("终态任务记录缺少结果或终态时间")
+            candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
+        else:
+            raise TaskRecordStoreError("本地持久化记录的生命周期推进不合法")
     except TaskRecordContractError as error:
         raise TaskRecordStoreError("本地持久化记录的生命周期推进不合法") from error
 
