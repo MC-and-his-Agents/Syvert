@@ -42,13 +42,18 @@
   - post-admission 共享失败是否一律纳入 durable `TaskRecord`
   - 读侧是否会拒绝生命周期不完整的持久化历史
 - guardian 第三轮审查继续返回 `REQUEST_CHANGES`，指出 `FR-0008` 对 pre-`accepted` admission/pre-execution 失败与 post-`accepted` durable failure 的边界仍未和上游 `FR-0004` / `FR-0005` contract 完全对齐。
-- 当前 checkpoint `1f3b833555de3e8e4f74ea0d0de075aa67ae099c` 已按前三轮 guardian 结论收口：
+- guardian 第四轮审查继续返回 `REQUEST_CHANGES`，指出两项剩余阻断：
+  - active `exec-plan` 的 checkpoint SHA 写错，无法回溯到真实提交
+  - `FR-0008` 尚未冻结同一 `task_id` 下重复建档/重复终态写入的幂等语义
+- 当前 checkpoint `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea` 已按前四轮 guardian 结论收口：
   - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
   - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
   - 初始 `accepted` 建档失败被明确为进入后续共享执行前的 fail-closed 阻断
   - post-admission 共享失败被统一纳入 durable `TaskRecord`
   - 读侧非法记录规则已补齐“缺少当前状态要求的生命周期事件”这一类截断历史
   - `accepted` 的建档时点已明确后移到“共享 admission + 共享 pre-execution 校验全部通过之后”，从而与 `FR-0004` / `FR-0005` 已冻结的 admission/pre-execution 失败语义保持一致
+  - 同一 `task_id` 下重复建档、重复终态写入与冲突写入的幂等/拒绝语义已冻结为 explicit contract
+  - active `exec-plan` 的历史 checkpoint SHA 已纠正为真实提交对象
 
 ## 下一步动作
 
@@ -115,6 +120,13 @@
     - unsupported capability / target_type / collection_mode、registry / declaration 失败等上游 pre-execution 失败被明确留在 pre-`accepted` 边界之外
 - `git commit -m 'docs(spec): 对齐 FR-0008 与上游 admission 边界'`
   - 结果：已生成 checkpoint `1f3b833555de3e8e4f74ea0d0de075aa67ae099c`
+- `python3 scripts/pr_guardian.py review 145`
+  - 结果：guardian 第四轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - exec-plan checkpoint SHA 已纠正为真实提交对象
+    - 同一 `task_id` 下重复建档、重复终态写入与冲突写入的幂等语义已冻结
+- `git commit -m 'docs(spec): 补齐 FR-0008 幂等持久化契约'`
+  - 结果：已生成 checkpoint `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea`
 
 ## 未决风险
 
@@ -127,4 +139,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1f3b833555de3e8e4f74ea0d0de075aa67ae099c`
+- `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea`
