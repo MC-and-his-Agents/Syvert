@@ -27,7 +27,7 @@
   - `docs/exec-plans/CHORE-0124-fr-0008-local-persistence-and-serialization.md`
   - `docs/releases/v0.3.0.md`
   - `docs/sprints/2026-S16.md`
-  - GitHub `#140` / `#127` / `#137` / `#138` / `#139` issue 正文与 closeout 评论对齐
+  - GitHub `#140` / `#127` / `#137` / `#138` / `#139` issue 正文、closeout 评论与 Project 状态对齐
 - 本次不纳入：
   - 任何新的 runtime / adapter / test 实现
   - `FR-0008` formal spec 语义改写
@@ -46,7 +46,8 @@
 
 - 把 `FR-0008` requirement container、`#137/#138/#139` 历史执行记录、release / sprint 索引与 `#140` 对齐到“唯一 active closeout 入口”后的主干真相。
 - 当前 head 完成 docs 类门禁与受控 PR 创建后，进入 guardian / merge gate。
-- 合并后先关闭当前 Work Item `#140`，再修正 GitHub `#127` 正文、发布 `#127` closeout 评论并关闭 `#127`。
+- 合并后先把 `#140` 的 Project 状态从 `In Progress` 切到 `Done`，修正 `#140` 正文并关闭当前 Work Item。
+- 随后修正 GitHub `#127` 正文、发布 `#127` closeout 评论、把 `#127` 的 Project 状态从 `Todo` 切到 `Done`，再关闭 `#127`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -70,7 +71,9 @@
 - `gh issue view 139 --json state,title,url,body,projectItems`
   - 结果：`#139` 为 `CLOSED`，Project 状态为 `Done`；对应 PR `#148` / merge commit `b6ebf00dce8cb0182b81b077fb1255270f1ee803`，但正文仍停留在 `进行中（PR #148）`。
 - `gh issue view 140 --json state,title,url,body,projectItems`
-  - 结果：`#140` 为 `OPEN`，Project 状态为 `Todo`。
+  - 结果：`#140` 为 `OPEN`，Project 状态为 `In Progress`。
+- `gh issue view 127 --json state,title,url,body,projectItems`
+  - 结果：`#127` 为 `OPEN`，Project 状态为 `Todo`；父事项 closeout 完成后需切到 `Done`。
 - `gh pr view 145 --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=093141b5dfbde9d5912963fe72497081334bc6bd`
 - `gh pr view 147 --json state,mergedAt,mergeCommit`
@@ -99,7 +102,7 @@
   - PR `#147` / `#138`：落地 `TaskRecord` / `TaskRequestSnapshot` / `TaskTerminalResult` / `TaskLogEntry` 共享模型、JSON-safe 序列化与 runtime 生命周期接线
   - PR `#148` / `#139`：落地 `LocalTaskRecordStore`、accepted/running/completion 三段 durable 写入、fail-closed invalidation 与 accepted/running/terminal 幂等回放
 - release / sprint 证据：`docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 在本回合回链 `#127/#137/#138/#139/#140` 与 PR `#145/#147/#148`
-- GitHub closeout 证据：当前剩余 GitHub closeout issue 为 active Work Item `#140` 与父 FR `#127`；本回合合入后应先关闭 `#140`，再关闭 `#127`
+- GitHub closeout 证据：当前剩余 GitHub closeout issue 为 active Work Item `#140` 与父 FR `#127`；本回合合入后应先把 `#140` 从 `In Progress` 切到 `Done` 并关闭，再把 `#127` 从 `Todo` 切到 `Done` 并关闭
 
 ## GitHub closeout 工件
 
@@ -107,17 +110,26 @@
   - 执行状态改为 `已完成（PR #... 已 MERGED）`
   - 回填 merge commit；当前受审 docs head 与 docs 门禁记录已在本轮 closeout exec-plan 中落盘
   - 明确本事项只负责 docs / GitHub closeout 收口，不引入新 runtime 或 formal spec 语义
+- `#140` Project 状态目标：
+  - PR `#149` 审查与合并期间保持 `In Progress`
+  - 合并并回写正文后切到 `Done`
 - `#127` 正文修正目标：
   - 明确 formal spec 已由 PR `#145` 合入主干
   - 明确共享模型实现已由 `#138` / PR `#147` 落地
   - 明确本地持久化与共享序列化管线已由 `#139` / PR `#148` 落地
   - 将父事项 closeout 入口补为 `#140`
   - 子 Work Item 保持：`#137`、`#138`、`#139`、`#140`
+- `#127` Project 状态目标：
+  - 在 `#140` 合入前保持 `Todo`
+  - `#140` 合入且 `#127` 正文 / closeout comment 对齐后切到 `Done`
 - `#127` closeout 评论草案：
   - `FR-0008` formal spec 已由 PR `#145` 合入主干，spec 真相位于 `docs/specs/FR-0008-task-record-persistence/`
   - `#138` / PR `#147` 已完成任务状态/结果/日志共享模型
   - `#139` / PR `#148` 已完成本地持久化与共享序列化管线
   - 当前父事项 closeout 已由 `#140` 承接，`docs/releases/v0.3.0.md`、`docs/sprints/2026-S16.md` 与 active exec-plan 已与 GitHub 真相一致
+- Project 状态验证入口：
+  - `gh issue view 140 --json projectItems`：验证 `#140` 已从 `In Progress` 切到 `Done`
+  - `gh issue view 127 --json projectItems`：验证 `#127` 已从 `Todo` 切到 `Done`
 
 ## 未决风险
 
