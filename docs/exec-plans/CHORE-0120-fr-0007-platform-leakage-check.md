@@ -38,9 +38,9 @@
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-120-fr-0007`
 - 当前执行分支：`issue-120-fr-0007`
 - 当前受审 PR：`#123`
-- 当前受审 runtime head：`de0a5a247553688c565ffc0d7491d639ecb91677`
+- 当前受审 runtime head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
 - 基线真相：`origin/main@830c1021febf4a4fa5be670dcdece009dc2352b5`
-- 当前 runtime-affecting 实现 checkpoint：`de0a5a247553688c565ffc0d7491d639ecb91677`
+- 当前 runtime-affecting 实现 checkpoint：`6ccec937291a54ab956a187b1eb47b1594370fcf`
 - 当前实现约束：
   - 默认不改 `syvert/version_gate.py`
   - 公开入口先验形再验值，缺失即 fail-closed
@@ -104,7 +104,9 @@
     - `validate_platform_leakage_source_report()` 现在要求 top-level `evidence_refs` 必须证明三份冻结 scan target 全部被扫描，并与 finding trace 一起形成 canonical trace；forged clean report 不能再靠任意占位 ref 洗成 pass。
     - `build_platform_leakage_payload()` 现在对空 `version`、set-shaped `boundary_scope` 与其他非冻结公共输入直接产出 canonical fail-shaped payload：`summary` 固定转为 failed，`boundary_scope` 固定回到冻结列表，不再把 malformed public input 原样回显成误导性的 pass-like 输出。
     - `run_platform_leakage_check()` 现在把 raw malformed input 与 canonical fail payload 分层处理：direct builder surface 保持 fail-shaped 输出，validator 入口仍能看见原始坏输入并给出 `invalid_boundary_scope` / `missing_boundary_scope` / `boundary_scope_order_mismatch` 等具体 fail-closed 原因。
-  - 当前已提交的运行时语义锚定在实现 checkpoint `de0a5a247553688c565ffc0d7491d639ecb91677`
+    - `runtime.py` 的 boundary resolver 现在把 `normalize_request()`、`project_to_adapter_request()`、`validate_projection_axes_for_current_runtime()` 纳入 `shared_input_model`，不再把这些共享输入 contract 主路径的泄漏归回 `core_runtime`。
+    - `execute_task()` 的 success envelope 组装/返回尾段现在按 `shared_result_contract` 归类，真实 `{raw, normalized}` 共享结果主路径的 finding 不会再掉回 `core_runtime`。
+  - 当前已提交的运行时语义锚定在实现 checkpoint `6ccec937291a54ab956a187b1eb47b1594370fcf`
   - metadata-only follow-up 只用于同步 exec-plan / PR body / issue body / 验证记录，不改 runtime 语义
   - 当前剩余动作只包括：同步 GitHub 当前事实；重发 guardian；若通过，再进入 merge gate
 
@@ -141,6 +143,10 @@
 - 已阅读：`syvert/runtime.py`
 - 已阅读：`syvert/registry.py`
 - 已阅读：`tests/runtime/test_version_gate.py`
+- `python3 -m unittest tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_normalize_request_leak_to_shared_input_model tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
+  - 结果：在 checkpoint `6ccec937291a54ab956a187b1eb47b1594370fcf` 上通过，`Ran 2 tests`，`OK`；已覆盖 guardian 指出的共享输入 / 共享结果主路径 boundary 归类 blocker。
+- `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：在 checkpoint `6ccec937291a54ab956a187b1eb47b1594370fcf` 上通过，`Ran 251 tests`，`OK (skipped=6)`；已覆盖 guardian 指出的 boundary resolver blocker，并保持 builder canonical fail payload、forged clean report、共享 carrier fail-closed、`boundary_scope` 收紧和 orchestrator 接入回归继续通过。
 - `python3 -m unittest tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_fails_closed_when_boundary_scope_is_incomplete tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_fails_closed_when_boundary_scope_has_extra_boundary tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_fails_closed_when_boundary_scope_order_differs tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_fails_closed_when_boundary_scope_is_set_shaped tests.runtime.test_platform_leakage.PlatformLeakageTests.test_build_payload_fails_closed_on_set_shaped_boundary_scope tests.runtime.test_platform_leakage.PlatformLeakageTests.test_build_payload_fails_closed_on_empty_version`
   - 结果：在 checkpoint `de0a5a247553688c565ffc0d7491d639ecb91677` 上通过，`Ran 6 tests`，`OK`；已覆盖 builder canonical fail payload 与 run-wrapper 原始 boundary failure reason 的分层回归。
 - `python3 -m unittest tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_runtime tests.runtime.test_registry`
@@ -228,7 +234,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 实现 checkpoint：`de0a5a247553688c565ffc0d7491d639ecb91677`
-- 最近一次重跑目标测试的 head：`de0a5a247553688c565ffc0d7491d639ecb91677`
-- 当前受审 runtime head：`de0a5a247553688c565ffc0d7491d639ecb91677`
-- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `de0a5a247553688c565ffc0d7491d639ecb91677`，不得把 follow-up 误记为新的运行时真相
+- 实现 checkpoint：`6ccec937291a54ab956a187b1eb47b1594370fcf`
+- 最近一次重跑目标测试的 head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
+- 当前受审 runtime head：`6ccec937291a54ab956a187b1eb47b1594370fcf`
+- 若后续只补 metadata-only follow-up，则必须继续把 runtime checkpoint 维持为 `6ccec937291a54ab956a187b1eb47b1594370fcf`，不得把 follow-up 误记为新的运行时真相
