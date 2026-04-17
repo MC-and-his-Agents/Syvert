@@ -21,4 +21,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b6ebf00dce8cb0182b81b077fb1255270f1ee803`
+- 实质 closeout checkpoint：`3840abaef51b6706a6167192c2a725bef8a1ce2a`
+- 说明：该 checkpoint 首次把 requirement container 作为 `#140` closeout 工件落盘；其后的 metadata-only review sync 只回写受审 head / docs 验证 / GitHub 追账，不改写 `FR-0008` requirement 语义。

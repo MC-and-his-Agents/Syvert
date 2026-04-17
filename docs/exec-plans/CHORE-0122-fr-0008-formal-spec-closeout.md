@@ -8,7 +8,7 @@
 - release：`v0.3.0`
 - sprint：`2026-S16`
 - 关联 spec：`docs/specs/FR-0008-task-record-persistence/`
-- 关联 PR：`#145`
+- 关联 PR：
 - active 收口事项：`CHORE-0122-fr-0008-formal-spec-closeout`
 
 ## 目标
@@ -59,7 +59,6 @@
   - active `exec-plan` 的历史 checkpoint SHA 已纠正为真实提交对象
   - adapter/business 路径失败与终态持久化失败已拆分为两类不同 contract：前者 durable failed 收口，后者 fail-closed 并把半截历史留在读侧拒绝范围
 - 当前 PR live head 以 `PR #145` 的最新提交为准；若后续只追加 exec-plan / guardian closeout metadata，则不把该 metadata-only head 伪装成新的语义 checkpoint。
-- PR `#145` 已于 `2026-04-17T10:18:29Z` 合入主干，merge commit 为 `093141b5dfbde9d5912963fe72497081334bc6bd`；当前文档仅保留 formal spec 收口轮次的历史执行记录。
 
 ## 下一步动作
 

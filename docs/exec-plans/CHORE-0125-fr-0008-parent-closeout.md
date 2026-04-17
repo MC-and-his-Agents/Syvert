@@ -39,6 +39,8 @@
 - `#137` 已由 PR `#145` 合入并关闭；`#138` 已由 PR `#147` 合入并关闭；`#139` 已由 PR `#148` 合入并关闭。
 - 当前 `FR-0008` GitHub closeout 仍包含 Work Item `#140` 与父 FR `#127`；二者正文仍未回写 formal spec / implementation / closeout 的完整主干真相。
 - `#140` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-140-chore-fr-0008`。
+- 当前实质 closeout checkpoint 为 `3840abaef51b6706a6167192c2a725bef8a1ce2a`，已首次落盘 requirement container、parent closeout exec-plan、release/sprint 对齐与 `#145/#147/#148` 主干回链。
+- 当前受审 PR：`#149`
 
 ## 下一步动作
 
@@ -77,6 +79,18 @@
   - 结果：`state=MERGED`，`mergeCommit=b6ebf00dce8cb0182b81b077fb1255270f1ee803`
 - `python3 scripts/create_worktree.py --issue 140 --class docs`
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-140-chore-fr-0008`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-140-chore-fr-0008`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过，`PR class=docs`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：在实质 closeout checkpoint `3840abaef51b6706a6167192c2a725bef8a1ce2a` 上通过
+- `python3 scripts/open_pr.py --class docs --issue 140 --item-key CHORE-0125-fr-0008-parent-closeout --item-type CHORE --release v0.3.0 --sprint 2026-S16 --title 'docs(closeout): 收口 FR-0008 父事项' --closing fixes --dry-run`
+  - 结果：通过；当前受审 PR 为 `#149 https://github.com/MC-and-his-Agents/Syvert/pull/149`
 
 ## closeout 证据
 
@@ -91,7 +105,7 @@
 
 - `#140` 正文修正目标：
   - 执行状态改为 `已完成（PR #... 已 MERGED）`
-  - 回填当前受审 docs head、merge commit 与 docs 门禁记录
+  - 回填 merge commit；当前受审 docs head 与 docs 门禁记录已在本轮 closeout exec-plan 中落盘
   - 明确本事项只负责 docs / GitHub closeout 收口，不引入新 runtime 或 formal spec 语义
 - `#127` 正文修正目标：
   - 明确 formal spec 已由 PR `#145` 合入主干
@@ -120,4 +134,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b6ebf00dce8cb0182b81b077fb1255270f1ee803`
+- 前置完成基线：`b6ebf00dce8cb0182b81b077fb1255270f1ee803`
+- 实质 closeout checkpoint：`3840abaef51b6706a6167192c2a725bef8a1ce2a`
+- 说明：`b6ebf00...` 是 formal spec / `#138` / `#139` 已完成后的主干基线；`3840aba...` 首次落盘本轮 requirement container、parent closeout exec-plan、release/sprint 对齐与 closeout 证据。其后的 metadata-only review sync 只回写受审 head / docs 验证 / GitHub 追账，不改写 `FR-0008` closeout 语义。
