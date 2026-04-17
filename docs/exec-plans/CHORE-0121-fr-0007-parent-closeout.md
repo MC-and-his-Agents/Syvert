@@ -117,6 +117,14 @@
 
 ## GitHub closeout 工件
 
+- `#121` 正文修正目标：
+  - 执行状态改为 `已完成（PR #125 已 MERGED）`
+  - 回填最终受审 head、docs checkpoint、metadata-only follow-up、merge commit 与最终验证记录
+  - 明确本事项只负责 docs / GitHub closeout 收口，不引入新 runtime 或 formal spec 语义
+- `#121` closeout 评论草案：
+  - `FR-0007` requirement container、active parent closeout exec-plan、release / sprint 索引已通过 PR `#125` 收口到主干
+  - `#67` 将按同一轮 closeout 更新正文并关闭
+  - `#63` 仅在 `#64/#65/#66/#67` 全部关闭且阶段正文完成对齐后才关闭
 - `#67` 正文修正目标：
   - 明确 formal spec 已由 PR `#84` 合入主干
   - 明确版本 gate 编排已由 `#118` / PR `#122` 落地
@@ -130,10 +138,17 @@
   - `#119` / PR `#124` 已完成双参考适配器真实回归执行器
   - `#120` / PR `#123` 已完成平台泄漏检查器，并独立区分 GitHub merge 真相与本地清理尾项
   - 当前父事项 closeout 已由 `#121` 承接，release / sprint / exec-plan / GitHub issue 真相已回链到同一条 `FR-0007` 证据链
+- `#63` 正文修正目标：
+  - 保持子 FR 为 `#64/#65/#66/#67`
+  - 当 `#67` 已关闭时，把阶段完成事实补齐为：`#64/#65/#66/#67` 均已 closed，且 `v0.2.0` release / sprint / formal spec / exec-plan 真相已一致
+  - 若 `#67` 仍未关闭，则不得把阶段写成已完成
 - `#63` 条件性关闭前提：
   - `#64/#65/#66/#67` 必须全部 `CLOSED`
   - `#63` 正文必须更新为与 `docs/releases/v0.2.0.md`、`docs/sprints/2026-S15.md` 一致的阶段完成事实
   - 若任一条件不满足，则不得关闭 `#63`
+- `#63` 条件性 closeout 评论草案：
+  - 若条件满足：`v0.2.0` 契约可验证 Core 阶段已完成，`#64/#65/#66/#67` 全部 closed，release / sprint / formal spec / exec-plan 真相已统一
+  - 若条件不满足：在 `#63` 留下 blocker 评论，明确尚未满足的 issue / project 条件，并保持 `#63` 为 `OPEN`
 
 ## 未决风险
 
@@ -151,5 +166,9 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0603e3060f3518621afa4c0f0862e95b3d8e2380`
-- 说明：该 checkpoint 已新增 `FR-0007` requirement container、active parent closeout plan 与 release / sprint closeout 入口，并已绑定当前受审 PR `#125`；后续若只补 PR / issue 当前事实或验证记录，只能作为 metadata-only follow-up。
+- 实质 docs checkpoint：`0603e3060f3518621afa4c0f0862e95b3d8e2380`
+- 后续 metadata-only follow-up：
+  - `d5c01d6ad6780d9cf5bfce4d9fc43c60b3d2966c`：绑定当前受审 PR `#125` 与 docs 门禁记录
+  - `369758d383ff7dc2608d5f0b1d80216c3467ed64`：修正 `FR-0007` 历史子回合在 requirement container / release / sprint 中的状态口径
+  - `5992c5625b8c55ea7115dcb06579dc8515885a9f`：收紧 active parent closeout exec-plan 的剩余动作
+- 说明：`0603e306...` 只承载仓内 closeout 工件首次落盘的实质语义；其后的 PR 绑定、状态口径与 stop-point 更新均作为 metadata-only follow-up 追账，不伪装成新的实质 checkpoint。
