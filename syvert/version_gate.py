@@ -1751,7 +1751,11 @@ def _merge_rebuilt_source_report_with_input_failures(
         merged_report["summary"] = failure_summary
     if input_verdict == FAIL_VERDICT or rebuilt_failures:
         merged_report["verdict"] = FAIL_VERDICT
-    if input_verdict == FAIL_VERDICT and input_evidence_refs:
+    if (
+        input_verdict == FAIL_VERDICT
+        and input_evidence_refs
+        and str(merged_report.get("source") or "") != SOURCE_PLATFORM_LEAKAGE
+    ):
         merged_report["evidence_refs"] = list(input_evidence_refs)
     return merged_report
 

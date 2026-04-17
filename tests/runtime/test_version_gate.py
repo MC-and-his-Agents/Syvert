@@ -1732,6 +1732,54 @@ class VersionGateTests(unittest.TestCase):
         self.assertNotIn("invalid_leakage_finding_boundary", {item["code"] for item in report["failures"]})
         self.assertNotIn("failure_report_without_findings", {item["code"] for item in report["failures"]})
 
+    def test_orchestrator_rewrites_forged_failed_platform_leakage_evidence_refs(self) -> None:
+        forged_report = {
+            "source": "platform_leakage",
+            "version": "v0.2.0",
+            "verdict": "fail",
+            "summary": "forged failed leakage report",
+            "evidence_refs": ["forged:1", "leakage:core-runtime:1"],
+            "details": {
+                "boundary_scope": self.valid_platform_leakage_payload()["boundary_scope"],
+                "report_verdict": "fail",
+                "findings": [
+                    {
+                        "code": "platform_branch_in_core",
+                        "message": "platform-specific branch leaked into core runtime",
+                        "boundary": "core_runtime",
+                        "evidence_ref": "leakage:core-runtime:1",
+                    }
+                ],
+                "failures": [],
+            },
+        }
+
+        report = orchestrate_version_gate(
+            version="v0.2.0",
+            reference_pair=["xhs", "douyin"],
+            harness_report=build_harness_source_report(
+                self.valid_harness_results(),
+                required_sample_ids=["sample-success", "sample-legal-failure"],
+                version="v0.2.0",
+            ),
+            real_adapter_regression_report=validate_real_adapter_regression_source_report(
+                self.valid_real_adapter_regression_payload(),
+                version="v0.2.0",
+                reference_pair=["xhs", "douyin"],
+            ),
+            platform_leakage_report=forged_report,
+        )
+
+        self.assertEqual(
+            report["source_reports"]["platform_leakage"]["evidence_refs"],
+            [
+                "leakage:core-runtime:1",
+                "platform_leakage:scan:syvert/registry.py",
+                "platform_leakage:scan:syvert/runtime.py",
+                "platform_leakage:scan:syvert/version_gate.py",
+            ],
+        )
+
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:
         forged_report = {
             "source": "real_adapter_regression",
