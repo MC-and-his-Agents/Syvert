@@ -15,7 +15,12 @@ from syvert.task_record import (
     finish_task_record,
     start_task_record,
 )
-from syvert.task_record_store import TaskRecordStore, TaskRecordStoreError, default_task_record_store
+from syvert.task_record_store import (
+    TaskRecordConflictError,
+    TaskRecordStore,
+    TaskRecordStoreError,
+    default_task_record_store,
+)
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_DETAIL = "content_detail"
@@ -439,6 +444,20 @@ def persist_task_record(
         return record, None
     try:
         return task_record_store.write(record), None
+    except TaskRecordConflictError as error:
+        return None, TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error(
+                    "task_record_conflict",
+                    "共享任务记录写入与既有 durable truth 冲突",
+                    details={"stage": stage, "reason": str(error)},
+                ),
+            ),
+            None,
+        )
     except (TaskRecordStoreError, OSError) as error:
         invalidation_details: dict[str, Any] = {}
         try:

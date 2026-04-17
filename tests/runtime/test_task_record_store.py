@@ -241,6 +241,36 @@ class TaskRecordStoreTests(unittest.TestCase):
         self.assertEqual(adapter.calls, 1)
         self.assertIsNone(outcome.task_record)
 
+    def test_runtime_rejects_conflicting_replay_without_invalidating_existing_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            first = execute_task_with_record(
+                TaskRequest(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-conflict"),
+                ),
+                adapters={"stub": SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-conflict",
+                task_record_store=store,
+            )
+
+            second = execute_task_with_record(
+                TaskRequest(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-conflict"),
+                ),
+                adapters={"stub": SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-conflict",
+                task_record_store=store,
+            )
+
+            self.assertEqual(first.envelope["status"], "success")
+            self.assertEqual(second.envelope["status"], "failed")
+            self.assertEqual(second.envelope["error"]["code"], "task_record_conflict")
+            self.assertEqual(store.load("task-store-conflict"), first.task_record)
+
     def test_runtime_fails_closed_when_terminal_persistence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             adapter = SuccessfulAdapter()

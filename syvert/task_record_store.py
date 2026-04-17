@@ -37,6 +37,14 @@ class TaskRecordStoreError(RuntimeError):
     pass
 
 
+class TaskRecordConflictError(TaskRecordStoreError):
+    pass
+
+
+class TaskRecordPersistenceError(TaskRecordStoreError):
+    pass
+
+
 @dataclass(frozen=True)
 class LocalTaskRecordStore:
     root: Path
@@ -44,7 +52,7 @@ class LocalTaskRecordStore:
     def write(self, record: TaskRecord) -> TaskRecord:
         invalid_marker = self.invalid_marker_path(record.task_id)
         if invalid_marker.exists():
-            raise TaskRecordStoreError(f"本地任务记录 `{record.task_id}` 已因持久化失败被标记为无效")
+            raise TaskRecordConflictError(f"本地任务记录 `{record.task_id}` 已因持久化失败被标记为无效")
         path = self.record_path(record.task_id)
         existing = self._try_load_existing(record.task_id, path)
         candidate = reconcile_persisted_record(existing, record)
@@ -58,7 +66,7 @@ class LocalTaskRecordStore:
         path = self.record_path(task_id)
         invalid_marker = self.invalid_marker_path(task_id)
         if invalid_marker.exists():
-            raise TaskRecordStoreError(f"本地任务记录 `{task_id}` 已因持久化失败被标记为无效")
+            raise TaskRecordPersistenceError(f"本地任务记录 `{task_id}` 已因持久化失败被标记为无效")
         if not path.exists():
             raise FileNotFoundError(path)
         return self._load_from_path(path)
@@ -93,7 +101,7 @@ class LocalTaskRecordStore:
             self._write_json_atomic(record_path, payload)
             return
         except (TaskRecordStoreError, OSError) as poison_error:
-            raise TaskRecordStoreError(
+            raise TaskRecordPersistenceError(
                 f"无法将本地任务记录 `{task_id}` 标记为无效: "
                 f"marker={marker_error}; move={move_error}; poison={poison_error}"
             ) from poison_error
@@ -103,20 +111,20 @@ class LocalTaskRecordStore:
             return None
         record = self._load_from_path(path)
         if record.task_id != task_id:
-            raise TaskRecordStoreError("本地持久化记录的 task_id 与文件名不一致")
+            raise TaskRecordPersistenceError("本地持久化记录的 task_id 与文件名不一致")
         return record
 
     def _load_from_path(self, path: Path) -> TaskRecord:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            raise TaskRecordStoreError(f"无法读取本地任务记录 `{path}`") from error
+            raise TaskRecordPersistenceError(f"无法读取本地任务记录 `{path}`") from error
         if not isinstance(payload, Mapping):
-            raise TaskRecordStoreError(f"本地任务记录 `{path}` 必须是对象")
+            raise TaskRecordPersistenceError(f"本地任务记录 `{path}` 必须是对象")
         try:
             return task_record_from_dict(payload)
         except TaskRecordContractError as error:
-            raise TaskRecordStoreError(f"本地任务记录 `{path}` 不满足共享 contract") from error
+            raise TaskRecordPersistenceError(f"本地任务记录 `{path}` 不满足共享 contract") from error
 
     def _write_json_atomic(self, path: Path, payload: Mapping[str, object]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,7 +137,7 @@ class LocalTaskRecordStore:
                 os.fsync(handle.fileno())
             os.replace(temp_path, path)
         except OSError as error:
-            raise TaskRecordStoreError(f"无法写入本地任务记录 `{path}`") from error
+            raise TaskRecordPersistenceError(f"无法写入本地任务记录 `{path}`") from error
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -153,10 +161,10 @@ def resolve_task_record_store_root(env: Mapping[str, str] | None = None) -> Path
 def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord) -> TaskRecord:
     if existing is None:
         if incoming.status != "accepted":
-            raise TaskRecordStoreError("本地持久化的第一条任务记录必须是 accepted")
+            raise TaskRecordConflictError("本地持久化的第一条任务记录必须是 accepted")
         return incoming
     if existing.task_id != incoming.task_id:
-        raise TaskRecordStoreError("本地持久化记录的 task_id 不一致")
+        raise TaskRecordConflictError("本地持久化记录的 task_id 不一致")
 
     try:
         if existing.status == "accepted" and incoming.status == "accepted":
@@ -165,24 +173,17 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
             candidate = start_task_record(existing, occurred_at=incoming.updated_at)
         elif existing.status == "running" and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
-                raise TaskRecordStoreError("终态任务记录缺少结果或终态时间")
+                raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
             candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
         elif existing.status in {"succeeded", "failed"} and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
-                raise TaskRecordStoreError("终态任务记录缺少结果或终态时间")
+                raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
             candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
         else:
-            raise TaskRecordStoreError("本地持久化记录的生命周期推进不合法")
+            raise TaskRecordConflictError("本地持久化记录的生命周期推进不合法")
     except TaskRecordContractError as error:
-        raise TaskRecordStoreError("本地持久化记录的生命周期推进不合法") from error
+        raise TaskRecordConflictError("本地持久化记录的生命周期推进不合法") from error
 
     if candidate != incoming:
-        raise TaskRecordStoreError("本地持久化记录与共享模型不一致")
+        raise TaskRecordConflictError("本地持久化记录与共享模型不一致")
     return candidate
-
-
-def extract_stage_time(record: TaskRecord, stage: str) -> str:
-    for entry in record.logs:
-        if entry.stage == stage:
-            return entry.occurred_at
-    raise TaskRecordStoreError(f"任务记录缺少 `{stage}` 生命周期事件")
