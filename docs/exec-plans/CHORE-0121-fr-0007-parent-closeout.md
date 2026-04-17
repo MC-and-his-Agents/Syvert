@@ -8,7 +8,7 @@
 - release：`v0.2.0`
 - sprint：`2026-S15`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
-- 关联 PR：`待创建`
+- 关联 PR：`#125`
 - 状态：`active`
 - active 收口事项：`CHORE-0121-fr-0007-parent-closeout`
 
@@ -42,6 +42,8 @@
 - 当前 `FR-0007` GitHub closeout 仍包含 Work Item `#121` 与父 FR `#67`；阶段 `#63` 仍为 `OPEN`，因为其子 FR `#67` 尚未关闭。
 - `#63` 的另外三个子 FR `#64/#65/#66` 已全部 `CLOSED`；`#67` 是当前阻止 `#63` closeout 的唯一直接前提。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-121-chore-fr-0007`。
+- 当前受审 PR：`#125`
+- 当前 docs checkpoint：`0603e3060f3518621afa4c0f0862e95b3d8e2380`
 
 ## 下一步动作
 
@@ -92,6 +94,16 @@
   - 结果：`state=MERGED`，`mergeCommit=830c1021febf4a4fa5be670dcdece009dc2352b5`
 - `gh pr view 123 --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=f9f2b564f17c3ef269eb25faecd12f1c0e18442b`
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：在 docs checkpoint `0603e3060f3518621afa4c0f0862e95b3d8e2380` 上通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：在 docs checkpoint `0603e3060f3518621afa4c0f0862e95b3d8e2380` 上通过，`PR class=docs`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在 docs checkpoint `0603e3060f3518621afa4c0f0862e95b3d8e2380` 上通过
+- `python3 scripts/spec_guard.py --all`
+  - 结果：在 docs checkpoint `0603e3060f3518621afa4c0f0862e95b3d8e2380` 上通过
+- `python3 scripts/open_pr.py --class docs --issue 121 --item-key CHORE-0121-fr-0007-parent-closeout --item-type CHORE --release v0.2.0 --sprint 2026-S15 --title 'docs(closeout): 收口 FR-0007 父事项' --closing fixes`
+  - 结果：已创建当前受审 PR `#125`
 
 ## closeout 证据
 
@@ -139,5 +151,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `f9f2b564f17c3ef269eb25faecd12f1c0e18442b`
-- 说明：该 checkpoint 已包含 `FR-0007` formal spec、`#118/#119/#120` implementation 主干真相与 `#120` closeout 后的 GitHub 状态；本回合仅负责 parent closeout 元数据收口。
+- `0603e3060f3518621afa4c0f0862e95b3d8e2380`
+- 说明：该 checkpoint 已新增 `FR-0007` requirement container、active parent closeout plan 与 release / sprint closeout 入口，并已绑定当前受审 PR `#125`；后续若只补 PR / issue 当前事实或验证记录，只能作为 metadata-only follow-up。
