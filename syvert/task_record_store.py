@@ -29,6 +29,9 @@ class TaskRecordStore(Protocol):
     def load(self, task_id: str) -> TaskRecord:
         ...
 
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        ...
+
 
 class TaskRecordStoreError(RuntimeError):
     pass
@@ -46,10 +49,14 @@ class LocalTaskRecordStore:
             return existing
         payload = task_record_to_dict(candidate)
         self._write_json_atomic(path, payload)
+        self._clear_invalid_marker(record.task_id)
         return candidate
 
     def load(self, task_id: str) -> TaskRecord:
         path = self.record_path(task_id)
+        invalid_marker = self.invalid_marker_path(task_id)
+        if invalid_marker.exists():
+            raise TaskRecordStoreError(f"本地任务记录 `{task_id}` 已因持久化失败被标记为无效")
         if not path.exists():
             raise FileNotFoundError(path)
         return self._load_from_path(path)
@@ -58,6 +65,14 @@ class LocalTaskRecordStore:
         if not isinstance(task_id, str) or not task_id:
             raise TaskRecordStoreError("task_id 必须为非空字符串")
         return self.root / f"{quote(task_id, safe='')}.json"
+
+    def invalid_marker_path(self, task_id: str) -> Path:
+        return self.root / f"{quote(task_id, safe='')}.invalid.json"
+
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        marker = self.invalid_marker_path(task_id)
+        payload = {"task_id": task_id, "stage": stage, "reason": reason}
+        self._write_json_atomic(marker, payload)
 
     def _try_load_existing(self, task_id: str, path: Path) -> TaskRecord | None:
         if not path.exists():
@@ -94,6 +109,11 @@ class LocalTaskRecordStore:
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+    def _clear_invalid_marker(self, task_id: str) -> None:
+        marker = self.invalid_marker_path(task_id)
+        if marker.exists():
+            marker.unlink()
 
 
 def default_task_record_store() -> LocalTaskRecordStore:

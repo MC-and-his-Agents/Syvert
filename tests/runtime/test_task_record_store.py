@@ -88,6 +88,22 @@ class SelectiveFailingStore:
     def load(self, task_id: str):
         return self.records[task_id]
 
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        self.records[f"invalid:{task_id}"] = {"stage": stage, "reason": reason}
+
+
+class TerminalFailingLocalStore(LocalTaskRecordStore):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.write_count = 0
+
+    def _write_json_atomic(self, path, payload) -> None:
+        if path.suffix == ".json" and path.name.endswith(".json") and not path.name.endswith(".invalid.json"):
+            self.write_count += 1
+            if self.write_count == 3:
+                raise TaskRecordStoreError("boom")
+        return super()._write_json_atomic(path, payload)
+
 
 class TaskRecordStoreTests(unittest.TestCase):
     def test_runtime_can_persist_and_reload_success_record(self) -> None:
@@ -148,23 +164,27 @@ class TaskRecordStoreTests(unittest.TestCase):
         self.assertIsNone(outcome.task_record)
 
     def test_runtime_fails_closed_when_terminal_persistence_fails(self) -> None:
-        adapter = SuccessfulAdapter()
-        outcome = execute_task_with_record(
-            TaskRequest(
-                adapter_key="stub",
-                capability="content_detail_by_url",
-                input=TaskInput(url="https://example.com/post/store-4"),
-            ),
-            adapters={"stub": adapter},
-            task_id_factory=lambda: "task-store-4",
-            task_record_store=SelectiveFailingStore("completion"),
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            adapter = SuccessfulAdapter()
+            store = TerminalFailingLocalStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-4"),
+                ),
+                adapters={"stub": adapter},
+                task_id_factory=lambda: "task-store-4",
+                task_record_store=store,
+            )
 
-        self.assertEqual(outcome.envelope["status"], "failed")
-        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
-        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "completion")
-        self.assertEqual(adapter.calls, 1)
-        self.assertIsNone(outcome.task_record)
+            self.assertEqual(outcome.envelope["status"], "failed")
+            self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+            self.assertEqual(outcome.envelope["error"]["details"]["stage"], "completion")
+            self.assertEqual(adapter.calls, 1)
+            self.assertIsNone(outcome.task_record)
+            with self.assertRaises(TaskRecordStoreError):
+                store.load("task-store-4")
 
     def test_store_rejects_non_accepted_first_write(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

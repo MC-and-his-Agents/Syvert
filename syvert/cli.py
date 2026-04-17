@@ -15,6 +15,7 @@ from syvert.runtime import (
     resolve_task_id,
     runtime_contract_error,
 )
+from syvert.task_record_store import default_task_record_store
 
 
 class CliArgumentError(ValueError):
@@ -90,6 +91,7 @@ def main(
         request,
         adapters=resolved_adapters,
         task_id_factory=task_id_factory,
+        task_record_store=default_task_record_store(),
     ).envelope
     stream = out if envelope["status"] == "success" else err
     try:

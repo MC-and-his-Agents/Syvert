@@ -423,6 +423,11 @@ def persist_task_record(
     try:
         return task_record_store.write(record), None
     except (TaskRecordStoreError, OSError) as error:
+        invalidation_details: dict[str, Any] = {}
+        try:
+            task_record_store.mark_invalid(task_id, stage=stage, reason=str(error))
+        except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
+            invalidation_details["invalidation_reason"] = str(invalidation_error)
         return None, TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -431,7 +436,7 @@ def persist_task_record(
                 runtime_contract_error(
                     "task_record_persistence_failed",
                     "共享任务记录无法可靠写入本地稳定存储",
-                    details={"stage": stage, "reason": str(error)},
+                    details={"stage": stage, "reason": str(error), **invalidation_details},
                 ),
             ),
             None,
