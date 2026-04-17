@@ -41,17 +41,19 @@
   - 初始 `accepted` 建档本身是否 fail-closed
   - post-admission 共享失败是否一律纳入 durable `TaskRecord`
   - 读侧是否会拒绝生命周期不完整的持久化历史
-- 当前 checkpoint `60acbdd673fa3e653c348ca58a586cc8ef8f19d9` 已按前两轮 guardian 结论收口：
+- guardian 第三轮审查继续返回 `REQUEST_CHANGES`，指出 `FR-0008` 对 pre-`accepted` admission/pre-execution 失败与 post-`accepted` durable failure 的边界仍未和上游 `FR-0004` / `FR-0005` contract 完全对齐。
+- 当前 checkpoint `1f3b8330cd6415c8efc2d89563444692228ad3f4` 已按前三轮 guardian 结论收口：
   - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
   - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
   - 初始 `accepted` 建档失败被明确为进入后续共享执行前的 fail-closed 阻断
   - post-admission 共享失败被统一纳入 durable `TaskRecord`
   - 读侧非法记录规则已补齐“缺少当前状态要求的生命周期事件”这一类截断历史
+  - `accepted` 的建档时点已明确后移到“共享 admission + 共享 pre-execution 校验全部通过之后”，从而与 `FR-0004` / `FR-0005` 已冻结的 admission/pre-execution 失败语义保持一致
 
 ## 下一步动作
 
-- 推送当前 head，等待 `PR #145` checks 重新绑定到最新提交。
-- 基于当前 checkpoint 重跑 guardian，确认已消除 formal spec 阻断。
+- 推送当前 head，等待 `PR #145` checks 与 guardian 重新绑定到最新提交。
+- 基于当前 checkpoint 重跑 guardian，确认已消除 formal spec 边界阻断。
 - 在 guardian / checks 通过后，用受控 merge 完成 PR 收口并关闭 `#137`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -106,6 +108,13 @@
   - 结果：已生成 checkpoint `f6c799cd86bae44c9eff0752562fb24b84dd8721`
 - `git commit -m 'docs(spec): 明确 FR-0008 durable truth 边界'`
   - 结果：已生成 checkpoint `60acbdd673fa3e653c348ca58a586cc8ef8f19d9`
+- `python3 scripts/pr_guardian.py review 145`
+  - 结果：guardian 第三轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `accepted` 只在共享 admission 与共享 pre-execution 校验全部通过后创建
+    - unsupported capability / target_type / collection_mode、registry / declaration 失败等上游 pre-execution 失败被明确留在 pre-`accepted` 边界之外
+- `git commit -m 'docs(spec): 对齐 FR-0008 与上游 admission 边界'`
+  - 结果：已生成 checkpoint `1f3b8330cd6415c8efc2d89563444692228ad3f4`
 
 ## 未决风险
 
@@ -118,4 +127,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `60acbdd673fa3e653c348ca58a586cc8ef8f19d9`
+- `1f3b8330cd6415c8efc2d89563444692228ad3f4`
