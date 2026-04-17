@@ -15,6 +15,7 @@ from syvert.task_record import (
     finish_task_record,
     start_task_record,
 )
+from syvert.task_record_store import TaskRecordStore, TaskRecordStoreError
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_DETAIL = "content_detail"
@@ -109,12 +110,14 @@ def execute_task_with_record(
     *,
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
+    task_record_store: TaskRecordStore | None = None,
 ) -> TaskExecutionResult:
     return execute_task_internal(
         request,
         adapters=adapters,
         task_id_factory=task_id_factory,
         preserve_envelope_on_record_error=False,
+        task_record_store=task_record_store,
     )
 
 
@@ -124,6 +127,7 @@ def execute_task_internal(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
     preserve_envelope_on_record_error: bool,
+    task_record_store: TaskRecordStore | None = None,
 ) -> TaskExecutionResult:
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
@@ -249,7 +253,7 @@ def execute_task_internal(
         return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_error), None)
 
     try:
-        record = start_task_record(create_task_record(task_id, build_task_request_snapshot(normalized_request)))
+        record = create_task_record(task_id, build_task_request_snapshot(normalized_request))
     except TaskRecordContractError as error:
         return TaskExecutionResult(
             failure_envelope(
@@ -260,6 +264,43 @@ def execute_task_internal(
             ),
             None,
         )
+    persisted_record, persistence_error = persist_task_record(
+        task_id,
+        adapter_key,
+        capability,
+        record,
+        stage="accepted",
+        task_record_store=task_record_store,
+    )
+    if persistence_error is not None:
+        return persistence_error
+    if persisted_record is not None:
+        record = persisted_record
+
+    try:
+        record = start_task_record(record)
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("invalid_task_record", str(error)),
+            ),
+            None,
+        )
+    persisted_record, persistence_error = persist_task_record(
+        task_id,
+        adapter_key,
+        capability,
+        record,
+        stage="running",
+        task_record_store=task_record_store,
+    )
+    if persistence_error is not None:
+        return persistence_error
+    if persisted_record is not None:
+        record = persisted_record
 
     try:
         payload = declaration.adapter.execute(adapter_request)
@@ -273,6 +314,7 @@ def execute_task_internal(
                 record,
                 envelope,
                 preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=task_record_store,
             )
     except PlatformAdapterError as error:
         envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
@@ -283,6 +325,7 @@ def execute_task_internal(
             record,
             envelope,
             preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+            task_record_store=task_record_store,
         )
     except Exception as error:
         envelope = failure_envelope(
@@ -301,6 +344,7 @@ def execute_task_internal(
             record,
             envelope,
             preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+            task_record_store=task_record_store,
         )
 
     envelope = {
@@ -318,6 +362,7 @@ def execute_task_internal(
         record,
         envelope,
         preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+        task_record_store=task_record_store,
     )
 
 
@@ -329,9 +374,10 @@ def finalize_task_execution_result(
     envelope: Mapping[str, Any],
     *,
     preserve_envelope_on_record_error: bool,
+    task_record_store: TaskRecordStore | None,
 ) -> TaskExecutionResult:
     try:
-        return TaskExecutionResult(dict(envelope), finish_task_record(record, envelope))
+        terminal_record = finish_task_record(record, envelope)
     except TaskRecordContractError as error:
         if preserve_envelope_on_record_error:
             return TaskExecutionResult(dict(envelope), None)
@@ -344,6 +390,48 @@ def finalize_task_execution_result(
                     "envelope_not_json_serializable",
                     "共享终态结果无法收口为 JSON-safe TaskRecord",
                     details={"reason": str(error)},
+                ),
+            ),
+            None,
+        )
+    persisted_record, persistence_error = persist_task_record(
+        task_id,
+        adapter_key,
+        capability,
+        terminal_record,
+        stage="completion",
+        task_record_store=task_record_store,
+    )
+    if persistence_error is not None:
+        if preserve_envelope_on_record_error and task_record_store is None:
+            return TaskExecutionResult(dict(envelope), None)
+        return persistence_error
+    return TaskExecutionResult(dict(envelope), persisted_record or terminal_record)
+
+
+def persist_task_record(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    record: TaskRecord,
+    *,
+    stage: str,
+    task_record_store: TaskRecordStore | None,
+) -> tuple[TaskRecord | None, TaskExecutionResult | None]:
+    if task_record_store is None:
+        return record, None
+    try:
+        return task_record_store.write(record), None
+    except (TaskRecordStoreError, OSError) as error:
+        return None, TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error(
+                    "task_record_persistence_failed",
+                    "共享任务记录无法可靠写入本地稳定存储",
+                    details={"stage": stage, "reason": str(error)},
                 ),
             ),
             None,
