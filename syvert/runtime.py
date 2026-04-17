@@ -7,6 +7,14 @@ from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 from syvert.registry import AdapterRegistry, RegistryError
+from syvert.task_record import (
+    TaskRecord,
+    TaskRecordContractError,
+    build_task_request_snapshot,
+    create_task_record,
+    finish_task_record,
+    start_task_record,
+)
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_DETAIL = "content_detail"
@@ -76,123 +84,190 @@ def default_task_id_factory() -> str:
     return f"task-{uuid4().hex}"
 
 
+@dataclass(frozen=True)
+class TaskExecutionResult:
+    envelope: dict[str, Any]
+    task_record: TaskRecord | None
+
+
 def execute_task(
     request: TaskRequest | CoreTaskRequest,
     *,
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
+    return execute_task_with_record(
+        request,
+        adapters=adapters,
+        task_id_factory=task_id_factory,
+    ).envelope
+
+
+def execute_task_with_record(
+    request: TaskRequest | CoreTaskRequest,
+    *,
+    adapters: Mapping[str, Any],
+    task_id_factory: Callable[[], str] | None = None,
+) -> TaskExecutionResult:
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
     if task_id_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, task_id_error)
+        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, task_id_error), None)
 
     normalized_request, contract_error = normalize_request(request)
     if contract_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, contract_error)
+        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, contract_error), None)
     if normalized_request is None:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            invalid_input_error("invalid_task_request", "task_request 顶层形状不合法"),
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_input_error("invalid_task_request", "task_request 顶层形状不合法"),
+            ),
+            None,
         )
 
     adapter_key = normalized_request.target.adapter_key
     capability = normalized_request.target.capability
     capability_family, capability_family_error = resolve_capability_family(capability)
     if capability_family_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, capability_family_error)
+        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, capability_family_error), None)
     if capability_family is None:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            invalid_input_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_input_error("invalid_capability", "capability 无法投影到 adapter-facing family"),
+            ),
+            None,
         )
 
     projection_axis_error = validate_projection_axes_for_current_runtime(normalized_request)
     if projection_axis_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, projection_axis_error)
+        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_axis_error), None)
 
     try:
         registry = AdapterRegistry.from_mapping(adapters)
     except RegistryError as error:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            runtime_contract_error(
-                error.code,
-                error.message,
-                details=error.details,
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error(
+                    error.code,
+                    error.message,
+                    details=error.details,
+                ),
             ),
+            None,
         )
 
     declaration = registry.lookup(adapter_key)
     if declaration is None:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            unsupported_error("adapter_not_found", f"adapter `{adapter_key}` 不存在"),
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                unsupported_error("adapter_not_found", f"adapter `{adapter_key}` 不存在"),
+            ),
+            None,
         )
 
     supported_capabilities = declaration.supported_capabilities
     if capability_family not in supported_capabilities:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            unsupported_error(
-                "capability_not_supported",
-                f"adapter `{adapter_key}` 不支持 `{capability_family}`",
-                details={
-                    "supported_capabilities": sorted(supported_capabilities),
-                    "capability_family": capability_family,
-                },
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                unsupported_error(
+                    "capability_not_supported",
+                    f"adapter `{adapter_key}` 不支持 `{capability_family}`",
+                    details={
+                        "supported_capabilities": sorted(supported_capabilities),
+                        "capability_family": capability_family,
+                    },
+                ),
             ),
+            None,
         )
 
     supported_targets = declaration.supported_targets
     if normalized_request.target.target_type not in supported_targets:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            invalid_input_error(
-                "target_type_not_supported",
-                f"adapter `{adapter_key}` 不支持 target_type `{normalized_request.target.target_type}`",
-                details={"supported_targets": sorted(supported_targets)},
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_input_error(
+                    "target_type_not_supported",
+                    f"adapter `{adapter_key}` 不支持 target_type `{normalized_request.target.target_type}`",
+                    details={"supported_targets": sorted(supported_targets)},
+                ),
             ),
+            None,
         )
 
     supported_collection_modes = declaration.supported_collection_modes
     if normalized_request.policy.collection_mode not in supported_collection_modes:
-        return failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            invalid_input_error(
-                "collection_mode_not_supported",
-                f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
-                details={"supported_collection_modes": sorted(supported_collection_modes)},
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_input_error(
+                    "collection_mode_not_supported",
+                    f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
+                    details={"supported_collection_modes": sorted(supported_collection_modes)},
+                ),
             ),
+            None,
         )
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
     if projection_error is not None:
-        return failure_envelope(task_id, adapter_key, capability, projection_error)
+        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_error), None)
+
+    try:
+        record = start_task_record(create_task_record(task_id, build_task_request_snapshot(normalized_request)))
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("invalid_task_record", str(error)),
+            ),
+            None,
+        )
 
     try:
         payload = declaration.adapter.execute(adapter_request)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
-            return failure_envelope(task_id, adapter_key, capability, payload_error)
+            envelope = failure_envelope(task_id, adapter_key, capability, payload_error)
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                envelope,
+            )
     except PlatformAdapterError as error:
-        return failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
+        envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
+        return finalize_task_execution_result(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            envelope,
+        )
     except Exception as error:
-        return failure_envelope(
+        envelope = failure_envelope(
             task_id,
             adapter_key,
             capability,
@@ -201,8 +276,15 @@ def execute_task(
                 str(error) or error.__class__.__name__,
             ),
         )
+        return finalize_task_execution_result(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            envelope,
+        )
 
-    return {
+    envelope = {
         "task_id": task_id,
         "adapter_key": adapter_key,
         "capability": capability,
@@ -210,6 +292,38 @@ def execute_task(
         "raw": payload["raw"],
         "normalized": payload["normalized"],
     }
+    return finalize_task_execution_result(
+        task_id,
+        adapter_key,
+        capability,
+        record,
+        envelope,
+    )
+
+
+def finalize_task_execution_result(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    record: TaskRecord,
+    envelope: Mapping[str, Any],
+) -> TaskExecutionResult:
+    try:
+        return TaskExecutionResult(dict(envelope), finish_task_record(record, envelope))
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error(
+                    "envelope_not_json_serializable",
+                    "共享终态结果无法收口为 JSON-safe TaskRecord",
+                    details={"reason": str(error)},
+                ),
+            ),
+            None,
+        )
 
 
 def validate_request(request: Any) -> dict[str, Any] | None:
