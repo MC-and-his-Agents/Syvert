@@ -45,7 +45,10 @@
 - guardian 第四轮审查继续返回 `REQUEST_CHANGES`，指出两项剩余阻断：
   - active `exec-plan` 的 checkpoint SHA 写错，无法回溯到真实提交
   - `FR-0008` 尚未冻结同一 `task_id` 下重复建档/重复终态写入的幂等语义
-- 当前 checkpoint `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea` 已按前四轮 guardian 结论收口：
+- guardian 第五轮审查继续返回 `REQUEST_CHANGES`，指出最后两项阻断：
+  - `FR-0008` 需要把“业务失败 durable failed”与“终态持久化失败 fail-closed”拆成单一 contract
+  - active `exec-plan` 需要把“最新语义 checkpoint”与“当前 PR live head”明确区分，避免恢复点与当前审查对象脱节
+- 最新语义 checkpoint `e8066e2bdead450fdab9205bd1e0c0a3646135ea` 已按前五轮 guardian 结论收口：
   - 把可持久化失败限定为“已通过共享 admission 并进入执行主路径之后”的失败
   - 删除 `TaskTerminalResult.status`，改为由 `envelope.status` 作为唯一终态结果状态真相源
   - 初始 `accepted` 建档失败被明确为进入后续共享执行前的 fail-closed 阻断
@@ -54,11 +57,13 @@
   - `accepted` 的建档时点已明确后移到“共享 admission + 共享 pre-execution 校验全部通过之后”，从而与 `FR-0004` / `FR-0005` 已冻结的 admission/pre-execution 失败语义保持一致
   - 同一 `task_id` 下重复建档、重复终态写入与冲突写入的幂等/拒绝语义已冻结为 explicit contract
   - active `exec-plan` 的历史 checkpoint SHA 已纠正为真实提交对象
+  - adapter/business 路径失败与终态持久化失败已拆分为两类不同 contract：前者 durable failed 收口，后者 fail-closed 并把半截历史留在读侧拒绝范围
+- 当前 PR live head 以 `PR #145` 的最新提交为准；若后续只追加 exec-plan / guardian closeout metadata，则不把该 metadata-only head 伪装成新的语义 checkpoint。
 
 ## 下一步动作
 
-- 推送当前 head，等待 `PR #145` checks 与 guardian 重新绑定到最新提交。
-- 基于当前 checkpoint 重跑 guardian，确认已消除 formal spec 边界阻断。
+- 推送当前 PR live head，等待 checks 与 guardian 重新绑定到最新提交。
+- 基于上述最新语义 checkpoint 重跑 guardian，确认 formal spec 阻断已经消除。
 - 在 guardian / checks 通过后，用受控 merge 完成 PR 收口并关闭 `#137`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -127,6 +132,13 @@
     - 同一 `task_id` 下重复建档、重复终态写入与冲突写入的幂等语义已冻结
 - `git commit -m 'docs(spec): 补齐 FR-0008 幂等持久化契约'`
   - 结果：已生成 checkpoint `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea`
+- `python3 scripts/pr_guardian.py review 145`
+  - 结果：guardian 第五轮返回 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - adapter/business 路径失败与终态持久化失败已拆分为单一、不矛盾的 contract
+    - active exec-plan 已明确区分“最新语义 checkpoint”与“当前 PR live head”
+- `git commit -m 'docs(spec): 澄清 FR-0008 终态持久化失败语义'`
+  - 结果：已生成 checkpoint `e8066e2bdead450fdab9205bd1e0c0a3646135ea`
 
 ## 未决风险
 
@@ -139,4 +151,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ce0a0ad3618fb9169dd5f7d29e0a2e922c77f2ea`
+- `e8066e2bdead450fdab9205bd1e0c0a3646135ea`
