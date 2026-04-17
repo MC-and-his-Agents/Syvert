@@ -479,6 +479,29 @@ class TaskRecordStoreTests(unittest.TestCase):
             with self.assertRaises(TaskRecordStoreError):
                 store.write(conflicting)
 
+    def test_store_allows_idempotent_running_rewrite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            snapshot = TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/post/store-running-idempotent",
+                collection_mode="hybrid",
+            )
+            accepted = create_task_record(
+                "task-store-running-idempotent",
+                snapshot,
+                occurred_at="2026-04-17T12:00:00Z",
+            )
+            running = start_task_record(accepted, occurred_at="2026-04-17T12:00:01Z")
+
+            store.write(accepted)
+            persisted = store.write(running)
+
+            self.assertEqual(store.write(running), persisted)
+            self.assertEqual(store.load("task-store-running-idempotent"), persisted)
+
     def test_store_allows_idempotent_terminal_rewrite_and_rejects_conflicting_terminal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))

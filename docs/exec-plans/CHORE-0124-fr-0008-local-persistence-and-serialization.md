@@ -35,7 +35,7 @@
 
 - `#138` 已通过 PR `#147` 把共享 `TaskRecord` 模型与 runtime 生命周期接线合入主干。
 - 当前分支已把 `LocalTaskRecordStore`、runtime durable 接线与回归测试落到 worktree，并通过当前受审 PR `#148` 进入 implementation 审查。
-- 当前受审 head 为 `3a3bbfe4aa0fe06ee980117724485e0e5c7834fb`，已把 accepted / running / completion 三段 durable 写入、冲突/无效化处理与默认本地 store 路径接入到 `execute_task_with_record()`。
+- 当前受审 head 为 `157c377eacb118884d8b92a257c2cdba1533b4d2`，已把 accepted / running / completion 三段 durable 写入、冲突/无效化处理、accepted/running 幂等重放与默认本地 store 路径接入到 `execute_task_with_record()`。
 
 ## 下一步动作
 
@@ -65,6 +65,18 @@
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-139-fr-0008`
 - `python3 scripts/open_pr.py --class implementation --issue 139 --item-key CHORE-0124-fr-0008-local-persistence-and-serialization --item-type CHORE --release v0.3.0 --sprint 2026-S16 --title 'feat(runtime): 落地 FR-0008 本地任务记录持久化' --closing fixes --dry-run`
   - 结果：通过；当前受审 PR 为 `#148 https://github.com/MC-and-his-Agents/Syvert/pull/148`
+- `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_task_record tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_models tests.runtime.test_cli`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过，覆盖 accepted/running/terminal 持久化与幂等回归
+- `python3 scripts/commit_check.py --mode pr --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-139-fr-0008`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过
+- `python3 scripts/spec_guard.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD)`
+  - 结果：在当前受审 head `157c377eacb118884d8b92a257c2cdba1533b4d2` 上通过
 
 ## 未决风险
 
@@ -77,5 +89,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 当前受审 head：`3a3bbfe4aa0fe06ee980117724485e0e5c7834fb`
-- 说明：该 head 已绑定当前 implementation PR `#148`，并补齐 accepted / running / completion durable 写入、失效标记与 running-at-adapter-boundary 回归测试的最新事实。
+- 当前受审 head：`157c377eacb118884d8b92a257c2cdba1533b4d2`
+- 说明：该 head 已绑定当前 implementation PR `#148`，并补齐 accepted / running / completion durable 写入、accepted/running 幂等重放、失效标记与 running-at-adapter-boundary 回归测试的最新事实。

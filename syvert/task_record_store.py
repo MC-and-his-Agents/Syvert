@@ -173,6 +173,8 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
             return existing
         elif existing.status == "accepted" and incoming.status == "running":
             candidate = start_task_record(existing, occurred_at=incoming.updated_at)
+        elif existing.status == "running" and incoming.status == "running":
+            candidate = existing
         elif existing.status == "running" and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
