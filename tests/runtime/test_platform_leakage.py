@@ -97,6 +97,34 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertTrue(finding_refs.issubset(set(report["evidence_refs"])))
         self.assertTrue(all(ref.count(":") >= 3 for ref in finding_refs))
 
+    def test_run_check_maps_normalize_request_leak_to_shared_input_model(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    target = request.target\n",
+                    '    target = request.target\n    default_mode = "xhs_only"\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_input_model"})
+
+    def test_run_check_maps_success_envelope_leak_to_shared_result_contract(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    '        "normalized": payload["normalized"],\n',
+                    '        "xhs_extra": "1",\n        "normalized": payload["normalized"],\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_result_contract"})
+
     def test_run_check_fails_closed_when_boundary_scope_is_incomplete(self) -> None:
         report = run_platform_leakage_check(
             version="v0.2.0",

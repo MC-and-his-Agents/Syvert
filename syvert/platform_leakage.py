@@ -40,6 +40,10 @@ _RUNTIME_SYMBOL_BOUNDARIES = {
     "CoreTaskRequest": "shared_input_model",
     "TaskRequest": "shared_input_model",
     "AdapterTaskRequest": "shared_input_model",
+    "validate_request": "shared_input_model",
+    "normalize_request": "shared_input_model",
+    "project_to_adapter_request": "shared_input_model",
+    "validate_projection_axes_for_current_runtime": "shared_input_model",
     "PlatformAdapterError": "shared_error_model",
     "validate_success_payload": "shared_result_contract",
     "failure_envelope": "shared_error_model",
@@ -282,6 +286,7 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
         return lambda _line_number: "core_runtime"
 
     ranges: list[tuple[int, int, str]] = []
+    ranges.extend(_collect_runtime_statement_boundary_overrides(module))
     for node in module.body:
         if not isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -297,6 +302,21 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
         return "core_runtime"
 
     return resolve
+
+
+def _collect_runtime_statement_boundary_overrides(module: ast.Module) -> list[tuple[int, int, str]]:
+    ranges: list[tuple[int, int, str]] = []
+    for node in module.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "execute_task":
+            continue
+        end_line = getattr(node, "end_lineno", node.lineno)
+        for statement in node.body:
+            if isinstance(statement, ast.Try) and any(
+                isinstance(name, ast.Name) and name.id == "payload" for name in ast.walk(statement)
+            ):
+                ranges.append((statement.lineno, end_line, "shared_result_contract"))
+                break
+    return ranges
 
 
 def _build_allowed_exception_statements(relative_name: str, source_text: str) -> frozenset[tuple[int, int, int, int]]:
