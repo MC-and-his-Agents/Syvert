@@ -17,7 +17,7 @@ SHARED_CAPABILITIES = frozenset({"content_detail_by_url"})
 SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
-RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
 
 class TaskRecordContractError(ValueError):
@@ -410,11 +410,20 @@ def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
 def validate_timestamp(value: str, *, field: str) -> None:
     if not isinstance(value, str) or not RFC3339_UTC_RE.fullmatch(value):
         raise TaskRecordContractError(f"{field} 必须为 RFC3339 UTC 时间")
+    if parse_timestamp(value, field=field).utcoffset() != timezone.utc.utcoffset(None):
+        raise TaskRecordContractError(f"{field} 必须是 UTC 时间")
 
 
 def parse_timestamp(value: str, *, field: str) -> datetime:
-    validate_timestamp(value, field=field)
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, str) or not RFC3339_UTC_RE.fullmatch(value):
+        raise TaskRecordContractError(f"{field} 必须为 RFC3339 UTC 时间")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise TaskRecordContractError(f"{field} 必须为 RFC3339 UTC 时间") from error
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(None):
+        raise TaskRecordContractError(f"{field} 必须是 UTC 时间")
+    return parsed
 
 
 def terminal_record_status(envelope: Mapping[str, Any]) -> str:

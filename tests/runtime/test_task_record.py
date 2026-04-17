@@ -114,6 +114,43 @@ class UnserializableSuccessAdapter:
         }
 
 
+class OffsetTimestampSuccessAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def execute(self, request):
+        return {
+            "raw": {"id": "raw-offset-1"},
+            "normalized": {
+                "platform": "stub",
+                "content_id": "content-offset-1",
+                "content_type": "unknown",
+                "canonical_url": request.input.url,
+                "title": "",
+                "body_text": "",
+                "published_at": "2026-04-17T10:30:00+00:00",
+                "author": {
+                    "author_id": None,
+                    "display_name": None,
+                    "avatar_url": None,
+                },
+                "stats": {
+                    "like_count": None,
+                    "comment_count": None,
+                    "share_count": None,
+                    "collect_count": None,
+                },
+                "media": {
+                    "cover_url": None,
+                    "video_url": None,
+                    "image_urls": [],
+                },
+            },
+        }
+
+
 class TaskRecordCodecTests(unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
@@ -341,6 +378,24 @@ class RuntimeTaskRecordTests(unittest.TestCase):
         self.assertEqual(envelope["task_id"], "task-record-8")
         self.assertIn("raw", envelope)
         self.assertEqual(type(envelope["raw"]["bad"]).__name__, "object")
+
+    def test_execute_task_with_record_accepts_offset_utc_timestamp_in_success_payload(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/9"),
+            ),
+            adapters={"stub": OffsetTimestampSuccessAdapter()},
+            task_id_factory=lambda: "task-record-9",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertIsNotNone(outcome.task_record)
+        self.assertEqual(
+            outcome.task_record.result.envelope["normalized"]["published_at"],
+            "2026-04-17T10:30:00+00:00",
+        )
 
 
 if __name__ == "__main__":
