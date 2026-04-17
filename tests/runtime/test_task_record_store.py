@@ -422,6 +422,63 @@ class TaskRecordStoreTests(unittest.TestCase):
             with self.assertRaises(TaskRecordStoreError):
                 store.write(running)
 
+    def test_store_allows_idempotent_accepted_rewrite_with_fresh_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            snapshot = TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/post/store-accepted-idempotent",
+                collection_mode="hybrid",
+            )
+            first = create_task_record(
+                "task-store-accepted-idempotent",
+                snapshot,
+                occurred_at="2026-04-17T12:00:00Z",
+            )
+            second = create_task_record(
+                "task-store-accepted-idempotent",
+                snapshot,
+                occurred_at="2026-04-17T12:00:05Z",
+            )
+
+            persisted = store.write(first)
+
+            self.assertEqual(store.write(second), persisted)
+            self.assertEqual(store.load("task-store-accepted-idempotent"), persisted)
+
+    def test_store_rejects_conflicting_accepted_rewrite_when_snapshot_differs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            accepted = create_task_record(
+                "task-store-accepted-conflict",
+                TaskRequestSnapshot(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    target_type="url",
+                    target_value="https://example.com/post/store-accepted-conflict",
+                    collection_mode="hybrid",
+                ),
+                occurred_at="2026-04-17T12:00:00Z",
+            )
+            conflicting = create_task_record(
+                "task-store-accepted-conflict",
+                TaskRequestSnapshot(
+                    adapter_key="stub",
+                    capability="content_detail_by_url",
+                    target_type="url",
+                    target_value="https://example.com/post/store-accepted-conflict-changed",
+                    collection_mode="hybrid",
+                ),
+                occurred_at="2026-04-17T12:00:05Z",
+            )
+
+            store.write(accepted)
+
+            with self.assertRaises(TaskRecordStoreError):
+                store.write(conflicting)
+
     def test_store_allows_idempotent_terminal_rewrite_and_rejects_conflicting_terminal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))

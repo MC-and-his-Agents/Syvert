@@ -12,6 +12,7 @@ from urllib.parse import quote
 from syvert.task_record import (
     TaskRecord,
     TaskRecordContractError,
+    create_task_record,
     finish_task_record,
     start_task_record,
     task_record_from_dict,
@@ -168,7 +169,8 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
 
     try:
         if existing.status == "accepted" and incoming.status == "accepted":
-            candidate = existing
+            create_task_record(existing.task_id, incoming.request, existing=existing)
+            return existing
         elif existing.status == "accepted" and incoming.status == "running":
             candidate = start_task_record(existing, occurred_at=incoming.updated_at)
         elif existing.status == "running" and incoming.status in {"succeeded", "failed"}:
