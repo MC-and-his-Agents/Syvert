@@ -13,12 +13,12 @@
   - `run` 在 `v0.3.0` 不新增其他必填参数，也不再向更深层子命令扩张
   - `run` 继续接收上述固定请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
   - legacy 平铺入口 `--adapter --capability --url` 的兼容投影固定为 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
-  - `query` 只接收单个 `task_id`
+  - `query` 的固定 public CLI 形状：`python -m syvert.cli query --task-id <id>`
   - legacy 平铺执行入口继续兼容，并映射到 `run` 语义
 - 输出结构：
   - `run` 继续输出共享 success / failed envelope
-  - `query` 成功时输出完整共享 `TaskRecord` JSON，即该 durable record 的共享 JSON-safe 序列化载荷
-  - `query` 失败时输出 shared failed envelope，不新增 query 私有错误 schema
+  - `query` 成功时把完整共享 `TaskRecord` JSON 写入 `stdout`，即该 durable record 的共享 JSON-safe 序列化载荷
+  - `query` 失败时把 shared failed envelope 写入 `stderr`，不新增 query 私有错误 schema，且 CLI 返回码必须为非零
 
 ## 错误与边界行为
 

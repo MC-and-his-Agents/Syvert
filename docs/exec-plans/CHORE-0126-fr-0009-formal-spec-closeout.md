@@ -34,12 +34,11 @@
 - `FR-0009` formal spec 套件、requirement container 与最小 release / sprint 索引已经在当前分支首次落盘。
 - `#141` 当前为 `OPEN`，GitHub body 中的 `sprint` 已同步为 `2026-S16`。
 - 受控入口 `open_pr.py --class spec --issue 141 ... --dry-run` 已通过，spec PR `#154` 已创建并指向当前事项。
-- guardian 对旧 head 的审查先后指出了六类阻断：formal spec 回退了上游共享请求 contract / 泄漏实现细节，`invalid_cli_arguments` 在可恢复 `--task-id` 时仍可能丢失用户查询键，`plan.md` 中存在与串行收口策略不一致的并行描述，`#141` 允许写集未把 requirement container 纳入合法范围，以及 `run` public surface / shared store 选择 contract 尚未冻结到 formal spec；其中最新一轮还要求去掉 helper 名级的 fallback 描述并把 `run` 的必填形状固定到底。
-- 当前分支已把 `FR-0009` spec 收敛回 `FR-0004` / `FR-0008` 已冻结的共享请求模型与 durable-truth contract，补齐“可恢复 query key 时必须回显用户 `task_id`”的参数错误 contract，把 fallback 改写为纯 contract 语言，把 legacy URL 兼容投影与 `#141 -> #142 -> #143 -> #144` 串行关系写死，把 requirement container 明确纳入 `#141` 合法 docs scope，并冻结 `run` 的公开 CLI 形状、必填参数集合与共享 store 选择 contract；当前停点是等待绑定最新 head 的 guardian 复核。
+- 当前分支已经针对 guardian 的静态审查逐项补齐 formal spec、plan、contract、risk 与索引工件的一致性：包括 public surface 冻结、CLI 参数错误 contract、legacy URL 兼容投影、shared store 选择 contract、验证矩阵、回滚口径以及 release / sprint closeout 索引。
+- 当前停点是等待 guardian 基于当前 PR head 复核这些最新文档修正，并进入受控 merge gate。
 
 ## 下一步动作
 
-- 提交并推送本次 formal spec 语义修正，让 PR `#154` 的最新 head 与 active exec-plan 保持一致。
 - 等待 guardian 产出绑定当前 PR head 的 verdict 与 `safe_to_merge` 结论。
 - 在 guardian / merge gate 全部通过后，使用 `python3 scripts/merge_pr.py 154 --delete-branch` 执行受控 squash merge。
 - `#141` 合入主干后，把 `#128` 的 formal spec 字段从 `planned` 收敛到已入库真相，再切换到 `#142`。
@@ -72,8 +71,8 @@
   - 结果：通过
 - `gh pr checks 154`
   - 结果：Commit / Docs / Governance / Spec Guard checks 全绿
-- guardian 旧 head 审查摘要
-  - 结果：指出 shared request contract drift、实现细节泄漏到 formal spec、`invalid_cli_arguments` 可能丢失可恢复的查询键、`plan.md` 存在并行描述、`#141` 合法写集定义遗漏 requirement container，以及 `run` public surface / shared store 选择 contract 未冻结；当前分支已据此修正，待最新 head 复核
+- 当前 head 的 merge gate 进展
+  - 结果：guardian 正基于当前 PR head 复核最新文档修正；当前分支已经按上一轮 review finding 补齐 contract carrier、验证矩阵、回滚口径与 closeout 索引一致性
 
 ## 未决风险
 

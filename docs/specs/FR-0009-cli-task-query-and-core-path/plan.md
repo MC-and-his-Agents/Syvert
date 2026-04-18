@@ -47,14 +47,19 @@
   - `python3 -m unittest tests.runtime.test_task_record_store`
   - 受 CLI 入口影响的 adapter CLI 回归测试
 - 手动验证：
+  - 验证 `run --adapter --capability --url` 与 legacy 平铺入口都返回共享 success / failed envelope，并在参数错误时保留已冻结的 `adapter_key` / `capability` 回显规则
   - 验证 `query --task-id <id>` 返回完整共享 `TaskRecord`
+  - 验证 `query` 可读取 `accepted`、`running`、`succeeded`、`failed` 四种 durable 状态
   - 验证 legacy 平铺执行入口与 `run` 子命令都沿共享 durable path 工作
-  - 验证 invalid marker、损坏记录与 store 不可用都 fail-closed 为 `task_record_unavailable`
+  - 验证 `query` 对不存在记录返回 `task_record_not_found`，并与 invalid marker、损坏记录、store 不可用等 `task_record_unavailable` 明确区分
+  - 验证 `query invalid_cli_arguments` 在可恢复 `--task-id` 时回显用户查询键，在不可恢复时生成新的非空 fallback CLI `task_id`
+  - 验证 `run/query` 都继续共享 `SYVERT_TASK_RECORD_STORE_DIR` 或共享默认本地 store 位置，不存在 query 专用 store 入口
 
 ## TDD 范围
 
 - 先写测试的模块：
   - CLI `query` 成功/失败 surface
+  - CLI `run` / legacy 参数错误与兼容 surface
   - legacy 平铺入口与 `run` 子命令的兼容回归
   - same-path 回读与 fail-closed 查询回归
 - 暂不纳入 TDD 的模块与理由：
