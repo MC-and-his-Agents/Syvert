@@ -18,6 +18,7 @@
 ## 范围
 
 - 本次纳入：
+  - `docs/exec-plans/artifacts/FR-0009-cli-query-and-core-path-verification-matrix.md`
   - `syvert/cli.py`
   - 与 CLI query public surface 直接相关的测试
   - `docs/exec-plans/CHORE-0127-fr-0009-cli-task-query.md`
@@ -29,15 +30,15 @@
 ## 当前停点
 
 - `issue-142-fr-0009-cli` 已作为 `#142` 的独立 implementation worktree 建立，且只保留 `syvert/cli.py`、`tests/runtime/test_cli.py` 与当前 exec-plan 的受控改动。
-- 当前分支已经完成 `run/query` 顶层子命令、legacy 平铺执行入口兼容、query 成功输出完整 `TaskRecord` JSON，以及 `invalid_cli_arguments` / `task_record_not_found` / `task_record_unavailable` 的错误映射实现。
+- 当前分支已经完成 `run/query` 顶层子命令、legacy 平铺执行入口兼容、query 成功输出完整 `TaskRecord` JSON，以及 `invalid_cli_arguments` / `task_record_not_found` / `task_record_unavailable` 的 formal spec 错误映射实现。
 - `#141` formal spec 已由 PR `#154` 合入主干，当前分支也已 rebase 到最新 `origin/main`。
-- `#142` 当前停点是同步 GitHub issue 执行上下文，完成实现门禁、受控开 PR 与 guardian merge gate。
+- `#142` 当前停点是恢复推进补丁已在本地落盘并完成回归，待提交到 PR `#156`，再重跑 guardian 与受控 merge gate。
 
 ## 下一步动作
 
-- 运行 `pr_scope_guard` 与 `open_pr.py --dry-run`，确认 PR 范围与事项上下文一致。
-- 同步 GitHub issue `#142` 的执行状态与当前事项上下文后，创建 implementation PR 并进入 guardian 审查与受控合并。
-- guardian / merge gate 通过后，以受控 merge 收口 `#142`，再建立 `#143` 的独立执行现场。
+- 提交本轮恢复推进补丁，并把 verification matrix、exec-plan、实现与测试一起推送到 PR `#156`。
+- 同步 GitHub issue `#142` 与 PR `#156` 的执行真相，明确当前 PR 已进入“guardian findings recovered”状态。
+- 在当前 head 上重跑 guardian 与 `merge_pr.py 156 --delete-branch --refresh-review`，如仍有阻断则先回填 matrix 再修。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -52,21 +53,17 @@
 ## 已验证项
 
 - 已核对 `#141` formal spec 已由 PR `#154` 合入主干，且 `#128` 的 formal spec 字段已收敛到已入库真相。
+- 已建立 `FR-0009` formal spec clause -> runtime/test 的 verification matrix carrier：`docs/exec-plans/artifacts/FR-0009-cli-query-and-core-path-verification-matrix.md`
 - `python3 -m unittest tests.runtime.test_cli tests.runtime.test_task_record tests.runtime.test_task_record_store`
-  - 结果：通过（63 tests, OK）
+  - 结果：通过（65 tests, OK）
 - `python3 -m unittest tests.runtime.test_xhs_adapter.XhsAdapterTests.test_cli_module_path_can_load_xhs_adapter_from_shared_registry`
   - 结果：通过（1 test, OK）
-- 已新增并本地通过的回归覆盖：
-  - `run/query` 顶层子命令
-  - legacy 平铺执行入口兼容
-  - `query` 回读 `accepted` / `running` / `succeeded` / `failed`
-  - `invalid_cli_arguments` / `task_record_not_found` / `task_record_unavailable`
-  - 已加载 record 的输出失败回填 `record.request.adapter_key` / `capability`
-  - `run` 与 legacy 平铺执行入口的共享 durable truth 一致性
+- 当前已验证项以 verification matrix 为准；`#142` 只负责矩阵中 `scope owner=#142` 的条目，`#143` 同路径闭环条目保持 `planned`。
 
 ## 未决风险
 
-- 当前分支尚未 rebase 到包含 `#141` 的最新 `origin/main`；若 rebase 暴露同文件冲突，需要先按 formal spec 真相收敛，再进入 PR 流程。
+- 若继续只按 guardian 最新 finding 点修，而不按 verification matrix 全量对账，`#156` 仍可能因遗漏相邻负路径再次被驳回。
+- 需要确保推送到 PR `#156` 的 head 与当前 exec-plan / verification matrix / guardian 复审绑定到同一提交，避免再次出现 review 真相分叉。
 
 ## 回滚方式
 

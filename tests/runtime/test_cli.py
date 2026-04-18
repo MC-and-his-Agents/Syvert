@@ -78,6 +78,11 @@ class PlatformFailureAdapter:
         )
 
 
+class BrokenWriteStream(io.StringIO):
+    def write(self, s: str) -> int:
+        raise BrokenPipeError("forced-broken-pipe")
+
+
 class CliTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -419,6 +424,49 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["category"], "invalid_input")
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
+    def test_query_subcommand_parse_failure_preserves_recoverable_task_id(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        exit_code = main(
+            ["query", "--task-id", "task-cli-query-recoverable-1", "--unknown"],
+            stdout=stdout,
+            stderr=stderr,
+            task_id_factory=lambda: "task-cli-query-fallback-should-not-be-used",
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["task_id"], "task-cli-query-recoverable-1")
+        self.assertEqual(payload["adapter_key"], "")
+        self.assertEqual(payload["capability"], "")
+        self.assertEqual(payload["error"]["category"], "invalid_input")
+        self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
+
+    def test_query_subcommand_parse_failure_returns_invalid_task_id_when_fallback_task_id_generation_fails(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        exit_code = main(
+            ["query"],
+            stdout=stdout,
+            stderr=stderr,
+            task_id_factory=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertIsInstance(payload["task_id"], str)
+        self.assertTrue(payload["task_id"])
+        self.assertEqual(payload["adapter_key"], "")
+        self.assertEqual(payload["capability"], "")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "invalid_task_id")
+
     def test_query_subcommand_returns_not_found_for_unknown_task_id(self) -> None:
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -577,6 +625,36 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["error"]["category"], "runtime_contract")
         self.assertEqual(payload["error"]["code"], "task_record_unavailable")
 
+    def test_query_subcommand_uses_record_context_when_loaded_record_cannot_be_written_to_stdout(self) -> None:
+        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
+        accepted = create_task_record(
+            "task-cli-query-write-failure-1",
+            TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/query-write-failure-1",
+                collection_mode="hybrid",
+            ),
+        )
+        store.write(accepted)
+
+        stdout = BrokenWriteStream()
+        stderr = io.StringIO()
+        exit_code = main(
+            ["query", "--task-id", "task-cli-query-write-failure-1"],
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+        self.assertEqual(exit_code, 1)
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["task_id"], "task-cli-query-write-failure-1")
+        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["capability"], "content_detail_by_url")
+        self.assertEqual(payload["error"]["category"], "runtime_contract")
+        self.assertEqual(payload["error"]["code"], "task_record_unavailable")
+
     def test_query_subcommand_returns_unavailable_when_store_root_is_missing(self) -> None:
         missing_root = Path(self._task_record_store_dir.name) / "missing-root"
         stdout = io.StringIO()
@@ -597,69 +675,6 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "")
         self.assertEqual(payload["error"]["category"], "runtime_contract")
         self.assertEqual(payload["error"]["code"], "task_record_unavailable")
-
-    def test_run_subcommand_and_legacy_entrypoint_share_same_task_record_truth(self) -> None:
-        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
-
-        legacy_stdout = io.StringIO()
-        legacy_stderr = io.StringIO()
-        legacy_exit_code = main(
-            [
-                "--adapter",
-                "stub",
-                "--capability",
-                "content_detail_by_url",
-                "--url",
-                "https://example.com/posts/shared-path-1",
-            ],
-            adapters={"stub": SuccessfulAdapter()},
-            stdout=legacy_stdout,
-            stderr=legacy_stderr,
-            task_id_factory=lambda: "task-cli-shared-path-1",
-        )
-        self.assertEqual(legacy_exit_code, 0, legacy_stderr.getvalue())
-        legacy_record_payload = task_record_to_dict(store.load("task-cli-shared-path-1"))
-
-        run_stdout = io.StringIO()
-        run_stderr = io.StringIO()
-        run_exit_code = main(
-            [
-                "run",
-                "--adapter",
-                "stub",
-                "--capability",
-                "content_detail_by_url",
-                "--url",
-                "https://example.com/posts/shared-path-1",
-            ],
-            adapters={"stub": SuccessfulAdapter()},
-            stdout=run_stdout,
-            stderr=run_stderr,
-            task_id_factory=lambda: "task-cli-shared-path-2",
-        )
-        self.assertEqual(run_exit_code, 0, run_stderr.getvalue())
-        run_record_payload = task_record_to_dict(store.load("task-cli-shared-path-2"))
-
-        legacy_record_payload["task_id"] = "normalized-task-id"
-        run_record_payload["task_id"] = "normalized-task-id"
-        legacy_record_payload["result"]["envelope"]["task_id"] = "normalized-task-id"
-        run_record_payload["result"]["envelope"]["task_id"] = "normalized-task-id"
-
-        self.assertEqual(run_record_payload["request"], legacy_record_payload["request"])
-        self.assertEqual(run_record_payload["status"], legacy_record_payload["status"])
-        self.assertEqual(run_record_payload["result"], legacy_record_payload["result"])
-
-        query_stdout = io.StringIO()
-        query_stderr = io.StringIO()
-        query_exit_code = main(
-            ["query", "--task-id", "task-cli-shared-path-2"],
-            stdout=query_stdout,
-            stderr=query_stderr,
-        )
-
-        self.assertEqual(query_exit_code, 0)
-        self.assertEqual(query_stderr.getvalue(), "")
-        self.assertEqual(json.loads(query_stdout.getvalue()), task_record_to_dict(store.load("task-cli-shared-path-2")))
 
     def test_cli_module_path_can_load_shared_adapter_registry(self) -> None:
         import tempfile

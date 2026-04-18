@@ -100,8 +100,7 @@ def main(
     try:
         args = parse_args(argv)
     except CliArgumentError as error:
-        task_id, task_id_error = resolve_task_id(task_id_factory)
-        adapter_key, capability = extract_cli_context(argv)
+        task_id, adapter_key, capability, task_id_error = recover_cli_failure_context(argv, task_id_factory)
         envelope_error = task_id_error or invalid_input_error("invalid_cli_arguments", str(error))
         envelope = failure_envelope(task_id, adapter_key, capability, envelope_error)
         err.write(json.dumps(envelope, ensure_ascii=False) + "\n")
@@ -219,7 +218,8 @@ def execute_query_command(
     try:
         payload = task_record_to_dict(record)
         serialized = json.dumps(payload, ensure_ascii=False)
-    except (TaskRecordContractError, TypeError, ValueError) as error:
+        stdout.write(serialized + "\n")
+    except (TaskRecordContractError, TypeError, ValueError, OSError) as error:
         return write_query_failure(
             task_id=task_id,
             adapter_key=record.request.adapter_key,
@@ -231,8 +231,6 @@ def execute_query_command(
                 details={"reason": str(error) or error.__class__.__name__},
             ),
         )
-
-    stdout.write(serialized + "\n")
     return 0
 
 
@@ -294,6 +292,23 @@ def extract_cli_context(argv: list[str] | None) -> tuple[str, str]:
     adapter_key = extract_cli_option(args, "--adapter")
     capability = extract_cli_option(args, "--capability")
     return adapter_key, capability
+
+
+def recover_cli_failure_context(
+    argv: list[str] | None,
+    task_id_factory: Callable[[], str] | None,
+) -> tuple[str, str, str, dict[str, Any] | None]:
+    args = list(argv) if argv is not None else sys.argv[1:]
+    if args and args[0] == "query":
+        query_task_id = extract_cli_option(args[1:], "--task-id")
+        if query_task_id:
+            return query_task_id, "", "", None
+        task_id, task_id_error = resolve_task_id(task_id_factory)
+        return task_id, "", "", task_id_error
+
+    task_id, task_id_error = resolve_task_id(task_id_factory)
+    adapter_key, capability = extract_cli_context(args)
+    return task_id, adapter_key, capability, task_id_error
 
 
 def extract_cli_option(argv: list[str], option: str) -> str:
