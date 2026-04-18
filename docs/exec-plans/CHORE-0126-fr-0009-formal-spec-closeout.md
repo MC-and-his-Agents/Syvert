@@ -85,4 +85,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b5cd8648281559ad0c712c3732fedba8e788fb2b`
+- `8e063ab55a9c6c66ef0c34ed17d5c10f254b8408`
