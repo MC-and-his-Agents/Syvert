@@ -30,7 +30,8 @@
 
 - `#142 / PR #156` 已于 2026-04-18 合入主干，`run/query` public surface、query 错误 contract 与 verification matrix carrier 已成为主干真相。
 - 当前缺口只剩 same-path 端到端证据：需要把 `run`、legacy 平铺执行入口、shared store truth 与 `query` 回读结果绑定成同一条验证链。
-- `issue-143-fr-0009-cli-core-path` 已作为 `#143` 的独立 implementation worktree 建立；same-path 测试与 matrix 回填已经在本地落盘并通过回归，当前停在提交 checkpoint、同步 GitHub 真相并进入受控 PR。
+- canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 测试与 matrix 回填已提交为 checkpoint `3a07b3377361ad538481529f8c21b1e666487b23`，并通过本地回归。
+- 当前停点是同步 GitHub issue `#143` 的执行状态、运行受控入口并创建 implementation PR。
 
 ## 下一步动作
 
@@ -68,4 +69,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9aa4dc97d838b0bdbbbad9469e2202037d35af11`
+- `3a07b3377361ad538481529f8c21b1e666487b23`
