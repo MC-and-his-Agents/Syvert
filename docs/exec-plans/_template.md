@@ -52,3 +52,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `<checkpoint_commit_sha>`
+- 如需描述 metadata-only review sync，只记录追溯说明，不把当前受审 head 写成必须与最新 HEAD 完全一致的静态字段。

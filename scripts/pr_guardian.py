@@ -47,6 +47,7 @@ from scripts.integration_contract import (
 )
 from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
 from scripts.open_pr import extract_issue_summary_sections
+from scripts.policy.policy import classify_paths
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 
@@ -59,6 +60,11 @@ REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "spr
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
     "若缺少必要工件或验证证据，应明确指出阻断项；merge gate、head 绑定与 squash merge 安全性由 guardian gate 入口单独消费。",
+)
+METADATA_ONLY_CLOSEOUT_DOC_PREFIXES = (
+    "docs/exec-plans/",
+    "docs/releases/",
+    "docs/sprints/",
 )
 REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
@@ -757,6 +763,30 @@ def append_optional_section(lines: list[str], title: str, content: str) -> None:
     lines.extend(["", title, content])
 
 
+def is_metadata_only_closeout_follow_up(item_context: dict[str, str], changed_files: list[str]) -> bool:
+    item_key = str(item_context.get("item_key", "")).strip().lower()
+    if "closeout" not in item_key or not changed_files:
+        return False
+    categories = {item.category for item in classify_paths(changed_files)}
+    if categories != {"docs"}:
+        return False
+    return all(path.startswith(METADATA_ONLY_CLOSEOUT_DOC_PREFIXES) for path in changed_files)
+
+
+def head_checkpoint_contract_rules(context: dict[str, object]) -> list[str]:
+    rules = [
+        "当前 live review head 以 PR 基本信息中的 `头部提交` 为准，并由 guardian state / merge gate 绑定；不要要求 active exec-plan 追写该值。",
+        "active exec-plan 只承载最近一次 checkpoint / resume truth；若当前 diff 仅补 review / merge gate / closeout metadata，不要把 metadata-only head 视为新的 checkpoint。",
+    ]
+    item_context = context.get("item_context")
+    changed_files = context.get("changed_files")
+    if isinstance(item_context, dict) and isinstance(changed_files, list) and is_metadata_only_closeout_follow_up(item_context, changed_files):
+        rules.append(
+            "当前 diff 命中 metadata-only closeout follow-up：请核对 checkpoint 语义、追溯关系与门禁证据是否自洽；不要因 exec-plan 未把静态 SHA 追到当前 HEAD 而单独给出阻断。"
+        )
+    return rules
+
+
 def render_raw_body_fallback(raw_body: str, raw_sections: dict[str, str]) -> str:
     if not raw_body:
         return ""
@@ -802,6 +832,9 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         "",
         "执行约束：",
         *[f"- {rule}" for rule in REVIEW_EXECUTION_RULES],
+        "",
+        "Head / Checkpoint Contract：",
+        *[f"- {rule}" for rule in head_checkpoint_contract_rules(context)],
         "",
         "Reviewer Rubric 节选（来自 `code_review.md`）：",
         rubric_excerpt,

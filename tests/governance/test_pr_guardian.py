@@ -1469,6 +1469,44 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertIn("风险摘要：", prompt)
         self.assertIn("审查关注：guardian 入口不要回退到模板噪音", prompt)
 
+    def test_build_prompt_marks_metadata_only_closeout_follow_up_as_live_head_contract(self) -> None:
+        meta = {
+            "number": 149,
+            "title": "文档: 收口 FR-0008 父事项",
+            "url": "https://example.test/pr/149",
+            "baseRefName": "main",
+            "headRefOid": "sha-149",
+            "headRefName": "issue-140-closeout-branch",
+            "body": "## 摘要\n\n- 变更目的：收口 closeout metadata\n",
+        }
+
+        with patch(
+            "scripts.pr_guardian.build_review_context",
+            return_value={
+                "pr_identity": ["- PR: #149", "- 头部提交: sha-149"],
+                "issue_context": {"identity": [], "summary": ""},
+                "item_context": {"issue": "140", "item_key": "CHORE-0125-fr-0008-parent-closeout"},
+                "raw_sections": {"摘要": "- 变更目的：收口 closeout metadata"},
+                "pr_sections": {"summary": "- 变更目的：收口 closeout metadata"},
+                "changed_files": [
+                    "docs/exec-plans/CHORE-0125-fr-0008-parent-closeout.md",
+                    "docs/exec-plans/FR-0008-task-record-persistence.md",
+                    "docs/releases/v0.3.0.md",
+                    "docs/sprints/2026-S16.md",
+                ],
+                "diff_stat": "4 files changed",
+                "related_paths": ["docs/exec-plans/CHORE-0125-fr-0008-parent-closeout.md"],
+                "context_notes": [],
+            },
+        ):
+            with patch("scripts.pr_guardian.load_reviewer_rubric_excerpt", return_value="## Review Rubric\n- contract 一致性"):
+                prompt = build_prompt(meta, Path("/tmp/worktree"))
+
+        self.assertIn("Head / Checkpoint Contract：", prompt)
+        self.assertIn("不要要求 active exec-plan 追写该值", prompt)
+        self.assertIn("当前 diff 命中 metadata-only closeout follow-up", prompt)
+        self.assertIn("不要因 exec-plan 未把静态 SHA 追到当前 HEAD 而单独给出阻断", prompt)
+
     def test_build_item_context_summary_returns_exec_plan_and_related_paths(self) -> None:
         meta = {
             "body": "\n".join(
