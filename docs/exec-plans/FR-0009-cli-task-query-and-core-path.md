@@ -18,5 +18,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 本地实现准备 checkpoint：`6d39961dc9304f513cde40ee50cc86ebb4f7991f`
+- 本地实现准备 checkpoint：`2dd45df4fe0d8ca18cc342f2f4d7116d15955792`
 - 说明：当前 requirement container 首次把 `FR-0009` 的 spec 路径、Work Item 拆分与 release / sprint 索引落盘；后续由 `#141/#142/#143/#144` 各自的 exec-plan 记录独立执行事实。
