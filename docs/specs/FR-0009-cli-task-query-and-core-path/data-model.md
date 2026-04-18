@@ -39,6 +39,10 @@
   - `task_id` 语义：
     - `run` / legacy：在参数错误且尚无 durable `task_id` 时，使用新生成的非空 fallback CLI `task_id`
     - `query`：若可恢复用户查询键则回显该值，否则使用新生成的非空 fallback CLI `task_id`
+- `invalid_task_id`
+  - 适用：CLI 参数错误路径上，fallback CLI `task_id` 的生成或校验本身失败
+  - 输出：`error.code=invalid_task_id`、`error.category=runtime_contract` 的 failed envelope
+  - 优先级：一旦该分支触发，必须优先于 `invalid_cli_arguments`
 - `task_record_not_found`
   - 适用：store 可访问，但 durable record 不存在
   - 输出：`error.code=task_record_not_found`、`error.category=invalid_input` 的 failed envelope

@@ -31,6 +31,7 @@
     - `run` / legacy 在参数错误且尚无 durable `task_id` 时，必须生成新的非空 fallback CLI `task_id`；若 malformed argv 中可恢复 `adapter_key` / `capability`，则 failed envelope 必须回显这些值
     - `query` 若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用新生成的非空 fallback CLI `task_id`
     - `query` 在参数错误场景下固定 `adapter_key=""`；`capability=""`
+    - 若 fallback CLI `task_id` 的生成或校验本身失败，则必须优先返回共享 `invalid_task_id` failed envelope；其 `error.category` 固定为 `runtime_contract`
 - `task_record_not_found`
   - 适用场景：store 可访问，但请求的 `task_id` 不存在 durable record
   - 约束：`error.category=invalid_input`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
