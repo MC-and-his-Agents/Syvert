@@ -31,6 +31,7 @@
 
 - 功能需求：
   - CLI 顶层必须提供两个 public subcommand：`run` 与 `query`。
+  - `run` 的最小 public surface 固定为 `python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`。
   - `run` 语义必须等价于当前执行入口：继续承接当前 CLI 执行入口暴露的请求载体，并把它投影到 `FR-0004` / `FR-0008` 已冻结的共享请求模型，再沿同一条 Core 执行路径完成 admission、adapter 执行、`TaskRecord` durable 写入与终态输出。
   - legacy 平铺执行入口 `python -m syvert.cli --adapter ... --capability ... --url ...` 必须继续兼容，并映射到 `run` 语义；引入 subcommand 后不得破坏当前 parse failure 的 machine-readable 行为。
   - 对 legacy 平铺执行入口的共享语义，formal spec 固定采用 `FR-0004` 已冻结的 URL 兼容投影：`target_type=url`、`target_value=<用户提供的 url>`、`collection_mode=hybrid`；`FR-0009` 不得把该兼容入口扩张成第二套请求 contract。
@@ -38,7 +39,7 @@
   - `query` 成功时必须把同一份 durable `TaskRecord` 的完整共享 JSON-safe 表示写到 `stdout`；该输出必须与 `FR-0008` 已冻结的共享序列化 contract 一致，不得裁剪请求快照、执行日志或终态 envelope，也不得增加 CLI 私有字段。
   - `query` 必须允许回读任意合法 durable `TaskRecord`，不限终态；`accepted`、`running`、`succeeded`、`failed` 都必须可查询。
   - `query` 失败时必须输出 machine-readable shared failed envelope 到 `stderr`，并维持返回码非零。
-  - `query` 与 `run` 必须继续消费同一份共享 local store truth，并沿当前共享 store 选择 contract 工作；`v0.3.0` 不得引入 query 专用文件、影子状态表、影子结果 payload 或 query 专用 store 选择入口。
+  - `query` 与 `run` 必须继续消费同一份共享 local store truth，并沿同一份共享 store 选择 contract 工作：`v0.3.0` 继续只允许使用现有的 `SYVERT_TASK_RECORD_STORE_DIR` 环境变量覆盖或共享默认本地 store 位置，不得为 `query` 或 `run` 任一方新增专用 store flag、专用覆盖入口或第二套持久化位置。
 - 契约需求：
   - `query` 成功输出的 JSON 形状必须与共享 `TaskRecord` contract 一致，即该 durable record 的完整共享 JSON-safe 序列化载荷。
   - `query` 缺少 `--task-id`、携带未知参数或子命令参数形状不合法时：
@@ -84,6 +85,12 @@
 Given 某个 `task_id` 对应的 durable `TaskRecord` 已存在  
 When 用户执行 `python -m syvert.cli query --task-id <id>`  
 Then CLI 必须把完整共享 `TaskRecord` JSON 输出到 `stdout`，而不是输出 CLI 私有摘要视图
+
+### 场景 1A
+
+Given 用户使用 `python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`  
+When CLI 接收该请求  
+Then 这组参数形状必须作为 `v0.3.0` 的固定 public `run` surface 被接受，并沿共享请求投影与 durable path 工作
 
 ### 场景 2
 

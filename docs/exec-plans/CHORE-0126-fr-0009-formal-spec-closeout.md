@@ -34,8 +34,8 @@
 - `FR-0009` formal spec 套件、requirement container 与最小 release / sprint 索引已经在当前分支首次落盘。
 - `#141` 当前为 `OPEN`，GitHub body 中的 `sprint` 已同步为 `2026-S16`。
 - 受控入口 `open_pr.py --class spec --issue 141 ... --dry-run` 已通过，spec PR `#154` 已创建并指向当前事项。
-- guardian 对旧 head 的审查先后指出了四类阻断：formal spec 回退了上游共享请求 contract / 泄漏实现细节，`invalid_cli_arguments` 在可恢复 `--task-id` 时仍可能丢失用户查询键，`plan.md` 中存在与串行收口策略不一致的并行描述，以及 `#141` 允许写集未把 requirement container 纳入合法范围。
-- 当前分支已把 `FR-0009` spec 收敛回 `FR-0004` / `FR-0008` 已冻结的共享请求模型与 durable-truth contract，补齐“可恢复 query key 时必须回显用户 `task_id`”的参数错误 contract，把 legacy URL 兼容投影与 `#141 -> #142 -> #143 -> #144` 串行关系写死，并把 requirement container 明确纳入 `#141` 合法 docs scope；当前停点是等待绑定最新 head 的 guardian 复核。
+- guardian 对旧 head 的审查先后指出了五类阻断：formal spec 回退了上游共享请求 contract / 泄漏实现细节，`invalid_cli_arguments` 在可恢复 `--task-id` 时仍可能丢失用户查询键，`plan.md` 中存在与串行收口策略不一致的并行描述，`#141` 允许写集未把 requirement container 纳入合法范围，以及 `run` public surface / shared store 选择 contract 尚未冻结到 formal spec。
+- 当前分支已把 `FR-0009` spec 收敛回 `FR-0004` / `FR-0008` 已冻结的共享请求模型与 durable-truth contract，补齐“可恢复 query key 时必须回显用户 `task_id`”的参数错误 contract，把 legacy URL 兼容投影与 `#141 -> #142 -> #143 -> #144` 串行关系写死，把 requirement container 明确纳入 `#141` 合法 docs scope，并冻结 `run` 的公开 CLI 形状与共享 store 选择 contract；当前停点是等待绑定最新 head 的 guardian 复核。
 
 ## 下一步动作
 
@@ -73,7 +73,7 @@
 - `gh pr checks 154`
   - 结果：Commit / Docs / Governance / Spec Guard checks 全绿
 - guardian 旧 head 审查摘要
-  - 结果：指出 shared request contract drift、实现细节泄漏到 formal spec、`invalid_cli_arguments` 可能丢失可恢复的查询键、`plan.md` 存在并行描述，以及 `#141` 合法写集定义遗漏 requirement container；当前分支已据此修正，待最新 head 复核
+  - 结果：指出 shared request contract drift、实现细节泄漏到 formal spec、`invalid_cli_arguments` 可能丢失可恢复的查询键、`plan.md` 存在并行描述、`#141` 合法写集定义遗漏 requirement container，以及 `run` public surface / shared store 选择 contract 未冻结；当前分支已据此修正，待最新 head 复核
 
 ## 未决风险
 

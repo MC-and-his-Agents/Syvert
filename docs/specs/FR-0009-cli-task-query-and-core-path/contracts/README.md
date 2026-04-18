@@ -9,6 +9,7 @@
 ## 输入输出结构
 
 - 输入结构：
+  - `run` 的固定 public CLI 形状：`python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`
   - `run` 继续接收当前 CLI 执行入口承载的请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
   - legacy 平铺入口 `--adapter --capability --url` 的兼容投影固定为 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
   - `query` 只接收单个 `task_id`
@@ -36,4 +37,5 @@
 
 - legacy 平铺执行入口必须继续兼容，不得因 subcommand 改造而失效
 - `FR-0009` 只消费 `FR-0008` durable `TaskRecord` contract，不重写状态、结果或日志 schema
+- `run` 与 `query` 继续共享同一份 local store 选择 contract：允许沿现有 `SYVERT_TASK_RECORD_STORE_DIR` 环境变量覆盖共享 store 根目录，未覆盖时回退到共享默认本地 store 位置
 - `v0.3.0` 不引入 query 专用 store-path CLI flag，不绑定唯一文件布局或唯一目录命名
