@@ -31,7 +31,7 @@
 - `#142 / PR #156` 已于 2026-04-18 合入主干，`run/query` public surface、query 错误 contract 与 verification matrix carrier 已成为主干真相。
 - 当前缺口只剩 same-path 端到端证据：需要把 `run`、legacy 平铺执行入口、shared store truth 与 `query` 回读结果绑定成同一条验证链。
 - canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 证据已在 PR `#157` 上进入 guardian 复审。
-- 当前停点是根据 guardian 新阻断补强两条判别式证据：`run`/legacy durable-truth 等价性，以及 query 在 `load + serializer` 之外不得咨询任何额外文件系统来源；本地回归已重新通过，待提交新的 evidence checkpoint 并推送回 `#157`。
+- 当前停点是 guardian 阻断修复已提交为 checkpoint `7c23eb02e20bbd8ad3b617c8d34cc61d3138611b`，并已重新通过本地回归；下一步是推送回 `#157` 并重跑 guardian / merge gate。
 
 ## 下一步动作
 
@@ -70,4 +70,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3a07b3377361ad538481529f8c21b1e666487b23`
+- `7c23eb02e20bbd8ad3b617c8d34cc61d3138611b`
