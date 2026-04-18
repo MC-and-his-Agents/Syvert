@@ -1553,6 +1553,30 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertTrue(result)
 
+    def test_metadata_only_closeout_follow_up_accepts_legacy_review_sync_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs" / "exec-plans" / "CHORE-0125-fr-0008-parent-closeout.md"
+            exec_plan_path.parent.mkdir(parents=True, exist_ok=True)
+            exec_plan_path.write_text(
+                "当前回合仍保留 legacy metadata-only review sync 追溯说明，仅补 review / merge gate / closeout metadata。\n",
+                encoding="utf-8",
+            )
+
+            result = is_metadata_only_closeout_follow_up(
+                repo_root,
+                {
+                    "item_key": "CHORE-0125-fr-0008-parent-closeout",
+                    "exec_plan": "docs/exec-plans/CHORE-0125-fr-0008-parent-closeout.md",
+                },
+                [
+                    "docs/exec-plans/CHORE-0125-fr-0008-parent-closeout.md",
+                    "docs/releases/v0.3.0.md",
+                ],
+            )
+
+        self.assertTrue(result)
+
     def test_metadata_only_closeout_follow_up_rejects_docs_only_closeout_without_marker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
