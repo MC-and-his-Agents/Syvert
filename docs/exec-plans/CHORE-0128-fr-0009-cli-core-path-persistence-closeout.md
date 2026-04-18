@@ -29,14 +29,17 @@
 ## 当前停点
 
 - `#142 / PR #156` 已于 2026-04-18 合入主干，`run/query` public surface、query 错误 contract 与 verification matrix carrier 已成为主干真相。
-- 当前缺口只剩 same-path 端到端证据：需要把 `run`、legacy 平铺执行入口、shared store truth 与 `query` 回读结果绑定成同一条验证链。
-- canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 证据已在 PR `#157` 上进入 guardian 复审。
-- 当前停点是 guardian 阻断修复已提交为 checkpoint `7c23eb02e20bbd8ad3b617c8d34cc61d3138611b`，并已重新通过本地回归；下一步是推送回 `#157` 并重跑 guardian / merge gate。
+- canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 证据在 PR `#157` 上进入 guardian 后，于 2026-04-19 再次收到 `REQUEST_CHANGES`。
+- 本轮 guardian 阻断不是新 contract，而是两条 `scope owner=#143` 证据仍然不够判别式：
+  - legacy 平铺执行入口与 `run` 子命令的 durable truth 等价性，只比较了 `request/status/result`，没有覆盖 `created_at/updated_at/terminal_at/logs`
+  - `query` 无 shadow payload / secondary filesystem consultation 的证明仍过度依赖狭窄 mock success path
+- 当前停点是把这两条 finding 回填到 verification matrix 和本 exec-plan，再补强同路径证据测试后重跑 guardian / merge gate。
 
 ## 下一步动作
 
-- 提交 guardian 修复后的 same-path evidence checkpoint，并推送到 PR `#157`。
-- 更新 verification matrix 与 exec-plan 的证据口径，确保不再夸大 legacy/query round-trip 或 no-shadow-path 证明。
+- 更新 verification matrix 与 exec-plan 的证据口径，确保 `#143` 只声明已被判别式测试覆盖的 same-path 条目。
+- 补强 legacy/run durable truth 等价性测试，仅规范化真正易变的 task_id 与时间字段，并比较完整 persisted `TaskRecord` JSON-safe 载荷。
+- 补强 `query` success path regression，使 `load() + task_record_to_dict()` 之外的 secondary filesystem consultation 在测试中直接失败。
 - 在当前 head 上重跑 guardian / merge gate，合入后再切换到 `#144` parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -57,12 +60,12 @@
   - 结果：通过（68 tests, OK）
 - `python3 -m unittest tests.runtime.test_xhs_adapter.XhsAdapterTests.test_cli_module_path_can_load_xhs_adapter_from_shared_registry`
   - 结果：通过（1 test, OK）
-- `FR-0009` verification matrix 中 `scope owner=#143` 的 same-path 条目已全部回填到具体测试名，并在 guardian 阻断修复后重新验证通过。
+- `FR-0009` verification matrix 中 `scope owner=#143` 的 same-path 条目已全部回填到具体测试名；本轮 guardian finding 已回映到对应条目的 clause/test 口径，避免继续把宽泛成功路径当成完成证据。
 
 ## 未决风险
 
 - 若继续把 legacy/query round-trip 当成 legacy/run durable-truth 等价性，会再次偏离 `FR-0009` formal spec 的冻结条款。
-- 若 no-shadow-path 证据没有把额外文件系统咨询显式 fail-closed，后续 shadow payload 回归仍可能绕过 same-path closeout。
+- 若 no-shadow-path 证据没有把额外文件系统咨询显式击穿，后续 shadow payload / secondary history source 回归仍可能绕过 same-path closeout。
 
 ## 回滚方式
 
@@ -70,4 +73,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7c23eb02e20bbd8ad3b617c8d34cc61d3138611b`
+- `1e482af26edbf638baa9339dcb37015a2162b5bb`
