@@ -33,13 +33,14 @@
 - `issue-141-fr-0009-formal-spec` 已作为 `#141` 的独立 spec worktree 建立。
 - `FR-0009` formal spec 套件、requirement container 与最小 release / sprint 索引已经在当前分支首次落盘。
 - `#141` 当前为 `OPEN`，GitHub body 中的 `sprint` 已同步为 `2026-S16`。
-- 当前仍处于 pre-PR 阶段；formal spec 门禁已通过，但受控入口尚未消费当前未提交变更。
+- 受控入口 `open_pr.py --class spec --issue 141 ... --dry-run` 已通过，spec PR `#154` 已创建并指向当前事项。
+- PR `#154` 的 Commit / Docs / Governance / Spec Guard checks 已全部通过，当前处于 guardian 审查与合入前复核阶段。
 
 ## 下一步动作
 
-- 将 formal spec 核心文件与 active exec-plan 纳入当前执行回合的 git 索引。
-- 通过 `open_pr.py --class spec --issue 141 ... --dry-run` 验证受控入口。
-- 在 dry-run 通过后提交、推送并创建 `#141` 的 spec PR。
+- 等待 guardian 产出绑定当前 PR head 的 verdict 与 `safe_to_merge` 结论。
+- 在 guardian / merge gate 全部通过后，使用 `python3 scripts/merge_pr.py 154 --delete-branch` 执行受控 squash merge。
+- `#141` 合入主干后，把 `#128` 的 formal spec 字段从 `planned` 收敛到已入库真相，再切换到 `#142`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -65,6 +66,10 @@
   - 结果：通过
 - `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-141-fr-0009-formal-spec`
   - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 141 --item-key CHORE-0126-fr-0009-formal-spec-closeout --item-type CHORE --release v0.3.0 --sprint 2026-S16 --title "spec: 收口 FR-0009 的 formal spec" --dry-run`
+  - 结果：通过
+- `gh pr checks 154`
+  - 结果：Commit / Docs / Governance / Spec Guard checks 全绿
 
 ## 未决风险
 
