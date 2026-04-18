@@ -22,7 +22,9 @@
 - `run`
   - public surface：`python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`
   - public surface 约束：`v0.3.0` 不新增其他必填参数，也不新增更深层执行子命令
-  - 输入：当前 CLI 执行入口承载的请求载体；其共享语义必须可回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
+  - `capability` public 值域：固定为调用侧 operation id `content_detail_by_url`
+  - 输入：上述固定 CLI 请求载体；其共享语义必须可回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
+  - capability 投影：`content_detail_by_url` 在共享请求模型中按 `FR-0004` 兼容规则投影为 adapter-facing capability family `content_detail`
   - legacy URL 兼容投影：`--adapter --capability --url` 必须固定回映到 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
   - 输出：共享 success / failed envelope
   - durable side effect：沿共享 Core / task-record / store 路径创建、推进并持久化 `TaskRecord`

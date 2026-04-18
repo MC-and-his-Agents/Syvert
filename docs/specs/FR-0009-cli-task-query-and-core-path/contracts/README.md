@@ -11,7 +11,9 @@
 - 输入结构：
   - `run` 的固定 public CLI 形状：`python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`
   - `run` 在 `v0.3.0` 不新增其他必填参数，也不再向更深层子命令扩张
+  - `run --capability` 的固定 public 值域：`content_detail_by_url`
   - `run` 继续接收上述固定请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
+  - `run --capability=content_detail_by_url` 在进入共享请求模型后，必须按 `FR-0004` 兼容投影解释为 adapter-facing capability family `content_detail`
   - legacy 平铺入口 `--adapter --capability --url` 的兼容投影固定为 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
   - `query` 的固定 public CLI 形状：`python -m syvert.cli query --task-id <id>`
   - legacy 平铺执行入口继续兼容，并映射到 `run` 语义

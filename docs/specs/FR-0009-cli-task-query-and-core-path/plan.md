@@ -47,7 +47,8 @@
   - `python3 -m unittest tests.runtime.test_task_record_store`
   - 受 CLI 入口影响的 adapter CLI 回归测试
 - 手动验证：
-  - 验证 `run --adapter --capability --url` 与 legacy 平铺入口都返回共享 success / failed envelope，并在参数错误时保留已冻结的 `adapter_key` / `capability` 回显规则
+  - 验证 `run --adapter --capability content_detail_by_url --url` 与 legacy 平铺入口都返回共享 success / failed envelope，并在参数错误时保留已冻结的 `adapter_key` / `capability` 回显规则
+  - 验证 public `run --capability content_detail_by_url` 在进入共享请求模型后按 `FR-0004` 固定投影到 adapter-facing capability family `content_detail`
   - 验证 `query --task-id <id>` 返回完整共享 `TaskRecord`
   - 验证 `query` 可读取 `accepted`、`running`、`succeeded`、`failed` 四种 durable 状态
   - 验证 legacy 平铺执行入口与 `run` 子命令都沿共享 durable path 工作
@@ -62,6 +63,7 @@
 - 先写测试的模块：
   - CLI `query` 成功/失败 surface
   - CLI `run` / legacy 参数错误与兼容 surface
+  - `run --capability content_detail_by_url` 的 public 值域与 capability-family 投影回归
   - CLI 参数错误路径下的 `invalid_task_id` fail-closed 分支
   - legacy 平铺入口与 `run` 子命令的兼容回归
   - same-path 回读与 fail-closed 查询回归
