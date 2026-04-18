@@ -25,7 +25,7 @@
 ## 实现约束
 
 - 不允许触碰的边界：
-  - `#141` formal spec PR 只允许修改 `docs/specs/FR-0009-cli-task-query-and-core-path/`、当前事项 exec-plan 与最小 release/sprint 索引
+  - `#141` formal spec PR 只允许修改 `docs/specs/FR-0009-cli-task-query-and-core-path/`、`docs/exec-plans/FR-0009-cli-task-query-and-core-path.md`、当前事项 exec-plan 与最小 release/sprint 索引
   - `#142` 不得重新定义 `TaskRecord` schema，也不得扩张成列表查询或摘要视图
   - `#143` 不得新增 query 私有 payload，只负责证明 same-path 与 fail-closed 行为
   - `#144` 不得引入新 runtime 或新的 formal spec 语义
