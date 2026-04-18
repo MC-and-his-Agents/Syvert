@@ -26,7 +26,7 @@
   - `docs/exec-plans/CHORE-0128-fr-0009-cli-core-path-persistence-closeout.md`
   - `docs/releases/v0.3.0.md`
   - `docs/sprints/2026-S16.md`
-  - GitHub `#141` / `#143` / `#144` / `#128` issue 正文、`#128` closeout 评论与 Issue 状态对齐
+  - GitHub `#141` / `#143` / `#144` / `#128` issue 正文、`#128` closeout 评论、Project 状态与 Issue 状态对齐
 - 本次不纳入：
   - 任何新的 runtime / adapter / test 实现
   - `FR-0009` formal spec 语义改写
@@ -37,13 +37,15 @@
 - `origin/main@2f4aea6322d93feefa66b63227a3c9ff5299b44c` 已包含 `FR-0009` closeout 所需的关键前提：PR `#154`、`#156`、`#157`。
 - `#141` 已由 PR `#154` 合入并关闭；`#142` 已由 PR `#156` 合入并关闭；`#143` 已由 PR `#157` 合入并关闭。
 - `FR-0009` requirement container、release / sprint 索引仍未回写 `#142/#143` 已合入与 `#144` 成为唯一 active closeout 入口的主干真相。
-- GitHub 侧仍有 closeout 追账：`#141` 正文停留在 `待开始`，`#143` 正文停留在 `进行中（PR #157 审查中）`，`#144` 仍为 `待开始`，父 FR `#128` 仍保留初始骨架正文。
+- GitHub 侧仍有 closeout 追账：`#141` 正文停留在 `待开始`，`#143` 正文停留在 `进行中（PR #157 审查中）`，`#144` 已切到 `进行中（PR #158 审查中）`，父 FR `#128` 仍保留初始骨架正文。
 - `#144` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-144-chore-fr-0009`。
+- PR `#158` 首轮 guardian 已回指出三项 parent closeout artifact 缺口：实质 checkpoint SHA 记错、`#144/#128` Project-state carrier 缺失、requirement container 仍停留在 pre-closeout baseline。
 
 ## 下一步动作
 
-- 落盘 `FR-0009` requirement container、`#141/#142/#143` 历史执行记录、release / sprint 索引与 `#144` 的 parent closeout 真相。
-- 在当前 head 上完成 docs 类门禁与受控 PR 创建，进入 guardian / merge gate。
+- 修正 `CHORE-0129` 的 recovery pointer、Project-state closeout carrier 与 `projectItems` 验证证据，避免 closeout 真相与 GitHub 调度状态分叉。
+- 更新 requirement container 的 checkpoint block，使其直接指向本轮实质 closeout checkpoint。
+- 在当前 head 上重跑 docs 类门禁与受控 PR / guardian / merge gate。
 - 合并后先修正 `#144` 正文为 `已完成（PR #... 已 MERGED）` 并关闭当前 Work Item。
 - 随后修正 GitHub `#141/#143` 正文到已完成真相，更新 `#128` 正文、发布 `#128` closeout 评论，并关闭 `#128`。
 
@@ -69,7 +71,11 @@
 - `gh issue view 143 --json state,title,url,body`
   - 结果：`#143` 为 `CLOSED`；对应 PR `#157` / merge commit `2f4aea6322d93feefa66b63227a3c9ff5299b44c`，但正文仍停留在 `进行中（PR #157 审查中）`。
 - `gh issue view 144 --json state,title,url,body`
-  - 结果：`#144` 为 `OPEN`，正文当前为 `待开始`。
+  - 结果：`#144` 为 `OPEN`，正文当前为 `进行中（PR #158 审查中）`。
+- `gh issue view 144 --json state,title,url,body,projectItems`
+  - 结果：`#144` 为 `OPEN`，Project 状态为 `In Progress`。
+- `gh issue view 128 --json state,title,url,body,projectItems`
+  - 结果：`#128` 为 `OPEN`，Project 状态为 `Todo`。
 - `gh pr view 154 --json state,mergedAt,mergeCommit`
   - 结果：`state=MERGED`，`mergeCommit=ef4f021d5ffb5f34f6bc2bd2bee7c18af50545a1`
 - `gh pr view 156 --json state,mergedAt,mergeCommit`
@@ -79,13 +85,13 @@
 - `python3 scripts/create_worktree.py --issue 144 --class docs`
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-144-chore-fr-0009`
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+  - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+  - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+  - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
 - `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-144-chore-fr-0009`
-  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+  - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
 
 ## closeout 证据
 
@@ -102,6 +108,9 @@
   - 执行状态改为 `已完成（PR #... 已 MERGED）`
   - 回填 merge commit
   - 明确本事项只负责 docs / GitHub closeout 收口，不引入新 runtime 或 formal spec 语义
+- `#144` Project 状态目标：
+  - PR `#158` 审查与合并期间保持 `In Progress`
+  - 合并并回写正文后切到 `Done`
 - `#141` 正文修正目标：
   - 执行状态改为 `已完成（PR #154 已 MERGED）`
   - 回填 merge commit `ef4f021d5ffb5f34f6bc2bd2bee7c18af50545a1`
@@ -114,11 +123,17 @@
   - 明确 same-path 证据已由 `#143` / PR `#157` 落地
   - 将父事项 closeout 入口补为 `#144`
   - 子 Work Item 保持：`#141`、`#142`、`#143`、`#144`
+- `#128` Project 状态目标：
+  - 在 `#144` 合入前保持 `Todo`
+  - `#144` 合入且 `#128` 正文 / closeout comment 对齐后切到 `Done`
 - `#128` closeout 评论草案：
   - `FR-0009` formal spec 已由 PR `#154` 合入主干，spec 真相位于 `docs/specs/FR-0009-cli-task-query-and-core-path/`
   - `#142` / PR `#156` 已完成 CLI 查询任务状态与结果的 public surface 和错误 contract
   - `#143` / PR `#157` 已完成 `run/legacy-run -> durable record -> query` 的同路径闭环与 shared durable truth 证据
   - 当前父事项 closeout 已由 `#144` 承接，`docs/releases/v0.3.0.md`、`docs/sprints/2026-S16.md` 与 active exec-plan 已与 GitHub 真相一致
+- Project 状态验证入口：
+  - `gh issue view 144 --json projectItems`：验证 `#144` 已从 `In Progress` 切到 `Done`
+  - `gh issue view 128 --json projectItems`：验证 `#128` 已从 `Todo` 切到 `Done`
 
 ## 未决风险
 
@@ -136,5 +151,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 前置完成基线：`2f4aea6322d93feefa66b63227a3c9ff5299b44c`
-- 实质 closeout checkpoint：`8591231e48dc2a3e025630d4c20f5d3e27e3c162`
-- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；`8591231...` 首次把 requirement container、parent closeout exec-plan 与 release / sprint 索引收口到 `#141/#142/#143` 已合入后的主干真相。
+- 实质 closeout checkpoint：`85912316ad95d24a3d33ac83142048fd9c44309b`
+- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；`85912316...` 首次把 requirement container、parent closeout exec-plan 与 release / sprint 索引收口到 `#141/#142/#143` 已合入后的主干真相。

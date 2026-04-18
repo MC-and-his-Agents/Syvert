@@ -23,4 +23,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 父事项 closeout 基线：`2f4aea6322d93feefa66b63227a3c9ff5299b44c`
-- 说明：该基线已经包含 `#141/#142/#143` 合入主干后的 requirement 真相；后续由 `#144` 的 exec-plan 记录 parent closeout、release / sprint 索引与 GitHub 关闭语义收口事实。
+- 实质 closeout checkpoint：`85912316ad95d24a3d33ac83142048fd9c44309b`
+- 说明：`2f4aea...` 是 `#157` 合入后的主干基线；`85912316...` 首次把 `FR-0009` requirement container、release / sprint 索引与 `#144` parent closeout 入口收口到同一条主干真相。
