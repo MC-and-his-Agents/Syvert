@@ -78,6 +78,14 @@
   - 结果：`state=MERGED`，`mergeCommit=2f4aea6322d93feefa66b63227a3c9ff5299b44c`
 - `python3 scripts/create_worktree.py --issue 144 --class docs`
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-144-chore-fr-0009`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-144-chore-fr-0009`
+  - 结果：在实质 closeout checkpoint `8591231e48dc2a3e025630d4c20f5d3e27e3c162` 上通过
 
 ## closeout 证据
 
@@ -128,4 +136,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 前置完成基线：`2f4aea6322d93feefa66b63227a3c9ff5299b44c`
-- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；后续 checkpoint 只负责回写 requirement container、release / sprint 索引与 GitHub closeout 真相。
+- 实质 closeout checkpoint：`8591231e48dc2a3e025630d4c20f5d3e27e3c162`
+- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；`8591231...` 首次把 requirement container、parent closeout exec-plan 与 release / sprint 索引收口到 `#141/#142/#143` 已合入后的主干真相。
