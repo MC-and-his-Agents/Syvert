@@ -11,7 +11,7 @@
 - 输入结构：
   - `run` 的固定 public CLI 形状：`python -m syvert.cli run --adapter <adapter_key> --capability <capability> --url <url>`
   - `run` 在 `v0.3.0` 不新增其他必填参数，也不再向更深层子命令扩张
-  - `run` 继续接收当前 CLI 执行入口承载的请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
+  - `run` 继续接收上述固定请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
   - legacy 平铺入口 `--adapter --capability --url` 的兼容投影固定为 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
   - `query` 只接收单个 `task_id`
   - legacy 平铺执行入口继续兼容，并映射到 `run` 语义
@@ -23,8 +23,14 @@
 ## 错误与边界行为
 
 - `invalid_cli_arguments`
-  - 适用场景：缺少 `--task-id`、出现未知参数、query 子命令参数形状不合法
-  - 约束：`error.category=invalid_input`；若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用既有共享 CLI 参数错误兜底 `task_id` contract；`adapter_key=""`；`capability=""`
+  - 适用场景：
+    - `run` / legacy：缺少 `--adapter`、`--capability`、`--url` 等必填参数，出现未知参数，或参数形状不合法
+    - `query`：缺少 `--task-id`、出现未知参数、query 子命令参数形状不合法
+  - 约束：
+    - `error.category=invalid_input`
+    - `run` / legacy 在参数错误且尚无 durable `task_id` 时，必须生成新的非空 fallback CLI `task_id`；若 malformed argv 中可恢复 `adapter_key` / `capability`，则 failed envelope 必须回显这些值
+    - `query` 若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用新生成的非空 fallback CLI `task_id`
+    - `query` 在参数错误场景下固定 `adapter_key=""`；`capability=""`
 - `task_record_not_found`
   - 适用场景：store 可访问，但请求的 `task_id` 不存在 durable record
   - 约束：`error.category=invalid_input`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`

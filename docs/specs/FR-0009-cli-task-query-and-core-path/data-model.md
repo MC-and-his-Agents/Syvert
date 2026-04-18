@@ -34,8 +34,11 @@
 ## 错误码映射
 
 - `invalid_cli_arguments`
-  - 适用：缺少 `--task-id`、未知参数、query 子命令参数形状不合法
+  - 适用：`run` / legacy / `query` 的参数形状错误
   - 输出：`error.code=invalid_cli_arguments`、`error.category=invalid_input` 的 failed envelope
+  - `task_id` 语义：
+    - `run` / legacy：在参数错误且尚无 durable `task_id` 时，使用新生成的非空 fallback CLI `task_id`
+    - `query`：若可恢复用户查询键则回显该值，否则使用新生成的非空 fallback CLI `task_id`
 - `task_record_not_found`
   - 适用：store 可访问，但 durable record 不存在
   - 输出：`error.code=task_record_not_found`、`error.category=invalid_input` 的 failed envelope
