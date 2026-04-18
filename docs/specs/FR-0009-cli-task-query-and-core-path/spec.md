@@ -47,7 +47,7 @@
     - `error.code` 固定为 `invalid_cli_arguments`
     - `error.category` 固定为 `invalid_input`
     - 若 malformed argv 中仍能恢复出用户提供的 `--task-id <id>`，failed envelope 必须回显该 `task_id`
-    - 只有在 `--task-id` 缺失、值缺失或无法从 malformed argv 中恢复查询键时，`task_id` 才允许退回到当前 parse-failure 的共享兜底生成语义
+    - 只有在 `--task-id` 缺失、值缺失或无法从 malformed argv 中恢复查询键时，`task_id` 才允许退回到既有共享 CLI 参数错误兜底 `task_id` contract
     - `adapter_key=""`
     - `capability=""`
   - `query` 的 `task_id` 不存在 durable record 时：
@@ -109,7 +109,7 @@ Then 该入口必须继续兼容，并以 `target_type=url`、`target_value=<url
 
 Given `query` 参数缺失 `--task-id`、出现未知参数或子命令参数形状不合法  
 When CLI 构造失败输出  
-Then 它必须返回 `invalid_cli_arguments` failed envelope；若 malformed argv 中仍可恢复 `--task-id` 则必须回显该值，否则继续使用 parse-failure 的 `task_id` 兜底语义
+Then 它必须返回 `invalid_cli_arguments` failed envelope；若 malformed argv 中仍可恢复 `--task-id` 则必须回显该值，否则继续使用既有共享 CLI 参数错误兜底 `task_id` contract
 
 ### 场景 5
 

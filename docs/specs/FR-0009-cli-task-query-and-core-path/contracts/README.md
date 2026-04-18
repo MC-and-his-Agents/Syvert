@@ -24,7 +24,7 @@
 
 - `invalid_cli_arguments`
   - 适用场景：缺少 `--task-id`、出现未知参数、query 子命令参数形状不合法
-  - 约束：若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用当前 parse-failure 的共享兜底生成语义；`adapter_key=""`；`capability=""`
+  - 约束：若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用既有共享 CLI 参数错误兜底 `task_id` contract；`adapter_key=""`；`capability=""`
 - `task_record_not_found`
   - 适用场景：store 可访问，但请求的 `task_id` 不存在 durable record
   - 约束：回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
