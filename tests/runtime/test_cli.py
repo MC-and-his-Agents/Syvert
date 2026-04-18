@@ -712,7 +712,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(query_stderr.getvalue(), "")
         self.assertEqual(json.loads(query_stdout.getvalue()), expected_payload)
 
-    def test_legacy_entrypoint_persists_record_that_query_reads_from_shared_store(self) -> None:
+    def test_run_subcommand_and_legacy_entrypoint_persist_equivalent_durable_truth(self) -> None:
         store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
         legacy_stdout = io.StringIO()
         legacy_stderr = io.StringIO()
@@ -733,19 +733,37 @@ class CliTests(unittest.TestCase):
         )
 
         self.assertEqual(legacy_exit_code, 0, legacy_stderr.getvalue())
-        expected_payload = task_record_to_dict(store.load("task-cli-shared-legacy-1"))
+        legacy_record_payload = task_record_to_dict(store.load("task-cli-shared-legacy-1"))
 
-        query_stdout = io.StringIO()
-        query_stderr = io.StringIO()
-        query_exit_code = main(
-            ["query", "--task-id", "task-cli-shared-legacy-1"],
-            stdout=query_stdout,
-            stderr=query_stderr,
+        run_stdout = io.StringIO()
+        run_stderr = io.StringIO()
+        run_exit_code = main(
+            [
+                "run",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/shared-legacy-1",
+            ],
+            adapters={"stub": SuccessfulAdapter()},
+            stdout=run_stdout,
+            stderr=run_stderr,
+            task_id_factory=lambda: "task-cli-shared-run-equivalent-1",
         )
 
-        self.assertEqual(query_exit_code, 0)
-        self.assertEqual(query_stderr.getvalue(), "")
-        self.assertEqual(json.loads(query_stdout.getvalue()), expected_payload)
+        self.assertEqual(run_exit_code, 0, run_stderr.getvalue())
+        run_record_payload = task_record_to_dict(store.load("task-cli-shared-run-equivalent-1"))
+
+        legacy_record_payload["task_id"] = "normalized-task-id"
+        run_record_payload["task_id"] = "normalized-task-id"
+        legacy_record_payload["result"]["envelope"]["task_id"] = "normalized-task-id"
+        run_record_payload["result"]["envelope"]["task_id"] = "normalized-task-id"
+
+        self.assertEqual(run_record_payload["request"], legacy_record_payload["request"])
+        self.assertEqual(run_record_payload["status"], legacy_record_payload["status"])
+        self.assertEqual(run_record_payload["result"], legacy_record_payload["result"])
 
     def test_query_subcommand_reads_loaded_record_via_shared_store_and_shared_serializer(self) -> None:
         record = create_task_record(
@@ -769,10 +787,27 @@ class CliTests(unittest.TestCase):
 
         stdout = io.StringIO()
         stderr = io.StringIO()
+        shadow_payload = Path(self._task_record_store_dir.name) / "shadow-payload.json"
+        shadow_payload.write_text(json.dumps({"shadow": "payload"}), encoding="utf-8")
         with mock.patch("syvert.cli.default_task_record_store", return_value=store), mock.patch(
             "syvert.cli.validate_query_store_root",
             return_value=None,
-        ), mock.patch("syvert.cli.task_record_to_dict", return_value=expected_payload) as serializer:
+        ), mock.patch("syvert.cli.task_record_to_dict", return_value=expected_payload) as serializer, mock.patch(
+            "builtins.open",
+            side_effect=AssertionError("unexpected_file_open"),
+        ), mock.patch(
+            "pathlib.Path.open",
+            side_effect=AssertionError("unexpected_path_open"),
+        ), mock.patch(
+            "pathlib.Path.read_text",
+            side_effect=AssertionError("unexpected_path_read_text"),
+        ), mock.patch(
+            "pathlib.Path.read_bytes",
+            side_effect=AssertionError("unexpected_path_read_bytes"),
+        ), mock.patch(
+            "pathlib.Path.exists",
+            side_effect=AssertionError("unexpected_path_exists"),
+        ):
             exit_code = main(
                 ["query", "--task-id", "task-cli-shared-store-serializer-1"],
                 stdout=stdout,

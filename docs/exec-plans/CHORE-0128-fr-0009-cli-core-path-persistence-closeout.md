@@ -30,14 +30,14 @@
 
 - `#142 / PR #156` 已于 2026-04-18 合入主干，`run/query` public surface、query 错误 contract 与 verification matrix carrier 已成为主干真相。
 - 当前缺口只剩 same-path 端到端证据：需要把 `run`、legacy 平铺执行入口、shared store truth 与 `query` 回读结果绑定成同一条验证链。
-- canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 测试与 matrix 回填已提交为 checkpoint `3a07b3377361ad538481529f8c21b1e666487b23`，并通过本地回归。
-- 当前停点是同步 GitHub issue `#143` 的执行状态、运行受控入口并创建 implementation PR。
+- canonical worktree `issue-143-fr-0009-cli-core` 已登记到 `worktrees.json` 并承接当前执行回合；same-path 证据已在 PR `#157` 上进入 guardian 复审。
+- 当前停点是根据 guardian 新阻断补强两条判别式证据：`run`/legacy durable-truth 等价性，以及 query 在 `load + serializer` 之外不得咨询任何额外文件系统来源；本地回归已重新通过，待提交新的 evidence checkpoint 并推送回 `#157`。
 
 ## 下一步动作
 
-- 提交 same-path 证据补丁，并推送到 `#143` 的独立分支。
-- 同步 GitHub issue `#143` 的执行状态与当前事项上下文，创建 implementation PR。
-- 在当前 head 上运行 guardian / merge gate，合入后再切换到 `#144` parent closeout。
+- 提交 guardian 修复后的 same-path evidence checkpoint，并推送到 PR `#157`。
+- 更新 verification matrix 与 exec-plan 的证据口径，确保不再夸大 legacy/query round-trip 或 no-shadow-path 证明。
+- 在当前 head 上重跑 guardian / merge gate，合入后再切换到 `#144` parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -57,11 +57,12 @@
   - 结果：通过（68 tests, OK）
 - `python3 -m unittest tests.runtime.test_xhs_adapter.XhsAdapterTests.test_cli_module_path_can_load_xhs_adapter_from_shared_registry`
   - 结果：通过（1 test, OK）
-- `FR-0009` verification matrix 中 `scope owner=#143` 的 same-path 条目已全部回填到具体测试名，并在本地标记为 `implemented`。
+- `FR-0009` verification matrix 中 `scope owner=#143` 的 same-path 条目已全部回填到具体测试名，并在 guardian 阻断修复后重新验证通过。
 
 ## 未决风险
 
-- 若 same-path 证据只证明输出相似，而不证明 query 继续消费 `TaskRecordStore.load()` + `task_record_to_dict()`，后续仍可能被认为存在 shadow payload 风险。
+- 若继续把 legacy/query round-trip 当成 legacy/run durable-truth 等价性，会再次偏离 `FR-0009` formal spec 的冻结条款。
+- 若 no-shadow-path 证据没有把额外文件系统咨询显式 fail-closed，后续 shadow payload 回归仍可能绕过 same-path closeout。
 
 ## 回滚方式
 
