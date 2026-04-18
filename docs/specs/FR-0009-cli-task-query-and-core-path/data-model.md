@@ -49,3 +49,6 @@
 - `task_record_unavailable`
   - 适用：store 根目录不可用、invalid marker、记录 JSON 损坏、contract 非法、记录不可读、权限或 IO 异常
   - 输出：`error.code=task_record_unavailable`、`error.category=runtime_contract` 的 failed envelope
+  - 字段语义：
+    - pre-load / load-failure：`task_id` 回显用户请求值，`adapter_key=""`，`capability=""`
+    - post-load output-failure：`task_id` 回显已加载 record 的 `task_id`，`adapter_key` / `capability` 回填自 `record.request`

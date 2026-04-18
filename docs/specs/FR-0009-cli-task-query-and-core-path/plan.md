@@ -54,6 +54,7 @@
   - 验证 `query` 对不存在记录返回 `task_record_not_found`，并与 invalid marker、损坏记录、store 不可用等 `task_record_unavailable` 明确区分
   - 验证 `query invalid_cli_arguments` 在可恢复 `--task-id` 时回显用户查询键，在不可恢复时生成新的非空 fallback CLI `task_id`
   - 验证 `run` / legacy / `query` 的参数错误路径上，若 fallback CLI `task_id` 生成或校验失败，则优先返回共享 `invalid_task_id` / `runtime_contract`
+  - 验证 `query` 在 durable record 已加载后若共享序列化或 CLI 输出失败，则返回 `task_record_unavailable` / `runtime_contract`，并回填 record.request 中的 `adapter_key` / `capability`
   - 验证 `run/query` 都继续共享 `SYVERT_TASK_RECORD_STORE_DIR` 或共享默认本地 store 位置，不存在 query 专用 store 入口
 
 ## TDD 范围

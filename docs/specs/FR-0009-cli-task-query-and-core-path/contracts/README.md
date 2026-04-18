@@ -37,8 +37,9 @@
   - 约束：`error.category=invalid_input`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
 - `task_record_unavailable`
   - 适用场景：store 根目录不可用、invalid marker、记录 JSON 损坏、contract 非法、记录不可读、权限或 IO 异常
-  - 约束：`error.category=runtime_contract`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
-- 一旦 durable record 已成功加载，后续序列化或 CLI 输出失败时，必须从 `record.request` 回填 `adapter_key` 与 `capability`
+  - 约束：
+    - pre-load / load-failure：`error.category=runtime_contract`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
+    - post-load output-failure：`error.category=runtime_contract`；回显已加载 record 的 `task_id`；`adapter_key` / `capability` 必须回填自 `record.request`
 - query 不允许读取影子 schema、影子结果文件或 query 私有摘要 payload
 
 ## 向后兼容约束
