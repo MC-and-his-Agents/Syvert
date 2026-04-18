@@ -104,7 +104,7 @@ codex:
 - 完成一组可验证改动后必须更新一次 checkpoint。
 - 变更停点、风险、验证结论或形成新的 checkpoint 时必须更新。
 - 若仅发生后续跟进 commit、但尚未形成新的 checkpoint，可保留最近一次 checkpoint head，并由 guardian state 绑定当前受审 head。
-- 若仅补 review / merge gate / closeout metadata，可记录 metadata-only follow-up 的追溯说明，但不得把版本化 `exec-plan` 的静态 SHA 定义为必须穷尽到当前 HEAD。
+- 若当前回合被 active `exec-plan` 明确声明为 `metadata-only closeout follow-up`，且仅补 review / merge gate / closeout metadata，可记录该 follow-up 的追溯说明，但不得把版本化 `exec-plan` 的静态 SHA 定义为必须穷尽到当前 HEAD。
 - 若仅补充 review / merge gate 元数据，而未显式推进新的执行停点，不要求刷新 checkpoint head。
 - 变更 `item_key`、`item_type`、`release`、`sprint` 或事项在当前轮次中的定位时必须更新。
 - 进入 review、进入 merge gate 前必须更新到最新状态。

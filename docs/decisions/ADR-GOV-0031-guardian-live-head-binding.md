@@ -22,7 +22,7 @@
 ## 决策
 
 - 当前 live review head 的唯一真相固定为 PR `headRefOid` 与 guardian state / merge gate 的当前绑定结果，不写回 versioned `exec-plan` 作为静态真相。
-- active `exec-plan` 只承载最近一次 checkpoint / resume truth；若需要描述后续 metadata-only review sync，只能作为追溯说明，而不是必须穷尽到当前 HEAD 的静态列表。
+- active `exec-plan` 只承载最近一次 checkpoint / resume truth；只有当当前回合被该工件明确声明为 `metadata-only closeout follow-up` 且变更仅限 review / merge gate / closeout metadata 时，才允许把后续跟进写成追溯说明，而不是必须穷尽到当前 HEAD 的静态列表。
 - guardian prompt 必须显式提醒 reviewer：不要要求 active `exec-plan` 追写当前 live head；若当前 diff 仅补 review / merge gate / closeout metadata，也不要把 metadata-only head 视为新的 checkpoint。
 - metadata-only closeout follow-up 的审查重点固定为 checkpoint 语义、追溯关系、验证证据与门禁结果是否自洽，而不是文档中的静态 SHA 是否等于当前 HEAD。
 - 当前事项不放宽 reviewer rubric、guardian verdict schema、`safe_to_merge` 语义或 merge gate 条件；只修正 live head carrier 与 checkpoint carrier 的职责边界。

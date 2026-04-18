@@ -66,6 +66,10 @@ METADATA_ONLY_CLOSEOUT_DOC_PREFIXES = (
     "docs/releases/",
     "docs/sprints/",
 )
+METADATA_ONLY_CLOSEOUT_MARKERS = (
+    "metadata-only closeout follow-up",
+    "metadata-only review sync",
+)
 REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
     "Issue 摘要": "issue_summary",
@@ -763,24 +767,48 @@ def append_optional_section(lines: list[str], title: str, content: str) -> None:
     lines.extend(["", title, content])
 
 
-def is_metadata_only_closeout_follow_up(item_context: dict[str, str], changed_files: list[str]) -> bool:
+def resolve_exec_plan_path(repo_root: Path, item_context: dict[str, str]) -> Path | None:
+    path_text = str(item_context.get("exec_plan", "")).strip()
+    if not path_text:
+        return None
+    exec_plan_path = Path(path_text)
+    if not exec_plan_path.is_absolute():
+        exec_plan_path = repo_root / exec_plan_path
+    return exec_plan_path
+
+
+def exec_plan_declares_metadata_only_closeout_follow_up(repo_root: Path, item_context: dict[str, str]) -> bool:
+    exec_plan_path = resolve_exec_plan_path(repo_root, item_context)
+    if exec_plan_path is None or not exec_plan_path.exists():
+        return False
+    normalized = exec_plan_path.read_text(encoding="utf-8").lower()
+    return any(marker in normalized for marker in METADATA_ONLY_CLOSEOUT_MARKERS)
+
+
+def is_metadata_only_closeout_follow_up(repo_root: Path, item_context: dict[str, str], changed_files: list[str]) -> bool:
     item_key = str(item_context.get("item_key", "")).strip().lower()
     if "closeout" not in item_key or not changed_files:
         return False
     categories = {item.category for item in classify_paths(changed_files)}
     if categories != {"docs"}:
         return False
-    return all(path.startswith(METADATA_ONLY_CLOSEOUT_DOC_PREFIXES) for path in changed_files)
+    if not all(path.startswith(METADATA_ONLY_CLOSEOUT_DOC_PREFIXES) for path in changed_files):
+        return False
+    return exec_plan_declares_metadata_only_closeout_follow_up(repo_root, item_context)
 
 
-def head_checkpoint_contract_rules(context: dict[str, object]) -> list[str]:
+def head_checkpoint_contract_rules(repo_root: Path, context: dict[str, object]) -> list[str]:
     rules = [
         "当前 live review head 以 PR 基本信息中的 `头部提交` 为准，并由 guardian state / merge gate 绑定；不要要求 active exec-plan 追写该值。",
         "active exec-plan 只承载最近一次 checkpoint / resume truth；若当前 diff 仅补 review / merge gate / closeout metadata，不要把 metadata-only head 视为新的 checkpoint。",
     ]
     item_context = context.get("item_context")
     changed_files = context.get("changed_files")
-    if isinstance(item_context, dict) and isinstance(changed_files, list) and is_metadata_only_closeout_follow_up(item_context, changed_files):
+    if (
+        isinstance(item_context, dict)
+        and isinstance(changed_files, list)
+        and is_metadata_only_closeout_follow_up(repo_root, item_context, changed_files)
+    ):
         rules.append(
             "当前 diff 命中 metadata-only closeout follow-up：请核对 checkpoint 语义、追溯关系与门禁证据是否自洽；不要因 exec-plan 未把静态 SHA 追到当前 HEAD 而单独给出阻断。"
         )
@@ -834,7 +862,7 @@ def build_prompt(meta: dict, worktree_dir: Path) -> str:
         *[f"- {rule}" for rule in REVIEW_EXECUTION_RULES],
         "",
         "Head / Checkpoint Contract：",
-        *[f"- {rule}" for rule in head_checkpoint_contract_rules(context)],
+        *[f"- {rule}" for rule in head_checkpoint_contract_rules(worktree_dir, context)],
         "",
         "Reviewer Rubric 节选（来自 `code_review.md`）：",
         rubric_excerpt,

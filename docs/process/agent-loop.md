@@ -26,7 +26,7 @@
 - 只有当执行回合显式形成新的 checkpoint 时，才推进该 head SHA。
 - review 结论、GitHub checks、PR 关联等审查态信息的补充，不单独构成新的 checkpoint。
 - 当前 live review head 只由 PR `headRefOid` 与 guardian state / merge gate 绑定，不要求 active `exec-plan` 追写该值。
-- 若仅补 review / merge gate / closeout metadata，可附带 metadata-only follow-up 追溯说明，但不得把其写成必须穷尽当前 HEAD 的静态清单。
+- 若当前回合被 active `exec-plan` 明确声明为 `metadata-only closeout follow-up`，且仅补 review / merge gate / closeout metadata，可附带该 follow-up 的追溯说明，但不得把其写成必须穷尽当前 HEAD 的静态清单。
 
 ## compact
 

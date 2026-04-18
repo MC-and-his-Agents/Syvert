@@ -19,7 +19,7 @@
 - `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
 - 不得要求 active `exec-plan` 追写当前受审 head；当前 live review head 只由 PR `headRefOid` 与 guardian state / merge gate 绑定。
 - 若当前 PR 在最近一次 checkpoint 之后仍有跟进 commit，但尚未形成新的 checkpoint，可保留最近一次 checkpoint head，并由 guardian state 绑定当前受审 head。
-- 若仅补 review / merge gate / closeout metadata，可记录 metadata-only follow-up 的追溯说明，但不得把版本化 `exec-plan` 的静态 SHA 定义为必须穷尽到当前 HEAD。
+- 若当前回合被 active `exec-plan` 明确声明为 `metadata-only closeout follow-up`，且仅补 review / merge gate / closeout metadata，可记录该 follow-up 的追溯说明，但不得把版本化 `exec-plan` 的静态 SHA 定义为必须穷尽到当前 HEAD。
 - review 结论、GitHub checks、PR 关联与索引入口的更新，只要未显式推进新的执行停点，就属于审查态元数据补充，不要求单独刷新 checkpoint head。
 
 ## 职责边界
