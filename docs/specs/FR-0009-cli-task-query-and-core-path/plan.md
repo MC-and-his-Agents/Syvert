@@ -63,7 +63,7 @@
 ## 并行 / 串行关系
 
 - 可并行项：
-  - `#141` 的 spec 套件起草与 `#144` 的 requirement container / closeout 文档骨架
+  - 无；`#141 -> #142 -> #143 -> #144` 必须按 Work Item 串行收口，不在 formal spec 阶段提前展开 `#144` 文档骨架
 - 串行依赖项：
   - 必须先完成 `#141` formal spec 冻结，`#142/#143` 才能进入实现 PR
   - `#142` 先冻结 CLI public surface，`#143` 再补 same-path 端到端证据

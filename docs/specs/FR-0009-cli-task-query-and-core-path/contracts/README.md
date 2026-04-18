@@ -10,6 +10,7 @@
 
 - 输入结构：
   - `run` 继续接收当前 CLI 执行入口承载的请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
+  - legacy 平铺入口 `--adapter --capability --url` 的兼容投影固定为 `target_type=url`、`target_value=<url>`、`collection_mode=hybrid`
   - `query` 只接收单个 `task_id`
   - legacy 平铺执行入口继续兼容，并映射到 `run` 语义
 - 输出结构：
