@@ -33,7 +33,7 @@
 - 本轮 guardian 阻断不是新 contract，而是两条 `scope owner=#143` 证据仍然不够判别式：
   - legacy 平铺执行入口与 `run` 子命令的 durable truth 等价性，只比较了 `request/status/result`，没有覆盖 `created_at/updated_at/terminal_at/logs`
   - `query` 无 shadow payload / secondary filesystem consultation 的证明仍过度依赖狭窄 mock success path
-- 当前停点是把这两条 finding 回填到 verification matrix 和本 exec-plan，再补强同路径证据测试后重跑 guardian / merge gate。
+- 当前停点是判别式 same-path 修复已落为 checkpoint `38008e7280d434e7df4331a06765ca9d72198c42`，并重新通过本地回归；下一步只剩推送回 `#157` 并重跑 guardian / merge gate。
 
 ## 下一步动作
 
@@ -73,4 +73,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1e482af26edbf638baa9339dcb37015a2162b5bb`
+- `38008e7280d434e7df4331a06765ca9d72198c42`
