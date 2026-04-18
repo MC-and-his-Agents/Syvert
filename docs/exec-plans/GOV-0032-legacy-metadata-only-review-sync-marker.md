@@ -27,13 +27,14 @@
 
 - `#150` 已合入主干，当前实现继续兼容 `metadata-only review sync` marker，但缺少独立回归。
 - 当前工作树已创建：`/Users/mc/code/worktrees/syvert/issue-152-gov-legacy-metadata-only-review-sync-marker`。
-- 下一步是在不改动实现逻辑的前提下补齐专门测试和 bootstrap 工件。
+- 当前补强已在 checkpoint `00aecaa5809db6004b16c7dbc01884b1e109a5e7` 落盘：legacy marker 专门回归、bootstrap decision / exec-plan 与 release / sprint 索引已同步补齐。
+- 当前停在推送分支与创建 PR 前；下一步进入受控 `open_pr`、guardian gate 与 merge gate 收口。
 
 ## 下一步动作
 
-- 补一条 legacy marker 正向回归。
-- 运行治理测试与 guard，确认只增加保护，不改变现有 contract。
-- 创建受控 PR，推进 guardian / merge gate / issue closeout。
+- 推送 `issue-152-gov-legacy-metadata-only-review-sync-marker` 分支。
+- 通过受控入口创建治理 PR，并把 `Issue` / `item_key` / `release` / `sprint` 与 canonical `integration_check` carrier 对齐。
+- 运行 guardian 审查与受控 merge，随后关闭 `#152` 并清理分支 / worktree。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -52,6 +53,15 @@
 - 已阅读：`docs/exec-plans/GOV-0031-guardian-live-head-binding.md`
 - 已阅读：`docs/decisions/ADR-GOV-0031-guardian-live-head-binding.md`
 - 已阅读：`tests/governance/test_pr_guardian.py`
+- 已完成最小改动文件：`tests/governance/test_pr_guardian.py`
+- 已完成最小改动文件：`docs/decisions/ADR-GOV-0032-legacy-metadata-only-review-sync-marker.md`
+- 已完成最小改动文件：`docs/exec-plans/GOV-0032-legacy-metadata-only-review-sync-marker.md`
+- 已完成最小改动文件：`docs/releases/v0.3.0.md`
+- 已完成最小改动文件：`docs/sprints/2026-S16.md`
+- `python3 -m unittest tests.governance.test_pr_guardian`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/open_pr.py --class governance --issue 152 --item-key GOV-0032-legacy-metadata-only-review-sync-marker --item-type GOV --release v0.3.0 --sprint 2026-S16 --title "test(governance): 锁定 legacy review sync marker 兼容回归" --dry-run`
 
 ## 未决风险
 
@@ -64,5 +74,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `c1ec5cf4f353568fa4c7e85b368d550678f4f744`
-- 说明：该 checkpoint 是 `#151` 合入后的主干基线；当前事项仅在其上补齐 legacy marker 兼容回归，不改写 guardian contract。
+- `00aecaa5809db6004b16c7dbc01884b1e109a5e7`
+- 说明：该 checkpoint 首次把 legacy `metadata-only review sync` marker 的专门回归、bootstrap decision / exec-plan 与 sprint / release 索引同步落盘；当前事项不改写 guardian contract，只补兼容保护。
