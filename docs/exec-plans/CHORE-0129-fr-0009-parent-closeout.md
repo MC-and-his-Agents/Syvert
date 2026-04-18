@@ -39,7 +39,7 @@
 - `FR-0009` requirement container、release / sprint 索引仍未回写 `#142/#143` 已合入与 `#144` 成为唯一 active closeout 入口的主干真相。
 - GitHub 侧仍有 closeout 追账：`#141` 正文停留在 `待开始`，`#143` 正文停留在 `进行中（PR #157 审查中）`，`#144` 已切到 `进行中（PR #158 审查中）`，父 FR `#128` 仍保留初始骨架正文。
 - `#144` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-144-chore-fr-0009`。
-- PR `#158` 首轮 guardian 已回指出三项 parent closeout artifact 缺口：实质 checkpoint SHA 记错、`#144/#128` Project-state carrier 缺失、requirement container 仍停留在 pre-closeout baseline。
+- PR `#158` 的 guardian follow-up 当前只剩 review-sync 追溯：需要把当前受审 docs head 的最小验证结果和 metadata-only closeout 追账说明回写到 `CHORE-0129` 与 requirement container，而不改写 `FR-0009` requirement 语义。
 
 ## 下一步动作
 
@@ -86,12 +86,24 @@
   - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-144-chore-fr-0009`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在当前受审 docs head 上重新通过；当前 review-sync 只回写 closeout / review 元数据，不改写 `FR-0009` closeout 语义
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在当前受审 docs head 上重新通过；当前 review-sync 只回写 closeout / review 元数据，不改写 `FR-0009` closeout 语义
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在当前受审 docs head 上重新通过；当前 review-sync 只回写 closeout / review 元数据，不改写 `FR-0009` closeout 语义
 - `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-144-chore-fr-0009`
   - 结果：在实质 closeout checkpoint `85912316ad95d24a3d33ac83142048fd9c44309b` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-144-chore-fr-0009`
+  - 结果：在当前受审 docs head 上重新通过；当前 review-sync 只回写 closeout / review 元数据，不改写 `FR-0009` closeout 语义
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 docs head 上通过，`PR class=docs`
+- `python3 scripts/open_pr.py --class docs --issue 144 --item-key CHORE-0129-fr-0009-parent-closeout --item-type CHORE --release v0.3.0 --sprint 2026-S16 --title 'docs(closeout): 收口 FR-0009 父事项' --dry-run`
+  - 结果：在当前受审 docs head 上通过；当前受审 PR 为 `#158 https://github.com/MC-and-his-Agents/Syvert/pull/158`
 
 ## closeout 证据
 
@@ -152,4 +164,7 @@
 
 - 前置完成基线：`2f4aea6322d93feefa66b63227a3c9ff5299b44c`
 - 实质 closeout checkpoint：`85912316ad95d24a3d33ac83142048fd9c44309b`
-- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；`85912316...` 首次把 requirement container、parent closeout exec-plan 与 release / sprint 索引收口到 `#141/#142/#143` 已合入后的主干真相。
+- current review-sync head：
+  - 仅回写 recovery pointer、Project-state carrier、当前受审 head 验证结果与 requirement-container review-sync 说明
+  - 不改写 `FR-0009` requirement 语义，也不重新打开 `#141/#142/#143`
+- 说明：当前 `#144` closeout 由包含 `#157` 的主干基线启动；`85912316...` 首次把 requirement container、parent closeout exec-plan 与 release / sprint 索引收口到 `#141/#142/#143` 已合入后的主干真相，其后的 review sync 只追账当前受审 head 的 closeout 元数据与验证证据。

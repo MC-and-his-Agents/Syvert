@@ -24,4 +24,5 @@
 
 - 父事项 closeout 基线：`2f4aea6322d93feefa66b63227a3c9ff5299b44c`
 - 实质 closeout checkpoint：`85912316ad95d24a3d33ac83142048fd9c44309b`
+- review-sync 说明：其后的 parent-closeout follow-up 只回写审查 / closeout 元数据与当前受审 head 的验证追溯，不改写 `FR-0009` requirement 语义。
 - 说明：`2f4aea...` 是 `#157` 合入后的主干基线；`85912316...` 首次把 `FR-0009` requirement container、release / sprint 索引与 `#144` parent closeout 入口收口到同一条主干真相。
