@@ -35,10 +35,10 @@
 
 - `invalid_cli_arguments`
   - 适用：缺少 `--task-id`、未知参数、query 子命令参数形状不合法
-  - 输出：failed envelope
+  - 输出：`error.code=invalid_cli_arguments`、`error.category=invalid_input` 的 failed envelope
 - `task_record_not_found`
   - 适用：store 可访问，但 durable record 不存在
-  - 输出：failed envelope
+  - 输出：`error.code=task_record_not_found`、`error.category=invalid_input` 的 failed envelope
 - `task_record_unavailable`
   - 适用：store 根目录不可用、invalid marker、记录 JSON 损坏、contract 非法、记录不可读、权限或 IO 异常
-  - 输出：failed envelope
+  - 输出：`error.code=task_record_unavailable`、`error.category=runtime_contract` 的 failed envelope

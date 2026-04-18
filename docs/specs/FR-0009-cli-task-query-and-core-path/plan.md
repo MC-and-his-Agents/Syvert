@@ -18,7 +18,7 @@
 ## 分阶段拆分
 
 - 阶段 1：`#141` 冻结 formal spec，明确 `run/query` public surface、query 成功/失败 contract 与 same-path 边界。
-- 阶段 2：`#142` 在不扩张 requirement 的前提下，实现顶层子命令解析与 CLI query surface，同时保留 legacy 平铺执行入口兼容。
+- 阶段 2：`#142` 在不扩张 requirement 的前提下，实现已由 `#141` 冻结的顶层子命令解析与 CLI query surface，同时保留 legacy 平铺执行入口兼容。
 - 阶段 3：`#143` 补齐 `run/legacy-run -> durable record -> query` 的端到端验证，证明 query 只消费共享 durable truth。
 - 阶段 4：`#144` 统一收口 requirement container、release/sprint 索引、exec-plan 与 GitHub issue 真相。
 
@@ -66,7 +66,7 @@
   - 无；`#141 -> #142 -> #143 -> #144` 必须按 Work Item 串行收口，不在 formal spec 阶段提前展开 `#144` 文档骨架
 - 串行依赖项：
   - 必须先完成 `#141` formal spec 冻结，`#142/#143` 才能进入实现 PR
-  - `#142` 先冻结 CLI public surface，`#143` 再补 same-path 端到端证据
+  - `#142` 先实现已冻结的 CLI public surface，`#143` 再补 same-path 端到端证据
   - `#144` 必须等待 `#141/#142/#143` 完成并合入主干
 
 ## 进入实现前条件

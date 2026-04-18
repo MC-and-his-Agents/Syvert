@@ -24,13 +24,13 @@
 
 - `invalid_cli_arguments`
   - 适用场景：缺少 `--task-id`、出现未知参数、query 子命令参数形状不合法
-  - 约束：若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用既有共享 CLI 参数错误兜底 `task_id` contract；`adapter_key=""`；`capability=""`
+  - 约束：`error.category=invalid_input`；若 malformed argv 中仍能恢复 `--task-id <id>`，则 failed envelope 必须回显该值；只有查询键缺失、值缺失或不可恢复时，`task_id` 才使用既有共享 CLI 参数错误兜底 `task_id` contract；`adapter_key=""`；`capability=""`
 - `task_record_not_found`
   - 适用场景：store 可访问，但请求的 `task_id` 不存在 durable record
-  - 约束：回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
+  - 约束：`error.category=invalid_input`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
 - `task_record_unavailable`
   - 适用场景：store 根目录不可用、invalid marker、记录 JSON 损坏、contract 非法、记录不可读、权限或 IO 异常
-  - 约束：回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
+  - 约束：`error.category=runtime_contract`；回显用户传入的 `task_id`；`adapter_key=""`；`capability=""`
 - 一旦 durable record 已成功加载，后续序列化或 CLI 输出失败时，必须从 `record.request` 回填 `adapter_key` 与 `capability`
 - query 不允许读取影子 schema、影子结果文件或 query 私有摘要 payload
 
