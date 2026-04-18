@@ -34,10 +34,12 @@
 - `FR-0009` formal spec 套件、requirement container 与最小 release / sprint 索引已经在当前分支首次落盘。
 - `#141` 当前为 `OPEN`，GitHub body 中的 `sprint` 已同步为 `2026-S16`。
 - 受控入口 `open_pr.py --class spec --issue 141 ... --dry-run` 已通过，spec PR `#154` 已创建并指向当前事项。
-- PR `#154` 的 Commit / Docs / Governance / Spec Guard checks 已全部通过，当前处于 guardian 审查与合入前复核阶段。
+- guardian 对旧 head 的审查指出了两类高优先级语义问题：formal spec 回退了上游共享请求 contract，并把函数/环境变量级实现细节写入 formal spec。
+- 当前分支已把 `FR-0009` spec 收敛回 `FR-0004` / `FR-0008` 已冻结的共享请求模型与 durable-truth contract；当前停点是等待绑定最新 head 的 guardian 复核。
 
 ## 下一步动作
 
+- 提交并推送本次 formal spec 语义修正，让 PR `#154` 的最新 head 与 active exec-plan 保持一致。
 - 等待 guardian 产出绑定当前 PR head 的 verdict 与 `safe_to_merge` 结论。
 - 在 guardian / merge gate 全部通过后，使用 `python3 scripts/merge_pr.py 154 --delete-branch` 执行受控 squash merge。
 - `#141` 合入主干后，把 `#128` 的 formal spec 字段从 `planned` 收敛到已入库真相，再切换到 `#142`。
@@ -70,6 +72,8 @@
   - 结果：通过
 - `gh pr checks 154`
   - 结果：Commit / Docs / Governance / Spec Guard checks 全绿
+- guardian 旧 head 审查摘要
+  - 结果：指出 shared request contract drift 与实现细节泄漏到 formal spec；当前分支已据此修正，待最新 head 复核
 
 ## 未决风险
 

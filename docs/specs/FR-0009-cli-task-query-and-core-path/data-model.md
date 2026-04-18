@@ -11,7 +11,7 @@
 - `TaskRecord`
   - 来源：`FR-0008`
   - 角色：query 成功时输出的完整 durable 载荷
-  - 约束：直接复用共享 `task_record_to_dict(record)` 形状，不增加 CLI 私有字段，不裁剪请求快照、日志或终态结果
+  - 约束：直接复用 `FR-0008` 已冻结的共享 JSON-safe 序列化形状，不增加 CLI 私有字段，不裁剪请求快照、日志或终态结果
 - failed envelope
   - 来源：`FR-0002` / `FR-0005`
   - 角色：query 失败时的 machine-readable 输出
@@ -20,7 +20,7 @@
 ## CLI surface 映射
 
 - `run`
-  - 输入：`adapter_key`、`capability`、`url`
+  - 输入：当前 CLI 执行入口承载的请求载体；其共享语义必须可回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
   - 输出：共享 success / failed envelope
   - durable side effect：沿共享 Core / task-record / store 路径创建、推进并持久化 `TaskRecord`
 - `query`

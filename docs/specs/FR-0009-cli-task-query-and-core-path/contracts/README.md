@@ -9,12 +9,12 @@
 ## 输入输出结构
 
 - 输入结构：
-  - `run` 继续接收共享执行请求输入：`adapter_key`、`capability`、`url`
+  - `run` 继续接收当前 CLI 执行入口承载的请求载体；其共享语义必须可无损回映到 `FR-0004` / `FR-0008` 已冻结的 `adapter_key`、`capability`、`target_type`、`target_value`、`collection_mode`
   - `query` 只接收单个 `task_id`
   - legacy 平铺执行入口继续兼容，并映射到 `run` 语义
 - 输出结构：
   - `run` 继续输出共享 success / failed envelope
-  - `query` 成功时输出完整共享 `TaskRecord` JSON，即 `task_record_to_dict(record)` 的完整载荷
+  - `query` 成功时输出完整共享 `TaskRecord` JSON，即该 durable record 的共享 JSON-safe 序列化载荷
   - `query` 失败时输出 shared failed envelope，不新增 query 私有错误 schema
 
 ## 错误与边界行为
@@ -35,4 +35,4 @@
 
 - legacy 平铺执行入口必须继续兼容，不得因 subcommand 改造而失效
 - `FR-0009` 只消费 `FR-0008` durable `TaskRecord` contract，不重写状态、结果或日志 schema
-- `v0.3.0` 不引入 store-path CLI flag，不绑定唯一文件布局或唯一目录命名
+- `v0.3.0` 不引入 query 专用 store-path CLI flag，不绑定唯一文件布局或唯一目录命名

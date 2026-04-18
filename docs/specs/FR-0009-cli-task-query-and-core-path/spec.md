@@ -31,15 +31,15 @@
 
 - 功能需求：
   - CLI 顶层必须提供两个 public subcommand：`run` 与 `query`。
-  - `run` 语义必须等价于当前执行入口：接收共享请求输入，沿同一条 Core 执行路径完成 admission、adapter 执行、`TaskRecord` durable 写入与终态输出。
+  - `run` 语义必须等价于当前执行入口：继续承接当前 CLI 执行入口暴露的请求载体，并把它投影到 `FR-0004` / `FR-0008` 已冻结的共享请求模型，再沿同一条 Core 执行路径完成 admission、adapter 执行、`TaskRecord` durable 写入与终态输出。
   - legacy 平铺执行入口 `python -m syvert.cli --adapter ... --capability ... --url ...` 必须继续兼容，并映射到 `run` 语义；引入 subcommand 后不得破坏当前 parse failure 的 machine-readable 行为。
   - `query` 的最小 public surface 固定为 `python -m syvert.cli query --task-id <id>`；`v0.3.0` 不额外提供列表查询、筛选或摘要模式。
-  - `query` 成功时必须把同一份 durable `TaskRecord` 以完整 JSON-safe 形式写到 `stdout`；该输出直接复用共享 `task_record_to_dict(record)` 语义，不得裁剪请求快照、执行日志或终态 envelope，也不得增加 CLI 私有字段。
+  - `query` 成功时必须把同一份 durable `TaskRecord` 的完整共享 JSON-safe 表示写到 `stdout`；该输出必须与 `FR-0008` 已冻结的共享序列化 contract 一致，不得裁剪请求快照、执行日志或终态 envelope，也不得增加 CLI 私有字段。
   - `query` 必须允许回读任意合法 durable `TaskRecord`，不限终态；`accepted`、`running`、`succeeded`、`failed` 都必须可查询。
   - `query` 失败时必须输出 machine-readable shared failed envelope 到 `stderr`，并维持返回码非零。
-  - `query` 与 `run` 必须继续只消费 `default_task_record_store()` / `SYVERT_TASK_RECORD_STORE_DIR` 指向的共享 store truth，不得引入 query 专用文件、影子状态表或影子结果 payload。
+  - `query` 与 `run` 必须继续消费同一份共享 local store truth，并沿当前共享 store 选择 contract 工作；`v0.3.0` 不得引入 query 专用文件、影子状态表、影子结果 payload 或 query 专用 store 选择入口。
 - 契约需求：
-  - `query` 成功输出的 JSON 形状必须与共享 `TaskRecord` contract 一致，即等价于 `task_record_to_dict(record)` 的完整载荷。
+  - `query` 成功输出的 JSON 形状必须与共享 `TaskRecord` contract 一致，即该 durable record 的完整共享 JSON-safe 序列化载荷。
   - `query` 缺少 `--task-id`、携带未知参数或子命令参数形状不合法时：
     - `error.code` 固定为 `invalid_cli_arguments`
     - `error.category` 固定为 `invalid_input`
@@ -62,7 +62,7 @@
   - `query` 不得通过重新拼装 success/failed envelope、单独读取结果文件，或维护第二套查询 schema 来伪造任务历史。
 - 非功能需求：
   - query 读取 durable record 时必须 fail-closed；任何无法证明为合法共享 `TaskRecord` 的历史都不得被宽松修复后继续输出。
-  - `run` 与 legacy 平铺入口在同一输入语义下必须写入等价的 durable truth，不得分叉为两条不同路径。
+  - `run` 与 legacy 平铺入口在同一输入语义下必须先投影到同一份共享请求模型，再写入等价的 durable truth；不得分叉为两条不同路径或两套请求 contract。
   - `v0.3.0` 的 query contract 必须保持实现无关，不绑定唯一文件布局、唯一目录命名或唯一嵌入式存储引擎。
 
 ## 约束
