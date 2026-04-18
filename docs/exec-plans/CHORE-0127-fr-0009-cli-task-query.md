@@ -32,7 +32,7 @@
 - `issue-142-fr-0009-cli` 已作为 `#142` 的独立 implementation worktree 建立，且只保留 `syvert/cli.py`、`tests/runtime/test_cli.py` 与当前 exec-plan 的受控改动。
 - 当前分支已经完成 `run/query` 顶层子命令、legacy 平铺执行入口兼容、query 成功输出完整 `TaskRecord` JSON，以及 `invalid_cli_arguments` / `task_record_not_found` / `task_record_unavailable` 的 formal spec 错误映射实现。
 - `#141` formal spec 已由 PR `#154` 合入主干，当前分支也已 rebase 到最新 `origin/main`。
-- `#142` 当前停点是恢复推进补丁已在本地落盘并完成回归，待提交到 PR `#156`，再重跑 guardian 与受控 merge gate。
+- `#142` 当前停点是恢复推进补丁已提交为 checkpoint `51be04214fcb79fdfe0630d775bc1118c11cde48`，并已完成本地回归；下一步是推送到 PR `#156` 并重跑 guardian / merge gate。
 
 ## 下一步动作
 
@@ -71,4 +71,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7b5688d99d8c79fd3e8db0f502d759b5c970e7e5`
+- `51be04214fcb79fdfe0630d775bc1118c11cde48`
