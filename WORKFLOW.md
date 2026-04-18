@@ -57,6 +57,7 @@ codex:
 - 长任务统一按 `kickoff -> checkpoint -> compact -> resume -> handoff -> merge-ready` 执行。
 - `核心事项` 强制存在 `exec-plan`，并记录事项上下文、停点、下一步、已验证项、未决风险、最近一次 checkpoint 对应的 head SHA。
 - `exec-plan` 中的 head SHA 用于恢复最近一次 checkpoint，不替代 guardian 对当前受审 head SHA 的绑定与 merge gate 校验。
+- 不得要求 active `exec-plan` 追写当前受审 head；当前 live review head 只以 PR `headRefOid` 与 guardian state / merge gate 结果为准。
 - 仅当执行回合显式推进新的 checkpoint 时，才刷新 `exec-plan` 中记录的 checkpoint head。
 - review 结论、GitHub checks、PR 关联、索引入口等审查态信息的更新，不自动构成新的 checkpoint。
 - checkpoint 与 resume 必须保持 `Issue`、`item_key`、`release`、`sprint` 一致；若事项上下文发生变化，必须先更新 active `exec-plan`，再继续执行。
@@ -103,6 +104,7 @@ codex:
 - 完成一组可验证改动后必须更新一次 checkpoint。
 - 变更停点、风险、验证结论或形成新的 checkpoint 时必须更新。
 - 若仅发生后续跟进 commit、但尚未形成新的 checkpoint，可保留最近一次 checkpoint head，并由 guardian state 绑定当前受审 head。
+- 若当前回合被 active `exec-plan` 明确声明为 `metadata-only closeout follow-up`，且仅补 review / merge gate / closeout metadata，可记录该 follow-up 的追溯说明，但不得把版本化 `exec-plan` 的静态 SHA 定义为必须穷尽到当前 HEAD。
 - 若仅补充 review / merge gate 元数据，而未显式推进新的执行停点，不要求刷新 checkpoint head。
 - 变更 `item_key`、`item_type`、`release`、`sprint` 或事项在当前轮次中的定位时必须更新。
 - 进入 review、进入 merge gate 前必须更新到最新状态。

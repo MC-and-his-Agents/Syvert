@@ -52,3 +52,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `<checkpoint_commit_sha>`
+- 如当前回合被明确声明为 `metadata-only closeout follow-up`，只记录该 follow-up 的追溯说明，不把当前受审 head 写成必须与最新 HEAD 完全一致的静态字段。
