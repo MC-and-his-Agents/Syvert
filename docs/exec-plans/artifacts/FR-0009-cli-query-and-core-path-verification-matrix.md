@@ -4,9 +4,9 @@
 
 - FR：`#128`
 - formal spec：`docs/specs/FR-0009-cli-task-query-and-core-path/`
-- 当前 implementation Work Item：`#142 / CHORE-0127-fr-0009-cli-task-query`
-- 后续 same-path Work Item：`#143 / CHORE-0128-fr-0009-cli-core-path-persistence-closeout`
-- 当前主 PR：`#156`
+- query surface Work Item：`#142 / CHORE-0127-fr-0009-cli-task-query`
+- 当前 same-path Work Item：`#143 / CHORE-0128-fr-0009-cli-core-path-persistence-closeout`
+- 当前主 PR：`#157`
 
 ## 使用规则
 
@@ -33,6 +33,6 @@
 | record 已加载后 stdout 写出失败，必须 fail-closed 并回填 record context | `#142` | `execute_query_command()` post-load output branch | `stdout=""` / `stderr=failed envelope` | `1` | `code=task_record_unavailable`, `category=runtime_contract`, `task_id=<record.task_id>`, `adapter_key=<record.request.adapter_key>`, `capability=<record.request.capability>` | `test_query_subcommand_uses_record_context_when_loaded_record_cannot_be_written_to_stdout` | `implemented` |
 | `run` 子命令成功输出 shared success envelope | `#142` | `parse_args()` -> `execute_task_with_record()` | `stdout=success envelope` / `stderr=""` | `0` | `n/a` | `test_run_subcommand_writes_success_envelope_to_stdout` | `implemented` |
 | legacy 平铺执行入口 parse failure 继续保留 shared failed envelope 行为 | `#142` | `main()` legacy parse failure -> `extract_cli_context()` | `stdout=""` / `stderr=failed envelope` | `1` | `code=invalid_cli_arguments`, `category=invalid_input`, recoverable `adapter_key` / `capability` preserved | `test_cli_fails_closed_for_missing_required_arguments`, `test_cli_parse_failure_preserves_adapter_key_from_equals_syntax`, `test_cli_parse_failure_does_not_consume_next_flag_as_adapter_value` | `implemented` |
-| `run` 后 `query` 必须等于 `task_record_to_dict(store.load(task_id))` | `#143` | `run`/legacy run -> shared store -> `query` | `stdout=完整 TaskRecord JSON` / `stderr=""` | `0` | `n/a` | `planned in #143` | `planned` |
-| legacy run 与 `run` 子命令写入等价 durable truth | `#143` | legacy run path + `run` path -> shared durable record | `n/a` | `0` | `n/a` | `planned in #143` | `planned` |
-| `query` 不得消费 shadow file / shadow payload | `#143` | same-path evidence / e2e tests | `n/a` | `n/a` | `n/a` | `planned in #143` | `planned` |
+| `run` 后 `query` 必须等于 `task_record_to_dict(store.load(task_id))` | `#143` | `run` -> shared store -> `query` | `stdout=完整 TaskRecord JSON` / `stderr=""` | `0` | `n/a` | `test_run_subcommand_persists_record_that_query_reads_from_shared_store` | `implemented` |
+| legacy run 与 `run` 子命令必须写入等价 durable truth，比较时只能规范化真正易变的 task_id 与时间字段 | `#143` | legacy run path + `run` path -> shared durable record | `n/a` | `0` | `n/a` | `test_run_subcommand_and_legacy_entrypoint_persist_equivalent_durable_truth` | `implemented` |
+| `query` success path 只能消费 `load()` 返回的 shared record 与 `task_record_to_dict()`；任何 secondary filesystem consultation / shadow payload 旁路都必须被回归测试击穿 | `#143` | `execute_query_command()` -> `default_task_record_store().load()` -> `task_record_to_dict()` | `stdout=task_record_to_dict(record)` / `stderr=""` | `0` | `n/a` | `test_query_subcommand_reads_loaded_record_via_shared_store_and_shared_serializer_without_secondary_filesystem_consultation` | `implemented` |

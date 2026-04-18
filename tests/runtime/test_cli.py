@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 import io
 import json
 import os
@@ -10,7 +11,7 @@ from pathlib import Path
 import tempfile
 from unittest import mock
 
-from syvert.cli import main
+from syvert.cli import execute_query_command, main
 from syvert.task_record import (
     TaskRecordContractError,
     TaskRequestSnapshot,
@@ -81,6 +82,29 @@ class PlatformFailureAdapter:
 class BrokenWriteStream(io.StringIO):
     def write(self, s: str) -> int:
         raise BrokenPipeError("forced-broken-pipe")
+
+
+def normalize_persisted_task_record_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized = json.loads(json.dumps(payload))
+    normalized["task_id"] = "normalized-task-id"
+    result = normalized.get("result")
+    if isinstance(result, dict):
+        envelope = result.get("envelope")
+        if isinstance(envelope, dict) and isinstance(envelope.get("task_id"), str):
+            envelope["task_id"] = "normalized-task-id"
+    for field in ("created_at", "updated_at", "terminal_at"):
+        if isinstance(normalized.get(field), str):
+            normalized[field] = f"normalized-{field}"
+    logs = normalized.get("logs")
+    if isinstance(logs, list):
+        for index, entry in enumerate(logs, start=1):
+            if isinstance(entry, dict) and isinstance(entry.get("occurred_at"), str):
+                entry["occurred_at"] = f"normalized-log-{index}-occurred-at"
+    return normalized
+
+
+def unexpected_secondary_filesystem_consultation(*args: object, **kwargs: object) -> object:
+    raise AssertionError("unexpected_secondary_filesystem_consultation")
 
 
 class CliTests(unittest.TestCase):
@@ -675,6 +699,156 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["capability"], "")
         self.assertEqual(payload["error"]["category"], "runtime_contract")
         self.assertEqual(payload["error"]["code"], "task_record_unavailable")
+
+    def test_run_subcommand_persists_record_that_query_reads_from_shared_store(self) -> None:
+        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
+        run_stdout = io.StringIO()
+        run_stderr = io.StringIO()
+
+        run_exit_code = main(
+            [
+                "run",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/shared-run-1",
+            ],
+            adapters={"stub": SuccessfulAdapter()},
+            stdout=run_stdout,
+            stderr=run_stderr,
+            task_id_factory=lambda: "task-cli-shared-run-1",
+        )
+
+        self.assertEqual(run_exit_code, 0, run_stderr.getvalue())
+        expected_payload = task_record_to_dict(store.load("task-cli-shared-run-1"))
+
+        query_stdout = io.StringIO()
+        query_stderr = io.StringIO()
+        query_exit_code = main(
+            ["query", "--task-id", "task-cli-shared-run-1"],
+            stdout=query_stdout,
+            stderr=query_stderr,
+        )
+
+        self.assertEqual(query_exit_code, 0)
+        self.assertEqual(query_stderr.getvalue(), "")
+        self.assertEqual(json.loads(query_stdout.getvalue()), expected_payload)
+
+    def test_run_subcommand_and_legacy_entrypoint_persist_equivalent_durable_truth(self) -> None:
+        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
+        legacy_stdout = io.StringIO()
+        legacy_stderr = io.StringIO()
+
+        legacy_exit_code = main(
+            [
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/shared-legacy-1",
+            ],
+            adapters={"stub": SuccessfulAdapter()},
+            stdout=legacy_stdout,
+            stderr=legacy_stderr,
+            task_id_factory=lambda: "task-cli-shared-legacy-1",
+        )
+
+        self.assertEqual(legacy_exit_code, 0, legacy_stderr.getvalue())
+        legacy_record_payload = task_record_to_dict(store.load("task-cli-shared-legacy-1"))
+
+        run_stdout = io.StringIO()
+        run_stderr = io.StringIO()
+        run_exit_code = main(
+            [
+                "run",
+                "--adapter",
+                "stub",
+                "--capability",
+                "content_detail_by_url",
+                "--url",
+                "https://example.com/posts/shared-legacy-1",
+            ],
+            adapters={"stub": SuccessfulAdapter()},
+            stdout=run_stdout,
+            stderr=run_stderr,
+            task_id_factory=lambda: "task-cli-shared-run-equivalent-1",
+        )
+
+        self.assertEqual(run_exit_code, 0, run_stderr.getvalue())
+        run_record_payload = task_record_to_dict(store.load("task-cli-shared-run-equivalent-1"))
+
+        self.assertEqual(
+            normalize_persisted_task_record_payload(run_record_payload),
+            normalize_persisted_task_record_payload(legacy_record_payload),
+        )
+
+    def test_query_subcommand_reads_loaded_record_via_shared_store_and_shared_serializer_without_secondary_filesystem_consultation(
+        self,
+    ) -> None:
+        record = create_task_record(
+            "task-cli-shared-store-serializer-1",
+            TaskRequestSnapshot(
+                adapter_key="stub",
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/posts/shared-store-serializer-1",
+                collection_mode="hybrid",
+            ),
+        )
+        expected_payload = task_record_to_dict(record)
+        store = mock.Mock()
+        store.load.return_value = record
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        shadow_payload = Path(self._task_record_store_dir.name) / "task-cli-shared-store-serializer-1.shadow.json"
+        shadow_payload.write_text(
+            json.dumps({"shadow": "payload", "task_id": "shadow-task-id", "status": "shadow"}),
+            encoding="utf-8",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch("syvert.cli.default_task_record_store", return_value=store))
+            stack.enter_context(mock.patch("syvert.cli.validate_query_store_root", return_value=None))
+            serializer = stack.enter_context(mock.patch("syvert.cli.task_record_to_dict", wraps=task_record_to_dict))
+            for target in (
+                "builtins.open",
+                "os.open",
+                "os.listdir",
+                "os.scandir",
+                "os.walk",
+                "os.path.exists",
+                "os.path.isdir",
+                "os.path.isfile",
+                "pathlib.Path.open",
+                "pathlib.Path.read_text",
+                "pathlib.Path.read_bytes",
+                "pathlib.Path.exists",
+                "pathlib.Path.is_dir",
+                "pathlib.Path.is_file",
+                "pathlib.Path.iterdir",
+                "pathlib.Path.glob",
+                "pathlib.Path.rglob",
+            ):
+                stack.enter_context(
+                    mock.patch(
+                        target,
+                        side_effect=unexpected_secondary_filesystem_consultation,
+                    )
+                )
+            exit_code = execute_query_command(
+                "task-cli-shared-store-serializer-1",
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        store.load.assert_called_once_with("task-cli-shared-store-serializer-1")
+        serializer.assert_called_once_with(record)
+        self.assertEqual(json.loads(stdout.getvalue()), expected_payload)
 
     def test_cli_module_path_can_load_shared_adapter_registry(self) -> None:
         import tempfile
