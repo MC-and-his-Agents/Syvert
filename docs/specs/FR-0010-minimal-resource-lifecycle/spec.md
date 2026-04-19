@@ -66,6 +66,7 @@
     - `resource_lease_mismatch`
     - `resource_release_conflict`
     - `resource_state_conflict`
+  - 对于 `resource_unavailable`：其语义固定为“请求形状合法，但当前 host-side runtime 无法为全部 `requested_slots` 提供满足整包 acquire contract 的 `AVAILABLE` 资源”，因此它不得被误报为静态 `unsupported` 或 adapter 已接管后的 `platform` 失败。
   - Core 必须是资源生命周期语义的唯一拥有者；任何 adapter、平台桥接层或外部调用方都不得直接改写共享资源状态。
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
