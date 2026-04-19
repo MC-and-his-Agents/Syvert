@@ -692,6 +692,97 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         expected_status = "AVAILABLE" if lease.target_status_after_release == "AVAILABLE" else "INVALID"
         self.assertEqual(snapshot.resources[0].status, expected_status)
 
+    def test_release_retries_when_unrelated_write_advances_revision(self) -> None:
+        class ConcurrentReleaseStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._barrier = threading.Barrier(2)
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.write_snapshot(snapshot)
+
+        store = ConcurrentReleaseStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                ),
+                ResourceRecord(
+                    resource_id="proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material={"proxy_endpoint": "http://proxy-001"},
+                ),
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-015e",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-015e",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        results: list[object] = []
+
+        def release_worker() -> None:
+            results.append(
+                release(
+                    ReleaseRequest(
+                        lease_id=bundle.lease_id,
+                        task_id="task-015e",
+                        target_status_after_release="AVAILABLE",
+                        reason="normal",
+                    ),
+                    store,
+                    "task-context-015e",
+                )
+            )
+
+        def acquire_worker() -> None:
+            results.append(
+                acquire(
+                    AcquireRequest(
+                        task_id="task-015f",
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        requested_slots=("proxy",),
+                    ),
+                    store,
+                    "task-context-015f",
+                )
+            )
+
+        thread_a = threading.Thread(target=release_worker)
+        thread_b = threading.Thread(target=acquire_worker)
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(any(isinstance(result, ResourceLease) for result in results))
+        self.assertTrue(any(isinstance(result, ResourceBundle) for result in results))
+        snapshot = self.make_store().load_snapshot()
+        resources_by_id = {record.resource_id: record for record in snapshot.resources}
+        self.assertEqual(resources_by_id["account-001"].status, "AVAILABLE")
+        self.assertEqual(resources_by_id["proxy-001"].status, "IN_USE")
+
     def test_same_second_transitions_preserve_latest_settled_truth(self) -> None:
         self.seed_default_resources()
 

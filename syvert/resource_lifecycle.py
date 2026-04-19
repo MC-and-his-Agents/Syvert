@@ -153,7 +153,7 @@ def acquire(
                 store.write_snapshot(updated_snapshot)
                 return bundle
             except ResourceLifecycleContractError as error:
-                if not is_retryable_acquire_conflict(error):
+                if not is_retryable_revision_conflict(error):
                     raise
                 current_snapshot = store.load_snapshot()
                 validate_snapshot(current_snapshot)
@@ -206,68 +206,74 @@ def release(
     capability = lease.capability
 
     try:
-        if lease.task_id != normalized_request.task_id:
-            raise lease_mismatch_error("release task_id 与 lease 绑定 task_id 不一致")
-        if lease.released_at is not None:
-            if (
-                lease.target_status_after_release == normalized_request.target_status_after_release
-                and lease.release_reason == normalized_request.reason
-            ):
-                return lease
-            raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
-
-        resources_by_id = {record.resource_id: record for record in snapshot.resources}
-        for resource_id in lease.resource_ids:
-            record = resources_by_id.get(resource_id)
-            if record is None:
-                raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 不存在")
-            if record.status != "IN_USE":
-                raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 未处于 IN_USE")
-
-        released_at = now_rfc3339_utc()
-        settled_lease = ResourceLease(
-            lease_id=lease.lease_id,
-            bundle_id=lease.bundle_id,
-            task_id=lease.task_id,
-            adapter_key=lease.adapter_key,
-            capability=lease.capability,
-            resource_ids=lease.resource_ids,
-            acquired_at=lease.acquired_at,
-            released_at=released_at,
-            target_status_after_release=normalized_request.target_status_after_release,
-            release_reason=normalized_request.reason,
-        )
-        validate_resource_lease(settled_lease)
-        updated_resources = apply_release_transition(
-            snapshot.resources,
-            lease.resource_ids,
-            normalized_request.target_status_after_release,
-        )
-        updated_leases = tuple(
-            settled_lease if existing.lease_id == lease.lease_id else existing for existing in snapshot.leases
-        )
-        updated_snapshot = ResourceLifecycleSnapshot(
-            schema_version=snapshot.schema_version,
-            revision=snapshot.revision + 1,
-            resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
-            leases=updated_leases,
-        )
-        validate_snapshot(updated_snapshot)
-        try:
-            store.write_snapshot(updated_snapshot)
-        except ResourceLifecycleContractError as error:
-            refreshed_snapshot = store.load_snapshot()
-            validate_snapshot(refreshed_snapshot)
-            refreshed_lease = require_lease(refreshed_snapshot, lease.lease_id)
-            if refreshed_lease.released_at is not None:
+        current_snapshot = snapshot
+        while True:
+            current_lease = require_lease(current_snapshot, normalized_request.lease_id)
+            if current_lease.task_id != normalized_request.task_id:
+                raise lease_mismatch_error("release task_id 与 lease 绑定 task_id 不一致")
+            if current_lease.released_at is not None:
                 if (
-                    refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
-                    and refreshed_lease.release_reason == normalized_request.reason
+                    current_lease.target_status_after_release == normalized_request.target_status_after_release
+                    and current_lease.release_reason == normalized_request.reason
                 ):
-                    return refreshed_lease
+                    return current_lease
                 raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
-            raise error
-        return settled_lease
+
+            resources_by_id = {record.resource_id: record for record in current_snapshot.resources}
+            for resource_id in current_lease.resource_ids:
+                record = resources_by_id.get(resource_id)
+                if record is None:
+                    raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 不存在")
+                if record.status != "IN_USE":
+                    raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 未处于 IN_USE")
+
+            released_at = now_rfc3339_utc()
+            settled_lease = ResourceLease(
+                lease_id=current_lease.lease_id,
+                bundle_id=current_lease.bundle_id,
+                task_id=current_lease.task_id,
+                adapter_key=current_lease.adapter_key,
+                capability=current_lease.capability,
+                resource_ids=current_lease.resource_ids,
+                acquired_at=current_lease.acquired_at,
+                released_at=released_at,
+                target_status_after_release=normalized_request.target_status_after_release,
+                release_reason=normalized_request.reason,
+            )
+            validate_resource_lease(settled_lease)
+            updated_resources = apply_release_transition(
+                current_snapshot.resources,
+                current_lease.resource_ids,
+                normalized_request.target_status_after_release,
+            )
+            updated_leases = tuple(
+                settled_lease if existing.lease_id == current_lease.lease_id else existing
+                for existing in current_snapshot.leases
+            )
+            updated_snapshot = ResourceLifecycleSnapshot(
+                schema_version=current_snapshot.schema_version,
+                revision=current_snapshot.revision + 1,
+                resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
+                leases=updated_leases,
+            )
+            validate_snapshot(updated_snapshot)
+            try:
+                store.write_snapshot(updated_snapshot)
+                return settled_lease
+            except ResourceLifecycleContractError as error:
+                refreshed_snapshot = store.load_snapshot()
+                validate_snapshot(refreshed_snapshot)
+                refreshed_lease = require_lease(refreshed_snapshot, current_lease.lease_id)
+                if refreshed_lease.released_at is not None:
+                    if (
+                        refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
+                        and refreshed_lease.release_reason == normalized_request.reason
+                    ):
+                        return refreshed_lease
+                    raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
+                if not is_retryable_revision_conflict(error):
+                    raise
+                current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
         return failure_envelope(
             envelope_task_id,
@@ -909,7 +915,7 @@ def invalid_request_error(message: str) -> ResourceLifecycleContractError:
     return ResourceLifecycleContractError(f"invalid_resource_request: {message}")
 
 
-def is_retryable_acquire_conflict(error: ResourceLifecycleContractError) -> bool:
+def is_retryable_revision_conflict(error: ResourceLifecycleContractError) -> bool:
     return str(error).startswith("resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致")
 
 

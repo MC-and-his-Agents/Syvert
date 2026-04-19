@@ -109,6 +109,11 @@ class LocalResourceLifecycleStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temp_path, self.path)
+            dir_fd = os.open(self.path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
         except OSError as error:
             raise ResourceLifecyclePersistenceError(
                 f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"

@@ -47,6 +47,7 @@
 - guardian 第十轮 review 已把阻断收敛到 failure carrier 与 bootstrap replay 语义；当前工作树已移除失败路径上的 synthetic `task_id` 生成，并让 `seed_resources()` 对 active durable truth 支持同值 replay 幂等。
 - guardian 第十一轮 review 已把阻断收敛到 failure carrier 来源约束与 replay 的“严格 no-op”语义；当前工作树已让 release 失败 carrier 不再借用 `lease.task_id`，并把同值 `seed_resources()` replay 收紧成 revision 不变的 no-op。
 - guardian 第十二轮 review 已把阻断收敛到 acquire / seed 的并发语义；当前工作树已让 `acquire()` 在 revision 冲突后按最新 durable truth 重新选资源，并把 `seed_resources()` 的读/合并/no-op 判断全部搬进锁内。
+- guardian 第十三轮 review 已把阻断收敛到目录 fsync durability 与 release 的 benign CAS retry；当前工作树已在 `os.replace()` 后补目录项 fsync，并让 `release()` 遇到无关 revision bump 时按刷新后的 durable truth 重试。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -75,7 +76,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（40 tests, OK）
+  - 结果：通过（43 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -149,6 +150,11 @@
     - `seed_resources()` 的读 / merge / no-op / 写入全部进入同一锁区间，避免并发 disjoint seed 丢失更新
     - 新增“并发 acquire 仍有 spare capacity 时双成功”与“并发 seed 不同资源时最终 truth 同时保留两者”回归
     - acquire 重试范围收紧为仅 revision mismatch，避免把写路径 `OSError` 误判为可重试冲突
+  - 第十三轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `_write_json_atomic()` 在 `os.replace()` 后追加父目录 fsync，补齐本地快照提交的目录项 durability
+    - `release()` 的 revision mismatch 处理扩展为 benign CAS retry：若刷新后的目标 lease 仍 active，则按最新 durable truth 重新尝试 release，而不是误报 `resource_state_conflict`
+    - 新增“无关资源写入导致 revision bump 时，release 仍可成功收口”的并发回归
 
 ## 未决风险
 
