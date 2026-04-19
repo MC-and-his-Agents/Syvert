@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol, Union
 from uuid import uuid4
 
 from syvert.runtime import failure_envelope, invalid_input_error, is_valid_rfc3339_utc, runtime_contract_error
-from syvert.task_record import normalize_json_value
+from syvert.task_record import TaskRecordContractError, normalize_json_value
 
 
 RESOURCE_LIFECYCLE_VERSION = "v0.4.0"
@@ -320,7 +320,7 @@ def resource_record_to_dict(record: ResourceRecord) -> dict[str, Any]:
         "resource_id": record.resource_id,
         "resource_type": record.resource_type,
         "status": record.status,
-        "material": normalize_json_value(record.material, field=f"resource[{record.resource_id}].material"),
+        "material": normalize_resource_material(record.material, field=f"resource[{record.resource_id}].material"),
     }
 
 
@@ -331,7 +331,7 @@ def resource_record_from_dict(payload: Mapping[str, Any]) -> ResourceRecord:
         resource_id=require_non_empty_string(payload.get("resource_id"), field="resource.resource_id"),
         resource_type=require_non_empty_string(payload.get("resource_type"), field="resource.resource_type"),
         status=require_non_empty_string(payload.get("status"), field="resource.status"),
-        material=normalize_json_value(payload.get("material"), field="resource.material"),
+        material=normalize_resource_material(payload.get("material"), field="resource.material"),
     )
     validate_resource_record(record)
     return record
@@ -415,18 +415,19 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
 
     lease_ids: set[str] = set()
     active_resource_ids: set[str] = set()
-    latest_settled_by_resource_id: dict[str, tuple[str, int, str]] = {}
-    invalid_released_at_by_resource_id: dict[str, tuple[str, int]] = {}
-    leases_by_resource_id: dict[str, list[tuple[int, ResourceLease]]] = {}
+    latest_settled_by_resource_id: dict[str, tuple[tuple[datetime, int], str]] = {}
+    invalid_released_at_by_resource_id: dict[str, tuple[datetime, int]] = {}
+    leases_by_resource_id: dict[str, list[tuple[tuple[datetime, int], tuple[datetime, int] | None, ResourceLease]]] = {}
     for lease_index, lease in enumerate(snapshot.leases):
         validate_resource_lease(lease)
+        acquired_marker = (parse_rfc3339_utc_datetime(lease.acquired_at, field="lease.acquired_at"), lease_index)
         if lease.lease_id in lease_ids:
             raise ResourceLifecycleContractError("资源生命周期快照存在重复 lease_id")
         lease_ids.add(lease.lease_id)
         for resource_id in lease.resource_ids:
             if resource_id not in resources_by_id:
                 raise ResourceLifecycleContractError("lease 绑定了不存在的 resource_id")
-            leases_by_resource_id.setdefault(resource_id, []).append((lease_index, lease))
+        released_marker: tuple[datetime, int] | None = None
         if lease.released_at is None:
             for resource_id in lease.resource_ids:
                 if resource_id in active_resource_ids:
@@ -434,19 +435,17 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
                 active_resource_ids.add(resource_id)
         else:
             assert lease.target_status_after_release is not None
+            released_marker = (parse_rfc3339_utc_datetime(lease.released_at, field="lease.released_at"), lease_index)
             for resource_id in lease.resource_ids:
                 latest = latest_settled_by_resource_id.get(resource_id)
-                release_marker = (lease.released_at, lease_index)
-                if latest is None or release_marker > latest[:2]:
-                    latest_settled_by_resource_id[resource_id] = (
-                        lease.released_at,
-                        lease_index,
-                        lease.target_status_after_release,
-                    )
+                if latest is None or released_marker > latest[0]:
+                    latest_settled_by_resource_id[resource_id] = (released_marker, lease.target_status_after_release)
                 if lease.target_status_after_release == "INVALID":
                     invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
-                    if invalid_released_at is None or release_marker > invalid_released_at:
-                        invalid_released_at_by_resource_id[resource_id] = release_marker
+                    if invalid_released_at is None or released_marker > invalid_released_at:
+                        invalid_released_at_by_resource_id[resource_id] = released_marker
+        for resource_id in lease.resource_ids:
+            leases_by_resource_id.setdefault(resource_id, []).append((acquired_marker, released_marker, lease))
 
     for resource_id in active_resource_ids:
         if resources_by_id[resource_id].status != "IN_USE":
@@ -456,15 +455,26 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
             raise ResourceLifecycleContractError("IN_USE 资源必须由唯一 active lease 持有")
         if record.status != "IN_USE" and resource_id not in active_resource_ids:
             latest_settled = latest_settled_by_resource_id.get(resource_id)
-            if latest_settled is not None and record.status != latest_settled[2]:
+            if latest_settled is not None and record.status != latest_settled[1]:
                 raise ResourceLifecycleContractError("资源状态必须与最新 settled lease truth 一致")
         invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
         if invalid_released_at is not None:
             if record.status != "INVALID":
                 raise ResourceLifecycleContractError("INVALID 资源不得被重新写回其他状态")
-            for lease_index, lease in leases_by_resource_id.get(resource_id, []):
-                if (lease.acquired_at, lease_index) > invalid_released_at:
+            for acquired_marker, _, _lease in leases_by_resource_id.get(resource_id, []):
+                if acquired_marker > invalid_released_at:
                     raise ResourceLifecycleContractError("INVALID 资源不得在 settled 后再次被 lease 占用")
+        intervals = sorted(leases_by_resource_id.get(resource_id, []), key=lambda item: item[0])
+        previous_end: tuple[datetime, int] | None = None
+        active_seen = False
+        for acquired_marker, released_marker, _lease in intervals:
+            if active_seen:
+                raise ResourceLifecycleContractError("active lease 之后不得再出现后续 lease")
+            if previous_end is not None and acquired_marker < previous_end:
+                raise ResourceLifecycleContractError("同一资源的 lease 时间区间不得重叠")
+            previous_end = released_marker
+            if released_marker is None:
+                active_seen = True
 
 
 def validate_resource_record(record: ResourceRecord) -> None:
@@ -473,7 +483,7 @@ def validate_resource_record(record: ResourceRecord) -> None:
         raise ResourceLifecycleContractError("resource.resource_type 不在允许值范围内")
     if record.status not in RESOURCE_STATUSES:
         raise ResourceLifecycleContractError("resource.status 不在允许值范围内")
-    normalize_json_value(record.material, field=f"resource[{record.resource_id}].material")
+    normalize_resource_material(record.material, field=f"resource[{record.resource_id}].material")
 
 
 def validate_resource_bundle(bundle: ResourceBundle) -> None:
@@ -506,14 +516,16 @@ def validate_resource_lease(lease: ResourceLease) -> None:
     require_non_empty_string(lease.adapter_key, field="lease.adapter_key")
     require_non_empty_string(lease.capability, field="lease.capability")
     validate_unique_non_empty_strings(lease.resource_ids, field="lease.resource_ids")
-    validate_rfc3339_utc(lease.acquired_at, field="lease.acquired_at")
+    acquired_at = parse_rfc3339_utc_datetime(lease.acquired_at, field="lease.acquired_at")
 
     if lease.released_at is None:
         if lease.target_status_after_release is not None or lease.release_reason is not None:
             raise ResourceLifecycleContractError("active lease 不得包含 release 收口字段")
         return
 
-    validate_rfc3339_utc(lease.released_at, field="lease.released_at")
+    released_at = parse_rfc3339_utc_datetime(lease.released_at, field="lease.released_at")
+    if released_at < acquired_at:
+        raise ResourceLifecycleContractError("lease.released_at 不得早于 lease.acquired_at")
     if lease.target_status_after_release not in RELEASE_TARGET_STATUSES:
         raise ResourceLifecycleContractError("lease.target_status_after_release 不在允许值范围内")
     require_non_empty_string(lease.release_reason, field="lease.release_reason")
@@ -865,6 +877,25 @@ def validate_unique_non_empty_strings(values: Sequence[str], *, field: str) -> N
 def validate_rfc3339_utc(value: str, *, field: str) -> None:
     if not isinstance(value, str) or not is_valid_rfc3339_utc(value):
         raise ResourceLifecycleContractError(f"{field} 必须为 RFC3339 UTC 时间")
+
+
+def parse_rfc3339_utc_datetime(value: str, *, field: str) -> datetime:
+    validate_rfc3339_utc(value, field=field)
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as error:
+        raise ResourceLifecycleContractError(f"{field} 必须为 RFC3339 UTC 时间") from error
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise ResourceLifecycleContractError(f"{field} 必须是 UTC 时间")
+    return parsed.astimezone(timezone.utc)
+
+
+def normalize_resource_material(value: Any, *, field: str) -> Any:
+    try:
+        return normalize_json_value(value, field=field)
+    except TaskRecordContractError as error:
+        raise ResourceLifecycleContractError(str(error)) from error
 
 
 def _selected_resource_for_slot(

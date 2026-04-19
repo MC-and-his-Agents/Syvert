@@ -43,6 +43,7 @@
 - guardian 第六轮 review 已把阻断收敛到 store bootstrap / 持久化异常边界；当前工作树已把 `seed_resources()` 收紧为“仅允许同值重播，不得覆写既有资源 truth”，并把锁文件准备、`flock`、原子写临时文件等 `OSError` 统一包成 `ResourceLifecyclePersistenceError`。
 - guardian 第七轮 review 已把阻断收敛到 durable snapshot 语义校验；当前工作树已让 `validate_snapshot()` 同时校验最新 settled lease 与当前资源 truth 的一致性，并禁止 `INVALID` 终态之后再出现任何后续 lease。
 - guardian 第八轮 review 已把阻断收敛到 post-commit unlock 伪失败、同秒序列排序与 `requested_slots` 非法输入；当前工作树已把 `LOCK_UN` 失败降为 best-effort、把 lifecycle 时间戳提到微秒并用“时间戳 + durable lease 顺序”判定最新 truth，同时把 slot 校验改成逐项验证后再去重。
+- guardian 第九轮 review 已把阻断收敛到快照时间排序与历史语义完整性；当前工作树已把所有 lease 事件排序切到解析后的 UTC datetime、补齐 `released_at >= acquired_at` 与同资源 lease 区间不重叠校验，并把 `material` 归一失败统一收口为资源生命周期 contract 错误。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -71,7 +72,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（34 tests, OK）
+  - 结果：通过（39 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -123,6 +124,12 @@
     - `now_rfc3339_utc()` 提升到微秒精度，且 `validate_snapshot()` 以“时间戳 + lease 顺序”推导最新 settled truth，消除同秒多次生命周期转换的错误排序
     - `validate_requested_slots()` 改为逐项校验字符串合法性后再做去重，避免非 hashable slot 直接触发原始 `TypeError`
     - 新增 unlock-after-commit 仍返回成功、同秒 `AVAILABLE -> AVAILABLE -> INVALID` 合法序列、以及非 hashable `requested_slots` 返回 `invalid_resource_request` 回归
+  - 第九轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `validate_snapshot()` 的 lease 事件排序统一改为解析后的 UTC datetime + lease 顺序 marker，消除混合精度 RFC3339 字符串比较带来的错序
+    - `validate_resource_lease()` 新增 `released_at >= acquired_at` 约束，`validate_snapshot()` 新增同一资源 lease 区间不得重叠、`INVALID` 终态后不得再有后续 lease 的历史校验
+    - `normalize_json_value()` 的 `material` 归一失败通过 `normalize_resource_material()` 统一转成 `ResourceLifecycleContractError`，避免坏快照以 `TaskRecordContractError` 形式逃逸
+    - 新增 mixed-precision `INVALID` 后重占用、非法 `material`、`released_at < acquired_at` 与重叠 lease 区间回归
 
 ## 未决风险
 

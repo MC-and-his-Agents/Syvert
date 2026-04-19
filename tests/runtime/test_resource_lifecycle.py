@@ -773,6 +773,41 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
+    def test_acquire_fails_closed_for_snapshot_with_invalid_material_payload(self) -> None:
+        Path(self._resource_store_path).write_text(
+            """
+            {
+              "schema_version": "v0.4.0",
+              "revision": 1,
+              "resources": [
+                {
+                  "resource_id": "account-001",
+                  "resource_type": "account",
+                  "status": "AVAILABLE",
+                  "material": {"provider_account_id": NaN}
+                }
+              ],
+              "leases": []
+            }
+            """,
+            encoding="utf-8",
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-material",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013-material",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
     def test_acquire_returns_failed_envelope_when_store_write_setup_raises_oserror(self) -> None:
         self.seed_default_resources()
 

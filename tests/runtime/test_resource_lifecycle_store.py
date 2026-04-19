@@ -357,6 +357,161 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(ResourceLifecyclePersistenceError):
             self.make_store().load_snapshot()
 
+    def test_load_snapshot_rejects_invalid_material_payload(self) -> None:
+        Path(self._resource_store_path).write_text(
+            """
+            {
+              "schema_version": "v0.4.0",
+              "revision": 1,
+              "resources": [
+                {
+                  "resource_id": "account-001",
+                  "resource_type": "account",
+                  "status": "AVAILABLE",
+                  "material": {"provider_account_id": NaN}
+                }
+              ],
+              "leases": []
+            }
+            """,
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
+
+    def test_load_snapshot_rejects_released_at_before_acquired_at(self) -> None:
+        Path(self._resource_store_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "v0.4.0",
+                    "revision": 1,
+                    "resources": [
+                        {
+                            "resource_id": "account-001",
+                            "resource_type": "account",
+                            "status": "AVAILABLE",
+                            "material": {"provider_account_id": "pa-001"},
+                        }
+                    ],
+                    "leases": [
+                        {
+                            "lease_id": "lease-invalid-order",
+                            "bundle_id": "bundle-invalid-order",
+                            "task_id": "task-invalid-order",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:01:00Z",
+                            "released_at": "2026-04-20T00:00:00Z",
+                            "target_status_after_release": "AVAILABLE",
+                            "release_reason": "normal",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
+
+    def test_load_snapshot_rejects_overlapping_resource_leases(self) -> None:
+        Path(self._resource_store_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "v0.4.0",
+                    "revision": 2,
+                    "resources": [
+                        {
+                            "resource_id": "account-001",
+                            "resource_type": "account",
+                            "status": "AVAILABLE",
+                            "material": {"provider_account_id": "pa-001"},
+                        }
+                    ],
+                    "leases": [
+                        {
+                            "lease_id": "lease-a",
+                            "bundle_id": "bundle-a",
+                            "task_id": "task-a",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:00:00Z",
+                            "released_at": "2026-04-20T00:02:00Z",
+                            "target_status_after_release": "AVAILABLE",
+                            "release_reason": "normal",
+                        },
+                        {
+                            "lease_id": "lease-b",
+                            "bundle_id": "bundle-b",
+                            "task_id": "task-b",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:01:00Z",
+                            "released_at": "2026-04-20T00:03:00Z",
+                            "target_status_after_release": "AVAILABLE",
+                            "release_reason": "normal",
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
+
+    def test_load_snapshot_rejects_mixed_precision_reacquire_after_invalid(self) -> None:
+        Path(self._resource_store_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "v0.4.0",
+                    "revision": 2,
+                    "resources": [
+                        {
+                            "resource_id": "account-001",
+                            "resource_type": "account",
+                            "status": "AVAILABLE",
+                            "material": {"provider_account_id": "pa-001"},
+                        }
+                    ],
+                    "leases": [
+                        {
+                            "lease_id": "lease-invalid",
+                            "bundle_id": "bundle-invalid",
+                            "task_id": "task-invalid",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:00:00Z",
+                            "released_at": "2026-04-20T00:00:00Z",
+                            "target_status_after_release": "INVALID",
+                            "release_reason": "burned",
+                        },
+                        {
+                            "lease_id": "lease-reacquire",
+                            "bundle_id": "bundle-reacquire",
+                            "task_id": "task-reacquire",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:00:00.000001Z",
+                            "released_at": "2026-04-20T00:00:01Z",
+                            "target_status_after_release": "AVAILABLE",
+                            "release_reason": "normal",
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
+
 
 if __name__ == "__main__":
     unittest.main()
