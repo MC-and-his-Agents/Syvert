@@ -79,6 +79,11 @@ class LocalResourceLifecycleStore:
                     if resource_id in {record.resource_id for record in seeded}:
                         raise ResourceLifecyclePersistenceError("存在 active lease 时不得覆写其绑定资源")
         for record in seeded:
+            existing = existing_by_id.get(record.resource_id)
+            if existing is not None and existing.status == "INVALID" and record.status != "INVALID":
+                raise ResourceLifecyclePersistenceError(
+                    "resource_state_conflict: INVALID 资源不得被重新写回可分配状态"
+                )
             existing_by_id[record.resource_id] = record
         updated_snapshot = ResourceLifecycleSnapshot(
             schema_version=snapshot.schema_version,

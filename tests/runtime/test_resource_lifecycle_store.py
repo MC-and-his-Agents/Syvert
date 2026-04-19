@@ -250,6 +250,52 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         marker = reloaded.resources[0].material["marker"]
         self.assertIn(marker, {"a", "b"})
 
+    def test_seed_resources_cannot_resurrect_invalid_resource(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-invalid",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-invalid",
+        )
+        assert isinstance(bundle, ResourceBundle)
+        release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-invalid",
+                target_status_after_release="INVALID",
+                reason="burned",
+            ),
+            store,
+            "task-context-invalid",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            store.seed_resources(
+                [
+                    ResourceRecord(
+                        resource_id="account-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material={"provider_account_id": "pa-001", "marker": "revived"},
+                    )
+                ]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

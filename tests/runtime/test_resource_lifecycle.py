@@ -388,6 +388,24 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result["error"]["code"], "invalid_resource_release")
+        self.assertEqual(result["error"]["category"], "invalid_input")
+
+    def test_release_invalid_non_string_fields_map_to_invalid_resource_release(self) -> None:
+        self.seed_default_resources()
+
+        result = release(
+            {
+                "lease_id": 123,
+                "task_id": "task-010e",
+                "target_status_after_release": "AVAILABLE",
+                "reason": "normal",
+            },
+            self.make_store(),
+            "task-context-010e",
+        )
+
+        self.assertEqual(result["error"]["category"], "invalid_input")
+        self.assertEqual(result["error"]["code"], "invalid_resource_release")
 
     def test_acquire_failure_backfills_task_id_from_context(self) -> None:
         self.seed_default_resources()

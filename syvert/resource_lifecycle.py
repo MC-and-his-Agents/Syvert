@@ -501,13 +501,13 @@ def normalize_acquire_request(request: Any) -> AcquireRequest:
 
 def normalize_release_request(request: Any) -> ReleaseRequest:
     normalized = ReleaseRequest(
-        lease_id=require_non_empty_string(extract_string(request, "lease_id"), field="release.lease_id"),
-        task_id=require_non_empty_string(extract_string(request, "task_id"), field="release.task_id"),
+        lease_id=require_non_empty_string(extract_release_string(request, "lease_id"), field="release.lease_id"),
+        task_id=require_non_empty_string(extract_release_string(request, "task_id"), field="release.task_id"),
         target_status_after_release=require_non_empty_string(
-            extract_string(request, "target_status_after_release"),
+            extract_release_string(request, "target_status_after_release"),
             field="release.target_status_after_release",
         ),
-        reason=require_non_empty_string(extract_string(request, "reason"), field="release.reason"),
+        reason=require_non_empty_string(extract_release_string(request, "reason"), field="release.reason"),
     )
     validate_release_request(normalized)
     return normalized
@@ -769,6 +769,13 @@ def extract_string(request: Any, field: str) -> str:
     value = extract_value(request, field)
     if not isinstance(value, str):
         raise invalid_request_error(f"{field} 必须为非空字符串")
+    return value
+
+
+def extract_release_string(request: Any, field: str) -> str:
+    value = extract_value(request, field)
+    if not isinstance(value, str):
+        raise invalid_release_error(f"{field} 必须为非空字符串")
     return value
 
 
