@@ -33,7 +33,7 @@
 
 - `issue-168-fr-0012-formal-spec` 已作为 `#168` 的独立 spec worktree 建立。
 - `FR-0012` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 最新 formal spec 语义 checkpoint `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
+- 最新 formal spec 语义 checkpoint `d2125d7d577de96a32f0e3e0b87e36c2cb19b02b` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
 - spec PR `#171` 已创建并绑定当前分支。
 - 当前分支已 rebase 到包含 `#170` 与 `#169` 的最新 `origin/main`。
 - 当前停点是同步 review-sync / checkpoint 记录，并等待 guardian 对当前 live head 给出 merge gate 结论。
@@ -68,8 +68,8 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-168-fr-0012-formal-spec`
   - 结果：通过
-- `git commit -m 'docs(spec): 补齐 FR-0012 资源处置提示非法输入约束'`
-  - 结果：已生成最新语义 checkpoint `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf`
+- `git commit -m 'docs(spec): 收紧 FR-0012 资源包完整复用约束'`
+  - 结果：已生成最新语义 checkpoint `d2125d7d577de96a32f0e3e0b87e36c2cb19b02b`
 
 ## 未决风险
 
@@ -82,5 +82,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf`
+- `d2125d7d577de96a32f0e3e0b87e36c2cb19b02b`
 - review-sync 说明：后续若只追加 exec-plan checkpoint 同步或 PR metadata，则不把 metadata-only 收口伪装成新的语义 checkpoint。
