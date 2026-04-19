@@ -43,6 +43,7 @@
     - `from_status`
     - `to_status`
     - `occurred_at`
+      - RFC3339 UTC 时间戳
     - `reason`
   - `reason` 在 `v0.4.0` 内对所有事件都是必填字段：
     - `acquired`：表达资源为何被当前 task 占用；最小 canonical 语义允许使用 `acquired_for_task`
@@ -133,6 +134,7 @@ Then Core 必须把该迁移视为不成立并 fail-closed，而不是把 tracin
 ## 验收标准
 
 - [ ] formal spec 明确冻结 `ResourceTraceEvent` 的最小字段集合与 append-only 语义
+- [ ] formal spec 明确冻结 `occurred_at` 的 RFC3339 UTC 时间约束
 - [ ] formal spec 明确冻结 `acquired / released / invalidated` 事件类型与最小时间线
 - [ ] formal spec 明确冻结 task/resource/lease/bundle 的关联字段
 - [ ] formal spec 明确要求资源使用日志可由 tracing truth 按 `task_id`、`resource_id`、`lease_id` 与 `bundle_id` 重建

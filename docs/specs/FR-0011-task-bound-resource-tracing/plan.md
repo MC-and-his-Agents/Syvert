@@ -40,7 +40,7 @@
   - `python3 scripts/workflow_guard.py --mode ci`
 - implementation 阶段：
   - tracing 事件序列单测：验证 append-only、重复事件幂等与冲突 fail-closed
-  - task-bound usage projection 测试：验证按 `task_id` / `resource_id` / `lease_id` 可重建最小时间线
+  - task-bound usage projection 测试：验证按 `task_id` / `resource_id` / `lease_id` / `bundle_id` 可重建最小时间线
   - 资源生命周期集成测试：验证状态迁移成功时 tracing truth 必然存在
 - 手动验证：
   - 逐条核对 `FR-0011` 与 `FR-0010` / `FR-0012` 的交界，确保 tracing 不再长出第二套状态机或注入 contract

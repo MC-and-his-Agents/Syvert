@@ -7,7 +7,7 @@
 - 实体：`TaskResourceUsageLog`
   - 用途：表达基于 `ResourceTraceEvent` 构建的 task-bound 最小审计投影
 - 实体：`ResourceLeaseTimeline`
-  - 用途：表达某个 `lease_id` 在 acquire 到 release/invalidate 之间的最小时间线视图
+  - 用途：表达某个 `lease_id` / `bundle_id` 的聚合时间线视图；它只能汇总 `ResourceTraceEvent`，不得替代按 `resource_id` 回放的 canonical 事件时间线
 
 ## 关键字段
 
@@ -48,12 +48,12 @@
     - 约束：唯一指向某组资源被某个 task 占用的时间线
   - `bundle_id`
     - 约束：必须与同一时间线下的全部事件一致
-  - `resource_ids`
-    - 约束：必须覆盖该 lease 涉及的全部资源
-  - `acquired_at`
-    - 约束：来自 `acquired` 事件
-  - `released_at` / `invalidated_at`
-    - 约束：二者最多出现其一，用于收口时间线
+  - `resource_timelines`
+    - 约束：必须按 `resource_id` 汇总该 lease 涉及的全部资源时间线，且不得丢失 per-resource 收口事实
+  - `resource_timelines[].acquired_at`
+    - 约束：来自对应 `resource_id` 的 `acquired` 事件
+  - `resource_timelines[].released_at` / `resource_timelines[].invalidated_at`
+    - 约束：二者最多出现其一，用于表达对应 `resource_id` 的收口时间线
 
 ## 生命周期
 

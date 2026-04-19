@@ -66,11 +66,13 @@
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
 - `git commit -m 'docs(spec): 冻结 FR-0011 任务级资源追踪 formal spec'`
-  - 结果：已生成初始 checkpoint `c330d9145746674447b2b894082e67083d91cc26`
+  - 结果：已生成初始 checkpoint `c330d9164cdd92aea839dbacf1d6dbd46d174b8b`
 - `git commit -m 'docs(spec): 对齐 FR-0011 tracing 字段语义'`
   - 结果：已生成中间语义 checkpoint `b19c63f3a025b327dc3485a36640236f096398fa`
 - `git commit -m 'docs(spec): 收口 FR-0011 guardian 审查问题'`
   - 结果：已生成最新语义 checkpoint `8241217d65fe9dda57a783b55cbdec5d040f14de`
+- `git commit -m 'docs(exec-plan): 同步 FR-0011 最新 checkpoint 真相'`
+  - 结果：metadata-only follow-up `a523bd776e69ba8938369c94af308194c73931ab`，用于对齐 checkpoint 证据链，不改写最新语义 checkpoint
 
 ## 未决风险
 
@@ -84,4 +86,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `8241217d65fe9dda57a783b55cbdec5d040f14de`
-- review-sync 说明：本次 head 已吸纳 guardian 指出的语义补齐；后续若只追加 exec-plan / PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
+- review-sync 说明：当前 live head `a523bd776e69ba8938369c94af308194c73931ab` 仅是 checkpoint truth 对齐的 metadata-only follow-up；最新语义 checkpoint 仍为 `8241217d65fe9dda57a783b55cbdec5d040f14de`。
