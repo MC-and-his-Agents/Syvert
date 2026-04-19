@@ -21,7 +21,7 @@
 ## 范围
 
 - 本次纳入：
-  - `docs/exec-plans/CHORE-0130-v0-3-0-phase-and-release-closeout.md`
+  - `docs/exec-plans/GOV-0033-v0-3-0-phase-and-release-closeout.md`
   - `docs/releases/v0.3.0.md`
   - `docs/sprints/2026-S16.md`
   - GitHub `#126` / `#159` issue 正文、Project 状态与关闭语义对齐
@@ -44,7 +44,7 @@
 
 ## 下一步动作
 
-- 落盘 `CHORE-0130` exec-plan，并把 release / sprint 索引改成最终完成态，不再保留 active closeout 入口。
+- 落盘 `GOV-0033` exec-plan，并把 release / sprint 索引改成最终完成态，不再保留 active closeout 入口。
 - 在当前 head 上完成受控 PR 创建、guardian 与 merge gate，合入主干。
 - 合并后同步 `main`，创建 tag `v0.3.0`，发布 GitHub Release `v0.3.0`。
 - 随后回写并关闭 `#126` 与 `#159`，确认 Project 状态、tag / release 与仓内真相一致。
