@@ -33,9 +33,9 @@
 
 - `issue-166-fr-0011-formal-spec` 已作为 `#166` 的独立 spec worktree 建立。
 - `FR-0011` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 最新 formal spec 语义 checkpoint `8241217d65fe9dda57a783b55cbdec5d040f14de` 已生成，并已覆盖 guardian 指出的 `bundle_id` / `occurred_at` 语义补齐。
+- 最新 formal spec 语义 checkpoint `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 已生成，并已收口 guardian 指出的 checkpoint SHA、timeline 粒度、`bundle_id` 验证维度与 `occurred_at` 格式约束问题。
 - spec PR `#169` 已创建并绑定当前分支。
-- 当前停点是将最新语义 checkpoint 的验证链与 PR live head 对齐后继续进入 guardian / merge gate。
+- 当前停点是等待 guardian / merge gate 基于最新语义 checkpoint `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 完成最终收口。
 
 ## 下一步动作
 
@@ -73,6 +73,16 @@
   - 结果：已生成最新语义 checkpoint `8241217d65fe9dda57a783b55cbdec5d040f14de`
 - `git commit -m 'docs(exec-plan): 同步 FR-0011 最新 checkpoint 真相'`
   - 结果：metadata-only follow-up `a523bd776e69ba8938369c94af308194c73931ab`，用于对齐 checkpoint 证据链，不改写最新语义 checkpoint
+- `git commit -m 'docs(spec): 收口 FR-0011 guardian 剩余阻断项'`
+  - 结果：已生成最新语义 checkpoint `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：已针对 `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：已针对 `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：已针对 `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-166-fr-0011-formal-spec`
+  - 结果：已针对 `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166` 通过
 
 ## 未决风险
 
@@ -85,5 +95,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8241217d65fe9dda57a783b55cbdec5d040f14de`
-- review-sync 说明：当前 live head `a523bd776e69ba8938369c94af308194c73931ab` 仅是 checkpoint truth 对齐的 metadata-only follow-up；最新语义 checkpoint 仍为 `8241217d65fe9dda57a783b55cbdec5d040f14de`。
+- `2d42d7bc9e011b0b52c8f9117aa22f51b92d5166`
+- review-sync 说明：当前 live head 已与最新语义 checkpoint 对齐；后续若只追加 exec-plan / PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
