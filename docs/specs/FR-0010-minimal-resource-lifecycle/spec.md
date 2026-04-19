@@ -32,11 +32,12 @@
 - 功能需求：
   - `v0.4.0` 受管资源类型固定为 `account` 与 `proxy`，Core 不得在本 FR 中提前扩张到浏览器、设备或任意自定义资源族。
   - 每个共享资源至少必须具备稳定 `resource_id`、固定 `resource_type`、最小状态 `status` 与供后续消费的 `material`。`material` 允许承载类型专属、JSON-safe 的不透明 payload，但不得改变顶层共享字段命名。
-  - Core 侧最小 `acquire` 请求必须显式携带 `task_id`、`adapter_key`、`capability` 与 `requested_slots`；其中 `requested_slots` 必须为非空数组，且允许值固定为 `account`、`proxy`。
+  - Core 侧最小 `acquire` 请求必须显式携带 `task_id`、`adapter_key`、`capability` 与 `requested_slots`；其中 `requested_slots` 必须为非空、去重数组，且允许值固定为 `account`、`proxy`。
   - `acquire` 成功时必须返回单个 `ResourceBundle`，至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与对应 slot 下的资源实体。
   - `acquire` 的成功语义必须是“整包成功”：一旦请求声明某个 slot，Core 只有在该 slot 已被确定绑定到 `AVAILABLE` 资源时才可返回成功；不得返回缺 slot 的部分 bundle 并把其伪装成成功。
   - `release` 请求必须显式携带 `lease_id`、`task_id`、`target_status_after_release` 与 `reason`。`target_status_after_release` 在 `v0.4.0` 只允许 `AVAILABLE` 或 `INVALID`。
   - `release` 成功时必须只作用于该 `lease_id` 所绑定的同一组资源；Core 不得把 release 扩散到其他 bundle、其他 lease 或其他 task 的持有关系。
+  - `release` 成功时必须返回同一 `lease_id` 的 settled `ResourceLease` 视图，至少包含 `lease_id`、`bundle_id`、`task_id`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release` 与 `release_reason`；后续实现不得在 `void`、确认字符串或另一套影子 carrier 之间自由发挥。
   - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
 - 契约需求：
   - 共享资源状态集合在 `v0.4.0` 固定为：

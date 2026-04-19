@@ -13,7 +13,7 @@
     - `task_id`
     - `adapter_key`
     - `capability`
-    - `requested_slots[]`，允许值固定为 `account`、`proxy`
+    - `requested_slots[]`，必须非空且去重，允许值固定为 `account`、`proxy`
   - 输出：
     - 成功时返回单个 `ResourceBundle`
     - `ResourceBundle` 至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与对应 slot 下的资源实体
@@ -27,7 +27,7 @@
     - `target_status_after_release`
     - `reason`
   - 输出：
-    - 成功时确认同一 `lease_id` 已被一致收口
+    - 成功时返回 settled `ResourceLease`
   - 成功约束：
     - `target_status_after_release` 只允许 `AVAILABLE` 或 `INVALID`
     - release 只允许作用于该 lease 当前持有的资源集合
@@ -37,9 +37,9 @@
 - `invalid_input`
   - 适用场景：
     - 缺少 `task_id`、`adapter_key`、`capability`
-    - `requested_slots` 为空或形状不合法
-    - `requested_slots` 出现 `account`、`proxy` 之外的未知 slot
-    - `release` 缺少 `lease_id` 或 `task_id`
+    - `requested_slots` 为空、重复、形状不合法或出现 `account`、`proxy` 之外的未知 slot
+    - `release` 缺少 `lease_id`、`task_id`、`target_status_after_release` 或 `reason`
+    - `target_status_after_release` 不是 `AVAILABLE` 或 `INVALID`
 - `runtime_contract`
   - 适用场景：
     - 任一 `requested_slot` 没有可用 `AVAILABLE` 资源，导致整包 acquire 无法成立
