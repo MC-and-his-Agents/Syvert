@@ -133,5 +133,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2ee25c77f4a3595399a03c2a00543712842ad192`
-- 说明：该 checkpoint 对应阶段 A 合入后的主干事实，已经包含 `GOV-0033` 的两阶段决策与仓内 carrier 收口。当前分支只作为阶段 B `metadata-only closeout follow-up`，把已建立的 tag / GitHub Release 与仓内 release / sprint 最终发布真相对齐。
+- `4b6040aaf1a263584ee53b49213fef59abfc17ef`
+- 说明：该 checkpoint 把已建立的 `v0.3.0` tag / GitHub Release 与 `docs/releases/v0.3.0.md`、`docs/sprints/2026-S16.md` 的发布完成真相同步到同一条仓内语义链。当前受审 head 若继续存在后续 commit，只允许用于 review / merge gate / GitHub carrier 同步，不再改写该 checkpoint 语义。
