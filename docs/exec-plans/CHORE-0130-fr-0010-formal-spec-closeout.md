@@ -33,13 +33,13 @@
 
 - `issue-164-fr-0010-formal-spec` 已作为 `#164` 的独立 spec worktree 建立。
 - `FR-0010` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 最新 formal spec 语义 checkpoint `54d383278ca0eeb5a7fb4914ff43e76ff1f51665` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
+- 最新 formal spec 语义 checkpoint `f1b8ea89a54e754356b428aa01aebd900d246991` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
 - spec PR `#170` 已创建并绑定当前分支。
-- 当前停点是基于当前 live head 收口 review-sync / checkpoint 口径，并等待最新 guardian verdict。
+- 当前停点是最新 semantic checkpoint 已对齐到 review-sync / checkpoint 记录，等待 PR checks / guardian 基于当前 live head 继续收口。
 
 ## 下一步动作
 
-- 完成 review-sync / checkpoint 口径修正后，刷新最新 PR checks 与 guardian verdict。
+- 刷新最新 PR checks 与 guardian verdict。
 - 若 guardian 放行，则执行受控 merge 并关闭 `#164`。
 - `#164` 合入主干后，再把 `FR-0011` / `FR-0012` rebase 到新主干继续收口。
 
@@ -67,8 +67,8 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-164-fr-0010-formal-spec`
   - 结果：通过
-- `git commit -m 'docs(spec): 收口 FR-0010 审查同步与幂等释放语义'`
-  - 结果：已生成最新语义 checkpoint `54d383278ca0eeb5a7fb4914ff43e76ff1f51665`
+- `git commit -m 'docs(spec): 补齐 FR-0010 资源分配与失败回填契约'`
+  - 结果：已生成最新语义 checkpoint `f1b8ea89a54e754356b428aa01aebd900d246991`
 
 ## 未决风险
 
@@ -81,5 +81,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `54d383278ca0eeb5a7fb4914ff43e76ff1f51665`
-- review-sync 说明：后续若只追加 exec-plan、`plan.md` 审查口径同步或 PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
+- `f1b8ea89a54e754356b428aa01aebd900d246991`
+- review-sync 说明：后续若只追加 exec-plan checkpoint 同步、`plan.md` 审查口径同步或 PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。

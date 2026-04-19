@@ -18,8 +18,8 @@
 - `FR-0010` 只冻结资源生命周期主 contract：资源类型、bundle/lease carrier、状态迁移与 `acquire / release` 语义。
 - task-bound tracing / audit contract 留给 `FR-0011`，Adapter 注入边界留给 `FR-0012`；相邻事项不得反向改写本 FR 的主 contract。
 - 后续实现 Work Item 必须消费本 formal spec，而不是在实现 PR 中重开状态名、slot 命名或 lease 语义。
-- 当前分支已形成最新 formal spec 语义 checkpoint `54d383278ca0eeb5a7fb4914ff43e76ff1f51665`；其后若仅追加 exec-plan、`plan.md` 审查口径同步或 PR metadata，只作为 review-sync follow-up，不改写 requirement 语义。
+- 当前分支已形成最新 formal spec 语义 checkpoint `f1b8ea89a54e754356b428aa01aebd900d246991`；其后若仅追加 exec-plan checkpoint 同步、`plan.md` 审查口径同步或 PR metadata，只作为 review-sync follow-up，不改写 requirement 语义。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `54d383278ca0eeb5a7fb4914ff43e76ff1f51665`
+- `f1b8ea89a54e754356b428aa01aebd900d246991`
