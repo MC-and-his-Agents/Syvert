@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0010-minimal-resource-lifecycle/`
 - 关联 PR：`#170`
-- 状态：`requirement container`
+- 状态：`inactive requirement container`
 
 ## 说明
 
