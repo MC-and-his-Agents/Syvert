@@ -85,7 +85,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.account.status, "IN_USE")
         self.assertEqual(result.proxy.status, "IN_USE")
 
-    def test_concurrent_acquire_retries_when_spare_capacity_still_exists(self) -> None:
+    def test_concurrent_acquire_fails_closed_after_stale_selection_conflict(self) -> None:
         class ConcurrentAcquireStore:
             def __init__(self, inner_store):
                 self._inner_store = inner_store
@@ -144,13 +144,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         thread_b.join()
 
         self.assertEqual(len(results), 2)
-        self.assertTrue(all(isinstance(result, ResourceBundle) for result in results))
-        resource_ids = {
-            result.account.resource_id
-            for result in results
-            if isinstance(result, ResourceBundle) and result.account is not None
-        }
-        self.assertEqual(resource_ids, {"account-001", "account-002"})
+        successes = [result for result in results if isinstance(result, ResourceBundle)]
+        failures = [result for result in results if isinstance(result, dict)]
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["error"]["code"], "resource_state_conflict")
+        snapshot = self.make_store().load_snapshot()
+        statuses = {record.resource_id: record.status for record in snapshot.resources}
+        self.assertEqual(statuses["account-001"], "IN_USE")
+        self.assertEqual(statuses["account-002"], "AVAILABLE")
 
     def test_acquire_fails_closed_when_any_slot_is_missing(self) -> None:
         self.make_store().seed_resources(
@@ -513,6 +515,19 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["capability"], "")
         self.assertEqual(result["error"]["code"], "invalid_resource_request")
 
+    def test_acquire_requires_non_empty_task_context(self) -> None:
+        with self.assertRaisesRegex(ValueError, "task_context_task_id"):
+            acquire(
+                {
+                    "task_id": "task-011b",
+                    "adapter_key": "xhs",
+                    "capability": "content_detail_by_url",
+                    "requested_slots": ("account",),
+                },
+                self.make_store(),
+                "",
+            )
+
     def test_release_failure_backfills_from_lease_context(self) -> None:
         self.seed_default_resources()
         bundle = acquire(
@@ -542,6 +557,19 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["adapter_key"], "douyin")
         self.assertEqual(result["capability"], "content_detail_by_url")
         self.assertEqual(result["error"]["code"], "invalid_resource_release")
+
+    def test_release_requires_non_empty_task_context(self) -> None:
+        with self.assertRaisesRegex(ValueError, "task_context_task_id"):
+            release(
+                {
+                    "lease_id": "lease-012b",
+                    "task_id": "task-012b",
+                    "target_status_after_release": "AVAILABLE",
+                    "reason": "normal",
+                },
+                self.make_store(),
+                "",
+            )
 
     def test_release_is_idempotent_under_concurrent_same_semantics(self) -> None:
         class ConcurrentReleaseStore:

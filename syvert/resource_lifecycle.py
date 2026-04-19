@@ -109,6 +109,7 @@ def acquire(
     store: ResourceLifecycleStore,
     task_context_task_id: str,
 ) -> ResourceAcquireResult:
+    task_context_task_id = require_task_context_task_id(task_context_task_id)
     envelope_task_id = recover_acquire_failure_task_id(request, task_context_task_id)
     adapter_key = recover_acquire_failure_adapter_key(request)
     capability = recover_acquire_failure_capability(request)
@@ -128,35 +129,27 @@ def acquire(
     adapter_key = normalized_request.adapter_key
     capability = normalized_request.capability
     try:
-        current_snapshot = snapshot
-        while True:
-            selected = select_available_resources(current_snapshot, normalized_request.requested_slots)
-            acquired_at = now_rfc3339_utc()
-            bundle = build_resource_bundle(
-                task_id=normalized_request.task_id,
-                adapter_key=adapter_key,
-                capability=capability,
-                requested_slots=normalized_request.requested_slots,
-                selected_resources=selected,
-                acquired_at=acquired_at,
-            )
-            lease = build_resource_lease(bundle)
-            updated_resources = apply_acquire_transition(current_snapshot.resources, selected)
-            updated_snapshot = ResourceLifecycleSnapshot(
-                schema_version=current_snapshot.schema_version,
-                revision=current_snapshot.revision + 1,
-                resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
-                leases=tuple([*current_snapshot.leases, lease]),
-            )
-            validate_snapshot(updated_snapshot)
-            try:
-                store.write_snapshot(updated_snapshot)
-                return bundle
-            except ResourceLifecycleContractError as error:
-                if not is_retryable_revision_conflict(error):
-                    raise
-                current_snapshot = store.load_snapshot()
-                validate_snapshot(current_snapshot)
+        selected = select_available_resources(snapshot, normalized_request.requested_slots)
+        acquired_at = now_rfc3339_utc()
+        bundle = build_resource_bundle(
+            task_id=normalized_request.task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            requested_slots=normalized_request.requested_slots,
+            selected_resources=selected,
+            acquired_at=acquired_at,
+        )
+        lease = build_resource_lease(bundle)
+        updated_resources = apply_acquire_transition(snapshot.resources, selected)
+        updated_snapshot = ResourceLifecycleSnapshot(
+            schema_version=snapshot.schema_version,
+            revision=snapshot.revision + 1,
+            resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
+            leases=tuple([*snapshot.leases, lease]),
+        )
+        validate_snapshot(updated_snapshot)
+        store.write_snapshot(updated_snapshot)
+        return bundle
     except ResourceLifecycleContractError as error:
         return failure_envelope(
             normalized_request.task_id,
@@ -171,6 +164,7 @@ def release(
     store: ResourceLifecycleStore,
     task_context_task_id: str,
 ) -> ResourceReleaseResult:
+    task_context_task_id = require_task_context_task_id(task_context_task_id)
     snapshot: ResourceLifecycleSnapshot | None = None
     lease: ResourceLease | None = None
     raw_lease_id = extract_optional_string(request, "lease_id")
@@ -862,6 +856,12 @@ def require_optional_non_empty_string(value: Any, *, field: str) -> str | None:
 def require_non_negative_int(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ResourceLifecycleContractError(f"{field} 必须为非负整数")
+    return value
+
+
+def require_task_context_task_id(value: Any) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("task_context_task_id 必须为非空字符串")
     return value
 
 
