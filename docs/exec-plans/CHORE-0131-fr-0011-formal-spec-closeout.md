@@ -33,9 +33,9 @@
 
 - `issue-166-fr-0011-formal-spec` 已作为 `#166` 的独立 spec worktree 建立。
 - `FR-0011` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 首个 formal spec 语义 checkpoint `3c469e35e1815108949f6b48d7f9d26d14a5cd1f` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
+- 最新 formal spec 语义 checkpoint `b19c63f3a025b327dc3485a36640236f096398fa` 已生成，并已覆盖 `reason` 必填与 `bundle_id` 维度语义对齐。
 - spec PR `#169` 已创建并绑定当前分支。
-- 当前停点是等待 PR checks / guardian 基于当前 live head 继续收口。
+- 当前停点是将最新语义 checkpoint 的验证链与 PR live head 对齐后继续进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -66,7 +66,9 @@
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
 - `git commit -m 'docs(spec): 冻结 FR-0011 任务级资源追踪 formal spec'`
-  - 结果：已生成 checkpoint `3c469e35e1815108949f6b48d7f9d26d14a5cd1f`
+  - 结果：已生成初始 checkpoint `c330d9145746674447b2b894082e67083d91cc26`
+- `git commit -m 'docs(spec): 对齐 FR-0011 tracing 字段语义'`
+  - 结果：已生成最新语义 checkpoint `b19c63f3a025b327dc3485a36640236f096398fa`
 
 ## 未决风险
 
@@ -79,5 +81,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3c469e35e1815108949f6b48d7f9d26d14a5cd1f`
+- `b19c63f3a025b327dc3485a36640236f096398fa`
 - review-sync 说明：后续若只追加 exec-plan / PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
