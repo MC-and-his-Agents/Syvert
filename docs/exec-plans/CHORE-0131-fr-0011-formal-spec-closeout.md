@@ -8,6 +8,7 @@
 - release：`v0.4.0`
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0011-task-bound-resource-tracing/`
+- 关联 PR：`#169`
 - 状态：`active`
 - active 收口事项：`CHORE-0131-fr-0011-formal-spec-closeout`
 
@@ -33,7 +34,8 @@
 - `issue-166-fr-0011-formal-spec` 已作为 `#166` 的独立 spec worktree 建立。
 - `FR-0011` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
 - 首个 formal spec 语义 checkpoint `3c469e35e1815108949f6b48d7f9d26d14a5cd1f` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
-- 当前停点是基于该 checkpoint 回填 exec-plan 元数据，并为后续受控 PR 做准备。
+- spec PR `#169` 已创建并绑定当前分支。
+- 当前停点是等待 PR checks / guardian 基于当前 live head 继续收口。
 
 ## 下一步动作
 
