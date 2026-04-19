@@ -32,7 +32,7 @@
 - 功能需求：
   - `v0.4.0` 受管资源类型固定为 `account` 与 `proxy`，Core 不得在本 FR 中提前扩张到浏览器、设备或任意自定义资源族。
   - 每个共享资源至少必须具备稳定 `resource_id`、固定 `resource_type`、最小状态 `status` 与供后续消费的 `material`。`material` 允许承载类型专属、JSON-safe 的不透明 payload，但不得改变顶层共享字段命名。
-  - Core 侧最小 `acquire` 请求必须显式携带 `task_id`、`adapter_key`、`capability` 与 `requested_slots`；其中 `requested_slots` 的允许值固定为 `account`、`proxy`。
+  - Core 侧最小 `acquire` 请求必须显式携带 `task_id`、`adapter_key`、`capability` 与 `requested_slots`；其中 `requested_slots` 必须为非空数组，且允许值固定为 `account`、`proxy`。
   - `acquire` 成功时必须返回单个 `ResourceBundle`，至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与对应 slot 下的资源实体。
   - `acquire` 的成功语义必须是“整包成功”：一旦请求声明某个 slot，Core 只有在该 slot 已被确定绑定到 `AVAILABLE` 资源时才可返回成功；不得返回缺 slot 的部分 bundle 并把其伪装成成功。
   - `release` 请求必须显式携带 `lease_id`、`task_id`、`target_status_after_release` 与 `reason`。`target_status_after_release` 在 `v0.4.0` 只允许 `AVAILABLE` 或 `INVALID`。
@@ -47,7 +47,6 @@
     - `AVAILABLE -> IN_USE`：仅在 `acquire` 成功时发生
     - `IN_USE -> AVAILABLE`：仅在 `release(target_status_after_release=AVAILABLE)` 成功时发生
     - `IN_USE -> INVALID`：仅在 `release(target_status_after_release=INVALID)` 成功时发生
-    - `AVAILABLE -> INVALID`：允许由 Core 侧资源校验/剔除路径触发，但不要求本 FR 定义校验策略本身
   - 以下迁移必须被视为 contract violation 并 fail-closed：
     - `INVALID -> AVAILABLE`
     - `INVALID -> IN_USE`
