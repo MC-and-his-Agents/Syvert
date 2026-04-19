@@ -51,9 +51,9 @@
   - canonical `error.code`：
     - `invalid_resource_request`
     - `invalid_resource_release`
-- `unsupported`
+- `platform`
   - 适用场景：
-    - 请求形状与 slot 集合法，但当前运行时资源集合没有足够的 `AVAILABLE` 资源满足整包 acquire
+    - 请求形状与 slot 集合法，但当前运行时资源集合没有足够的 `AVAILABLE` 资源满足整包 acquire，导致平台执行前提暂时不满足
   - canonical `error.code`：
     - `resource_unavailable`
 - `runtime_contract`
