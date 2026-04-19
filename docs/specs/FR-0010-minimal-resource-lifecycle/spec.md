@@ -38,7 +38,7 @@
   - `release` 请求必须显式携带 `lease_id`、`task_id`、`target_status_after_release` 与 `reason`。`target_status_after_release` 在 `v0.4.0` 只允许 `AVAILABLE` 或 `INVALID`，`reason` 必须为非空字符串。
   - `release` 成功时必须只作用于该 `lease_id` 所绑定的同一组资源；Core 不得把 release 扩散到其他 bundle、其他 lease 或其他 task 的持有关系。
   - `release` 成功时必须返回同一 `lease_id` 的 settled `ResourceLease` 视图，至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release` 与 `release_reason`；后续实现不得在 `void`、确认字符串或另一套影子 carrier 之间自由发挥。
-  - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
+  - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；idempotent no-op 仍必须返回与首次成功 release 同一份 settled `ResourceLease` 语义，不得切换成其他 success carrier。任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
 - 契约需求：
   - 共享资源状态集合在 `v0.4.0` 固定为：
     - `AVAILABLE`：资源可被 Core 分配，但尚未被当前 task 占用

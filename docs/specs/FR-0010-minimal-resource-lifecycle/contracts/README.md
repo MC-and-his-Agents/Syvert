@@ -67,6 +67,7 @@
   - acquire 失败时不得返回部分 bundle
   - release 失败时不得静默把资源重新标记为 `AVAILABLE`
   - 重复 `release` 只有在 `lease_id` 一致、`target_status_after_release` 一致且 `reason` 完全一致时，才允许作为 canonical idempotent no-op
+  - canonical idempotent no-op 仍必须返回与首次成功 release 同一份 settled `ResourceLease`
   - 任一重复 `release` 只要目标状态或 `reason` 不一致，就必须返回 `resource_release_conflict`
   - `ResourceBundle` 是 host-side canonical carrier；Adapter 注入边界由 `FR-0012` 继续定义，不在本 contract 中重写
 

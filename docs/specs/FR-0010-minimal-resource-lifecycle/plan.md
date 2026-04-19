@@ -67,18 +67,18 @@
 
 ## 进入实现前条件
 
-- [x] `FR-0010` formal spec 已通过当前轮次的 spec review 自审并达到 merge-ready 候选状态
+- [ ] `FR-0010` formal spec 已通过 reviewer / guardian 对当前 live head 的最终复核
 - [x] `account` / `proxy` / `ResourceBundle` / `ResourceLease` 最小 carrier 已冻结
 - [x] `acquire` / `release` 输入输出与失败语义已冻结
 - [x] `AVAILABLE / IN_USE / INVALID` 状态迁移边界已冻结
 
 ## spec review 结论
 
-- 当前结论：通过
+- 当前结论：需修改
 - 未决问题与风险：
-  - 当前 formal spec 套件内未保留阻断级 contract 缺口；残余风险已集中记录在 `risks.md`
-  - 当前 PR 仍需最新 guardian / checks / merge gate 基于 live head 放行，但这属于合并门禁，不再属于 spec 内容缺口
-- 进入实现前条件：当前 formal spec 语义视图下已满足，可作为后续 implementation Work Item 的 requirement 输入。
+  - formal spec 内容已持续按 guardian finding 收口，但在 reviewer / guardian 对当前 live head 完成最终复核前，不提前写成“通过”
+  - 残余风险已集中记录在 `risks.md`；若当前 head 无新增阻断 finding，则下一轮可切换为“通过”
+- 进入实现前条件：除“最新 head 已完成正式复核”外，其余 requirement 条件已满足。
 - 结论目标：把 `v0.4.0` 的“最小资源生命周期”从 GitHub 意图推进到 implementation-ready 的主 contract。
 - 审查关注：
   - 是否把资源类型、bundle/lease carrier 与状态机讲清楚
