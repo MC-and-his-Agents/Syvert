@@ -35,13 +35,15 @@
 - `FR-0012` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
 - 首个 formal spec 语义 checkpoint `d18c8eb40f17b89b773193e63d5bab1a81dd9203` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
 - spec PR `#171` 已创建并绑定当前分支。
-- 当前停点是等待 PR checks / guardian 基于当前 live head 继续收口。
+- 当前分支已 rebase 到 `origin/main` 的 `c972d3560ad2881af0799f994030080bfd2dd482`。
+- 当前 live review head 为 `e835a33edf67316f5615d25093787066a043d997`，本地 `governance_gate` 与 GitHub PR checks 已基于该 head 通过。
+- 当前停点是等待 guardian 对当前 live head 给出 merge gate 结论。
 
 ## 下一步动作
 
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard`，修复注入 boundary 套件与文档边界问题。
-- 形成首个 formal spec checkpoint 后回填 exec-plan 的 checkpoint SHA 与验证结果。
-- 通过受控入口创建 spec PR，并进入 review / guardian / merge gate。
+- 继续保持当前 live head 与 `origin/main` 对齐，避免 guardian 输入再次失配。
+- 进入 guardian，消费当前 PR head `e835a33edf67316f5615d25093787066a043d997` 的 merge gate 结果。
+- 若 guardian 无阻断，则等待 reviewer 结论与上游合入策略确认后进入受控 merge。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -65,6 +67,13 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-168-fr-0012-formal-spec`
+  - 结果：通过
+- GitHub PR checks（head=`e835a33edf67316f5615d25093787066a043d997`）
+  - `Validate Commit Messages`：通过
+  - `Validate Docs And Guard Scripts`：通过
+  - `Validate Governance Tooling`：通过
+  - `Validate Spec Review Boundaries`：通过
 - `git commit -m 'docs(spec): 冻结 FR-0012 Core 注入资源边界 formal spec'`
   - 结果：已生成 checkpoint `d18c8eb40f17b89b773193e63d5bab1a81dd9203`
 
@@ -80,4 +89,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `d18c8eb40f17b89b773193e63d5bab1a81dd9203`
-- review-sync 说明：后续若只追加 exec-plan / PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
+- review-sync 说明：当前 live review head 已推进到 `e835a33edf67316f5615d25093787066a043d997`；本次 follow-up 仅同步 rebase、门禁与 PR metadata，不把 metadata-only 收口伪装成新的语义 checkpoint。
