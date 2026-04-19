@@ -8,6 +8,7 @@
 - release：`v0.4.0`
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0012-core-injected-resource-bundle/`
+- 关联 PR：`#171`
 - 状态：`active`
 - active 收口事项：`CHORE-0132-fr-0012-formal-spec-closeout`
 
@@ -33,7 +34,8 @@
 - `issue-168-fr-0012-formal-spec` 已作为 `#168` 的独立 spec worktree 建立。
 - `FR-0012` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
 - 首个 formal spec 语义 checkpoint `d18c8eb40f17b89b773193e63d5bab1a81dd9203` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
-- 当前停点是基于该 checkpoint 回填 exec-plan 元数据，并为后续受控 PR 做准备。
+- spec PR `#171` 已创建并绑定当前分支。
+- 当前停点是等待 PR checks / guardian 基于当前 live head 继续收口。
 
 ## 下一步动作
 
