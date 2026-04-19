@@ -37,7 +37,7 @@
 - `origin/main@eebeb9818e296736cadb43904ffa9072c27163ae` 已包含 `v0.3.0` 所需的全部功能与 closeout 前提：PR `#145/#147/#148/#149/#154/#156/#157/#158`。
 - `#127/#128` 与其下属 Work Item 均已关闭，`v0.3.0` 的功能/contract 目标已经完成。
 - 本事项按同一 Work Item 的两阶段模型推进：阶段 A 负责仓内 carrier 收口，阶段 B 负责 merge 后的发布锚点与 GitHub closeout。
-- 当前分支 head 将 `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 收口为完成态索引，去除了 `#144` 的旧 active closeout 入口。
+- 当前分支 head 将 `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 收口为阶段 A 完成态索引，并把后续发布动作明确保留在 `GOV-0033` 阶段 B。
 - GitHub 侧仍残留 Phase `#126` 未关闭，正文仍写 `冲刺：待 project 排期`，Project 状态仍为 `Todo`。
 - 仓外发布载体仍未建立：当前仓库没有 `v0.3.0` tag，也没有 GitHub Release `v0.3.0`。
 - `#159` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-159-chore-v0-3-0-phase`。
@@ -92,7 +92,7 @@
   - `FR-0008` formal spec / implementation / parent closeout 已由 PR `#145/#147/#148/#149` 合入主干
   - `FR-0009` formal spec / implementation / parent closeout 已由 PR `#154/#156/#157/#158` 合入主干
 - release / sprint 证据：
-  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 已在当前 head 收口为完成态索引，不再保留 active closeout 入口
+  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 已在当前 head 收口为阶段 A 完成态索引，并明确 `GOV-0033` 仍承接阶段 B 发布收口
 - 阶段 A 仓内工件证据：
   - `docs/decisions/ADR-GOV-0033-v0-3-0-phase-and-release-closeout.md`
   - `docs/exec-plans/GOV-0033-v0-3-0-phase-and-release-closeout.md`
