@@ -45,7 +45,11 @@
     - 缺少 `task_id`、`adapter_key`、`capability`
     - `requested_slots` 为空、重复、形状不合法或出现 `account`、`proxy` 之外的未知 slot
     - `release` 缺少 `lease_id`、`task_id`、`target_status_after_release` 或 `reason`
+    - `reason` 为空字符串
     - `target_status_after_release` 不是 `AVAILABLE` 或 `INVALID`
+  - canonical `error.code`：
+    - `invalid_resource_request`
+    - `invalid_resource_release`
 - `runtime_contract`
   - 适用场景：
     - 任一 `requested_slot` 没有可用 `AVAILABLE` 资源，导致整包 acquire 无法成立
@@ -53,6 +57,11 @@
     - `lease_id` 与 `task_id` 不匹配，或 release 试图收口非当前持有关系
     - 重复 release 的语义冲突，无法被判定为 idempotent no-op
     - 任一资源试图执行未批准的状态迁移
+  - canonical `error.code`：
+    - `resource_unavailable`
+    - `resource_lease_mismatch`
+    - `resource_release_conflict`
+    - `resource_state_conflict`
 - 边界约束：
   - acquire 失败时不得返回部分 bundle
   - release 失败时不得静默把资源重新标记为 `AVAILABLE`

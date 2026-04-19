@@ -35,7 +35,7 @@
   - Core 侧最小 `acquire` 请求必须显式携带 `task_id`、`adapter_key`、`capability` 与 `requested_slots`；其中 `requested_slots` 必须为非空、去重数组，且允许值固定为 `account`、`proxy`。
   - `acquire` 成功时必须返回单个 `ResourceBundle`，至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与对应 slot 下的资源实体。
   - `acquire` 的成功语义必须是“整包成功”：一旦请求声明某个 slot，Core 只有在该 slot 已被确定绑定到 `AVAILABLE` 资源时才可返回成功；不得返回缺 slot 的部分 bundle 并把其伪装成成功。
-  - `release` 请求必须显式携带 `lease_id`、`task_id`、`target_status_after_release` 与 `reason`。`target_status_after_release` 在 `v0.4.0` 只允许 `AVAILABLE` 或 `INVALID`。
+  - `release` 请求必须显式携带 `lease_id`、`task_id`、`target_status_after_release` 与 `reason`。`target_status_after_release` 在 `v0.4.0` 只允许 `AVAILABLE` 或 `INVALID`，`reason` 必须为非空字符串。
   - `release` 成功时必须只作用于该 `lease_id` 所绑定的同一组资源；Core 不得把 release 扩散到其他 bundle、其他 lease 或其他 task 的持有关系。
   - `release` 成功时必须返回同一 `lease_id` 的 settled `ResourceLease` 视图，至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release` 与 `release_reason`；后续实现不得在 `void`、确认字符串或另一套影子 carrier 之间自由发挥。
   - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
@@ -59,6 +59,13 @@
   - `acquire` / `release` 失败时，失败 carrier 必须复用上游 `FR-0002` / `FR-0005` 已冻结的共享 failed envelope：顶层字段继续为 `task_id`、`adapter_key`、`capability`、`status=failed`、`error`，不得额外发明字符串确认、异常对象或第二套错误 payload。
   - `acquire` 失败时，shared failed envelope 必须回显请求自带的 `task_id`、`adapter_key`、`capability`。
   - `release` 失败时，shared failed envelope 必须回显请求自带的 `task_id`；若当前 `lease_id` 已解析到既有 `ResourceLease`，则 `adapter_key` 与 `capability` 必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则 `adapter_key=""`、`capability=""`。
+  - `acquire` / `release` 的关键失败路径必须冻结稳定 `error.code`，至少包括：
+    - `invalid_resource_request`
+    - `invalid_resource_release`
+    - `resource_unavailable`
+    - `resource_lease_mismatch`
+    - `resource_release_conflict`
+    - `resource_state_conflict`
   - Core 必须是资源生命周期语义的唯一拥有者；任何 adapter、平台桥接层或外部调用方都不得直接改写共享资源状态。
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
