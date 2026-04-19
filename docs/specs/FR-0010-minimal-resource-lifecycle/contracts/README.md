@@ -38,10 +38,8 @@
   - 适用场景：
     - 缺少 `task_id`、`adapter_key`、`capability`
     - `requested_slots` 为空或形状不合法
-    - `release` 缺少 `lease_id` 或 `task_id`
-- `unsupported`
-  - 适用场景：
     - `requested_slots` 出现 `account`、`proxy` 之外的未知 slot
+    - `release` 缺少 `lease_id` 或 `task_id`
 - `runtime_contract`
   - 适用场景：
     - 任一 `requested_slot` 没有可用 `AVAILABLE` 资源，导致整包 acquire 无法成立

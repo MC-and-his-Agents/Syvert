@@ -54,7 +54,7 @@
     - 对同一资源跳过 `IN_USE` 直接从 `AVAILABLE` 进入第二个 task 的占用关系
     - 未经当前有效 lease 持有即执行 release
   - `ResourceBundle` 是 host-side canonical lifecycle carrier；其字段与 slot 命名在本 FR 冻结，但 Adapter 如何消费该 bundle 的执行边界由 `FR-0012` 定义，不在本 FR 重复展开。
-  - `ResourceLease` 是“资源被某个 task 占用”的唯一共享真相源；在 `v0.4.0` 内不得为同一 `lease_id` 维护第二套影子 lease schema。
+  - `ResourceLease` 是“资源被某个 task 占用”的唯一共享真相源；在 `v0.4.0` 内不得为同一 `lease_id` 维护第二套影子 lease schema。若 `release reason` 参与幂等判定，它也必须落在该共享 carrier 上，而不是由实现层私自引入影子字段。
   - `acquire` 失败时不得留下“看似成功但资源未进入 `IN_USE`”的半完成 bundle truth；`release` 失败时也不得把资源悄悄回收到 `AVAILABLE`。
   - Core 必须是资源生命周期语义的唯一拥有者；任何 adapter、平台桥接层或外部调用方都不得直接改写共享资源状态。
 - 非功能需求：

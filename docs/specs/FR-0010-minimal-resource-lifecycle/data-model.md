@@ -56,6 +56,8 @@
     - 约束：仅 release 成功后出现
   - `target_status_after_release`
     - 约束：只允许 `AVAILABLE` 或 `INVALID`
+  - `release_reason`
+    - 约束：仅 release 成功后出现；非空字符串；与 `target_status_after_release` 一起构成重复 release 的幂等判定真相
 
 ## 生命周期
 
@@ -65,7 +67,7 @@
 - 更新：
   - `release(target_status_after_release=AVAILABLE)` 成功后，lease 绑定资源从 `IN_USE` 回到 `AVAILABLE`
   - `release(target_status_after_release=INVALID)` 成功后，lease 绑定资源从 `IN_USE` 进入 `INVALID`
-  - 相同语义的重复 `release` 只允许作为 idempotent no-op；冲突性重复 release 必须 fail-closed
+  - 相同 `target_status_after_release + release_reason` 的重复 `release` 只允许作为 idempotent no-op；冲突性重复 release 必须 fail-closed
 - 失效/归档：
   - `INVALID` 在 `v0.4.0` 视为终态；本 FR 不定义从 `INVALID` 回到 `AVAILABLE` 的恢复语义
   - 失败 acquire 不得生成半完成 lease；失败 release 不得留下伪装成已释放的影子 truth
