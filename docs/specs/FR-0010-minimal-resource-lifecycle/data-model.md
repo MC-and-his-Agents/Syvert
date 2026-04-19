@@ -50,6 +50,8 @@
     - 约束：必须回指同次 acquire 产生的 `ResourceBundle`
   - `task_id`
     - 约束：非空字符串；lease 只属于单个 task
+  - `adapter_key` / `capability`
+    - 约束：复用共享请求上下文；必须作为 lease 真相的一部分被持有，以支持 release 失败 envelope 的 canonical 回填
   - `resource_ids`
     - 约束：必须与 bundle 中实际承载的资源集合一致
   - `acquired_at`

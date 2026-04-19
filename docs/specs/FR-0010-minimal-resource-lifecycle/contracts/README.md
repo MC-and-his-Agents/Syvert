@@ -31,6 +31,7 @@
   - 成功约束：
     - `target_status_after_release` 只允许 `AVAILABLE` 或 `INVALID`
     - release 只允许作用于该 lease 当前持有的资源集合
+    - 返回的 `ResourceLease` 必须保留 `adapter_key` 与 `capability`，作为后续 release 失败 envelope 的 canonical 回填来源
 
 ## 错误与边界行为
 
