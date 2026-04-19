@@ -321,6 +321,36 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                 ]
             )
 
+    def test_seed_resources_allows_active_truth_replay(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-active-replay",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-active-replay",
+        )
+        assert isinstance(bundle, ResourceBundle)
+        active_record = store.load_snapshot().resources[0]
+
+        replayed = store.seed_resources([active_record])
+
+        self.assertEqual(len(replayed), 1)
+        self.assertEqual(replayed[0], active_record)
+
     def test_load_snapshot_rejects_invalid_resource_resurrection(self) -> None:
         Path(self._resource_store_path).write_text(
             json.dumps(

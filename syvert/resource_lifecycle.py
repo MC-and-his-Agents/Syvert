@@ -739,8 +739,8 @@ def classify_release_contract_error(error: ResourceLifecycleContractError) -> di
 
 def recover_acquire_failure_task_id(request: Any, task_context_task_id: str) -> str:
     if is_non_empty_string(extract_optional_string(request, "task_id")):
-        return extract_optional_string(request, "task_id") or fallback_task_id(task_context_task_id)
-    return fallback_task_id(task_context_task_id)
+        return extract_optional_string(request, "task_id") or ""
+    return task_context_task_id if is_non_empty_string(task_context_task_id) else ""
 
 
 def recover_acquire_failure_adapter_key(request: Any) -> str:
@@ -763,7 +763,7 @@ def recover_release_failure_task_id(
         return task_context_task_id
     if lease is not None:
         return lease.task_id
-    return generated_task_id()
+    return ""
 
 
 def recover_release_failure_adapter_key(lease: ResourceLease | None) -> str:
@@ -776,16 +776,6 @@ def recover_release_failure_capability(lease: ResourceLease | None) -> str:
     if lease is None:
         return ""
     return lease.capability
-
-
-def fallback_task_id(task_context_task_id: str) -> str:
-    if is_non_empty_string(task_context_task_id):
-        return task_context_task_id
-    return generated_task_id()
-
-
-def generated_task_id() -> str:
-    return f"task-{uuid4().hex}"
 
 
 def validate_requested_slots(value: Sequence[str], *, field: str) -> None:

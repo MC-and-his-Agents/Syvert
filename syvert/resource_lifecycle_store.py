@@ -73,12 +73,6 @@ class LocalResourceLifecycleStore:
         seeded = seedable_resource_records(records)
         snapshot = self.load_snapshot()
         existing_by_id = {record.resource_id: record for record in snapshot.resources}
-        seeded_ids = {record.resource_id for record in seeded}
-        for lease in snapshot.leases:
-            if lease.released_at is None:
-                for resource_id in lease.resource_ids:
-                    if resource_id in seeded_ids:
-                        raise ResourceLifecyclePersistenceError("存在 active lease 时不得覆写其绑定资源")
         for record in seeded:
             existing = existing_by_id.get(record.resource_id)
             if existing is not None and existing != record:

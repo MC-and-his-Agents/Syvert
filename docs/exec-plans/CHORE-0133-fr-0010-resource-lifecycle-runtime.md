@@ -44,6 +44,7 @@
 - guardian 第七轮 review 已把阻断收敛到 durable snapshot 语义校验；当前工作树已让 `validate_snapshot()` 同时校验最新 settled lease 与当前资源 truth 的一致性，并禁止 `INVALID` 终态之后再出现任何后续 lease。
 - guardian 第八轮 review 已把阻断收敛到 post-commit unlock 伪失败、同秒序列排序与 `requested_slots` 非法输入；当前工作树已把 `LOCK_UN` 失败降为 best-effort、把 lifecycle 时间戳提到微秒并用“时间戳 + durable lease 顺序”判定最新 truth，同时把 slot 校验改成逐项验证后再去重。
 - guardian 第九轮 review 已把阻断收敛到快照时间排序与历史语义完整性；当前工作树已把所有 lease 事件排序切到解析后的 UTC datetime、补齐 `released_at >= acquired_at` 与同资源 lease 区间不重叠校验，并把 `material` 归一失败统一收口为资源生命周期 contract 错误。
+- guardian 第十轮 review 已把阻断收敛到 failure carrier 与 bootstrap replay 语义；当前工作树已移除失败路径上的 synthetic `task_id` 生成，并让 `seed_resources()` 对 active durable truth 支持同值 replay 幂等。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -72,7 +73,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（39 tests, OK）
+  - 结果：通过（42 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -130,6 +131,11 @@
     - `validate_resource_lease()` 新增 `released_at >= acquired_at` 约束，`validate_snapshot()` 新增同一资源 lease 区间不得重叠、`INVALID` 终态后不得再有后续 lease 的历史校验
     - `normalize_json_value()` 的 `material` 归一失败通过 `normalize_resource_material()` 统一转成 `ResourceLifecycleContractError`，避免坏快照以 `TaskRecordContractError` 形式逃逸
     - 新增 mixed-precision `INVALID` 后重占用、非法 `material`、`released_at < acquired_at` 与重叠 lease 区间回归
+  - 第十轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `recover_acquire_failure_task_id()` / `recover_release_failure_task_id()` 不再生成 synthetic `task_id`；失败 carrier 只复用请求、task context 或 lease 中已经存在的真实标识
+    - `seed_resources()` 对既有 durable truth 只做“同值 replay 允许、任何漂移拒绝”的统一判定，active lease 绑定资源也支持幂等重播
+    - 新增“空 context 下失败 carrier 不生成新 task_id”与“active IN_USE 资源允许同值 replay”回归
 
 ## 未决风险
 
