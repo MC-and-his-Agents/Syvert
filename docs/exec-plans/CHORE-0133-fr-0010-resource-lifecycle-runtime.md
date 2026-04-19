@@ -8,7 +8,7 @@
 - release：`v0.4.0`
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0010-minimal-resource-lifecycle/`
-- 关联 PR：
+- 关联 PR：`#176`
 - active 收口事项：`CHORE-0133-fr-0010-resource-lifecycle-runtime`
 
 ## 目标
@@ -113,4 +113,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `4671d8bf3a97970659bc25ef56904883c9d4ec90`
+- `18ca662afdf60ce25868eabc28e5f1c8c3bf0ce2`
