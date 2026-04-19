@@ -36,7 +36,7 @@
 
 - `origin/main@eebeb9818e296736cadb43904ffa9072c27163ae` 已包含 `v0.3.0` 所需的全部功能与 closeout 前提：PR `#145/#147/#148/#149/#154/#156/#157/#158`。
 - `#127/#128` 与其下属 Work Item 均已关闭，`v0.3.0` 的功能/contract 目标已经完成。
-- 仓内仍残留“当前 active closeout 入口”为 `#144` 的过渡叙述；`docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 尚未切换到最终完成态。
+- 仓内仍残留“当前 active closeout 入口”为 `#144` 的过渡叙述；`docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 需要先切换到由 `GOV-0033` 承接的发布前过渡态，再在全部发布动作完成后回写最终完成真相。
 - GitHub 侧仍残留 Phase `#126` 未关闭，正文仍写 `冲刺：待 project 排期`，Project 状态仍为 `Todo`。
 - 仓外发布载体仍未建立：当前仓库没有 `v0.3.0` tag，也没有 GitHub Release `v0.3.0`。
 - `#159` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-159-chore-v0-3-0-phase`。
@@ -44,7 +44,7 @@
 
 ## 下一步动作
 
-- 落盘 `GOV-0033` exec-plan，并把 release / sprint 索引改成最终完成态，不再保留 active closeout 入口。
+- 落盘 `GOV-0033` exec-plan，并把 release / sprint 索引改成由 `GOV-0033` 承接的发布前过渡态，去除 `#144` 的旧 active closeout 入口。
 - 在当前 head 上完成受控 PR 创建、guardian 与 merge gate，合入主干。
 - 合并后同步 `main`，创建 tag `v0.3.0`，发布 GitHub Release `v0.3.0`。
 - 随后回写并关闭 `#126` 与 `#159`，确认 Project 状态、tag / release 与仓内真相一致。
@@ -91,7 +91,7 @@
   - `FR-0008` formal spec / implementation / parent closeout 已由 PR `#145/#147/#148/#149` 合入主干
   - `FR-0009` formal spec / implementation / parent closeout 已由 PR `#154/#156/#157/#158` 合入主干
 - release / sprint 证据：
-  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 将在本回合改为“版本完成态”索引，不再保留 active closeout 入口
+  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 将在本回合改为由 `GOV-0033` 承接的发布前过渡态索引，待全部发布动作完成后再回写最终完成真相
 - 发布证据：
   - tag：`v0.3.0`
   - GitHub Release：`v0.3.0`
