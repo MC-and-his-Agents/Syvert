@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -436,6 +437,76 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["adapter_key"], "douyin")
         self.assertEqual(result["capability"], "content_detail_by_url")
         self.assertEqual(result["error"]["code"], "invalid_resource_release")
+
+    def test_release_is_idempotent_under_concurrent_same_semantics(self) -> None:
+        class ConcurrentReleaseStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._barrier = threading.Barrier(2)
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.write_snapshot(snapshot)
+
+        store = ConcurrentReleaseStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-015",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-015",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        results = []
+
+        def worker() -> None:
+            results.append(
+                release(
+                    ReleaseRequest(
+                        lease_id=bundle.lease_id,
+                        task_id="task-015",
+                        target_status_after_release="AVAILABLE",
+                        reason="normal",
+                    ),
+                    store,
+                    "task-context-015",
+                )
+            )
+
+        thread_a = threading.Thread(target=worker)
+        thread_b = threading.Thread(target=worker)
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(result, ResourceLease) for result in results))
+        first, second = results
+        assert isinstance(first, ResourceLease)
+        assert isinstance(second, ResourceLease)
+        self.assertEqual(first, second)
 
     def test_seed_resources_rejects_in_use_without_active_lease(self) -> None:
         with self.assertRaisesRegex(Exception, "IN_USE 资源必须由唯一 active lease 持有"):

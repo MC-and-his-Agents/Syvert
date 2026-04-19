@@ -245,7 +245,19 @@ def release(
             leases=updated_leases,
         )
         validate_snapshot(updated_snapshot)
-        store.write_snapshot(updated_snapshot)
+        try:
+            store.write_snapshot(updated_snapshot)
+        except ResourceLifecycleContractError as error:
+            refreshed_snapshot = store.load_snapshot()
+            validate_snapshot(refreshed_snapshot)
+            refreshed_lease = require_lease(refreshed_snapshot, lease.lease_id)
+            if (
+                refreshed_lease.released_at is not None
+                and refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
+                and refreshed_lease.release_reason == normalized_request.reason
+            ):
+                return refreshed_lease
+            raise error
         return settled_lease
     except ResourceLifecycleContractError as error:
         return failure_envelope(
