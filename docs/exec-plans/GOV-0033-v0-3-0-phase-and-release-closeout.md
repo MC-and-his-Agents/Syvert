@@ -137,5 +137,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `201ddef800eff91d57dff4c338237434da2b2045`
-- 说明：该 checkpoint 首次把 `ADR-GOV-0033`、两阶段 Work Item 决策、`v0.3.0` / `2026-S16` 完成态索引与阶段 A/阶段 B 分界收口到同一条仓内真相。当前 PR head 上的后续变更只用于 review / merge gate / GitHub carrier 同步，属于 `metadata-only closeout follow-up`。
+- `fd7f2dc9d9995c0e005752e18dd2d14e826e62d6`
+- 说明：该 checkpoint 首次把 `ADR-GOV-0033`、两阶段 Work Item 决策、`v0.3.0` / `2026-S16` 完成态索引与阶段 A/阶段 B 分界收口到同一条仓内真相。当前受审 head 若继续存在后续 commit，只允许用于 review / merge gate / GitHub carrier 同步，不再改写该 checkpoint 语义。
