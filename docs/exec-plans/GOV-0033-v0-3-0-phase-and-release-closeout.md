@@ -82,7 +82,7 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
-- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-159-chore-v0-3-0-phase`
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-159-chore-v0-3-0-phase-b`
   - 结果：通过
 
 ## closeout 证据
