@@ -40,11 +40,12 @@
 - GitHub 侧仍残留 Phase `#126` 未关闭，正文仍写 `冲刺：待 project 排期`，Project 状态仍为 `Todo`。
 - 仓外发布载体仍未建立：当前仓库没有 `v0.3.0` tag，也没有 GitHub Release `v0.3.0`。
 - `#159` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-159-chore-v0-3-0-phase`。
+- 当前发布 closeout 工件已在 checkpoint `def9d704d0de4c3175179c058c21fe02c202d1d5` 落盘：`ADR-GOV-0033`、`GOV-0033` exec-plan 与 `v0.3.0` / `2026-S16` 完成态索引已同步补齐。
 
 ## 下一步动作
 
 - 落盘 `CHORE-0130` exec-plan，并把 release / sprint 索引改成最终完成态，不再保留 active closeout 入口。
-- 在当前 head 上完成 docs / workflow / governance 门禁与受控 PR 创建，合入主干。
+- 在当前 head 上完成受控 PR 创建、guardian 与 merge gate，合入主干。
 - 合并后同步 `main`，创建 tag `v0.3.0`，发布 GitHub Release `v0.3.0`。
 - 随后回写并关闭 `#126` 与 `#159`，确认 Project 状态、tag / release 与仓内真相一致。
 
@@ -130,4 +131,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 前置完成基线：`eebeb9818e296736cadb43904ffa9072c27163ae`
-- 说明：该基线已经包含 `v0.3.0` 所需的全部功能与父事项 closeout 真相；本回合只负责发布态索引、Phase closeout 与发布锚点收口。
+- 实质 closeout checkpoint：`def9d704d0de4c3175179c058c21fe02c202d1d5`
+- 说明：`eebeb98...` 是 `v0.3.0` 功能与 FR closeout 已全部合入后的主干基线；`def9d70...` 首次把治理 decision、phase/release closeout exec-plan 与完成态 release / sprint 索引收口到同一条发布前真相。
