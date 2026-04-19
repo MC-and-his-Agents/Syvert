@@ -22,7 +22,8 @@
 
 - `invalid_input`
   - 适用场景：
-    - `ResourceDispositionHint` 缺少 `lease_id` 或 `reason`
+    - `ResourceDispositionHint` 缺少 `lease_id`、`target_status_after_release` 或 `reason`
+    - `reason` 为空字符串
     - `target_status_after_release` 不是 `AVAILABLE` 或 `INVALID`
 - `runtime_contract`
   - 适用场景：
