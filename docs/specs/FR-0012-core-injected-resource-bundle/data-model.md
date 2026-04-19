@@ -13,7 +13,7 @@
 ## 关键字段
 
 - `ResourceBundle`
-  - 约束：不在本 FR 重新定义字段；直接复用 `FR-0010` 已冻结的 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots` 与 slot 资源实体
+  - 约束：不在本 FR 重新定义字段；直接完整复用 `FR-0010` 已冻结的 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与 slot 资源实体，不得删减已冻结字段
 - `AdapterExecutionContext`
   - `request`
     - 约束：复用上游已冻结的共享请求语义

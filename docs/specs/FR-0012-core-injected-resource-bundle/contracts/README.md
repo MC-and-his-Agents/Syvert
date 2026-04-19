@@ -10,7 +10,7 @@
 
 - 输入结构：
   - `AdapterExecutionContext`
-  - 其中 `resource_bundle` 复用 `FR-0010` 已冻结的 `ResourceBundle` carrier
+  - 其中 `resource_bundle` 完整复用 `FR-0010` 已冻结的 `ResourceBundle` carrier，不得删减其已冻结字段（至少包括 `acquired_at`）
   - `resource_bundle` 只允许两种状态：
     - 合法完整 bundle：用于资源依赖路径
     - `null`：仅当该执行路径被 Core 明确判定为不依赖受管资源

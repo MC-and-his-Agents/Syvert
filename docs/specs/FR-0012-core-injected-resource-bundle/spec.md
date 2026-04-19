@@ -30,7 +30,7 @@
 
 - 功能需求：
   - 当某条执行路径被判定需要受管资源时，Core 必须先完成 `FR-0010` 所定义的 `acquire`，得到合法 `ResourceBundle` 后，才能调用 Adapter。
-  - Adapter 执行边界中的 `resource_bundle` 必须复用 `FR-0010` 已冻结的 canonical carrier：至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots` 与已填充的 slot 资源实体。`FR-0012` 不得重新定义第二套 bundle 顶层字段。
+  - Adapter 执行边界中的 `resource_bundle` 必须完整复用 `FR-0010` 已冻结的 canonical carrier，不得删减任何已冻结字段；最小可见字段至少包括 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots`、`acquired_at` 与已填充的 slot 资源实体。`FR-0012` 不得重新定义第二套 bundle 顶层字段。
   - Adapter 允许在单次执行内消费 `resource_bundle` 中各 slot 的 `material`，并把它们转译为平台私有的 header、cookie、session、client 或网络配置；这些派生物属于 Adapter 内部临时执行材料，不得回写为新的共享资源 truth。
   - 若当前执行路径被声明为资源依赖路径，而 Core 无法提供合法完整的 `resource_bundle`，Core 必须在调用 Adapter 之前 fail-closed；Adapter 不得以“缺 bundle 时自行补资源”的方式继续执行。
   - 若当前执行路径不依赖受管资源，Core 只能显式注入 `resource_bundle=null`；`null` 是非资源路径的唯一 canonical 表示，不允许在本 FR 中再引入 `{}`、空 bundle 或其他影子 carrier。
