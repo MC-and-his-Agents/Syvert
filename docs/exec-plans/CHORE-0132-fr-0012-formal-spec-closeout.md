@@ -32,7 +32,8 @@
 
 - `issue-168-fr-0012-formal-spec` 已作为 `#168` 的独立 spec worktree 建立。
 - `FR-0012` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 当前停点是完成首个 formal spec checkpoint、运行本地 guards，并为后续受控 PR 做准备。
+- 首个 formal spec 语义 checkpoint `d18c8eb40f17b89b773193e63d5bab1a81dd9203` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
+- 当前停点是基于该 checkpoint 回填 exec-plan 元数据，并为后续受控 PR 做准备。
 
 ## 下一步动作
 
@@ -56,6 +57,14 @@
 - 已核对 `#162`、`#167`、`#168` 对 `v0.4.0` 资源注入边界与本 Work Item 的目标、非目标与关闭条件描述。
 - 已核对 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md`、`WORKFLOW.md` 与 `spec_review.md` 的上位约束。
 - 已核对 formal spec 模板与近期 closeout 示例 `docs/exec-plans/CHORE-0126-fr-0009-formal-spec-closeout.md`。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `git commit -m 'docs(spec): 冻结 FR-0012 Core 注入资源边界 formal spec'`
+  - 结果：已生成 checkpoint `d18c8eb40f17b89b773193e63d5bab1a81dd9203`
 
 ## 未决风险
 
@@ -68,4 +77,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待补充：首个 formal spec checkpoint 提交后回填`
+- `d18c8eb40f17b89b773193e63d5bab1a81dd9203`
+- review-sync 说明：后续若只追加 exec-plan / PR metadata，则不把 metadata-only follow-up 伪装成新的语义 checkpoint。
