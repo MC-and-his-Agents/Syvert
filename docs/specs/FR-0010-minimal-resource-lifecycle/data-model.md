@@ -27,9 +27,13 @@
 - `AccountResource`
   - `account_key`
     - 约束：非空字符串；用于表达账号资源的稳定引用
+  - 继承约束：
+    - 必须同时携带 `ResourceRecord` 的 `resource_id`、`resource_type`、`status`、`material`
 - `ProxyResource`
   - `proxy_key`
     - 约束：非空字符串；用于表达代理资源的稳定引用
+  - 继承约束：
+    - 必须同时携带 `ResourceRecord` 的 `resource_id`、`resource_type`、`status`、`material`
 - `ResourceBundle`
   - `bundle_id`
     - 约束：非空字符串；用于标识本次成功 acquire 的 bundle

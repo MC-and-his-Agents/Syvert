@@ -31,6 +31,7 @@
   - 成功约束：
     - `target_status_after_release` 只允许 `AVAILABLE` 或 `INVALID`
     - release 只允许作用于该 lease 当前持有的资源集合
+    - 返回载荷至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release`、`release_reason`
     - 返回的 `ResourceLease` 必须保留 `adapter_key` 与 `capability`，作为后续 release 失败 envelope 的 canonical 回填来源
 
 ## 错误与边界行为
@@ -68,6 +69,8 @@
 - 边界约束：
   - acquire 失败时不得返回部分 bundle
   - release 失败时不得静默把资源重新标记为 `AVAILABLE`
+  - 重复 `release` 只有在 `lease_id` 一致、`target_status_after_release` 一致且 `reason` 完全一致时，才允许作为 canonical idempotent no-op
+  - 任一重复 `release` 只要目标状态或 `reason` 不一致，就必须返回 `resource_release_conflict`
   - `ResourceBundle` 是 host-side canonical carrier；Adapter 注入边界由 `FR-0012` 继续定义，不在本 contract 中重写
 
 ## 向后兼容约束

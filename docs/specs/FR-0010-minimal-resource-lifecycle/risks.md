@@ -9,6 +9,6 @@
 
 ## 合并前核对
 
-- [ ] 高风险项已有缓解策略
-- [ ] acquire / release 的 fail-closed 行为已冻结
-- [ ] `INVALID` 终态语义已冻结
+- [x] 高风险项已有缓解策略
+- [x] acquire / release 的 fail-closed 行为已冻结
+- [x] `INVALID` 终态语义已冻结

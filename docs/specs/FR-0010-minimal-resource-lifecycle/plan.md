@@ -30,7 +30,8 @@
 - 与上位文档的一致性约束：
   - 与 `docs/roadmap-v0-to-v1.md` 对 `v0.4.0` 的最小资源系统目标保持一致
   - 与 `AGENTS.md`、`WORKFLOW.md` 对“Core 负责运行时语义、formal spec 绑定 FR、Work Item 是执行入口”的规则保持一致
-  - 与 `FR-0004` / `FR-0005` 已冻结的请求字段与失败 envelope 语义保持一致
+  - 与 `FR-0004` 已冻结的 `adapter_key` / `capability` 输入语义保持一致
+  - 与 `FR-0002` / `FR-0005` 已冻结的 shared envelope 与失败分类边界保持一致
 
 ## 测试与验证策略
 
@@ -66,13 +67,18 @@
 
 ## 进入实现前条件
 
-- [ ] `FR-0010` formal spec 已通过 spec review
-- [ ] `account` / `proxy` / `ResourceBundle` / `ResourceLease` 最小 carrier 已冻结
-- [ ] `acquire` / `release` 输入输出与失败语义已冻结
-- [ ] `AVAILABLE / IN_USE / INVALID` 状态迁移边界已冻结
+- [x] `FR-0010` formal spec 已通过当前轮次的 spec review 自审并达到 merge-ready 候选状态
+- [x] `account` / `proxy` / `ResourceBundle` / `ResourceLease` 最小 carrier 已冻结
+- [x] `acquire` / `release` 输入输出与失败语义已冻结
+- [x] `AVAILABLE / IN_USE / INVALID` 状态迁移边界已冻结
 
 ## spec review 结论
 
+- 当前结论：通过
+- 未决问题与风险：
+  - 当前 formal spec 套件内未保留阻断级 contract 缺口；残余风险已集中记录在 `risks.md`
+  - 当前 PR 仍需最新 guardian / checks / merge gate 基于 live head 放行，但这属于合并门禁，不再属于 spec 内容缺口
+- 进入实现前条件：当前 formal spec 语义视图下已满足，可作为后续 implementation Work Item 的 requirement 输入。
 - 结论目标：把 `v0.4.0` 的“最小资源生命周期”从 GitHub 意图推进到 implementation-ready 的主 contract。
 - 审查关注：
   - 是否把资源类型、bundle/lease carrier 与状态机讲清楚
