@@ -36,15 +36,15 @@
 
 - `origin/main@eebeb9818e296736cadb43904ffa9072c27163ae` 已包含 `v0.3.0` 所需的全部功能与 closeout 前提：PR `#145/#147/#148/#149/#154/#156/#157/#158`。
 - `#127/#128` 与其下属 Work Item 均已关闭，`v0.3.0` 的功能/contract 目标已经完成。
-- 仓内仍残留“当前 active closeout 入口”为 `#144` 的过渡叙述；`docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 需要先切换到由 `GOV-0033` 承接的发布前过渡态，再在全部发布动作完成后回写最终完成真相。
+- 当前分支 head 将 `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 收口为完成态索引，去除了 `#144` 的旧 active closeout 入口。
 - GitHub 侧仍残留 Phase `#126` 未关闭，正文仍写 `冲刺：待 project 排期`，Project 状态仍为 `Todo`。
 - 仓外发布载体仍未建立：当前仓库没有 `v0.3.0` tag，也没有 GitHub Release `v0.3.0`。
 - `#159` 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-159-chore-v0-3-0-phase`。
-- 当前发布 closeout 工件已在 checkpoint `def9d704d0de4c3175179c058c21fe02c202d1d5` 落盘：`ADR-GOV-0033`、`GOV-0033` exec-plan 与 `v0.3.0` / `2026-S16` 完成态索引已同步补齐。
+- 当前发布 closeout 工件已在当前分支最新 head 落盘：`ADR-GOV-0033`、`GOV-0033` exec-plan 与 `v0.3.0` / `2026-S16` 完成态索引已同步补齐。
 
 ## 下一步动作
 
-- 落盘 `GOV-0033` exec-plan，并把 release / sprint 索引改成由 `GOV-0033` 承接的发布前过渡态，去除 `#144` 的旧 active closeout 入口。
+- 确认 `GOV-0033` exec-plan 与 release / sprint 索引已经收口为完成态，并以受控 docs PR 合入主干。
 - 在当前 head 上完成受控 PR 创建、guardian 与 merge gate，合入主干。
 - 合并后同步 `main`，创建 tag `v0.3.0`，发布 GitHub Release `v0.3.0`。
 - 随后回写并关闭 `#126` 与 `#159`，确认 Project 状态、tag / release 与仓内真相一致。
@@ -91,7 +91,7 @@
   - `FR-0008` formal spec / implementation / parent closeout 已由 PR `#145/#147/#148/#149` 合入主干
   - `FR-0009` formal spec / implementation / parent closeout 已由 PR `#154/#156/#157/#158` 合入主干
 - release / sprint 证据：
-  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 将在本回合改为由 `GOV-0033` 承接的发布前过渡态索引，待全部发布动作完成后再回写最终完成真相
+  - `docs/releases/v0.3.0.md` 与 `docs/sprints/2026-S16.md` 已在当前 head 收口为完成态索引，不再保留 active closeout 入口
 - 发布证据：
   - tag：`v0.3.0`
   - GitHub Release：`v0.3.0`
@@ -128,8 +128,8 @@
   - 若 closeout PR 未合入，恢复 `#126/#159` 正文并停止发布动作
   - 若 tag / GitHub Release 已创建但发现主干事实有误，先修正主干与 GitHub 事实，再按独立回合决定是否删除 / 重建发布锚点
 
-## 最近一次 checkpoint 对应的 head SHA
+## 最近一次 checkpoint 对应的 head
 
 - 前置完成基线：`eebeb9818e296736cadb43904ffa9072c27163ae`
-- 实质 closeout checkpoint：`def9d704d0de4c3175179c058c21fe02c202d1d5`
-- 说明：`eebeb98...` 是 `v0.3.0` 功能与 FR closeout 已全部合入后的主干基线；`def9d70...` 首次把治理 decision、phase/release closeout exec-plan 与完成态 release / sprint 索引收口到同一条发布前真相。
+- 实质 closeout checkpoint：当前分支最新 head（待合入 PR `#160`）
+- 说明：`eebeb98...` 是 `v0.3.0` 功能与 FR closeout 已全部合入后的主干基线；当前分支最新 head 把治理 decision、phase/release closeout exec-plan 与完成态 release / sprint 索引收口到同一条仓内最终真相。
