@@ -39,9 +39,9 @@
 
 ## 下一步动作
 
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard`，修复 formal spec 套件与文档边界问题。
-- 形成首个 formal spec checkpoint 后回填 exec-plan 的 checkpoint SHA 与验证结果。
-- 通过受控入口创建 spec PR，并进入后续 review / guardian / merge gate。
+- 等待最新 PR checks 与 guardian 基于当前 live head 形成最终 verdict。
+- 若 guardian 放行，则执行受控 merge 并关闭 `#164`。
+- `#164` 合入主干后，再把 `FR-0011` / `FR-0012` rebase 到新主干继续收口。
 
 ## 当前 checkpoint 推进的 release 目标
 

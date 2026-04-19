@@ -50,15 +50,18 @@
   - canonical `error.code`：
     - `invalid_resource_request`
     - `invalid_resource_release`
+- `unsupported`
+  - 适用场景：
+    - 请求形状与 slot 集合法，但当前运行时资源集合没有足够的 `AVAILABLE` 资源满足整包 acquire
+  - canonical `error.code`：
+    - `resource_unavailable`
 - `runtime_contract`
   - 适用场景：
-    - 任一 `requested_slot` 没有可用 `AVAILABLE` 资源，导致整包 acquire 无法成立
     - 资源在 acquire 过程中出现状态冲突或重复分配
     - `lease_id` 与 `task_id` 不匹配，或 release 试图收口非当前持有关系
     - 重复 release 的语义冲突，无法被判定为 idempotent no-op
     - 任一资源试图执行未批准的状态迁移
   - canonical `error.code`：
-    - `resource_unavailable`
     - `resource_lease_mismatch`
     - `resource_release_conflict`
     - `resource_state_conflict`
