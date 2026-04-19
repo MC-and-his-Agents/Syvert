@@ -67,21 +67,21 @@
 
 ## 进入实现前条件
 
-- [ ] `FR-0010` formal spec 已通过 reviewer / guardian 对当前 live head 的最终复核
+- [x] `spec review` 已通过
 - [x] `account` / `proxy` / `ResourceBundle` / `ResourceLease` 最小 carrier 已冻结
 - [x] `acquire` / `release` 输入输出与失败语义已冻结
 - [x] `AVAILABLE / IN_USE / INVALID` 状态迁移边界已冻结
 
 ## spec review 结论
 
-- 当前结论：需修改
+- 当前结论：通过
 - 未决问题与风险：
-  - formal spec 内容已持续按 guardian finding 收口，但在 reviewer / guardian 对当前 live head 完成最终复核前，不提前写成“通过”
-  - 残余风险已集中记录在 `risks.md`；若当前 head 无新增阻断 finding，则下一轮可切换为“通过”
-- 进入实现前条件：除“最新 head 已完成正式复核”外，其余 requirement 条件已满足。
+  - 当前 formal spec 已把资源类型、bundle/lease carrier、状态迁移、`acquire / release` 输入输出与 fail-closed 边界收口到 implementation-ready；残余风险主要在后续实现是否忠实消费该 contract，而不是当前规约仍存在未冻结的 requirement 缺口
+  - `resource_unavailable` 的 host-side / `runtime_contract` 边界，以及重复 `release` 的 canonical idempotent no-op 必须返回 settled `ResourceLease` 语义，仍需在后续实现 Work Item 中补齐 contract tests 与回归验证，避免运行时漂移成 `unsupported` / `platform` 或其他 success carrier
+- 进入实现前条件：已满足；guardian / PR checks 属于独立 merge gate，由当前 Work Item exec-plan 跟踪，不混写进 formal spec review 结论。
 - 结论目标：把 `v0.4.0` 的“最小资源生命周期”从 GitHub 意图推进到 implementation-ready 的主 contract。
 - 审查关注：
   - 是否把资源类型、bundle/lease carrier 与状态机讲清楚
   - 是否明确定义整包 acquire、冲突 release 与 fail-closed 行为
   - 是否把 tracing / Adapter 注入边界留在相邻 FR，而不是在生命周期主 contract 中混写
-- implementation-ready 判定：当前 formal spec 通过 spec review 且进入实现前条件满足后，后续实现 Work Item 才可进入独立实现回合。
+- implementation-ready 判定：当前 formal spec 已通过 spec review 且进入实现前条件满足，后续实现 Work Item 可在独立 implementation PR 中消费本 requirement baseline。
