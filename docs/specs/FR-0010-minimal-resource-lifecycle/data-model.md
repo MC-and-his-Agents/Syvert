@@ -42,11 +42,11 @@
   - `task_id` / `adapter_key` / `capability`
     - 约束：复用共享请求上下文，不再创建第二套 task 关联字段
   - `requested_slots`
-    - 约束：非空、去重数组；只允许 `account`、`proxy`；成功时 bundle 中的已声明 slot 必须全部被填充
+    - 约束：非空、去重数组；只允许 `account`、`proxy`；成功时 bundle 中的已声明 slot 必须全部被填充，且未声明 slot 不得出现在成功 bundle 中
   - `acquired_at`
     - 约束：RFC3339 UTC 时间；必须与同次 acquire 成功建立的 `ResourceLease.acquired_at` 语义一致
   - `account` / `proxy`
-    - 约束：对应 slot 若被请求，则成功 bundle 中必须存在且其 `status=IN_USE`
+    - 约束：对应 slot 若被请求，则成功 bundle 中必须存在且其 `status=IN_USE`；若未被请求，则对应 slot 不得出现在成功 bundle 中
 - `ResourceLease`
   - `lease_id`
     - 约束：唯一、非空；是占用关系的唯一标识
@@ -57,7 +57,7 @@
   - `adapter_key` / `capability`
     - 约束：复用共享请求上下文；必须作为 lease 真相的一部分被持有，以支持 release 失败 envelope 的 canonical 回填
   - `resource_ids`
-    - 约束：必须与 bundle 中实际承载的资源集合一致
+    - 约束：必须与 bundle 中实际承载的资源集合一致，且只能覆盖 `requested_slots` 对应的资源，不得额外记录未请求资源
   - `acquired_at`
     - 约束：RFC3339 UTC 时间；仅 acquire 成功后出现
   - `released_at`
@@ -66,6 +66,17 @@
     - 约束：只允许 `AVAILABLE` 或 `INVALID`
   - `release_reason`
     - 约束：仅 release 成功后出现；非空字符串；与 `target_status_after_release` 一起构成重复 release 的幂等判定真相
+
+## 失败载荷上下文
+
+- `acquire` failed envelope
+  - `task_id` / `adapter_key` / `capability`
+    - 约束：优先回显可恢复的请求值；若对应字段缺失、不可恢复或形状非法，则固定回填为 `""`
+- `release` failed envelope
+  - `task_id`
+    - 约束：优先回显请求值；若请求里缺失或不可恢复，则固定回填为 `""`
+  - `adapter_key` / `capability`
+    - 约束：若 `lease_id` 已解析到既有 `ResourceLease`，则必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则固定回填为 `""`
 
 ## 生命周期
 
