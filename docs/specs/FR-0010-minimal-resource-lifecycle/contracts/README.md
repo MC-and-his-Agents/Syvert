@@ -34,6 +34,11 @@
 
 ## 错误与边界行为
 
+- 失败返回 carrier：
+  - `acquire` / `release` 失败都必须复用共享 failed envelope
+  - 顶层字段固定为：`task_id`、`adapter_key`、`capability`、`status=failed`、`error`
+  - `acquire` 失败时：`task_id`、`adapter_key`、`capability` 必须回显请求值
+  - `release` 失败时：`task_id` 必须回显请求值；若 `lease_id` 已解析到既有 lease，则 `adapter_key` / `capability` 回填自该 lease；否则二者固定为空字符串
 - `invalid_input`
   - 适用场景：
     - 缺少 `task_id`、`adapter_key`、`capability`

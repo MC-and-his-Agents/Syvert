@@ -56,6 +56,9 @@
   - `ResourceBundle` 是 host-side canonical lifecycle carrier；其字段与 slot 命名在本 FR 冻结，但 Adapter 如何消费该 bundle 的执行边界由 `FR-0012` 定义，不在本 FR 重复展开。
   - `ResourceLease` 是“资源被某个 task 占用”的唯一共享真相源；在 `v0.4.0` 内不得为同一 `lease_id` 维护第二套影子 lease schema。若 `release reason` 参与幂等判定，它也必须落在该共享 carrier 上，而不是由实现层私自引入影子字段。
   - `acquire` 失败时不得留下“看似成功但资源未进入 `IN_USE`”的半完成 bundle truth；`release` 失败时也不得把资源悄悄回收到 `AVAILABLE`。
+  - `acquire` / `release` 失败时，失败 carrier 必须复用上游 `FR-0002` / `FR-0005` 已冻结的共享 failed envelope：顶层字段继续为 `task_id`、`adapter_key`、`capability`、`status=failed`、`error`，不得额外发明字符串确认、异常对象或第二套错误 payload。
+  - `acquire` 失败时，shared failed envelope 必须回显请求自带的 `task_id`、`adapter_key`、`capability`。
+  - `release` 失败时，shared failed envelope 必须回显请求自带的 `task_id`；若当前 `lease_id` 已解析到既有 `ResourceLease`，则 `adapter_key` 与 `capability` 必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则 `adapter_key=""`、`capability=""`。
   - Core 必须是资源生命周期语义的唯一拥有者；任何 adapter、平台桥接层或外部调用方都不得直接改写共享资源状态。
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
