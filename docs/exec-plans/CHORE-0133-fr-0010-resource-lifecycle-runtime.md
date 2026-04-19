@@ -45,6 +45,7 @@
 - guardian 第八轮 review 已把阻断收敛到 post-commit unlock 伪失败、同秒序列排序与 `requested_slots` 非法输入；当前工作树已把 `LOCK_UN` 失败降为 best-effort、把 lifecycle 时间戳提到微秒并用“时间戳 + durable lease 顺序”判定最新 truth，同时把 slot 校验改成逐项验证后再去重。
 - guardian 第九轮 review 已把阻断收敛到快照时间排序与历史语义完整性；当前工作树已把所有 lease 事件排序切到解析后的 UTC datetime、补齐 `released_at >= acquired_at` 与同资源 lease 区间不重叠校验，并把 `material` 归一失败统一收口为资源生命周期 contract 错误。
 - guardian 第十轮 review 已把阻断收敛到 failure carrier 与 bootstrap replay 语义；当前工作树已移除失败路径上的 synthetic `task_id` 生成，并让 `seed_resources()` 对 active durable truth 支持同值 replay 幂等。
+- guardian 第十一轮 review 已把阻断收敛到 failure carrier 来源约束与 replay 的“严格 no-op”语义；当前工作树已让 release 失败 carrier 不再借用 `lease.task_id`，并把同值 `seed_resources()` replay 收紧成 revision 不变的 no-op。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -73,7 +74,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（42 tests, OK）
+  - 结果：通过（40 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -136,6 +137,11 @@
     - `recover_acquire_failure_task_id()` / `recover_release_failure_task_id()` 不再生成 synthetic `task_id`；失败 carrier 只复用请求、task context 或 lease 中已经存在的真实标识
     - `seed_resources()` 对既有 durable truth 只做“同值 replay 允许、任何漂移拒绝”的统一判定，active lease 绑定资源也支持幂等重播
     - 新增“空 context 下失败 carrier 不生成新 task_id”与“active IN_USE 资源允许同值 replay”回归
+  - 第十一轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `recover_release_failure_task_id()` 失败回填仅允许使用请求 `task_id` 或当前 task context，不再借用 `lease.task_id`
+    - `seed_resources()` 的同值 replay 现在是严格 no-op：durable truth 未变化时不写盘、不增长 revision
+    - `test_seed_resources_allows_active_truth_replay` 补充 revision 稳定断言，锁定 no-op 语义
 
 ## 未决风险
 

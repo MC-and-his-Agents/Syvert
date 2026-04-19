@@ -761,8 +761,6 @@ def recover_release_failure_task_id(
         return request_task_id
     if is_non_empty_string(task_context_task_id):
         return task_context_task_id
-    if lease is not None:
-        return lease.task_id
     return ""
 
 

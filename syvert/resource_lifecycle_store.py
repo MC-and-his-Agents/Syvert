@@ -73,11 +73,16 @@ class LocalResourceLifecycleStore:
         seeded = seedable_resource_records(records)
         snapshot = self.load_snapshot()
         existing_by_id = {record.resource_id: record for record in snapshot.resources}
+        changed = False
         for record in seeded:
             existing = existing_by_id.get(record.resource_id)
             if existing is not None and existing != record:
                 raise ResourceLifecyclePersistenceError("resource_state_conflict: seed_resources 不得覆写既有资源 truth")
+            if existing is None:
+                changed = True
             existing_by_id[record.resource_id] = record
+        if not changed:
+            return snapshot.resources
         updated_snapshot = ResourceLifecycleSnapshot(
             schema_version=snapshot.schema_version,
             revision=snapshot.revision + 1,

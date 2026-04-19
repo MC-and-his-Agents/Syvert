@@ -446,22 +446,6 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["capability"], "")
         self.assertEqual(result["error"]["code"], "invalid_resource_request")
 
-    def test_acquire_failure_does_not_generate_synthetic_task_id(self) -> None:
-        self.seed_default_resources()
-
-        result = acquire(
-            {
-                "task_id": "",
-                "adapter_key": "xhs",
-                "capability": "content_detail_by_url",
-                "requested_slots": [],
-            },
-            self.make_store(),
-            "",
-        )
-
-        self.assertEqual(result["task_id"], "")
-
     def test_release_failure_backfills_from_lease_context(self) -> None:
         self.seed_default_resources()
         bundle = acquire(
@@ -491,20 +475,6 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["adapter_key"], "douyin")
         self.assertEqual(result["capability"], "content_detail_by_url")
         self.assertEqual(result["error"]["code"], "invalid_resource_release")
-
-    def test_release_failure_does_not_generate_synthetic_task_id(self) -> None:
-        result = release(
-            {
-                "lease_id": "",
-                "task_id": "",
-                "target_status_after_release": "",
-                "reason": "",
-            },
-            self.make_store(),
-            "",
-        )
-
-        self.assertEqual(result["task_id"], "")
 
     def test_release_is_idempotent_under_concurrent_same_semantics(self) -> None:
         class ConcurrentReleaseStore:

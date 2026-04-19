@@ -344,12 +344,16 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             "task-context-active-replay",
         )
         assert isinstance(bundle, ResourceBundle)
-        active_record = store.load_snapshot().resources[0]
+        active_snapshot = store.load_snapshot()
+        active_record = active_snapshot.resources[0]
 
         replayed = store.seed_resources([active_record])
+        replayed_snapshot = store.load_snapshot()
 
         self.assertEqual(len(replayed), 1)
         self.assertEqual(replayed[0], active_record)
+        self.assertEqual(replayed_snapshot.revision, active_snapshot.revision)
+        self.assertEqual(replayed_snapshot.resources, active_snapshot.resources)
 
     def test_load_snapshot_rejects_invalid_resource_resurrection(self) -> None:
         Path(self._resource_store_path).write_text(
