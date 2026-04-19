@@ -137,5 +137,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `73542aef650ee76b2573c4ea3315b52d4b6f1676`
+- `73542ae7909f34f68d7fee668ac00fc7e26a5ef5`
 - 说明：该 checkpoint 把 `ADR-GOV-0033` 的两阶段 Work Item 决策、`v0.3.0` / `2026-S16` 的阶段 A 收口真相，以及 `GOV-0033` 继续承接阶段 B 发布动作的边界固定到同一条仓内语义链。当前受审 head 若继续存在后续 commit，只允许用于 review / merge gate / GitHub carrier 同步，不再改写该 checkpoint 语义。
