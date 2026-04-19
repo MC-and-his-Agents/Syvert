@@ -11,9 +11,9 @@
 - 输入结构：
   - `AdapterExecutionContext`
   - 其中 `resource_bundle` 复用 `FR-0010` 已冻结的 `ResourceBundle` carrier
-  - `resource_bundle` 可以是：
+  - `resource_bundle` 只允许两种状态：
     - 合法完整 bundle：用于资源依赖路径
-    - 空 bundle / `null`：仅当该执行路径被 Core 明确判定为不依赖受管资源
+    - `null`：仅当该执行路径被 Core 明确判定为不依赖受管资源
 - 输出结构：
   - Adapter 成功/失败结果继续复用既有 Core envelope
   - 若需反馈资源处置建议，返回 `ResourceDispositionHint(lease_id, target_status_after_release, reason)`

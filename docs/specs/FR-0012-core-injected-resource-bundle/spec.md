@@ -33,7 +33,7 @@
   - Adapter 执行边界中的 `resource_bundle` 必须复用 `FR-0010` 已冻结的 canonical carrier：至少包含 `bundle_id`、`lease_id`、`task_id`、`adapter_key`、`capability`、`requested_slots` 与已填充的 slot 资源实体。`FR-0012` 不得重新定义第二套 bundle 顶层字段。
   - Adapter 允许在单次执行内消费 `resource_bundle` 中各 slot 的 `material`，并把它们转译为平台私有的 header、cookie、session、client 或网络配置；这些派生物属于 Adapter 内部临时执行材料，不得回写为新的共享资源 truth。
   - 若当前执行路径被声明为资源依赖路径，而 Core 无法提供合法完整的 `resource_bundle`，Core 必须在调用 Adapter 之前 fail-closed；Adapter 不得以“缺 bundle 时自行补资源”的方式继续执行。
-  - 若当前执行路径不依赖受管资源，Core 可以显式注入空 bundle / `null` bundle，但这一事实必须由 Core 决定，而不是由 Adapter 在运行时自行判定后绕过。
+  - 若当前执行路径不依赖受管资源，Core 只能显式注入 `resource_bundle=null`；`null` 是非资源路径的唯一 canonical 表示，不允许在本 FR 中再引入 `{}`、空 bundle 或其他影子 carrier。
   - Adapter 在执行过程中只允许向 Core 返回“资源处置提示”，例如当前 bundle 应按 `AVAILABLE` 或 `INVALID` 收口；真正的 `release` / 状态推进仍只能由 Core 执行。
   - 资源处置提示若存在，最小 payload 必须包含：
     - `lease_id`
@@ -107,7 +107,7 @@ Then 它必须被视为违反“Adapter 不自行来源化执行资源”的 con
   - 若 Adapter 直接释放、失效或改写共享资源状态，则违反 Core 拥有生命周期语义的架构边界。
 - 边界场景：
   - 本事项允许 Adapter 把注入资源转换为平台私有运行对象，但这些对象只在单次执行边界内有效。
-  - 本事项允许 Core 明确注入空 bundle / `null` bundle 给“不依赖受管资源”的执行路径；是否依赖由 Core 决定，而不是 Adapter 自行猜测。
+  - 本事项允许 Core 对“不依赖受管资源”的执行路径明确注入 `resource_bundle=null`；是否依赖由 Core 决定，而不是 Adapter 自行猜测。
   - 本事项不定义资源需求 DSL、优先级、provider 选择或浏览器桥接实现。
 
 ## 验收标准
