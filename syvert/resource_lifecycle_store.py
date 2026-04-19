@@ -59,38 +59,44 @@ class LocalResourceLifecycleStore:
     def write_snapshot(self, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
         validate_snapshot(snapshot)
         with self._exclusive_lock():
-            current_snapshot = self.load_snapshot()
-            expected_revision = current_snapshot.revision + 1
-            if snapshot.revision != expected_revision:
-                raise ResourceLifecyclePersistenceError(
-                    "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
-                )
-            payload = snapshot_to_dict(snapshot)
-            self._write_json_atomic(payload)
+            self._write_snapshot_locked(snapshot)
         return snapshot
 
     def seed_resources(self, records: Sequence[ResourceRecord]) -> tuple[ResourceRecord, ...]:
         seeded = seedable_resource_records(records)
-        snapshot = self.load_snapshot()
-        existing_by_id = {record.resource_id: record for record in snapshot.resources}
-        changed = False
-        for record in seeded:
-            existing = existing_by_id.get(record.resource_id)
-            if existing is not None and existing != record:
-                raise ResourceLifecyclePersistenceError("resource_state_conflict: seed_resources 不得覆写既有资源 truth")
-            if existing is None:
-                changed = True
-            existing_by_id[record.resource_id] = record
-        if not changed:
-            return snapshot.resources
-        updated_snapshot = ResourceLifecycleSnapshot(
-            schema_version=snapshot.schema_version,
-            revision=snapshot.revision + 1,
-            resources=tuple(sorted(existing_by_id.values(), key=lambda item: item.resource_id)),
-            leases=snapshot.leases,
-        )
-        self.write_snapshot(updated_snapshot)
-        return updated_snapshot.resources
+        with self._exclusive_lock():
+            snapshot = self.load_snapshot()
+            existing_by_id = {record.resource_id: record for record in snapshot.resources}
+            changed = False
+            for record in seeded:
+                existing = existing_by_id.get(record.resource_id)
+                if existing is not None and existing != record:
+                    raise ResourceLifecyclePersistenceError(
+                        "resource_state_conflict: seed_resources 不得覆写既有资源 truth"
+                    )
+                if existing is None:
+                    changed = True
+                existing_by_id[record.resource_id] = record
+            if not changed:
+                return snapshot.resources
+            updated_snapshot = ResourceLifecycleSnapshot(
+                schema_version=snapshot.schema_version,
+                revision=snapshot.revision + 1,
+                resources=tuple(sorted(existing_by_id.values(), key=lambda item: item.resource_id)),
+                leases=snapshot.leases,
+            )
+            self._write_snapshot_locked(updated_snapshot)
+            return updated_snapshot.resources
+
+    def _write_snapshot_locked(self, snapshot: ResourceLifecycleSnapshot) -> None:
+        current_snapshot = self.load_snapshot()
+        expected_revision = current_snapshot.revision + 1
+        if snapshot.revision != expected_revision:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
+            )
+        payload = snapshot_to_dict(snapshot)
+        self._write_json_atomic(payload)
 
     def _write_json_atomic(self, payload: Mapping[str, object]) -> None:
         temp_path: str | None = None

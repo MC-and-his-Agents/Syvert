@@ -355,6 +355,49 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(replayed_snapshot.revision, active_snapshot.revision)
         self.assertEqual(replayed_snapshot.resources, active_snapshot.resources)
 
+    def test_seed_resources_merges_disjoint_concurrent_inserts(self) -> None:
+        store = self.make_store()
+        barrier = threading.Barrier(2)
+        errors: list[str] = []
+
+        def seeder(record: ResourceRecord) -> None:
+            barrier.wait()
+            try:
+                store.seed_resources([record])
+            except ResourceLifecyclePersistenceError as error:
+                errors.append(str(error))
+
+        thread_a = threading.Thread(
+            target=seeder,
+            args=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                ),
+            ),
+        )
+        thread_b = threading.Thread(
+            target=seeder,
+            args=(
+                ResourceRecord(
+                    resource_id="proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material={"proxy_endpoint": "http://proxy-001"},
+                ),
+            ),
+        )
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(errors, [])
+        snapshot = store.load_snapshot()
+        self.assertEqual({record.resource_id for record in snapshot.resources}, {"account-001", "proxy-001"})
+
     def test_load_snapshot_rejects_invalid_resource_resurrection(self) -> None:
         Path(self._resource_store_path).write_text(
             json.dumps(

@@ -128,27 +128,35 @@ def acquire(
     adapter_key = normalized_request.adapter_key
     capability = normalized_request.capability
     try:
-        selected = select_available_resources(snapshot, normalized_request.requested_slots)
-        acquired_at = now_rfc3339_utc()
-        bundle = build_resource_bundle(
-            task_id=normalized_request.task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            requested_slots=normalized_request.requested_slots,
-            selected_resources=selected,
-            acquired_at=acquired_at,
-        )
-        lease = build_resource_lease(bundle)
-        updated_resources = apply_acquire_transition(snapshot.resources, selected)
-        updated_snapshot = ResourceLifecycleSnapshot(
-            schema_version=snapshot.schema_version,
-            revision=snapshot.revision + 1,
-            resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
-            leases=tuple([*snapshot.leases, lease]),
-        )
-        validate_snapshot(updated_snapshot)
-        store.write_snapshot(updated_snapshot)
-        return bundle
+        current_snapshot = snapshot
+        while True:
+            selected = select_available_resources(current_snapshot, normalized_request.requested_slots)
+            acquired_at = now_rfc3339_utc()
+            bundle = build_resource_bundle(
+                task_id=normalized_request.task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                requested_slots=normalized_request.requested_slots,
+                selected_resources=selected,
+                acquired_at=acquired_at,
+            )
+            lease = build_resource_lease(bundle)
+            updated_resources = apply_acquire_transition(current_snapshot.resources, selected)
+            updated_snapshot = ResourceLifecycleSnapshot(
+                schema_version=current_snapshot.schema_version,
+                revision=current_snapshot.revision + 1,
+                resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
+                leases=tuple([*current_snapshot.leases, lease]),
+            )
+            validate_snapshot(updated_snapshot)
+            try:
+                store.write_snapshot(updated_snapshot)
+                return bundle
+            except ResourceLifecycleContractError as error:
+                if not is_retryable_acquire_conflict(error):
+                    raise
+                current_snapshot = store.load_snapshot()
+                validate_snapshot(current_snapshot)
     except ResourceLifecycleContractError as error:
         return failure_envelope(
             normalized_request.task_id,
@@ -899,6 +907,10 @@ def is_non_empty_string(value: Any) -> bool:
 
 def invalid_request_error(message: str) -> ResourceLifecycleContractError:
     return ResourceLifecycleContractError(f"invalid_resource_request: {message}")
+
+
+def is_retryable_acquire_conflict(error: ResourceLifecycleContractError) -> bool:
+    return str(error).startswith("resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致")
 
 
 def invalid_release_error(message: str) -> ResourceLifecycleContractError:

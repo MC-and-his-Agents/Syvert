@@ -85,6 +85,73 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.account.status, "IN_USE")
         self.assertEqual(result.proxy.status, "IN_USE")
 
+    def test_concurrent_acquire_retries_when_spare_capacity_still_exists(self) -> None:
+        class ConcurrentAcquireStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._barrier = threading.Barrier(2)
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 2:
+                    self._barrier.wait()
+                return self._inner_store.write_snapshot(snapshot)
+
+        store = ConcurrentAcquireStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                ),
+                ResourceRecord(
+                    resource_id="account-002",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-002"},
+                ),
+            ]
+        )
+
+        results = []
+
+        def worker(task_id: str) -> None:
+            results.append(
+                acquire(
+                    AcquireRequest(
+                        task_id=task_id,
+                        adapter_key="xhs",
+                        capability="content_detail_by_url",
+                        requested_slots=("account",),
+                    ),
+                    store,
+                    f"task-context-{task_id}",
+                )
+            )
+
+        thread_a = threading.Thread(target=worker, args=("task-001a",))
+        thread_b = threading.Thread(target=worker, args=("task-001b",))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(isinstance(result, ResourceBundle) for result in results))
+        resource_ids = {
+            result.account.resource_id
+            for result in results
+            if isinstance(result, ResourceBundle) and result.account is not None
+        }
+        self.assertEqual(resource_ids, {"account-001", "account-002"})
+
     def test_acquire_fails_closed_when_any_slot_is_missing(self) -> None:
         self.make_store().seed_resources(
             [

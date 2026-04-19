@@ -46,6 +46,7 @@
 - guardian 第九轮 review 已把阻断收敛到快照时间排序与历史语义完整性；当前工作树已把所有 lease 事件排序切到解析后的 UTC datetime、补齐 `released_at >= acquired_at` 与同资源 lease 区间不重叠校验，并把 `material` 归一失败统一收口为资源生命周期 contract 错误。
 - guardian 第十轮 review 已把阻断收敛到 failure carrier 与 bootstrap replay 语义；当前工作树已移除失败路径上的 synthetic `task_id` 生成，并让 `seed_resources()` 对 active durable truth 支持同值 replay 幂等。
 - guardian 第十一轮 review 已把阻断收敛到 failure carrier 来源约束与 replay 的“严格 no-op”语义；当前工作树已让 release 失败 carrier 不再借用 `lease.task_id`，并把同值 `seed_resources()` replay 收紧成 revision 不变的 no-op。
+- guardian 第十二轮 review 已把阻断收敛到 acquire / seed 的并发语义；当前工作树已让 `acquire()` 在 revision 冲突后按最新 durable truth 重新选资源，并把 `seed_resources()` 的读/合并/no-op 判断全部搬进锁内。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -142,6 +143,12 @@
     - `recover_release_failure_task_id()` 失败回填仅允许使用请求 `task_id` 或当前 task context，不再借用 `lease.task_id`
     - `seed_resources()` 的同值 replay 现在是严格 no-op：durable truth 未变化时不写盘、不增长 revision
     - `test_seed_resources_allows_active_truth_replay` 补充 revision 稳定断言，锁定 no-op 语义
+  - 第十二轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `acquire()` 在 `write_snapshot()` 因 revision mismatch 失败时回读最新快照并重新执行 slot 选择；若仍有空闲资源则继续成功 acquire，而不是误报 `resource_state_conflict`
+    - `seed_resources()` 的读 / merge / no-op / 写入全部进入同一锁区间，避免并发 disjoint seed 丢失更新
+    - 新增“并发 acquire 仍有 spare capacity 时双成功”与“并发 seed 不同资源时最终 truth 同时保留两者”回归
+    - acquire 重试范围收紧为仅 revision mismatch，避免把写路径 `OSError` 误判为可重试冲突
 
 ## 未决风险
 
