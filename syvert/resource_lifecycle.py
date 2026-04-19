@@ -251,12 +251,13 @@ def release(
             refreshed_snapshot = store.load_snapshot()
             validate_snapshot(refreshed_snapshot)
             refreshed_lease = require_lease(refreshed_snapshot, lease.lease_id)
-            if (
-                refreshed_lease.released_at is not None
-                and refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
-                and refreshed_lease.release_reason == normalized_request.reason
-            ):
-                return refreshed_lease
+            if refreshed_lease.released_at is not None:
+                if (
+                    refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
+                    and refreshed_lease.release_reason == normalized_request.reason
+                ):
+                    return refreshed_lease
+                raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
             raise error
         return settled_lease
     except ResourceLifecycleContractError as error:

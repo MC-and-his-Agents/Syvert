@@ -526,6 +526,85 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         assert isinstance(second, ResourceLease)
         self.assertEqual(first, second)
 
+    def test_release_rejects_concurrent_conflicting_semantics(self) -> None:
+        class ConcurrentReleaseStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._barrier = threading.Barrier(2)
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.write_snapshot(snapshot)
+
+        store = ConcurrentReleaseStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-015b",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-015b",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        results = []
+
+        def worker(target_status_after_release: str, reason: str) -> None:
+            results.append(
+                release(
+                    ReleaseRequest(
+                        lease_id=bundle.lease_id,
+                        task_id="task-015b",
+                        target_status_after_release=target_status_after_release,
+                        reason=reason,
+                    ),
+                    store,
+                    "task-context-015b",
+                )
+            )
+
+        thread_a = threading.Thread(target=worker, args=("AVAILABLE", "normal"))
+        thread_b = threading.Thread(target=worker, args=("INVALID", "burned"))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(len(results), 2)
+        successful = [result for result in results if isinstance(result, ResourceLease)]
+        failed = [result for result in results if isinstance(result, dict)]
+        self.assertEqual(len(successful), 1)
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]["error"]["code"], "resource_release_conflict")
+
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(len(snapshot.leases), 1)
+        lease = snapshot.leases[0]
+        self.assertIsNotNone(lease.released_at)
+        self.assertIn(lease.target_status_after_release, {"AVAILABLE", "INVALID"})
+        self.assertIn(lease.release_reason, {"normal", "burned"})
+        expected_status = "AVAILABLE" if lease.target_status_after_release == "AVAILABLE" else "INVALID"
+        self.assertEqual(snapshot.resources[0].status, expected_status)
+
     def test_seed_resources_rejects_in_use_without_active_lease(self) -> None:
         with self.assertRaisesRegex(Exception, "IN_USE 资源必须由唯一 active lease 持有"):
             self.make_store().seed_resources(

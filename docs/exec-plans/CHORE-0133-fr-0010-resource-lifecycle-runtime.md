@@ -39,6 +39,7 @@
 - guardian 第二轮 review 已把阻断收敛到真正的 CAS/互斥写问题；当前分支已把快照 revision 检查与 `os.replace` 放进文件锁保护区，并补并发同基线写入争用测试。
 - guardian 第三轮 review 已把阻断收敛到并发同语义 `release` 的幂等 no-op 语义；当前分支已在 release 写入期 CAS 冲突后回读最新 lease，并对“同目标状态 + 同 reason”返回同一 settled `ResourceLease`。
 - guardian 第四轮 review 已把阻断收敛到 `release` 非法输入分类与 `INVALID` 资源终态保护；当前分支已把 release 字段解析切到 `invalid_resource_release` 路径，并禁止 `seed_resources()` 把既有 `INVALID` 资源写回可分配状态。
+- guardian 第五轮 review 已把阻断收敛到并发不同语义 `release` 的冲突分类；当前工作树已把 CAS 冲突回读后的“已 settled 但语义不一致”路径收口为 `resource_release_conflict`，并补并发冲突 release 回归。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -67,7 +68,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（25 tests, OK）
+  - 结果：通过（26 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -99,6 +100,10 @@
     - `normalize_release_request()` 改用 release 专用字符串提取，确保非字符串 / 缺字段 release 输入统一落到 `invalid_input / invalid_resource_release`
     - `seed_resources()` 禁止把既有 `INVALID` 资源重新写回 `AVAILABLE` 等可分配状态，保持失效终态不可复活
     - 新增非法 release 字段分类测试与 `INVALID` 资源不可复活测试
+  - 第五轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `release()` 在写入期 CAS 冲突后若回读到已 settled 且 `target_status_after_release` / `reason` 与当前请求不一致，统一返回 `resource_release_conflict`
+    - 新增并发不同语义 release 回归，验证一方成功、一方 fail-closed 为 `resource_release_conflict`，且快照保留胜出方 settled truth
 
 ## 未决风险
 
