@@ -42,6 +42,7 @@
 - guardian 第五轮 review 已把阻断收敛到并发不同语义 `release` 的冲突分类；当前工作树已把 CAS 冲突回读后的“已 settled 但语义不一致”路径收口为 `resource_release_conflict`，并补并发冲突 release 回归。
 - guardian 第六轮 review 已把阻断收敛到 store bootstrap / 持久化异常边界；当前工作树已把 `seed_resources()` 收紧为“仅允许同值重播，不得覆写既有资源 truth”，并把锁文件准备、`flock`、原子写临时文件等 `OSError` 统一包成 `ResourceLifecyclePersistenceError`。
 - guardian 第七轮 review 已把阻断收敛到 durable snapshot 语义校验；当前工作树已让 `validate_snapshot()` 同时校验最新 settled lease 与当前资源 truth 的一致性，并禁止 `INVALID` 终态之后再出现任何后续 lease。
+- guardian 第八轮 review 已把阻断收敛到 post-commit unlock 伪失败、同秒序列排序与 `requested_slots` 非法输入；当前工作树已把 `LOCK_UN` 失败降为 best-effort、把 lifecycle 时间戳提到微秒并用“时间戳 + durable lease 顺序”判定最新 truth，同时把 slot 校验改成逐项验证后再去重。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -70,7 +71,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（31 tests, OK）
+  - 结果：通过（34 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -116,6 +117,12 @@
     - `validate_snapshot()` 新增 latest settled truth 校验：当资源当前不处于 active lease 时，durable resource status 必须与最新 settled lease 的 `target_status_after_release` 一致
     - `validate_snapshot()` 新增 `INVALID` 终态校验：一旦资源被 settled 到 `INVALID`，当前资源状态必须保持 `INVALID`，且不得再出现 `acquired_at` 晚于该 invalid release 的后续 lease
     - 新增 semantically corrupt snapshot 回归，覆盖 store `load_snapshot()` 与 runtime `acquire()` 对“`INVALID` 资源被脏快照复活为 `AVAILABLE`”的 fail-closed 拒绝
+  - 第八轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `_exclusive_lock()` 对 `LOCK_UN` 失败改为 best-effort，不再把已 durable commit 的成功 acquire / release 外翻为失败 envelope
+    - `now_rfc3339_utc()` 提升到微秒精度，且 `validate_snapshot()` 以“时间戳 + lease 顺序”推导最新 settled truth，消除同秒多次生命周期转换的错误排序
+    - `validate_requested_slots()` 改为逐项校验字符串合法性后再做去重，避免非 hashable slot 直接触发原始 `TypeError`
+    - 新增 unlock-after-commit 仍返回成功、同秒 `AVAILABLE -> AVAILABLE -> INVALID` 合法序列、以及非 hashable `requested_slots` 返回 `invalid_resource_request` 回归
 
 ## 未决风险
 

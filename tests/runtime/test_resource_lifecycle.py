@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import tempfile
@@ -146,6 +147,24 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
             "task-context-004",
         )
 
+        self.assertEqual(result["error"]["code"], "invalid_resource_request")
+
+    def test_acquire_rejects_unhashable_requested_slots(self) -> None:
+        self.seed_default_resources()
+
+        result = acquire(
+            {
+                "task_id": "task-002b",
+                "adapter_key": "xhs",
+                "capability": "content_detail_by_url",
+                "requested_slots": [{"slot": "account"}],
+            },
+            self.make_store(),
+            "task-context-002b",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "invalid_input")
         self.assertEqual(result["error"]["code"], "invalid_resource_request")
 
     def test_acquire_rejects_invalid_resource_reuse(self) -> None:
@@ -606,6 +625,59 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         expected_status = "AVAILABLE" if lease.target_status_after_release == "AVAILABLE" else "INVALID"
         self.assertEqual(snapshot.resources[0].status, expected_status)
 
+    def test_same_second_transitions_preserve_latest_settled_truth(self) -> None:
+        self.seed_default_resources()
+
+        with mock.patch("syvert.resource_lifecycle.now_rfc3339_utc", return_value="2026-04-20T00:00:00Z"):
+            first_bundle = acquire(
+                AcquireRequest(
+                    task_id="task-015c",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-015c",
+            )
+            assert isinstance(first_bundle, ResourceBundle)
+            first_release = release(
+                ReleaseRequest(
+                    lease_id=first_bundle.lease_id,
+                    task_id="task-015c",
+                    target_status_after_release="AVAILABLE",
+                    reason="normal",
+                ),
+                self.make_store(),
+                "task-context-015c",
+            )
+            assert isinstance(first_release, ResourceLease)
+            second_bundle = acquire(
+                AcquireRequest(
+                    task_id="task-015d",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-015d",
+            )
+            assert isinstance(second_bundle, ResourceBundle)
+            second_release = release(
+                ReleaseRequest(
+                    lease_id=second_bundle.lease_id,
+                    task_id="task-015d",
+                    target_status_after_release="INVALID",
+                    reason="burned",
+                ),
+                self.make_store(),
+                "task-context-015d",
+            )
+
+        self.assertIsInstance(second_release, ResourceLease)
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.resources[0].status, "INVALID")
+        self.assertEqual(snapshot.leases[-1].target_status_after_release, "INVALID")
+
     def test_seed_resources_rejects_in_use_without_active_lease(self) -> None:
         with self.assertRaisesRegex(Exception, "IN_USE 资源必须由唯一 active lease 持有"):
             self.make_store().seed_resources(
@@ -749,6 +821,33 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_stays_successful_when_unlock_fails_after_commit(self) -> None:
+        self.seed_default_resources()
+        real_flock = fcntl.flock
+
+        def flaky_flock(fd, operation):
+            if operation == fcntl.LOCK_UN:
+                raise OSError("unlock failed")
+            return real_flock(fd, operation)
+
+        with mock.patch("syvert.resource_lifecycle_store.fcntl.flock", side_effect=flaky_flock):
+            result = acquire(
+                AcquireRequest(
+                    task_id="task-013d",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-013d",
+            )
+
+        self.assertIsInstance(result, ResourceBundle)
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 2)
+        self.assertEqual(snapshot.resources[0].status, "IN_USE")
+        self.assertEqual(len(snapshot.leases), 1)
 
 
 if __name__ == "__main__":

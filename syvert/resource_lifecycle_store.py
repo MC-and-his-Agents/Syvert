@@ -132,10 +132,11 @@ class LocalResourceLifecycleStore:
                 finally:
                     try:
                         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-                    except OSError as error:
-                        raise ResourceLifecyclePersistenceError(
-                            f"resource_state_conflict: 无法解锁资源生命周期快照 `{self.path}`"
-                        ) from error
+                    except OSError:
+                        # The durable snapshot may already be committed; closing the file descriptor
+                        # will release the advisory lock, so unlock failures must not flip success
+                        # into an external failure result after truth has been persisted.
+                        pass
         except OSError as error:
             raise ResourceLifecyclePersistenceError(
                 f"resource_state_conflict: 无法准备资源生命周期快照锁 `{self.path}`"

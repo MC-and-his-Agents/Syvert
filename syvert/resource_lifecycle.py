@@ -92,7 +92,7 @@ ResourceReleaseResult = Union[ResourceLease, dict[str, Any]]
 
 
 def now_rfc3339_utc() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def empty_snapshot() -> ResourceLifecycleSnapshot:
@@ -415,10 +415,10 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
 
     lease_ids: set[str] = set()
     active_resource_ids: set[str] = set()
-    latest_settled_by_resource_id: dict[str, tuple[str, str]] = {}
-    invalid_released_at_by_resource_id: dict[str, str] = {}
-    leases_by_resource_id: dict[str, list[ResourceLease]] = {}
-    for lease in snapshot.leases:
+    latest_settled_by_resource_id: dict[str, tuple[str, int, str]] = {}
+    invalid_released_at_by_resource_id: dict[str, tuple[str, int]] = {}
+    leases_by_resource_id: dict[str, list[tuple[int, ResourceLease]]] = {}
+    for lease_index, lease in enumerate(snapshot.leases):
         validate_resource_lease(lease)
         if lease.lease_id in lease_ids:
             raise ResourceLifecycleContractError("资源生命周期快照存在重复 lease_id")
@@ -426,7 +426,7 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
         for resource_id in lease.resource_ids:
             if resource_id not in resources_by_id:
                 raise ResourceLifecycleContractError("lease 绑定了不存在的 resource_id")
-            leases_by_resource_id.setdefault(resource_id, []).append(lease)
+            leases_by_resource_id.setdefault(resource_id, []).append((lease_index, lease))
         if lease.released_at is None:
             for resource_id in lease.resource_ids:
                 if resource_id in active_resource_ids:
@@ -436,12 +436,17 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
             assert lease.target_status_after_release is not None
             for resource_id in lease.resource_ids:
                 latest = latest_settled_by_resource_id.get(resource_id)
-                if latest is None or lease.released_at > latest[0]:
-                    latest_settled_by_resource_id[resource_id] = (lease.released_at, lease.target_status_after_release)
+                release_marker = (lease.released_at, lease_index)
+                if latest is None or release_marker > latest[:2]:
+                    latest_settled_by_resource_id[resource_id] = (
+                        lease.released_at,
+                        lease_index,
+                        lease.target_status_after_release,
+                    )
                 if lease.target_status_after_release == "INVALID":
                     invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
-                    if invalid_released_at is None or lease.released_at > invalid_released_at:
-                        invalid_released_at_by_resource_id[resource_id] = lease.released_at
+                    if invalid_released_at is None or release_marker > invalid_released_at:
+                        invalid_released_at_by_resource_id[resource_id] = release_marker
 
     for resource_id in active_resource_ids:
         if resources_by_id[resource_id].status != "IN_USE":
@@ -451,14 +456,14 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
             raise ResourceLifecycleContractError("IN_USE 资源必须由唯一 active lease 持有")
         if record.status != "IN_USE" and resource_id not in active_resource_ids:
             latest_settled = latest_settled_by_resource_id.get(resource_id)
-            if latest_settled is not None and record.status != latest_settled[1]:
+            if latest_settled is not None and record.status != latest_settled[2]:
                 raise ResourceLifecycleContractError("资源状态必须与最新 settled lease truth 一致")
         invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
         if invalid_released_at is not None:
             if record.status != "INVALID":
                 raise ResourceLifecycleContractError("INVALID 资源不得被重新写回其他状态")
-            for lease in leases_by_resource_id.get(resource_id, []):
-                if lease.acquired_at > invalid_released_at:
+            for lease_index, lease in leases_by_resource_id.get(resource_id, []):
+                if (lease.acquired_at, lease_index) > invalid_released_at:
                     raise ResourceLifecycleContractError("INVALID 资源不得在 settled 后再次被 lease 占用")
 
 
@@ -777,9 +782,13 @@ def validate_requested_slots(value: Sequence[str], *, field: str) -> None:
     slots = tuple(value)
     if not slots:
         raise invalid_request_error(f"{field} 必须为非空去重数组")
-    if len(set(slots)) != len(slots):
-        raise invalid_request_error(f"{field} 不允许重复 slot")
+    seen: set[str] = set()
     for slot in slots:
+        if not isinstance(slot, str) or not slot:
+            raise invalid_request_error(f"{field} 存在非法 slot")
+        if slot in seen:
+            raise invalid_request_error(f"{field} 不允许重复 slot")
+        seen.add(slot)
         if slot not in RESOURCE_TYPES:
             raise invalid_request_error(f"{field} 存在未知 slot `{slot}`")
 
