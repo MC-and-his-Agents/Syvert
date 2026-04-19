@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from syvert.resource_lifecycle import (
@@ -435,6 +436,53 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["adapter_key"], "douyin")
         self.assertEqual(result["capability"], "content_detail_by_url")
         self.assertEqual(result["error"]["code"], "invalid_resource_release")
+
+    def test_seed_resources_rejects_in_use_without_active_lease(self) -> None:
+        with self.assertRaisesRegex(Exception, "IN_USE 资源必须由唯一 active lease 持有"):
+            self.make_store().seed_resources(
+                [
+                    ResourceRecord(
+                        resource_id="account-in-use",
+                        resource_type="account",
+                        status="IN_USE",
+                        material={"provider_account_id": "pa-in-use"},
+                    )
+                ]
+            )
+
+    def test_acquire_returns_failed_envelope_for_corrupt_snapshot(self) -> None:
+        Path(self._resource_store_path).write_text("{not-json", encoding="utf-8")
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_release_returns_failed_envelope_for_corrupt_snapshot(self) -> None:
+        Path(self._resource_store_path).write_text("{not-json", encoding="utf-8")
+
+        result = release(
+            ReleaseRequest(
+                lease_id="lease-missing",
+                task_id="task-014",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-014",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
 
 if __name__ == "__main__":

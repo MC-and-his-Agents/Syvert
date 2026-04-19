@@ -7,8 +7,16 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from syvert.resource_lifecycle import AcquireRequest, ReleaseRequest, ResourceBundle, ResourceRecord, acquire, release
-from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+from syvert.resource_lifecycle import (
+    AcquireRequest,
+    ReleaseRequest,
+    ResourceBundle,
+    ResourceLifecycleSnapshot,
+    ResourceRecord,
+    acquire,
+    release,
+)
+from syvert.resource_lifecycle_store import ResourceLifecyclePersistenceError, default_resource_lifecycle_store
 
 
 class ResourceStoreEnvMixin:
@@ -50,6 +58,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(seeded), 1)
         payload = json.loads(Path(self._resource_store_path).read_text(encoding="utf-8"))
         self.assertEqual(payload["schema_version"], "v0.4.0")
+        self.assertEqual(payload["revision"], 1)
         self.assertEqual(payload["resources"][0]["resource_id"], "account-001")
         self.assertEqual(payload["leases"], [])
 
@@ -98,6 +107,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(reloaded.resources), 2)
         self.assertEqual(len(reloaded.leases), 1)
         self.assertEqual(reloaded.leases[0].released_at is not None, True)
+        self.assertEqual(reloaded.revision, 3)
 
     def test_failed_acquire_does_not_leave_half_written_truth(self) -> None:
         store = self.make_store()
@@ -127,6 +137,51 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         reloaded = store.load_snapshot()
         self.assertEqual(len(reloaded.leases), 0)
         self.assertEqual(reloaded.resources[0].status, "AVAILABLE")
+
+    def test_write_snapshot_rejects_stale_revision(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        base_snapshot = store.load_snapshot()
+        first_update = ResourceLifecycleSnapshot(
+            schema_version=base_snapshot.schema_version,
+            revision=base_snapshot.revision + 1,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001", "marker": "first"},
+                ),
+            ),
+            leases=base_snapshot.leases,
+        )
+        store.write_snapshot(first_update)
+
+        stale_update = ResourceLifecycleSnapshot(
+            schema_version=base_snapshot.schema_version,
+            revision=base_snapshot.revision + 1,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001", "marker": "stale"},
+                ),
+            ),
+            leases=base_snapshot.leases,
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            store.write_snapshot(stale_update)
 
 
 if __name__ == "__main__":

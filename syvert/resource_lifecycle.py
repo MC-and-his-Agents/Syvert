@@ -74,6 +74,7 @@ class ReleaseRequest:
 @dataclass(frozen=True)
 class ResourceLifecycleSnapshot:
     schema_version: str
+    revision: int
     resources: tuple[ResourceRecord, ...]
     leases: tuple[ResourceLease, ...]
 
@@ -97,6 +98,7 @@ def now_rfc3339_utc() -> str:
 def empty_snapshot() -> ResourceLifecycleSnapshot:
     return ResourceLifecycleSnapshot(
         schema_version=RESOURCE_LIFECYCLE_VERSION,
+        revision=0,
         resources=(),
         leases=(),
     )
@@ -140,6 +142,7 @@ def acquire(
         updated_resources = apply_acquire_transition(snapshot.resources, selected)
         updated_snapshot = ResourceLifecycleSnapshot(
             schema_version=snapshot.schema_version,
+            revision=snapshot.revision + 1,
             resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
             leases=tuple([*snapshot.leases, lease]),
         )
@@ -237,6 +240,7 @@ def release(
         )
         updated_snapshot = ResourceLifecycleSnapshot(
             schema_version=snapshot.schema_version,
+            revision=snapshot.revision + 1,
             resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
             leases=updated_leases,
         )
@@ -272,6 +276,7 @@ def snapshot_to_dict(snapshot: ResourceLifecycleSnapshot) -> dict[str, Any]:
     validate_snapshot(snapshot)
     return {
         "schema_version": snapshot.schema_version,
+        "revision": snapshot.revision,
         "resources": [resource_record_to_dict(record) for record in snapshot.resources],
         "leases": [resource_lease_to_dict(lease) for lease in snapshot.leases],
     }
@@ -288,6 +293,7 @@ def snapshot_from_dict(payload: Mapping[str, Any]) -> ResourceLifecycleSnapshot:
         raise ResourceLifecycleContractError("资源生命周期快照.leases 必须是数组")
     snapshot = ResourceLifecycleSnapshot(
         schema_version=require_non_empty_string(payload.get("schema_version"), field="snapshot.schema_version"),
+        revision=require_non_negative_int(payload.get("revision"), field="snapshot.revision"),
         resources=tuple(resource_record_from_dict(item) for item in raw_resources),
         leases=tuple(resource_lease_from_dict(item) for item in raw_leases),
     )
@@ -382,6 +388,8 @@ def resource_lease_from_dict(payload: Mapping[str, Any]) -> ResourceLease:
 def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
     if snapshot.schema_version != RESOURCE_LIFECYCLE_VERSION:
         raise ResourceLifecycleContractError("资源生命周期快照 schema_version 不合法")
+    if isinstance(snapshot.revision, bool) or not isinstance(snapshot.revision, int) or snapshot.revision < 0:
+        raise ResourceLifecycleContractError("资源生命周期快照 revision 不合法")
 
     resource_ids: set[str] = set()
     resources_by_id: dict[str, ResourceRecord] = {}
@@ -411,6 +419,9 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
     for resource_id in active_resource_ids:
         if resources_by_id[resource_id].status != "IN_USE":
             raise ResourceLifecycleContractError("active lease 绑定资源必须处于 IN_USE")
+    for resource_id, record in resources_by_id.items():
+        if record.status == "IN_USE" and resource_id not in active_resource_ids:
+            raise ResourceLifecycleContractError("IN_USE 资源必须由唯一 active lease 持有")
 
 
 def validate_resource_record(record: ResourceRecord) -> None:
@@ -777,6 +788,12 @@ def require_optional_non_empty_string(value: Any, *, field: str) -> str | None:
         return None
     if not isinstance(value, str) or not value:
         raise ResourceLifecycleContractError(f"{field} 必须为非空字符串或 null")
+    return value
+
+
+def require_non_negative_int(value: Any, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ResourceLifecycleContractError(f"{field} 必须为非负整数")
     return value
 
 
