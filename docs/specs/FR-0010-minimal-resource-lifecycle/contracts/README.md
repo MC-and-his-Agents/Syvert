@@ -20,6 +20,7 @@
   - 成功约束：
     - 所有 `requested_slots` 都已绑定到 `AVAILABLE` 资源
     - bundle 内资源在返回时统一处于 `IN_USE`
+    - 对应 slot 下的资源实体至少包含共享 `resource_id`、`resource_type`、`status`、`material`；账号/代理专属标识继续封装在 `material` 中，不额外冻结新的共享顶层字段
     - `ResourceBundle` 与同次 `ResourceLease.resource_ids` 只能且必须覆盖 `requested_slots` 对应的资源；不得额外附带未请求 slot
 - `release`
   - 输入：
@@ -40,8 +41,8 @@
 - 失败返回 carrier：
   - `acquire` / `release` 失败都必须复用共享 failed envelope
   - 顶层字段固定为：`task_id`、`adapter_key`、`capability`、`status=failed`、`error`
-  - `acquire` 失败时：`task_id`、`adapter_key`、`capability` 必须优先回显可恢复的请求值；对应字段若缺失、不可恢复或形状非法，则固定回填为空字符串
-  - `release` 失败时：`task_id` 必须优先回显请求值；若请求里缺失或不可恢复，则 `task_id=""`；若 `lease_id` 已解析到既有 lease，则 `adapter_key` / `capability` 回填自该 lease；否则二者固定为空字符串
+  - `acquire` 失败时：`task_id`、`adapter_key`、`capability` 必须优先回显可恢复的请求值；`task_id` 若缺失、不可恢复或形状非法，仍必须回填当前 task-bound Core 上下文中的非空 `task_id`；`adapter_key` / `capability` 若缺失、不可恢复或形状非法，则固定回填为空字符串
+  - `release` 失败时：`task_id` 必须优先回显请求值；若请求里缺失、不可恢复或形状非法，仍必须回填当前 task-bound Core 上下文中的非空 `task_id`；若 `lease_id` 已解析到既有 lease，则 `adapter_key` / `capability` 回填自该 lease；否则二者固定为空字符串
 - `invalid_input`
   - 适用场景：
     - 缺少 `task_id`、`adapter_key`、`capability`

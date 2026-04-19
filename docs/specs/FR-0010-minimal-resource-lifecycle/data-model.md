@@ -23,17 +23,15 @@
   - `status`
     - 约束：只允许 `AVAILABLE`、`IN_USE`、`INVALID`
   - `material`
-    - 约束：JSON-safe 的不透明 payload；允许承载类型专属执行材料，但不得改写共享顶层字段命名
+    - 约束：JSON-safe 的不透明 payload；允许承载账号/代理专属执行材料与 provider-side key，但在 `v0.4.0` 不得把这些类型专属值升格为新的共享顶层字段
 - `AccountResource`
-  - `account_key`
-    - 约束：非空字符串；用于表达账号资源的稳定引用
   - 继承约束：
     - 必须同时携带 `ResourceRecord` 的 `resource_id`、`resource_type`、`status`、`material`
+    - 账号资源的 provider-side 专属标识若需要暴露，只允许封装在 `material` 中；`v0.4.0` 不另建稳定顶层 `account_key`
 - `ProxyResource`
-  - `proxy_key`
-    - 约束：非空字符串；用于表达代理资源的稳定引用
   - 继承约束：
     - 必须同时携带 `ResourceRecord` 的 `resource_id`、`resource_type`、`status`、`material`
+    - 代理资源的 provider-side 专属标识若需要暴露，只允许封装在 `material` 中；`v0.4.0` 不另建稳定顶层 `proxy_key`
 - `ResourceBundle`
   - `bundle_id`
     - 约束：非空字符串；用于标识本次成功 acquire 的 bundle
@@ -71,10 +69,10 @@
 
 - `acquire` failed envelope
   - `task_id` / `adapter_key` / `capability`
-    - 约束：优先回显可恢复的请求值；若对应字段缺失、不可恢复或形状非法，则固定回填为 `""`
+    - 约束：优先回显可恢复的请求值；`task_id` 若缺失、不可恢复或形状非法，仍必须回填当前 task-bound Core 上下文中的非空 `task_id`；`adapter_key` / `capability` 若缺失、不可恢复或形状非法，则固定回填为 `""`
 - `release` failed envelope
   - `task_id`
-    - 约束：优先回显请求值；若请求里缺失或不可恢复，则固定回填为 `""`
+    - 约束：优先回显请求值；若请求里缺失、不可恢复或形状非法，仍必须回填当前 task-bound Core 上下文中的非空 `task_id`
   - `adapter_key` / `capability`
     - 约束：若 `lease_id` 已解析到既有 `ResourceLease`，则必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则固定回填为 `""`
 
