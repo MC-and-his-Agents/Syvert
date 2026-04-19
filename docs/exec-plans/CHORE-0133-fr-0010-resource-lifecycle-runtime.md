@@ -1,0 +1,93 @@
+# CHORE-0133 执行计划
+
+## 关联信息
+
+- item_key：`CHORE-0133-fr-0010-resource-lifecycle-runtime`
+- Issue：`#175`
+- item_type：`CHORE`
+- release：`v0.4.0`
+- sprint：`2026-S17`
+- 关联 spec：`docs/specs/FR-0010-minimal-resource-lifecycle/`
+- 关联 PR：
+- active 收口事项：`CHORE-0133-fr-0010-resource-lifecycle-runtime`
+
+## 目标
+
+- 在不改 `execute_task` 主执行链的前提下，落地 `FR-0010` 最小资源生命周期子系统。
+- 提供独立的 `acquire / release` contract、本地原子快照存储与最小 bootstrap API。
+- 通过单测冻结资源状态迁移、整包 acquire、release 幂等与失败 envelope 回填行为。
+
+## 范围
+
+- 本次纳入：
+  - `syvert/resource_lifecycle.py`
+  - `syvert/resource_lifecycle_store.py`
+  - `tests/runtime/test_resource_lifecycle.py`
+  - `tests/runtime/test_resource_lifecycle_store.py`
+  - 视需要最小补充当前 active `exec-plan`
+- 本次不纳入：
+  - `syvert/runtime.py` 主执行路径接线
+  - 资源 CLI / API
+  - `FR-0011` tracing / usage log
+  - `FR-0012` resource bundle 注入与 reference adapter 改造
+
+## 当前停点
+
+- `FR-0010` formal spec 已由 PR `#170` 合入主干，当前执行入口切到真实 Work Item `#175`。
+- 当前分支已经落地独立的 `resource_lifecycle` / `resource_lifecycle_store` 模块、原子快照存储与生命周期单测，且保持 `runtime.execute_task()`、CLI 与 reference adapter 主路径不变。
+- 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
+
+## 下一步动作
+
+- 提交本轮实现补丁并推送分支。
+- 通过受控入口创建 implementation PR，并把 `Issue` / `item_key` / `release` / `sprint` 与 PR carrier 对齐。
+- 在 PR head 上继续补 guardian / merge gate 所需的收口验证。
+
+## 当前 checkpoint 推进的 release 目标
+
+- 为 `v0.4.0` 建立最小资源生命周期子系统，使后续 `FR-0011` / `FR-0012` 可以围绕同一套 bundle / lease / state truth 继续实现。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`FR-0010` 的 implementation Work Item，负责把 formal spec 中的生命周期 contract 落地为可独立调用的 Core 子系统。
+- 阻塞：
+  - 不得让本次实现长出 tracing schema 或 adapter 注入边界。
+  - 不得破坏当前 `runtime` / `registry` / 参考 adapter 回归基线。
+
+## 已验证项
+
+- `gh issue create` 已创建 Work Item `#175`
+- `python3 scripts/create_worktree.py --issue 175 --class implementation`
+  - 结果：已创建独立 worktree `/Users/mc/code/worktrees/syvert/issue-175-fr-0010`
+- `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/spec.md`
+- `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
+- `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
+- `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
+  - 结果：通过（17 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：通过（48 tests, OK）
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_build_payload_passes_for_current_shared_files tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_passes_for_current_shared_files`
+  - 结果：通过（2 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate`
+  - 结果：失败；主干 `/Users/mc/dev/syvert` 同样失败，属于既有基线问题，不是本事项引入的回归
+
+## 未决风险
+
+- 若 bundle / lease carrier 与 formal spec 漂移，后续 `FR-0011` / `FR-0012` 会被迫建立影子 schema。
+- 若本地 store 不是整包原子写入，失败 acquire / release 可能留下半完成 truth。
+- `test_platform_leakage` 全集耗时显著高于常规 runtime 回归，后续 guardian / merge gate 阶段应继续把快回归与慢回归拆开记录。
+- `tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate` 当前与主干同样失败；若仓库把它纳入强制 gate，需要独立事项修复 version-gate 与测试 fixture 的不一致。
+
+## 回滚方式
+
+- 使用独立 revert PR 撤销资源生命周期模块、本地 store 与对应测试。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `e9bcbba933efc5a4133f8313744e8b94a570915f`
