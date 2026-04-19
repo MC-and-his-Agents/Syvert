@@ -33,7 +33,11 @@
   - `occurred_at`
     - 约束：RFC3339 UTC 时间；是时间线判定的最小时间锚点
   - `reason`
-    - 约束：非空字符串；用于说明释放或失效的最小语义
+    - 约束：非空字符串；对所有事件都必须存在
+    - 事件语义：
+      - `acquired`：说明资源为何被当前 task 占用；最小 canonical 值允许为 `acquired_for_task`
+      - `released`：说明资源为何回收到 `AVAILABLE`
+      - `invalidated`：说明资源为何进入 `INVALID`
 - `TaskResourceUsageLog`
   - `task_id`
     - 约束：作为投影主键之一，必须可枚举该 task 关联的全部 `ResourceTraceEvent`

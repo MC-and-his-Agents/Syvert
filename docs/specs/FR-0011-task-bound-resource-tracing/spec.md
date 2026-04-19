@@ -44,6 +44,10 @@
     - `to_status`
     - `occurred_at`
     - `reason`
+  - `reason` 在 `v0.4.0` 内对所有事件都是必填字段：
+    - `acquired`：表达资源为何被当前 task 占用；最小 canonical 语义允许使用 `acquired_for_task`
+    - `released`：表达资源为何回收到 `AVAILABLE`
+    - `invalidated`：表达资源为何进入 `INVALID`
   - `resource_type` 在 `v0.4.0` 只允许复用 `FR-0010` 已冻结的 `account`、`proxy`，不得在 tracing 层另建第三套资源类型命名。
   - `event_type` 在 `v0.4.0` 固定为：
     - `acquired`
@@ -52,6 +56,7 @@
   - `from_status` 与 `to_status` 必须严格复用 `FR-0010` 的状态名与允许迁移集合。tracing 层可以观察这些迁移，但不得重新定义新的状态轴。
   - 若一个 `ResourceBundle` 同时包含多个资源 slot，则必须为 bundle 内每个 `resource_id` 分别记录事件，但这些事件必须共享同一 `task_id`、`lease_id`、`bundle_id`，以表达“同一 task 在同一 lease 下占用了一组资源”。
   - “资源使用日志”在 `v0.4.0` 内固定定义为 `ResourceTraceEvent` 的 task-bound 投影：系统至少必须能够按 `task_id`、`lease_id` 或 `resource_id` 重建该 task 使用过哪些资源、何时 acquire、何时 release 或 invalidate。
+  - 上述最小审计面同样必须支持按 `bundle_id` 重建同一 bundle 内资源的收口过程。
   - tracing 成功语义必须覆盖最小时间线：
     - `acquired` 事件：`AVAILABLE -> IN_USE`
     - `released` 事件：`IN_USE -> AVAILABLE`

@@ -13,7 +13,7 @@
   - 最小字段：`event_id`、`task_id`、`lease_id`、`bundle_id`、`resource_id`、`resource_type`、`adapter_key`、`capability`、`event_type`、`from_status`、`to_status`、`occurred_at`、`reason`
 - 输出结构：
   - canonical tracing truth：append-only 事件流
-  - task-bound usage log：基于同一事件 truth 的最小投影，至少支持按 `task_id`、`resource_id`、`lease_id` 重建时间线
+  - task-bound usage log：基于同一事件 truth 的最小投影，至少支持按 `task_id`、`resource_id`、`lease_id`、`bundle_id` 重建时间线
 
 ## 错误与边界行为
 
