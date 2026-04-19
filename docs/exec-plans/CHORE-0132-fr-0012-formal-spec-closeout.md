@@ -33,16 +33,15 @@
 
 - `issue-168-fr-0012-formal-spec` 已作为 `#168` 的独立 spec worktree 建立。
 - `FR-0012` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 首个 formal spec 语义 checkpoint `9514340132f0476e53185913770ef23166d4d6a7` 已生成，并已通过本地 `spec_guard`、`docs_guard` 与 `workflow_guard`。
+- 最新 formal spec 语义 checkpoint `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
 - spec PR `#171` 已创建并绑定当前分支。
-- 当前分支已 rebase 到 `origin/main` 的 `c972d3560ad2881af0799f994030080bfd2dd482`。
-- 当前 live review head 为 `9fc0ea856183bfabab154363273d9db7bfc4a611`，本地 `governance_gate` 已基于该 head 通过，GitHub PR checks 正在随当前 head 刷新。
-- 当前停点是等待 guardian 对当前 live head 给出 merge gate 结论。
+- 当前分支已 rebase 到包含 `#170` 与 `#169` 的最新 `origin/main`。
+- 当前停点是同步 review-sync / checkpoint 记录，并等待 guardian 对当前 live head 给出 merge gate 结论。
 
 ## 下一步动作
 
-- 继续保持当前 live head 与 `origin/main` 对齐，避免 guardian 输入再次失配。
-- 进入 guardian，消费当前 PR head `9fc0ea856183bfabab154363273d9db7bfc4a611` 的 merge gate 结果。
+- 继续保持当前 live head 与最新 `origin/main` 对齐，避免 guardian 输入再次失配。
+- 进入 guardian，消费当前 PR live head 的 merge gate 结果。
 - 若 guardian 无阻断，则等待 reviewer 结论与上游合入策略确认后进入受控 merge。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -69,14 +68,8 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-168-fr-0012-formal-spec`
   - 结果：通过
-- GitHub PR checks（head=`e835a33edf67316f5615d25093787066a043d997`）
-  - `Validate Commit Messages`：通过
-  - `Validate Docs And Guard Scripts`：通过
-  - `Validate Governance Tooling`：通过
-  - `Validate Spec Review Boundaries`：通过
-  - 说明：上述结果对应 rebase 后、metadata follow-up 之前的 live review head；当前 head 的 checks 以 GitHub 最新结果为准。
-- `git commit -m 'docs(spec): 冻结 FR-0012 Core 注入资源边界 formal spec'`
-  - 结果：已生成 checkpoint `9514340132f0476e53185913770ef23166d4d6a7`
+- `git commit -m 'docs(spec): 补齐 FR-0012 资源处置提示非法输入约束'`
+  - 结果：已生成最新语义 checkpoint `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf`
 
 ## 未决风险
 
@@ -89,5 +82,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9514340132f0476e53185913770ef23166d4d6a7`
-- review-sync 说明：当前 live review head 已推进到 `9fc0ea856183bfabab154363273d9db7bfc4a611`；本次 follow-up 仅同步 rebase、门禁与 PR metadata，不把 metadata-only 收口伪装成新的语义 checkpoint。
+- `3cc67ea0f1276556e5860d7b53bff60e9dfa2daf`
+- review-sync 说明：后续若只追加 exec-plan checkpoint 同步或 PR metadata，则不把 metadata-only 收口伪装成新的语义 checkpoint。
