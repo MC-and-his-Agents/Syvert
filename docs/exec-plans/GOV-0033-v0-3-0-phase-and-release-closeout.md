@@ -128,7 +128,7 @@
   - 若 closeout PR 未合入，恢复 `#126/#159` 正文并停止发布动作
   - 若 tag / GitHub Release 已创建但发现主干事实有误，先修正主干与 GitHub 事实，再按独立回合决定是否删除 / 重建发布锚点
 
-## 最近一次 checkpoint 对应的 head
+## 最近一次 checkpoint 对应的 head SHA
 
 - 前置完成基线：`eebeb9818e296736cadb43904ffa9072c27163ae`
 - 实质 closeout checkpoint：当前分支最新 head（待合入 PR `#160`）
