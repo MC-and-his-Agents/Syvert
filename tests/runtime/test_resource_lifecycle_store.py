@@ -296,6 +296,31 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                 ]
             )
 
+    def test_seed_resources_cannot_overwrite_existing_resource_truth(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            store.seed_resources(
+                [
+                    ResourceRecord(
+                        resource_id="account-001",
+                        resource_type="account",
+                        status="INVALID",
+                        material={"provider_account_id": "pa-001"},
+                    )
+                ]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

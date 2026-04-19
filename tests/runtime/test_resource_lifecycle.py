@@ -652,6 +652,55 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
+    def test_acquire_returns_failed_envelope_when_store_write_setup_raises_oserror(self) -> None:
+        self.seed_default_resources()
+
+        with mock.patch("syvert.resource_lifecycle_store.tempfile.mkstemp", side_effect=OSError("disk full")):
+            result = acquire(
+                AcquireRequest(
+                    task_id="task-013b",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-013b",
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_release_returns_failed_envelope_when_store_lock_raises_oserror(self) -> None:
+        self.seed_default_resources()
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-013c",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013c",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        with mock.patch("syvert.resource_lifecycle_store.fcntl.flock", side_effect=OSError("lock failed")):
+            result = release(
+                ReleaseRequest(
+                    lease_id=bundle.lease_id,
+                    task_id="task-013c",
+                    target_status_after_release="AVAILABLE",
+                    reason="normal",
+                ),
+                self.make_store(),
+                "task-context-013c",
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
 
 if __name__ == "__main__":
     unittest.main()

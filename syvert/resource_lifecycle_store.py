@@ -73,17 +73,16 @@ class LocalResourceLifecycleStore:
         seeded = seedable_resource_records(records)
         snapshot = self.load_snapshot()
         existing_by_id = {record.resource_id: record for record in snapshot.resources}
+        seeded_ids = {record.resource_id for record in seeded}
         for lease in snapshot.leases:
             if lease.released_at is None:
                 for resource_id in lease.resource_ids:
-                    if resource_id in {record.resource_id for record in seeded}:
+                    if resource_id in seeded_ids:
                         raise ResourceLifecyclePersistenceError("存在 active lease 时不得覆写其绑定资源")
         for record in seeded:
             existing = existing_by_id.get(record.resource_id)
-            if existing is not None and existing.status == "INVALID" and record.status != "INVALID":
-                raise ResourceLifecyclePersistenceError(
-                    "resource_state_conflict: INVALID 资源不得被重新写回可分配状态"
-                )
+            if existing is not None and existing != record:
+                raise ResourceLifecyclePersistenceError("resource_state_conflict: seed_resources 不得覆写既有资源 truth")
             existing_by_id[record.resource_id] = record
         updated_snapshot = ResourceLifecycleSnapshot(
             schema_version=snapshot.schema_version,
@@ -95,9 +94,10 @@ class LocalResourceLifecycleStore:
         return updated_snapshot.resources
 
     def _write_json_atomic(self, payload: Mapping[str, object]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_path = tempfile.mkstemp(prefix=f".{self.path.stem}.", suffix=".tmp", dir=self.path.parent)
+        temp_path: str | None = None
         try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temp_path = tempfile.mkstemp(prefix=f".{self.path.stem}.", suffix=".tmp", dir=self.path.parent)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
                 handle.write("\n")
@@ -109,19 +109,37 @@ class LocalResourceLifecycleStore:
                 f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
             ) from error
         finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
     @contextmanager
     def _exclusive_lock(self):
         lock_path = self.path.with_name(f"{self.path.name}.lock")
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("a+", encoding="utf-8") as handle:
-            try:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            with lock_path.open("a+", encoding="utf-8") as handle:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                except OSError as error:
+                    raise ResourceLifecyclePersistenceError(
+                        f"resource_state_conflict: 无法锁定资源生命周期快照 `{self.path}`"
+                    ) from error
+                try:
+                    yield
+                finally:
+                    try:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    except OSError as error:
+                        raise ResourceLifecyclePersistenceError(
+                            f"resource_state_conflict: 无法解锁资源生命周期快照 `{self.path}`"
+                        ) from error
+        except OSError as error:
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 无法准备资源生命周期快照锁 `{self.path}`"
+            ) from error
 
 
 def default_resource_lifecycle_store() -> LocalResourceLifecycleStore:
