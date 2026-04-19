@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import threading
@@ -650,6 +651,54 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_fails_closed_for_snapshot_that_resurrects_invalid_resource(self) -> None:
+        Path(self._resource_store_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "v0.4.0",
+                    "revision": 1,
+                    "resources": [
+                        {
+                            "resource_id": "account-001",
+                            "resource_type": "account",
+                            "status": "AVAILABLE",
+                            "material": {"provider_account_id": "pa-001"},
+                        }
+                    ],
+                    "leases": [
+                        {
+                            "lease_id": "lease-invalid",
+                            "bundle_id": "bundle-invalid",
+                            "task_id": "task-invalid",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T00:00:00Z",
+                            "released_at": "2026-04-20T00:01:00Z",
+                            "target_status_after_release": "INVALID",
+                            "release_reason": "burned",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-invalid",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013-invalid",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
     def test_acquire_returns_failed_envelope_when_store_write_setup_raises_oserror(self) -> None:

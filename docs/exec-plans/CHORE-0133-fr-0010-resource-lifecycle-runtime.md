@@ -41,6 +41,7 @@
 - guardian 第四轮 review 已把阻断收敛到 `release` 非法输入分类与 `INVALID` 资源终态保护；当前分支已把 release 字段解析切到 `invalid_resource_release` 路径，并禁止 `seed_resources()` 把既有 `INVALID` 资源写回可分配状态。
 - guardian 第五轮 review 已把阻断收敛到并发不同语义 `release` 的冲突分类；当前工作树已把 CAS 冲突回读后的“已 settled 但语义不一致”路径收口为 `resource_release_conflict`，并补并发冲突 release 回归。
 - guardian 第六轮 review 已把阻断收敛到 store bootstrap / 持久化异常边界；当前工作树已把 `seed_resources()` 收紧为“仅允许同值重播，不得覆写既有资源 truth”，并把锁文件准备、`flock`、原子写临时文件等 `OSError` 统一包成 `ResourceLifecyclePersistenceError`。
+- guardian 第七轮 review 已把阻断收敛到 durable snapshot 语义校验；当前工作树已让 `validate_snapshot()` 同时校验最新 settled lease 与当前资源 truth 的一致性，并禁止 `INVALID` 终态之后再出现任何后续 lease。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -69,7 +70,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（29 tests, OK）
+  - 结果：通过（31 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -110,6 +111,11 @@
     - `seed_resources()` 不再允许覆写既有资源 truth；对同一 `resource_id` 仅允许同值重播，任何状态或 material 漂移都 fail-closed 为 `resource_state_conflict`
     - `LocalResourceLifecycleStore` 把锁目录准备、锁文件打开、`flock`、原子写入临时文件等 `OSError` 统一包成 `ResourceLifecyclePersistenceError`，避免 `acquire()` / `release()` 泄漏原始异常
     - 新增已有资源 truth 不可被 `seed_resources()` 覆写、`acquire` 写路径 `OSError` envelope 化、`release` 锁路径 `OSError` envelope 化回归
+  - 第七轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `validate_snapshot()` 新增 latest settled truth 校验：当资源当前不处于 active lease 时，durable resource status 必须与最新 settled lease 的 `target_status_after_release` 一致
+    - `validate_snapshot()` 新增 `INVALID` 终态校验：一旦资源被 settled 到 `INVALID`，当前资源状态必须保持 `INVALID`，且不得再出现 `acquired_at` 晚于该 invalid release 的后续 lease
+    - 新增 semantically corrupt snapshot 回归，覆盖 store `load_snapshot()` 与 runtime `acquire()` 对“`INVALID` 资源被脏快照复活为 `AVAILABLE`”的 fail-closed 拒绝
 
 ## 未决风险
 

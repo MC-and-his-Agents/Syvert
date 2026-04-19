@@ -415,6 +415,9 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
 
     lease_ids: set[str] = set()
     active_resource_ids: set[str] = set()
+    latest_settled_by_resource_id: dict[str, tuple[str, str]] = {}
+    invalid_released_at_by_resource_id: dict[str, str] = {}
+    leases_by_resource_id: dict[str, list[ResourceLease]] = {}
     for lease in snapshot.leases:
         validate_resource_lease(lease)
         if lease.lease_id in lease_ids:
@@ -423,11 +426,22 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
         for resource_id in lease.resource_ids:
             if resource_id not in resources_by_id:
                 raise ResourceLifecycleContractError("lease 绑定了不存在的 resource_id")
+            leases_by_resource_id.setdefault(resource_id, []).append(lease)
         if lease.released_at is None:
             for resource_id in lease.resource_ids:
                 if resource_id in active_resource_ids:
                     raise ResourceLifecycleContractError("同一资源被多个 active lease 重复占用")
                 active_resource_ids.add(resource_id)
+        else:
+            assert lease.target_status_after_release is not None
+            for resource_id in lease.resource_ids:
+                latest = latest_settled_by_resource_id.get(resource_id)
+                if latest is None or lease.released_at > latest[0]:
+                    latest_settled_by_resource_id[resource_id] = (lease.released_at, lease.target_status_after_release)
+                if lease.target_status_after_release == "INVALID":
+                    invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
+                    if invalid_released_at is None or lease.released_at > invalid_released_at:
+                        invalid_released_at_by_resource_id[resource_id] = lease.released_at
 
     for resource_id in active_resource_ids:
         if resources_by_id[resource_id].status != "IN_USE":
@@ -435,6 +449,17 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
     for resource_id, record in resources_by_id.items():
         if record.status == "IN_USE" and resource_id not in active_resource_ids:
             raise ResourceLifecycleContractError("IN_USE 资源必须由唯一 active lease 持有")
+        if record.status != "IN_USE" and resource_id not in active_resource_ids:
+            latest_settled = latest_settled_by_resource_id.get(resource_id)
+            if latest_settled is not None and record.status != latest_settled[1]:
+                raise ResourceLifecycleContractError("资源状态必须与最新 settled lease truth 一致")
+        invalid_released_at = invalid_released_at_by_resource_id.get(resource_id)
+        if invalid_released_at is not None:
+            if record.status != "INVALID":
+                raise ResourceLifecycleContractError("INVALID 资源不得被重新写回其他状态")
+            for lease in leases_by_resource_id.get(resource_id, []):
+                if lease.acquired_at > invalid_released_at:
+                    raise ResourceLifecycleContractError("INVALID 资源不得在 settled 后再次被 lease 占用")
 
 
 def validate_resource_record(record: ResourceRecord) -> None:
