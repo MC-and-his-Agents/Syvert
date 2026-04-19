@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -182,6 +183,72 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         with self.assertRaises(ResourceLifecyclePersistenceError):
             store.write_snapshot(stale_update)
+
+    def test_write_snapshot_serializes_concurrent_same_base_revision(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+        base_snapshot = store.load_snapshot()
+        candidate_a = ResourceLifecycleSnapshot(
+            schema_version=base_snapshot.schema_version,
+            revision=base_snapshot.revision + 1,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001", "marker": "a"},
+                ),
+            ),
+            leases=base_snapshot.leases,
+        )
+        candidate_b = ResourceLifecycleSnapshot(
+            schema_version=base_snapshot.schema_version,
+            revision=base_snapshot.revision + 1,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001", "marker": "b"},
+                ),
+            ),
+            leases=base_snapshot.leases,
+        )
+
+        barrier = threading.Barrier(2)
+        results: list[str] = []
+        errors: list[str] = []
+
+        def writer(snapshot: ResourceLifecycleSnapshot, label: str) -> None:
+            barrier.wait()
+            try:
+                store.write_snapshot(snapshot)
+                results.append(label)
+            except ResourceLifecyclePersistenceError as error:
+                errors.append(str(error))
+
+        thread_a = threading.Thread(target=writer, args=(candidate_a, "a"))
+        thread_b = threading.Thread(target=writer, args=(candidate_b, "b"))
+        thread_a.start()
+        thread_b.start()
+        thread_a.join()
+        thread_b.join()
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("resource_state_conflict", errors[0])
+        reloaded = store.load_snapshot()
+        marker = reloaded.resources[0].material["marker"]
+        self.assertIn(marker, {"a", "b"})
 
 
 if __name__ == "__main__":

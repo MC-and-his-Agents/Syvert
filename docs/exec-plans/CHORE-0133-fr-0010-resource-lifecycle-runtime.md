@@ -36,6 +36,7 @@
 - `FR-0010` formal spec 已由 PR `#170` 合入主干，当前执行入口切到真实 Work Item `#175`。
 - 当前分支已经落地独立的 `resource_lifecycle` / `resource_lifecycle_store` 模块、原子快照存储与生命周期单测，且保持 `runtime.execute_task()`、CLI 与 reference adapter 主路径不变。
 - guardian 首轮 review 已指出 3 个阻断点：快照 stale-write 覆盖、无 active lease 的 `IN_USE` 资源、损坏快照时异常泄漏；当前分支已补 revision CAS、反向状态不变量与 store-failure envelope 回退。
+- guardian 第二轮 review 已把阻断收敛到真正的 CAS/互斥写问题；当前分支已把快照 revision 检查与 `os.replace` 放进文件锁保护区，并补并发同基线写入争用测试。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -64,7 +65,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（21 tests, OK）
+  - 结果：通过（22 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -83,6 +84,10 @@
     - 快照 write 路径补 revision CAS，拒绝 stale write 覆盖
     - `IN_USE` 资源必须由唯一 active lease 持有
     - 损坏 / 不可读快照统一回退为 canonical failed envelope
+  - 第二轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 快照 write 路径补真实文件锁，把 revision 校验与原子替换收进同一互斥区
+    - 新增并发同基线 revision 争用测试，验证一写成功、一写以 `resource_state_conflict` 失败
 
 ## 未决风险
 

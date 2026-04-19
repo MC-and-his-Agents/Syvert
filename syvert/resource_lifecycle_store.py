@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -56,14 +58,15 @@ class LocalResourceLifecycleStore:
 
     def write_snapshot(self, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
         validate_snapshot(snapshot)
-        current_snapshot = self.load_snapshot()
-        expected_revision = current_snapshot.revision + 1
-        if snapshot.revision != expected_revision:
-            raise ResourceLifecyclePersistenceError(
-                "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
-            )
-        payload = snapshot_to_dict(snapshot)
-        self._write_json_atomic(payload)
+        with self._exclusive_lock():
+            current_snapshot = self.load_snapshot()
+            expected_revision = current_snapshot.revision + 1
+            if snapshot.revision != expected_revision:
+                raise ResourceLifecyclePersistenceError(
+                    "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
+                )
+            payload = snapshot_to_dict(snapshot)
+            self._write_json_atomic(payload)
         return snapshot
 
     def seed_resources(self, records: Sequence[ResourceRecord]) -> tuple[ResourceRecord, ...]:
@@ -103,6 +106,17 @@ class LocalResourceLifecycleStore:
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+    @contextmanager
+    def _exclusive_lock(self):
+        lock_path = self.path.with_name(f"{self.path.name}.lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a+", encoding="utf-8") as handle:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def default_resource_lifecycle_store() -> LocalResourceLifecycleStore:
