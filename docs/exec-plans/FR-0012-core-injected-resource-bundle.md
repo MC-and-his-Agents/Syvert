@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0012-core-injected-resource-bundle/`
 - 关联 PR：`#171`
-- 状态：`requirement container`
+- 状态：`inactive requirement container`
 
 ## 说明
 
