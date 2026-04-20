@@ -49,13 +49,15 @@
 - guardian 第十二轮 review 已把阻断收敛到 acquire / seed 的并发语义；当前工作树已让 `acquire()` 在 revision 冲突后按最新 durable truth 重新选资源，并把 `seed_resources()` 的读/合并/no-op 判断全部搬进锁内。
 - guardian 第十三轮 review 已把阻断收敛到目录 fsync durability 与 release 的 benign CAS retry；当前工作树已在 `os.replace()` 后补目录项 fsync，并让 `release()` 遇到无关 revision bump 时按刷新后的 durable truth 重试。
 - guardian 第十四轮 review 已把阻断回拉到 formal spec 的 acquire / failure carrier 约束；当前工作树已把 acquire 恢复为冲突即 fail-closed，并把 `task_context_task_id` 升格为 acquire / release 的显式必填前置条件。
+- 在等待 `#178` formal traceability follow-up 合入期间，本地快回归额外暴露了一个 acquire / release CAS 非对称：`release()` 会在无关 revision bump 后重试，但 `acquire()` 在“同一组资源仍然成立”的场景下会过早 fail-closed。
+- 当前工作树已把 `acquire()` revision-conflict 处理收紧为“same-selection retry, stale-selection fail-closed”：若刷新后的 durable truth 仍映射到同一组 `resource_id`，则按最新 revision 重试；若资源选择发生漂移或失效，则继续返回 `resource_state_conflict`，不静默改选其他资源。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
 
-- 提交本轮实现补丁并推送分支。
-- 通过受控入口创建 implementation PR，并把 `Issue` / `item_key` / `release` / `sprint` 与 PR carrier 对齐。
-- 在 PR head 上继续补 guardian / merge gate 所需的收口验证。
+- 提交本轮 acquire CAS retry 修复并推送分支。
+- 待 `#178` 合入后，刷新 implementation PR `#176` 的 guardian / merge gate。
+- 在最新 PR head 上引用已完成的本地快回归证据，并把主干同样失败的慢回归项与本事项新增改动显式区分。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -80,6 +82,10 @@
   - 结果：通过（45 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
+  - 结果：在当前分支失败；主干 `/Users/mc/dev/Syvert` 同样失败，属于既有基线问题，不是本事项引入的回归
+- `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_exception_failure_return_to_shared_error_model`
+  - 结果：在当前分支失败；主干 `/Users/mc/dev/Syvert` 同样失败，属于既有基线问题，不是本事项引入的回归
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -161,6 +167,9 @@
     - `acquire()` 不再在 revision 冲突后静默重选其他资源；保持 FR-0010 的整包 fail-closed 语义
     - `task_context_task_id` 升格为 acquire / release 的显式前置条件，避免失败 carrier 产生空 `task_id`
     - 并发 acquire 回归改为“一成一败且剩余资源保持 AVAILABLE”，并新增空 context 直接拒绝的前置约束测试
+  - 本地快回归补充修复（待下一轮 guardian 复核）：
+    - `acquire()` 现在仅在 refreshed snapshot 仍保持同一组已选 `resource_id` 时重试 revision mismatch；若 selection 发生漂移，则继续 fail-closed 为 `resource_state_conflict`
+    - “无关资源写入导致 acquire revision bump”回归重新通过，同时“stale selection 一成一败”回归保持通过
 
 ## 未决风险
 

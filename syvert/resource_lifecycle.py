@@ -129,27 +129,49 @@ def acquire(
     adapter_key = normalized_request.adapter_key
     capability = normalized_request.capability
     try:
-        selected = select_available_resources(snapshot, normalized_request.requested_slots)
-        acquired_at = now_rfc3339_utc()
-        bundle = build_resource_bundle(
-            task_id=normalized_request.task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            requested_slots=normalized_request.requested_slots,
-            selected_resources=selected,
-            acquired_at=acquired_at,
-        )
-        lease = build_resource_lease(bundle)
-        updated_resources = apply_acquire_transition(snapshot.resources, selected)
-        updated_snapshot = ResourceLifecycleSnapshot(
-            schema_version=snapshot.schema_version,
-            revision=snapshot.revision + 1,
-            resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
-            leases=tuple([*snapshot.leases, lease]),
-        )
-        validate_snapshot(updated_snapshot)
-        store.write_snapshot(updated_snapshot)
-        return bundle
+        current_snapshot = snapshot
+        while True:
+            selected = select_available_resources(current_snapshot, normalized_request.requested_slots)
+            selected_resource_ids = {slot: record.resource_id for slot, record in selected.items()}
+            acquired_at = now_rfc3339_utc()
+            bundle = build_resource_bundle(
+                task_id=normalized_request.task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                requested_slots=normalized_request.requested_slots,
+                selected_resources=selected,
+                acquired_at=acquired_at,
+            )
+            lease = build_resource_lease(bundle)
+            updated_resources = apply_acquire_transition(current_snapshot.resources, selected)
+            updated_snapshot = ResourceLifecycleSnapshot(
+                schema_version=current_snapshot.schema_version,
+                revision=current_snapshot.revision + 1,
+                resources=tuple(sorted(updated_resources, key=lambda record: record.resource_id)),
+                leases=tuple([*current_snapshot.leases, lease]),
+            )
+            validate_snapshot(updated_snapshot)
+            try:
+                store.write_snapshot(updated_snapshot)
+                return bundle
+            except ResourceLifecycleContractError as error:
+                if not is_retryable_revision_conflict(error):
+                    raise
+                refreshed_snapshot = store.load_snapshot()
+                validate_snapshot(refreshed_snapshot)
+                try:
+                    refreshed_selected = select_available_resources(
+                        refreshed_snapshot,
+                        normalized_request.requested_slots,
+                    )
+                except ResourceLifecycleContractError as refreshed_error:
+                    raise state_conflict_error("revision 冲突后资源选择已过期") from refreshed_error
+                refreshed_resource_ids = {
+                    slot: record.resource_id for slot, record in refreshed_selected.items()
+                }
+                if refreshed_resource_ids != selected_resource_ids:
+                    raise state_conflict_error("revision 冲突后资源选择已过期")
+                current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
         return failure_envelope(
             normalized_request.task_id,
