@@ -51,6 +51,7 @@
 - guardian 第十四轮 review 已把阻断回拉到 formal spec 的 acquire / failure carrier 约束；当前工作树已把 acquire 恢复为冲突即 fail-closed，并把 `task_context_task_id` 升格为 acquire / release 的显式必填前置条件。
 - 在等待 `#178` formal traceability follow-up 合入期间，本地快回归额外暴露了一个 acquire / release CAS 非对称：`release()` 会在无关 revision bump 后重试，但 `acquire()` 在“同一组资源仍然成立”的场景下会过早 fail-closed。
 - 当前工作树已把 `acquire()` revision-conflict 处理收紧为“same-selection retry, stale-selection fail-closed”：若刷新后的 durable truth 仍映射到同一组 `resource_id`，则按最新 revision 重试；若资源选择发生漂移或失效，则继续返回 `resource_state_conflict`，不静默改选其他资源。
+- 当前工作树已在 `65f67b1` 落下 acquire CAS retry 边界修复；当前提交只负责把 active exec-plan 的 checkpoint 同步到该最新语义提交，随后等待 `#178` 合入后再刷新 guardian / merge gate。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -184,4 +185,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e21272834d36d563bfe316e5b1808a89647e7d61`
+- `65f67b1f59e5d82930a4d01d88fc63b16acd19c0`
