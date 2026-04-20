@@ -50,6 +50,7 @@
     - 不可读、损坏、shape 非法或 contract 非法的 snapshot 都必须被视为共享 truth 冲突，而不是被静默忽略或自动修复
   - 提交约束：
     - 只允许提交满足完整 snapshot contract 的 payload
+    - 任一成功的 `acquire`、`release` 或 `seed_resources(records)` 都必须把本次变更后的 `resources[]` 与 `leases[]` 真相作为同一份 snapshot 原子提交；不得留下部分资源状态已更新、lease truth 未更新，或仅推进 `revision` 的半完成结果
     - `revision` 必须精确等于当前 durable truth 的 `revision + 1`
     - 任一 stale write、乱序 revision 或试图覆写更新 durable truth 的行为，都必须以 `resource_state_conflict` fail-closed
 - `seed_resources(records)` internal bootstrap surface
