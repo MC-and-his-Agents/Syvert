@@ -54,13 +54,14 @@
 - guardian 第十五轮 review 已把阻断继续收敛到同一类 store-boundary 一致性问题：post-commit 目录同步失败会把已提交 truth 报成失败、invalid UTF-8 / 非 contract store 异常仍可能越过 fail-closed 边界、`seed_resources()` 的 replay 比较尚未完全建立在 canonical material truth 上，以及 active exec-plan 证据时态落后于当前 head。
 - 当前工作树已把本地 store 的提交点收紧为 `os.replace()`：目录 `fsync` 属于 post-commit best-effort，不得再把已提交 truth 翻成外部失败；`load_snapshot()` 现已吸收 invalid UTF-8，`acquire()` / `release()` 会把非 contract store 异常统一收口为 `resource_state_conflict` failed envelope，`seed_resources()` 也改为先 canonicalize `ResourceRecord.material` 再做 replay/no-op/conflict 判定。
 - 当前工作树已新增四条回归，分别锁定 post-commit directory sync failure 仍成功、invalid UTF-8 快照 fail-closed、unexpected store load error fail-closed，以及 JSON-equivalent `material` 在持久化 round-trip 后仍保持 same-value replay/no-op。
+- 当前 checkpoint `80465b3` 已完成本轮 store-boundary / replay canonicalization 语义修复；当前 head 只负责把 active exec-plan 与验证证据同步到该 checkpoint，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
 
-- 提交本轮 store-boundary / seed replay canonicalization 修复与回归测试，并推送分支。
-- 更新 active exec-plan checkpoint 与验证证据到最新 review head，然后重新提交 guardian。
-- guardian 通过后进入 merge gate，并继续把主干同样失败的慢回归项与本事项新增改动显式区分。
+- 在最新 head 上重跑 `docs_guard` / `workflow_guard`，确认 exec-plan sync 不引入新的流程噪音。
+- 重新提交 guardian；若通过，则直接进入 merge gate。
+- merge gate 阶段继续把当前 head 的 3 个既有慢回归失败与本事项新增改动显式区分，避免把主干噪音误判为本 PR 回归。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -196,4 +197,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `57b5cdd44bb1867413a05e3033828fe73f5501a1`
+- `80465b394a46e279e4d77cf60780ec6edb25fdac`
