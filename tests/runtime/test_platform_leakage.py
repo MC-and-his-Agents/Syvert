@@ -125,6 +125,24 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_result_contract"})
 
+    def test_run_check_maps_direct_failure_return_to_shared_error_model(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    '                invalid_input_error("invalid_task_request", "task_request 顶层形状不合法"),\n',
+                    '                invalid_input_error(\n'
+                    '                    "invalid_task_request",\n'
+                    '                    "task_request 顶层形状不合法",\n'
+                    '                    details={"xhs_extra": "1"},\n'
+                    "                ),\n",
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_error_model"})
+
     def test_run_check_maps_exception_failure_return_to_shared_error_model(self) -> None:
         report = self.run_with_fixture(
             {
@@ -139,6 +157,20 @@ class PlatformLeakageTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
         self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_error_model"})
+
+    def test_run_check_keeps_non_envelope_execute_task_statement_in_core_runtime(self) -> None:
+        report = self.run_with_fixture(
+            {
+                "syvert/runtime.py": (
+                    "    supported_targets = declaration.supported_targets\n",
+                    '    runtime_platform_hint = "xhs"\n    supported_targets = declaration.supported_targets\n',
+                )
+            }
+        )
+
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
+        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"core_runtime"})
 
     def test_run_check_fails_closed_when_boundary_scope_is_incomplete(self) -> None:
         report = run_platform_leakage_check(
