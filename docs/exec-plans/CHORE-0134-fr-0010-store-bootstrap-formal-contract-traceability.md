@@ -52,13 +52,14 @@
 - 在 `2fd971f` 对应的 merge gate refresh-review 中，最后残留的阻断收敛到 requirement container：`FR-0010` 容器仍停留在“bootstrap 只允许不依赖 active lease 的 truth”这版旧口径，和 canonical spec/data-model/contract 中已经允许的“active truth same-value replay”不一致。
 - 在 `6e1c058` 对应的 merge gate refresh-review 中，最后残留的阻断继续收敛到 `spec.md` 的一条 bootstrap replay 句子：canonical 规则本来允许所有既有 truth 的 same-value replay / no-op，只是 `IN_USE` 额外要求 active lease 解释，但该句子只把 `IN_USE` 分支写了出来，容易误读成 `AVAILABLE` / `INVALID` replay 不合法。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 已在 `8188335` 把 `spec.md` 中的 bootstrap replay 主句补成完整表述：所有既有 truth 都允许 same-value replay / no-op，而 `IN_USE` 只是额外要求 active lease 解释。本轮主动探查进一步确认 formal suite 还需要把 `active lease / settled lease / latest settled truth` 的判定规则显式冻结，避免 snapshot invariant 继续依赖隐含推断。
+- 当前 worktree 已在 `2197c21` 把 `active lease / settled lease / latest settled truth` 的判定规则显式冻结进 canonical formal artifact，并在 `93ff1c7` 把 requirement container / active exec-plan checkpoint 追到该语义停点。
+- 在 `93ff1c7` 对应的 merge gate refresh-review 中，阻断继续收敛到 artifact-chain 自洽性的最后两处残留：`data-model.md` 的 `ResourceLease` 字段级约束仍把 settled lease 写得比 `spec.md` / `contracts/README.md` 更宽，而 active exec-plan 的“当前停点 / 下一步”仍停留在修正前时态。
 
 ## 下一步动作
 
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard`，确认 spec-only traceability follow-up 满足仓内文档与流程约束。
-- 提交本次 formal contract 自包含性修正与 active exec-plan checkpoint 对齐修正，并推送到 PR `#178`。
-- 在重新提交 guardian 前，先完成 formal artifact 链主动探查与本地门禁，确认 bootstrap replay、active/settled lease 判定与 checkpoint 叙事已经收口为单一真相。
+- 收紧 `data-model.md` 的 `ResourceLease` 字段级约束，使 active / settled lease 的字段存在性规则与 `spec.md` / `contracts/README.md` 严格一致。
+- 更新 active exec-plan 的当前停点 / 下一步 / 已验证项，使其与 `2197c21` / `93ff1c7` 两个 checkpoint、主动探查结果、本地 guards 和 guardian / merge gate 历史保持同一时态。
+- 重新运行 `spec_guard`、`docs_guard`、`workflow_guard` 与 guardian，确认 formal artifact 链已经同时消除字段级 lease 判定漂移与 exec-plan stale narrative。
 - `#177` 合入后，回到 implementation PR `#176` 刷新 guardian / merge gate，并在审查回复中引用本次补齐的 formal artifact。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -102,6 +103,16 @@
   - 结果：已复用仓内既有 formal spec 形状，确认“数据模型与迁移说明”应直接进入 canonical spec，而不是只留在 exec-plan 或风险说明里
 - `python3 - <<'PY' ... state['prs'].get('178') ... PY`
   - 结果：已确认在 `e621d45` 上，guardian 新阻断已切换为 bootstrap `IN_USE` traceability 与 snapshot consistency wording 过宽，而不再是 migration completeness
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：已确认在 `2197c21` 语义修正后通过；`93ff1c7` checkpoint 同步后再次通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：已确认在 `2197c21` 与 `93ff1c7` 两次停点后均通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：已确认在 `2197c21` 与 `93ff1c7` 两次停点后均通过
+- `python3 scripts/pr_guardian.py review 178`
+  - 结果：已确认 `93ff1c7` 的独立 guardian verdict 为 `APPROVE`
+- `python3 scripts/merge_pr.py 178 --delete-branch --refresh-review --confirm-integration-recheck`
+  - 结果：已确认 `93ff1c7` 的 merge gate refresh-review 把残余阻断继续收敛到“data-model lease 字段级约束仍宽于 canonical spec/contract”与“active exec-plan 当前时态仍陈旧”，不再出现新的范围外问题
 
 ## 未决风险
 

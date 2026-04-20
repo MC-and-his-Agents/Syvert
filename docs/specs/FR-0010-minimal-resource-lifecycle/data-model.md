@@ -61,11 +61,11 @@
   - `acquired_at`
     - 约束：RFC3339 UTC 时间；仅 acquire 成功后出现
   - `released_at`
-    - 约束：仅 release 成功后出现；缺失时该 lease 视为 active lease，存在时该 lease 视为 settled lease
+    - 约束：仅 release 成功后出现；缺失时该 lease 视为 active lease，且 `target_status_after_release` / `release_reason` 也必须同时缺失；存在时该 lease 视为 settled lease，且 `target_status_after_release` / `release_reason` 也必须同时存在
   - `target_status_after_release`
-    - 约束：只允许 `AVAILABLE` 或 `INVALID`
+    - 约束：仅 settled lease 出现；只允许 `AVAILABLE` 或 `INVALID`
   - `release_reason`
-    - 约束：仅 release 成功后出现；非空字符串；与 `target_status_after_release` 一起构成重复 release 的幂等判定真相
+    - 约束：仅 settled lease 出现；非空字符串；与 `target_status_after_release` 一起构成重复 release 的幂等判定真相
 - `ResourceLifecycleSnapshot`
   - `schema_version`
     - 约束：非空字符串；在 `v0.4.0` 固定为 `v0.4.0`
