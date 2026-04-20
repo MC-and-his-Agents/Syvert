@@ -50,7 +50,7 @@
 - 在 `51fccb5` 对应的下一轮 guardian 中，阻断切换为工件完整性问题：formal suite 已冻结 durable snapshot / store-path contract，但 canonical spec 里仍缺少可审查的迁移结论，无法明确回答“本次是否涉及 schema 升级、路径迁移或数据回填”。
 - 在 `e621d45` 对应的下一轮 guardian 中，阻断重新回到 traceability 对齐本身：formal suite 把 bootstrap `IN_USE` 规则收得比当前实现更严，且 snapshot 一致性文案仍有一处过宽，导致 canonical spec 与 implementation-ready truth 再次分叉。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要把 bootstrap / snapshot invariant 收回到与实现一致的最小 contract：允许被 active lease 解释的 `IN_USE` same-value replay，禁止无 lease 可解释的 `IN_USE` 新增或漂移；同时把 settled truth 校验限定到当前无 active lease 覆盖的资源。完成该轮后，再次同步 active exec-plan checkpoint，即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `e4a2913` 把 bootstrap / snapshot invariant 收回到与实现一致的最小 contract：允许被 active lease 解释的 `IN_USE` same-value replay，禁止无 lease 可解释的 `IN_USE` 新增或漂移；同时把 settled truth 校验限定到当前无 active lease 覆盖的资源。当前提交只负责把 active exec-plan checkpoint 同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -118,4 +118,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e3c975c044b3ddc83fe8e268eced160281c6540c`
+- `e4a2913a9363aa3af1adddd2c169bdb5146784bd`
