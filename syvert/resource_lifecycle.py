@@ -950,6 +950,17 @@ def canonical_resource_record(record: ResourceRecord) -> ResourceRecord:
     return normalized
 
 
+def canonical_snapshot(snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
+    normalized = ResourceLifecycleSnapshot(
+        schema_version=snapshot.schema_version,
+        revision=snapshot.revision,
+        resources=tuple(canonical_resource_record(record) for record in snapshot.resources),
+        leases=snapshot.leases,
+    )
+    validate_snapshot(normalized)
+    return normalized
+
+
 def _selected_resource_for_slot(
     selected_resources: Mapping[str, ResourceRecord],
     slot: str,
@@ -991,17 +1002,20 @@ def state_conflict_error(message: str) -> ResourceLifecycleContractError:
 
 def load_snapshot_from_store(store: ResourceLifecycleStore) -> ResourceLifecycleSnapshot:
     try:
-        return store.load_snapshot()
+        snapshot = store.load_snapshot()
     except ResourceLifecycleContractError:
         raise
     except Exception as error:
         raise state_conflict_error("资源生命周期 store.load_snapshot 失败") from error
+    return canonical_snapshot(snapshot)
 
 
 def write_snapshot_to_store(store: ResourceLifecycleStore, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
+    snapshot = canonical_snapshot(snapshot)
     try:
-        return store.write_snapshot(snapshot)
+        written = store.write_snapshot(snapshot)
     except ResourceLifecycleContractError:
         raise
     except Exception as error:
         raise state_conflict_error("资源生命周期 store.write_snapshot 失败") from error
+    return canonical_snapshot(written)

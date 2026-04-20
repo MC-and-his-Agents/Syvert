@@ -14,6 +14,7 @@ from syvert.resource_lifecycle import (
     ReleaseRequest,
     ResourceBundle,
     ResourceLease,
+    ResourceLifecycleSnapshot,
     ResourceRecord,
     acquire,
     release,
@@ -1177,6 +1178,42 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_canonicalizes_material_from_in_memory_snapshot(self) -> None:
+        class TupleMaterialStore:
+            def load_snapshot(self):
+                return ResourceLifecycleSnapshot(
+                    schema_version="v0.4.0",
+                    revision=0,
+                    resources=(
+                        ResourceRecord(
+                            resource_id="account-tuple",
+                            resource_type="account",
+                            status="AVAILABLE",
+                            material={"vals": ("a", "b")},
+                        ),
+                    ),
+                    leases=(),
+                )
+
+            def write_snapshot(self, snapshot):
+                return snapshot
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-canonical-material",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            TupleMaterialStore(),
+            "task-context-013-canonical-material",
+        )
+
+        self.assertIsInstance(result, ResourceBundle)
+        assert isinstance(result, ResourceBundle)
+        assert result.account is not None
+        self.assertEqual(result.account.material, {"vals": ["a", "b"]})
 
     def test_release_returns_failed_envelope_when_store_lock_raises_oserror(self) -> None:
         self.seed_default_resources()
