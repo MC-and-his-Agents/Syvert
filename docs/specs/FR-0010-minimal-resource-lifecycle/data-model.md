@@ -108,7 +108,7 @@
 ## 生命周期
 
 - bootstrap / durable 建档：
-  - 当 host-side local store 尚不存在 durable truth 时，canonical 初始值固定为 `ResourceLifecycleSnapshot(schema_version=v0.4.0, revision=0, resources=(), leases=())`
+  - 当 host-side local store 尚不存在 durable truth 时，canonical 初始值固定为 `ResourceLifecycleSnapshot(schema_version=v0.4.0, revision=0, resources=[], leases=[])`
   - `seed_resources(records)` 只有在新增此前不存在的资源 truth 时才推进 `revision`；同值 replay / no-op 必须保持 `revision` 不变
   - 任一 snapshot 写入若发现自身 `revision` 不是当前 durable truth 的下一个版本，必须 fail-closed，而不是静默覆写 store 中较新的 truth
 - 创建：
