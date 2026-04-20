@@ -45,7 +45,7 @@
 - implementation 阶段：
   - 资源状态迁移单测：验证 `AVAILABLE / IN_USE / INVALID` 允许迁移与非法迁移 fail-closed
   - 资源 bundle/lease 集成测试：验证整包 acquire/release 语义与重复 release 幂等
-  - bootstrap / snapshot 测试：验证 `seed_resources(records)` 的 same-value replay/no-op、同批重复 `resource_id` 直接拒绝、既有 truth 冲突 fail-closed
+  - bootstrap / snapshot 测试：验证 `seed_resources(records)` 的 same-value replay/no-op、同批重复 `resource_id` 直接拒绝、`status=IN_USE` 的 seed 输入前置拒绝，以及既有 truth 冲突 fail-closed
   - durable write 测试：验证 snapshot `revision` compare-and-swap 的 stale-write 拒绝，以及空 store 回落到 canonical 空 snapshot
   - 默认本地入口测试：验证 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 覆盖优先级与未提供时回落 `~/.syvert/resource-lifecycle.json`
   - 端到端回归：验证 Core 不会在部分 slot 缺失时错误注入部分 bundle
@@ -84,7 +84,7 @@
 
 - 当前结论：通过（含 `#177` traceability follow-up）
 - 未决问题与风险：
-  - 当前 formal spec 已把资源类型、bundle/lease carrier、状态迁移、`acquire / release` 输入输出、host-side durable snapshot truth、bootstrap replay/no-op/conflict 与默认本地入口 traceability 收口到 implementation-ready；残余风险主要在后续实现是否忠实消费该 contract，而不是当前规约仍存在 requirement 缺口
+  - 当前 formal spec 已把资源类型、bundle/lease carrier、状态迁移、`acquire / release` 输入输出、host-side durable snapshot truth、bootstrap replay/no-op/conflict、bootstrap 不得引入无 lease 可解释的 `IN_USE` 资源，以及默认本地入口 traceability 收口到 implementation-ready；残余风险主要在后续实现是否忠实消费该 contract，而不是当前规约仍存在 requirement 缺口
   - `resource_unavailable` 的 host-side / `runtime_contract` 边界、重复 `release` 的 canonical idempotent no-op，以及 snapshot `revision` compare-and-swap 的并发行为，仍需在后续实现 Work Item 中补齐 contract tests 与回归验证，避免运行时漂移成 `unsupported` / `platform` 或影子 store 语义
 - 进入实现前条件：已满足；guardian / PR checks 属于独立 merge gate，由当前 Work Item exec-plan 跟踪，不混写进 formal spec review 结论。
 - 结论目标：把 `v0.4.0` 的“最小资源生命周期”从 GitHub 意图推进到 implementation-ready 的主 contract。

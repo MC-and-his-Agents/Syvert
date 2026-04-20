@@ -81,11 +81,13 @@
 - `seed_resources(records)` internal bootstrap surface
   - 输入约束：
     - 只允许 `Sequence[ResourceRecord]`；字符串 / bytes、非 `ResourceRecord` 元素或重复 `resource_id` 都必须视为非法 bootstrap 输入
+    - bootstrap 输入记录的 `status` 只允许 `AVAILABLE` 或 `INVALID`；任一 `status=IN_USE` 的记录都必须在触达 durable truth 前 fail-closed，因为 bootstrap surface 不负责建立 lease truth
   - 写入约束：
     - 只允许把此前不存在的 `resource_id` 追加进 `ResourceLifecycleSnapshot.resources`
     - 若某个 `resource_id` 已存在，只有与既有 `ResourceRecord` 完全一致时才允许作为 same-value replay / no-op
     - 既有 `resource_id` 只要 truth 不一致，就必须按冲突 fail-closed；bootstrap 不得覆写既有资源 truth
     - bootstrap 不得创建、删除或改写 `ResourceLifecycleSnapshot.leases`
+    - bootstrap 不得把资源直接写成 `IN_USE`；snapshot 中任一 `IN_USE` 资源都必须能被 active `ResourceLease` 唯一解释
   - 并发 / merge 约束：
     - 多个 disjoint bootstrap 写入必须收敛到同一份 canonical snapshot truth，而不是分叉成影子 store 结果
     - same-value replay / no-op 必须返回既有 snapshot truth，且不得制造新的 `revision`

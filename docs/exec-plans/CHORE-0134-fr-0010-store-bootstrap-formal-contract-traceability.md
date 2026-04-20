@@ -42,15 +42,17 @@
   - `247ddd1`：重新收口范围、checkpoint 与 active exec-plan 对 formal traceability follow-up 的描述，避免 requirement container 与 active exec-plan 对同一事项给出不同停点。
   - `cc42965`：补齐 bootstrap 验证口径，明确“单批重复 `resource_id` 直接拒绝”“空 store 回落 canonical 空 snapshot”“implementation 阶段必须验证默认本地入口与 bootstrap/revision 语义”。
 - 当前阻断不再是 formal spec 内容缺项，而是 guardian 指出 active exec-plan 仍停留在 `a90a90a` 对应的旧 checkpoint，错误声称“只剩 git / PR 收口”，与 `ad78075`、`247ddd1`、`cc42965` 之后的真实语义状态不一致。
-- 本次修正的目标是把 active exec-plan 本身也推进到与当前 formal suite 同步的 checkpoint，避免 review 历史再次重复出现“formal 文档已前进、active exec-plan 仍落后”的系统性断层。
+- 上一轮修正已解决 stale exec-plan 问题，但 guardian 在 `a03c48d` 上继续指出另一条 bootstrap/snapshot invariant 缺口：formal spec 一边允许 `seed_resources(records)` 接收 generic `ResourceRecord`，另一边又要求所有 `IN_USE` 资源必须由 active lease 唯一解释，同时 bootstrap surface 禁止写入 lease truth，导致“seed 一个无 lease 的 `IN_USE` 资源是否合法”缺少 canonical 结论。
+- 本轮修正的目标是把 bootstrap contract 收紧为单一路径：`IN_USE` 只能由 `acquire + active lease` 建立；`seed_resources(records)` 只允许注入 `AVAILABLE` / `INVALID`，并且任何 `status=IN_USE` 的 seed 输入都必须在触达 durable truth 前 fail-closed。
+- 当前实现 PR `#176` 已通过 snapshot invariant 拒绝无 lease 的 `IN_USE` seed；本事项需要把这一运行时真相补回 formal suite，避免实现正确但 contract 仍留空洞。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 在语义上已完成 traceability closeout；完成本次 exec-plan 对齐后，剩余工作才会真正收敛到 guard、review 与 merge gate。
+- 当前 worktree 需要再完成一轮 formal suite 同步与 exec-plan checkpoint 对齐；完成该轮后，剩余工作才会真正收敛到 guard、review 与 merge gate。
 
 ## 下一步动作
 
 - 运行 `spec_guard`、`docs_guard`、`workflow_guard`，确认 spec-only traceability follow-up 满足仓内文档与流程约束。
 - 提交本次 active exec-plan checkpoint 对齐修正，并推送到 PR `#178`。
-- 重新运行 guardian，确认 formal artifact 链已经不再存在 stale exec-plan / stale checkpoint 阻断。
+- 重新运行 guardian，确认 formal artifact 链已经同时消除 stale exec-plan 与 bootstrap `IN_USE` invariant 缺口。
 - `#177` 合入后，回到 implementation PR `#176` 刷新 guardian / merge gate，并在审查回复中引用本次补齐的 formal artifact。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -81,13 +83,18 @@
 - `git log --oneline --decorate -12`
   - 结果：已确认 `ad78075`、`247ddd1`、`cc42965` 是 `a90a90a` 之后的连续语义提交，当前 active exec-plan 需要显式吸收这些 checkpoint 变化
 - `gh pr view 178 --json number,title,state,headRefName,baseRefName,mergeStateStatus,statusCheckRollup,url`
-  - 结果：已确认 PR `#178` 当前 checks 为绿色，但 guardian 最新阻断仍是 active exec-plan stale checkpoint
+  - 结果：已确认 PR `#178` 当前 checks 为绿色；上一轮 guardian 阻断是 active exec-plan stale checkpoint
+- `python3 scripts/pr_guardian.py review 178`
+  - 结果：已确认在 `a03c48d` 上，guardian 新阻断已切换为 bootstrap/snapshot invariant 缺口：formal spec 仍未明确禁止无 lease 的 `IN_USE` seed 输入
+- `rg -n "seed_resources|IN_USE|bootstrap" docs/specs/FR-0010-minimal-resource-lifecycle/spec.md docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md docs/specs/FR-0010-minimal-resource-lifecycle/plan.md docs/specs/FR-0010-minimal-resource-lifecycle/risks.md`
+  - 结果：已定位需要沿同一 invariant 同步收口的 formal artifact 范围，不再只修单一 finding 文件
 
 ## 未决风险
 
 - 若本事项把 store / bootstrap 语义写成新的 public runtime surface，会反向扩张 `FR-0010` 范围并污染 `FR-0012` 边界。
 - 若 formal artifact 只补字段名而不补 same-value replay / no-op / conflict 与 revision truth，`#176` 仍会在审查中被认定为缺少 canonical contract 依据。
 - 若 active exec-plan 继续滞后于 formal suite 的真实语义 checkpoint，guardian 会重复把同一问题判定为 artifact-chain 不一致；因此本事项必须把“当前停点 / 下一步 / checkpoint head”与当前 HEAD 一并收口，而不是只更新 spec 文档正文。
+- 若 bootstrap contract 不明确排除无 active lease 可解释的 `IN_USE` seed 输入，formal suite 会继续允许一个实现上无法合法落盘的影子 snapshot 状态，guardian 也会继续把该缺口视为阻断级 contract 不一致。
 
 ## 回滚方式
 
@@ -95,4 +102,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `cc429659f5ccf813a0bd893833afab7b7fc2584a`
+- `a03c48d517026237359f7800cf42433678e3fecf`
