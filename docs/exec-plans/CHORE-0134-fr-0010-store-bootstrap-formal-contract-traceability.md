@@ -43,7 +43,7 @@
   - `cc42965`：补齐 bootstrap 验证口径，明确“单批重复 `resource_id` 直接拒绝”“空 store 回落 canonical 空 snapshot”“implementation 阶段必须验证默认本地入口与 bootstrap/revision 语义”。
 - 当前阻断不再是 formal spec 内容缺项，而是 guardian 指出 active exec-plan 仍停留在 `a90a90a` 对应的旧 checkpoint，错误声称“只剩 git / PR 收口”，与 `ad78075`、`247ddd1`、`cc42965` 之后的真实语义状态不一致。
 - 上一轮修正已解决 stale exec-plan 问题，但 guardian 在 `a03c48d` 上继续指出另一条 bootstrap/snapshot invariant 缺口：formal spec 一边允许 `seed_resources(records)` 接收 generic `ResourceRecord`，另一边又要求所有 `IN_USE` 资源必须由 active lease 唯一解释，同时 bootstrap surface 禁止写入 lease truth，导致“seed 一个无 lease 的 `IN_USE` 资源是否合法”缺少 canonical 结论。
-- 本轮修正的目标是把 bootstrap contract 收紧为单一路径：`IN_USE` 只能由 `acquire + active lease` 建立；`seed_resources(records)` 只允许注入 `AVAILABLE` / `INVALID`，并且任何 `status=IN_USE` 的 seed 输入都必须在触达 durable truth 前 fail-closed。
+- 本轮修正的目标是把 bootstrap contract 收紧为单一路径：`IN_USE` 只能由 `acquire + active lease` 建立；`seed_resources(records)` 不得新建、漂移或覆写成无 active lease 可解释的 `IN_USE` truth，但对已经被 active lease 唯一解释的既有 `IN_USE` 资源，仍允许 same-value replay / no-op。
 - 当前实现 PR `#176` 已通过 snapshot invariant 拒绝无 lease 的 `IN_USE` seed；本事项需要把这一运行时真相补回 formal suite，避免实现正确但 contract 仍留空洞。
 - 在 `32ffa93` 对应的下一轮 guardian 中，阻断已继续收敛到 bootstrap revision 子契约：formal artifact 仍需明确“只有改变 durable truth 的成功写入才推进 `revision`，same-value replay / no-op 虽然成功但不构成新的 durable write”，否则 `contracts/README.md` 与 `spec.md` / `data-model.md` 仍然不是单一真相。
 - 在 `6e01c33` 对应的下一轮 guardian 中，阻断又继续收敛到 snapshot/lease 关系的一句过强表述：`contracts/README.md` 把“lease 唯一解释资源状态”写成了覆盖全部状态，意外与 `spec.md` / `data-model.md` 中“只有 `IN_USE` 需要 active lease 解释，`AVAILABLE` / `INVALID` 可作为 bootstrap truth 独立存在”的语义冲突。
