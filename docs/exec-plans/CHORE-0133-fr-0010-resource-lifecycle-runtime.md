@@ -51,14 +51,16 @@
 - guardian 第十四轮 review 已把阻断回拉到 formal spec 的 acquire / failure carrier 约束；当前工作树已把 acquire 恢复为冲突即 fail-closed，并把 `task_context_task_id` 升格为 acquire / release 的显式必填前置条件。
 - 在等待 `#178` formal traceability follow-up 合入期间，本地快回归额外暴露了一个 acquire / release CAS 非对称：`release()` 会在无关 revision bump 后重试，但 `acquire()` 在“同一组资源仍然成立”的场景下会过早 fail-closed。
 - 当前工作树已把 `acquire()` revision-conflict 处理收紧为“same-selection retry, stale-selection fail-closed”：若刷新后的 durable truth 仍映射到同一组 `resource_id`，则按最新 revision 重试；若资源选择发生漂移或失效，则继续返回 `resource_state_conflict`，不静默改选其他资源。
-- 当前工作树已在 `65f67b1` 落下 acquire CAS retry 边界修复；本轮主动探查进一步确认还需要一条显式回归，把“无关 revision bump 但 same-selection 仍成立”的成功重试路径单独锁进测试证据，而不是只靠 stale-selection fail-closed 与 release retry 类比证明。
+- guardian 第十五轮 review 已把阻断继续收敛到同一类 store-boundary 一致性问题：post-commit 目录同步失败会把已提交 truth 报成失败、invalid UTF-8 / 非 contract store 异常仍可能越过 fail-closed 边界、`seed_resources()` 的 replay 比较尚未完全建立在 canonical material truth 上，以及 active exec-plan 证据时态落后于当前 head。
+- 当前工作树已把本地 store 的提交点收紧为 `os.replace()`：目录 `fsync` 属于 post-commit best-effort，不得再把已提交 truth 翻成外部失败；`load_snapshot()` 现已吸收 invalid UTF-8，`acquire()` / `release()` 会把非 contract store 异常统一收口为 `resource_state_conflict` failed envelope，`seed_resources()` 也改为先 canonicalize `ResourceRecord.material` 再做 replay/no-op/conflict 判定。
+- 当前工作树已新增四条回归，分别锁定 post-commit directory sync failure 仍成功、invalid UTF-8 快照 fail-closed、unexpected store load error fail-closed，以及 JSON-equivalent `material` 在持久化 round-trip 后仍保持 same-value replay/no-op。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
 
-- 提交本轮 acquire CAS retry 回归测试与 exec-plan 同步，并推送分支。
-- 待 `#178` 合入后，刷新 implementation PR `#176` 的 guardian / merge gate。
-- 在最新 PR head 上引用已完成的本地快回归证据，并把主干同样失败的慢回归项与本事项新增改动显式区分。
+- 提交本轮 store-boundary / seed replay canonicalization 修复与回归测试，并推送分支。
+- 更新 active exec-plan checkpoint 与验证证据到最新 review head，然后重新提交 guardian。
+- guardian 通过后进入 merge gate，并继续把主干同样失败的慢回归项与本事项新增改动显式区分。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -80,7 +82,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（45 tests, OK）
+  - 结果：通过（51 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
@@ -97,6 +99,8 @@
   - 结果：通过（2 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate`
   - 结果：失败；主干 `/Users/mc/dev/syvert` 同样失败，属于既有基线问题，不是本事项引入的回归
+- `python3 -m unittest -q tests.runtime.test_real_adapter_regression tests.runtime.test_platform_leakage`
+  - 结果：当前 head 仍仅失败 3 项（`test_end_to_end_real_adapter_regression_report_feeds_version_gate`、`test_run_check_maps_success_envelope_leak_to_shared_result_contract`、`test_run_check_maps_exception_failure_return_to_shared_error_model`），其余 126 tests 通过、6 tests skipped；未出现新的失败类型
 - guardian `merge_pr.py 176 --refresh-review`
   - 结果：首轮 `REQUEST_CHANGES`
   - 已修复阻断：
@@ -168,14 +172,21 @@
     - `acquire()` 不再在 revision 冲突后静默重选其他资源；保持 FR-0010 的整包 fail-closed 语义
     - `task_context_task_id` 升格为 acquire / release 的显式前置条件，避免失败 carrier 产生空 `task_id`
     - 并发 acquire 回归改为“一成一败且剩余资源保持 AVAILABLE”，并新增空 context 直接拒绝的前置约束测试
+  - 第十五轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `_write_json_atomic()` 以 `os.replace()` 作为本地 store commit point，post-commit directory `fsync` 失败不再把已提交 truth 翻成失败结果
+    - `load_snapshot()` 现已把 invalid UTF-8 与 JSON/IO 一起收口为 `ResourceLifecyclePersistenceError`
+    - `acquire()` / `release()` 新增 store boundary 兜底，非 contract backend 异常统一 fail-closed 为 `resource_state_conflict`
+    - `seed_resources()` 改为基于 canonicalized `ResourceRecord.material` 执行 replay/no-op/conflict 判定，避免 JSON-equivalent truth 在 round-trip 后误报覆写
   - 本地快回归补充修复（待下一轮 guardian 复核）：
     - `acquire()` 现在仅在 refreshed snapshot 仍保持同一组已选 `resource_id` 时重试 revision mismatch；若 selection 发生漂移，则继续 fail-closed 为 `resource_state_conflict`
     - 新增显式回归，锁定“无关资源写入导致 acquire revision bump，但 same-selection 仍成立时允许 retry 成功”的分支；同时“stale selection 一成一败”回归继续保持通过
+    - 新增 `test_acquire_stays_successful_when_post_commit_directory_sync_fails`、`test_acquire_returns_failed_envelope_for_invalid_utf8_snapshot`、`test_acquire_returns_failed_envelope_when_store_load_raises_unexpected_error` 与 `test_seed_resources_replay_is_idempotent_for_json_equivalent_material`
 
 ## 未决风险
 
 - 若 bundle / lease carrier 与 formal spec 漂移，后续 `FR-0011` / `FR-0012` 会被迫建立影子 schema。
-- 若本地 store 不是整包原子写入，失败 acquire / release 可能留下半完成 truth。
+- 若本地 store 的提交点与对外结果语义再次分叉，仍可能出现“durable truth 已切换但 API 返回 failed envelope”的假失败。
 - `test_platform_leakage` 全集耗时显著高于常规 runtime 回归，后续 guardian / merge gate 阶段应继续把快回归与慢回归拆开记录。
 - `tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate` 当前与主干同样失败；若仓库把它纳入强制 gate，需要独立事项修复 version-gate 与测试 fixture 的不一致。
 

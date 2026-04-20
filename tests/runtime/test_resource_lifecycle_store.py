@@ -355,6 +355,24 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(replayed_snapshot.revision, active_snapshot.revision)
         self.assertEqual(replayed_snapshot.resources, active_snapshot.resources)
 
+    def test_seed_resources_replay_is_idempotent_for_json_equivalent_material(self) -> None:
+        store = self.make_store()
+        original = ResourceRecord(
+            resource_id="account-001",
+            resource_type="account",
+            status="AVAILABLE",
+            material={"vals": ("a", "b")},
+        )
+
+        seeded = store.seed_resources([original])
+        replayed = store.seed_resources([original])
+        snapshot = store.load_snapshot()
+
+        self.assertEqual(len(seeded), 1)
+        self.assertEqual(len(replayed), 1)
+        self.assertEqual(snapshot.revision, 1)
+        self.assertEqual(snapshot.resources[0].material, {"vals": ["a", "b"]})
+
     def test_seed_resources_merges_disjoint_concurrent_inserts(self) -> None:
         store = self.make_store()
         barrier = threading.Barrier(2)
@@ -397,6 +415,12 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(errors, [])
         snapshot = store.load_snapshot()
         self.assertEqual({record.resource_id for record in snapshot.resources}, {"account-001", "proxy-001"})
+
+    def test_load_snapshot_rejects_invalid_utf8_bytes(self) -> None:
+        Path(self._resource_store_path).write_bytes(b"\xff\xfe")
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
 
     def test_load_snapshot_rejects_invalid_resource_resurrection(self) -> None:
         Path(self._resource_store_path).write_text(

@@ -1076,6 +1076,73 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
+    def test_acquire_stays_successful_when_post_commit_directory_sync_fails(self) -> None:
+        self.seed_default_resources()
+        real_open = os.open
+
+        def flaky_open(path, flags, mode=0o777):
+            target_path = Path(path)
+            if target_path == Path(self._resource_store_dir.name):
+                raise OSError("directory fsync failed")
+            return real_open(path, flags, mode)
+
+        with mock.patch("syvert.resource_lifecycle_store.os.open", side_effect=flaky_open):
+            result = acquire(
+                AcquireRequest(
+                    task_id="task-013-post-commit",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-013-post-commit",
+            )
+
+        self.assertIsInstance(result, ResourceBundle)
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 2)
+        self.assertEqual(snapshot.resources[0].status, "IN_USE")
+
+    def test_acquire_returns_failed_envelope_for_invalid_utf8_snapshot(self) -> None:
+        Path(self._resource_store_path).write_bytes(b"\xff\xfe")
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-utf8",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013-utf8",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_returns_failed_envelope_when_store_load_raises_unexpected_error(self) -> None:
+        class BrokenStore:
+            def load_snapshot(self):
+                raise OSError("backend unavailable")
+
+            def write_snapshot(self, snapshot):
+                raise AssertionError("write_snapshot should not be called")
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-store-boundary",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            BrokenStore(),
+            "task-context-013-store-boundary",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
     def test_release_returns_failed_envelope_when_store_lock_raises_oserror(self) -> None:
         self.seed_default_resources()
         bundle = acquire(

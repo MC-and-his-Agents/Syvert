@@ -41,7 +41,7 @@ class LocalResourceLifecycleStore:
             return empty_snapshot()
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ResourceLifecyclePersistenceError(
                 f"resource_state_conflict: 无法读取资源生命周期快照 `{self.path}`"
             ) from error
@@ -109,11 +109,6 @@ class LocalResourceLifecycleStore:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temp_path, self.path)
-            dir_fd = os.open(self.path.parent, os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
         except OSError as error:
             raise ResourceLifecyclePersistenceError(
                 f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
@@ -124,6 +119,16 @@ class LocalResourceLifecycleStore:
                     os.unlink(temp_path)
                 except OSError:
                     pass
+        try:
+            dir_fd = os.open(self.path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            # The durable truth is already visible after os.replace(); a best-effort directory
+            # sync failure must not flip a committed write into an external failure result.
+            pass
 
     @contextmanager
     def _exclusive_lock(self):

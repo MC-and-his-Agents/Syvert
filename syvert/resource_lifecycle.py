@@ -80,6 +80,13 @@ class ResourceLifecycleSnapshot:
 
 
 class ResourceLifecycleStore(Protocol):
+    """Store boundary for lifecycle truth.
+
+    Implementations should raise ResourceLifecycleContractError on fail-closed errors.
+    acquire()/release() still defensively coerce unexpected backend exceptions into
+    resource_state_conflict so callers do not observe raw store failures.
+    """
+
     def load_snapshot(self) -> ResourceLifecycleSnapshot:
         ...
 
@@ -116,7 +123,7 @@ def acquire(
 
     try:
         normalized_request = normalize_acquire_request(request)
-        snapshot = store.load_snapshot()
+        snapshot = load_snapshot_from_store(store)
         validate_snapshot(snapshot)
     except ResourceLifecycleContractError as error:
         return failure_envelope(
@@ -152,12 +159,12 @@ def acquire(
             )
             validate_snapshot(updated_snapshot)
             try:
-                store.write_snapshot(updated_snapshot)
+                write_snapshot_to_store(store, updated_snapshot)
                 return bundle
             except ResourceLifecycleContractError as error:
                 if not is_retryable_revision_conflict(error):
                     raise
-                refreshed_snapshot = store.load_snapshot()
+                refreshed_snapshot = load_snapshot_from_store(store)
                 validate_snapshot(refreshed_snapshot)
                 try:
                     refreshed_selected = select_available_resources(
@@ -191,7 +198,7 @@ def release(
     lease: ResourceLease | None = None
     raw_lease_id = extract_optional_string(request, "lease_id")
     try:
-        snapshot = store.load_snapshot()
+        snapshot = load_snapshot_from_store(store)
         validate_snapshot(snapshot)
         if raw_lease_id:
             lease = find_lease(snapshot, raw_lease_id)
@@ -206,7 +213,7 @@ def release(
     try:
         normalized_request = normalize_release_request(request)
         if snapshot is None:
-            snapshot = store.load_snapshot()
+            snapshot = load_snapshot_from_store(store)
             validate_snapshot(snapshot)
         lease = require_lease(snapshot, normalized_request.lease_id)
     except ResourceLifecycleContractError as error:
@@ -274,10 +281,10 @@ def release(
             )
             validate_snapshot(updated_snapshot)
             try:
-                store.write_snapshot(updated_snapshot)
+                write_snapshot_to_store(store, updated_snapshot)
                 return settled_lease
             except ResourceLifecycleContractError as error:
-                refreshed_snapshot = store.load_snapshot()
+                refreshed_snapshot = load_snapshot_from_store(store)
                 validate_snapshot(refreshed_snapshot)
                 refreshed_lease = require_lease(refreshed_snapshot, current_lease.lease_id)
                 if refreshed_lease.released_at is not None:
@@ -307,11 +314,11 @@ def seedable_resource_records(records: Sequence[ResourceRecord]) -> tuple[Resour
     for record in records:
         if not isinstance(record, ResourceRecord):
             raise ResourceLifecycleContractError("seed_resources 仅允许写入 ResourceRecord")
-        validate_resource_record(record)
+        normalized_record = canonical_resource_record(record)
         if record.resource_id in seen:
             raise ResourceLifecycleContractError("seed_resources 不允许重复 resource_id")
-        seen.add(record.resource_id)
-        normalized.append(record)
+        seen.add(normalized_record.resource_id)
+        normalized.append(normalized_record)
     return tuple(sorted(normalized, key=lambda record: record.resource_id))
 
 
@@ -922,6 +929,17 @@ def normalize_resource_material(value: Any, *, field: str) -> Any:
         raise ResourceLifecycleContractError(str(error)) from error
 
 
+def canonical_resource_record(record: ResourceRecord) -> ResourceRecord:
+    normalized = ResourceRecord(
+        resource_id=record.resource_id,
+        resource_type=record.resource_type,
+        status=record.status,
+        material=normalize_resource_material(record.material, field=f"resource[{record.resource_id}].material"),
+    )
+    validate_resource_record(normalized)
+    return normalized
+
+
 def _selected_resource_for_slot(
     selected_resources: Mapping[str, ResourceRecord],
     slot: str,
@@ -959,3 +977,21 @@ def release_conflict_error(message: str) -> ResourceLifecycleContractError:
 
 def state_conflict_error(message: str) -> ResourceLifecycleContractError:
     return ResourceLifecycleContractError(f"resource_state_conflict: {message}")
+
+
+def load_snapshot_from_store(store: ResourceLifecycleStore) -> ResourceLifecycleSnapshot:
+    try:
+        return store.load_snapshot()
+    except ResourceLifecycleContractError:
+        raise
+    except Exception as error:
+        raise state_conflict_error("资源生命周期 store.load_snapshot 失败") from error
+
+
+def write_snapshot_to_store(store: ResourceLifecycleStore, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
+    try:
+        return store.write_snapshot(snapshot)
+    except ResourceLifecycleContractError:
+        raise
+    except Exception as error:
+        raise state_conflict_error("资源生命周期 store.write_snapshot 失败") from error
