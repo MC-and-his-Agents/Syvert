@@ -307,29 +307,45 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
 def _collect_runtime_statement_boundary_overrides(module: ast.Module) -> list[tuple[int, int, str]]:
     ranges: list[tuple[int, int, str]] = []
     for node in module.body:
-        if not isinstance(node, ast.FunctionDef) or node.name != "execute_task":
+        if not isinstance(node, ast.FunctionDef) or node.name != "execute_task_internal":
             continue
         for statement in sorted(
-            (child for child in ast.walk(node) if isinstance(child, ast.Return)),
+            (
+                child
+                for child in ast.walk(node)
+                if isinstance(child, (ast.Assign, ast.AnnAssign, ast.Return))
+            ),
             key=lambda child: (child.lineno, getattr(child, "end_lineno", child.lineno)),
         ):
-            boundary = _classify_execute_task_return_boundary(statement)
+            boundary = _classify_execute_task_statement_boundary(statement)
             if boundary is None:
                 continue
             ranges.append((statement.lineno, getattr(statement, "end_lineno", statement.lineno), boundary))
     return ranges
 
 
-def _classify_execute_task_return_boundary(statement: ast.Return) -> str | None:
-    if _is_failure_envelope_return(statement):
+def _classify_execute_task_statement_boundary(statement: ast.stmt) -> str | None:
+    value = _statement_value(statement)
+    if isinstance(statement, ast.Return) and _return_contains_failure_envelope(value):
         return "shared_error_model"
-    if _is_success_envelope_return(statement):
+    if isinstance(statement, (ast.Assign, ast.AnnAssign)) and _is_failure_envelope_expr(value):
+        return "shared_error_model"
+    if _is_success_envelope_expr(value):
         return "shared_result_contract"
     return None
 
 
-def _is_failure_envelope_return(statement: ast.Return) -> bool:
-    value = statement.value
+def _statement_value(statement: ast.stmt) -> ast.AST | None:
+    if isinstance(statement, ast.Return):
+        return statement.value
+    if isinstance(statement, ast.Assign):
+        return statement.value
+    if isinstance(statement, ast.AnnAssign):
+        return statement.value
+    return None
+
+
+def _is_failure_envelope_expr(value: ast.AST | None) -> bool:
     return (
         isinstance(value, ast.Call)
         and isinstance(value.func, ast.Name)
@@ -337,8 +353,13 @@ def _is_failure_envelope_return(statement: ast.Return) -> bool:
     )
 
 
-def _is_success_envelope_return(statement: ast.Return) -> bool:
-    value = statement.value
+def _return_contains_failure_envelope(value: ast.AST | None) -> bool:
+    if value is None:
+        return False
+    return any(_is_failure_envelope_expr(node) for node in ast.walk(value))
+
+
+def _is_success_envelope_expr(value: ast.AST | None) -> bool:
     if not isinstance(value, ast.Dict):
         return False
     keys = {key.value for key in value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}

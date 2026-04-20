@@ -16,6 +16,7 @@ from syvert.version_gate import (
     validate_platform_leakage_source_report,
     validate_real_adapter_regression_source_report,
 )
+from tests.runtime.platform_leakage_fixtures import canonical_platform_leakage_payload
 
 
 class ShapeContractSpoofAdapter:
@@ -626,21 +627,7 @@ class RealAdapterRegressionTests(unittest.TestCase):
 
     @staticmethod
     def valid_platform_leakage_payload() -> dict[str, object]:
-        return {
-            "version": "v0.2.0",
-            "boundary_scope": [
-                "core_runtime",
-                "shared_input_model",
-                "shared_error_model",
-                "adapter_registry",
-                "shared_result_contract",
-                "version_gate_logic",
-            ],
-            "verdict": "pass",
-            "summary": "platform leakage checks are clean",
-            "findings": [],
-            "evidence_refs": ["leakage:scan:1"],
-        }
+        return canonical_platform_leakage_payload()
 
 
 if __name__ == "__main__":
