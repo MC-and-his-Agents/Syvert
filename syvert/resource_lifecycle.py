@@ -307,7 +307,7 @@ def release(
 
 
 def seedable_resource_records(records: Sequence[ResourceRecord]) -> tuple[ResourceRecord, ...]:
-    if isinstance(records, (str, bytes)):
+    if isinstance(records, (str, bytes)) or not isinstance(records, Sequence):
         raise ResourceLifecycleContractError("seed_resources 需要 ResourceRecord 数组")
     normalized: list[ResourceRecord] = []
     seen: set[str] = set()
@@ -394,7 +394,7 @@ def resource_bundle_to_dict(bundle: ResourceBundle) -> dict[str, Any]:
 
 def resource_lease_to_dict(lease: ResourceLease) -> dict[str, Any]:
     validate_resource_lease(lease)
-    return {
+    payload = {
         "lease_id": lease.lease_id,
         "bundle_id": lease.bundle_id,
         "task_id": lease.task_id,
@@ -402,10 +402,12 @@ def resource_lease_to_dict(lease: ResourceLease) -> dict[str, Any]:
         "capability": lease.capability,
         "resource_ids": list(lease.resource_ids),
         "acquired_at": lease.acquired_at,
-        "released_at": lease.released_at,
-        "target_status_after_release": lease.target_status_after_release,
-        "release_reason": lease.release_reason,
     }
+    if lease.released_at is not None:
+        payload["released_at"] = lease.released_at
+        payload["target_status_after_release"] = lease.target_status_after_release
+        payload["release_reason"] = lease.release_reason
+    return payload
 
 
 def resource_lease_from_dict(payload: Mapping[str, Any]) -> ResourceLease:
@@ -414,6 +416,21 @@ def resource_lease_from_dict(payload: Mapping[str, Any]) -> ResourceLease:
     raw_resource_ids = payload.get("resource_ids")
     if not isinstance(raw_resource_ids, list):
         raise ResourceLifecycleContractError("lease.resource_ids 必须是数组")
+    release_fields = ("released_at", "target_status_after_release", "release_reason")
+    release_field_presence = {field: field in payload for field in release_fields}
+    if any(release_field_presence.values()) and not all(release_field_presence.values()):
+        raise ResourceLifecycleContractError("active lease 不得包含不完整的 release 收口字段")
+    if all(release_field_presence.values()):
+        released_at = require_contract_non_empty_string(payload.get("released_at"), field="lease.released_at")
+        target_status_after_release = require_contract_non_empty_string(
+            payload.get("target_status_after_release"),
+            field="lease.target_status_after_release",
+        )
+        release_reason = require_contract_non_empty_string(payload.get("release_reason"), field="lease.release_reason")
+    else:
+        released_at = None
+        target_status_after_release = None
+        release_reason = None
     lease = ResourceLease(
         lease_id=require_contract_non_empty_string(payload.get("lease_id"), field="lease.lease_id"),
         bundle_id=require_contract_non_empty_string(payload.get("bundle_id"), field="lease.bundle_id"),
@@ -424,12 +441,9 @@ def resource_lease_from_dict(payload: Mapping[str, Any]) -> ResourceLease:
             require_contract_non_empty_string(resource_id, field="lease.resource_ids[]") for resource_id in raw_resource_ids
         ),
         acquired_at=require_contract_non_empty_string(payload.get("acquired_at"), field="lease.acquired_at"),
-        released_at=require_optional_contract_non_empty_string(payload.get("released_at"), field="lease.released_at"),
-        target_status_after_release=require_optional_contract_non_empty_string(
-            payload.get("target_status_after_release"),
-            field="lease.target_status_after_release",
-        ),
-        release_reason=require_optional_contract_non_empty_string(payload.get("release_reason"), field="lease.release_reason"),
+        released_at=released_at,
+        target_status_after_release=target_status_after_release,
+        release_reason=release_reason,
     )
     validate_resource_lease(lease)
     return lease

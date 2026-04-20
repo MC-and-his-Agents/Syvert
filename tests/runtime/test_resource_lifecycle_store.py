@@ -12,6 +12,7 @@ from syvert.resource_lifecycle import (
     AcquireRequest,
     ReleaseRequest,
     ResourceBundle,
+    ResourceLifecycleContractError,
     ResourceLifecycleSnapshot,
     ResourceRecord,
     acquire,
@@ -42,6 +43,10 @@ class ResourceStoreEnvMixin:
 
 
 class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
+    def test_seed_resources_rejects_non_sequence_input(self) -> None:
+        with self.assertRaises(ResourceLifecycleContractError):
+            self.make_store().seed_resources(None)  # type: ignore[arg-type]
+
     def test_seed_resources_persists_atomic_snapshot(self) -> None:
         store = self.make_store()
 
@@ -109,6 +114,74 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(reloaded.leases), 1)
         self.assertEqual(reloaded.leases[0].released_at is not None, True)
         self.assertEqual(reloaded.revision, 3)
+
+    def test_acquire_persists_active_lease_without_null_release_fields(self) -> None:
+        store = self.make_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-active-shape",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-active-shape",
+        )
+
+        assert isinstance(bundle, ResourceBundle)
+        payload = json.loads(Path(self._resource_store_path).read_text(encoding="utf-8"))
+        lease_payload = payload["leases"][0]
+
+        self.assertNotIn("released_at", lease_payload)
+        self.assertNotIn("target_status_after_release", lease_payload)
+        self.assertNotIn("release_reason", lease_payload)
+
+    def test_load_snapshot_rejects_active_lease_with_null_release_fields(self) -> None:
+        Path(self._resource_store_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "v0.4.0",
+                    "revision": 1,
+                    "resources": [
+                        {
+                            "resource_id": "account-001",
+                            "resource_type": "account",
+                            "status": "IN_USE",
+                            "material": {"provider_account_id": "pa-001"},
+                        }
+                    ],
+                    "leases": [
+                        {
+                            "lease_id": "lease-001",
+                            "bundle_id": "bundle-001",
+                            "task_id": "task-001",
+                            "adapter_key": "xhs",
+                            "capability": "content_detail_by_url",
+                            "resource_ids": ["account-001"],
+                            "acquired_at": "2026-04-20T11:00:00.000000Z",
+                            "released_at": None,
+                            "target_status_after_release": None,
+                            "release_reason": None,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().load_snapshot()
 
     def test_failed_acquire_does_not_leave_half_written_truth(self) -> None:
         store = self.make_store()
@@ -183,6 +256,17 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         with self.assertRaises(ResourceLifecyclePersistenceError):
             store.write_snapshot(stale_update)
+
+    def test_write_snapshot_rejects_invalid_resource_element_shape(self) -> None:
+        invalid_snapshot = ResourceLifecycleSnapshot(
+            schema_version="v0.4.0",
+            revision=1,
+            resources=("not-a-record",),  # type: ignore[arg-type]
+            leases=(),
+        )
+
+        with self.assertRaises(ResourceLifecyclePersistenceError):
+            self.make_store().write_snapshot(invalid_snapshot)
 
     def test_write_snapshot_serializes_concurrent_same_base_revision(self) -> None:
         store = self.make_store()

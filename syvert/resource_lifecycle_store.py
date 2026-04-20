@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 
 from syvert.resource_lifecycle import (
+    canonical_snapshot,
     ResourceLifecycleContractError,
     ResourceLifecycleSnapshot,
     ResourceRecord,
@@ -57,7 +58,16 @@ class LocalResourceLifecycleStore:
             ) from error
 
     def write_snapshot(self, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
-        validate_snapshot(snapshot)
+        try:
+            snapshot = canonical_snapshot(snapshot)
+        except ResourceLifecycleContractError as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
+        except Exception as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
         with self._exclusive_lock():
             self._write_snapshot_locked(snapshot)
         return snapshot
