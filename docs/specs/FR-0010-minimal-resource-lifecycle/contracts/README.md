@@ -65,6 +65,7 @@
     - disjoint 新增资源必须并入同一份 canonical snapshot，而不是拆成多份并行 truth
 - 默认本地 store 路径
   - host-side 默认本地 store 位置由环境变量 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 控制；未显式覆盖时，默认路径固定为 `~/.syvert/resource-lifecycle.json`
+  - `v0.4.0` 的 canonical default local backend 固定为单文件 `ResourceLifecycleSnapshot`；上述 env var / fallback path 属于该默认后端的正式 contract，而不是可随意漂移的实现提示
   - 该路径选择 contract 只属于本地 durable store boundary；`FR-0010` 不因此新增 `acquire` / `release` 的 public store-path 参数，也不引入第二套 store selector
 
 ## 错误与边界行为
@@ -113,21 +114,3 @@
 - `task_id`、`adapter_key`、`capability` 继续复用上游已冻结字段，不另建影子上下文字段
 - `v0.4.0` 不引入第三种以上资源类型，也不引入复杂匹配与调度语义
 - `INVALID` 在 `v0.4.0` 为终态；若后续需要恢复机制，必须通过新的 formal spec 扩张 contract
-
-## 内部 bootstrap 与默认后端
-
-- `seed_resources(records)`
-  - 性质：内部 bootstrap surface，仅用于测试与后续 provider 接入；不是最终用户暴露的 CLI / API
-  - 输入：
-    - `records[]`，每项必须是合法 `ResourceRecord`
-  - 行为约束：
-    - 只允许为不存在的 `resource_id` 建档，或对既有 durable truth 执行同值 replay
-    - 任何状态、类型、material 漂移都必须 fail-closed 为 `resource_state_conflict`
-    - 同值 replay 必须是严格 no-op，不得增长 snapshot `revision`
-- `ResourceLifecycleSnapshot`
-  - 结构：`schema_version`、`revision`、`resources[]`、`leases[]`
-  - 语义：`resources` 与 `leases` 共同构成单份 durable truth；一次 `acquire / release / seed_resources` 的整包更新必须针对同一份 snapshot 原子落盘
-- 默认本地 store
-  - `v0.4.0` 可以使用单文件 JSON 原子快照作为默认后端
-  - store 路径可由 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 提供；未提供时默认落到本机用户目录下的资源生命周期快照文件
-  - 这是 `v0.4.0` 的实现选择，不把唯一存储引擎冻结为长期外部 contract

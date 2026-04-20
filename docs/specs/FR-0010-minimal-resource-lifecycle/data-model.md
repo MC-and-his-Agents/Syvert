@@ -14,8 +14,6 @@
   - 用途：表达某组资源被某个 task 占用的唯一共享真相
 - 实体：`ResourceLifecycleSnapshot`
   - 用途：表达 host-side durable store 中的 canonical lifecycle snapshot；为 bootstrap、load/write 与 revision compare-and-swap 提供唯一真相
-- 实体：`ResourceLifecycleSnapshot`
-  - 用途：表达 `v0.4.0` 本地默认后端中的单文件 durable truth；同时承载资源库存真相与 lease 真相
 
 ## 关键字段
 
@@ -91,15 +89,10 @@
   - 并发 / merge 约束：
     - 多个 disjoint bootstrap 写入必须收敛到同一份 canonical snapshot truth，而不是分叉成影子 store 结果
     - same-value replay / no-op 必须返回既有 snapshot truth，且不得制造新的 `revision`
-- `ResourceLifecycleSnapshot`
-  - `schema_version`
-    - 约束：非空字符串；必须与当前资源生命周期 contract 版本一致
-  - `revision`
-    - 约束：非负整数；表示同一份 durable snapshot 的单调版本号
-  - `resources`
-    - 约束：资源库存的完整真相；同一 `resource_id` 不得重复
-  - `leases`
-    - 约束：lease 真相的完整集合；同一 `lease_id` 与 `bundle_id` 不得重复
+- host-side 默认本地后端基线
+  - `v0.4.0` 的 canonical default local backend 固定为单文件 `ResourceLifecycleSnapshot`
+  - 路径入口固定为：优先读取 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`，未提供时落到 `~/.syvert/resource-lifecycle.json`
+  - 后续若要调整默认后端或默认路径，必须通过新的 formal spec 扩张 contract，而不是把变化降格成实现细节
 
 ## 失败载荷上下文
 
@@ -111,17 +104,6 @@
     - 约束：优先回显请求值；若请求里缺失、不可恢复或形状非法，仍必须回填当前 task-bound Core 上下文中的非空 `task_id`
   - `adapter_key` / `capability`
     - 约束：若 `lease_id` 已解析到既有 `ResourceLease`，则必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则固定回填为 `""`
-
-## 内部 bootstrap / store surface
-
-- `seed_resources(records)`
-  - 约束：仅限内部 bootstrap / 测试 / 后续 provider 接入使用；不是终端用户 CLI / API
-  - 行为：
-    - 只允许写入 `ResourceRecord`
-    - 对既有 durable truth 只允许同值 replay；任何状态、类型或 material 漂移都必须 fail-closed
-    - 同值 replay 是严格 no-op：不得改写 durable truth、不得增长 `revision`
-- 本地默认后端
-  - 约束：`v0.4.0` 默认后端可以使用单文件 `ResourceLifecycleSnapshot` 原子快照；这是当前阶段实现选择，不把唯一存储引擎冻结为长期外部 contract
 
 ## 生命周期
 
