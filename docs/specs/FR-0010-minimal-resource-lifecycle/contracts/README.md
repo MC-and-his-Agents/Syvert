@@ -65,7 +65,7 @@
     - disjoint 新增资源必须并入同一份 canonical snapshot，而不是拆成多份并行 truth
 - 默认本地 store 路径
   - host-side 默认本地 store 位置由环境变量 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 控制；未显式覆盖时，默认路径固定为 `~/.syvert/resource-lifecycle.json`
-  - `v0.4.0` 的 canonical default local backend 固定为单文件 `ResourceLifecycleSnapshot`；上述 env var / fallback path 属于该默认后端的正式 contract，而不是可随意漂移的实现提示
+  - `v0.4.0` 的当前默认本地入口可使用单文件 `ResourceLifecycleSnapshot`；上述 env var / fallback path 属于该默认入口的正式 traceability contract，而不是可随意漂移的实现提示
   - 该路径选择 contract 只属于本地 durable store boundary；`FR-0010` 不因此新增 `acquire` / `release` 的 public store-path 参数，也不引入第二套 store selector
 
 ## 错误与边界行为

@@ -90,9 +90,9 @@
     - 多个 disjoint bootstrap 写入必须收敛到同一份 canonical snapshot truth，而不是分叉成影子 store 结果
     - same-value replay / no-op 必须返回既有 snapshot truth，且不得制造新的 `revision`
 - host-side 默认本地后端基线
-  - `v0.4.0` 的 canonical default local backend 固定为单文件 `ResourceLifecycleSnapshot`
+  - `v0.4.0` 的当前默认本地入口可使用单文件 `ResourceLifecycleSnapshot`
   - 路径入口固定为：优先读取 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`，未提供时落到 `~/.syvert/resource-lifecycle.json`
-  - 后续若要调整默认后端或默认路径，必须通过新的 formal spec 扩张 contract，而不是把变化降格成实现细节
+  - 上述 backend/path 语义用于保证默认本地入口的 traceability，不把单文件 JSON store 冻结为唯一长期后端
 
 ## 失败载荷上下文
 

@@ -23,6 +23,8 @@
   - `docs/specs/FR-0010-minimal-resource-lifecycle/plan.md`
   - `docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
   - `docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
+  - `docs/specs/FR-0010-minimal-resource-lifecycle/risks.md`
+  - `docs/exec-plans/FR-0010-minimal-resource-lifecycle.md`
   - `docs/exec-plans/CHORE-0134-fr-0010-store-bootstrap-formal-contract-traceability.md`
 - 本次不纳入：
   - `syvert/**`
@@ -36,6 +38,7 @@
 - implementation PR `#176` 已新增本地 snapshot store、`ResourceLifecycleSnapshot`、`seed_resources()`、snapshot `revision` 与 same-value replay / no-op / conflict 行为。
 - 当前阻断不在运行时代码，而在 formal artifact 仍缺少 store / bootstrap traceability，导致 `#176` 的实现 surface 缺少可引用的 canonical contract 依据。
 - 当前补丁同时回写 `spec.md` / `plan.md`，把 store / bootstrap surface 提升回 FR 主文档与实施计划，避免 formal suite 内部出现“核心文档无追踪、附属文档单独冻结”的断层。
+- 当前补丁也同步刷新 `risks.md` 与 requirement container，确保新增 snapshot / bootstrap / revision / 默认本地入口语义进入 formal suite 的最小审查输入。
 - 本事项只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
 - 当前 worktree 已补齐 store / bootstrap traceability，并已通过 `spec_guard`、`docs_guard`、`workflow_guard`；下一步只剩由主线程执行 git / PR 收口。
 

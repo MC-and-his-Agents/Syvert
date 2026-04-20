@@ -73,17 +73,20 @@
 - [x] `account` / `proxy` / `ResourceBundle` / `ResourceLease` 最小 carrier 已冻结
 - [x] `acquire` / `release` 输入输出与失败语义已冻结
 - [x] `AVAILABLE / IN_USE / INVALID` 状态迁移边界已冻结
+- [x] `ResourceLifecycleSnapshot`、`seed_resources(records)` 与 `revision` compare-and-swap 语义已补齐到 formal suite
+- [x] 默认本地入口的 store-path traceability 已补齐，且没有把当前 JSON/file backend 升格为唯一长期后端
 
 ## spec review 结论
 
-- 当前结论：通过
+- 当前结论：通过（含 `#177` traceability follow-up）
 - 未决问题与风险：
-  - 当前 formal spec 已把资源类型、bundle/lease carrier、状态迁移、`acquire / release` 输入输出与 fail-closed 边界收口到 implementation-ready；残余风险主要在后续实现是否忠实消费该 contract，而不是当前规约仍存在未冻结的 requirement 缺口
-  - `resource_unavailable` 的 host-side / `runtime_contract` 边界，以及重复 `release` 的 canonical idempotent no-op 必须返回 settled `ResourceLease` 语义，仍需在后续实现 Work Item 中补齐 contract tests 与回归验证，避免运行时漂移成 `unsupported` / `platform` 或其他 success carrier
+  - 当前 formal spec 已把资源类型、bundle/lease carrier、状态迁移、`acquire / release` 输入输出、host-side durable snapshot truth、bootstrap replay/no-op/conflict 与默认本地入口 traceability 收口到 implementation-ready；残余风险主要在后续实现是否忠实消费该 contract，而不是当前规约仍存在 requirement 缺口
+  - `resource_unavailable` 的 host-side / `runtime_contract` 边界、重复 `release` 的 canonical idempotent no-op，以及 snapshot `revision` compare-and-swap 的并发行为，仍需在后续实现 Work Item 中补齐 contract tests 与回归验证，避免运行时漂移成 `unsupported` / `platform` 或影子 store 语义
 - 进入实现前条件：已满足；guardian / PR checks 属于独立 merge gate，由当前 Work Item exec-plan 跟踪，不混写进 formal spec review 结论。
 - 结论目标：把 `v0.4.0` 的“最小资源生命周期”从 GitHub 意图推进到 implementation-ready 的主 contract。
 - 审查关注：
   - 是否把资源类型、bundle/lease carrier 与状态机讲清楚
   - 是否明确定义整包 acquire、冲突 release 与 fail-closed 行为
+  - 是否把 snapshot / bootstrap / revision / 默认本地入口 traceability 收进同一套 canonical contract
   - 是否把 tracing / Adapter 注入边界留在相邻 FR，而不是在生命周期主 contract 中混写
 - implementation-ready 判定：当前 formal spec 已通过 spec review 且进入实现前条件满足，后续实现 Work Item 可在独立 implementation PR 中消费本 requirement baseline。

@@ -73,8 +73,8 @@
   - Core 必须是资源生命周期语义的唯一拥有者；任何 adapter、平台桥接层或外部调用方都不得直接改写共享资源状态。
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
-  - `v0.4.0` 的 lifecycle contract 仍必须保持 provider / adapter 无关；但 host-side 默认本地后端作为当前阶段的 canonical baseline 被显式冻结为单文件 `ResourceLifecycleSnapshot`，其路径入口固定为优先读取 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`、未提供时落到 `~/.syvert/resource-lifecycle.json`。
-  - host-side 默认本地后端的 snapshot 结构、revision compare-and-swap 与路径入口属于 `v0.4.0` 的 formal contract；后续若要调整默认后端或默认路径，必须通过新的 formal spec 扩张 contract，而不是把这类变化降格成实现细节。
+  - `v0.4.0` 的 lifecycle contract 仍必须保持 provider / adapter 无关；本 FR 冻结的是 host-side durable snapshot truth、revision compare-and-swap、bootstrap replay/no-op/conflict 与当前默认本地入口的 traceability，不把单文件 JSON store 升格为唯一长期后端。
+  - 当前默认本地入口的 canonical baseline 为：host-side 默认本地后端可使用单文件 `ResourceLifecycleSnapshot`，路径入口优先读取 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`、未提供时落到 `~/.syvert/resource-lifecycle.json`；这组语义只用于约束 `v0.4.0` 的默认本地入口与实现 traceability，不排斥后续通过新 formal spec 引入其他 backend 或路径策略。
   - 本 FR 只冻结“资源如何进入/退出占用态”的最小真相，不提前承诺调度公平性、优先级、租户隔离或复杂匹配。
 
 ## 约束
