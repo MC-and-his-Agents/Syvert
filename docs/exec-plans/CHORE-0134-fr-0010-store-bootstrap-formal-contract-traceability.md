@@ -19,13 +19,14 @@
 ## 范围
 
 - 本次纳入：
+  - `docs/specs/FR-0010-minimal-resource-lifecycle/spec.md`
+  - `docs/specs/FR-0010-minimal-resource-lifecycle/plan.md`
   - `docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
   - `docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
   - `docs/exec-plans/CHORE-0134-fr-0010-store-bootstrap-formal-contract-traceability.md`
 - 本次不纳入：
   - `syvert/**`
   - `tests/**`
-  - `docs/specs/FR-0010-minimal-resource-lifecycle/spec.md`
   - `FR-0011` 的 tracing schema
   - `FR-0012` 的 Adapter 注入 boundary
 
@@ -34,7 +35,9 @@
 - `FR-0010` formal spec 主 contract 已由 PR `#170` 合入主干，资源类型、bundle / lease carrier、状态迁移与 `acquire / release` 语义已经冻结。
 - implementation PR `#176` 已新增本地 snapshot store、`ResourceLifecycleSnapshot`、`seed_resources()`、snapshot `revision` 与 same-value replay / no-op / conflict 行为。
 - 当前阻断不在运行时代码，而在 formal artifact 仍缺少 store / bootstrap traceability，导致 `#176` 的实现 surface 缺少可引用的 canonical contract 依据。
+- 当前补丁同时回写 `spec.md` / `plan.md`，把 store / bootstrap surface 提升回 FR 主文档与实施计划，避免 formal suite 内部出现“核心文档无追踪、附属文档单独冻结”的断层。
 - 本事项只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
+- 当前 worktree 已补齐 store / bootstrap traceability，并已通过 `spec_guard`、`docs_guard`、`workflow_guard`；下一步只剩由主线程执行 git / PR 收口。
 
 ## 下一步动作
 
@@ -65,6 +68,12 @@
   - 结果：已确认 `#176` 为当前 implementation PR，当前缺口是 formal artifact 未显式覆盖 store / bootstrap surface
 - `gh pr diff 176 --patch`
   - 结果：已核对 `ResourceLifecycleSnapshot`、`seed_resources()`、snapshot `revision` CAS、same-value replay / no-op / conflict 与 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 默认路径语义
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
 
 ## 未决风险
 

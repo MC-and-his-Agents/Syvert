@@ -74,7 +74,7 @@
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
   - `v0.4.0` 的 lifecycle contract 必须保持实现无关，不绑定唯一存储引擎、唯一 provider 或唯一进程布局。
-  - 默认本地 store 路径可以由实现层环境变量提供，但 formal spec 只冻结“存在默认路径入口”与“同一 snapshot 原子更新”这两个语义，不把具体文件系统布局升级成跨阶段演进的长期外部 contract。
+  - `v0.4.0` 若采用本地默认 store，则默认路径入口与当前本地文件布局一并冻结为：优先读取 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`，未提供时落到 `~/.syvert/resource-lifecycle.json`；这一定义只服务当前阶段的本地默认后端，后续若要调整路径或替换默认后端，必须通过新的 formal spec 显式扩张 contract。
   - 本 FR 只冻结“资源如何进入/退出占用态”的最小真相，不提前承诺调度公平性、优先级、租户隔离或复杂匹配。
 
 ## 约束
