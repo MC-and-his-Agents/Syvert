@@ -10,6 +10,7 @@
 - 关联 exec-plan：
   - `docs/exec-plans/FR-0010-minimal-resource-lifecycle.md`
   - `docs/exec-plans/CHORE-0130-fr-0010-formal-spec-closeout.md`
+  - `docs/exec-plans/CHORE-0134-fr-0010-store-bootstrap-formal-contract-traceability.md`
 
 ## 实施目标
 
