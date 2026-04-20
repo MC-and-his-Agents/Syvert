@@ -49,7 +49,7 @@
 - 在 `6e01c33` 对应的下一轮 guardian 中，阻断又继续收敛到 snapshot/lease 关系的一句过强表述：`contracts/README.md` 把“lease 唯一解释资源状态”写成了覆盖全部状态，意外与 `spec.md` / `data-model.md` 中“只有 `IN_USE` 需要 active lease 解释，`AVAILABLE` / `INVALID` 可作为 bootstrap truth 独立存在”的语义冲突。
 - 在 `51fccb5` 对应的下一轮 guardian 中，阻断切换为工件完整性问题：formal suite 已冻结 durable snapshot / store-path contract，但 canonical spec 里仍缺少可审查的迁移结论，无法明确回答“本次是否涉及 schema 升级、路径迁移或数据回填”。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要补齐 durable snapshot / store-path traceability 的迁移说明，并把该结论落到 canonical formal artifact 中；完成该轮后，再次同步 active exec-plan checkpoint，即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `e3c975c` 补齐 durable snapshot / store-path traceability 的迁移说明；当前提交只负责把 active exec-plan 的 checkpoint 与停点同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -114,4 +114,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2a0feed33f10c43c67cc924744dc4fe89802cf88`
+- `e3c975c044b3ddc83fe8e268eced160281c6540c`
