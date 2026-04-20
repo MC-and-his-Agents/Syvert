@@ -61,7 +61,7 @@
   - `acquired_at`
     - 约束：RFC3339 UTC 时间；仅 acquire 成功后出现
   - `released_at`
-    - 约束：仅 release 成功后出现
+    - 约束：仅 release 成功后出现；缺失时该 lease 视为 active lease，存在时该 lease 视为 settled lease
   - `target_status_after_release`
     - 约束：只允许 `AVAILABLE` 或 `INVALID`
   - `release_reason`
@@ -72,9 +72,9 @@
   - `revision`
     - 约束：非负整数；空快照从 `0` 开始；任一改变 durable truth 的成功写入必须以“当前 durable truth 的 `revision + 1`”提交；同值 bootstrap replay / no-op 不得推进 `revision`
   - `resources`
-    - 约束：数组；元素必须全部满足 `ResourceRecord` contract；`resource_id` 必须唯一；与 snapshot 内 active / settled lease 真相保持一致
+    - 约束：数组；元素必须全部满足 `ResourceRecord` contract；`resource_id` 必须唯一；与 snapshot 内 active / settled lease 真相保持一致：若某资源存在 active lease 覆盖，则当前状态必须为 `IN_USE`；若不存在 active lease 但存在 settled lease 历史，则当前状态必须与该资源最新 settled lease 的 `target_status_after_release` 一致；若既无 active lease 也无 settled lease 历史，则 `AVAILABLE` / `INVALID` 可作为 bootstrap durable truth 独立存在
   - `leases`
-    - 约束：数组；元素必须全部满足 `ResourceLease` contract；`lease_id` 必须唯一；用于决定哪些资源当前由 active lease 持有，以及最新 settled lease 对应的释放真相
+    - 约束：数组；元素必须全部满足 `ResourceLease` contract；`lease_id` 必须唯一；其中 `released_at` 缺失且无 release 收口字段的 lease 视为 active lease，`released_at` 存在且带有 `target_status_after_release` / `release_reason` 的 lease 视为 settled lease；该数组用于决定哪些资源当前由 active lease 持有，以及最新 settled lease 对应的释放真相
 
 ## bootstrap 与 durable snapshot
 

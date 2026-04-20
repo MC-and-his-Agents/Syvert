@@ -52,13 +52,13 @@
 - 在 `2fd971f` 对应的 merge gate refresh-review 中，最后残留的阻断收敛到 requirement container：`FR-0010` 容器仍停留在“bootstrap 只允许不依赖 active lease 的 truth”这版旧口径，和 canonical spec/data-model/contract 中已经允许的“active truth same-value replay”不一致。
 - 在 `6e1c058` 对应的 merge gate refresh-review 中，最后残留的阻断继续收敛到 `spec.md` 的一条 bootstrap replay 句子：canonical 规则本来允许所有既有 truth 的 same-value replay / no-op，只是 `IN_USE` 额外要求 active lease 解释，但该句子只把 `IN_USE` 分支写了出来，容易误读成 `AVAILABLE` / `INVALID` replay 不合法。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 已在 `8188335` 把 `spec.md` 中的 bootstrap replay 主句补成完整表述：所有既有 truth 都允许 same-value replay / no-op，而 `IN_USE` 只是额外要求 active lease 解释。当前提交只负责把 active exec-plan / requirement container checkpoint 同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `8188335` 把 `spec.md` 中的 bootstrap replay 主句补成完整表述：所有既有 truth 都允许 same-value replay / no-op，而 `IN_USE` 只是额外要求 active lease 解释。本轮主动探查进一步确认 formal suite 还需要把 `active lease / settled lease / latest settled truth` 的判定规则显式冻结，避免 snapshot invariant 继续依赖隐含推断。
 
 ## 下一步动作
 
 - 运行 `spec_guard`、`docs_guard`、`workflow_guard`，确认 spec-only traceability follow-up 满足仓内文档与流程约束。
-- 提交本次 active exec-plan checkpoint 对齐修正，并推送到 PR `#178`。
-- 重新运行 guardian，确认 formal artifact 链已经同时消除 stale exec-plan 与 bootstrap `IN_USE` invariant 缺口。
+- 提交本次 formal contract 自包含性修正与 active exec-plan checkpoint 对齐修正，并推送到 PR `#178`。
+- 在重新提交 guardian 前，先完成 formal artifact 链主动探查与本地门禁，确认 bootstrap replay、active/settled lease 判定与 checkpoint 叙事已经收口为单一真相。
 - `#177` 合入后，回到 implementation PR `#176` 刷新 guardian / merge gate，并在审查回复中引用本次补齐的 formal artifact。
 
 ## 当前 checkpoint 推进的 release 目标

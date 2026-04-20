@@ -61,8 +61,10 @@
     - 未经当前有效 lease 持有即执行 release
   - `ResourceBundle` 是 host-side canonical lifecycle carrier；其字段与 slot 命名在本 FR 冻结，但 Adapter 如何消费该 bundle 的执行边界由 `FR-0012` 定义，不在本 FR 重复展开。
   - `ResourceLease` 是“资源被某个 task 占用”的唯一共享真相源；在 `v0.4.0` 内不得为同一 `lease_id` 维护第二套影子 lease schema。若 `release reason` 参与幂等判定，它也必须落在该共享 carrier 上，而不是由实现层私自引入影子字段。
+  - `released_at` 缺失、且同时不存在 `target_status_after_release` / `release_reason` 的 `ResourceLease` 视为 active lease；`released_at` 存在、且同时携带 `target_status_after_release` / `release_reason` 的 `ResourceLease` 视为 settled lease。`release` 成功只允许把 active lease 收口成 settled lease，不得在两者之外再发明第三种 lifecycle 形态。
   - 若实现提供默认本地 store，`ResourceLifecycleSnapshot` 必须同时持有 `schema_version`、`revision`、`resources[]` 与 `leases[]`，并保证一次 `acquire / release / seed_resources` 的整包更新针对同一份 snapshot 原子落盘。
   - snapshot 中任一 `IN_USE` 资源都必须能够被当前 active `ResourceLease` 唯一解释；因此 `seed_resources(records)` 只能把 `IN_USE` 作为与既有 active truth 完全一致的 same-value replay，不能作为创建新占用态的入口。
+  - 对某个 `resource_id` 计算 snapshot 当前真相时，判定顺序固定为：先看是否存在覆盖该资源的 active lease；若存在，则当前 `ResourceRecord.status` 必须为 `IN_USE`。若不存在 active lease，但存在 settled lease 历史，则当前状态必须与最新 settled lease 的 `target_status_after_release` 一致；若既无 active lease 也无 settled lease 历史，则 `AVAILABLE` / `INVALID` 可以作为 bootstrap durable truth 独立存在。
   - `acquire` 失败时不得留下“看似成功但资源未进入 `IN_USE`”的半完成 bundle truth；`release` 失败时也不得把资源悄悄回收到 `AVAILABLE`。
   - `acquire` / `release` 失败时，失败 carrier 必须复用上游 `FR-0002` / `FR-0005` 已冻结的共享 failed envelope：顶层字段继续为 `task_id`、`adapter_key`、`capability`、`status=failed`、`error`，不得额外发明字符串确认、异常对象或第二套错误 payload。
   - `acquire` 失败时，shared failed envelope 必须优先回显请求中可恢复的 `task_id`、`adapter_key`、`capability`；若 `task_id` 缺失、不可恢复或形状非法，Core 仍必须回填当前 task-bound 执行上下文中已存在的非空 `task_id`，不得降格为空字符串；`adapter_key` / `capability` 若缺失、不可恢复或形状非法，则固定回填为 `""`。
