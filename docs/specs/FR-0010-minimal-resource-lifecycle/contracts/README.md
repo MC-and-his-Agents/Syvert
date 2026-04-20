@@ -56,6 +56,7 @@
   - 作用：在 `acquire` 前向 snapshot 注入初始 `ResourceRecord` truth；这是 host-side internal bootstrap 入口，不是 Adapter-facing public runtime surface
   - 成功约束：
     - 输入只允许 `ResourceRecord` 序列；bootstrap 不得越权写入 lease truth
+    - 同一输入批次若出现重复 `resource_id`，必须在触达 durable truth 前直接 fail-closed；不得静默去重，也不得把同批重复解释为 replay / conflict
     - 对此前不存在的 `resource_id`，允许把记录并入当前 snapshot
     - 对已存在的 `resource_id`，只有与既有 truth 完全一致时才允许 same-value replay / no-op
     - same-value replay / no-op 必须保持当前 `revision` 不变

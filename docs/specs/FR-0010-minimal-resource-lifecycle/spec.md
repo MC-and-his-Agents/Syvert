@@ -43,6 +43,7 @@
   - `release` 成功时必须返回同一 `lease_id` 的 settled `ResourceLease` 视图，至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release` 与 `release_reason`；后续实现不得在 `void`、确认字符串或另一套影子 carrier 之间自由发挥。
   - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；idempotent no-op 仍必须返回与首次成功 release 同一份 settled `ResourceLease` 语义，不得切换成其他 success carrier。任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
   - `v0.4.0` 的生命周期实现若需要本地默认后端，必须让资源库存 truth 与 lease truth 落在同一份 `ResourceLifecycleSnapshot` 中，并支持内部 `seed_resources(records)` bootstrap surface；该 surface 仅供测试与后续 provider 接入使用，不得被提升为终端用户 CLI / API。
+  - `seed_resources(records)` 在单次输入批次内若出现重复 `resource_id`，必须在触达 durable truth 前直接 fail-closed；不得静默去重，也不得把同批重复误判为 same-value replay / conflict。
 - 契约需求：
   - 共享资源状态集合在 `v0.4.0` 固定为：
     - `AVAILABLE`：资源可被 Core 分配，但尚未被当前 task 占用
@@ -139,6 +140,24 @@ Then 该操作只允许被视为 same-value replay / no-op，不得改写 snapsh
 Given host-side 默认本地 store 已持有较新的 snapshot truth，或 `seed_resources(records)` 试图为既有 `resource_id` 写入与 durable truth 不一致的记录  
 When Core 执行 snapshot 写入或 bootstrap  
 Then Core 必须以 `resource_state_conflict` fail-closed，而不是覆写较新的 `revision` 或篡改既有资源 truth
+
+### 场景 9
+
+Given host-side 默认本地 store 尚不存在 durable truth  
+When Core 首次读取该 store 作为生命周期基线  
+Then Core 必须回落到 canonical 空 `ResourceLifecycleSnapshot(schema_version=v0.4.0, revision=0, resources=[], leases=[])`，而不是返回 `null`、`{}` 或其他影子 carrier
+
+### 场景 10
+
+Given host-side 默认本地入口在一条执行路径中未显式提供 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE`  
+When Core 解析默认本地 store 路径  
+Then Core 必须落到 `~/.syvert/resource-lifecycle.json`
+
+### 场景 11
+
+Given `seed_resources(records)` 的单次输入批次内包含两个相同的 `resource_id`  
+When Core 执行 bootstrap  
+Then Core 必须在触达 durable truth 前直接 fail-closed，不得去重，不得把该输入批次解释为 replay，也不得留下部分写入结果
 
 ## 异常与边界场景
 
