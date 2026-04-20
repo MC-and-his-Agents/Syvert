@@ -60,7 +60,10 @@
 - guardian 第十七轮 review 已把残余阻断继续收敛到 shared carrier canonicalization：`ResourceRecord.material` 的 JSON-safe 约束此前只被检查、未在成功 `ResourceBundle` carrier 上真正规范化，导致 custom store / in-memory snapshot 仍可能把 tuple 等非 canonical 值带进成功结果。
 - 当前工作树已把 canonicalization 前移到 `store -> lifecycle runtime` 边界：`load_snapshot_from_store()` / `write_snapshot_to_store()` 会先把 `ResourceLifecycleSnapshot.resources` 规范化为 canonical JSON-safe truth，再进入 `select_available_resources()` / `build_resource_bundle()` / durable write 路径，避免不同 store 实现暴露不同 carrier 形状。
 - 当前工作树已新增 `test_acquire_canonicalizes_material_from_in_memory_snapshot`，锁定非 canonical 但可规范化的 `material` 经 custom store 进入 `acquire()` 后，成功返回必须暴露 canonical JSON-safe 值。
-- 当前 checkpoint 已推进到最新 carrier canonicalization 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
+- 提交 guardian 前的主动探查又暴露了一类同源 store-return boundary 风险：`store.load_snapshot()` 返回 mapping snapshot / record / lease 时，hydrate/canonicalize 仍可能在 fail-closed 边界外抛异常；`store.write_snapshot()` 已提交 durable truth 后若回显 malformed snapshot，也会把已提交写入误翻成外部失败。
+- 当前工作树已把 `store -> lifecycle runtime` 适配边界整体收口：`canonical_snapshot()` 现支持从 mapping hydrate `snapshot/resource/lease`，`load_snapshot_from_store()` 会把 load + hydrate + canonicalize 统一包进 fail-closed 边界，`write_snapshot_to_store()` 则把 malformed write echo 视为 post-commit advisory noise，不再把已提交 acquire / release 翻成 failed envelope。
+- 当前工作树已新增四条回归，分别锁定 mapping snapshot hydrate 成功、invalid mapping snapshot fail-closed、malformed write echo 下 acquire 仍成功，以及 malformed write echo 下 release 仍成功。
+- 当前 checkpoint 已推进到最新 store-return boundary 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -89,7 +92,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（53 tests, OK）
+  - 结果：通过（57 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
@@ -199,6 +202,7 @@
     - 新增 `test_acquire_stays_successful_when_post_commit_directory_sync_fails`、`test_acquire_returns_failed_envelope_for_invalid_utf8_snapshot`、`test_acquire_returns_failed_envelope_when_store_load_raises_unexpected_error` 与 `test_seed_resources_replay_is_idempotent_for_json_equivalent_material`
     - 新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`
     - 新增 `test_acquire_canonicalizes_material_from_in_memory_snapshot`
+    - 新增 `test_acquire_hydrates_mapping_snapshot_from_custom_store`、`test_acquire_returns_failed_envelope_for_invalid_mapping_snapshot`、`test_acquire_stays_successful_when_store_write_returns_malformed_snapshot` 与 `test_release_stays_successful_when_store_write_returns_malformed_snapshot`
 
 ## 未决风险
 
@@ -213,4 +217,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `47e58d23845ef8dd8c9b5b95ddb657cf961a9998`
+- `676c7e9c2f99f712c65543f8f1d37e5dfb73a693`
