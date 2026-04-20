@@ -45,7 +45,7 @@
 - implementation 阶段：
   - 资源状态迁移单测：验证 `AVAILABLE / IN_USE / INVALID` 允许迁移与非法迁移 fail-closed
   - 资源 bundle/lease 集成测试：验证整包 acquire/release 语义与重复 release 幂等
-  - bootstrap / snapshot 测试：验证 `seed_resources(records)` 的 same-value replay/no-op、同批重复 `resource_id` 直接拒绝、`status=IN_USE` 的 seed 输入前置拒绝，以及既有 truth 冲突 fail-closed
+  - bootstrap / snapshot 测试：验证 `seed_resources(records)` 的 same-value replay/no-op、同批重复 `resource_id` 直接拒绝、被 active lease 解释的 `IN_USE` same-value replay 允许、无 lease 可解释的 `IN_USE` seed 输入前置拒绝，以及既有 truth 冲突 fail-closed
   - durable write 测试：验证 snapshot `revision` compare-and-swap 的 stale-write 拒绝，以及空 store 回落到 canonical 空 snapshot
   - 默认本地入口测试：验证 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 覆盖优先级与未提供时回落 `~/.syvert/resource-lifecycle.json`
   - 端到端回归：验证 Core 不会在部分 slot 缺失时错误注入部分 bundle

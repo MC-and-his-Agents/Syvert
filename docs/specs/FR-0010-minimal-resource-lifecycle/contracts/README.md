@@ -57,14 +57,15 @@
   - 作用：在 `acquire` 前向 snapshot 注入初始 `ResourceRecord` truth；这是 host-side internal bootstrap 入口，不是 Adapter-facing public runtime surface
   - 成功约束：
     - 输入只允许 `ResourceRecord` 序列；bootstrap 不得越权写入 lease truth
-    - bootstrap 输入记录的 `status` 只允许 `AVAILABLE` 或 `INVALID`；任一 `status=IN_USE` 的记录都必须在触达 durable truth 前被拒绝
+    - 对此前不存在的 `resource_id`，bootstrap 输入记录的 `status` 只允许 `AVAILABLE` 或 `INVALID`
+    - 对已存在的 `resource_id`，若 durable truth 已经是被 active lease 解释的 `IN_USE` 资源，则允许 same-value replay / no-op；任一试图新建、漂移或覆写成无 active lease 可解释的 `IN_USE` truth 的输入，都必须在触达 durable truth 前被拒绝
     - 同一输入批次若出现重复 `resource_id`，必须在触达 durable truth 前直接 fail-closed；不得静默去重，也不得把同批重复解释为 replay / conflict
     - 对此前不存在的 `resource_id`，允许把记录并入当前 snapshot
     - 对已存在的 `resource_id`，只有与既有 truth 完全一致时才允许 same-value replay / no-op
     - same-value replay / no-op 必须保持当前 `revision` 不变，且不构成新的 durable write
     - 同一 `resource_id` 只要 truth 不一致，就必须返回 `resource_state_conflict`，而不是覆写既有资源 truth
     - disjoint 新增资源必须并入同一份 canonical snapshot，而不是拆成多份并行 truth
-    - bootstrap 不得制造无 active lease 可解释的 `IN_USE` 资源，也不得通过影子 lease 或隐式占用关系绕过该约束
+    - bootstrap 不得制造无 active lease 可解释的 `IN_USE` 资源，也不得通过影子 lease 或隐式占用关系绕过该约束；`IN_USE` 仅允许作为与既有 active truth 完全一致的 replay 出现
 - 默认本地 store 路径
   - host-side 默认本地 store 位置由环境变量 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 控制；未显式覆盖时，默认路径固定为 `~/.syvert/resource-lifecycle.json`
   - `v0.4.0` 的当前默认本地入口可使用单文件 `ResourceLifecycleSnapshot`；上述 env var / fallback path 属于该默认入口的正式 traceability contract，而不是可随意漂移的实现提示
@@ -91,7 +92,7 @@
   - 适用场景：
     - 请求形状与 slot 集合法，但当前运行时资源集合没有足够的 `AVAILABLE` 资源满足整包 acquire，导致 host-side runtime 的整包 acquire contract 无法成立
     - 资源在 acquire 过程中出现状态冲突或重复分配
-    - host-side durable snapshot 不可读、损坏、shape 非法、schema/version/revision 非法，或其 active / settled truth 与资源状态不一致
+    - host-side durable snapshot 不可读、损坏、shape 非法、schema/version/revision 非法，或其 active lease truth 与当前 `IN_USE` 资源不一致，或在无 active lease 覆盖的资源上 latest settled truth 与当前状态不一致
     - snapshot write 的 `revision` 与当前 durable truth 不一致，导致 stale write 试图覆写更新 truth
     - `lease_id` 与 `task_id` 不匹配，或 release 试图收口非当前持有关系
     - 重复 release 的语义冲突，无法被判定为 idempotent no-op
