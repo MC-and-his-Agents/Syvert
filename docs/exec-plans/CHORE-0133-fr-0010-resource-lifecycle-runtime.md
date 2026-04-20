@@ -57,14 +57,14 @@
 - guardian 第十六轮 review 已把残余阻断继续收敛到 validation boundary：同一组 `require_non_empty_string` helper 同时承担请求校验与内部 snapshot/resource/lease 校验，导致坏快照可能被误报成 `invalid_resource_request`。
 - 当前工作树已拆分 request-side 与 contract-side 的非空字符串校验 helper：调用方请求仍保留 `invalid_resource_request` / `invalid_resource_release`，内部 durable truth / in-memory snapshot 校验统一落回 `ResourceLifecycleContractError`，再由 `acquire()` / `release()` 映射成 `resource_state_conflict`。
 - 当前工作树已新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`，锁定 malformed snapshot object 只能走 runtime-contract 边界，不能再被误报成 caller invalid input。
-- 当前 checkpoint 已推进到最新 validation-boundary 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
+- 当前 checkpoint `9235e5a` 已完成最新 validation-boundary 修复；当前 head 只负责把 active exec-plan 与验证证据同步到该语义停点，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
 
-- 在最新 head 上重跑 `docs_guard` / `workflow_guard`，确认 exec-plan sync 不引入新的流程噪音。
 - 重新提交 guardian；若通过，则直接进入 merge gate。
 - merge gate 阶段继续把当前 head 的 3 个既有慢回归失败与本事项新增改动显式区分，避免把主干噪音误判为本 PR 回归。
+- 合入后关闭 `#175`，并确认实现 PR / Work Item / active exec-plan / main truth 已收成一致。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -205,4 +205,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `80465b394a46e279e4d77cf60780ec6edb25fdac`
+- `9235e5a3de094d7e5ce7e7391c14ea54ee9dff13`
