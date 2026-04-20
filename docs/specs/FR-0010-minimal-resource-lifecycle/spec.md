@@ -20,6 +20,8 @@
   - 冻结最小 `ResourceBundle` / `ResourceLease` 生命周期 carrier
   - 冻结 Core 侧 `acquire` / `release` 输入输出与失败语义
   - 冻结 `AVAILABLE -> IN_USE -> AVAILABLE|INVALID` 的最小迁移规则
+  - 补齐 `ResourceLifecycleSnapshot`、`seed_resources(records)`、`revision` compare-and-swap 与 same-value replay / no-op / conflict 的 formal traceability
+  - 补齐 host-side 默认本地入口的 store-path traceability
 - 本次不纳入：
   - 浏览器资源、设备资源或其他高阶资源类型
   - 资源能力匹配、需求声明、选择策略扩展与多资源档位
