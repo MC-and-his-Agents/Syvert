@@ -44,15 +44,13 @@
     - 空 durable truth 的 canonical 初始值固定为 `schema_version=v0.4.0`、`revision=0`、`resources=[]`、`leases=[]`
     - `resources[]` / `leases[]` 必须继续满足 `FR-0010` 已冻结的 `ResourceRecord` / `ResourceLease` contract，不得在 store 层降格成第二套影子 schema
     - snapshot 中的 active / settled lease truth 必须能唯一解释资源当前状态；`IN_USE` 资源不得脱离 active lease 单独存在
-- `load_snapshot()`
-  - 作用：读取当前 canonical durable truth；若本地 store 尚不存在，则返回空 snapshot，而不是返回 `null`、`{}` 或其他影子 carrier
-  - 边界：
+- durable truth 读取 / 提交语义
+  - 读取边界：
+    - 若本地 store 尚不存在，读取结果必须回落到空 snapshot，而不是 `null`、`{}` 或其他影子 carrier
     - 不可读、损坏、shape 非法或 contract 非法的 snapshot 都必须被视为共享 truth 冲突，而不是被静默忽略或自动修复
-- `write_snapshot(snapshot)`
-  - 作用：提交新的 canonical durable truth
-  - 成功约束：
+  - 提交约束：
     - 只允许提交满足完整 snapshot contract 的 payload
-    - `snapshot.revision` 必须精确等于当前 durable truth 的 `revision + 1`
+    - `revision` 必须精确等于当前 durable truth 的 `revision + 1`
     - 任一 stale write、乱序 revision 或试图覆写更新 durable truth 的行为，都必须以 `resource_state_conflict` fail-closed
 - `seed_resources(records)` internal bootstrap surface
   - 作用：在 `acquire` 前向 snapshot 注入初始 `ResourceRecord` truth；这是 host-side internal bootstrap 入口，不是 Adapter-facing public runtime surface
