@@ -50,8 +50,9 @@
 - 在 `51fccb5` 对应的下一轮 guardian 中，阻断切换为工件完整性问题：formal suite 已冻结 durable snapshot / store-path contract，但 canonical spec 里仍缺少可审查的迁移结论，无法明确回答“本次是否涉及 schema 升级、路径迁移或数据回填”。
 - 在 `e621d45` 对应的下一轮 guardian 中，阻断重新回到 traceability 对齐本身：formal suite 把 bootstrap `IN_USE` 规则收得比当前实现更严，且 snapshot 一致性文案仍有一处过宽，导致 canonical spec 与 implementation-ready truth 再次分叉。
 - 在 `2fd971f` 对应的 merge gate refresh-review 中，最后残留的阻断收敛到 requirement container：`FR-0010` 容器仍停留在“bootstrap 只允许不依赖 active lease 的 truth”这版旧口径，和 canonical spec/data-model/contract 中已经允许的“active truth same-value replay”不一致。
+- 在 `6e1c058` 对应的 merge gate refresh-review 中，最后残留的阻断继续收敛到 `spec.md` 的一条 bootstrap replay 句子：canonical 规则本来允许所有既有 truth 的 same-value replay / no-op，只是 `IN_USE` 额外要求 active lease 解释，但该句子只把 `IN_USE` 分支写了出来，容易误读成 `AVAILABLE` / `INVALID` replay 不合法。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 已在 `31ab4a6` 把 requirement container 同步到同一条 bootstrap invariant：禁止无 active lease 可解释的 `IN_USE` 新增或漂移，但允许既有 active truth 的 same-value replay / no-op。当前提交只负责把 active exec-plan / requirement container checkpoint 同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
+- 当前 worktree 需要把 `spec.md` 中的 bootstrap replay 主句也补成完整表述：所有既有 truth 都允许 same-value replay / no-op，而 `IN_USE` 只是额外要求 active lease 解释。完成该轮后，再次同步 active exec-plan / requirement container checkpoint，即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 

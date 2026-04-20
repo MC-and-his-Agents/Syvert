@@ -44,7 +44,7 @@
   - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；idempotent no-op 仍必须返回与首次成功 release 同一份 settled `ResourceLease` 语义，不得切换成其他 success carrier。任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
   - `v0.4.0` 的生命周期实现若需要本地默认后端，必须让资源库存 truth 与 lease truth 落在同一份 `ResourceLifecycleSnapshot` 中，并支持内部 `seed_resources(records)` bootstrap surface；该 surface 仅供测试与后续 provider 接入使用，不得被提升为终端用户 CLI / API。
   - `seed_resources(records)` 在单次输入批次内若出现重复 `resource_id`，必须在触达 durable truth 前直接 fail-closed；不得静默去重，也不得把同批重复误判为 same-value replay / conflict。
-  - `seed_resources(records)` 只允许注入 bootstrap-legal 的 `ResourceRecord` truth：对此前不存在的 `resource_id`，bootstrap 只允许引入 `AVAILABLE` 或 `INVALID`；对已存在的 `resource_id`，若 durable truth 已经是被 active lease 解释的 `IN_USE` 资源，则允许 same-value replay / no-op。任一试图以 bootstrap 新建、漂移或覆写成无 active lease 可解释的 `IN_USE` 资源的输入，都必须在触达 durable truth 前 fail-closed。
+  - `seed_resources(records)` 只允许注入 bootstrap-legal 的 `ResourceRecord` truth：对此前不存在的 `resource_id`，bootstrap 只允许引入 `AVAILABLE` 或 `INVALID`；对已存在的 `resource_id`，只要输入与 durable truth 完全一致，就允许 same-value replay / no-op，其中 `IN_USE` 额外要求该 truth 已经被 active lease 唯一解释。任一试图以 bootstrap 新建、漂移或覆写成无 active lease 可解释的 `IN_USE` 资源的输入，都必须在触达 durable truth 前 fail-closed。
 - 契约需求：
   - 共享资源状态集合在 `v0.4.0` 固定为：
     - `AVAILABLE`：资源可被 Core 分配，但尚未被当前 task 占用
