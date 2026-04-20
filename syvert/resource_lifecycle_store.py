@@ -1,0 +1,180 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+import fcntl
+import json
+import os
+from pathlib import Path
+import tempfile
+
+from syvert.resource_lifecycle import (
+    canonical_snapshot,
+    ResourceLifecycleContractError,
+    ResourceLifecycleSnapshot,
+    ResourceRecord,
+    empty_snapshot,
+    seedable_resource_records,
+    snapshot_from_dict,
+    snapshot_to_dict,
+    validate_snapshot,
+)
+
+
+DEFAULT_RESOURCE_LIFECYCLE_STORE_ENV = "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE"
+
+
+class ResourceLifecycleStoreError(ResourceLifecycleContractError):
+    pass
+
+
+class ResourceLifecyclePersistenceError(ResourceLifecycleStoreError):
+    pass
+
+
+@dataclass(frozen=True)
+class LocalResourceLifecycleStore:
+    path: Path
+
+    def load_snapshot(self) -> ResourceLifecycleSnapshot:
+        if not self.path.exists():
+            return empty_snapshot()
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 无法读取资源生命周期快照 `{self.path}`"
+            ) from error
+        if not isinstance(payload, Mapping):
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 资源生命周期快照 `{self.path}` 必须是对象"
+            )
+        try:
+            return snapshot_from_dict(payload)
+        except ResourceLifecycleContractError as error:
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 资源生命周期快照 `{self.path}` 不满足共享 contract"
+            ) from error
+
+    def write_snapshot(self, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
+        try:
+            snapshot = canonical_snapshot(snapshot)
+        except ResourceLifecycleContractError as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
+        except Exception as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
+        with self._exclusive_lock():
+            self._write_snapshot_locked(snapshot)
+        return snapshot
+
+    def seed_resources(self, records: Sequence[ResourceRecord]) -> tuple[ResourceRecord, ...]:
+        seeded = seedable_resource_records(records)
+        with self._exclusive_lock():
+            snapshot = self.load_snapshot()
+            existing_by_id = {record.resource_id: record for record in snapshot.resources}
+            changed = False
+            for record in seeded:
+                existing = existing_by_id.get(record.resource_id)
+                if existing is not None and existing != record:
+                    raise ResourceLifecyclePersistenceError(
+                        "resource_state_conflict: seed_resources 不得覆写既有资源 truth"
+                    )
+                if existing is None:
+                    changed = True
+                existing_by_id[record.resource_id] = record
+            if not changed:
+                return snapshot.resources
+            updated_snapshot = ResourceLifecycleSnapshot(
+                schema_version=snapshot.schema_version,
+                revision=snapshot.revision + 1,
+                resources=tuple(sorted(existing_by_id.values(), key=lambda item: item.resource_id)),
+                leases=snapshot.leases,
+            )
+            self._write_snapshot_locked(updated_snapshot)
+            return updated_snapshot.resources
+
+    def _write_snapshot_locked(self, snapshot: ResourceLifecycleSnapshot) -> None:
+        current_snapshot = self.load_snapshot()
+        expected_revision = current_snapshot.revision + 1
+        if snapshot.revision != expected_revision:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
+            )
+        payload = snapshot_to_dict(snapshot)
+        self._write_json_atomic(payload)
+
+    def _write_json_atomic(self, payload: Mapping[str, object]) -> None:
+        temp_path: str | None = None
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temp_path = tempfile.mkstemp(prefix=f".{self.path.stem}.", suffix=".tmp", dir=self.path.parent)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, self.path)
+        except OSError as error:
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
+            ) from error
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+        try:
+            dir_fd = os.open(self.path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            # The durable truth is already visible after os.replace(); a best-effort directory
+            # sync failure must not flip a committed write into an external failure result.
+            pass
+
+    @contextmanager
+    def _exclusive_lock(self):
+        lock_path = self.path.with_name(f"{self.path.name}.lock")
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            with lock_path.open("a+", encoding="utf-8") as handle:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                except OSError as error:
+                    raise ResourceLifecyclePersistenceError(
+                        f"resource_state_conflict: 无法锁定资源生命周期快照 `{self.path}`"
+                    ) from error
+                try:
+                    yield
+                finally:
+                    try:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    except OSError:
+                        # The durable snapshot may already be committed; closing the file descriptor
+                        # will release the advisory lock, so unlock failures must not flip success
+                        # into an external failure result after truth has been persisted.
+                        pass
+        except OSError as error:
+            raise ResourceLifecyclePersistenceError(
+                f"resource_state_conflict: 无法准备资源生命周期快照锁 `{self.path}`"
+            ) from error
+
+
+def default_resource_lifecycle_store() -> LocalResourceLifecycleStore:
+    return LocalResourceLifecycleStore(resolve_resource_lifecycle_store_path())
+
+
+def resolve_resource_lifecycle_store_path(env: Mapping[str, str] | None = None) -> Path:
+    source = env if env is not None else os.environ
+    configured = source.get(DEFAULT_RESOURCE_LIFECYCLE_STORE_ENV)
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".syvert" / "resource-lifecycle.json"
