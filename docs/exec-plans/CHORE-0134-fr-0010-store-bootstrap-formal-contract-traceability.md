@@ -51,7 +51,7 @@
 - 在 `e621d45` 对应的下一轮 guardian 中，阻断重新回到 traceability 对齐本身：formal suite 把 bootstrap `IN_USE` 规则收得比当前实现更严，且 snapshot 一致性文案仍有一处过宽，导致 canonical spec 与 implementation-ready truth 再次分叉。
 - 在 `2fd971f` 对应的 merge gate refresh-review 中，最后残留的阻断收敛到 requirement container：`FR-0010` 容器仍停留在“bootstrap 只允许不依赖 active lease 的 truth”这版旧口径，和 canonical spec/data-model/contract 中已经允许的“active truth same-value replay”不一致。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要把 requirement container 也同步到同一条 bootstrap invariant：禁止无 active lease 可解释的 `IN_USE` 新增或漂移，但允许既有 active truth 的 same-value replay / no-op。完成该轮后，再次同步 active exec-plan / requirement container checkpoint，即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `31ab4a6` 把 requirement container 同步到同一条 bootstrap invariant：禁止无 active lease 可解释的 `IN_USE` 新增或漂移，但允许既有 active truth 的 same-value replay / no-op。当前提交只负责把 active exec-plan / requirement container checkpoint 同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -119,4 +119,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `e4a2913a9363aa3af1adddd2c169bdb5146784bd`
+- `31ab4a6f0c50193d3db6cad8ae7483953ed54f0c`
