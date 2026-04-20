@@ -46,7 +46,7 @@
 - 本轮修正的目标是把 bootstrap contract 收紧为单一路径：`IN_USE` 只能由 `acquire + active lease` 建立；`seed_resources(records)` 只允许注入 `AVAILABLE` / `INVALID`，并且任何 `status=IN_USE` 的 seed 输入都必须在触达 durable truth 前 fail-closed。
 - 当前实现 PR `#176` 已通过 snapshot invariant 拒绝无 lease 的 `IN_USE` seed；本事项需要把这一运行时真相补回 formal suite，避免实现正确但 contract 仍留空洞。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要再完成一轮 formal suite 同步与 exec-plan checkpoint 对齐；完成该轮后，剩余工作才会真正收敛到 guard、review 与 merge gate。
+- 当前 worktree 已在 `5211230` 完成 bootstrap `IN_USE` invariant 的 formal suite 收口；当前提交只负责把 active exec-plan 的 checkpoint 与停点同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -102,4 +102,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `a03c48d517026237359f7800cf42433678e3fecf`
+- `5211230468b116837247c61d2b6f92af5291b4a7`
