@@ -154,6 +154,69 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(statuses["account-001"], "IN_USE")
         self.assertEqual(statuses["account-002"], "AVAILABLE")
 
+    def test_acquire_retries_when_unrelated_write_advances_revision_without_changing_selection(self) -> None:
+        class ConcurrentAcquireRetryStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._injected = False
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 2 and not self._injected:
+                    self._injected = True
+                    self._inner_store.seed_resources(
+                        [
+                            ResourceRecord(
+                                resource_id="proxy-001",
+                                resource_type="proxy",
+                                status="AVAILABLE",
+                                material={"proxy_endpoint": "http://proxy-001"},
+                            )
+                        ]
+                    )
+                return self._inner_store.write_snapshot(snapshot)
+
+        store = ConcurrentAcquireRetryStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-001"},
+                )
+            ]
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-001c",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-001c",
+        )
+
+        self.assertIsInstance(result, ResourceBundle)
+        assert isinstance(result, ResourceBundle)
+        assert result.account is not None
+        self.assertEqual(result.account.resource_id, "account-001")
+        self.assertEqual(result.account.status, "IN_USE")
+
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 3)
+        statuses = {record.resource_id: record.status for record in snapshot.resources}
+        self.assertEqual(statuses["account-001"], "IN_USE")
+        self.assertEqual(statuses["proxy-001"], "AVAILABLE")
+        self.assertEqual(len(snapshot.leases), 1)
+
     def test_acquire_fails_closed_when_any_slot_is_missing(self) -> None:
         self.make_store().seed_resources(
             [

@@ -51,12 +51,12 @@
 - guardian 第十四轮 review 已把阻断回拉到 formal spec 的 acquire / failure carrier 约束；当前工作树已把 acquire 恢复为冲突即 fail-closed，并把 `task_context_task_id` 升格为 acquire / release 的显式必填前置条件。
 - 在等待 `#178` formal traceability follow-up 合入期间，本地快回归额外暴露了一个 acquire / release CAS 非对称：`release()` 会在无关 revision bump 后重试，但 `acquire()` 在“同一组资源仍然成立”的场景下会过早 fail-closed。
 - 当前工作树已把 `acquire()` revision-conflict 处理收紧为“same-selection retry, stale-selection fail-closed”：若刷新后的 durable truth 仍映射到同一组 `resource_id`，则按最新 revision 重试；若资源选择发生漂移或失效，则继续返回 `resource_state_conflict`，不静默改选其他资源。
-- 当前工作树已在 `65f67b1` 落下 acquire CAS retry 边界修复；当前提交只负责把 active exec-plan 的 checkpoint 同步到该最新语义提交，随后等待 `#178` 合入后再刷新 guardian / merge gate。
+- 当前工作树已在 `65f67b1` 落下 acquire CAS retry 边界修复；本轮主动探查进一步确认还需要一条显式回归，把“无关 revision bump 但 same-selection 仍成立”的成功重试路径单独锁进测试证据，而不是只靠 stale-selection fail-closed 与 release retry 类比证明。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
 
-- 提交本轮 acquire CAS retry 修复并推送分支。
+- 提交本轮 acquire CAS retry 回归测试与 exec-plan 同步，并推送分支。
 - 待 `#178` 合入后，刷新 implementation PR `#176` 的 guardian / merge gate。
 - 在最新 PR head 上引用已完成的本地快回归证据，并把主干同样失败的慢回归项与本事项新增改动显式区分。
 
@@ -170,7 +170,7 @@
     - 并发 acquire 回归改为“一成一败且剩余资源保持 AVAILABLE”，并新增空 context 直接拒绝的前置约束测试
   - 本地快回归补充修复（待下一轮 guardian 复核）：
     - `acquire()` 现在仅在 refreshed snapshot 仍保持同一组已选 `resource_id` 时重试 revision mismatch；若 selection 发生漂移，则继续 fail-closed 为 `resource_state_conflict`
-    - “无关资源写入导致 acquire revision bump”回归重新通过，同时“stale selection 一成一败”回归保持通过
+    - 新增显式回归，锁定“无关资源写入导致 acquire revision bump，但 same-selection 仍成立时允许 retry 成功”的分支；同时“stale selection 一成一败”回归继续保持通过
 
 ## 未决风险
 
