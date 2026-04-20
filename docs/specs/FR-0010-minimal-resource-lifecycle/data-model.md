@@ -12,6 +12,10 @@
   - 用途：表达一次 `acquire` 成功后返回给调用方的整包资源 carrier
 - 实体：`ResourceLease`
   - 用途：表达某组资源被某个 task 占用的唯一共享真相
+- 实体：`ResourceLifecycleSnapshot`
+  - 用途：表达 host-side durable store 中的 canonical lifecycle snapshot；为 bootstrap、load/write 与 revision compare-and-swap 提供唯一真相
+- 实体：`ResourceLifecycleSnapshot`
+  - 用途：表达 `v0.4.0` 本地默认后端中的单文件 durable truth；同时承载资源库存真相与 lease 真相
 
 ## 关键字段
 
@@ -64,6 +68,38 @@
     - 约束：只允许 `AVAILABLE` 或 `INVALID`
   - `release_reason`
     - 约束：仅 release 成功后出现；非空字符串；与 `target_status_after_release` 一起构成重复 release 的幂等判定真相
+- `ResourceLifecycleSnapshot`
+  - `schema_version`
+    - 约束：非空字符串；在 `v0.4.0` 固定为 `v0.4.0`
+  - `revision`
+    - 约束：非负整数；空快照从 `0` 开始；任一改变 durable truth 的成功写入必须以“当前 durable truth 的 `revision + 1`”提交；同值 bootstrap replay / no-op 不得推进 `revision`
+  - `resources`
+    - 约束：数组；元素必须全部满足 `ResourceRecord` contract；`resource_id` 必须唯一；与 snapshot 内 active / settled lease 真相保持一致
+  - `leases`
+    - 约束：数组；元素必须全部满足 `ResourceLease` contract；`lease_id` 必须唯一；用于决定哪些资源当前由 active lease 持有，以及最新 settled lease 对应的释放真相
+
+## bootstrap 与 durable snapshot
+
+- `seed_resources(records)` internal bootstrap surface
+  - 输入约束：
+    - 只允许 `Sequence[ResourceRecord]`；字符串 / bytes、非 `ResourceRecord` 元素或重复 `resource_id` 都必须视为非法 bootstrap 输入
+  - 写入约束：
+    - 只允许把此前不存在的 `resource_id` 追加进 `ResourceLifecycleSnapshot.resources`
+    - 若某个 `resource_id` 已存在，只有与既有 `ResourceRecord` 完全一致时才允许作为 same-value replay / no-op
+    - 既有 `resource_id` 只要 truth 不一致，就必须按冲突 fail-closed；bootstrap 不得覆写既有资源 truth
+    - bootstrap 不得创建、删除或改写 `ResourceLifecycleSnapshot.leases`
+  - 并发 / merge 约束：
+    - 多个 disjoint bootstrap 写入必须收敛到同一份 canonical snapshot truth，而不是分叉成影子 store 结果
+    - same-value replay / no-op 必须返回既有 snapshot truth，且不得制造新的 `revision`
+- `ResourceLifecycleSnapshot`
+  - `schema_version`
+    - 约束：非空字符串；必须与当前资源生命周期 contract 版本一致
+  - `revision`
+    - 约束：非负整数；表示同一份 durable snapshot 的单调版本号
+  - `resources`
+    - 约束：资源库存的完整真相；同一 `resource_id` 不得重复
+  - `leases`
+    - 约束：lease 真相的完整集合；同一 `lease_id` 与 `bundle_id` 不得重复
 
 ## 失败载荷上下文
 
@@ -76,8 +112,23 @@
   - `adapter_key` / `capability`
     - 约束：若 `lease_id` 已解析到既有 `ResourceLease`，则必须回填自该 lease 绑定的共享上下文；若 lease 尚不可解析，则固定回填为 `""`
 
+## 内部 bootstrap / store surface
+
+- `seed_resources(records)`
+  - 约束：仅限内部 bootstrap / 测试 / 后续 provider 接入使用；不是终端用户 CLI / API
+  - 行为：
+    - 只允许写入 `ResourceRecord`
+    - 对既有 durable truth 只允许同值 replay；任何状态、类型或 material 漂移都必须 fail-closed
+    - 同值 replay 是严格 no-op：不得改写 durable truth、不得增长 `revision`
+- 本地默认后端
+  - 约束：`v0.4.0` 默认后端可以使用单文件 `ResourceLifecycleSnapshot` 原子快照；这是当前阶段实现选择，不把唯一存储引擎冻结为长期外部 contract
+
 ## 生命周期
 
+- bootstrap / durable 建档：
+  - 当 host-side local store 尚不存在 durable truth 时，canonical 初始值固定为 `ResourceLifecycleSnapshot(schema_version=v0.4.0, revision=0, resources=(), leases=())`
+  - `seed_resources(records)` 只有在新增此前不存在的资源 truth 时才推进 `revision`；同值 replay / no-op 必须保持 `revision` 不变
+  - 任一 snapshot 写入若发现自身 `revision` 不是当前 durable truth 的下一个版本，必须 fail-closed，而不是静默覆写 store 中较新的 truth
 - 创建：
   - 当 `acquire` 请求形状合法、全部 `requested_slots` 都绑定到 `AVAILABLE` 资源、且 `ResourceBundle` 与 `ResourceLease` 已可靠建立时，创建新的占用关系
   - 创建成功后，bundle 中全部资源状态必须同步推进为 `IN_USE`

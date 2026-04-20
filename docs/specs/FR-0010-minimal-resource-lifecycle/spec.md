@@ -40,6 +40,7 @@
   - `release` 成功时必须只作用于该 `lease_id` 所绑定的同一组资源；Core 不得把 release 扩散到其他 bundle、其他 lease 或其他 task 的持有关系。
   - `release` 成功时必须返回同一 `lease_id` 的 settled `ResourceLease` 视图，至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release` 与 `release_reason`；后续实现不得在 `void`、确认字符串或另一套影子 carrier 之间自由发挥。
   - 相同 `lease_id` 的重复 `release` 只有在目标状态与理由语义完全一致时才允许作为 idempotent no-op；idempotent no-op 仍必须返回与首次成功 release 同一份 settled `ResourceLease` 语义，不得切换成其他 success carrier。任何冲突性重复 release、重复 acquire 绑定或 lease/task 对不上号都必须 fail-closed。
+  - `v0.4.0` 的生命周期实现若需要本地默认后端，必须让资源库存 truth 与 lease truth 落在同一份 `ResourceLifecycleSnapshot` 中，并支持内部 `seed_resources(records)` bootstrap surface；该 surface 仅供测试与后续 provider 接入使用，不得被提升为终端用户 CLI / API。
 - 契约需求：
   - 共享资源状态集合在 `v0.4.0` 固定为：
     - `AVAILABLE`：资源可被 Core 分配，但尚未被当前 task 占用
@@ -56,6 +57,7 @@
     - 未经当前有效 lease 持有即执行 release
   - `ResourceBundle` 是 host-side canonical lifecycle carrier；其字段与 slot 命名在本 FR 冻结，但 Adapter 如何消费该 bundle 的执行边界由 `FR-0012` 定义，不在本 FR 重复展开。
   - `ResourceLease` 是“资源被某个 task 占用”的唯一共享真相源；在 `v0.4.0` 内不得为同一 `lease_id` 维护第二套影子 lease schema。若 `release reason` 参与幂等判定，它也必须落在该共享 carrier 上，而不是由实现层私自引入影子字段。
+  - 若实现提供默认本地 store，`ResourceLifecycleSnapshot` 必须同时持有 `schema_version`、`revision`、`resources[]` 与 `leases[]`，并保证一次 `acquire / release / seed_resources` 的整包更新针对同一份 snapshot 原子落盘。
   - `acquire` 失败时不得留下“看似成功但资源未进入 `IN_USE`”的半完成 bundle truth；`release` 失败时也不得把资源悄悄回收到 `AVAILABLE`。
   - `acquire` / `release` 失败时，失败 carrier 必须复用上游 `FR-0002` / `FR-0005` 已冻结的共享 failed envelope：顶层字段继续为 `task_id`、`adapter_key`、`capability`、`status=failed`、`error`，不得额外发明字符串确认、异常对象或第二套错误 payload。
   - `acquire` 失败时，shared failed envelope 必须优先回显请求中可恢复的 `task_id`、`adapter_key`、`capability`；若 `task_id` 缺失、不可恢复或形状非法，Core 仍必须回填当前 task-bound 执行上下文中已存在的非空 `task_id`，不得降格为空字符串；`adapter_key` / `capability` 若缺失、不可恢复或形状非法，则固定回填为 `""`。
@@ -72,6 +74,7 @@
 - 非功能需求：
   - 生命周期 contract 必须 fail-closed；任何无法证明资源、bundle、lease 与当前 task 一致的情况，都不得宽松放行。
   - `v0.4.0` 的 lifecycle contract 必须保持实现无关，不绑定唯一存储引擎、唯一 provider 或唯一进程布局。
+  - 默认本地 store 路径可以由实现层环境变量提供，但 formal spec 只冻结“存在默认路径入口”与“同一 snapshot 原子更新”这两个语义，不把具体文件系统布局升级成跨阶段演进的长期外部 contract。
   - 本 FR 只冻结“资源如何进入/退出占用态”的最小真相，不提前承诺调度公平性、优先级、租户隔离或复杂匹配。
 
 ## 约束

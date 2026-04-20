@@ -36,6 +36,37 @@
     - 返回载荷至少包含 `lease_id`、`bundle_id`、`task_id`、`adapter_key`、`capability`、`resource_ids`、`acquired_at`、`released_at`、`target_status_after_release`、`release_reason`
     - 返回的 `ResourceLease` 必须保留 `adapter_key` 与 `capability`，作为后续 release 失败 envelope 的 canonical 回填来源
 
+## host-side durable store / bootstrap surface
+
+- `ResourceLifecycleSnapshot`
+  - 作用：作为 host-side local store 的 canonical durable carrier，承载 `schema_version`、`revision`、`resources[]`、`leases[]`
+  - 约束：
+    - 空 durable truth 的 canonical 初始值固定为 `schema_version=v0.4.0`、`revision=0`、`resources=[]`、`leases=[]`
+    - `resources[]` / `leases[]` 必须继续满足 `FR-0010` 已冻结的 `ResourceRecord` / `ResourceLease` contract，不得在 store 层降格成第二套影子 schema
+    - snapshot 中的 active / settled lease truth 必须能唯一解释资源当前状态；`IN_USE` 资源不得脱离 active lease 单独存在
+- `load_snapshot()`
+  - 作用：读取当前 canonical durable truth；若本地 store 尚不存在，则返回空 snapshot，而不是返回 `null`、`{}` 或其他影子 carrier
+  - 边界：
+    - 不可读、损坏、shape 非法或 contract 非法的 snapshot 都必须被视为共享 truth 冲突，而不是被静默忽略或自动修复
+- `write_snapshot(snapshot)`
+  - 作用：提交新的 canonical durable truth
+  - 成功约束：
+    - 只允许提交满足完整 snapshot contract 的 payload
+    - `snapshot.revision` 必须精确等于当前 durable truth 的 `revision + 1`
+    - 任一 stale write、乱序 revision 或试图覆写更新 durable truth 的行为，都必须以 `resource_state_conflict` fail-closed
+- `seed_resources(records)` internal bootstrap surface
+  - 作用：在 `acquire` 前向 snapshot 注入初始 `ResourceRecord` truth；这是 host-side internal bootstrap 入口，不是 Adapter-facing public runtime surface
+  - 成功约束：
+    - 输入只允许 `ResourceRecord` 序列；bootstrap 不得越权写入 lease truth
+    - 对此前不存在的 `resource_id`，允许把记录并入当前 snapshot
+    - 对已存在的 `resource_id`，只有与既有 truth 完全一致时才允许 same-value replay / no-op
+    - same-value replay / no-op 必须保持当前 `revision` 不变
+    - 同一 `resource_id` 只要 truth 不一致，就必须返回 `resource_state_conflict`，而不是覆写既有资源 truth
+    - disjoint 新增资源必须并入同一份 canonical snapshot，而不是拆成多份并行 truth
+- 默认本地 store 路径
+  - host-side 默认本地 store 位置由环境变量 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 控制；未显式覆盖时，默认路径固定为 `~/.syvert/resource-lifecycle.json`
+  - 该路径选择 contract 只属于本地 durable store boundary；`FR-0010` 不因此新增 `acquire` / `release` 的 public store-path 参数，也不引入第二套 store selector
+
 ## 错误与边界行为
 
 - 失败返回 carrier：
@@ -57,8 +88,11 @@
   - 适用场景：
     - 请求形状与 slot 集合法，但当前运行时资源集合没有足够的 `AVAILABLE` 资源满足整包 acquire，导致 host-side runtime 的整包 acquire contract 无法成立
     - 资源在 acquire 过程中出现状态冲突或重复分配
+    - host-side durable snapshot 不可读、损坏、shape 非法、schema/version/revision 非法，或其 active / settled truth 与资源状态不一致
+    - snapshot write 的 `revision` 与当前 durable truth 不一致，导致 stale write 试图覆写更新 truth
     - `lease_id` 与 `task_id` 不匹配，或 release 试图收口非当前持有关系
     - 重复 release 的语义冲突，无法被判定为 idempotent no-op
+    - `seed_resources(records)` 试图覆写既有 `resource_id` 的资源 truth，或把 bootstrap 输入扩张成 lease / shadow schema 写入
     - 任一资源试图执行未批准的状态迁移
   - canonical `error.code`：
     - `resource_unavailable`
@@ -79,3 +113,21 @@
 - `task_id`、`adapter_key`、`capability` 继续复用上游已冻结字段，不另建影子上下文字段
 - `v0.4.0` 不引入第三种以上资源类型，也不引入复杂匹配与调度语义
 - `INVALID` 在 `v0.4.0` 为终态；若后续需要恢复机制，必须通过新的 formal spec 扩张 contract
+
+## 内部 bootstrap 与默认后端
+
+- `seed_resources(records)`
+  - 性质：内部 bootstrap surface，仅用于测试与后续 provider 接入；不是最终用户暴露的 CLI / API
+  - 输入：
+    - `records[]`，每项必须是合法 `ResourceRecord`
+  - 行为约束：
+    - 只允许为不存在的 `resource_id` 建档，或对既有 durable truth 执行同值 replay
+    - 任何状态、类型、material 漂移都必须 fail-closed 为 `resource_state_conflict`
+    - 同值 replay 必须是严格 no-op，不得增长 snapshot `revision`
+- `ResourceLifecycleSnapshot`
+  - 结构：`schema_version`、`revision`、`resources[]`、`leases[]`
+  - 语义：`resources` 与 `leases` 共同构成单份 durable truth；一次 `acquire / release / seed_resources` 的整包更新必须针对同一份 snapshot 原子落盘
+- 默认本地 store
+  - `v0.4.0` 可以使用单文件 JSON 原子快照作为默认后端
+  - store 路径可由 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 提供；未提供时默认落到本机用户目录下的资源生命周期快照文件
+  - 这是 `v0.4.0` 的实现选择，不把唯一存储引擎冻结为长期外部 contract

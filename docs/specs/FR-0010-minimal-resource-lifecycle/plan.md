@@ -19,6 +19,7 @@
 
 - 阶段 1：`#164` 收口 formal spec，明确资源类型、bundle/lease carrier、状态机与 `acquire/release` 主 contract。
 - 阶段 2：后续实现 Work Item 基于该 formal spec 落地 Core 侧资源模型与获取/释放路径。
+- 阶段 2.1：实现 Work Item 需要同时消费 formal spec 中的 `ResourceLifecycleSnapshot` / `seed_resources(records)` traceability，把本地默认 store 与 bootstrap 入口约束在同一套 lifecycle contract 下。
 - 阶段 3：相邻 FR 在不改写 lifecycle 主 contract 的前提下，分别补齐 task-bound tracing 与 Adapter 注入边界。
 
 ## 实现约束
@@ -32,6 +33,7 @@
   - 与 `AGENTS.md`、`WORKFLOW.md` 对“Core 负责运行时语义、formal spec 绑定 FR、Work Item 是执行入口”的规则保持一致
   - 与 `FR-0004` 已冻结的 `adapter_key` / `capability` 输入语义保持一致
   - 与 `FR-0002` / `FR-0005` 已冻结的 shared envelope 与失败分类边界保持一致
+  - 若实现提供默认本地 store 与内部 bootstrap surface，则 `ResourceLifecycleSnapshot`、`revision`、`seed_resources(records)` 与默认 store 路径入口都必须直接复用 formal spec 词汇，不得在实现侧另发明影子 schema
 
 ## 测试与验证策略
 
