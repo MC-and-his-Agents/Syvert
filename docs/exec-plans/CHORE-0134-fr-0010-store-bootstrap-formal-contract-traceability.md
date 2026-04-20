@@ -47,7 +47,7 @@
 - 当前实现 PR `#176` 已通过 snapshot invariant 拒绝无 lease 的 `IN_USE` seed；本事项需要把这一运行时真相补回 formal suite，避免实现正确但 contract 仍留空洞。
 - 在 `32ffa93` 对应的下一轮 guardian 中，阻断已继续收敛到 bootstrap revision 子契约：formal artifact 仍需明确“只有改变 durable truth 的成功写入才推进 `revision`，same-value replay / no-op 虽然成功但不构成新的 durable write”，否则 `contracts/README.md` 与 `spec.md` / `data-model.md` 仍然不是单一真相。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要在 bootstrap 子契约内再完成一轮 revision/no-op 语义对齐；完成该轮后，再次同步 active exec-plan checkpoint，即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `9045dd4` 完成 bootstrap revision/no-op 语义对齐；当前提交只负责把 active exec-plan 的 checkpoint 与停点同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -106,4 +106,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5211230468b116837247c61d2b6f92af5291b4a7`
+- `9045dd44feb4883fd805d469d59a4ef0d7b9bf3f`
