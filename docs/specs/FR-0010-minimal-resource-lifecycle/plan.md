@@ -51,6 +51,7 @@
   - 端到端回归：验证 Core 不会在部分 slot 缺失时错误注入部分 bundle
 - 手动验证：
   - 逐条核对 `FR-0010` 与 `FR-0011 / FR-0012` 的边界，确保没有重复冻结同一 contract
+  - 明确记录 durable snapshot / store-path traceability 的迁移结论：本次 formal follow-up 不涉及 schema 升级、路径迁移或数据回填
 
 ## TDD 范围
 
