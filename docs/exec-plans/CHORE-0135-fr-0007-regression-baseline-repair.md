@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0007-release-gate-and-regression-checks/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#180`
 - active 收口事项：`CHORE-0135-fr-0007-regression-baseline-repair`
 
 ## 目标
@@ -37,6 +37,7 @@
 
 - 当前执行现场：`/Users/mc/code/worktrees/syvert/issue-179-fr-0007`
 - 当前执行分支：`issue-179-fr-0007`
+- 当前受审 PR：`#180`
 - 基线 head：`2c71a6d1be6eb965198cd984f2bcb17439ae6a02`
 - 当前实现 checkpoint：`cb5eaadbeff4cd3efa9a8f235cb72ef6297ddc85`
 - 当前代码已收口两类修复：
@@ -90,3 +91,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `cb5eaadbeff4cd3efa9a8f235cb72ef6297ddc85`
+- 当前回合已进入 `metadata-only closeout follow-up`；后续 PR / review / merge gate 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
