@@ -35,7 +35,7 @@
 ## 当前停点
 
 - `FR-0010` formal spec 主 contract 已由 PR `#170` 合入主干，资源类型、bundle / lease carrier、状态迁移与 `acquire / release` 语义已经冻结。
-- implementation PR `#176` 已新增本地 snapshot store、`ResourceLifecycleSnapshot`、`seed_resources()`、snapshot `revision` 与 same-value replay / no-op / conflict 行为。
+- implementation PR `#176` 已新增本地 snapshot store、`ResourceLifecycleSnapshot`、`seed_resources(records)`、snapshot `revision` 与 same-value replay / no-op / conflict 行为。
 - 当前阻断不在运行时代码，而在 formal artifact 仍缺少 store / bootstrap traceability，导致 `#176` 的实现 surface 缺少可引用的 canonical contract 依据。
 - 当前补丁同时回写 `spec.md` / `plan.md`，把 store / bootstrap surface 提升回 FR 主文档与实施计划，避免 formal suite 内部出现“核心文档无追踪、附属文档单独冻结”的断层。
 - 当前补丁也同步刷新 `risks.md` 与 requirement container，确保新增 snapshot / bootstrap / revision / 默认本地入口语义进入 formal suite 的最小审查输入。
@@ -56,7 +56,7 @@
 
 - 角色：`FR-0010` 的 spec-only traceability follow-up，负责把已进入实现面的 store / bootstrap 语义收回到 canonical formal artifact。
 - 阻塞：
-  - 若 `ResourceLifecycleSnapshot`、`seed_resources()`、`revision` 与默认 store-path 仍只存在于实现 PR，guardian 会继续把 `#176` 判定为缺 formal traceability。
+  - 若 `ResourceLifecycleSnapshot`、`seed_resources(records)`、`revision` 与默认 store-path 仍只存在于实现 PR，guardian 会继续把 `#176` 判定为缺 formal traceability。
 
 ## 已验证项
 
@@ -66,11 +66,11 @@
 - `sed -n '1,260p' docs/exec-plans/FR-0010-minimal-resource-lifecycle.md`
 - `sed -n '1,260p' docs/exec-plans/CHORE-0130-fr-0010-formal-spec-closeout.md`
 - `gh issue view 177 --json number,title,body,state,url`
-  - 结果：已确认 `#177` 要求为 `#176` 补齐 `ResourceLifecycleSnapshot`、`seed_resources()`、`revision`、same-value replay / no-op / conflict 与默认本地 store-path 的 formal traceability
+  - 结果：已确认 `#177` 要求为 `#176` 补齐 `ResourceLifecycleSnapshot`、`seed_resources(records)`、`revision`、same-value replay / no-op / conflict 与默认本地 store-path 的 formal traceability
 - `gh pr view 176 --json number,title,body,headRefName,baseRefName,state,url`
   - 结果：已确认 `#176` 为当前 implementation PR，当前缺口是 formal artifact 未显式覆盖 store / bootstrap surface
 - `gh pr diff 176 --patch`
-  - 结果：已核对 `ResourceLifecycleSnapshot`、`seed_resources()`、snapshot `revision` CAS、same-value replay / no-op / conflict 与 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 默认路径语义
+  - 结果：已核对 `ResourceLifecycleSnapshot`、`seed_resources(records)`、snapshot `revision` CAS、same-value replay / no-op / conflict 与 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` 默认路径语义
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -89,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `fc37c5bfb2f3c6c00cfba55125053346653b950b`
+- `59263bb1f6ec318c31b31b8347124eb13b2440e6`
