@@ -38,17 +38,16 @@
 - 当前执行现场：`/Users/mc/code/worktrees/syvert/issue-179-fr-0007`
 - 当前执行分支：`issue-179-fr-0007`
 - 基线 head：`2c71a6d1be6eb965198cd984f2bcb17439ae6a02`
-- 已确认主干存在 3 个既有失败：
-  - `tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
-  - `tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_exception_failure_return_to_shared_error_model`
-  - `tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate`
-- 已确认第三项失败的真实根因是测试 payload 漂移，而不是 `real_adapter_regression` 逻辑回归。
+- 当前实现 checkpoint：`cb5eaadbeff4cd3efa9a8f235cb72ef6297ddc85`
+- 当前代码已收口两类修复：
+  - `syvert/platform_leakage.py` 对 `execute_task` / `execute_task_internal` 内 success envelope dict 与 `failure_envelope(...)` 语句值做 statement-level boundary override，success 归 `shared_result_contract`、failure 归 `shared_error_model`。
+  - `tests/runtime/platform_leakage_fixtures.py` 已成为 canonical platform leakage payload 的单一测试真相源，`test_version_gate` 与 `test_real_adapter_regression` 已去除漂移副本。
 
 ## 下一步动作
 
-- 为 `execute_task()` 构建语句级 boundary override，并补针对 return dict / failure envelope 参数行的回归。
-- 抽出共享 platform leakage payload fixture，统一 `test_version_gate` 与 `test_real_adapter_regression` 的 canonical evidence refs。
-- 先跑 3 个既有失败用例，再跑 `platform_leakage / version_gate / real_adapter_regression` 与 executor/runtime/registry 回归收口。
+- 运行 `pr_scope_guard` 与 `open_pr --dry-run`，确认 implementation PR carrier 干净。
+- 推送当前分支并创建 PR。
+- 提交 reviewer / guardian，若未获 `APPROVE`，优先做同类阻断复盘而不是逐条被动补丁。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -57,18 +56,32 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：清理主干既有回归噪音，恢复 FR-0007 相关 gate 的可信基线。
-- 阻塞：待实现修复并完成回归验证后进入 PR / guardian。
+- 阻塞：待 PR、review、guardian 与 merge gate 收口。
 
 ## 已验证项
 
 - `gh issue create` 已创建 Work Item `#179`
 - `python3 scripts/create_worktree.py --issue 179 --class implementation`
   - 结果：已创建 worktree `/Users/mc/code/worktrees/syvert/issue-179-fr-0007`
+- `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_exception_failure_return_to_shared_error_model tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_keeps_non_envelope_execute_task_statement_in_core_runtime tests.runtime.test_real_adapter_regression.RealAdapterRegressionTests.test_end_to_end_real_adapter_regression_report_feeds_version_gate`
+  - 结果：`Ran 4 tests in 24.822s`，`OK`
+- `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
+  - 结果：`Ran 48 tests in 0.020s`，`OK`
+- `python3 -m unittest -q tests.runtime.test_real_adapter_regression`
+  - 结果：`Ran 20 tests in 0.185s`，`OK`
+- `python3 -m unittest -q tests.runtime.test_version_gate`
+  - 结果：`Ran 99 tests in 30.849s`，`OK`
+- `python3 -m unittest -q tests.runtime.test_platform_leakage`
+  - 结果：`Ran 111 tests in 775.039s`，`OK (skipped=6)`
+- `python3 -m unittest -q tests.runtime.test_platform_leakage tests.runtime.test_version_gate tests.runtime.test_real_adapter_regression`
+  - 结果：`Ran 229 tests in 823.275s`，`OK (skipped=6)`
+- `python3 -m py_compile syvert/platform_leakage.py tests/runtime/test_platform_leakage.py tests/runtime/platform_leakage_fixtures.py tests/runtime/test_real_adapter_regression.py tests/runtime/test_version_gate.py`
+  - 结果：通过
 
 ## 未决风险
 
-- `platform_leakage` 当前按行号归类，若 override 设计不精确，可能影响非 `execute_task()` 语句的既有边界判断。
-- 测试 helper 抽取如果直接复用测试类静态方法，容易引入循环依赖；需要落独立 fixture 模块。
+- `tests.runtime.test_platform_leakage` 全量回归耗时较长；后续 guardian / closeout 需要避免把该慢用例误判为卡死。
+- 当前实现只修复 FR-0007 历史回归噪音，不触碰 formal spec 与 `version_gate` validator；后续若发现新的 evidence drift，应继续向共享 fixture 收敛，而不是放宽 contract。
 
 ## 回滚方式
 
@@ -76,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2c71a6d1be6eb965198cd984f2bcb17439ae6a02`
+- `cb5eaadbeff4cd3efa9a8f235cb72ef6297ddc85`
