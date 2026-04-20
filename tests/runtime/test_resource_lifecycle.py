@@ -1143,6 +1143,41 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
+    def test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot(self) -> None:
+        class InvalidSnapshotStore:
+            def load_snapshot(self):
+                return ResourceLifecycleSnapshot(
+                    schema_version="v0.4.0",
+                    revision=0,
+                    resources=(
+                        ResourceRecord(
+                            resource_id="",
+                            resource_type="account",
+                            status="AVAILABLE",
+                            material={"provider_account_id": "pa-invalid"},
+                        ),
+                    ),
+                    leases=(),
+                )
+
+            def write_snapshot(self, snapshot):
+                raise AssertionError("write_snapshot should not be called")
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-invalid-snapshot",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            InvalidSnapshotStore(),
+            "task-context-013-invalid-snapshot",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
     def test_release_returns_failed_envelope_when_store_lock_raises_oserror(self) -> None:
         self.seed_default_resources()
         bundle = acquire(

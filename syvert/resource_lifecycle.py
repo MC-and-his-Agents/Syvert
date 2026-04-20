@@ -342,7 +342,7 @@ def snapshot_from_dict(payload: Mapping[str, Any]) -> ResourceLifecycleSnapshot:
     if not isinstance(raw_leases, list):
         raise ResourceLifecycleContractError("资源生命周期快照.leases 必须是数组")
     snapshot = ResourceLifecycleSnapshot(
-        schema_version=require_non_empty_string(payload.get("schema_version"), field="snapshot.schema_version"),
+        schema_version=require_contract_non_empty_string(payload.get("schema_version"), field="snapshot.schema_version"),
         revision=require_non_negative_int(payload.get("revision"), field="snapshot.revision"),
         resources=tuple(resource_record_from_dict(item) for item in raw_resources),
         leases=tuple(resource_lease_from_dict(item) for item in raw_leases),
@@ -365,9 +365,9 @@ def resource_record_from_dict(payload: Mapping[str, Any]) -> ResourceRecord:
     if not isinstance(payload, Mapping):
         raise ResourceLifecycleContractError("资源记录必须是对象")
     record = ResourceRecord(
-        resource_id=require_non_empty_string(payload.get("resource_id"), field="resource.resource_id"),
-        resource_type=require_non_empty_string(payload.get("resource_type"), field="resource.resource_type"),
-        status=require_non_empty_string(payload.get("status"), field="resource.status"),
+        resource_id=require_contract_non_empty_string(payload.get("resource_id"), field="resource.resource_id"),
+        resource_type=require_contract_non_empty_string(payload.get("resource_type"), field="resource.resource_type"),
+        status=require_contract_non_empty_string(payload.get("status"), field="resource.status"),
         material=normalize_resource_material(payload.get("material"), field="resource.material"),
     )
     validate_resource_record(record)
@@ -415,21 +415,21 @@ def resource_lease_from_dict(payload: Mapping[str, Any]) -> ResourceLease:
     if not isinstance(raw_resource_ids, list):
         raise ResourceLifecycleContractError("lease.resource_ids 必须是数组")
     lease = ResourceLease(
-        lease_id=require_non_empty_string(payload.get("lease_id"), field="lease.lease_id"),
-        bundle_id=require_non_empty_string(payload.get("bundle_id"), field="lease.bundle_id"),
-        task_id=require_non_empty_string(payload.get("task_id"), field="lease.task_id"),
-        adapter_key=require_non_empty_string(payload.get("adapter_key"), field="lease.adapter_key"),
-        capability=require_non_empty_string(payload.get("capability"), field="lease.capability"),
+        lease_id=require_contract_non_empty_string(payload.get("lease_id"), field="lease.lease_id"),
+        bundle_id=require_contract_non_empty_string(payload.get("bundle_id"), field="lease.bundle_id"),
+        task_id=require_contract_non_empty_string(payload.get("task_id"), field="lease.task_id"),
+        adapter_key=require_contract_non_empty_string(payload.get("adapter_key"), field="lease.adapter_key"),
+        capability=require_contract_non_empty_string(payload.get("capability"), field="lease.capability"),
         resource_ids=tuple(
-            require_non_empty_string(resource_id, field="lease.resource_ids[]") for resource_id in raw_resource_ids
+            require_contract_non_empty_string(resource_id, field="lease.resource_ids[]") for resource_id in raw_resource_ids
         ),
-        acquired_at=require_non_empty_string(payload.get("acquired_at"), field="lease.acquired_at"),
-        released_at=require_optional_non_empty_string(payload.get("released_at"), field="lease.released_at"),
-        target_status_after_release=require_optional_non_empty_string(
+        acquired_at=require_contract_non_empty_string(payload.get("acquired_at"), field="lease.acquired_at"),
+        released_at=require_optional_contract_non_empty_string(payload.get("released_at"), field="lease.released_at"),
+        target_status_after_release=require_optional_contract_non_empty_string(
             payload.get("target_status_after_release"),
             field="lease.target_status_after_release",
         ),
-        release_reason=require_optional_non_empty_string(payload.get("release_reason"), field="lease.release_reason"),
+        release_reason=require_optional_contract_non_empty_string(payload.get("release_reason"), field="lease.release_reason"),
     )
     validate_resource_lease(lease)
     return lease
@@ -515,7 +515,7 @@ def validate_snapshot(snapshot: ResourceLifecycleSnapshot) -> None:
 
 
 def validate_resource_record(record: ResourceRecord) -> None:
-    require_non_empty_string(record.resource_id, field="resource.resource_id")
+    require_contract_non_empty_string(record.resource_id, field="resource.resource_id")
     if record.resource_type not in RESOURCE_TYPES:
         raise ResourceLifecycleContractError("resource.resource_type 不在允许值范围内")
     if record.status not in RESOURCE_STATUSES:
@@ -524,11 +524,11 @@ def validate_resource_record(record: ResourceRecord) -> None:
 
 
 def validate_resource_bundle(bundle: ResourceBundle) -> None:
-    require_non_empty_string(bundle.bundle_id, field="bundle.bundle_id")
-    require_non_empty_string(bundle.lease_id, field="bundle.lease_id")
-    require_non_empty_string(bundle.task_id, field="bundle.task_id")
-    require_non_empty_string(bundle.adapter_key, field="bundle.adapter_key")
-    require_non_empty_string(bundle.capability, field="bundle.capability")
+    require_contract_non_empty_string(bundle.bundle_id, field="bundle.bundle_id")
+    require_contract_non_empty_string(bundle.lease_id, field="bundle.lease_id")
+    require_contract_non_empty_string(bundle.task_id, field="bundle.task_id")
+    require_contract_non_empty_string(bundle.adapter_key, field="bundle.adapter_key")
+    require_contract_non_empty_string(bundle.capability, field="bundle.capability")
     validate_requested_slots(bundle.requested_slots, field="bundle.requested_slots")
     validate_rfc3339_utc(bundle.acquired_at, field="bundle.acquired_at")
 
@@ -547,11 +547,11 @@ def validate_resource_bundle(bundle: ResourceBundle) -> None:
 
 
 def validate_resource_lease(lease: ResourceLease) -> None:
-    require_non_empty_string(lease.lease_id, field="lease.lease_id")
-    require_non_empty_string(lease.bundle_id, field="lease.bundle_id")
-    require_non_empty_string(lease.task_id, field="lease.task_id")
-    require_non_empty_string(lease.adapter_key, field="lease.adapter_key")
-    require_non_empty_string(lease.capability, field="lease.capability")
+    require_contract_non_empty_string(lease.lease_id, field="lease.lease_id")
+    require_contract_non_empty_string(lease.bundle_id, field="lease.bundle_id")
+    require_contract_non_empty_string(lease.task_id, field="lease.task_id")
+    require_contract_non_empty_string(lease.adapter_key, field="lease.adapter_key")
+    require_contract_non_empty_string(lease.capability, field="lease.capability")
     validate_unique_non_empty_strings(lease.resource_ids, field="lease.resource_ids")
     acquired_at = parse_rfc3339_utc_datetime(lease.acquired_at, field="lease.acquired_at")
 
@@ -565,14 +565,14 @@ def validate_resource_lease(lease: ResourceLease) -> None:
         raise ResourceLifecycleContractError("lease.released_at 不得早于 lease.acquired_at")
     if lease.target_status_after_release not in RELEASE_TARGET_STATUSES:
         raise ResourceLifecycleContractError("lease.target_status_after_release 不在允许值范围内")
-    require_non_empty_string(lease.release_reason, field="lease.release_reason")
+    require_contract_non_empty_string(lease.release_reason, field="lease.release_reason")
 
 
 def normalize_acquire_request(request: Any) -> AcquireRequest:
     normalized = AcquireRequest(
-        task_id=require_non_empty_string(extract_string(request, "task_id"), field="acquire.task_id"),
-        adapter_key=require_non_empty_string(extract_string(request, "adapter_key"), field="acquire.adapter_key"),
-        capability=require_non_empty_string(extract_string(request, "capability"), field="acquire.capability"),
+        task_id=require_request_non_empty_string(extract_string(request, "task_id"), field="acquire.task_id"),
+        adapter_key=require_request_non_empty_string(extract_string(request, "adapter_key"), field="acquire.adapter_key"),
+        capability=require_request_non_empty_string(extract_string(request, "capability"), field="acquire.capability"),
         requested_slots=tuple(extract_requested_slots(request)),
     )
     validate_acquire_request(normalized)
@@ -581,31 +581,31 @@ def normalize_acquire_request(request: Any) -> AcquireRequest:
 
 def normalize_release_request(request: Any) -> ReleaseRequest:
     normalized = ReleaseRequest(
-        lease_id=require_non_empty_string(extract_release_string(request, "lease_id"), field="release.lease_id"),
-        task_id=require_non_empty_string(extract_release_string(request, "task_id"), field="release.task_id"),
-        target_status_after_release=require_non_empty_string(
+        lease_id=require_release_non_empty_string(extract_release_string(request, "lease_id"), field="release.lease_id"),
+        task_id=require_release_non_empty_string(extract_release_string(request, "task_id"), field="release.task_id"),
+        target_status_after_release=require_release_non_empty_string(
             extract_release_string(request, "target_status_after_release"),
             field="release.target_status_after_release",
         ),
-        reason=require_non_empty_string(extract_release_string(request, "reason"), field="release.reason"),
+        reason=require_release_non_empty_string(extract_release_string(request, "reason"), field="release.reason"),
     )
     validate_release_request(normalized)
     return normalized
 
 
 def validate_acquire_request(request: AcquireRequest) -> None:
-    require_non_empty_string(request.task_id, field="acquire.task_id")
-    require_non_empty_string(request.adapter_key, field="acquire.adapter_key")
-    require_non_empty_string(request.capability, field="acquire.capability")
+    require_request_non_empty_string(request.task_id, field="acquire.task_id")
+    require_request_non_empty_string(request.adapter_key, field="acquire.adapter_key")
+    require_request_non_empty_string(request.capability, field="acquire.capability")
     validate_requested_slots(request.requested_slots, field="acquire.requested_slots")
 
 
 def validate_release_request(request: ReleaseRequest) -> None:
-    require_non_empty_string(request.lease_id, field="release.lease_id")
-    require_non_empty_string(request.task_id, field="release.task_id")
+    require_release_non_empty_string(request.lease_id, field="release.lease_id")
+    require_release_non_empty_string(request.task_id, field="release.task_id")
     if request.target_status_after_release not in RELEASE_TARGET_STATUSES:
         raise invalid_release_error("release.target_status_after_release 不在允许值范围内")
-    require_non_empty_string(request.reason, field="release.reason")
+    require_release_non_empty_string(request.reason, field="release.reason")
 
 
 def build_resource_bundle(
@@ -866,15 +866,25 @@ def extract_value(request: Any, field: str, *, missing: Any = None) -> Any:
     return getattr(request, field, missing)
 
 
-def require_non_empty_string(value: Any, *, field: str) -> str:
+def require_request_non_empty_string(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value:
-        if field.startswith("release."):
-            raise invalid_release_error(f"{field} 必须为非空字符串")
         raise invalid_request_error(f"{field} 必须为非空字符串")
     return value
 
 
-def require_optional_non_empty_string(value: Any, *, field: str) -> str | None:
+def require_release_non_empty_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise invalid_release_error(f"{field} 必须为非空字符串")
+    return value
+
+
+def require_contract_non_empty_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ResourceLifecycleContractError(f"{field} 必须为非空字符串")
+    return value
+
+
+def require_optional_contract_non_empty_string(value: Any, *, field: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not value:
@@ -899,7 +909,7 @@ def validate_unique_non_empty_strings(values: Sequence[str], *, field: str) -> N
         raise ResourceLifecycleContractError(f"{field} 必须为非空去重数组")
     seen: set[str] = set()
     for value in values:
-        require_non_empty_string(value, field=field)
+        require_contract_non_empty_string(value, field=field)
         if value in seen:
             raise ResourceLifecycleContractError(f"{field} 不允许重复值")
         seen.add(value)

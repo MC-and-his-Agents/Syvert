@@ -54,7 +54,10 @@
 - guardian 第十五轮 review 已把阻断继续收敛到同一类 store-boundary 一致性问题：post-commit 目录同步失败会把已提交 truth 报成失败、invalid UTF-8 / 非 contract store 异常仍可能越过 fail-closed 边界、`seed_resources()` 的 replay 比较尚未完全建立在 canonical material truth 上，以及 active exec-plan 证据时态落后于当前 head。
 - 当前工作树已把本地 store 的提交点收紧为 `os.replace()`：目录 `fsync` 属于 post-commit best-effort，不得再把已提交 truth 翻成外部失败；`load_snapshot()` 现已吸收 invalid UTF-8，`acquire()` / `release()` 会把非 contract store 异常统一收口为 `resource_state_conflict` failed envelope，`seed_resources()` 也改为先 canonicalize `ResourceRecord.material` 再做 replay/no-op/conflict 判定。
 - 当前工作树已新增四条回归，分别锁定 post-commit directory sync failure 仍成功、invalid UTF-8 快照 fail-closed、unexpected store load error fail-closed，以及 JSON-equivalent `material` 在持久化 round-trip 后仍保持 same-value replay/no-op。
-- 当前 checkpoint `80465b3` 已完成本轮 store-boundary / replay canonicalization 语义修复；当前 head 只负责把 active exec-plan 与验证证据同步到该 checkpoint，不再新增运行时代码语义。
+- guardian 第十六轮 review 已把残余阻断继续收敛到 validation boundary：同一组 `require_non_empty_string` helper 同时承担请求校验与内部 snapshot/resource/lease 校验，导致坏快照可能被误报成 `invalid_resource_request`。
+- 当前工作树已拆分 request-side 与 contract-side 的非空字符串校验 helper：调用方请求仍保留 `invalid_resource_request` / `invalid_resource_release`，内部 durable truth / in-memory snapshot 校验统一落回 `ResourceLifecycleContractError`，再由 `acquire()` / `release()` 映射成 `resource_state_conflict`。
+- 当前工作树已新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`，锁定 malformed snapshot object 只能走 runtime-contract 边界，不能再被误报成 caller invalid input。
+- 当前 checkpoint 已推进到最新 validation-boundary 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -83,7 +86,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（51 tests, OK）
+  - 结果：通过（52 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
@@ -179,10 +182,15 @@
     - `load_snapshot()` 现已把 invalid UTF-8 与 JSON/IO 一起收口为 `ResourceLifecyclePersistenceError`
     - `acquire()` / `release()` 新增 store boundary 兜底，非 contract backend 异常统一 fail-closed 为 `resource_state_conflict`
     - `seed_resources()` 改为基于 canonicalized `ResourceRecord.material` 执行 replay/no-op/conflict 判定，避免 JSON-equivalent truth 在 round-trip 后误报覆写
+  - 第十六轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - request-side 与 contract-side 的非空字符串 helper 已拆分，坏快照 / 坏 lease / 坏资源 truth 不再被误报成 `invalid_resource_request` 或 `invalid_resource_release`
+    - 新增 in-memory invalid snapshot 回归，锁定 malformed durable truth 只能映射为 `resource_state_conflict`
   - 本地快回归补充修复（待下一轮 guardian 复核）：
     - `acquire()` 现在仅在 refreshed snapshot 仍保持同一组已选 `resource_id` 时重试 revision mismatch；若 selection 发生漂移，则继续 fail-closed 为 `resource_state_conflict`
     - 新增显式回归，锁定“无关资源写入导致 acquire revision bump，但 same-selection 仍成立时允许 retry 成功”的分支；同时“stale selection 一成一败”回归继续保持通过
     - 新增 `test_acquire_stays_successful_when_post_commit_directory_sync_fails`、`test_acquire_returns_failed_envelope_for_invalid_utf8_snapshot`、`test_acquire_returns_failed_envelope_when_store_load_raises_unexpected_error` 与 `test_seed_resources_replay_is_idempotent_for_json_equivalent_material`
+    - 新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`
 
 ## 未决风险
 
