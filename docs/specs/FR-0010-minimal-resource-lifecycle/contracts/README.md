@@ -43,7 +43,7 @@
   - 约束：
     - 空 durable truth 的 canonical 初始值固定为 `schema_version=v0.4.0`、`revision=0`、`resources=[]`、`leases=[]`
     - `resources[]` / `leases[]` 必须继续满足 `FR-0010` 已冻结的 `ResourceRecord` / `ResourceLease` contract，不得在 store 层降格成第二套影子 schema
-    - snapshot 中的 active / settled lease truth 必须能唯一解释资源当前状态；`IN_USE` 资源不得脱离 active lease 单独存在
+    - snapshot 中的 active lease truth 必须唯一解释所有 `IN_USE` 资源；`AVAILABLE` / `INVALID` 资源允许在无 active lease 的情况下作为 bootstrap 或已释放后的 durable truth 存在
 - durable truth 读取 / 提交语义
   - 读取边界：
     - 若本地 store 尚不存在，读取结果必须回落到空 snapshot，而不是 `null`、`{}` 或其他影子 carrier
