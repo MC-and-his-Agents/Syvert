@@ -63,7 +63,10 @@
 - 提交 guardian 前的主动探查又暴露了一类同源 store-return boundary 风险：`store.load_snapshot()` 返回 mapping snapshot / record / lease 时，hydrate/canonicalize 仍可能在 fail-closed 边界外抛异常；`store.write_snapshot()` 已提交 durable truth 后若回显 malformed snapshot，也会把已提交写入误翻成外部失败。
 - 当前工作树已把 `store -> lifecycle runtime` 适配边界整体收口：`canonical_snapshot()` 现支持从 mapping hydrate `snapshot/resource/lease`，`load_snapshot_from_store()` 会把 load + hydrate + canonicalize 统一包进 fail-closed 边界，`write_snapshot_to_store()` 则把 malformed write echo 视为 post-commit advisory noise，不再把已提交 acquire / release 翻成 failed envelope。
 - 当前工作树已新增四条回归，分别锁定 mapping snapshot hydrate 成功、invalid mapping snapshot fail-closed、malformed write echo 下 acquire 仍成功，以及 malformed write echo 下 release 仍成功。
-- 当前 checkpoint 已推进到最新 store-return boundary 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
+- 最新一轮 guardian 又把阻断收敛到 bootstrap / durable snapshot contract 自身：`seed_resources(records)` 对非序列输入仍会泄漏原始 `TypeError`，`LocalResourceLifecycleStore.write_snapshot()` 对坏快照元素形状仍可能抛出原始异常，active lease durable shape 仍会序列化出带 `null` 的 release 收口字段，且 active exec-plan 的 checkpoint SHA 需要重新指向当前仓库可解析的语义提交。
+- 当前工作树已把这组 contract 边界整体收口：`seedable_resource_records()` 现在显式拒绝非序列输入；`LocalResourceLifecycleStore.write_snapshot()` 先 canonicalize snapshot 并把坏 shape 统一包装成 `ResourceLifecyclePersistenceError`；active lease 序列化改为缺失 `released_at / target_status_after_release / release_reason` 三个字段，反序列化也不再接受 `null` 影子 shape。
+- 当前工作树已新增四条回归，分别锁定 `seed_resources(None)` fail-closed、坏 `resources[]` 元素形状写入 fail-closed、active lease durable snapshot 不落 `null` release 字段，以及带 `null` release 字段的 active lease snapshot 会被 load 侧拒绝。
+- 当前 checkpoint 已推进到最新 bootstrap / durable snapshot contract 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -92,7 +95,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（57 tests, OK）
+  - 结果：通过（61 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
@@ -203,6 +206,7 @@
     - 新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`
     - 新增 `test_acquire_canonicalizes_material_from_in_memory_snapshot`
     - 新增 `test_acquire_hydrates_mapping_snapshot_from_custom_store`、`test_acquire_returns_failed_envelope_for_invalid_mapping_snapshot`、`test_acquire_stays_successful_when_store_write_returns_malformed_snapshot` 与 `test_release_stays_successful_when_store_write_returns_malformed_snapshot`
+    - 新增 `test_seed_resources_rejects_non_sequence_input`、`test_write_snapshot_rejects_invalid_resource_element_shape`、`test_acquire_persists_active_lease_without_null_release_fields` 与 `test_load_snapshot_rejects_active_lease_with_null_release_fields`
 
 ## 未决风险
 
@@ -217,4 +221,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7dd47d4638d3b6315eefae2cd024b312d1cbda98`
+- `3f89ac8b9860b9c5446492fc23469b3cca26be21`
