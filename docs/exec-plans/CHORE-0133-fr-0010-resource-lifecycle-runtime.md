@@ -57,7 +57,10 @@
 - guardian 第十六轮 review 已把残余阻断继续收敛到 validation boundary：同一组 `require_non_empty_string` helper 同时承担请求校验与内部 snapshot/resource/lease 校验，导致坏快照可能被误报成 `invalid_resource_request`。
 - 当前工作树已拆分 request-side 与 contract-side 的非空字符串校验 helper：调用方请求仍保留 `invalid_resource_request` / `invalid_resource_release`，内部 durable truth / in-memory snapshot 校验统一落回 `ResourceLifecycleContractError`，再由 `acquire()` / `release()` 映射成 `resource_state_conflict`。
 - 当前工作树已新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`，锁定 malformed snapshot object 只能走 runtime-contract 边界，不能再被误报成 caller invalid input。
-- 当前 checkpoint `9235e5a` 已完成最新 validation-boundary 修复；当前 head 只负责把 active exec-plan 与验证证据同步到该语义停点，不再新增运行时代码语义。
+- guardian 第十七轮 review 已把残余阻断继续收敛到 shared carrier canonicalization：`ResourceRecord.material` 的 JSON-safe 约束此前只被检查、未在成功 `ResourceBundle` carrier 上真正规范化，导致 custom store / in-memory snapshot 仍可能把 tuple 等非 canonical 值带进成功结果。
+- 当前工作树已把 canonicalization 前移到 `store -> lifecycle runtime` 边界：`load_snapshot_from_store()` / `write_snapshot_to_store()` 会先把 `ResourceLifecycleSnapshot.resources` 规范化为 canonical JSON-safe truth，再进入 `select_available_resources()` / `build_resource_bundle()` / durable write 路径，避免不同 store 实现暴露不同 carrier 形状。
+- 当前工作树已新增 `test_acquire_canonicalizes_material_from_in_memory_snapshot`，锁定非 canonical 但可规范化的 `material` 经 custom store 进入 `acquire()` 后，成功返回必须暴露 canonical JSON-safe 值。
+- 当前 checkpoint 已推进到最新 carrier canonicalization 修复；下一提交只负责把 active exec-plan 与验证证据同步到该最新语义停点，不再新增运行时代码语义。
 - 参考 adapter 仍直接读取本地 session 文件，这属于 `FR-0012` 处理边界，本事项不触碰。
 
 ## 下一步动作
@@ -86,7 +89,7 @@
 - `sed -n '1,260p' docs/specs/FR-0010-minimal-resource-lifecycle/data-model.md`
 - `sed -n '1,220p' docs/specs/FR-0010-minimal-resource-lifecycle/contracts/README.md`
 - `python3 -m unittest -q tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store`
-  - 结果：通过（52 tests, OK）
+  - 结果：通过（53 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_executor tests.runtime.test_runtime tests.runtime.test_registry`
   - 结果：通过（48 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_platform_leakage.PlatformLeakageTests.test_run_check_maps_success_envelope_leak_to_shared_result_contract`
@@ -186,11 +189,16 @@
   - 已修复阻断：
     - request-side 与 contract-side 的非空字符串 helper 已拆分，坏快照 / 坏 lease / 坏资源 truth 不再被误报成 `invalid_resource_request` 或 `invalid_resource_release`
     - 新增 in-memory invalid snapshot 回归，锁定 malformed durable truth 只能映射为 `resource_state_conflict`
+  - 第十七轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `ResourceRecord.material` 的 canonicalization 已前移到 `store -> runtime` 边界，成功 `ResourceBundle` 不再暴露 tuple 等非 JSON-safe carrier 形状
+    - 新增 custom store / in-memory snapshot 回归，锁定 canonicalizable `material` 进入 `acquire()` 后必须返回 canonical JSON-safe truth
   - 本地快回归补充修复（待下一轮 guardian 复核）：
     - `acquire()` 现在仅在 refreshed snapshot 仍保持同一组已选 `resource_id` 时重试 revision mismatch；若 selection 发生漂移，则继续 fail-closed 为 `resource_state_conflict`
     - 新增显式回归，锁定“无关资源写入导致 acquire revision bump，但 same-selection 仍成立时允许 retry 成功”的分支；同时“stale selection 一成一败”回归继续保持通过
     - 新增 `test_acquire_stays_successful_when_post_commit_directory_sync_fails`、`test_acquire_returns_failed_envelope_for_invalid_utf8_snapshot`、`test_acquire_returns_failed_envelope_when_store_load_raises_unexpected_error` 与 `test_seed_resources_replay_is_idempotent_for_json_equivalent_material`
     - 新增 `test_acquire_returns_failed_envelope_for_invalid_in_memory_snapshot`
+    - 新增 `test_acquire_canonicalizes_material_from_in_memory_snapshot`
 
 ## 未决风险
 
@@ -205,4 +213,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9235e5a3de094d7e5ce7e7391c14ea54ee9dff13`
+- `47e58d23845ef8dd8c9b5b95ddb657cf961a9998`
