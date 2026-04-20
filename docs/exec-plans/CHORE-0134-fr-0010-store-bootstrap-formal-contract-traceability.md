@@ -48,7 +48,7 @@
 - 在 `32ffa93` 对应的下一轮 guardian 中，阻断已继续收敛到 bootstrap revision 子契约：formal artifact 仍需明确“只有改变 durable truth 的成功写入才推进 `revision`，same-value replay / no-op 虽然成功但不构成新的 durable write”，否则 `contracts/README.md` 与 `spec.md` / `data-model.md` 仍然不是单一真相。
 - 在 `6e01c33` 对应的下一轮 guardian 中，阻断又继续收敛到 snapshot/lease 关系的一句过强表述：`contracts/README.md` 把“lease 唯一解释资源状态”写成了覆盖全部状态，意外与 `spec.md` / `data-model.md` 中“只有 `IN_USE` 需要 active lease 解释，`AVAILABLE` / `INVALID` 可作为 bootstrap truth 独立存在”的语义冲突。
 - 本事项仍只回写 FR-0010 formal artifact 与 active exec-plan，不改写 runtime / test 语义。
-- 当前 worktree 需要再完成一轮 snapshot/lease 约束收窄，把 `contracts/README.md` 与其余 formal artifact 对齐；完成该轮后，再次同步 active exec-plan checkpoint，即可重新进入 guardian / merge gate。
+- 当前 worktree 已在 `2a0feed` 完成 snapshot/lease 约束收窄；当前提交只负责把 active exec-plan 的 checkpoint 与停点同步到该最新语义提交，随后即可重新进入 guardian / merge gate。
 
 ## 下一步动作
 
@@ -110,4 +110,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9045dd4093ce2331f85b08ba379fce2d41d9bad6`
+- `2a0feed33f10c43c67cc924744dc4fe89802cf88`
