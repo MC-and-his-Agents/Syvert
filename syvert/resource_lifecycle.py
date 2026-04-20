@@ -939,6 +939,23 @@ def normalize_resource_material(value: Any, *, field: str) -> Any:
         raise ResourceLifecycleContractError(str(error)) from error
 
 
+def coerce_resource_record(record: Any, *, field: str) -> ResourceRecord:
+    if isinstance(record, Mapping):
+        return resource_record_from_dict(record)
+    if not isinstance(record, ResourceRecord):
+        raise ResourceLifecycleContractError(f"{field} 必须是 ResourceRecord 或对象")
+    return canonical_resource_record(record)
+
+
+def coerce_resource_lease(lease: Any, *, field: str) -> ResourceLease:
+    if isinstance(lease, Mapping):
+        return resource_lease_from_dict(lease)
+    if not isinstance(lease, ResourceLease):
+        raise ResourceLifecycleContractError(f"{field} 必须是 ResourceLease 或对象")
+    validate_resource_lease(lease)
+    return lease
+
+
 def canonical_resource_record(record: ResourceRecord) -> ResourceRecord:
     normalized = ResourceRecord(
         resource_id=record.resource_id,
@@ -951,11 +968,21 @@ def canonical_resource_record(record: ResourceRecord) -> ResourceRecord:
 
 
 def canonical_snapshot(snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
+    if isinstance(snapshot, Mapping):
+        return snapshot_from_dict(snapshot)
+    if not isinstance(snapshot, ResourceLifecycleSnapshot):
+        raise ResourceLifecycleContractError("资源生命周期快照必须是 ResourceLifecycleSnapshot 或对象")
     normalized = ResourceLifecycleSnapshot(
         schema_version=snapshot.schema_version,
         revision=snapshot.revision,
-        resources=tuple(canonical_resource_record(record) for record in snapshot.resources),
-        leases=snapshot.leases,
+        resources=tuple(
+            coerce_resource_record(record, field=f"snapshot.resources[{index}]")
+            for index, record in enumerate(snapshot.resources)
+        ),
+        leases=tuple(
+            coerce_resource_lease(lease, field=f"snapshot.leases[{index}]")
+            for index, lease in enumerate(snapshot.leases)
+        ),
     )
     validate_snapshot(normalized)
     return normalized
@@ -1003,19 +1030,24 @@ def state_conflict_error(message: str) -> ResourceLifecycleContractError:
 def load_snapshot_from_store(store: ResourceLifecycleStore) -> ResourceLifecycleSnapshot:
     try:
         snapshot = store.load_snapshot()
+        return canonical_snapshot(snapshot)
     except ResourceLifecycleContractError:
         raise
     except Exception as error:
         raise state_conflict_error("资源生命周期 store.load_snapshot 失败") from error
-    return canonical_snapshot(snapshot)
 
 
 def write_snapshot_to_store(store: ResourceLifecycleStore, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:
     snapshot = canonical_snapshot(snapshot)
     try:
         written = store.write_snapshot(snapshot)
+        try:
+            return canonical_snapshot(written)
+        except ResourceLifecycleContractError:
+            # store.write_snapshot() has already reported success; a malformed echo must not
+            # flip a committed lifecycle transition into an external failed envelope.
+            return snapshot
     except ResourceLifecycleContractError:
         raise
     except Exception as error:
         raise state_conflict_error("资源生命周期 store.write_snapshot 失败") from error
-    return canonical_snapshot(written)

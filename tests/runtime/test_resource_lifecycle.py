@@ -1179,6 +1179,42 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
 
+    def test_acquire_hydrates_mapping_snapshot_from_custom_store(self) -> None:
+        class MappingSnapshotStore:
+            def load_snapshot(self):
+                return {
+                    "schema_version": "v0.4.0",
+                    "revision": 0,
+                    "resources": [
+                        {
+                            "resource_id": "account-mapping",
+                            "resource_type": "account",
+                            "status": "AVAILABLE",
+                            "material": {"vals": ("a", "b")},
+                        }
+                    ],
+                    "leases": [],
+                }
+
+            def write_snapshot(self, snapshot):
+                return snapshot
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-mapping-snapshot",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            MappingSnapshotStore(),
+            "task-context-013-mapping-snapshot",
+        )
+
+        self.assertIsInstance(result, ResourceBundle)
+        assert isinstance(result, ResourceBundle)
+        assert result.account is not None
+        self.assertEqual(result.account.material, {"vals": ["a", "b"]})
+
     def test_acquire_canonicalizes_material_from_in_memory_snapshot(self) -> None:
         class TupleMaterialStore:
             def load_snapshot(self):
@@ -1214,6 +1250,132 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         assert isinstance(result, ResourceBundle)
         assert result.account is not None
         self.assertEqual(result.account.material, {"vals": ["a", "b"]})
+
+    def test_acquire_returns_failed_envelope_for_invalid_mapping_snapshot(self) -> None:
+        class InvalidMappingSnapshotStore:
+            def load_snapshot(self):
+                return {
+                    "schema_version": "v0.4.0",
+                    "revision": 0,
+                    "resources": "not-a-list",
+                    "leases": [],
+                }
+
+            def write_snapshot(self, snapshot):
+                raise AssertionError("write_snapshot should not be called")
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-invalid-mapping",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            InvalidMappingSnapshotStore(),
+            "task-context-013-invalid-mapping",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_stays_successful_when_store_write_returns_malformed_snapshot(self) -> None:
+        class MalformedWriteReturnStore:
+            def __init__(self):
+                self.snapshot = ResourceLifecycleSnapshot(
+                    schema_version="v0.4.0",
+                    revision=0,
+                    resources=(
+                        ResourceRecord(
+                            resource_id="account-001",
+                            resource_type="account",
+                            status="AVAILABLE",
+                            material={"provider_account_id": "pa-001"},
+                        ),
+                    ),
+                    leases=(),
+                )
+
+            def load_snapshot(self):
+                return self.snapshot
+
+            def write_snapshot(self, snapshot):
+                self.snapshot = snapshot
+                return {"malformed": True}
+
+        store = MalformedWriteReturnStore()
+        result = acquire(
+            AcquireRequest(
+                task_id="task-013-malformed-write-return",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-013-malformed-write-return",
+        )
+
+        self.assertIsInstance(result, ResourceBundle)
+        assert isinstance(result, ResourceBundle)
+        persisted = store.load_snapshot()
+        self.assertEqual(persisted.revision, 1)
+        self.assertEqual(persisted.resources[0].status, "IN_USE")
+        self.assertEqual(len(persisted.leases), 1)
+
+    def test_release_stays_successful_when_store_write_returns_malformed_snapshot(self) -> None:
+        class MalformedWriteReturnStore:
+            def __init__(self):
+                self.snapshot = ResourceLifecycleSnapshot(
+                    schema_version="v0.4.0",
+                    revision=0,
+                    resources=(
+                        ResourceRecord(
+                            resource_id="account-001",
+                            resource_type="account",
+                            status="AVAILABLE",
+                            material={"provider_account_id": "pa-001"},
+                        ),
+                    ),
+                    leases=(),
+                )
+
+            def load_snapshot(self):
+                return self.snapshot
+
+            def write_snapshot(self, snapshot):
+                self.snapshot = snapshot
+                return {"malformed": True}
+
+        store = MalformedWriteReturnStore()
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-013-release-malformed-write-return",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-013-release-malformed-write-return",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        result = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id=bundle.task_id,
+                target_status_after_release="AVAILABLE",
+                reason="done",
+            ),
+            store,
+            "task-context-013-release-malformed-write-return",
+        )
+
+        self.assertIsInstance(result, ResourceLease)
+        assert isinstance(result, ResourceLease)
+        persisted = store.load_snapshot()
+        self.assertEqual(persisted.revision, 2)
+        self.assertEqual(persisted.resources[0].status, "AVAILABLE")
+        self.assertEqual(persisted.leases[0].released_at, result.released_at)
 
     def test_release_returns_failed_envelope_when_store_lock_raises_oserror(self) -> None:
         self.seed_default_resources()
