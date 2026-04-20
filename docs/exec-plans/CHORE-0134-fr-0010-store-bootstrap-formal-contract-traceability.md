@@ -102,7 +102,7 @@
 
 - 若本事项把 store / bootstrap 语义写成新的 public runtime surface，会反向扩张 `FR-0010` 范围并污染 `FR-0012` 边界。
 - 若 formal artifact 只补字段名而不补 same-value replay / no-op / conflict 与 revision truth，`#176` 仍会在审查中被认定为缺少 canonical contract 依据。
-- 若 active exec-plan 继续滞后于 formal suite 的真实语义 checkpoint，guardian 会重复把同一问题判定为 artifact-chain 不一致；因此本事项必须把“当前停点 / 下一步 / checkpoint head”与当前 HEAD 一并收口，而不是只更新 spec 文档正文。
+- 若 active exec-plan 继续滞后于 formal suite 的真实语义 checkpoint，guardian 会重复把同一问题判定为 artifact-chain 不一致；因此本事项必须持续把“当前停点 / 下一步 / checkpoint head”对齐到最近一次语义 checkpoint，而 live review head 继续交由 PR / guardian state 绑定。
 - 若 bootstrap contract 不明确排除无 active lease 可解释的 `IN_USE` seed 输入，formal suite 会继续允许一个实现上无法合法落盘的影子 snapshot 状态，guardian 也会继续把该缺口视为阻断级 contract 不一致。
 - 若 bootstrap revision 子契约不区分“改变 durable truth 的成功写入”和“成功但 no-op 的 replay”，formal suite 会继续在 `revision + 1` 与 replay/no-op 不增量之间自相矛盾，guardian 也会继续把它判定为阻断级 contract 不一致。
 - 若 snapshot/lease 关系被表述成“全部状态都必须由 lease 唯一解释”，formal suite 会反向否定合法的 `AVAILABLE` / `INVALID` bootstrap truth，并继续与 `spec.md` / `data-model.md` 发生阻断级冲突。
