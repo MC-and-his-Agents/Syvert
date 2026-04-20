@@ -111,7 +111,7 @@
 
 - bootstrap / durable 建档：
   - 当 host-side local store 尚不存在 durable truth 时，canonical 初始值固定为 `ResourceLifecycleSnapshot(schema_version=v0.4.0, revision=0, resources=[], leases=[])`
-  - 任一成功的 `acquire`、`release` 或 `seed_resources(records)` 写入，都必须针对同一份 `ResourceLifecycleSnapshot` 以 all-or-nothing 方式同时提交 `resources[]` 与 `leases[]` 的最终真相；不得留下只更新一半资源状态、只写入 lease、或只推进 `revision` 的半完成快照
+  - 任一改变 durable truth 的成功 `acquire`、`release` 或 `seed_resources(records)` 写入，都必须针对同一份 `ResourceLifecycleSnapshot` 以 all-or-nothing 方式同时提交 `resources[]` 与 `leases[]` 的最终真相；不得留下只更新一半资源状态、只写入 lease、或只推进 `revision` 的半完成快照
   - `seed_resources(records)` 只有在新增此前不存在的资源 truth 时才推进 `revision`；同值 replay / no-op 必须保持 `revision` 不变
   - 任一 snapshot 写入若发现自身 `revision` 不是当前 durable truth 的下一个版本，必须 fail-closed，而不是静默覆写 store 中较新的 truth
 - 创建：

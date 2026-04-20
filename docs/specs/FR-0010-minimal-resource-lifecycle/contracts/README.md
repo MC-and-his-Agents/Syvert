@@ -50,8 +50,8 @@
     - 不可读、损坏、shape 非法或 contract 非法的 snapshot 都必须被视为共享 truth 冲突，而不是被静默忽略或自动修复
   - 提交约束：
     - 只允许提交满足完整 snapshot contract 的 payload
-    - 任一成功的 `acquire`、`release` 或 `seed_resources(records)` 都必须把本次变更后的 `resources[]` 与 `leases[]` 真相作为同一份 snapshot 原子提交；不得留下部分资源状态已更新、lease truth 未更新，或仅推进 `revision` 的半完成结果
-    - `revision` 必须精确等于当前 durable truth 的 `revision + 1`
+    - 任一改变 durable truth 的成功 `acquire`、`release` 或 `seed_resources(records)` 写入，都必须把本次变更后的 `resources[]` 与 `leases[]` 真相作为同一份 snapshot 原子提交；不得留下部分资源状态已更新、lease truth 未更新，或仅推进 `revision` 的半完成结果
+    - 只有上述“改变 durable truth 的成功写入”才允许把 `revision` 推进到当前 durable truth 的 `revision + 1`；same-value replay / no-op 必须返回既有 snapshot truth，且不得推进 `revision`
     - 任一 stale write、乱序 revision 或试图覆写更新 durable truth 的行为，都必须以 `resource_state_conflict` fail-closed
 - `seed_resources(records)` internal bootstrap surface
   - 作用：在 `acquire` 前向 snapshot 注入初始 `ResourceRecord` truth；这是 host-side internal bootstrap 入口，不是 Adapter-facing public runtime surface
@@ -61,7 +61,7 @@
     - 同一输入批次若出现重复 `resource_id`，必须在触达 durable truth 前直接 fail-closed；不得静默去重，也不得把同批重复解释为 replay / conflict
     - 对此前不存在的 `resource_id`，允许把记录并入当前 snapshot
     - 对已存在的 `resource_id`，只有与既有 truth 完全一致时才允许 same-value replay / no-op
-    - same-value replay / no-op 必须保持当前 `revision` 不变
+    - same-value replay / no-op 必须保持当前 `revision` 不变，且不构成新的 durable write
     - 同一 `resource_id` 只要 truth 不一致，就必须返回 `resource_state_conflict`，而不是覆写既有资源 truth
     - disjoint 新增资源必须并入同一份 canonical snapshot，而不是拆成多份并行 truth
     - bootstrap 不得制造无 active lease 可解释的 `IN_USE` 资源，也不得通过影子 lease 或隐式占用关系绕过该约束
