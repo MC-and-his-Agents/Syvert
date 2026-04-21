@@ -20,6 +20,8 @@ from syvert.resource_lifecycle import (
     snapshot_to_dict,
     validate_snapshot,
 )
+from syvert.resource_trace import ResourceTraceEvent
+from syvert.resource_trace_store import LocalResourceTraceStore, merge_resource_trace_events
 
 
 DEFAULT_RESOURCE_LIFECYCLE_STORE_ENV = "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE"
@@ -97,6 +99,51 @@ class LocalResourceLifecycleStore:
             )
             self._write_snapshot_locked(updated_snapshot)
             return updated_snapshot.resources
+
+    def commit_with_trace(
+        self,
+        snapshot: ResourceLifecycleSnapshot,
+        *,
+        trace_store: LocalResourceTraceStore,
+        trace_events: Sequence[ResourceTraceEvent],
+    ) -> ResourceLifecycleSnapshot:
+        try:
+            snapshot = canonical_snapshot(snapshot)
+        except ResourceLifecycleContractError as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
+        except Exception as error:
+            raise ResourceLifecyclePersistenceError(
+                "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
+            ) from error
+
+        with trace_store.exclusive_lock():
+            with self._exclusive_lock():
+                current_snapshot = self.load_snapshot()
+                expected_revision = current_snapshot.revision + 1
+                if snapshot.revision != expected_revision:
+                    raise ResourceLifecyclePersistenceError(
+                        "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
+                    )
+                current_events = trace_store.load_events()
+                merged_events, _ = merge_resource_trace_events(current_events, trace_events)
+                trace_store.write_events(merged_events)
+                try:
+                    self._write_json_atomic(snapshot_to_dict(snapshot))
+                except Exception as error:
+                    try:
+                        trace_store.write_events(current_events)
+                    except Exception as rollback_error:
+                        raise ResourceLifecyclePersistenceError(
+                            "resource_state_conflict: 资源 tracing truth 回滚失败"
+                        ) from rollback_error
+                    if isinstance(error, ResourceLifecyclePersistenceError):
+                        raise
+                    raise ResourceLifecyclePersistenceError(
+                        f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
+                    ) from error
+        return snapshot
 
     def _write_snapshot_locked(self, snapshot: ResourceLifecycleSnapshot) -> None:
         current_snapshot = self.load_snapshot()

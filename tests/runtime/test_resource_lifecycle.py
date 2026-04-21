@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import fcntl
 import json
 import os
@@ -19,8 +20,11 @@ from syvert.resource_lifecycle import (
     ResourceRecord,
     acquire,
     release,
+    write_snapshot_with_tracing,
 )
+from syvert.resource_trace import ResourceTraceEvent
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+from syvert.resource_trace_store import LocalResourceTraceStore, default_resource_trace_store
 
 
 class ResourceStoreEnvMixin:
@@ -28,9 +32,13 @@ class ResourceStoreEnvMixin:
         super().setUp()
         self._resource_store_dir = tempfile.TemporaryDirectory()
         self._resource_store_path = os.path.join(self._resource_store_dir.name, "resource-lifecycle.json")
+        self._resource_trace_store_path = os.path.join(self._resource_store_dir.name, "resource-trace-events.jsonl")
         self._resource_store_patcher = mock.patch.dict(
             os.environ,
-            {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path},
+            {
+                "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path,
+                "SYVERT_RESOURCE_TRACE_STORE_FILE": self._resource_trace_store_path,
+            },
             clear=False,
         )
         self._resource_store_patcher.start()
@@ -42,6 +50,9 @@ class ResourceStoreEnvMixin:
 
     def make_store(self):
         return default_resource_lifecycle_store()
+
+    def make_trace_store(self):
+        return default_resource_trace_store()
 
 
 def managed_account_material(material: dict[str, object], *, adapter_key: str = "xhs") -> dict[str, object]:
@@ -92,6 +103,13 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         assert result.proxy is not None
         self.assertEqual(result.account.status, "IN_USE")
         self.assertEqual(result.proxy.status, "IN_USE")
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(len(trace_events), 2)
+        self.assertEqual({event.event_type for event in trace_events}, {"acquired"})
+        self.assertEqual({event.task_id for event in trace_events}, {"task-001"})
+        self.assertEqual({event.lease_id for event in trace_events}, {result.lease_id})
+        self.assertEqual({event.bundle_id for event in trace_events}, {result.bundle_id})
+        self.assertEqual({event.resource_id for event in trace_events}, {"account-001", "proxy-001"})
 
     def test_concurrent_acquire_fails_closed_after_stale_selection_conflict(self) -> None:
         class ConcurrentAcquireStore:
@@ -109,6 +127,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                 if snapshot.revision == 2:
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 2:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentAcquireStore(self.make_store())
         store.seed_resources(
@@ -189,6 +216,25 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     )
                 return self._inner_store.write_snapshot(snapshot)
 
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 2 and not self._injected:
+                    self._injected = True
+                    self._inner_store.seed_resources(
+                        [
+                            ResourceRecord(
+                                resource_id="proxy-001",
+                                resource_type="proxy",
+                                status="AVAILABLE",
+                                material={"proxy_endpoint": "http://proxy-001"},
+                            )
+                        ]
+                    )
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
         store = ConcurrentAcquireRetryStore(self.make_store())
         store.seed_resources(
             [
@@ -224,6 +270,94 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(statuses["account-001"], "IN_USE")
         self.assertEqual(statuses["proxy-001"], "AVAILABLE")
         self.assertEqual(len(snapshot.leases), 1)
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(len(trace_events), 1)
+        self.assertEqual(trace_events[0].lease_id, result.lease_id)
+
+    def test_acquire_retries_rebuilds_bundle_from_refreshed_truth_when_same_selection_material_changes(self) -> None:
+        class ConcurrentAcquireRetryStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._injected = False
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def _inject_refreshed_snapshot(self):
+                current = self._inner_store.load_snapshot()
+                refreshed_snapshot = ResourceLifecycleSnapshot(
+                    schema_version=current.schema_version,
+                    revision=current.revision + 1,
+                    resources=(
+                        ResourceRecord(
+                            resource_id="account-001",
+                            resource_type="account",
+                            status="AVAILABLE",
+                            material=managed_account_material({"provider_account_id": "pa-001-refreshed"}),
+                        ),
+                    ),
+                    leases=current.leases,
+                )
+                self._inner_store.write_snapshot(refreshed_snapshot)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 2 and not self._injected:
+                    self._injected = True
+                    self._inject_refreshed_snapshot()
+                return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 2 and not self._injected:
+                    self._injected = True
+                    self._inject_refreshed_snapshot()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
+        store = ConcurrentAcquireRetryStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-001c-rebuild",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-001c-rebuild",
+        )
+
+        self.assertIsInstance(result, ResourceBundle)
+        assert isinstance(result, ResourceBundle)
+        assert result.account is not None
+        self.assertEqual(result.account.resource_id, "account-001")
+        self.assertEqual(result.account.material["provider_account_id"], "pa-001-refreshed")
+        self.assertEqual(result.account.status, "IN_USE")
+
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 3)
+        statuses = {record.resource_id: record.status for record in snapshot.resources}
+        self.assertEqual(statuses["account-001"], "IN_USE")
+        self.assertEqual(len(snapshot.leases), 1)
+        self.assertEqual(snapshot.resources[0].material["provider_account_id"], "pa-001-refreshed")
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(len(trace_events), 1)
+        self.assertEqual(trace_events[0].lease_id, result.lease_id)
 
     def test_acquire_fails_closed_when_any_slot_is_missing(self) -> None:
         self.make_store().seed_resources(
@@ -494,6 +628,17 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.target_status_after_release, "AVAILABLE")
         snapshot = self.make_store().load_snapshot()
         self.assertEqual({record.status for record in snapshot.resources}, {"AVAILABLE"})
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(
+            [event.event_type for event in trace_events],
+            ["acquired", "acquired", "released", "released"],
+        )
+        usage_log = self.make_trace_store().task_usage_log("task-006")
+        self.assertEqual(len(usage_log.events), 4)
+        lease_timeline = self.make_trace_store().lease_timeline(bundle.lease_id)
+        self.assertEqual(lease_timeline.bundle_id, bundle.bundle_id)
+        self.assertEqual(len(lease_timeline.resource_timelines), 2)
+        self.assertEqual({timeline.released_at for timeline in lease_timeline.resource_timelines}, {result.released_at})
 
     def test_release_can_invalidate_resources(self) -> None:
         self.seed_default_resources()
@@ -524,6 +669,13 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         snapshot = self.make_store().load_snapshot()
         proxy = next(record for record in snapshot.resources if record.resource_type == "proxy")
         self.assertEqual(proxy.status, "INVALID")
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(
+            [event.event_type for event in trace_events],
+            ["acquired", "invalidated"],
+        )
+        self.assertEqual(trace_events[-1].to_status, "INVALID")
+        self.assertEqual(trace_events[-1].reason, "network-broken")
 
     def test_release_is_idempotent_for_same_semantics(self) -> None:
         self.seed_default_resources()
@@ -791,6 +943,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
 
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
             [
@@ -843,6 +1004,103 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         assert isinstance(first, ResourceLease)
         assert isinstance(second, ResourceLease)
         self.assertEqual(first, second)
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "released"])
+
+    def test_release_retries_rebuilds_settled_lease_from_refreshed_truth_when_same_selection_lease_changes(self) -> None:
+        refreshed_acquired_at = "2026-04-21T13:13:13.000000Z"
+
+        class ConcurrentReleaseStore:
+            def __init__(self, inner_store):
+                self._inner_store = inner_store
+                self._injected = False
+
+            def load_snapshot(self):
+                return self._inner_store.load_snapshot()
+
+            def seed_resources(self, records):
+                return self._inner_store.seed_resources(records)
+
+            def _inject_refreshed_snapshot(self):
+                current = self._inner_store.load_snapshot()
+                active_lease = current.leases[0]
+                refreshed_snapshot = ResourceLifecycleSnapshot(
+                    schema_version=current.schema_version,
+                    revision=current.revision + 1,
+                    resources=current.resources,
+                    leases=(
+                        ResourceLease(
+                            lease_id=active_lease.lease_id,
+                            bundle_id=active_lease.bundle_id,
+                            task_id=active_lease.task_id,
+                            adapter_key=active_lease.adapter_key,
+                            capability=active_lease.capability,
+                            resource_ids=active_lease.resource_ids,
+                            acquired_at=refreshed_acquired_at,
+                        ),
+                    ),
+                )
+                self._inner_store.write_snapshot(refreshed_snapshot)
+
+            def write_snapshot(self, snapshot):
+                if snapshot.revision == 3 and not self._injected:
+                    self._injected = True
+                    self._inject_refreshed_snapshot()
+                return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3 and not self._injected:
+                    self._injected = True
+                    self._inject_refreshed_snapshot()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
+        store = ConcurrentReleaseStore(self.make_store())
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-015-rebuild",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            store,
+            "task-context-015-rebuild",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        result = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-015-rebuild",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            store,
+            "task-context-015-rebuild",
+        )
+
+        self.assertIsInstance(result, ResourceLease)
+        assert isinstance(result, ResourceLease)
+        self.assertEqual(result.acquired_at, refreshed_acquired_at)
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 4)
+        self.assertEqual(snapshot.leases[0].acquired_at, refreshed_acquired_at)
+        self.assertIsNotNone(snapshot.leases[0].released_at)
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "released"])
 
     def test_release_rejects_concurrent_conflicting_semantics(self) -> None:
         class ConcurrentReleaseStore:
@@ -860,6 +1118,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                 if snapshot.revision == 3:
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
@@ -922,6 +1189,8 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIn(lease.release_reason, {"normal", "burned"})
         expected_status = "AVAILABLE" if lease.target_status_after_release == "AVAILABLE" else "INVALID"
         self.assertEqual(snapshot.resources[0].status, expected_status)
+        trace_events = self.make_trace_store().load_events()
+        self.assertEqual(len(trace_events), 2)
 
     def test_release_retries_when_unrelated_write_advances_revision(self) -> None:
         class ConcurrentReleaseStore:
@@ -939,6 +1208,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                 if snapshot.revision == 3:
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
@@ -1215,6 +1493,199 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_acquire_returns_failed_envelope_when_trace_write_fails(self) -> None:
+        self.seed_default_resources()
+
+        with mock.patch("syvert.resource_trace_store.LocalResourceTraceStore.write_events", side_effect=OSError("disk full")):
+            result = acquire(
+                AcquireRequest(
+                    task_id="task-013b-trace",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    requested_slots=("account",),
+                ),
+                self.make_store(),
+                "task-context-013b-trace",
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.leases, ())
+        self.assertEqual(snapshot.resources[0].status, "AVAILABLE")
+        self.assertEqual(self.make_trace_store().load_events(), ())
+
+    def test_release_fails_closed_when_prior_acquire_trace_is_missing(self) -> None:
+        self.seed_default_resources()
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-013c-missing-acquire-trace",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013c-missing-acquire-trace",
+        )
+        assert isinstance(bundle, ResourceBundle)
+
+        trace_store = self.make_trace_store()
+        trace_store.path.unlink()
+
+        result = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-013c-missing-acquire-trace",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-013c-missing-acquire-trace",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.resources[0].status, "IN_USE")
+        self.assertIsNone(snapshot.leases[0].released_at)
+        self.assertEqual(trace_store.load_events(), ())
+
+    def test_release_idempotent_success_fails_closed_when_settled_trace_is_missing(self) -> None:
+        self.seed_default_resources()
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-013c-missing-settled-trace",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+        assert isinstance(bundle, ResourceBundle)
+        first_release = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-013c-missing-settled-trace",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+        self.assertIsInstance(first_release, ResourceLease)
+
+        trace_store = self.make_trace_store()
+        trace_store.path.unlink()
+
+        result = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-013c-missing-settled-trace",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_fallback_write_snapshot_with_tracing_acquires_trace_lock_before_lifecycle_lock(self) -> None:
+        inner_store = self.make_store()
+        trace_store = self.make_trace_store()
+        inner_store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+
+        class WrapperStore:
+            def load_snapshot(self):
+                return inner_store.load_snapshot()
+
+            def write_snapshot(self, snapshot):
+                return inner_store.write_snapshot(snapshot)
+
+        snapshot = ResourceLifecycleSnapshot(
+            schema_version="v0.4.0",
+            revision=2,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="IN_USE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                ),
+            ),
+            leases=(
+                ResourceLease(
+                    lease_id="lease-fallback-order",
+                    bundle_id="bundle-fallback-order",
+                    task_id="task-fallback-order",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    resource_ids=("account-001",),
+                    acquired_at="2026-04-21T15:15:00.000000Z",
+                ),
+            ),
+        )
+        trace_events = (
+            ResourceTraceEvent(
+                event_id="acquired:lease-fallback-order:account-001",
+                task_id="task-fallback-order",
+                lease_id="lease-fallback-order",
+                bundle_id="bundle-fallback-order",
+                resource_id="account-001",
+                resource_type="account",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                event_type="acquired",
+                from_status="AVAILABLE",
+                to_status="IN_USE",
+                occurred_at="2026-04-21T15:15:00.000000Z",
+                reason="acquired_for_task",
+            ),
+        )
+        order: list[str] = []
+
+        @contextmanager
+        def trace_lock(_trace_store):
+            order.append("trace-enter")
+            try:
+                yield
+            finally:
+                order.append("trace-exit")
+
+        @contextmanager
+        def lifecycle_lock(_store):
+            order.append("lifecycle-enter")
+            try:
+                yield
+            finally:
+                order.append("lifecycle-exit")
+
+        with mock.patch.object(LocalResourceTraceStore, "exclusive_lock", autospec=True, side_effect=trace_lock):
+            with mock.patch.object(type(inner_store), "_exclusive_lock", autospec=True, side_effect=lifecycle_lock):
+                written_snapshot = write_snapshot_with_tracing(
+                    WrapperStore(),
+                    snapshot,
+                    resource_trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
+        self.assertEqual(written_snapshot.revision, 2)
+        self.assertLess(order.index("trace-enter"), order.index("lifecycle-enter"))
 
     def test_acquire_stays_successful_when_post_commit_directory_sync_fails(self) -> None:
         self.seed_default_resources()

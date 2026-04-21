@@ -41,6 +41,7 @@ DEFAULT_INVALID_HINT_RELEASE_REASON = "invalid_resource_disposition_hint"
 if TYPE_CHECKING:
     from syvert.resource_lifecycle import ResourceBundle
     from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
+    from syvert.resource_trace_store import LocalResourceTraceStore
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ def execute_task(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
     resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
+    resource_trace_store: "LocalResourceTraceStore | None" = None,
 ) -> dict[str, Any]:
     return execute_task_internal(
         request,
@@ -154,6 +156,7 @@ def execute_task(
         task_id_factory=task_id_factory,
         preserve_envelope_on_record_error=True,
         resource_lifecycle_store=resource_lifecycle_store,
+        resource_trace_store=resource_trace_store,
     ).envelope
 
 
@@ -164,6 +167,7 @@ def execute_task_with_record(
     task_id_factory: Callable[[], str] | None = None,
     task_record_store: TaskRecordStore | None = None,
     resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
+    resource_trace_store: "LocalResourceTraceStore | None" = None,
 ) -> TaskExecutionResult:
     store = task_record_store if task_record_store is not None else default_task_record_store()
     return execute_task_internal(
@@ -173,6 +177,7 @@ def execute_task_with_record(
         preserve_envelope_on_record_error=False,
         task_record_store=store,
         resource_lifecycle_store=resource_lifecycle_store,
+        resource_trace_store=resource_trace_store,
     )
 
 
@@ -184,6 +189,7 @@ def execute_task_internal(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None = None,
     resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
+    resource_trace_store: "LocalResourceTraceStore | None" = None,
 ) -> TaskExecutionResult:
     store = task_record_store
     adapter_key, capability = extract_request_context(request)
@@ -361,15 +367,18 @@ def execute_task_internal(
 
     requested_slots = resolve_requested_resource_slots(normalized_request)
     managed_resource_store = None
+    managed_trace_store = None
     resource_bundle = None
     if requested_slots is not None:
         managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
+        managed_trace_store = resource_trace_store or default_runtime_resource_trace_store(managed_resource_store)
         acquire_result = acquire_runtime_resource_bundle(
             task_id=task_id,
             adapter_key=adapter_key,
             capability=capability,
             requested_slots=requested_slots,
             resource_lifecycle_store=managed_resource_store,
+            resource_trace_store=managed_trace_store,
         )
         if isinstance(acquire_result, Mapping):
             return finalize_task_execution_result(
@@ -393,6 +402,7 @@ def execute_task_internal(
                 lease_id=resource_bundle.lease_id,
                 task_id=task_id,
                 resource_lifecycle_store=managed_resource_store,
+                resource_trace_store=managed_trace_store,
                 default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
                 hint=None,
             )
@@ -421,6 +431,7 @@ def execute_task_internal(
                 lease_id=live_resource_lease.lease_id,
                 task_id=task_id,
                 resource_lifecycle_store=managed_resource_store,
+                resource_trace_store=managed_trace_store,
                 default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
                 hint=None,
             )
@@ -492,6 +503,7 @@ def execute_task_internal(
             lease_id=live_resource_lease.lease_id,
             task_id=task_id,
             resource_lifecycle_store=managed_resource_store,
+            resource_trace_store=managed_trace_store,
             default_reason=default_release_reason,
             hint=disposition_hint,
         )
@@ -797,6 +809,18 @@ def default_runtime_resource_lifecycle_store():
     return default_resource_lifecycle_store()
 
 
+def default_runtime_resource_trace_store(resource_lifecycle_store=None):
+    from pathlib import Path
+
+    from syvert.resource_trace_store import LocalResourceTraceStore, default_resource_trace_store
+
+    store_path = getattr(resource_lifecycle_store, "path", None)
+    if isinstance(store_path, Path):
+        return LocalResourceTraceStore(store_path.with_name("resource-trace-events.jsonl"))
+
+    return default_resource_trace_store()
+
+
 def acquire_runtime_resource_bundle(
     *,
     task_id: str,
@@ -804,6 +828,7 @@ def acquire_runtime_resource_bundle(
     capability: str,
     requested_slots: tuple[str, ...],
     resource_lifecycle_store,
+    resource_trace_store,
 ):
     from syvert.resource_lifecycle import AcquireRequest, acquire
 
@@ -816,6 +841,7 @@ def acquire_runtime_resource_bundle(
         ),
         resource_lifecycle_store,
         task_id,
+        resource_trace_store,
     )
 
 
@@ -1001,6 +1027,7 @@ def settle_managed_resource_bundle(
     lease_id: str,
     task_id: str,
     resource_lifecycle_store,
+    resource_trace_store,
     default_reason: str,
     hint: ResourceDispositionHint | None,
 ) -> dict[str, Any] | None:
@@ -1017,6 +1044,7 @@ def settle_managed_resource_bundle(
         ),
         resource_lifecycle_store,
         task_id,
+        resource_trace_store,
     )
     if isinstance(release_result, Mapping):
         return dict(release_result)

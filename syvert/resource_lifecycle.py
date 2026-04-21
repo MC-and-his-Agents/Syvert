@@ -3,11 +3,18 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol, Union
+from typing import TYPE_CHECKING, Any, Protocol, Union
 from uuid import uuid4
 
+from syvert.resource_trace import (
+    ResourceTraceEvent,
+    build_resource_trace_event_id,
+)
 from syvert.runtime import failure_envelope, invalid_input_error, is_valid_rfc3339_utc, runtime_contract_error
 from syvert.task_record import TaskRecordContractError, normalize_json_value
+
+if TYPE_CHECKING:
+    from syvert.resource_trace_store import LocalResourceTraceStore
 
 
 RESOURCE_LIFECYCLE_VERSION = "v0.4.0"
@@ -116,6 +123,7 @@ def acquire(
     request: Any,
     store: ResourceLifecycleStore,
     task_context_task_id: str,
+    resource_trace_store: "LocalResourceTraceStore | None" = None,
 ) -> ResourceAcquireResult:
     task_context_task_id = require_task_context_task_id(task_context_task_id)
     envelope_task_id = recover_acquire_failure_task_id(request, task_context_task_id)
@@ -144,7 +152,10 @@ def acquire(
                 normalized_request.requested_slots,
                 adapter_key=normalized_request.adapter_key,
             )
-            selected_resource_ids = {slot: record.resource_id for slot, record in selected.items()}
+            selected_signature = selected_resources_signature(
+                requested_slots=normalized_request.requested_slots,
+                selected_resources=selected,
+            )
             acquired_at = now_rfc3339_utc()
             bundle = build_resource_bundle(
                 task_id=normalized_request.task_id,
@@ -155,6 +166,7 @@ def acquire(
                 acquired_at=acquired_at,
             )
             lease = build_resource_lease(bundle)
+            trace_events = build_acquired_resource_trace_events(bundle)
             updated_resources = apply_acquire_transition(current_snapshot.resources, selected)
             updated_snapshot = ResourceLifecycleSnapshot(
                 schema_version=current_snapshot.schema_version,
@@ -164,7 +176,12 @@ def acquire(
             )
             validate_snapshot(updated_snapshot)
             try:
-                write_snapshot_to_store(store, updated_snapshot)
+                write_snapshot_with_tracing(
+                    store,
+                    updated_snapshot,
+                    resource_trace_store=resource_trace_store,
+                    trace_events=trace_events,
+                )
                 return bundle
             except ResourceLifecycleContractError as error:
                 if not is_retryable_revision_conflict(error):
@@ -179,10 +196,11 @@ def acquire(
                     )
                 except ResourceLifecycleContractError as refreshed_error:
                     raise state_conflict_error("revision 冲突后资源选择已过期") from refreshed_error
-                refreshed_resource_ids = {
-                    slot: record.resource_id for slot, record in refreshed_selected.items()
-                }
-                if refreshed_resource_ids != selected_resource_ids:
+                refreshed_signature = selected_resources_signature(
+                    requested_slots=normalized_request.requested_slots,
+                    selected_resources=refreshed_selected,
+                )
+                if refreshed_signature != selected_signature:
                     raise state_conflict_error("revision 冲突后资源选择已过期")
                 current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
@@ -198,6 +216,7 @@ def release(
     request: Any,
     store: ResourceLifecycleStore,
     task_context_task_id: str,
+    resource_trace_store: "LocalResourceTraceStore | None" = None,
 ) -> ResourceReleaseResult:
     task_context_task_id = require_task_context_task_id(task_context_task_id)
     snapshot: ResourceLifecycleSnapshot | None = None
@@ -245,6 +264,12 @@ def release(
                     current_lease.target_status_after_release == normalized_request.target_status_after_release
                     and current_lease.release_reason == normalized_request.reason
                 ):
+                    ensure_settled_release_trace_truth(
+                        store=store,
+                        snapshot=current_snapshot,
+                        settled_lease=current_lease,
+                        resource_trace_store=resource_trace_store,
+                    )
                     return current_lease
                 raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
 
@@ -255,6 +280,10 @@ def release(
                     raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 不存在")
                 if record.status != "IN_USE":
                     raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 未处于 IN_USE")
+            active_release_signature = releasable_lease_signature(
+                lease=current_lease,
+                resources_by_id=resources_by_id,
+            )
 
             released_at = now_rfc3339_utc()
             settled_lease = ResourceLease(
@@ -268,6 +297,11 @@ def release(
                 released_at=released_at,
                 target_status_after_release=normalized_request.target_status_after_release,
                 release_reason=normalized_request.reason,
+            )
+            trace_events = build_release_resource_trace_events(
+                current_lease=current_lease,
+                settled_lease=settled_lease,
+                resources_by_id=resources_by_id,
             )
             validate_resource_lease(settled_lease)
             updated_resources = apply_release_transition(
@@ -287,7 +321,12 @@ def release(
             )
             validate_snapshot(updated_snapshot)
             try:
-                write_snapshot_to_store(store, updated_snapshot)
+                write_snapshot_with_tracing(
+                    store,
+                    updated_snapshot,
+                    resource_trace_store=resource_trace_store,
+                    trace_events=trace_events,
+                )
                 return settled_lease
             except ResourceLifecycleContractError as error:
                 refreshed_snapshot = load_snapshot_from_store(store)
@@ -298,10 +337,23 @@ def release(
                         refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
                         and refreshed_lease.release_reason == normalized_request.reason
                     ):
+                        ensure_settled_release_trace_truth(
+                            store=store,
+                            snapshot=refreshed_snapshot,
+                            settled_lease=refreshed_lease,
+                            resource_trace_store=resource_trace_store,
+                        )
                         return refreshed_lease
                     raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
                 if not is_retryable_revision_conflict(error):
                     raise
+                refreshed_resources_by_id = {record.resource_id: record for record in refreshed_snapshot.resources}
+                refreshed_release_signature = releasable_lease_signature(
+                    lease=refreshed_lease,
+                    resources_by_id=refreshed_resources_by_id,
+                )
+                if refreshed_release_signature != active_release_signature:
+                    raise state_conflict_error("revision 冲突后 lease truth 已过期")
                 current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
         return failure_envelope(
@@ -667,6 +719,85 @@ def build_resource_lease(bundle: ResourceBundle) -> ResourceLease:
     )
     validate_resource_lease(lease)
     return lease
+
+
+def build_acquired_resource_trace_events(bundle: ResourceBundle) -> tuple[ResourceTraceEvent, ...]:
+    events: list[ResourceTraceEvent] = []
+    for slot in bundle.requested_slots:
+        resource = getattr(bundle, slot)
+        if resource is None:
+            raise ResourceLifecycleContractError("requested slot 在 bundle 中不得缺失")
+        events.append(
+            ResourceTraceEvent(
+                event_id=build_resource_trace_event_id("acquired", bundle.lease_id, resource.resource_id),
+                task_id=bundle.task_id,
+                lease_id=bundle.lease_id,
+                bundle_id=bundle.bundle_id,
+                resource_id=resource.resource_id,
+                resource_type=resource.resource_type,
+                adapter_key=bundle.adapter_key,
+                capability=bundle.capability,
+                event_type="acquired",
+                from_status="AVAILABLE",
+                to_status="IN_USE",
+                occurred_at=bundle.acquired_at,
+                reason="acquired_for_task",
+            )
+        )
+    return tuple(events)
+
+
+def build_release_resource_trace_events(
+    *,
+    current_lease: ResourceLease,
+    settled_lease: ResourceLease,
+    resources_by_id: Mapping[str, ResourceRecord],
+) -> tuple[ResourceTraceEvent, ...]:
+    if settled_lease.released_at is None or settled_lease.target_status_after_release is None or settled_lease.release_reason is None:
+        raise ResourceLifecycleContractError("settled lease 缺少 release 收口字段")
+    event_type = "released" if settled_lease.target_status_after_release == "AVAILABLE" else "invalidated"
+    events: list[ResourceTraceEvent] = []
+    for resource_id in current_lease.resource_ids:
+        resource = resources_by_id.get(resource_id)
+        if resource is None:
+            raise ResourceLifecycleContractError(f"lease 绑定的资源 `{resource_id}` 不存在")
+        events.append(
+            ResourceTraceEvent(
+                event_id=build_resource_trace_event_id(event_type, current_lease.lease_id, resource_id),
+                task_id=current_lease.task_id,
+                lease_id=current_lease.lease_id,
+                bundle_id=current_lease.bundle_id,
+                resource_id=resource_id,
+                resource_type=resource.resource_type,
+                adapter_key=current_lease.adapter_key,
+                capability=current_lease.capability,
+                event_type=event_type,
+                from_status="IN_USE",
+                to_status=settled_lease.target_status_after_release,
+                occurred_at=settled_lease.released_at,
+                reason=settled_lease.release_reason,
+            )
+        )
+    return tuple(events)
+
+
+def selected_resources_signature(
+    *,
+    requested_slots: tuple[str, ...],
+    selected_resources: Mapping[str, ResourceRecord],
+) -> tuple[tuple[str, str], ...]:
+    return tuple((slot, selected_resources[slot].resource_id) for slot in requested_slots)
+
+
+def releasable_lease_signature(
+    *,
+    lease: ResourceLease,
+    resources_by_id: Mapping[str, ResourceRecord],
+) -> tuple[str, tuple[str, ...]]:
+    return (
+        lease.bundle_id,
+        tuple(resources_by_id[resource_id].resource_id for resource_id in lease.resource_ids),
+    )
 
 
 def select_available_resources(
@@ -1076,6 +1207,86 @@ def load_snapshot_from_store(store: ResourceLifecycleStore) -> ResourceLifecycle
         raise
     except Exception as error:
         raise state_conflict_error("资源生命周期 store.load_snapshot 失败") from error
+
+
+def default_resource_trace_store():
+    from syvert.resource_trace_store import default_resource_trace_store as build_default_resource_trace_store
+
+    return build_default_resource_trace_store()
+
+
+def derived_resource_trace_store(resource_lifecycle_store: Any):
+    from pathlib import Path
+
+    from syvert.resource_trace_store import LocalResourceTraceStore
+
+    store_path = getattr(resource_lifecycle_store, "path", None)
+    if isinstance(store_path, Path):
+        return LocalResourceTraceStore(store_path.with_name("resource-trace-events.jsonl"))
+    return default_resource_trace_store()
+
+
+def ensure_settled_release_trace_truth(
+    *,
+    store: ResourceLifecycleStore,
+    snapshot: ResourceLifecycleSnapshot,
+    settled_lease: ResourceLease,
+    resource_trace_store: "LocalResourceTraceStore | None",
+) -> None:
+    trace_store = resource_trace_store or derived_resource_trace_store(store)
+    resources_by_id = {record.resource_id: record for record in snapshot.resources}
+    expected_events = build_release_resource_trace_events(
+        current_lease=settled_lease,
+        settled_lease=settled_lease,
+        resources_by_id=resources_by_id,
+    )
+    persisted_events = {event.event_id: event for event in trace_store.load_events()}
+    for expected_event in expected_events:
+        if persisted_events.get(expected_event.event_id) != expected_event:
+            raise state_conflict_error(f"settled lease `{settled_lease.lease_id}` tracing truth 缺失或不一致")
+
+
+def write_snapshot_with_tracing(
+    store: ResourceLifecycleStore,
+    snapshot: ResourceLifecycleSnapshot,
+    *,
+    resource_trace_store: "LocalResourceTraceStore | None",
+    trace_events: Sequence[ResourceTraceEvent],
+) -> ResourceLifecycleSnapshot:
+    from syvert.resource_trace_store import merge_resource_trace_events
+
+    trace_store = resource_trace_store or derived_resource_trace_store(store)
+    commit_with_trace = getattr(store, "commit_with_trace", None)
+    if callable(commit_with_trace):
+        try:
+            written_snapshot = commit_with_trace(
+                snapshot,
+                trace_store=trace_store,
+                trace_events=trace_events,
+            )
+        except ResourceLifecycleContractError:
+            raise
+        except Exception as error:
+            raise state_conflict_error(f"资源 tracing truth 写入失败: {error}") from error
+        return written_snapshot
+
+    try:
+        with trace_store.exclusive_lock():
+            current_events = trace_store.load_events()
+            merged_events, _ = merge_resource_trace_events(current_events, trace_events)
+            trace_store.write_events(merged_events)
+            try:
+                return write_snapshot_to_store(store, snapshot)
+            except Exception as error:
+                try:
+                    trace_store.write_events(current_events)
+                except Exception as rollback_error:
+                    raise state_conflict_error(f"资源 tracing truth 回滚失败: {rollback_error}") from rollback_error
+                raise error
+    except ResourceLifecycleContractError:
+        raise
+    except Exception as error:
+        raise state_conflict_error(f"资源 tracing truth 写入失败: {error}") from error
 
 
 def write_snapshot_to_store(store: ResourceLifecycleStore, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:

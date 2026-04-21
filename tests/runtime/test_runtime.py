@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import os
+from pathlib import Path
 import tempfile
 from dataclasses import dataclass, replace
 from typing import Iterator, Tuple
@@ -11,7 +12,10 @@ from unittest import mock
 import syvert.runtime as runtime_module
 from syvert.adapters.douyin import DouyinAdapter
 from syvert.adapters.xhs import XhsAdapter
+from syvert.resource_lifecycle import ResourceRecord
+from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+from syvert.resource_trace_store import LocalResourceTraceStore
 from syvert.runtime import (
     AdapterExecutionContext,
     AdapterTaskRequest,
@@ -23,7 +27,13 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
 )
-from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, seed_default_runtime_resources
+from tests.runtime.resource_fixtures import (
+    ResourceStoreEnvMixin,
+    generic_account_material,
+    managed_account_material,
+    proxy_material,
+    seed_default_runtime_resources,
+)
 
 
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
@@ -940,6 +950,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
         self.assertIsNotNone(lease.released_at)
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-host-validation").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
 
     def test_execute_task_rejects_bundle_with_mismatched_lease_id_before_adapter_and_settles_real_lease(self) -> None:
         request = TaskRequest(
@@ -1009,6 +1021,62 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
 
+    def test_execute_task_derives_trace_store_as_lifecycle_sibling_when_only_lifecycle_store_is_injected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lifecycle_path = Path(temp_dir) / "custom-resource-lifecycle.json"
+            derived_trace_path = lifecycle_path.with_name("resource-trace-events.jsonl")
+            fallback_home = Path(temp_dir) / "isolated-home"
+            fallback_trace_path = fallback_home / ".syvert" / "resource-trace-events.jsonl"
+            lifecycle_store = LocalResourceLifecycleStore(lifecycle_path)
+            lifecycle_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-derived-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key="stub"),
+                    ),
+                    ResourceRecord(
+                        resource_id="proxy-derived-001",
+                        resource_type="proxy",
+                        status="AVAILABLE",
+                        material=proxy_material(),
+                    ),
+                )
+            )
+
+            original_trace_store_env = os.environ.pop("SYVERT_RESOURCE_TRACE_STORE_FILE", None)
+            try:
+                with mock.patch.dict(os.environ, {"HOME": str(fallback_home)}, clear=False):
+                    with mock.patch(
+                        "syvert.resource_trace_store.default_resource_trace_store",
+                        side_effect=AssertionError("runtime should derive trace store from injected lifecycle store"),
+                    ):
+                        envelope = execute_task(
+                            TaskRequest(
+                                adapter_key="stub",
+                                capability="content_detail_by_url",
+                                input=TaskInput(url="https://example.com/posts/derived-trace-store"),
+                            ),
+                            adapters={"stub": SuccessfulAdapter()},
+                            task_id_factory=lambda: "task-derived-trace-store",
+                            resource_lifecycle_store=lifecycle_store,
+                        )
+                self.assertEqual(envelope["status"], "success")
+                self.assertTrue(derived_trace_path.exists())
+                self.assertEqual(derived_trace_path.parent, lifecycle_path.parent)
+                self.assertFalse(fallback_trace_path.exists())
+                trace_events = LocalResourceTraceStore(derived_trace_path).task_usage_log(
+                    "task-derived-trace-store"
+                ).events
+                self.assertEqual(
+                    [event.event_type for event in trace_events],
+                    ["acquired", "acquired", "released", "released"],
+                )
+            finally:
+                if original_trace_store_env is not None:
+                    os.environ["SYVERT_RESOURCE_TRACE_STORE_FILE"] = original_trace_store_env
+
     def test_execute_task_settles_success_without_hint_as_available(self) -> None:
         envelope = execute_task(
             TaskRequest(
@@ -1026,6 +1094,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")
         self.assertEqual(lease.release_reason, "adapter_completed_without_disposition_hint")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-no-hint-success").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
+        self.assertEqual({event.bundle_id for event in trace_events}, {lease.bundle_id})
 
     def test_execute_task_settles_failure_without_hint_as_available(self) -> None:
         envelope = execute_task(
@@ -1044,6 +1115,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")
         self.assertEqual(lease.release_reason, "adapter_failed_without_disposition_hint")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-no-hint-failure").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
 
     def test_execute_task_applies_invalidating_hint_without_leaking_internal_field(self) -> None:
         envelope = execute_task(
@@ -1062,6 +1135,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "INVALID")
         self.assertEqual(lease.release_reason, "account_invalidated_by_adapter")
         self.assertEqual(set(self.resource_statuses().values()), {"INVALID"})
+        trace_events = self.make_trace_store().task_usage_log("task-invalidating-hint").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "invalidated", "invalidated"])
 
     def test_execute_task_rejects_mismatched_hint_lease_id_and_still_settles_bundle(self) -> None:
         envelope = execute_task(

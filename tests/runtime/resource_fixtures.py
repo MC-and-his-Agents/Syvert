@@ -7,6 +7,7 @@ from unittest import mock
 
 from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceBundle, ResourceRecord
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+from syvert.resource_trace_store import default_resource_trace_store
 
 
 def generic_account_material() -> dict[str, Any]:
@@ -128,9 +129,13 @@ class ResourceStoreEnvMixin:
         super().setUp()
         self._resource_store_dir = tempfile.TemporaryDirectory()
         self._resource_store_path = os.path.join(self._resource_store_dir.name, "resource-lifecycle.json")
+        self._resource_trace_store_path = os.path.join(self._resource_store_dir.name, "resource-trace-events.jsonl")
         self._resource_store_patcher = mock.patch.dict(
             os.environ,
-            {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path},
+            {
+                "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path,
+                "SYVERT_RESOURCE_TRACE_STORE_FILE": self._resource_trace_store_path,
+            },
             clear=False,
         )
         self._resource_store_patcher.start()
@@ -140,3 +145,6 @@ class ResourceStoreEnvMixin:
         self._resource_store_patcher.stop()
         self._resource_store_dir.cleanup()
         super().tearDown()
+
+    def make_trace_store(self):
+        return default_resource_trace_store()
