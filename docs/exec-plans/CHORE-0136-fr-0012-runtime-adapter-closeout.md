@@ -53,7 +53,7 @@
     - host-side bundle 校验现在会同时绑定 `acquired_at` 与 slot `ResourceRecord` 全量 truth，拒绝被篡改的执行材料进入 adapter
     - `run_real_adapter_regression()` 与 `run_contract_harness_automation()` 已改为在 clean environment 下显式创建临时 lifecycle store 并 seed 必需资源，不再依赖环境里的隐式 host truth
   - guardian 第三轮 review 指出的阻断已收口：
-    - 新增 `syvert/resource_bootstrap.py` 与 `scripts/bootstrap_resource_lifecycle_store.py`，为真实 host-side 执行面提供受支持的 managed resource bootstrap / migration 路径
+    - 新增 `syvert/resource_bootstrap.py` 与 `syvert/resource_bootstrap_cli.py`，为真实 host-side 执行面提供受支持的 managed resource bootstrap / migration 路径
     - bootstrap 入口允许两种 account 来源：直接提供 canonical account material JSON，或读取 legacy `xhs` / `douyin` session 文件并迁移为 canonical account.material；两种路径都会在写入 store 前按 adapter runtime contract 做 host-side 校验
     - bootstrap 入口只在 host-side 解析默认 lifecycle store；adapter 层仍只消费 Core 注入的 `resource_bundle`，不重新打开 session-file 执行来源面
 - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 Work Item 上下文、checkpoint、review 与 merge gate，不要求其静态 SHA 穷尽到后续纯元数据提交。
@@ -89,7 +89,7 @@
   - 结果：`Ran 5 tests in 0.318s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 311 tests in 40.169s`，`OK`
-- `python3 -m py_compile syvert/resource_bootstrap.py scripts/bootstrap_resource_lifecycle_store.py tests/runtime/test_resource_bootstrap.py`
+- `python3 -m py_compile syvert/resource_bootstrap.py syvert/resource_bootstrap_cli.py tests/runtime/test_resource_bootstrap.py`
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_platform_leakage`
   - 结果：`Ran 111 tests in 990.270s`，`OK (skipped=6)`
@@ -110,7 +110,7 @@
     - public harness / regression host 已显式 provision 临时 resource lifecycle store，并新增 clean-environment automation / regression 回归
   - 结果：第三轮 `REQUEST_CHANGES`
   - 已修复阻断：
-    - 增加受支持的非测试 bootstrap / migration 路径：`scripts/bootstrap_resource_lifecycle_store.py` 可把 canonical account material JSON 或 legacy session 文件迁移为 host-side managed `account` 资源，并与 `proxy` 资源一起 seed 到默认 lifecycle store
+    - 增加受支持的非测试 bootstrap / migration 路径：`python3 -m syvert.resource_bootstrap_cli` 可把 canonical account material JSON 或 legacy session 文件迁移为 host-side managed `account` 资源，并与 `proxy` 资源一起 seed 到默认 lifecycle store
     - 新增 `tests.runtime.test_resource_bootstrap`，覆盖 canonical material 校验、legacy session migration、store seed 与脚本级 bootstrap 回归
 
 ## 支持的 rollout / bootstrap 流程
@@ -119,8 +119,8 @@
   - canonical account material JSON：直接传 `--account-material-file`
   - legacy session 文件迁移：传 `--account-session-file`，脚本会按当前 adapter runtime contract 归一化为 canonical `account.material`
 - bootstrap 命令固定通过 host-side 入口执行，例如：
-  - `python3 scripts/bootstrap_resource_lifecycle_store.py --adapter xhs --account-resource-id xhs-account-main --account-session-file ~/.config/syvert/xhs.session.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
-  - `python3 scripts/bootstrap_resource_lifecycle_store.py --adapter douyin --account-resource-id douyin-account-main --account-material-file ./ops/douyin-account.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
+  - `python3 -m syvert.resource_bootstrap_cli --adapter xhs --account-resource-id xhs-account-main --account-session-file ~/.config/syvert/xhs.session.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
+  - `python3 -m syvert.resource_bootstrap_cli --adapter douyin --account-resource-id douyin-account-main --account-material-file ./ops/douyin-account.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
 - store 位置默认继续遵循 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` / `~/.syvert/resource-lifecycle.json`；若需要显式切换文件，可追加 `--store-file <path>`。
 
 ## 未决风险

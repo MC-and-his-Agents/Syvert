@@ -127,7 +127,8 @@ class ResourceBootstrapTests(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    "scripts/bootstrap_resource_lifecycle_store.py",
+                    "-m",
+                    "syvert.resource_bootstrap_cli",
                     "--adapter",
                     "xhs",
                     "--account-resource-id",
