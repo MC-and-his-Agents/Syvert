@@ -141,12 +141,30 @@ def canonical_resource_trace_event(event: ResourceTraceEvent | Mapping[str, Any]
     return event
 
 
+def canonicalize_resource_trace_events(events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
+    seen_by_id: dict[str, ResourceTraceEvent] = {}
+    canonical_events: list[ResourceTraceEvent] = []
+    for event in sort_resource_trace_events(events):
+        existing = seen_by_id.get(event.event_id)
+        if existing is not None:
+            if existing != event:
+                raise ResourceTraceContractError(
+                    f"resource trace stream 非法: event_id `{event.event_id}` payload 冲突"
+                )
+            continue
+        seen_by_id[event.event_id] = event
+        canonical_events.append(event)
+    return tuple(canonical_events)
+
+
 def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
-    canonical_events = tuple(sort_resource_trace_events(events))
+    canonical_events = canonicalize_resource_trace_events(events)
     lease_task_ids: dict[str, str] = {}
     bundle_task_ids: dict[str, str] = {}
     lease_bundle_ids: dict[str, str] = {}
     bundle_lease_ids: dict[str, str] = {}
+    resource_timeline_closeouts: dict[tuple[str, str], str | None] = {}
+    resource_timeline_has_acquired: dict[tuple[str, str], bool] = {}
     for event in canonical_events:
         existing_lease_task_id = lease_task_ids.get(event.lease_id)
         if existing_lease_task_id is not None and existing_lease_task_id != event.task_id:
@@ -172,7 +190,26 @@ def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tupl
                 f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能复用多个 lease_id"
             )
         bundle_lease_ids[event.bundle_id] = event.lease_id
-    return canonical_events
+        timeline_key = (event.lease_id, event.resource_id)
+        if event.event_type == "acquired":
+            if resource_timeline_has_acquired.get(timeline_key):
+                raise ResourceTraceContractError(
+                    f"resource trace stream 非法: lease_id `{event.lease_id}` / resource_id `{event.resource_id}` 只能有一条 acquired"
+                )
+            resource_timeline_has_acquired[timeline_key] = True
+            resource_timeline_closeouts.setdefault(timeline_key, None)
+            continue
+        if not resource_timeline_has_acquired.get(timeline_key):
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` / resource_id `{event.resource_id}` 缺少 acquired"
+            )
+        existing_closeout = resource_timeline_closeouts.get(timeline_key)
+        if existing_closeout is not None:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` / resource_id `{event.resource_id}` 不能重复收口"
+            )
+        resource_timeline_closeouts[timeline_key] = event.event_type
+    return tuple(canonical_events)
 
 
 def build_task_resource_usage_log(events: Sequence[ResourceTraceEvent], *, task_id: str) -> TaskResourceUsageLog:

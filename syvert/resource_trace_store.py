@@ -16,6 +16,7 @@ from syvert.resource_trace import (
     TaskResourceUsageLog,
     build_resource_lease_timeline,
     build_task_resource_usage_log,
+    canonicalize_resource_trace_events,
     canonical_resource_trace_event,
     resource_trace_event_from_dict,
     resource_trace_event_to_dict,
@@ -184,7 +185,7 @@ def merge_resource_trace_events(
     new_events: Sequence[ResourceTraceEvent],
 ) -> tuple[tuple[ResourceTraceEvent, ...], tuple[ResourceTraceEvent, ...]]:
     canonical_existing = validate_resource_trace_stream(existing_events)
-    canonical_new = validate_resource_trace_stream(new_events)
+    canonical_new = canonicalize_resource_trace_events(new_events)
     existing_by_id = {event.event_id: event for event in canonical_existing}
     events_to_append: list[ResourceTraceEvent] = []
     for event in canonical_new:

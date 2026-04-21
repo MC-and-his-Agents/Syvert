@@ -109,6 +109,17 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
             reason="adapter_completed_without_disposition_hint",
         )
 
+    def invalidated_event(self) -> ResourceTraceEvent:
+        return ResourceTraceEvent(
+            **{
+                **self.released_event().__dict__,
+                "event_id": "invalidated:lease-001:account-001",
+                "event_type": "invalidated",
+                "to_status": "INVALID",
+                "reason": "account_invalidated_by_adapter",
+            }
+        )
+
     def cross_task_proxy_acquired_event(self) -> ResourceTraceEvent:
         return ResourceTraceEvent(
             **{**self.proxy_acquired_event().__dict__, "task_id": "task-002"}
@@ -174,6 +185,19 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
 
         with self.assertRaises(ResourceTracePersistenceError):
             store.append_events((self.alternate_lease_proxy_acquired_event(),))
+
+    def test_append_events_rejects_released_without_matching_acquired(self) -> None:
+        store = self.make_store()
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.append_events((self.released_event(),))
+
+    def test_append_events_rejects_multiple_closeouts_for_same_resource_timeline(self) -> None:
+        store = self.make_store()
+        store.append_events((self.acquired_event(), self.released_event()))
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.append_events((self.invalidated_event(),))
 
     def test_store_builds_task_usage_log_and_lease_timeline(self) -> None:
         store = self.make_store()
@@ -279,6 +303,20 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
             build_task_resource_usage_log(events, task_id="task-001")
         with self.assertRaises(ResourceTraceContractError):
             build_resource_lease_timeline(events, bundle_id="bundle-001")
+
+    def test_projection_builders_reject_released_without_matching_acquired(self) -> None:
+        with self.assertRaises(ResourceTraceContractError):
+            build_task_resource_usage_log((self.released_event(),), task_id="task-001")
+        with self.assertRaises(ResourceTraceContractError):
+            build_resource_lease_timeline((self.released_event(),), lease_id="lease-001")
+
+    def test_projection_builders_reject_multiple_closeouts_for_same_resource_timeline(self) -> None:
+        events = (self.acquired_event(), self.released_event(), self.invalidated_event())
+
+        with self.assertRaises(ResourceTraceContractError):
+            build_task_resource_usage_log(events, task_id="task-001")
+        with self.assertRaises(ResourceTraceContractError):
+            build_resource_lease_timeline(events, lease_id="lease-001")
 
     def test_resolve_trace_store_path_prefers_env_then_default(self) -> None:
         self.assertEqual(resolve_resource_trace_store_path(), Path(self._trace_store_path))
