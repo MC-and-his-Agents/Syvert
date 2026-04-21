@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import re
 from typing import Any
 
 
@@ -322,6 +323,8 @@ def require_non_empty_string(value: Any, *, field: str) -> str:
 
 def parse_rfc3339_utc_datetime(value: str, *, field: str) -> datetime:
     if not isinstance(value, str) or not value:
+        raise ResourceTraceContractError(f"{field} 必须为 RFC3339 UTC 时间")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)", value):
         raise ResourceTraceContractError(f"{field} 必须为 RFC3339 UTC 时间")
     normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
     try:

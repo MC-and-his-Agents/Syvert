@@ -180,6 +180,15 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(ResourceTracePersistenceError):
             store.append_events((conflicting,))
 
+    def test_append_events_rejects_non_rfc3339_timestamp_shape(self) -> None:
+        store = self.make_store()
+        invalid = ResourceTraceEvent(
+            **{**self.acquired_event().__dict__, "occurred_at": "2026-04-21 12:00:00+00:00"}
+        )
+
+        with self.assertRaises(ResourceTraceContractError):
+            store.append_events((invalid,))
+
     def test_append_events_rejects_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
         store = self.make_store()
         store.append_events((self.acquired_event(),))
@@ -273,6 +282,16 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
                     "",
                 )
             ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.load_events()
+
+    def test_load_events_rejects_non_rfc3339_timestamp_shape(self) -> None:
+        store = self.make_store()
+        store.path.write_text(
+            '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:account-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21 12:00:00+00:00","reason":"acquired_for_task","resource_id":"account-001","resource_type":"account","task_id":"task-001","to_status":"IN_USE"}\n',
             encoding="utf-8",
         )
 
