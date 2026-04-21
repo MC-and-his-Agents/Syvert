@@ -39,7 +39,7 @@
 - 当前执行分支：`issue-181-fr-0012-core-reference-adapter`
 - 当前 Work Item：`#181`
 - 当前受审 PR：`#182`
-- 当前实现 checkpoint：`ddd4cda26f6889b0c0fd332496fe449d1cac1fc3`
+- 当前实现 checkpoint：`59cfd2f8ef2017e8ac507f01aefe8fd2a5a60ca7`
 - 当前代码已完成以下收口：
   - `execute_task_internal()` 现在由 Core 持有 hybrid 资源策略、`acquire()`、host-side bundle 校验、adapter-facing capability projection、`resource_disposition_hint` 消费与统一 `release()` 收口。
   - lifecycle truth 的 `capability` 固定保持 `content_detail_by_url`；adapter-facing request 仅在进入 adapter 前投影为 `content_detail`。
@@ -60,13 +60,16 @@
   - guardian 第四轮 review 指出的阻断已收口：
     - shared lifecycle store 中的 `account` 资源现在带 `managed_adapter_key` 受管标签，`acquire()` 只会选择与当前 `adapter_key` 兼容的账号，不再把 xhs / douyin 账号混成同一个无差别池
     - 新增 shared-store 双适配器 bootstrap 回归与 mismatch fail-closed 回归，验证同一份 store 中同时存在 xhs / douyin 账号时不会串号
+  - guardian 第五轮 review 指出的阻断已收口：
+    - 对 reference adapter 的 host-side `account` 选择而言，未带合法 `managed_adapter_key` 的账号 truth 现在也会被视为不兼容；若 store 中不存在与当前 `adapter_key` 兼容的账号，会在进入 adapter 前按 `resource_unavailable` fail-closed
+    - runtime / CLI / contract harness / real adapter regression 的 seed helpers 已统一改为写入 canonical managed account truth，不再用未打标签的 legacy account material 绕过隔离语义
 - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 Work Item 上下文、checkpoint、review 与 merge gate，不要求其静态 SHA 穷尽到后续纯元数据提交。
 
 ## 下一步动作
 
 - 推送包含 bootstrap / migration 入口的新 head，并同步 PR 描述中的 rollout truth。
-- 推送包含 adapter-aware account 选择修复的新 head，并同步 PR 描述中的 shared-store 隔离真相。
-- 基于 `ddd4cda26f6889b0c0fd332496fe449d1cac1fc3` 重新提交 guardian。
+- 推送包含 untagged account fail-closed 与 canonical managed fixtures 修复的新 head，并同步 PR 描述中的 shared-store 隔离真相。
+- 基于 `59cfd2f8ef2017e8ac507f01aefe8fd2a5a60ca7` 重新提交 guardian。
 - 若 guardian 转为 `APPROVE`，直接进入受控 `merge_pr`。
 - 若仍有阻断，继续优先检查 host-side rollout / lifecycle truth 是否存在新的 contract 漂移。
 
@@ -94,8 +97,12 @@
   - 结果：`Ran 5 tests in 0.318s`，`OK`
 - `python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 49 tests in 0.409s`，`OK`
+- `python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_bootstrap tests.runtime.test_contract_harness_automation tests.runtime.test_real_adapter_regression tests.runtime.test_cli`
+  - 结果：`Ran 132 tests in 2.873s`，`OK`
 - `python3 -m unittest tests.runtime.test_resource_lifecycle_store tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 332 tests in 41.452s`，`OK`
+- `python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
+  - 结果：`Ran 375 tests in 40.497s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 311 tests in 40.169s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
@@ -108,6 +115,8 @@
   - 结果：通过（最新 head 已不再触碰 `scripts/` governance 路径）
 - `python3 -m unittest tests.runtime.test_platform_leakage`
   - 结果：`Ran 111 tests in 990.270s`，`OK (skipped=6)`
+- `python3 -m unittest tests.runtime.test_platform_leakage`
+  - 结果：`Ran 111 tests in 978.157s`，`OK (skipped=6)`
 - `python3 -m unittest tests.runtime.test_runtime`
   - 结果：`Ran 46 tests in 0.123s`，`OK`
 - `python3 -m py_compile syvert/runtime.py syvert/adapters/xhs.py syvert/adapters/douyin.py tests/runtime/test_runtime.py tests/runtime/test_xhs_adapter.py tests/runtime/test_douyin_adapter.py tests/runtime/test_cli.py tests/runtime/test_real_adapter_regression.py tests/runtime/test_version_gate.py tests/runtime/resource_fixtures.py`
@@ -131,6 +140,10 @@
   - 已修复阻断：
     - shared lifecycle store 中的 `account` 资源现在带 `managed_adapter_key` 受管标签，`acquire()` 只会选择与当前 `adapter_key` 兼容的账号，不再把 xhs / douyin 账号混成同一个无差别池
     - 新增 shared-store 双适配器 bootstrap 回归与 mismatch fail-closed 回归，验证同一份 store 中同时存在 xhs / douyin 账号时不会串号
+  - 结果：第五轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - 对 reference adapter 的 host-side `account` 选择而言，未带合法 `managed_adapter_key` 的账号 truth 现在也会被视为不兼容；若 store 中不存在与当前 `adapter_key` 兼容的账号，会在进入 adapter 前按 `resource_unavailable` fail-closed
+    - runtime / CLI / contract harness / real adapter regression 的 seed helpers 已统一改为写入 canonical managed account truth，并新增验证 legacy untagged account fail-closed 的回归
 
 ## 支持的 rollout / bootstrap 流程
 
@@ -141,6 +154,7 @@
   - `python3 -m syvert.resource_bootstrap_cli --adapter xhs --account-resource-id xhs-account-main --account-session-file ~/.config/syvert/xhs.session.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
   - `python3 -m syvert.resource_bootstrap_cli --adapter douyin --account-resource-id douyin-account-main --account-material-file ./ops/douyin-account.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
 - 同一份 lifecycle store 若同时装入多套 reference adapter 账号，host-side `acquire()` 会只选择 `managed_adapter_key` 与当前 `adapter_key` 一致的 `account` 资源；若只有不兼容账号，则在进入 adapter 前按 `resource_unavailable` fail-closed。
+- 未带合法 `managed_adapter_key` 的 legacy account truth 不再被视为兼容 fallback；reference adapter 需要的执行资源必须通过 canonical managed truth 进入 store。
 - store 位置默认继续遵循 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` / `~/.syvert/resource-lifecycle.json`；若需要显式切换文件，可追加 `--store-file <path>`。
 
 ## 未决风险
@@ -155,5 +169,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ddd4cda26f6889b0c0fd332496fe449d1cac1fc3`
+- `59cfd2f8ef2017e8ac507f01aefe8fd2a5a60ca7`
 - 当前回合已进入 `metadata-only closeout follow-up`；后续 PR / review / merge gate 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
