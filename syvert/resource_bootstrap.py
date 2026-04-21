@@ -16,7 +16,12 @@ from syvert.adapters.xhs import (
     build_session_config_from_context as build_xhs_session_config_from_context,
     load_session_config as load_xhs_session_config,
 )
-from syvert.resource_lifecycle import ResourceLifecycleContractError, ResourceBundle, ResourceRecord
+from syvert.resource_lifecycle import (
+    MANAGED_ACCOUNT_ADAPTER_KEY_FIELD,
+    ResourceLifecycleContractError,
+    ResourceBundle,
+    ResourceRecord,
+)
 from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.runtime import AdapterExecutionContext, AdapterTaskRequest, PlatformAdapterError
 
@@ -69,10 +74,14 @@ def load_account_material_from_session_file(
     try:
         if adapter_key == "xhs":
             session = load_xhs_session_config(session_file)
-            return _serialize_xhs_session(session)
+            material = _serialize_xhs_session(session)
+            material[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
+            return material
         if adapter_key == "douyin":
             session = load_douyin_session_config(session_file)
-            return _serialize_douyin_session(session)
+            material = _serialize_douyin_session(session)
+            material[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
+            return material
     except PlatformAdapterError as exc:
         raise ValueError(exc.message) from exc
     raise ValueError(f"unsupported bootstrap adapter_key: {adapter_key}")
@@ -80,9 +89,13 @@ def load_account_material_from_session_file(
 
 def canonicalize_account_material(*, adapter_key: str, material: Mapping[str, Any]) -> dict[str, Any]:
     if adapter_key == "xhs":
-        return _serialize_xhs_session(_canonicalize_xhs_material(material))
+        normalized = _serialize_xhs_session(_canonicalize_xhs_material(material))
+        normalized[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
+        return normalized
     if adapter_key == "douyin":
-        return _serialize_douyin_session(_canonicalize_douyin_material(material))
+        normalized = _serialize_douyin_session(_canonicalize_douyin_material(material))
+        normalized[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
+        return normalized
     raise ValueError(f"unsupported bootstrap adapter_key: {adapter_key}")
 
 
