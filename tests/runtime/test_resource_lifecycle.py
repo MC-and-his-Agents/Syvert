@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import fcntl
 import json
 import os
@@ -19,9 +20,11 @@ from syvert.resource_lifecycle import (
     ResourceRecord,
     acquire,
     release,
+    write_snapshot_with_tracing,
 )
+from syvert.resource_trace import ResourceTraceEvent
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
-from syvert.resource_trace_store import default_resource_trace_store
+from syvert.resource_trace_store import LocalResourceTraceStore, default_resource_trace_store
 
 
 class ResourceStoreEnvMixin:
@@ -1333,6 +1336,97 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(snapshot.leases, ())
         self.assertEqual(snapshot.resources[0].status, "AVAILABLE")
         self.assertEqual(self.make_trace_store().load_events(), ())
+
+    def test_fallback_write_snapshot_with_tracing_acquires_trace_lock_before_lifecycle_lock(self) -> None:
+        inner_store = self.make_store()
+        trace_store = self.make_trace_store()
+        inner_store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+
+        class WrapperStore:
+            def load_snapshot(self):
+                return inner_store.load_snapshot()
+
+            def write_snapshot(self, snapshot):
+                return inner_store.write_snapshot(snapshot)
+
+        snapshot = ResourceLifecycleSnapshot(
+            schema_version="v0.4.0",
+            revision=2,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="IN_USE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                ),
+            ),
+            leases=(
+                ResourceLease(
+                    lease_id="lease-fallback-order",
+                    bundle_id="bundle-fallback-order",
+                    task_id="task-fallback-order",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    resource_ids=("account-001",),
+                    acquired_at="2026-04-21T15:15:00.000000Z",
+                ),
+            ),
+        )
+        trace_events = (
+            ResourceTraceEvent(
+                event_id="acquired:lease-fallback-order:account-001",
+                task_id="task-fallback-order",
+                lease_id="lease-fallback-order",
+                bundle_id="bundle-fallback-order",
+                resource_id="account-001",
+                resource_type="account",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                event_type="acquired",
+                from_status="AVAILABLE",
+                to_status="IN_USE",
+                occurred_at="2026-04-21T15:15:00.000000Z",
+                reason="acquired_for_task",
+            ),
+        )
+        order: list[str] = []
+
+        @contextmanager
+        def trace_lock(_trace_store):
+            order.append("trace-enter")
+            try:
+                yield
+            finally:
+                order.append("trace-exit")
+
+        @contextmanager
+        def lifecycle_lock(_store):
+            order.append("lifecycle-enter")
+            try:
+                yield
+            finally:
+                order.append("lifecycle-exit")
+
+        with mock.patch.object(LocalResourceTraceStore, "exclusive_lock", autospec=True, side_effect=trace_lock):
+            with mock.patch.object(type(inner_store), "_exclusive_lock", autospec=True, side_effect=lifecycle_lock):
+                written_snapshot = write_snapshot_with_tracing(
+                    WrapperStore(),
+                    snapshot,
+                    resource_trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
+        self.assertEqual(written_snapshot.revision, 2)
+        self.assertLess(order.index("trace-enter"), order.index("lifecycle-enter"))
 
     def test_acquire_stays_successful_when_post_commit_directory_sync_fails(self) -> None:
         self.seed_default_resources()

@@ -20,6 +20,7 @@ from syvert.resource_trace import (
     resource_trace_event_from_dict,
     resource_trace_event_to_dict,
     resource_trace_events_for_resource,
+    validate_resource_trace_stream,
 )
 
 
@@ -51,6 +52,10 @@ class LocalResourceTraceStore:
             raise ResourceTracePersistenceError(
                 f"resource_state_conflict: 无法读取资源 tracing 事件流 `{self.path}`"
             ) from error
+        except ResourceTraceContractError as error:
+            raise ResourceTracePersistenceError(
+                f"resource_state_conflict: 非法资源 tracing 事件流 `{self.path}`"
+            ) from error
 
     def append_events(self, events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
         normalized_events = tuple(canonical_resource_trace_event(event) for event in events)
@@ -58,7 +63,12 @@ class LocalResourceTraceStore:
             return ()
         with self.exclusive_lock():
             current_events = self.load_events()
-            merged_events, events_to_append = merge_resource_trace_events(current_events, normalized_events)
+            try:
+                merged_events, events_to_append = merge_resource_trace_events(current_events, normalized_events)
+            except ResourceTraceContractError as error:
+                raise ResourceTracePersistenceError(
+                    f"resource_state_conflict: 非法资源 tracing 事件流 `{self.path}`"
+                ) from error
             if not events_to_append:
                 return normalized_events
             self.write_events(merged_events)
@@ -92,10 +102,10 @@ class LocalResourceTraceStore:
                 )
             seen_by_id[event.event_id] = event
             events.append(event)
-        return events
+        return list(validate_resource_trace_stream(events))
 
     def write_events(self, events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
-        canonical_events = tuple(canonical_resource_trace_event(event) for event in events)
+        canonical_events = validate_resource_trace_stream(events)
         self._write_events_atomic(canonical_events)
         return canonical_events
 
@@ -171,8 +181,8 @@ def merge_resource_trace_events(
     existing_events: Sequence[ResourceTraceEvent],
     new_events: Sequence[ResourceTraceEvent],
 ) -> tuple[tuple[ResourceTraceEvent, ...], tuple[ResourceTraceEvent, ...]]:
-    canonical_existing = tuple(canonical_resource_trace_event(event) for event in existing_events)
-    canonical_new = tuple(canonical_resource_trace_event(event) for event in new_events)
+    canonical_existing = validate_resource_trace_stream(existing_events)
+    canonical_new = validate_resource_trace_stream(new_events)
     existing_by_id = {event.event_id: event for event in canonical_existing}
     events_to_append: list[ResourceTraceEvent] = []
     for event in canonical_new:
@@ -185,4 +195,5 @@ def merge_resource_trace_events(
             continue
         existing_by_id[event.event_id] = event
         events_to_append.append(event)
-    return tuple([*canonical_existing, *events_to_append]), tuple(events_to_append)
+    merged_events = validate_resource_trace_stream([*canonical_existing, *events_to_append])
+    return merged_events, tuple(events_to_append)

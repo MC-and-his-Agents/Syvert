@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import os
 import tempfile
@@ -219,6 +220,84 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(store.load_snapshot().revision, 1)
         self.assertEqual(trace_store.load_events(), (unrelated_event,))
+
+    def test_commit_with_trace_acquires_trace_lock_before_lifecycle_lock(self) -> None:
+        store = self.make_store()
+        trace_store = self.make_trace_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+        snapshot = ResourceLifecycleSnapshot(
+            schema_version="v0.4.0",
+            revision=2,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="IN_USE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                ),
+            ),
+            leases=(
+                ResourceLease(
+                    lease_id="lease-order",
+                    bundle_id="bundle-order",
+                    task_id="task-order",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    resource_ids=("account-001",),
+                    acquired_at="2026-04-21T14:45:00.000000Z",
+                ),
+            ),
+        )
+        trace_events = (
+            ResourceTraceEvent(
+                event_id="acquired:lease-order:account-001",
+                task_id="task-order",
+                lease_id="lease-order",
+                bundle_id="bundle-order",
+                resource_id="account-001",
+                resource_type="account",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                event_type="acquired",
+                from_status="AVAILABLE",
+                to_status="IN_USE",
+                occurred_at="2026-04-21T14:45:00.000000Z",
+                reason="acquired_for_task",
+            ),
+        )
+        order: list[str] = []
+
+        @contextmanager
+        def trace_lock(_trace_store):
+            order.append("trace-enter")
+            try:
+                yield
+            finally:
+                order.append("trace-exit")
+
+        @contextmanager
+        def lifecycle_lock(_store):
+            order.append("lifecycle-enter")
+            try:
+                yield
+            finally:
+                order.append("lifecycle-exit")
+
+        with mock.patch.object(type(trace_store), "exclusive_lock", autospec=True, side_effect=trace_lock):
+            with mock.patch.object(type(store), "_exclusive_lock", autospec=True, side_effect=lifecycle_lock):
+                written_snapshot = store.commit_with_trace(snapshot, trace_store=trace_store, trace_events=trace_events)
+
+        self.assertEqual(written_snapshot.revision, 2)
+        self.assertLess(order.index("trace-enter"), order.index("lifecycle-enter"))
 
     def test_acquire_persists_active_lease_without_null_release_fields(self) -> None:
         store = self.make_store()

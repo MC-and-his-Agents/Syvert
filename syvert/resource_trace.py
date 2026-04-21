@@ -141,9 +141,29 @@ def canonical_resource_trace_event(event: ResourceTraceEvent | Mapping[str, Any]
     return event
 
 
+def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
+    canonical_events = tuple(sort_resource_trace_events(events))
+    lease_task_ids: dict[str, str] = {}
+    bundle_task_ids: dict[str, str] = {}
+    for event in canonical_events:
+        existing_lease_task_id = lease_task_ids.get(event.lease_id)
+        if existing_lease_task_id is not None and existing_lease_task_id != event.task_id:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` 不能跨多个 task_id"
+            )
+        lease_task_ids[event.lease_id] = event.task_id
+        existing_bundle_task_id = bundle_task_ids.get(event.bundle_id)
+        if existing_bundle_task_id is not None and existing_bundle_task_id != event.task_id:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能跨多个 task_id"
+            )
+        bundle_task_ids[event.bundle_id] = event.task_id
+    return canonical_events
+
+
 def build_task_resource_usage_log(events: Sequence[ResourceTraceEvent], *, task_id: str) -> TaskResourceUsageLog:
     require_non_empty_string(task_id, field="task_id")
-    filtered = tuple(event for event in sort_resource_trace_events(events) if event.task_id == task_id)
+    filtered = tuple(event for event in validate_resource_trace_stream(events) if event.task_id == task_id)
     return TaskResourceUsageLog(task_id=task_id, events=filtered)
 
 
@@ -155,9 +175,10 @@ def build_resource_lease_timeline(
 ) -> ResourceLeaseTimeline:
     if not lease_id and not bundle_id:
         raise ResourceTraceContractError("lease_id 或 bundle_id 必须至少提供一个")
+    canonical_events = validate_resource_trace_stream(events)
     filtered = tuple(
         event
-        for event in sort_resource_trace_events(events)
+        for event in canonical_events
         if (lease_id is None or event.lease_id == lease_id) and (bundle_id is None or event.bundle_id == bundle_id)
     )
     if not filtered:
@@ -199,7 +220,7 @@ def build_resource_lease_timeline(
 
 def resource_trace_events_for_resource(events: Sequence[ResourceTraceEvent], *, resource_id: str) -> tuple[ResourceTraceEvent, ...]:
     require_non_empty_string(resource_id, field="resource_id")
-    return tuple(event for event in sort_resource_trace_events(events) if event.resource_id == resource_id)
+    return tuple(event for event in validate_resource_trace_stream(events) if event.resource_id == resource_id)
 
 
 def sort_resource_trace_events(events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:

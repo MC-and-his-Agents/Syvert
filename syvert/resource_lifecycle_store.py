@@ -118,14 +118,14 @@ class LocalResourceLifecycleStore:
                 "resource_state_conflict: 资源生命周期快照写入请求不满足共享 contract"
             ) from error
 
-        with self._exclusive_lock():
-            current_snapshot = self.load_snapshot()
-            expected_revision = current_snapshot.revision + 1
-            if snapshot.revision != expected_revision:
-                raise ResourceLifecyclePersistenceError(
-                    "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
-                )
-            with trace_store.exclusive_lock():
+        with trace_store.exclusive_lock():
+            with self._exclusive_lock():
+                current_snapshot = self.load_snapshot()
+                expected_revision = current_snapshot.revision + 1
+                if snapshot.revision != expected_revision:
+                    raise ResourceLifecyclePersistenceError(
+                        "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
+                    )
                 current_events = trace_store.load_events()
                 merged_events, _ = merge_resource_trace_events(current_events, trace_events)
                 trace_store.write_events(merged_events)

@@ -6,7 +6,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from syvert.resource_trace import ResourceTraceEvent
+from syvert.resource_trace import (
+    ResourceTraceContractError,
+    ResourceTraceEvent,
+    build_resource_lease_timeline,
+    build_task_resource_usage_log,
+)
 from syvert.resource_trace_store import (
     ResourceTracePersistenceError,
     default_resource_trace_store,
@@ -104,6 +109,11 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
             reason="adapter_completed_without_disposition_hint",
         )
 
+    def cross_task_proxy_acquired_event(self) -> ResourceTraceEvent:
+        return ResourceTraceEvent(
+            **{**self.proxy_acquired_event().__dict__, "task_id": "task-002"}
+        )
+
     def test_append_events_round_trips_jsonl_store(self) -> None:
         store = self.make_store()
         appended = store.append_events((self.acquired_event(), self.proxy_acquired_event()))
@@ -130,6 +140,13 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(ResourceTracePersistenceError):
             store.append_events((conflicting,))
 
+    def test_append_events_rejects_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
+        store = self.make_store()
+        store.append_events((self.acquired_event(),))
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.append_events((self.cross_task_proxy_acquired_event(),))
+
     def test_store_builds_task_usage_log_and_lease_timeline(self) -> None:
         store = self.make_store()
         store.append_events(
@@ -152,6 +169,30 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(resource_events), 2)
         self.assertEqual(resource_events[0].event_type, "acquired")
         self.assertEqual(resource_events[1].event_type, "released")
+
+    def test_load_events_rejects_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
+        store = self.make_store()
+        store.path.write_text(
+            "\n".join(
+                (
+                    '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:account-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"account-001","resource_type":"account","task_id":"task-001","to_status":"IN_USE"}',
+                    '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:proxy-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"proxy-001","resource_type":"proxy","task_id":"task-002","to_status":"IN_USE"}',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.load_events()
+
+    def test_projection_builders_reject_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
+        events = (self.acquired_event(), self.cross_task_proxy_acquired_event())
+
+        with self.assertRaises(ResourceTraceContractError):
+            build_task_resource_usage_log(events, task_id="task-001")
+        with self.assertRaises(ResourceTraceContractError):
+            build_resource_lease_timeline(events, lease_id="lease-001")
 
     def test_resolve_trace_store_path_prefers_env_then_default(self) -> None:
         self.assertEqual(resolve_resource_trace_store_path(), Path(self._trace_store_path))
