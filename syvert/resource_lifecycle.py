@@ -264,6 +264,12 @@ def release(
                     current_lease.target_status_after_release == normalized_request.target_status_after_release
                     and current_lease.release_reason == normalized_request.reason
                 ):
+                    ensure_settled_release_trace_truth(
+                        store=store,
+                        snapshot=current_snapshot,
+                        settled_lease=current_lease,
+                        resource_trace_store=resource_trace_store,
+                    )
                     return current_lease
                 raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
 
@@ -331,6 +337,12 @@ def release(
                         refreshed_lease.target_status_after_release == normalized_request.target_status_after_release
                         and refreshed_lease.release_reason == normalized_request.reason
                     ):
+                        ensure_settled_release_trace_truth(
+                            store=store,
+                            snapshot=refreshed_snapshot,
+                            settled_lease=refreshed_lease,
+                            resource_trace_store=resource_trace_store,
+                        )
                         return refreshed_lease
                     raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
                 if not is_retryable_revision_conflict(error):
@@ -1212,6 +1224,26 @@ def derived_resource_trace_store(resource_lifecycle_store: Any):
     if isinstance(store_path, Path):
         return LocalResourceTraceStore(store_path.with_name("resource-trace-events.jsonl"))
     return default_resource_trace_store()
+
+
+def ensure_settled_release_trace_truth(
+    *,
+    store: ResourceLifecycleStore,
+    snapshot: ResourceLifecycleSnapshot,
+    settled_lease: ResourceLease,
+    resource_trace_store: "LocalResourceTraceStore | None",
+) -> None:
+    trace_store = resource_trace_store or derived_resource_trace_store(store)
+    resources_by_id = {record.resource_id: record for record in snapshot.resources}
+    expected_events = build_release_resource_trace_events(
+        current_lease=settled_lease,
+        settled_lease=settled_lease,
+        resources_by_id=resources_by_id,
+    )
+    persisted_events = {event.event_id: event for event in trace_store.load_events()}
+    for expected_event in expected_events:
+        if persisted_events.get(expected_event.event_id) != expected_event:
+            raise state_conflict_error(f"settled lease `{settled_lease.lease_id}` tracing truth 缺失或不一致")
 
 
 def write_snapshot_with_tracing(

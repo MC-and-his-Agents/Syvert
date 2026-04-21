@@ -1553,6 +1553,49 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIsNone(snapshot.leases[0].released_at)
         self.assertEqual(trace_store.load_events(), ())
 
+    def test_release_idempotent_success_fails_closed_when_settled_trace_is_missing(self) -> None:
+        self.seed_default_resources()
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-013c-missing-settled-trace",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account",),
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+        assert isinstance(bundle, ResourceBundle)
+        first_release = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-013c-missing-settled-trace",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+        self.assertIsInstance(first_release, ResourceLease)
+
+        trace_store = self.make_trace_store()
+        trace_store.path.unlink()
+
+        result = release(
+            ReleaseRequest(
+                lease_id=bundle.lease_id,
+                task_id="task-013c-missing-settled-trace",
+                target_status_after_release="AVAILABLE",
+                reason="normal",
+            ),
+            self.make_store(),
+            "task-context-013c-missing-settled-trace",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
     def test_fallback_write_snapshot_with_tracing_acquires_trace_lock_before_lifecycle_lock(self) -> None:
         inner_store = self.make_store()
         trace_store = self.make_trace_store()
