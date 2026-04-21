@@ -15,7 +15,7 @@ from tests.runtime.contract_harness.validation_tool import (
     HarnessExecutionResult,
     validate_contract_samples,
 )
-from tests.runtime.resource_fixtures import generic_account_material, proxy_material
+from tests.runtime.resource_fixtures import generic_account_material, managed_account_material, proxy_material
 
 _EXPECTED_OUTCOME_BY_VERDICT = {
     ExpectedVerdict.PASS: "success",
@@ -163,7 +163,7 @@ def _execute_single_sample(sample: ContractSample) -> HarnessExecutionResult:
                     resource_id="fake-account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material=generic_account_material(),
+                    material=managed_account_material(generic_account_material(), adapter_key=sample.input.adapter_key),
                 ),
                 ResourceRecord(
                     resource_id="fake-proxy-001",

@@ -941,6 +941,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                     f"http://127.0.0.1:{server.server_port}",
                 ):
                     seed_default_runtime_resources(
+                        adapter_key="douyin",
                         account_material={
                             **douyin_account_material(),
                             "sign_base_url": f"http://127.0.0.1:{server.server_port}",

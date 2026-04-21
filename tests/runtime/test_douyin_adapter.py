@@ -86,6 +86,8 @@ def build_douyin_execution_context(
 
 
 class DouyinAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
+    resource_store_adapter_key = "douyin"
+
     def test_douyin_adapter_rejects_non_hybrid_adapter_task_request_before_session_lookup(self) -> None:
         from syvert.adapters.douyin import DouyinAdapter
 

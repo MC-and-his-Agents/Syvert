@@ -23,7 +23,7 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
 )
-from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, seed_default_runtime_resources
 
 
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
@@ -1160,6 +1160,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "release_write_failed")
 
     def test_execute_task_maps_real_xhs_invalid_url_to_invalid_input(self) -> None:
+        seed_default_runtime_resources(adapter_key="xhs", account_resource_id="xhs-account-001")
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
@@ -1177,6 +1178,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "invalid_xhs_url")
 
     def test_execute_task_maps_real_douyin_invalid_url_to_invalid_input(self) -> None:
+        seed_default_runtime_resources(adapter_key="douyin", account_resource_id="douyin-account-001")
         request = TaskRequest(
             adapter_key="douyin",
             capability="content_detail_by_url",

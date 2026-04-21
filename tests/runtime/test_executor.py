@@ -10,6 +10,8 @@ from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
+    resource_store_adapter_key = "xhs"
+
     def setUp(self) -> None:
         super().setUp()
         self._task_record_store_dir = tempfile.TemporaryDirectory()

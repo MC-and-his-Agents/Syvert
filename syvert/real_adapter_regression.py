@@ -8,7 +8,7 @@ from typing import Any
 
 from syvert.adapters.douyin import DouyinAdapter, default_page_state_transport
 from syvert.adapters.xhs import XhsAdapter
-from syvert.resource_lifecycle import ResourceRecord
+from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceRecord
 from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.runtime import TaskInput, TaskRequest, execute_task
 from syvert.version_gate import validate_real_adapter_regression_source_report
@@ -125,6 +125,7 @@ def seed_reference_regression_resources(
         account_material = _douyin_account_material()
     else:
         raise ValueError(f"unsupported adapter_key for regression resource seed: {adapter_key}")
+    account_material[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
     store.seed_resources(
         [
             ResourceRecord(

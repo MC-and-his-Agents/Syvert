@@ -14,6 +14,8 @@ from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
 class ContractHarnessHostTests(ResourceStoreEnvMixin, unittest.TestCase):
+    resource_store_adapter_key = DEFAULT_HARNESS_ADAPTER_KEY
+
     def test_executes_fake_adapter_via_standard_runtime_and_registry_path(self) -> None:
         adapter = FakeContractAdapter(scenario="success")
         sample = HarnessExecutionInput(sample_id="sample-success", url="https://example.com/fake/1")

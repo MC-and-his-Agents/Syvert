@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import json
 import os
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from syvert.resource_lifecycle import (
+    MANAGED_ACCOUNT_ADAPTER_KEY_FIELD,
     AcquireRequest,
     ReleaseRequest,
     ResourceBundle,
@@ -39,7 +41,49 @@ class ResourceStoreEnvMixin:
         super().tearDown()
 
     def make_store(self):
-        return default_resource_lifecycle_store()
+        return TaggedAccountStore(default_resource_lifecycle_store())
+
+
+class TaggedAccountStore:
+    def __init__(self, inner_store, *, default_adapter_key: str = "xhs") -> None:
+        self._inner_store = inner_store
+        self._default_adapter_key = default_adapter_key
+
+    def load_snapshot(self):
+        return self._inner_store.load_snapshot()
+
+    def write_snapshot(self, snapshot):
+        return self._inner_store.write_snapshot(snapshot)
+
+    def seed_resources(self, records: Sequence[ResourceRecord]):
+        if not isinstance(records, Sequence):
+            return self._inner_store.seed_resources(records)
+        return self._inner_store.seed_resources(_tag_default_accounts(records, adapter_key=self._default_adapter_key))
+
+
+def _tag_default_accounts(
+    records: Sequence[ResourceRecord],
+    *,
+    adapter_key: str,
+) -> list[ResourceRecord]:
+    tagged: list[ResourceRecord] = []
+    for record in records:
+        material = record.material
+        if record.resource_type != "account" or not isinstance(material, Mapping):
+            tagged.append(record)
+            continue
+        if MANAGED_ACCOUNT_ADAPTER_KEY_FIELD in material:
+            tagged.append(record)
+            continue
+        tagged.append(
+            ResourceRecord(
+                resource_id=record.resource_id,
+                resource_type=record.resource_type,
+                status=record.status,
+                material={**dict(material), MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key},
+            )
+        )
+    return tagged
 
 
 class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
@@ -455,7 +499,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(seeded), 1)
         self.assertEqual(len(replayed), 1)
         self.assertEqual(snapshot.revision, 1)
-        self.assertEqual(snapshot.resources[0].material, {"vals": ["a", "b"]})
+        self.assertEqual(snapshot.resources[0].material, {"managed_adapter_key": "xhs", "vals": ["a", "b"]})
 
     def test_seed_resources_merges_disjoint_concurrent_inserts(self) -> None:
         store = self.make_store()

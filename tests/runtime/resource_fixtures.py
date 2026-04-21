@@ -5,7 +5,7 @@ import tempfile
 from typing import Any
 from unittest import mock
 
-from syvert.resource_lifecycle import ResourceBundle, ResourceRecord
+from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceBundle, ResourceRecord
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
 
 
@@ -46,6 +46,10 @@ def proxy_material() -> dict[str, Any]:
     return {"proxy_endpoint": "http://proxy-001"}
 
 
+def managed_account_material(material: dict[str, Any], *, adapter_key: str) -> dict[str, Any]:
+    return {**material, MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key}
+
+
 def build_managed_resource_bundle(
     *,
     adapter_key: str,
@@ -72,7 +76,7 @@ def build_managed_resource_bundle(
                 resource_id="account-bundle-001",
                 resource_type="account",
                 status="IN_USE",
-                material=account_material or generic_account_material(),
+                material=managed_account_material(account_material or generic_account_material(), adapter_key=adapter_key),
             )
             if include_account
             else None
@@ -92,6 +96,9 @@ def build_managed_resource_bundle(
 
 def seed_default_runtime_resources(
     *,
+    adapter_key: str = "stub",
+    account_resource_id: str = "account-001",
+    proxy_resource_id: str = "proxy-001",
     account_material: dict[str, Any] | None = None,
     proxy_slot_material: dict[str, Any] | None = None,
 ) -> None:
@@ -99,13 +106,13 @@ def seed_default_runtime_resources(
     store.seed_resources(
         [
             ResourceRecord(
-                resource_id="account-001",
+                resource_id=account_resource_id,
                 resource_type="account",
                 status="AVAILABLE",
-                material=account_material or generic_account_material(),
+                material=managed_account_material(account_material or generic_account_material(), adapter_key=adapter_key),
             ),
             ResourceRecord(
-                resource_id="proxy-001",
+                resource_id=proxy_resource_id,
                 resource_type="proxy",
                 status="AVAILABLE",
                 material=proxy_slot_material or proxy_material(),
@@ -115,6 +122,8 @@ def seed_default_runtime_resources(
 
 
 class ResourceStoreEnvMixin:
+    resource_store_adapter_key = "stub"
+
     def setUp(self) -> None:
         super().setUp()
         self._resource_store_dir = tempfile.TemporaryDirectory()
@@ -125,7 +134,7 @@ class ResourceStoreEnvMixin:
             clear=False,
         )
         self._resource_store_patcher.start()
-        seed_default_runtime_resources()
+        seed_default_runtime_resources(adapter_key=self.resource_store_adapter_key)
 
     def tearDown(self) -> None:
         self._resource_store_patcher.stop()

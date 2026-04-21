@@ -88,6 +88,8 @@ def build_xhs_account_material(**overrides: Any) -> dict[str, Any]:
 
 
 class XhsAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
+    resource_store_adapter_key = "xhs"
+
     def build_xhs_context(
         self,
         *,
@@ -1808,6 +1810,7 @@ class XhsAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
                     f"http://127.0.0.1:{server.server_port}",
                 ):
                     seed_default_runtime_resources(
+                        adapter_key="xhs",
                         account_material=build_xhs_account_material(
                             sign_base_url=f"http://127.0.0.1:{server.server_port}",
                             timeout_seconds=5,
