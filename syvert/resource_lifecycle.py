@@ -1194,13 +1194,39 @@ def write_snapshot_with_tracing(
     resource_trace_store: "LocalResourceTraceStore | None",
     trace_events: Sequence[ResourceTraceEvent],
 ) -> ResourceLifecycleSnapshot:
+    from syvert.resource_trace_store import merge_resource_trace_events
+
     trace_store = resource_trace_store or default_resource_trace_store()
-    written_snapshot = write_snapshot_to_store(store, snapshot)
+    commit_with_trace = getattr(store, "commit_with_trace", None)
+    if callable(commit_with_trace):
+        try:
+            written_snapshot = commit_with_trace(
+                snapshot,
+                trace_store=trace_store,
+                trace_events=trace_events,
+            )
+        except ResourceLifecycleContractError:
+            raise
+        except Exception as error:
+            raise state_conflict_error(f"资源 tracing truth 写入失败: {error}") from error
+        return written_snapshot
+
+    current_events = trace_store.load_events()
+    merged_events, _ = merge_resource_trace_events(current_events, trace_events)
     try:
-        trace_store.append_events(trace_events)
+        trace_store.write_events(merged_events)
+        try:
+            return write_snapshot_to_store(store, snapshot)
+        except Exception as error:
+            try:
+                trace_store.write_events(current_events)
+            except Exception as rollback_error:
+                raise state_conflict_error(f"资源 tracing truth 回滚失败: {rollback_error}") from rollback_error
+            raise error
+    except ResourceLifecycleContractError:
+        raise
     except Exception as error:
         raise state_conflict_error(f"资源 tracing truth 写入失败: {error}") from error
-    return written_snapshot
 
 
 def write_snapshot_to_store(store: ResourceLifecycleStore, snapshot: ResourceLifecycleSnapshot) -> ResourceLifecycleSnapshot:

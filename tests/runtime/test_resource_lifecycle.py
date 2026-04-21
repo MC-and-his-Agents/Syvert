@@ -125,6 +125,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
 
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 2:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
         store = ConcurrentAcquireStore(self.make_store())
         store.seed_resources(
             [
@@ -203,6 +212,25 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                         ]
                     )
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 2 and not self._injected:
+                    self._injected = True
+                    self._inner_store.seed_resources(
+                        [
+                            ResourceRecord(
+                                resource_id="proxy-001",
+                                resource_type="proxy",
+                                status="AVAILABLE",
+                                material={"proxy_endpoint": "http://proxy-001"},
+                            )
+                        ]
+                    )
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentAcquireRetryStore(self.make_store())
         store.seed_resources(
@@ -827,6 +855,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
 
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
+
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
             [
@@ -898,6 +935,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                 if snapshot.revision == 3:
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
@@ -979,6 +1025,15 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                 if snapshot.revision == 3:
                     self._barrier.wait()
                 return self._inner_store.write_snapshot(snapshot)
+
+            def commit_with_trace(self, snapshot, *, trace_store, trace_events):
+                if snapshot.revision == 3:
+                    self._barrier.wait()
+                return self._inner_store.commit_with_trace(
+                    snapshot,
+                    trace_store=trace_store,
+                    trace_events=trace_events,
+                )
 
         store = ConcurrentReleaseStore(self.make_store())
         store.seed_resources(
@@ -1259,7 +1314,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_acquire_returns_failed_envelope_when_trace_write_fails(self) -> None:
         self.seed_default_resources()
 
-        with mock.patch("syvert.resource_trace_store.LocalResourceTraceStore.append_events", side_effect=OSError("disk full")):
+        with mock.patch("syvert.resource_trace_store.LocalResourceTraceStore.write_events", side_effect=OSError("disk full")):
             result = acquire(
                 AcquireRequest(
                     task_id="task-013b-trace",
@@ -1275,8 +1330,8 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
         snapshot = self.make_store().load_snapshot()
-        self.assertEqual(len(snapshot.leases), 1)
-        self.assertEqual(snapshot.resources[0].status, "IN_USE")
+        self.assertEqual(snapshot.leases, ())
+        self.assertEqual(snapshot.resources[0].status, "AVAILABLE")
         self.assertEqual(self.make_trace_store().load_events(), ())
 
     def test_acquire_stays_successful_when_post_commit_directory_sync_fails(self) -> None:

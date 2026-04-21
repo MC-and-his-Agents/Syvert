@@ -55,21 +55,10 @@ class LocalResourceTraceStore:
             return ()
         with self._exclusive_lock():
             current_events = self.load_events()
-            current_by_id = {event.event_id: event for event in current_events}
-            events_to_append: list[ResourceTraceEvent] = []
-            for event in normalized_events:
-                current = current_by_id.get(event.event_id)
-                if current is not None:
-                    if current != event:
-                        raise ResourceTracePersistenceError(
-                            f"resource_state_conflict: tracing event_id `{event.event_id}` payload 冲突"
-                        )
-                    continue
-                current_by_id[event.event_id] = event
-                events_to_append.append(event)
+            merged_events, events_to_append = merge_resource_trace_events(current_events, normalized_events)
             if not events_to_append:
                 return normalized_events
-            self._write_events_atomic([*current_events, *events_to_append])
+            self.write_events(merged_events)
             return tuple(events_to_append)
 
     def task_usage_log(self, task_id: str) -> TaskResourceUsageLog:
@@ -101,6 +90,11 @@ class LocalResourceTraceStore:
             seen_by_id[event.event_id] = event
             events.append(event)
         return events
+
+    def write_events(self, events: Sequence[ResourceTraceEvent]) -> tuple[ResourceTraceEvent, ...]:
+        canonical_events = tuple(canonical_resource_trace_event(event) for event in events)
+        self._write_events_atomic(canonical_events)
+        return canonical_events
 
     def _write_events_atomic(self, events: Sequence[ResourceTraceEvent]) -> None:
         temp_path: str | None = None
@@ -168,3 +162,24 @@ def resolve_resource_trace_store_path(env: Mapping[str, str] | None = None) -> P
     if configured:
         return Path(configured).expanduser()
     return Path.home() / ".syvert" / "resource-trace-events.jsonl"
+
+
+def merge_resource_trace_events(
+    existing_events: Sequence[ResourceTraceEvent],
+    new_events: Sequence[ResourceTraceEvent],
+) -> tuple[tuple[ResourceTraceEvent, ...], tuple[ResourceTraceEvent, ...]]:
+    canonical_existing = tuple(canonical_resource_trace_event(event) for event in existing_events)
+    canonical_new = tuple(canonical_resource_trace_event(event) for event in new_events)
+    existing_by_id = {event.event_id: event for event in canonical_existing}
+    events_to_append: list[ResourceTraceEvent] = []
+    for event in canonical_new:
+        current = existing_by_id.get(event.event_id)
+        if current is not None:
+            if current != event:
+                raise ResourceTracePersistenceError(
+                    f"resource_state_conflict: tracing event_id `{event.event_id}` payload 冲突"
+                )
+            continue
+        existing_by_id[event.event_id] = event
+        events_to_append.append(event)
+    return tuple([*canonical_existing, *events_to_append]), tuple(events_to_append)
