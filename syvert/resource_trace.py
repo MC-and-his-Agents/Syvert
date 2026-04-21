@@ -145,6 +145,8 @@ def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tupl
     canonical_events = tuple(sort_resource_trace_events(events))
     lease_task_ids: dict[str, str] = {}
     bundle_task_ids: dict[str, str] = {}
+    lease_bundle_ids: dict[str, str] = {}
+    bundle_lease_ids: dict[str, str] = {}
     for event in canonical_events:
         existing_lease_task_id = lease_task_ids.get(event.lease_id)
         if existing_lease_task_id is not None and existing_lease_task_id != event.task_id:
@@ -158,6 +160,18 @@ def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tupl
                 f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能跨多个 task_id"
             )
         bundle_task_ids[event.bundle_id] = event.task_id
+        existing_bundle_id = lease_bundle_ids.get(event.lease_id)
+        if existing_bundle_id is not None and existing_bundle_id != event.bundle_id:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` 不能复用多个 bundle_id"
+            )
+        lease_bundle_ids[event.lease_id] = event.bundle_id
+        existing_lease_id = bundle_lease_ids.get(event.bundle_id)
+        if existing_lease_id is not None and existing_lease_id != event.lease_id:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能复用多个 lease_id"
+            )
+        bundle_lease_ids[event.bundle_id] = event.lease_id
     return canonical_events
 
 

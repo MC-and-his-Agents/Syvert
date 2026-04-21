@@ -100,6 +100,8 @@ class LocalResourceTraceStore:
                 raise ResourceTracePersistenceError(
                     f"resource_state_conflict: tracing event_id `{event.event_id}` payload 冲突"
                 )
+            if existing is not None:
+                continue
             seen_by_id[event.event_id] = event
             events.append(event)
         return list(validate_resource_trace_stream(events))

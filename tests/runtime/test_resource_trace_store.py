@@ -114,6 +114,20 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
             **{**self.proxy_acquired_event().__dict__, "task_id": "task-002"}
         )
 
+    def alternate_bundle_proxy_acquired_event(self) -> ResourceTraceEvent:
+        return ResourceTraceEvent(
+            **{**self.proxy_acquired_event().__dict__, "bundle_id": "bundle-002"}
+        )
+
+    def alternate_lease_proxy_acquired_event(self) -> ResourceTraceEvent:
+        return ResourceTraceEvent(
+            **{
+                **self.proxy_acquired_event().__dict__,
+                "lease_id": "lease-002",
+                "event_id": "acquired:lease-002:proxy-001",
+            }
+        )
+
     def test_append_events_round_trips_jsonl_store(self) -> None:
         store = self.make_store()
         appended = store.append_events((self.acquired_event(), self.proxy_acquired_event()))
@@ -147,6 +161,20 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(ResourceTracePersistenceError):
             store.append_events((self.cross_task_proxy_acquired_event(),))
 
+    def test_append_events_rejects_same_lease_reused_with_different_bundle(self) -> None:
+        store = self.make_store()
+        store.append_events((self.acquired_event(),))
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.append_events((self.alternate_bundle_proxy_acquired_event(),))
+
+    def test_append_events_rejects_same_bundle_reused_with_different_lease(self) -> None:
+        store = self.make_store()
+        store.append_events((self.acquired_event(),))
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.append_events((self.alternate_lease_proxy_acquired_event(),))
+
     def test_store_builds_task_usage_log_and_lease_timeline(self) -> None:
         store = self.make_store()
         store.append_events(
@@ -167,8 +195,18 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(lease_timeline.resource_timelines), 2)
         self.assertEqual(lease_timeline.resource_timelines[0].acquired_at, "2026-04-21T12:00:00.000000Z")
         self.assertEqual(len(resource_events), 2)
+        self.assertEqual(store.bundle_timeline("bundle-001"), lease_timeline)
         self.assertEqual(resource_events[0].event_type, "acquired")
         self.assertEqual(resource_events[1].event_type, "released")
+
+    def test_load_events_deduplicates_identical_replayed_event_ids(self) -> None:
+        store = self.make_store()
+        payload = (
+            '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:account-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"account-001","resource_type":"account","task_id":"task-001","to_status":"IN_USE"}'
+        )
+        store.path.write_text(f"{payload}\n{payload}\n", encoding="utf-8")
+
+        self.assertEqual(store.load_events(), (self.acquired_event(),))
 
     def test_load_events_rejects_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
         store = self.make_store()
@@ -186,6 +224,38 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(ResourceTracePersistenceError):
             store.load_events()
 
+    def test_load_events_rejects_same_lease_reused_with_different_bundle(self) -> None:
+        store = self.make_store()
+        store.path.write_text(
+            "\n".join(
+                (
+                    '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:account-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"account-001","resource_type":"account","task_id":"task-001","to_status":"IN_USE"}',
+                    '{"adapter_key":"xhs","bundle_id":"bundle-002","capability":"content_detail_by_url","event_id":"acquired:lease-001:proxy-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"proxy-001","resource_type":"proxy","task_id":"task-001","to_status":"IN_USE"}',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.load_events()
+
+    def test_load_events_rejects_same_bundle_reused_with_different_lease(self) -> None:
+        store = self.make_store()
+        store.path.write_text(
+            "\n".join(
+                (
+                    '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-001:account-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-001","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"account-001","resource_type":"account","task_id":"task-001","to_status":"IN_USE"}',
+                    '{"adapter_key":"xhs","bundle_id":"bundle-001","capability":"content_detail_by_url","event_id":"acquired:lease-002:proxy-001","event_type":"acquired","from_status":"AVAILABLE","lease_id":"lease-002","occurred_at":"2026-04-21T12:00:00.000000Z","reason":"acquired_for_task","resource_id":"proxy-001","resource_type":"proxy","task_id":"task-001","to_status":"IN_USE"}',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(ResourceTracePersistenceError):
+            store.load_events()
+
     def test_projection_builders_reject_cross_task_reuse_of_same_lease_and_bundle(self) -> None:
         events = (self.acquired_event(), self.cross_task_proxy_acquired_event())
 
@@ -193,6 +263,22 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
             build_task_resource_usage_log(events, task_id="task-001")
         with self.assertRaises(ResourceTraceContractError):
             build_resource_lease_timeline(events, lease_id="lease-001")
+
+    def test_projection_builders_reject_same_lease_reused_with_different_bundle(self) -> None:
+        events = (self.acquired_event(), self.alternate_bundle_proxy_acquired_event())
+
+        with self.assertRaises(ResourceTraceContractError):
+            build_task_resource_usage_log(events, task_id="task-001")
+        with self.assertRaises(ResourceTraceContractError):
+            build_resource_lease_timeline(events, lease_id="lease-001")
+
+    def test_projection_builders_reject_same_bundle_reused_with_different_lease(self) -> None:
+        events = (self.acquired_event(), self.alternate_lease_proxy_acquired_event())
+
+        with self.assertRaises(ResourceTraceContractError):
+            build_task_resource_usage_log(events, task_id="task-001")
+        with self.assertRaises(ResourceTraceContractError):
+            build_resource_lease_timeline(events, bundle_id="bundle-001")
 
     def test_resolve_trace_store_path_prefers_env_then_default(self) -> None:
         self.assertEqual(resolve_resource_trace_store_path(), Path(self._trace_store_path))

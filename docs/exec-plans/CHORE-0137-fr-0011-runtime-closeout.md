@@ -78,6 +78,10 @@
   - 结果：通过（125 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
   - 结果：通过（211 tests, OK）
+- FR-0010 / FR-0012 边界核验（人工复核）
+  - `syvert/resource_lifecycle_store.py` 仍只持久化 `ResourceLifecycleSnapshot`，`resource_trace` durable truth 独立落在 `syvert/resource_trace_store.py`，未把 tracing 字段混入 `FR-0010` snapshot/lease contract。
+  - `syvert/runtime.py` 仍由 Core 统一 acquire / release / tracing；adapter 侧只消费 `resource_bundle` 并返回 `resource_disposition_hint`，未新增 tracing 写入口或资源来源入口。
+  - `tests.runtime.test_resource_lifecycle`、`tests.runtime.test_runtime` 与 `tests.runtime.test_real_adapter_regression` 已覆盖 snapshot/revision 语义、host-side hint 收口和真实参考适配器回归，未观察到 `FR-0010` / `FR-0012` 漂移。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -92,7 +96,6 @@
 ## 未决风险
 
 - 独立 trace store 当前仍不是跨文件硬事务；默认本地 store 已通过 lifecycle 锁内双写补偿收口主路径，但若未来要扩展到更复杂 backend，仍需要新的 store / backend contract 明确冻结。
-- 需要在更大回归面上确认 `FR-0010` / `FR-0012` 既有 contract 没有被 tracing 接线误伤。
 
 ## 回滚方式
 
