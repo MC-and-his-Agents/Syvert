@@ -71,7 +71,7 @@ class LocalResourceTraceStore:
                     f"resource_state_conflict: 非法资源 tracing 事件流 `{self.path}`"
                 ) from error
             if not events_to_append:
-                return normalized_events
+                return ()
             self.write_events(merged_events)
             return tuple(events_to_append)
 

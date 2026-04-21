@@ -773,21 +773,18 @@ def selected_resources_signature(
     *,
     requested_slots: tuple[str, ...],
     selected_resources: Mapping[str, ResourceRecord],
-) -> tuple[tuple[str, ResourceRecord], ...]:
-    return tuple((slot, selected_resources[slot]) for slot in requested_slots)
+) -> tuple[tuple[str, str], ...]:
+    return tuple((slot, selected_resources[slot].resource_id) for slot in requested_slots)
 
 
 def releasable_lease_signature(
     *,
     lease: ResourceLease,
     resources_by_id: Mapping[str, ResourceRecord],
-) -> tuple[ResourceLease, tuple[ResourceRecord, ...]]:
+) -> tuple[str, tuple[str, ...]]:
     return (
-        lease,
-        tuple(
-            resources_by_id[resource_id]
-            for resource_id in lease.resource_ids
-        ),
+        lease.bundle_id,
+        tuple(resources_by_id[resource_id].resource_id for resource_id in lease.resource_ids),
     )
 
 

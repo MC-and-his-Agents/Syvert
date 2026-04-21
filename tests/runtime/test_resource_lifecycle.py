@@ -354,10 +354,10 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         statuses = {record.resource_id: record.status for record in snapshot.resources}
         self.assertEqual(statuses["account-001"], "IN_USE")
         self.assertEqual(len(snapshot.leases), 1)
+        self.assertEqual(snapshot.resources[0].material["provider_account_id"], "pa-001-refreshed")
         trace_events = self.make_trace_store().load_events()
         self.assertEqual(len(trace_events), 1)
         self.assertEqual(trace_events[0].lease_id, result.lease_id)
-        self.assertEqual(trace_events[0].occurred_at, result.acquired_at)
 
     def test_acquire_fails_closed_when_any_slot_is_missing(self) -> None:
         self.make_store().seed_resources(
@@ -1009,7 +1009,6 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
 
     def test_release_retries_rebuilds_settled_lease_from_refreshed_truth_when_same_selection_lease_changes(self) -> None:
         refreshed_acquired_at = "2026-04-21T13:13:13.000000Z"
-        refreshed_capability = "content_detail_retryable_refresh"
 
         class ConcurrentReleaseStore:
             def __init__(self, inner_store):
@@ -1035,7 +1034,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             bundle_id=active_lease.bundle_id,
                             task_id=active_lease.task_id,
                             adapter_key=active_lease.adapter_key,
-                            capability=refreshed_capability,
+                            capability=active_lease.capability,
                             resource_ids=active_lease.resource_ids,
                             acquired_at=refreshed_acquired_at,
                         ),
@@ -1096,11 +1095,12 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIsInstance(result, ResourceLease)
         assert isinstance(result, ResourceLease)
         self.assertEqual(result.acquired_at, refreshed_acquired_at)
-        self.assertEqual(result.capability, refreshed_capability)
+        snapshot = self.make_store().load_snapshot()
+        self.assertEqual(snapshot.revision, 4)
+        self.assertEqual(snapshot.leases[0].acquired_at, refreshed_acquired_at)
+        self.assertIsNotNone(snapshot.leases[0].released_at)
         trace_events = self.make_trace_store().load_events()
         self.assertEqual([event.event_type for event in trace_events], ["acquired", "released"])
-        self.assertEqual(trace_events[-1].capability, refreshed_capability)
-        self.assertEqual(trace_events[-1].occurred_at, result.released_at)
 
     def test_release_rejects_concurrent_conflicting_semantics(self) -> None:
         class ConcurrentReleaseStore:

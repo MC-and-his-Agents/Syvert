@@ -41,11 +41,11 @@
 
 - 已创建 runtime Work Item `#183`，并通过 `python3 scripts/create_worktree.py --issue 183 --class implementation` 建立独立 worktree `/Users/mc/code/worktrees/syvert/issue-183-fr-0011`。
 - 当前工作树已新增 tracing 共享模型、本地 trace store、`runtime/resource_lifecycle` 接线与首批 tracing 回归测试。
-- 当前工作树已根据 guardian 的六轮阻断把 tracing 协调层继续收紧：`commit_with_trace` 与 fallback 路径统一为 `trace -> lifecycle` 锁顺序，避免 AB/BA 死锁；trace store 在 append/load/projection 三条路径上拒绝跨 task、跨 lease/bundle 身份漂移、不完整 resource timeline（缺失 acquired、双重收口）以及 `resource_type` / `adapter_key` / `capability` 漂移的非法事件流；`acquire()` / `release()` 的 retryable revision conflict 路径也改为基于刷新后的 snapshot 重新构造 bundle / lease / trace payload，不再复用陈旧 truth。
+- 当前工作树已根据 guardian 的七轮阻断把 tracing 协调层继续收紧：`commit_with_trace` 与 fallback 路径统一为 `trace -> lifecycle` 锁顺序，避免 AB/BA 死锁；trace store 在 append/load/projection 三条路径上拒绝跨 task、跨 lease/bundle 身份漂移、不完整 resource timeline（缺失 acquired、双重收口）以及 `resource_type` / `adapter_key` / `capability` 漂移的非法事件流；`acquire()` / `release()` 的 retryable revision conflict 路径也改为基于刷新后的 snapshot 重新构造 bundle / lease / trace payload，并只对稳定身份签名做过期判定，不再把 material/lease 非身份字段刷新误判成冲突。
 
 ## 下一步动作
 
-- 提交并推送第六轮 guardian 修复，刷新 `#184` merge gate。
+- 提交并推送第七轮 guardian 修复，刷新 `#184` merge gate。
 - 等待 guardian / merge gate，并在合入后收口 `#183`、`#165`、`#173` 与 `v0.4.0` closeout truth sweep。
 
 ## 当前 checkpoint 推进的 release 目标

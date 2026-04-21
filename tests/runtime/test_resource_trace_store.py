@@ -167,7 +167,7 @@ class ResourceTraceStoreTests(ResourceTraceStoreEnvMixin, unittest.TestCase):
         store.append_events((self.acquired_event(),))
         replayed = store.append_events((self.acquired_event(),))
 
-        self.assertEqual(replayed, (self.acquired_event(),))
+        self.assertEqual(replayed, ())
         self.assertEqual(store.load_events(), (self.acquired_event(),))
 
     def test_append_events_rejects_conflicting_payload_for_same_event_id(self) -> None:
