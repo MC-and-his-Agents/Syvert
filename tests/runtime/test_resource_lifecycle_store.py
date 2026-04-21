@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 import json
 import os
 import tempfile
@@ -41,49 +40,13 @@ class ResourceStoreEnvMixin:
         super().tearDown()
 
     def make_store(self):
-        return TaggedAccountStore(default_resource_lifecycle_store())
+        return default_resource_lifecycle_store()
 
 
-class TaggedAccountStore:
-    def __init__(self, inner_store, *, default_adapter_key: str = "xhs") -> None:
-        self._inner_store = inner_store
-        self._default_adapter_key = default_adapter_key
-
-    def load_snapshot(self):
-        return self._inner_store.load_snapshot()
-
-    def write_snapshot(self, snapshot):
-        return self._inner_store.write_snapshot(snapshot)
-
-    def seed_resources(self, records: Sequence[ResourceRecord]):
-        if not isinstance(records, Sequence):
-            return self._inner_store.seed_resources(records)
-        return self._inner_store.seed_resources(_tag_default_accounts(records, adapter_key=self._default_adapter_key))
-
-
-def _tag_default_accounts(
-    records: Sequence[ResourceRecord],
-    *,
-    adapter_key: str,
-) -> list[ResourceRecord]:
-    tagged: list[ResourceRecord] = []
-    for record in records:
-        material = record.material
-        if record.resource_type != "account" or not isinstance(material, Mapping):
-            tagged.append(record)
-            continue
-        if MANAGED_ACCOUNT_ADAPTER_KEY_FIELD in material:
-            tagged.append(record)
-            continue
-        tagged.append(
-            ResourceRecord(
-                resource_id=record.resource_id,
-                resource_type=record.resource_type,
-                status=record.status,
-                material={**dict(material), MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key},
-            )
-        )
-    return tagged
+def managed_account_material(material: dict[str, object], *, adapter_key: str = "xhs") -> dict[str, object]:
+    if MANAGED_ACCOUNT_ADAPTER_KEY_FIELD in material:
+        return dict(material)
+    return {**material, MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key}
 
 
 class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
@@ -100,7 +63,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -120,7 +83,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
                 ResourceRecord(
                     resource_id="proxy-001",
@@ -167,7 +130,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -235,7 +198,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -264,7 +227,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -277,7 +240,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "first"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "first"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -292,7 +255,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "stale"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "stale"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -320,7 +283,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -333,7 +296,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "a"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "a"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -346,7 +309,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "b"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "b"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -386,7 +349,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -419,7 +382,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                         resource_id="account-001",
                         resource_type="account",
                         status="AVAILABLE",
-                        material={"provider_account_id": "pa-001", "marker": "revived"},
+                        material=managed_account_material({"provider_account_id": "pa-001", "marker": "revived"}),
                     )
                 ]
             )
@@ -432,7 +395,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -444,7 +407,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                         resource_id="account-001",
                         resource_type="account",
                         status="INVALID",
-                        material={"provider_account_id": "pa-001"},
+                        material=managed_account_material({"provider_account_id": "pa-001"}),
                     )
                 ]
             )
@@ -457,7 +420,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -489,7 +452,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             resource_id="account-001",
             resource_type="account",
             status="AVAILABLE",
-            material={"vals": ("a", "b")},
+            material=managed_account_material({"vals": ("a", "b")}),
         )
 
         seeded = store.seed_resources([original])
@@ -520,7 +483,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
             ),
         )

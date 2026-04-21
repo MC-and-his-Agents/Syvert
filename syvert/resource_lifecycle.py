@@ -717,11 +717,11 @@ def resource_is_slot_compatible(record: ResourceRecord, *, slot: str, adapter_ke
         return True
     material = record.material
     if not isinstance(material, Mapping):
-        return True
+        return False
     managed_adapter_key = material.get(MANAGED_ACCOUNT_ADAPTER_KEY_FIELD)
     if managed_adapter_key is None:
-        return True
-    return isinstance(managed_adapter_key, str) and managed_adapter_key == adapter_key
+        return False
+    return isinstance(managed_adapter_key, str) and bool(managed_adapter_key) and managed_adapter_key == adapter_key
 
 
 def apply_acquire_transition(
