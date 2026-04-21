@@ -146,37 +146,27 @@ def acquire(
     capability = normalized_request.capability
     try:
         current_snapshot = snapshot
-        pending_bundle: ResourceBundle | None = None
-        pending_lease: ResourceLease | None = None
-        pending_trace_events: tuple[ResourceTraceEvent, ...] | None = None
-        pending_selected_resource_ids: dict[str, str] | None = None
         while True:
             selected = select_available_resources(
                 current_snapshot,
                 normalized_request.requested_slots,
                 adapter_key=normalized_request.adapter_key,
             )
-            selected_resource_ids = {slot: record.resource_id for slot, record in selected.items()}
-            if pending_bundle is None:
-                acquired_at = now_rfc3339_utc()
-                pending_bundle = build_resource_bundle(
-                    task_id=normalized_request.task_id,
-                    adapter_key=adapter_key,
-                    capability=capability,
-                    requested_slots=normalized_request.requested_slots,
-                    selected_resources=selected,
-                    acquired_at=acquired_at,
-                )
-                pending_lease = build_resource_lease(pending_bundle)
-                pending_trace_events = build_acquired_resource_trace_events(pending_bundle)
-                pending_selected_resource_ids = selected_resource_ids
-            elif pending_selected_resource_ids != selected_resource_ids:
-                raise state_conflict_error("revision 冲突后资源选择已过期")
-            assert pending_bundle is not None
-            assert pending_lease is not None
-            assert pending_trace_events is not None
-            bundle = pending_bundle
-            lease = pending_lease
+            selected_signature = selected_resources_signature(
+                requested_slots=normalized_request.requested_slots,
+                selected_resources=selected,
+            )
+            acquired_at = now_rfc3339_utc()
+            bundle = build_resource_bundle(
+                task_id=normalized_request.task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                requested_slots=normalized_request.requested_slots,
+                selected_resources=selected,
+                acquired_at=acquired_at,
+            )
+            lease = build_resource_lease(bundle)
+            trace_events = build_acquired_resource_trace_events(bundle)
             updated_resources = apply_acquire_transition(current_snapshot.resources, selected)
             updated_snapshot = ResourceLifecycleSnapshot(
                 schema_version=current_snapshot.schema_version,
@@ -190,7 +180,7 @@ def acquire(
                     store,
                     updated_snapshot,
                     resource_trace_store=resource_trace_store,
-                    trace_events=pending_trace_events,
+                    trace_events=trace_events,
                 )
                 return bundle
             except ResourceLifecycleContractError as error:
@@ -206,10 +196,11 @@ def acquire(
                     )
                 except ResourceLifecycleContractError as refreshed_error:
                     raise state_conflict_error("revision 冲突后资源选择已过期") from refreshed_error
-                refreshed_resource_ids = {
-                    slot: record.resource_id for slot, record in refreshed_selected.items()
-                }
-                if refreshed_resource_ids != selected_resource_ids:
+                refreshed_signature = selected_resources_signature(
+                    requested_slots=normalized_request.requested_slots,
+                    selected_resources=refreshed_selected,
+                )
+                if refreshed_signature != selected_signature:
                     raise state_conflict_error("revision 冲突后资源选择已过期")
                 current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
@@ -264,8 +255,6 @@ def release(
 
     try:
         current_snapshot = snapshot
-        pending_settled_lease: ResourceLease | None = None
-        pending_trace_events: tuple[ResourceTraceEvent, ...] | None = None
         while True:
             current_lease = require_lease(current_snapshot, normalized_request.lease_id)
             if current_lease.task_id != normalized_request.task_id:
@@ -285,28 +274,29 @@ def release(
                     raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 不存在")
                 if record.status != "IN_USE":
                     raise state_conflict_error(f"lease 绑定的资源 `{resource_id}` 未处于 IN_USE")
+            active_release_signature = releasable_lease_signature(
+                lease=current_lease,
+                resources_by_id=resources_by_id,
+            )
 
-            if pending_settled_lease is None:
-                released_at = now_rfc3339_utc()
-                pending_settled_lease = ResourceLease(
-                    lease_id=current_lease.lease_id,
-                    bundle_id=current_lease.bundle_id,
-                    task_id=current_lease.task_id,
-                    adapter_key=current_lease.adapter_key,
-                    capability=current_lease.capability,
-                    resource_ids=current_lease.resource_ids,
-                    acquired_at=current_lease.acquired_at,
-                    released_at=released_at,
-                    target_status_after_release=normalized_request.target_status_after_release,
-                    release_reason=normalized_request.reason,
-                )
-                pending_trace_events = build_release_resource_trace_events(
-                    current_lease=current_lease,
-                    settled_lease=pending_settled_lease,
-                    resources_by_id=resources_by_id,
-                )
-            settled_lease = pending_settled_lease
-            assert pending_trace_events is not None
+            released_at = now_rfc3339_utc()
+            settled_lease = ResourceLease(
+                lease_id=current_lease.lease_id,
+                bundle_id=current_lease.bundle_id,
+                task_id=current_lease.task_id,
+                adapter_key=current_lease.adapter_key,
+                capability=current_lease.capability,
+                resource_ids=current_lease.resource_ids,
+                acquired_at=current_lease.acquired_at,
+                released_at=released_at,
+                target_status_after_release=normalized_request.target_status_after_release,
+                release_reason=normalized_request.reason,
+            )
+            trace_events = build_release_resource_trace_events(
+                current_lease=current_lease,
+                settled_lease=settled_lease,
+                resources_by_id=resources_by_id,
+            )
             validate_resource_lease(settled_lease)
             updated_resources = apply_release_transition(
                 current_snapshot.resources,
@@ -329,7 +319,7 @@ def release(
                     store,
                     updated_snapshot,
                     resource_trace_store=resource_trace_store,
-                    trace_events=pending_trace_events,
+                    trace_events=trace_events,
                 )
                 return settled_lease
             except ResourceLifecycleContractError as error:
@@ -345,6 +335,13 @@ def release(
                     raise release_conflict_error("重复 release 的目标状态或原因与既有 settled lease 不一致")
                 if not is_retryable_revision_conflict(error):
                     raise
+                refreshed_resources_by_id = {record.resource_id: record for record in refreshed_snapshot.resources}
+                refreshed_release_signature = releasable_lease_signature(
+                    lease=refreshed_lease,
+                    resources_by_id=refreshed_resources_by_id,
+                )
+                if refreshed_release_signature != active_release_signature:
+                    raise state_conflict_error("revision 冲突后 lease truth 已过期")
                 current_snapshot = refreshed_snapshot
     except ResourceLifecycleContractError as error:
         return failure_envelope(
@@ -770,6 +767,28 @@ def build_release_resource_trace_events(
             )
         )
     return tuple(events)
+
+
+def selected_resources_signature(
+    *,
+    requested_slots: tuple[str, ...],
+    selected_resources: Mapping[str, ResourceRecord],
+) -> tuple[tuple[str, ResourceRecord], ...]:
+    return tuple((slot, selected_resources[slot]) for slot in requested_slots)
+
+
+def releasable_lease_signature(
+    *,
+    lease: ResourceLease,
+    resources_by_id: Mapping[str, ResourceRecord],
+) -> tuple[ResourceLease, tuple[ResourceRecord, ...]]:
+    return (
+        lease,
+        tuple(
+            resources_by_id[resource_id]
+            for resource_id in lease.resource_ids
+        ),
+    )
 
 
 def select_available_resources(
