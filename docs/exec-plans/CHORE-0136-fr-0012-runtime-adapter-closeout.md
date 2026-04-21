@@ -39,20 +39,23 @@
 - 当前执行分支：`issue-181-fr-0012-core-reference-adapter`
 - 当前 Work Item：`#181`
 - 当前受审 PR：`#182`
-- 当前实现 checkpoint：`8a2fa76e8292ad5fd8bc272d14449856d4628f53`
+- 当前实现 checkpoint：`0684d42d4d18eccb878290d3aea8ebf3e2b6b200`
 - 当前代码已完成以下收口：
   - `execute_task_internal()` 现在由 Core 持有 hybrid 资源策略、`acquire()`、host-side bundle 校验、adapter-facing capability projection、`resource_disposition_hint` 消费与统一 `release()` 收口。
   - lifecycle truth 的 `capability` 固定保持 `content_detail_by_url`；adapter-facing request 仅在进入 adapter 前投影为 `content_detail`。
   - `release()` 失败会覆盖原始 adapter success / failure；非法 hint 与 pre-adapter bundle 校验失败都会先 settle 已 acquire 的 lease。
   - xhs / douyin reference adapter 已改为只接受 `AdapterExecutionContext`，执行材料只从 `resource_bundle.account.material` 派生。
   - runtime / CLI / contract harness / reference regression / version gate 均已接入 host-side resource store seed，避免 hybrid canonical 路径在测试中漂移到 `resource_unavailable`。
+  - guardian 首轮 review 指出的两条阻断已收口：
+    - host-side bundle 校验现在会绑定 live active lease truth，并在 cleanup 时始终 release 解析出的真实 lease，而不是盲信注入 bundle 的 `lease_id`
+    - 非法 `resource_disposition_hint` 已统一回到 `invalid_input / invalid_resource_disposition_hint`
 - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 Work Item 上下文、checkpoint、review 与 merge gate，不要求其静态 SHA 穷尽到后续纯元数据提交。
 
 ## 下一步动作
 
-- 运行 `open_pr --dry-run` 校对 PR carrier，并推送当前分支。
-- 创建 implementation PR，补 reviewer / guardian 审查。
-- 若 guardian 未给出 `APPROVE`，优先按同类阻断聚类收口；通过后使用受控 `merge_pr` 执行 squash merge。
+- 基于 `0684d42d4d18eccb878290d3aea8ebf3e2b6b200` 重新提交 guardian。
+- 若 guardian 转为 `APPROVE`，直接进入受控 `merge_pr`。
+- 若仍有阻断，继续按同类 lifecycle truth / cleanup contract 聚类收口。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -67,7 +70,7 @@
 
 - `gh issue create` 已创建 Work Item `#181`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
-  - 结果：`Ran 294 tests in 42.461s`，`OK`
+  - 结果：`Ran 295 tests in 40.994s`，`OK`
 - `python3 -m unittest tests.runtime.test_platform_leakage`
   - 结果：`Ran 111 tests in 955.860s`，`OK (skipped=6)`
 - `python3 -m unittest tests.runtime.test_runtime`
@@ -76,6 +79,11 @@
   - 结果：通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main`
   - 结果：通过
+- `python3 scripts/pr_guardian.py review 182 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - host-side bundle 校验新增 live active lease 绑定，拒绝 bundle `lease_id` / `bundle_id` / slot resource ids 与真实 lease 漂移，并在 cleanup 时 release 真实 lease
+    - `resource_disposition_hint` 的类型、缺字段、lease mismatch、非法 `target_status_after_release` 统一映射为 `invalid_input / invalid_resource_disposition_hint`
 
 ## 未决风险
 
@@ -89,5 +97,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8a2fa76e8292ad5fd8bc272d14449856d4628f53`
+- `0684d42d4d18eccb878290d3aea8ebf3e2b6b200`
 - 当前回合已进入 `metadata-only closeout follow-up`；后续 PR / review / merge gate 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
