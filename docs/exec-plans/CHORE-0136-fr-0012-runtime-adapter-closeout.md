@@ -39,7 +39,7 @@
 - 当前执行分支：`issue-181-fr-0012-core-reference-adapter`
 - 当前 Work Item：`#181`
 - 当前受审 PR：`#182`
-- 当前实现 checkpoint：`062567d75c883ef6067e81c2bd6fe9c61b20026b`
+- 当前实现 checkpoint：`11bf9a948fef69d96be5c261dfc241aa09609776`
 - 当前代码已完成以下收口：
   - `execute_task_internal()` 现在由 Core 持有 hybrid 资源策略、`acquire()`、host-side bundle 校验、adapter-facing capability projection、`resource_disposition_hint` 消费与统一 `release()` 收口。
   - lifecycle truth 的 `capability` 固定保持 `content_detail_by_url`；adapter-facing request 仅在进入 adapter 前投影为 `content_detail`。
@@ -56,12 +56,13 @@
     - 新增 `syvert/resource_bootstrap.py` 与 `syvert/resource_bootstrap_cli.py`，为真实 host-side 执行面提供受支持的 managed resource bootstrap / migration 路径
     - bootstrap 入口允许两种 account 来源：直接提供 canonical account material JSON，或读取 legacy `xhs` / `douyin` session 文件并迁移为 canonical account.material；两种路径都会在写入 store 前按 adapter runtime contract 做 host-side 校验
     - bootstrap 入口只在 host-side 解析默认 lifecycle store；adapter 层仍只消费 Core 注入的 `resource_bundle`，不重新打开 session-file 执行来源面
+    - bootstrap 入口最终落在 `syvert/` runtime 包内，而不是 `scripts/` governance 面，确保 `implementation` PR 的路径分类与交付边界保持一致
 - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 Work Item 上下文、checkpoint、review 与 merge gate，不要求其静态 SHA 穷尽到后续纯元数据提交。
 
 ## 下一步动作
 
 - 推送包含 bootstrap / migration 入口的新 head，并同步 PR 描述中的 rollout truth。
-- 基于 `062567d75c883ef6067e81c2bd6fe9c61b20026b` 重新提交 guardian。
+- 基于 `11bf9a948fef69d96be5c261dfc241aa09609776` 重新提交 guardian。
 - 若 guardian 转为 `APPROVE`，直接进入受控 `merge_pr`。
 - 若仍有阻断，继续优先检查 host-side rollout / lifecycle truth 是否存在新的 contract 漂移。
 
@@ -89,8 +90,12 @@
   - 结果：`Ran 5 tests in 0.318s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 311 tests in 40.169s`，`OK`
+- `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
+  - 结果：`Ran 311 tests in 39.455s`，`OK`
 - `python3 -m py_compile syvert/resource_bootstrap.py syvert/resource_bootstrap_cli.py tests/runtime/test_resource_bootstrap.py`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main`
+  - 结果：通过（最新 head 已不再触碰 `scripts/` governance 路径）
 - `python3 -m unittest tests.runtime.test_platform_leakage`
   - 结果：`Ran 111 tests in 990.270s`，`OK (skipped=6)`
 - `python3 -m unittest tests.runtime.test_runtime`
