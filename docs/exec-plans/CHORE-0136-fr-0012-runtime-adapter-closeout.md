@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0012-core-injected-resource-bundle/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#182`
 - active 收口事项：`CHORE-0136-fr-0012-runtime-adapter-closeout`
 
 ## 目标
@@ -38,6 +38,7 @@
 - 当前执行现场：`/Users/mc/code/worktrees/syvert/issue-181-fr-0012-core-reference-adapter`
 - 当前执行分支：`issue-181-fr-0012-core-reference-adapter`
 - 当前 Work Item：`#181`
+- 当前受审 PR：`#182`
 - 当前实现 checkpoint：`8a2fa76e8292ad5fd8bc272d14449856d4628f53`
 - 当前代码已完成以下收口：
   - `execute_task_internal()` 现在由 Core 持有 hybrid 资源策略、`acquire()`、host-side bundle 校验、adapter-facing capability projection、`resource_disposition_hint` 消费与统一 `release()` 收口。
