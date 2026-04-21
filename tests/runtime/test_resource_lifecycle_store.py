@@ -27,9 +27,13 @@ class ResourceStoreEnvMixin:
         super().setUp()
         self._resource_store_dir = tempfile.TemporaryDirectory()
         self._resource_store_path = os.path.join(self._resource_store_dir.name, "resource-lifecycle.json")
+        self._resource_trace_store_path = os.path.join(self._resource_store_dir.name, "resource-trace-events.jsonl")
         self._resource_store_patcher = mock.patch.dict(
             os.environ,
-            {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path},
+            {
+                "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path,
+                "SYVERT_RESOURCE_TRACE_STORE_FILE": self._resource_trace_store_path,
+            },
             clear=False,
         )
         self._resource_store_patcher.start()

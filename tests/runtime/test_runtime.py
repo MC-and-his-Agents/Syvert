@@ -940,6 +940,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
         self.assertIsNotNone(lease.released_at)
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-host-validation").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
 
     def test_execute_task_rejects_bundle_with_mismatched_lease_id_before_adapter_and_settles_real_lease(self) -> None:
         request = TaskRequest(
@@ -1026,6 +1028,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")
         self.assertEqual(lease.release_reason, "adapter_completed_without_disposition_hint")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-no-hint-success").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
+        self.assertEqual({event.bundle_id for event in trace_events}, {lease.bundle_id})
 
     def test_execute_task_settles_failure_without_hint_as_available(self) -> None:
         envelope = execute_task(
@@ -1044,6 +1049,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")
         self.assertEqual(lease.release_reason, "adapter_failed_without_disposition_hint")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+        trace_events = self.make_trace_store().task_usage_log("task-no-hint-failure").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "released", "released"])
 
     def test_execute_task_applies_invalidating_hint_without_leaking_internal_field(self) -> None:
         envelope = execute_task(
@@ -1062,6 +1069,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.target_status_after_release, "INVALID")
         self.assertEqual(lease.release_reason, "account_invalidated_by_adapter")
         self.assertEqual(set(self.resource_statuses().values()), {"INVALID"})
+        trace_events = self.make_trace_store().task_usage_log("task-invalidating-hint").events
+        self.assertEqual([event.event_type for event in trace_events], ["acquired", "acquired", "invalidated", "invalidated"])
 
     def test_execute_task_rejects_mismatched_hint_lease_id_and_still_settles_bundle(self) -> None:
         envelope = execute_task(
