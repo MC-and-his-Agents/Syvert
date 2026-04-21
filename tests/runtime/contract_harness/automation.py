@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
+import tempfile
 from typing import Any
 
+from syvert.resource_lifecycle import ResourceRecord
+from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from tests.runtime.contract_harness.fake_adapter import FakeContractAdapter
 from tests.runtime.contract_harness.host import HarnessExecutionInput, execute_harness_sample
 from tests.runtime.contract_harness.samples import CONTRACT_SAMPLES, ContractSample, ExpectedVerdict
@@ -11,6 +15,7 @@ from tests.runtime.contract_harness.validation_tool import (
     HarnessExecutionResult,
     validate_contract_samples,
 )
+from tests.runtime.resource_fixtures import generic_account_material, proxy_material
 
 _EXPECTED_OUTCOME_BY_VERDICT = {
     ExpectedVerdict.PASS: "success",
@@ -150,16 +155,35 @@ def _execute_single_sample(sample: ContractSample) -> HarnessExecutionResult:
     adapter.supported_capabilities = frozenset(profile.declared_capabilities)
     adapter.supported_targets = frozenset(profile.supported_targets)
     adapter.supported_collection_modes = frozenset(profile.supported_collection_modes)
-    envelope = execute_harness_sample(
-        HarnessExecutionInput(
-            sample_id=sample.sample_id,
-            url=sample.input.target_url,
-            adapter_key=sample.input.adapter_key,
-            capability=sample.input.capability,
-        ),
-        adapters={sample.input.adapter_key: adapter},
-        task_id=f"task-{sample.sample_id}",
-    )
+    with tempfile.TemporaryDirectory(prefix=f"syvert-harness-{sample.sample_id}-") as temp_dir:
+        resource_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+        resource_store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="fake-account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=generic_account_material(),
+                ),
+                ResourceRecord(
+                    resource_id="fake-proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material=proxy_material(),
+                ),
+            ]
+        )
+        envelope = execute_harness_sample(
+            HarnessExecutionInput(
+                sample_id=sample.sample_id,
+                url=sample.input.target_url,
+                adapter_key=sample.input.adapter_key,
+                capability=sample.input.capability,
+            ),
+            adapters={sample.input.adapter_key: adapter},
+            task_id=f"task-{sample.sample_id}",
+            resource_lifecycle_store=resource_store,
+        )
     return HarnessExecutionResult(runtime_envelope=envelope)
 
 

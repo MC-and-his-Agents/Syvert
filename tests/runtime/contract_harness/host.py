@@ -22,6 +22,7 @@ def execute_harness_sample(
     *,
     adapters: Mapping[str, Any],
     task_id: str | None = None,
+    resource_lifecycle_store: Any | None = None,
 ) -> dict[str, Any]:
     request = TaskRequest(
         adapter_key=sample.adapter_key,
@@ -29,5 +30,10 @@ def execute_harness_sample(
         input=TaskInput(url=sample.url),
     )
     if task_id is None:
-        return execute_task(request, adapters=adapters)
-    return execute_task(request, adapters=adapters, task_id_factory=lambda: task_id)
+        return execute_task(request, adapters=adapters, resource_lifecycle_store=resource_lifecycle_store)
+    return execute_task(
+        request,
+        adapters=adapters,
+        task_id_factory=lambda: task_id,
+        resource_lifecycle_store=resource_lifecycle_store,
+    )

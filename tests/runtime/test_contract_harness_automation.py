@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from tests.runtime.contract_harness import (
     CONTRACT_SAMPLES,
@@ -15,6 +19,17 @@ from tests.runtime.contract_harness import (
 
 
 class ContractHarnessAutomationTests(unittest.TestCase):
+    def test_automation_runs_in_clean_environment_without_ambient_resource_store(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ,
+            {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(Path(temp_dir) / "fresh-resource-store.json")},
+            clear=False,
+        ):
+            results = run_contract_harness_automation()
+
+        observed = {result["sample_id"]: result["verdict"] for result in results}
+        self.assertEqual(observed, build_expected_verdict_index(CONTRACT_SAMPLES))
+
     def test_catalog_covers_four_fr0006_stable_sample_classes(self) -> None:
         self.assertEqual(
             [sample.sample_id for sample in CONTRACT_SAMPLES],

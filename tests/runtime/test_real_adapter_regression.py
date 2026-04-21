@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -105,6 +108,20 @@ def canonical_regression_evidence_refs() -> list[str]:
 
 
 class RealAdapterRegressionTests(ResourceStoreEnvMixin, unittest.TestCase):
+    def test_build_real_adapter_regression_payload_runs_in_clean_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ,
+            {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(Path(temp_dir) / "fresh-resource-store.json")},
+            clear=False,
+        ):
+            payload = build_real_adapter_regression_payload(
+                version="v0.2.0",
+                adapters=self.hermetic_adapters(),
+            )
+
+        self.assertEqual(payload["adapter_results"][0]["cases"][0]["observed_status"], "success")
+        self.assertEqual(payload["adapter_results"][1]["cases"][1]["observed_error_category"], "platform")
+
     def test_build_real_adapter_regression_payload_emits_frozen_matrix(self) -> None:
         payload = build_real_adapter_regression_payload(
             version="v0.2.0",

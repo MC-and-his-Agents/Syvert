@@ -971,6 +971,44 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
 
+    def test_execute_task_rejects_bundle_with_tampered_material_and_acquired_at_before_adapter(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/host-validation-material"),
+        )
+        original_acquire = runtime_module.acquire_runtime_resource_bundle
+
+        def acquire_bundle_with_tampered_truth(**kwargs):
+            bundle = original_acquire(**kwargs)
+            tampered_account = replace(
+                bundle.account,
+                material={**bundle.account.material, "cookies": "tampered=1"},
+            )
+            return replace(
+                bundle,
+                acquired_at="2026-01-01T00:00:00Z",
+                account=tampered_account,
+            )
+
+        with mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=acquire_bundle_with_tampered_truth,
+        ):
+            envelope = execute_task(
+                request,
+                adapters={"stub": NeverCalledAdapter()},
+                task_id_factory=lambda: "task-host-validation-material",
+            )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_resource_bundle")
+        lease = self.lease_for_task("task-host-validation-material")
+        self.assertEqual(lease.target_status_after_release, "AVAILABLE")
+        self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
+        self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+
     def test_execute_task_settles_success_without_hint_as_available(self) -> None:
         envelope = execute_task(
             TaskRequest(

@@ -382,7 +382,7 @@ def execute_task_internal(
                 task_record_store=store,
             )
         resource_bundle = acquire_result
-        live_resource_lease, live_lease_error = resolve_host_resource_lease(
+        live_resource_lease, live_resources_by_id, live_lease_error = resolve_host_resource_lease(
             task_id=task_id,
             adapter_key=adapter_key,
             capability=capability,
@@ -414,6 +414,7 @@ def execute_task_internal(
             capability=capability,
             requested_slots=requested_slots,
             live_resource_lease=live_resource_lease,
+            live_resources_by_id=live_resources_by_id,
         )
         if bundle_error is not None:
             cleanup_envelope = settle_managed_resource_bundle(
@@ -826,6 +827,7 @@ def validate_host_resource_bundle(
     capability: str,
     requested_slots: tuple[str, ...],
     live_resource_lease,
+    live_resources_by_id: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     from syvert.resource_lifecycle import ResourceLifecycleContractError, validate_resource_bundle
 
@@ -857,6 +859,11 @@ def validate_host_resource_bundle(
             "invalid_resource_bundle",
             "resource_bundle.requested_slots 与当前请求不一致",
         )
+    if resource_bundle.acquired_at != live_resource_lease.acquired_at:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.acquired_at 与当前 active lease 不一致",
+        )
     if resource_bundle.bundle_id != live_resource_lease.bundle_id:
         return runtime_contract_error(
             "invalid_resource_bundle",
@@ -877,6 +884,21 @@ def validate_host_resource_bundle(
             "invalid_resource_bundle",
             "resource_bundle slots 与当前 active lease 绑定资源不一致",
         )
+    for slot in requested_slots:
+        resource = getattr(resource_bundle, slot)
+        if resource is None:
+            continue
+        live_resource = live_resources_by_id.get(resource.resource_id)
+        if live_resource is None:
+            return runtime_contract_error(
+                "invalid_resource_bundle",
+                "resource_bundle slot 绑定了 host-side truth 中不存在的资源",
+            )
+        if resource != live_resource:
+            return runtime_contract_error(
+                "invalid_resource_bundle",
+                "resource_bundle slot 内容与 host-side resource truth 不一致",
+            )
     return None
 
 
@@ -944,6 +966,7 @@ def resolve_host_resource_lease(
     except ResourceLifecycleContractError as error:
         return (
             None,
+            {},
             runtime_contract_error(
                 "invalid_resource_bundle",
                 "host-side resource lifecycle truth 不满足共享 contract",
@@ -962,13 +985,15 @@ def resolve_host_resource_lease(
     if len(candidates) != 1:
         return (
             None,
+            {},
             runtime_contract_error(
                 "invalid_resource_bundle",
                 "当前 task 缺少唯一 active lease truth",
                 details={"active_lease_count": len(candidates)},
             ),
         )
-    return candidates[0], None
+    resources_by_id = {record.resource_id: record for record in snapshot.resources}
+    return candidates[0], resources_by_id, None
 
 
 def settle_managed_resource_bundle(
