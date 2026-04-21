@@ -71,6 +71,14 @@
   - 结果：通过（4 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_settles_success_without_hint_as_available tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_settles_failure_without_hint_as_available tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_applies_invalidating_hint_without_leaking_internal_field tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_releases_bundle_when_host_side_validation_fails_after_acquire`
   - 结果：通过（4 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_resource_trace_store tests.runtime.test_resource_lifecycle tests.runtime.test_runtime`
+  - 结果：通过（98 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
+  - 结果：通过（211 tests, OK）
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
 
 ## 未决风险
 
@@ -84,4 +92,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b004b73da8a30c898200b497c94d351013154612`
+- `30c4bc0d93ea4600fe4ef975f9bf09bca1bb904c`
