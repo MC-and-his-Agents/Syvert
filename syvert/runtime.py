@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import re
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 from uuid import uuid4
 
 from syvert.registry import AdapterRegistry, RegistryError
@@ -30,6 +30,17 @@ ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 CAPABILITY_FAMILY_BY_OPERATION = {CONTENT_DETAIL_BY_URL: CONTENT_DETAIL}
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
+RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
+    (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
+}
+DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
+DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
+DEFAULT_FAILURE_RELEASE_REASON = "adapter_failed_without_disposition_hint"
+DEFAULT_INVALID_HINT_RELEASE_REASON = "invalid_resource_disposition_hint"
+
+if TYPE_CHECKING:
+    from syvert.resource_lifecycle import ResourceBundle
+    from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 
 
 @dataclass(frozen=True)
@@ -75,12 +86,46 @@ class AdapterTaskRequest:
         return TaskInput(url=self.target_value)
 
 
+@dataclass(frozen=True)
+class ResourceDispositionHint:
+    lease_id: str
+    target_status_after_release: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class AdapterExecutionContext:
+    request: AdapterTaskRequest
+    resource_bundle: "ResourceBundle | None"
+
+    @property
+    def capability(self) -> str:
+        return self.request.capability
+
+    @property
+    def target_type(self) -> str:
+        return self.request.target_type
+
+    @property
+    def target_value(self) -> str:
+        return self.request.target_value
+
+    @property
+    def collection_mode(self) -> str:
+        return self.request.collection_mode
+
+    @property
+    def input(self) -> TaskInput:
+        return self.request.input
+
+
 @dataclass
 class PlatformAdapterError(Exception):
     code: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
     category: str = "platform"
+    resource_disposition_hint: ResourceDispositionHint | Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         super().__init__(self.message)
@@ -101,12 +146,14 @@ def execute_task(
     *,
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
+    resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
 ) -> dict[str, Any]:
     return execute_task_internal(
         request,
         adapters=adapters,
         task_id_factory=task_id_factory,
         preserve_envelope_on_record_error=True,
+        resource_lifecycle_store=resource_lifecycle_store,
     ).envelope
 
 
@@ -116,6 +163,7 @@ def execute_task_with_record(
     adapters: Mapping[str, Any],
     task_id_factory: Callable[[], str] | None = None,
     task_record_store: TaskRecordStore | None = None,
+    resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
 ) -> TaskExecutionResult:
     store = task_record_store if task_record_store is not None else default_task_record_store()
     return execute_task_internal(
@@ -124,6 +172,7 @@ def execute_task_with_record(
         task_id_factory=task_id_factory,
         preserve_envelope_on_record_error=False,
         task_record_store=store,
+        resource_lifecycle_store=resource_lifecycle_store,
     )
 
 
@@ -134,6 +183,7 @@ def execute_task_internal(
     task_id_factory: Callable[[], str] | None = None,
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None = None,
+    resource_lifecycle_store: "LocalResourceLifecycleStore | None" = None,
 ) -> TaskExecutionResult:
     store = task_record_store
     adapter_key, capability = extract_request_context(request)
@@ -309,11 +359,45 @@ def execute_task_internal(
     if persisted_record is not None:
         record = persisted_record
 
-    try:
-        payload = declaration.adapter.execute(adapter_request)
-        payload_error = validate_success_payload(payload)
-        if payload_error is not None:
-            envelope = failure_envelope(task_id, adapter_key, capability, payload_error)
+    requested_slots = resolve_requested_resource_slots(normalized_request)
+    managed_resource_store = None
+    resource_bundle = None
+    if requested_slots is not None:
+        managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
+        acquire_result = acquire_runtime_resource_bundle(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            requested_slots=requested_slots,
+            resource_lifecycle_store=managed_resource_store,
+        )
+        if isinstance(acquire_result, Mapping):
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                dict(acquire_result),
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
+        resource_bundle = acquire_result
+        bundle_error = validate_host_resource_bundle(
+            resource_bundle,
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            requested_slots=requested_slots,
+        )
+        if bundle_error is not None:
+            cleanup_envelope = settle_managed_resource_bundle(
+                resource_bundle=resource_bundle,
+                task_id=task_id,
+                resource_lifecycle_store=managed_resource_store,
+                default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
+                hint=None,
+            )
+            envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, bundle_error)
             return finalize_task_execution_result(
                 task_id,
                 adapter_key,
@@ -323,17 +407,47 @@ def execute_task_internal(
                 preserve_envelope_on_record_error=preserve_envelope_on_record_error,
                 task_record_store=store,
             )
+
+    adapter_context = AdapterExecutionContext(
+        request=adapter_request,
+        resource_bundle=resource_bundle,
+    )
+    disposition_hint: ResourceDispositionHint | None = None
+    default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
+    try:
+        payload = declaration.adapter.execute(adapter_context)
+        payload_error = validate_success_payload(payload)
+        if payload_error is not None:
+            envelope = failure_envelope(task_id, adapter_key, capability, payload_error)
+            default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
+        else:
+            disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+                payload.get("resource_disposition_hint"),
+                expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
+            )
+            if hint_error is not None:
+                envelope = failure_envelope(task_id, adapter_key, capability, hint_error)
+                default_release_reason = DEFAULT_INVALID_HINT_RELEASE_REASON
+            else:
+                envelope = {
+                    "task_id": task_id,
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "status": "success",
+                    "raw": payload["raw"],
+                    "normalized": payload["normalized"],
+                }
     except PlatformAdapterError as error:
-        envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
-        return finalize_task_execution_result(
-            task_id,
-            adapter_key,
-            capability,
-            record,
-            envelope,
-            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-            task_record_store=store,
+        disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+            error.resource_disposition_hint,
+            expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
         )
+        if hint_error is not None:
+            envelope = failure_envelope(task_id, adapter_key, capability, hint_error)
+            default_release_reason = DEFAULT_INVALID_HINT_RELEASE_REASON
+        else:
+            envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
+            default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
     except Exception as error:
         envelope = failure_envelope(
             task_id,
@@ -344,24 +458,19 @@ def execute_task_internal(
                 str(error) or error.__class__.__name__,
             ),
         )
-        return finalize_task_execution_result(
-            task_id,
-            adapter_key,
-            capability,
-            record,
-            envelope,
-            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-            task_record_store=store,
-        )
+        default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
 
-    envelope = {
-        "task_id": task_id,
-        "adapter_key": adapter_key,
-        "capability": capability,
-        "status": "success",
-        "raw": payload["raw"],
-        "normalized": payload["normalized"],
-    }
+    if resource_bundle is not None and managed_resource_store is not None:
+        cleanup_envelope = settle_managed_resource_bundle(
+            resource_bundle=resource_bundle,
+            task_id=task_id,
+            resource_lifecycle_store=managed_resource_store,
+            default_reason=default_release_reason,
+            hint=disposition_hint,
+        )
+        if cleanup_envelope is not None:
+            envelope = cleanup_envelope
+
     return finalize_task_execution_result(
         task_id,
         adapter_key,
@@ -644,6 +753,169 @@ def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dic
             details={"actual_type": type(generated).__name__},
         ),
     )
+
+
+def resolve_requested_resource_slots(request: CoreTaskRequest) -> tuple[str, ...] | None:
+    slots = RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE.get(
+        (request.target.capability, request.policy.collection_mode)
+    )
+    if slots is None:
+        return None
+    return tuple(slots)
+
+
+def default_runtime_resource_lifecycle_store():
+    from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+
+    return default_resource_lifecycle_store()
+
+
+def acquire_runtime_resource_bundle(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    requested_slots: tuple[str, ...],
+    resource_lifecycle_store,
+):
+    from syvert.resource_lifecycle import AcquireRequest, acquire
+
+    return acquire(
+        AcquireRequest(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            requested_slots=requested_slots,
+        ),
+        resource_lifecycle_store,
+        task_id,
+    )
+
+
+def validate_host_resource_bundle(
+    resource_bundle,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    requested_slots: tuple[str, ...],
+) -> dict[str, Any] | None:
+    from syvert.resource_lifecycle import ResourceLifecycleContractError, validate_resource_bundle
+
+    try:
+        validate_resource_bundle(resource_bundle)
+    except ResourceLifecycleContractError as error:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle 不满足共享 contract",
+            details={"reason": str(error)},
+        )
+    if resource_bundle.task_id != task_id:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.task_id 与当前 task 不一致",
+        )
+    if resource_bundle.adapter_key != adapter_key:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.adapter_key 与当前请求不一致",
+        )
+    if resource_bundle.capability != capability:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.capability 与当前请求不一致",
+        )
+    if tuple(resource_bundle.requested_slots) != tuple(requested_slots):
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.requested_slots 与当前请求不一致",
+        )
+    return None
+
+
+def extract_internal_resource_disposition_hint(
+    raw_hint: ResourceDispositionHint | Mapping[str, Any] | None,
+    *,
+    expected_lease_id: str | None,
+) -> tuple[ResourceDispositionHint | None, dict[str, Any] | None]:
+    if raw_hint is None:
+        return None, None
+    if expected_lease_id is None:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_disposition_hint",
+                "非资源路径不得返回 resource_disposition_hint",
+            ),
+        )
+    if isinstance(raw_hint, ResourceDispositionHint):
+        hint = raw_hint
+    elif isinstance(raw_hint, Mapping):
+        lease_id = raw_hint.get("lease_id")
+        target_status_after_release = raw_hint.get("target_status_after_release")
+        reason = raw_hint.get("reason")
+        hint = ResourceDispositionHint(
+            lease_id=lease_id if isinstance(lease_id, str) else "",
+            target_status_after_release=target_status_after_release if isinstance(target_status_after_release, str) else "",
+            reason=reason if isinstance(reason, str) else "",
+        )
+    else:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_disposition_hint",
+                "resource_disposition_hint 必须是对象",
+            ),
+        )
+
+    if not hint.lease_id:
+        return None, runtime_contract_error("invalid_resource_disposition_hint", "resource_disposition_hint.lease_id 不能为空")
+    if hint.lease_id != expected_lease_id:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_disposition_hint",
+                "resource_disposition_hint.lease_id 与注入 bundle 不一致",
+            ),
+        )
+    if hint.target_status_after_release not in {"AVAILABLE", "INVALID"}:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_disposition_hint",
+                "resource_disposition_hint.target_status_after_release 不在允许值范围内",
+            ),
+        )
+    if not hint.reason:
+        return None, runtime_contract_error("invalid_resource_disposition_hint", "resource_disposition_hint.reason 不能为空")
+    return hint, None
+
+
+def settle_managed_resource_bundle(
+    *,
+    resource_bundle,
+    task_id: str,
+    resource_lifecycle_store,
+    default_reason: str,
+    hint: ResourceDispositionHint | None,
+) -> dict[str, Any] | None:
+    from syvert.resource_lifecycle import ReleaseRequest, release
+
+    release_result = release(
+        ReleaseRequest(
+            lease_id=resource_bundle.lease_id,
+            task_id=task_id,
+            target_status_after_release=(
+                hint.target_status_after_release if hint is not None else "AVAILABLE"
+            ),
+            reason=hint.reason if hint is not None else default_reason,
+        ),
+        resource_lifecycle_store,
+        task_id,
+    )
+    if isinstance(release_result, Mapping):
+        return dict(release_result)
+    return None
 
 
 def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | None:

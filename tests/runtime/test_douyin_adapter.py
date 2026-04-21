@@ -10,7 +10,19 @@ from typing import Any
 import unittest
 from unittest import mock
 
-from syvert.runtime import AdapterTaskRequest, PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import (
+    AdapterExecutionContext,
+    AdapterTaskRequest,
+    PlatformAdapterError,
+    TaskInput,
+    TaskRequest,
+    execute_task,
+)
+from tests.runtime.resource_fixtures import (
+    ResourceStoreEnvMixin,
+    build_managed_resource_bundle,
+    douyin_account_material,
+)
 
 
 def build_douyin_aweme_detail(
@@ -52,21 +64,35 @@ def build_douyin_aweme_detail(
     }
 
 
-class DouyinAdapterTests(unittest.TestCase):
+def build_douyin_execution_context(
+    *,
+    url: str = "https://www.douyin.com/video/7580570616932224282",
+    collection_mode: str = "hybrid",
+    account_material: dict[str, Any] | None = None,
+) -> AdapterExecutionContext:
+    return AdapterExecutionContext(
+        request=AdapterTaskRequest(
+            capability="content_detail",
+            target_type="url",
+            target_value=url,
+            collection_mode=collection_mode,
+        ),
+        resource_bundle=build_managed_resource_bundle(
+            adapter_key="douyin",
+            task_id="task-douyin-direct-execution",
+            account_material=account_material or douyin_account_material(),
+        ),
+    )
+
+
+class DouyinAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_douyin_adapter_rejects_non_hybrid_adapter_task_request_before_session_lookup(self) -> None:
         from syvert.adapters.douyin import DouyinAdapter
 
         adapter = DouyinAdapter()
 
         with self.assertRaises(PlatformAdapterError) as raised:
-            adapter.execute(
-                AdapterTaskRequest(
-                    capability="content_detail",
-                    target_type="url",
-                    target_value="https://www.douyin.com/video/7580570616932224282",
-                    collection_mode="authenticated",
-                )
-            )
+            adapter.execute(build_douyin_execution_context(collection_mode="authenticated"))
 
         self.assertEqual(raised.exception.code, "invalid_douyin_request")
 
@@ -179,13 +205,7 @@ class DouyinAdapterTests(unittest.TestCase):
                 or {"status_code": 0, "aweme_detail": build_douyin_aweme_detail()},
             )
 
-            payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="douyin",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                )
-            )
+            payload = adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(payload["raw"]["aweme_detail"]["aweme_id"], "7580570616932224282")
         self.assertEqual(payload["normalized"]["platform"], "douyin")
@@ -233,13 +253,7 @@ class DouyinAdapterTests(unittest.TestCase):
                 },
             )
 
-            payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="douyin",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                )
-            )
+            payload = adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(payload["normalized"]["published_at"], None)
         self.assertEqual(payload["normalized"]["stats"]["like_count"], None)
@@ -275,13 +289,7 @@ class DouyinAdapterTests(unittest.TestCase):
             )
 
             with self.assertRaises(PlatformAdapterError) as raised:
-                adapter.execute(
-                    TaskRequest(
-                        adapter_key="douyin",
-                        capability="content_detail_by_url",
-                        input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                    )
-                )
+                adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(raised.exception.code, "douyin_detail_request_failed")
         self.assertEqual(raised.exception.details["platform_code"], 2190008)
@@ -321,13 +329,7 @@ class DouyinAdapterTests(unittest.TestCase):
                 },
             )
 
-            payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="douyin",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                )
-            )
+            payload = adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(payload["normalized"]["body_text"], "浏览器回退正文")
         self.assertEqual(payload["raw"]["status_code"], 0)
@@ -362,10 +364,12 @@ class DouyinAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="douyin",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
+                build_douyin_execution_context(
+                    account_material={
+                        "cookies": "a=1; b=2",
+                        "user_agent": "Mozilla/5.0 TestAgent",
+                        "sign_base_url": "http://127.0.0.1:8000",
+                    }
                 )
             )
 
@@ -410,13 +414,7 @@ class DouyinAdapterTests(unittest.TestCase):
             )
 
             with self.assertRaises(PlatformAdapterError) as raised:
-                adapter.execute(
-                    TaskRequest(
-                        adapter_key="douyin",
-                        capability="content_detail_by_url",
-                        input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                    )
-                )
+                adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(raised.exception.code, "douyin_detail_request_failed")
 
@@ -456,13 +454,7 @@ class DouyinAdapterTests(unittest.TestCase):
                 },
             )
 
-            payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="douyin",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.douyin.com/video/7580570616932224282"),
-                )
-            )
+            payload = adapter.execute(build_douyin_execution_context())
 
         self.assertEqual(payload["normalized"]["body_text"], "浏览器请求回退正文")
         self.assertEqual(payload["raw"]["status_code"], 0)
@@ -473,11 +465,11 @@ class DouyinAdapterTests(unittest.TestCase):
         from syvert.adapters.douyin import DouyinAdapter
 
         adapter = DouyinAdapter(
-            session_provider=lambda path: (_ for _ in ()).throw(
+            sign_transport=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
                 PlatformAdapterError(
-                    code="douyin_session_missing",
-                    message="抖音会话文件不存在",
-                    details={"session_path": str(path)},
+                    code="douyin_sign_unavailable",
+                    message="抖音签名服务不可用",
+                    details={"base_url": base_url},
                 )
             )
         )
@@ -494,4 +486,4 @@ class DouyinAdapterTests(unittest.TestCase):
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "platform")
-        self.assertEqual(envelope["error"]["code"], "douyin_session_missing")
+        self.assertEqual(envelope["error"]["code"], "douyin_sign_unavailable")

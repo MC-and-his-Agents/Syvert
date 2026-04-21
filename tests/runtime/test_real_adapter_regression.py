@@ -17,6 +17,7 @@ from syvert.version_gate import (
     validate_real_adapter_regression_source_report,
 )
 from tests.runtime.platform_leakage_fixtures import canonical_platform_leakage_payload
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
 class ShapeContractSpoofAdapter:
@@ -103,7 +104,7 @@ def canonical_regression_evidence_refs() -> list[str]:
     ]
 
 
-class RealAdapterRegressionTests(unittest.TestCase):
+class RealAdapterRegressionTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_build_real_adapter_regression_payload_emits_frozen_matrix(self) -> None:
         payload = build_real_adapter_regression_payload(
             version="v0.2.0",

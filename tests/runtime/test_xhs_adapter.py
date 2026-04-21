@@ -3,6 +3,7 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 from threading import Thread
@@ -11,7 +12,14 @@ import unittest
 from unittest import mock
 
 from syvert.cli import main
-from syvert.runtime import AdapterTaskRequest, PlatformAdapterError, TaskInput, TaskRequest, execute_task
+from syvert.runtime import (
+    AdapterExecutionContext,
+    AdapterTaskRequest,
+    PlatformAdapterError,
+    TaskInput,
+    TaskRequest,
+    execute_task,
+)
 
 from syvert.adapters.xhs import (
     XhsAdapter,
@@ -21,6 +29,12 @@ from syvert.adapters.xhs import (
     normalize_detail_response,
     parse_xhs_detail_url,
     post_json,
+)
+from tests.runtime.resource_fixtures import (
+    ResourceStoreEnvMixin,
+    build_managed_resource_bundle,
+    seed_default_runtime_resources,
+    xhs_account_material,
 )
 
 
@@ -67,16 +81,53 @@ class FakeHttpResponse:
         return False
 
 
-class XhsAdapterTests(unittest.TestCase):
+def build_xhs_account_material(**overrides: Any) -> dict[str, Any]:
+    material = xhs_account_material()
+    material.update(overrides)
+    return material
+
+
+class XhsAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
+    def build_xhs_context(
+        self,
+        *,
+        url: str,
+        collection_mode: str = "hybrid",
+        account_material: dict[str, Any] | None = None,
+        resource_bundle: bool = True,
+        requested_slots: tuple[str, ...] = ("account", "proxy"),
+        task_id: str = "task-xhs-test",
+        lease_id: str = "lease-xhs-test",
+    ) -> AdapterExecutionContext:
+        return AdapterExecutionContext(
+            request=AdapterTaskRequest(
+                capability="content_detail",
+                target_type="url",
+                target_value=url,
+                collection_mode=collection_mode,
+            ),
+            resource_bundle=(
+                build_managed_resource_bundle(
+                    adapter_key="xhs",
+                    task_id=task_id,
+                    requested_slots=requested_slots,
+                    lease_id=lease_id,
+                    account_material=(
+                        xhs_account_material() if account_material is None else account_material
+                    ),
+                )
+                if resource_bundle
+                else None
+            ),
+        )
+
     def test_xhs_adapter_rejects_non_hybrid_adapter_task_request_before_session_lookup(self) -> None:
         adapter = XhsAdapter()
 
         with self.assertRaises(PlatformAdapterError) as raised:
             adapter.execute(
-                AdapterTaskRequest(
-                    capability="content_detail",
-                    target_type="url",
-                    target_value="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
                     collection_mode="public",
                 )
             )
@@ -195,12 +246,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -242,12 +289,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -291,12 +334,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -428,15 +467,12 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url=(
-                            "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                            "?xsec_token=token-1&xsec_source=pc_search"
-                        )
+                self.build_xhs_context(
+                    url=(
+                        "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
+                        "?xsec_token=token-1&xsec_source=pc_search"
                     ),
+                    account_material=build_xhs_account_material(timeout_seconds=7),
                 )
             )
 
@@ -608,12 +644,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -712,12 +744,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -780,12 +808,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -847,12 +871,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -920,10 +940,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(url=f"https://www.xiaohongshu.com/explore/{source_note_id}"),
+                    self.build_xhs_context(
+                        url=f"https://www.xiaohongshu.com/explore/{source_note_id}"
                     )
                 )
 
@@ -985,12 +1003,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(PlatformAdapterError) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -1066,12 +1080,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -1122,12 +1132,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(Exception) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -1180,12 +1186,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(Exception) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
 
@@ -1193,18 +1195,17 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(raised.exception.details["platform_code"], 300013)
         self.assertEqual(raised.exception.details["platform_message"], "登录失效")
 
-    def test_xhs_adapter_raises_platform_error_when_session_file_is_missing(self) -> None:
-        adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))
+    def test_xhs_adapter_raises_platform_error_when_resource_bundle_is_missing(self) -> None:
+        adapter = XhsAdapter()
 
         with self.assertRaises(Exception) as raised:
             adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+                    resource_bundle=False,
                 )
             )
-        self.assertEqual(raised.exception.code, "xhs_session_missing")
+        self.assertEqual(raised.exception.code, "xhs_resource_bundle_missing")
 
     def test_xhs_adapter_preserves_html_fetch_failure_when_sign_base_url_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1236,12 +1237,9 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(Exception) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+                        account_material=build_xhs_account_material(sign_base_url=None),
                     )
                 )
             self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
@@ -1284,12 +1282,8 @@ class XhsAdapterTests(unittest.TestCase):
 
             with self.assertRaises(Exception) as raised:
                 adapter.execute(
-                    TaskRequest(
-                        adapter_key="xhs",
-                        capability="content_detail_by_url",
-                        input=TaskInput(
-                            url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                        ),
+                    self.build_xhs_context(
+                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                     )
                 )
             self.assertEqual(raised.exception.code, "xhs_content_not_found")
@@ -1355,12 +1349,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -1422,12 +1412,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -1486,12 +1472,8 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
                 )
             )
 
@@ -1555,12 +1537,9 @@ class XhsAdapterTests(unittest.TestCase):
             )
 
             payload = adapter.execute(
-                TaskRequest(
-                    adapter_key="xhs",
-                    capability="content_detail_by_url",
-                    input=TaskInput(
-                        url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8"
-                    ),
+                self.build_xhs_context(
+                    url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8",
+                    account_material=build_xhs_account_material(timeout_seconds=float("inf")),
                 )
             )
 
@@ -1625,7 +1604,32 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "xhs_detail_request_failed")
 
     def test_execute_task_returns_platform_failure_envelope_for_xhs_platform_errors(self) -> None:
-        adapter = XhsAdapter(session_path=Path("/tmp/syvert-does-not-exist/xhs.session.json"))
+        adapter = XhsAdapter(
+            sign_transport=lambda base_url, payload, timeout_seconds: {
+                "x_s": "signed-x-s",
+                "x_t": "signed-x-t",
+                "x_s_common": "signed-x-s-common",
+                "x_b3_traceid": "trace-1",
+            },
+            detail_transport=lambda **kwargs: (_ for _ in ()).throw(
+                PlatformAdapterError(
+                    code="xhs_detail_request_failed",
+                    message="detail unavailable",
+                )
+            ),
+            page_transport=lambda **kwargs: (_ for _ in ()).throw(
+                PlatformAdapterError(
+                    code="xhs_detail_request_failed",
+                    message="html fallback unavailable",
+                )
+            ),
+            page_state_transport=lambda **kwargs: (_ for _ in ()).throw(
+                PlatformAdapterError(
+                    code="xhs_browser_target_tab_missing",
+                    message="未找到目标小红书详情标签页",
+                )
+            ),
+        )
         request = TaskRequest(
             adapter_key="xhs",
             capability="content_detail_by_url",
@@ -1641,7 +1645,7 @@ class XhsAdapterTests(unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["task_id"], "task-xhs-platform-error")
         self.assertEqual(envelope["error"]["category"], "platform")
-        self.assertEqual(envelope["error"]["code"], "xhs_session_missing")
+        self.assertEqual(envelope["error"]["code"], "xhs_detail_request_failed")
 
     def test_runtime_rejects_incomplete_normalized_payload(self) -> None:
         class BrokenXhsAdapter:
@@ -1778,6 +1782,7 @@ class XhsAdapterTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as temp_home:
                 session_path = Path(temp_home) / "xhs.session.json"
+                resource_store_path = Path(temp_home) / "resource-lifecycle.json"
                 session_path.write_text(
                     json.dumps(
                         {
@@ -1791,10 +1796,23 @@ class XhsAdapterTests(unittest.TestCase):
                 )
                 stdout = io.StringIO()
                 stderr = io.StringIO()
-                with mock.patch("syvert.adapters.xhs.DEFAULT_XHS_SESSION_PATH", session_path), mock.patch(
+                with mock.patch.dict(
+                    os.environ,
+                    {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(resource_store_path)},
+                    clear=False,
+                ), mock.patch(
+                    "syvert.adapters.xhs.DEFAULT_XHS_SESSION_PATH",
+                    session_path,
+                ), mock.patch(
                     "syvert.adapters.xhs.XHS_API_BASE_URL",
                     f"http://127.0.0.1:{server.server_port}",
                 ):
+                    seed_default_runtime_resources(
+                        account_material=build_xhs_account_material(
+                            sign_base_url=f"http://127.0.0.1:{server.server_port}",
+                            timeout_seconds=5,
+                        )
+                    )
                     exit_code = main(
                         [
                             "--adapter",

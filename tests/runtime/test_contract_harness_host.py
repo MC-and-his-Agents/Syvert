@@ -3,16 +3,17 @@ from __future__ import annotations
 import unittest
 
 from syvert.registry import AdapterRegistry
-from syvert.runtime import AdapterTaskRequest
+from syvert.runtime import AdapterExecutionContext
 from tests.runtime.contract_harness.fake_adapter import FakeContractAdapter
 from tests.runtime.contract_harness.host import (
     DEFAULT_HARNESS_ADAPTER_KEY,
     HarnessExecutionInput,
     execute_harness_sample,
 )
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
-class ContractHarnessHostTests(unittest.TestCase):
+class ContractHarnessHostTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_executes_fake_adapter_via_standard_runtime_and_registry_path(self) -> None:
         adapter = FakeContractAdapter(scenario="success")
         sample = HarnessExecutionInput(sample_id="sample-success", url="https://example.com/fake/1")
@@ -32,11 +33,12 @@ class ContractHarnessHostTests(unittest.TestCase):
         self.assertIn("normalized", result)
         self.assertEqual(result["normalized"]["content_id"], "fake-content-001")
         self.assertEqual(result["normalized"]["canonical_url"], sample.url)
-        self.assertIsInstance(adapter.last_request, AdapterTaskRequest)
-        self.assertEqual(adapter.last_request.capability, "content_detail")
-        self.assertEqual(adapter.last_request.target_type, "url")
-        self.assertEqual(adapter.last_request.target_value, sample.url)
-        self.assertEqual(adapter.last_request.collection_mode, "hybrid")
+        self.assertIsInstance(adapter.last_request, AdapterExecutionContext)
+        self.assertEqual(adapter.last_request.request.capability, "content_detail")
+        self.assertEqual(adapter.last_request.request.target_type, "url")
+        self.assertEqual(adapter.last_request.request.target_value, sample.url)
+        self.assertEqual(adapter.last_request.request.collection_mode, "hybrid")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
 
         registry = AdapterRegistry.from_mapping({DEFAULT_HARNESS_ADAPTER_KEY: adapter})
         self.assertEqual(

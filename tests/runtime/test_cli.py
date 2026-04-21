@@ -20,6 +20,11 @@ from syvert.task_record import (
     task_record_to_dict,
 )
 from syvert.task_record_store import LocalTaskRecordStore
+from tests.runtime.resource_fixtures import (
+    ResourceStoreEnvMixin,
+    douyin_account_material,
+    seed_default_runtime_resources,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -107,7 +112,7 @@ def unexpected_secondary_filesystem_consultation(*args: object, **kwargs: object
     raise AssertionError("unexpected_secondary_filesystem_consultation")
 
 
-class CliTests(unittest.TestCase):
+class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self._task_record_store_dir = tempfile.TemporaryDirectory()
@@ -127,6 +132,7 @@ class CliTests(unittest.TestCase):
         return {
             "PYTHONPATH": str(REPO_ROOT),
             "SYVERT_TASK_RECORD_STORE_DIR": self._task_record_store_dir.name,
+            "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": self._resource_store_path,
         }
 
     def test_cli_wrapper_help_exits_zero(self) -> None:
@@ -245,10 +251,18 @@ class CliTests(unittest.TestCase):
 
     def test_cli_persists_task_record_through_default_store_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
+            resource_store_path = Path(temp_dir) / "resource-lifecycle.json"
             env = {
                 "PYTHONPATH": str(REPO_ROOT),
                 "SYVERT_TASK_RECORD_STORE_DIR": temp_dir,
+                "SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(resource_store_path),
             }
+            with mock.patch.dict(
+                os.environ,
+                {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(resource_store_path)},
+                clear=False,
+            ):
+                seed_default_runtime_resources()
             result = subprocess.run(
                 [
                     sys.executable,
@@ -898,6 +912,7 @@ class CliTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as temp_home:
                 session_path = Path(temp_home) / "douyin.session.json"
+                resource_store_path = Path(temp_home) / "resource-lifecycle.json"
                 session_path.write_text(
                     json.dumps(
                         {
@@ -914,10 +929,24 @@ class CliTests(unittest.TestCase):
                 )
                 stdout = io.StringIO()
                 stderr = io.StringIO()
-                with mock.patch("syvert.adapters.douyin.DEFAULT_DOUYIN_SESSION_PATH", session_path), mock.patch(
+                with mock.patch.dict(
+                    os.environ,
+                    {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(resource_store_path)},
+                    clear=False,
+                ), mock.patch(
+                    "syvert.adapters.douyin.DEFAULT_DOUYIN_SESSION_PATH",
+                    session_path,
+                ), mock.patch(
                     "syvert.adapters.douyin.DOUYIN_API_BASE_URL",
                     f"http://127.0.0.1:{server.server_port}",
                 ):
+                    seed_default_runtime_resources(
+                        account_material={
+                            **douyin_account_material(),
+                            "sign_base_url": f"http://127.0.0.1:{server.server_port}",
+                            "timeout_seconds": 5,
+                        }
+                    )
                     exit_code = main(
                         [
                             "--adapter",
