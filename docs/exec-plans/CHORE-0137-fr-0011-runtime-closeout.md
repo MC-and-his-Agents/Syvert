@@ -8,7 +8,7 @@
 - release：`v0.4.0`
 - sprint：`2026-S17`
 - 关联 spec：`docs/specs/FR-0011-task-bound-resource-tracing/`
-- 关联 PR：
+- 关联 PR：`#184`
 - active 收口事项：`CHORE-0137-fr-0011-runtime-closeout`
 
 ## 目标
@@ -39,7 +39,7 @@
 
 - 已创建 runtime Work Item `#183`，并通过 `python3 scripts/create_worktree.py --issue 183 --class implementation` 建立独立 worktree `/Users/mc/code/worktrees/syvert/issue-183-fr-0011`。
 - 当前工作树已新增 tracing 共享模型、本地 trace store、`runtime/resource_lifecycle` 接线与首批 tracing 回归测试。
-- 当前实现将 tracing truth 绑定到 lifecycle 提交后的同一 host-side 协调入口，优先保证主路径不发生并发死锁；后续如需更强的跨 store 原子性，需要新的 formal spec 或 backend 事务语义支撑。
+- 当前工作树已根据 guardian 的首轮阻断把默认本地 store 收紧为“带补偿的 tracing 双写协调”：在 lifecycle 锁内准备 trace truth，若 snapshot 写入失败则回滚 trace 文件，不再接受“lifecycle truth 已前滚、trace truth 缺失”的状态分叉。
 
 ## 下一步动作
 
@@ -79,11 +79,16 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 183 --item-key CHORE-0137-fr-0011-runtime-closeout --item-type CHORE --release v0.4.0 --sprint 2026-S17 --title 'feat(runtime): 落地 FR-0011 任务级资源追踪与使用日志' --closing fixes --dry-run`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 183 --item-key CHORE-0137-fr-0011-runtime-closeout --item-type CHORE --release v0.4.0 --sprint 2026-S17 --title 'feat(runtime): 落地 FR-0011 任务级资源追踪与使用日志' --closing fixes`
+  - 结果：已创建 PR `#184`
 
 ## 未决风险
 
-- 独立 trace store 当前没有跨文件事务；若未来要把 lifecycle truth 与 trace truth 做到更强原子性，需要新的 store / backend contract。
-- tracing 失败当前会 fail-closed 返回错误，但若失败发生在 lifecycle durable truth 提交之后，仍可能留下“状态已切换但 trace 缺席”的局部异常，需要后续更强 backend 语义收口。
+- 独立 trace store 当前仍不是跨文件硬事务；默认本地 store 已通过 lifecycle 锁内双写补偿收口主路径，但若未来要扩展到更复杂 backend，仍需要新的 store / backend contract 明确冻结。
 - 需要在更大回归面上确认 `FR-0010` / `FR-0012` 既有 contract 没有被 tracing 接线误伤。
 
 ## 回滚方式
@@ -92,4 +97,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `30c4bc0d93ea4600fe4ef975f9bf09bca1bb904c`
+- `43d93af94ef3ab76a2b8b0f584cc650ae80912b9`
