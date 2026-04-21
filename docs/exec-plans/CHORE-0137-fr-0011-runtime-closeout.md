@@ -23,9 +23,11 @@
   - `syvert/resource_trace.py`
   - `syvert/resource_trace_store.py`
   - `syvert/resource_lifecycle.py`
+  - `syvert/resource_lifecycle_store.py`
   - `syvert/runtime.py`
   - `tests/runtime/test_resource_trace_store.py`
   - `tests/runtime/test_resource_lifecycle.py`
+  - `tests/runtime/test_resource_lifecycle_store.py`
   - `tests/runtime/test_runtime.py`
   - `tests/runtime/resource_fixtures.py`
   - 当前 active `exec-plan`
@@ -39,13 +41,12 @@
 
 - 已创建 runtime Work Item `#183`，并通过 `python3 scripts/create_worktree.py --issue 183 --class implementation` 建立独立 worktree `/Users/mc/code/worktrees/syvert/issue-183-fr-0011`。
 - 当前工作树已新增 tracing 共享模型、本地 trace store、`runtime/resource_lifecycle` 接线与首批 tracing 回归测试。
-- 当前工作树已根据 guardian 的首轮阻断把默认本地 store 收紧为“带补偿的 tracing 双写协调”：在 lifecycle 锁内准备 trace truth，若 snapshot 写入失败则回滚 trace 文件，不再接受“lifecycle truth 已前滚、trace truth 缺失”的状态分叉。
+- 当前工作树已根据 guardian 的两轮阻断把默认本地 store 收紧为“串行化的 tracing 双写协调”：`execute_task*` 在只注入 lifecycle store 时会派生同目录 sibling trace store；`commit_with_trace` 与 fallback rollback 都在 trace-store 锁内完成，避免回滚误删并发 append-only 事件。
 
 ## 下一步动作
 
-- 跑通 `FR-0011` 相关 runtime / lifecycle / trace store 回归，并收掉失败分类或并发语义问题。
-- 补 `pr_scope_guard`、`open_pr --dry-run` 与需要的治理门禁。
-- 创建 implementation PR，等待 guardian / merge gate，然后收口 `#183`、`#165`、`#173` 的 GitHub 真相。
+- 提交并推送第二轮 guardian 修复，刷新 `#184` merge gate。
+- 等待 guardian / merge gate，并在合入后收口 `#183`、`#165`、`#173` 与 `v0.4.0` closeout truth sweep。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -73,6 +74,8 @@
   - 结果：通过（4 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_resource_trace_store tests.runtime.test_resource_lifecycle tests.runtime.test_runtime`
   - 结果：通过（98 tests, OK）
+- `python3 -m unittest -q tests.runtime.test_resource_trace_store tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_runtime`
+  - 结果：通过（120 tests, OK）
 - `python3 -m unittest -q tests.runtime.test_cli tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate`
   - 结果：通过（211 tests, OK）
 - `python3 scripts/docs_guard.py --mode ci`
@@ -97,4 +100,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `43d93af94ef3ab76a2b8b0f584cc650ae80912b9`
+- `6728f23b2511c5c5d229fe4b98cfbac1728f2366`

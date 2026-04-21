@@ -38,6 +38,9 @@ class ResourceTracePersistenceError(ResourceTraceStoreError):
 class LocalResourceTraceStore:
     path: Path
 
+    def exclusive_lock(self):
+        return self._exclusive_lock()
+
     def load_events(self) -> tuple[ResourceTraceEvent, ...]:
         if not self.path.exists():
             return ()
@@ -53,7 +56,7 @@ class LocalResourceTraceStore:
         normalized_events = tuple(canonical_resource_trace_event(event) for event in events)
         if not normalized_events:
             return ()
-        with self._exclusive_lock():
+        with self.exclusive_lock():
             current_events = self.load_events()
             merged_events, events_to_append = merge_resource_trace_events(current_events, normalized_events)
             if not events_to_append:

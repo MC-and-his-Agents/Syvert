@@ -125,23 +125,24 @@ class LocalResourceLifecycleStore:
                 raise ResourceLifecyclePersistenceError(
                     "resource_state_conflict: 资源生命周期快照 revision 与当前 durable truth 不一致"
                 )
-            current_events = trace_store.load_events()
-            merged_events, _ = merge_resource_trace_events(current_events, trace_events)
-            trace_store.write_events(merged_events)
-            try:
-                self._write_json_atomic(snapshot_to_dict(snapshot))
-            except Exception as error:
+            with trace_store.exclusive_lock():
+                current_events = trace_store.load_events()
+                merged_events, _ = merge_resource_trace_events(current_events, trace_events)
+                trace_store.write_events(merged_events)
                 try:
-                    trace_store.write_events(current_events)
-                except Exception as rollback_error:
+                    self._write_json_atomic(snapshot_to_dict(snapshot))
+                except Exception as error:
+                    try:
+                        trace_store.write_events(current_events)
+                    except Exception as rollback_error:
+                        raise ResourceLifecyclePersistenceError(
+                            "resource_state_conflict: 资源 tracing truth 回滚失败"
+                        ) from rollback_error
+                    if isinstance(error, ResourceLifecyclePersistenceError):
+                        raise
                     raise ResourceLifecyclePersistenceError(
-                        "resource_state_conflict: 资源 tracing truth 回滚失败"
-                    ) from rollback_error
-                if isinstance(error, ResourceLifecyclePersistenceError):
-                    raise
-                raise ResourceLifecyclePersistenceError(
-                    f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
-                ) from error
+                        f"resource_state_conflict: 无法写入资源生命周期快照 `{self.path}`"
+                    ) from error
         return snapshot
 
     def _write_snapshot_locked(self, snapshot: ResourceLifecycleSnapshot) -> None:

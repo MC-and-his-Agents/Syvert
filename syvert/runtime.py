@@ -371,7 +371,7 @@ def execute_task_internal(
     resource_bundle = None
     if requested_slots is not None:
         managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
-        managed_trace_store = resource_trace_store or default_runtime_resource_trace_store()
+        managed_trace_store = resource_trace_store or default_runtime_resource_trace_store(managed_resource_store)
         acquire_result = acquire_runtime_resource_bundle(
             task_id=task_id,
             adapter_key=adapter_key,
@@ -809,8 +809,14 @@ def default_runtime_resource_lifecycle_store():
     return default_resource_lifecycle_store()
 
 
-def default_runtime_resource_trace_store():
-    from syvert.resource_trace_store import default_resource_trace_store
+def default_runtime_resource_trace_store(resource_lifecycle_store=None):
+    from pathlib import Path
+
+    from syvert.resource_trace_store import LocalResourceTraceStore, default_resource_trace_store
+
+    store_path = getattr(resource_lifecycle_store, "path", None)
+    if isinstance(store_path, Path):
+        return LocalResourceTraceStore(store_path.with_name("resource-trace-events.jsonl"))
 
     return default_resource_trace_store()
 

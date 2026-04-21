@@ -14,12 +14,15 @@ from syvert.resource_lifecycle import (
     ReleaseRequest,
     ResourceBundle,
     ResourceLifecycleContractError,
+    ResourceLease,
     ResourceLifecycleSnapshot,
     ResourceRecord,
     acquire,
     release,
 )
 from syvert.resource_lifecycle_store import ResourceLifecyclePersistenceError, default_resource_lifecycle_store
+from syvert.resource_trace import ResourceTraceEvent
+from syvert.resource_trace_store import default_resource_trace_store
 
 
 class ResourceStoreEnvMixin:
@@ -45,6 +48,9 @@ class ResourceStoreEnvMixin:
 
     def make_store(self):
         return default_resource_lifecycle_store()
+
+    def make_trace_store(self):
+        return default_resource_trace_store()
 
 
 def managed_account_material(material: dict[str, object], *, adapter_key: str = "xhs") -> dict[str, object]:
@@ -125,6 +131,94 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(reloaded.leases), 1)
         self.assertEqual(reloaded.leases[0].released_at is not None, True)
         self.assertEqual(reloaded.revision, 3)
+
+    def test_commit_with_trace_rollback_preserves_concurrent_append_only_events(self) -> None:
+        store = self.make_store()
+        trace_store = self.make_trace_store()
+        store.seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                )
+            ]
+        )
+        snapshot = ResourceLifecycleSnapshot(
+            schema_version="v0.4.0",
+            revision=2,
+            resources=(
+                ResourceRecord(
+                    resource_id="account-001",
+                    resource_type="account",
+                    status="IN_USE",
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
+                ),
+            ),
+            leases=(
+                ResourceLease(
+                    lease_id="lease-rollback",
+                    bundle_id="bundle-rollback",
+                    task_id="task-rollback",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    resource_ids=("account-001",),
+                    acquired_at="2026-04-21T14:40:00.000000Z",
+                ),
+            ),
+        )
+        trace_events = (
+            ResourceTraceEvent(
+                event_id="acquired:lease-rollback:account-001",
+                task_id="task-rollback",
+                lease_id="lease-rollback",
+                bundle_id="bundle-rollback",
+                resource_id="account-001",
+                resource_type="account",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                event_type="acquired",
+                from_status="AVAILABLE",
+                to_status="IN_USE",
+                occurred_at="2026-04-21T14:40:00.000000Z",
+                reason="acquired_for_task",
+            ),
+        )
+        unrelated_event = ResourceTraceEvent(
+            event_id="acquired:lease-other:account-other",
+            task_id="task-other",
+            lease_id="lease-other",
+            bundle_id="bundle-other",
+            resource_id="account-other",
+            resource_type="account",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            event_type="acquired",
+            from_status="AVAILABLE",
+            to_status="IN_USE",
+            occurred_at="2026-04-21T14:41:00.000000Z",
+            reason="acquired_for_task",
+        )
+        barrier = threading.Barrier(2)
+
+        def concurrent_append() -> None:
+            barrier.wait()
+            trace_store.append_events((unrelated_event,))
+
+        thread = threading.Thread(target=concurrent_append)
+        def failing_write_json_atomic(_store, payload):
+            barrier.wait()
+            raise OSError("snapshot write failed")
+
+        thread.start()
+        with mock.patch.object(type(store), "_write_json_atomic", autospec=True, side_effect=failing_write_json_atomic):
+            with self.assertRaises(ResourceLifecyclePersistenceError):
+                store.commit_with_trace(snapshot, trace_store=trace_store, trace_events=trace_events)
+        thread.join()
+
+        self.assertEqual(store.load_snapshot().revision, 1)
+        self.assertEqual(trace_store.load_events(), (unrelated_event,))
 
     def test_acquire_persists_active_lease_without_null_release_fields(self) -> None:
         store = self.make_store()
