@@ -941,6 +941,36 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertIsNotNone(lease.released_at)
         self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
 
+    def test_execute_task_rejects_bundle_with_mismatched_lease_id_before_adapter_and_settles_real_lease(self) -> None:
+        request = TaskRequest(
+            adapter_key="stub",
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/host-validation-lease-id"),
+        )
+        original_acquire = runtime_module.acquire_runtime_resource_bundle
+
+        def acquire_bundle_with_mutated_lease_id(**kwargs):
+            bundle = original_acquire(**kwargs)
+            return replace(bundle, lease_id="lease-bogus")
+
+        with mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=acquire_bundle_with_mutated_lease_id,
+        ):
+            envelope = execute_task(
+                request,
+                adapters={"stub": NeverCalledAdapter()},
+                task_id_factory=lambda: "task-host-validation-lease-id",
+            )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_resource_bundle")
+        lease = self.lease_for_task("task-host-validation-lease-id")
+        self.assertEqual(lease.target_status_after_release, "AVAILABLE")
+        self.assertEqual(lease.release_reason, "host_side_bundle_validation_failed")
+        self.assertEqual(set(self.resource_statuses().values()), {"AVAILABLE"})
+
     def test_execute_task_settles_success_without_hint_as_available(self) -> None:
         envelope = execute_task(
             TaskRequest(
@@ -1007,6 +1037,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_resource_disposition_hint")
         lease = self.lease_for_task("task-hint-mismatch")
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")
@@ -1025,6 +1056,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
         self.assertEqual(envelope["error"]["code"], "invalid_resource_disposition_hint")
         lease = self.lease_for_task("task-hint-bad-status")
         self.assertEqual(lease.target_status_after_release, "AVAILABLE")

@@ -382,16 +382,42 @@ def execute_task_internal(
                 task_record_store=store,
             )
         resource_bundle = acquire_result
+        live_resource_lease, live_lease_error = resolve_host_resource_lease(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            resource_lifecycle_store=managed_resource_store,
+        )
+        if live_lease_error is not None:
+            cleanup_envelope = settle_managed_resource_bundle(
+                lease_id=resource_bundle.lease_id,
+                task_id=task_id,
+                resource_lifecycle_store=managed_resource_store,
+                default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
+                hint=None,
+            )
+            envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, live_lease_error)
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
+
         bundle_error = validate_host_resource_bundle(
             resource_bundle,
             task_id=task_id,
             adapter_key=adapter_key,
             capability=capability,
             requested_slots=requested_slots,
+            live_resource_lease=live_resource_lease,
         )
         if bundle_error is not None:
             cleanup_envelope = settle_managed_resource_bundle(
-                resource_bundle=resource_bundle,
+                lease_id=live_resource_lease.lease_id,
                 task_id=task_id,
                 resource_lifecycle_store=managed_resource_store,
                 default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
@@ -462,7 +488,7 @@ def execute_task_internal(
 
     if resource_bundle is not None and managed_resource_store is not None:
         cleanup_envelope = settle_managed_resource_bundle(
-            resource_bundle=resource_bundle,
+            lease_id=live_resource_lease.lease_id,
             task_id=task_id,
             resource_lifecycle_store=managed_resource_store,
             default_reason=default_release_reason,
@@ -799,6 +825,7 @@ def validate_host_resource_bundle(
     adapter_key: str,
     capability: str,
     requested_slots: tuple[str, ...],
+    live_resource_lease,
 ) -> dict[str, Any] | None:
     from syvert.resource_lifecycle import ResourceLifecycleContractError, validate_resource_bundle
 
@@ -830,6 +857,26 @@ def validate_host_resource_bundle(
             "invalid_resource_bundle",
             "resource_bundle.requested_slots 与当前请求不一致",
         )
+    if resource_bundle.bundle_id != live_resource_lease.bundle_id:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.bundle_id 与当前 active lease 不一致",
+        )
+    if resource_bundle.lease_id != live_resource_lease.lease_id:
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle.lease_id 与当前 active lease 不一致",
+        )
+    bundle_resource_ids = tuple(
+        getattr(resource_bundle, slot).resource_id
+        for slot in requested_slots
+        if getattr(resource_bundle, slot) is not None
+    )
+    if bundle_resource_ids != tuple(live_resource_lease.resource_ids):
+        return runtime_contract_error(
+            "invalid_resource_bundle",
+            "resource_bundle slots 与当前 active lease 绑定资源不一致",
+        )
     return None
 
 
@@ -838,15 +885,15 @@ def extract_internal_resource_disposition_hint(
     *,
     expected_lease_id: str | None,
 ) -> tuple[ResourceDispositionHint | None, dict[str, Any] | None]:
+    def invalid_hint_error(message: str) -> dict[str, Any]:
+        return invalid_input_error("invalid_resource_disposition_hint", message)
+
     if raw_hint is None:
         return None, None
     if expected_lease_id is None:
         return (
             None,
-            runtime_contract_error(
-                "invalid_resource_disposition_hint",
-                "非资源路径不得返回 resource_disposition_hint",
-            ),
+            invalid_hint_error("非资源路径不得返回 resource_disposition_hint"),
         )
     if isinstance(raw_hint, ResourceDispositionHint):
         hint = raw_hint
@@ -862,38 +909,71 @@ def extract_internal_resource_disposition_hint(
     else:
         return (
             None,
-            runtime_contract_error(
-                "invalid_resource_disposition_hint",
-                "resource_disposition_hint 必须是对象",
-            ),
+            invalid_hint_error("resource_disposition_hint 必须是对象"),
         )
 
     if not hint.lease_id:
-        return None, runtime_contract_error("invalid_resource_disposition_hint", "resource_disposition_hint.lease_id 不能为空")
+        return None, invalid_hint_error("resource_disposition_hint.lease_id 不能为空")
     if hint.lease_id != expected_lease_id:
         return (
             None,
-            runtime_contract_error(
-                "invalid_resource_disposition_hint",
-                "resource_disposition_hint.lease_id 与注入 bundle 不一致",
-            ),
+            invalid_hint_error("resource_disposition_hint.lease_id 与注入 bundle 不一致"),
         )
     if hint.target_status_after_release not in {"AVAILABLE", "INVALID"}:
         return (
             None,
-            runtime_contract_error(
-                "invalid_resource_disposition_hint",
-                "resource_disposition_hint.target_status_after_release 不在允许值范围内",
-            ),
+            invalid_hint_error("resource_disposition_hint.target_status_after_release 不在允许值范围内"),
         )
     if not hint.reason:
-        return None, runtime_contract_error("invalid_resource_disposition_hint", "resource_disposition_hint.reason 不能为空")
+        return None, invalid_hint_error("resource_disposition_hint.reason 不能为空")
     return hint, None
+
+
+def resolve_host_resource_lease(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    resource_lifecycle_store,
+):
+    from syvert.resource_lifecycle import ResourceLifecycleContractError, validate_snapshot
+
+    try:
+        snapshot = resource_lifecycle_store.load_snapshot()
+        validate_snapshot(snapshot)
+    except ResourceLifecycleContractError as error:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_bundle",
+                "host-side resource lifecycle truth 不满足共享 contract",
+                details={"reason": str(error)},
+            ),
+        )
+
+    candidates = [
+        lease
+        for lease in snapshot.leases
+        if lease.released_at is None
+        and lease.task_id == task_id
+        and lease.adapter_key == adapter_key
+        and lease.capability == capability
+    ]
+    if len(candidates) != 1:
+        return (
+            None,
+            runtime_contract_error(
+                "invalid_resource_bundle",
+                "当前 task 缺少唯一 active lease truth",
+                details={"active_lease_count": len(candidates)},
+            ),
+        )
+    return candidates[0], None
 
 
 def settle_managed_resource_bundle(
     *,
-    resource_bundle,
+    lease_id: str,
     task_id: str,
     resource_lifecycle_store,
     default_reason: str,
@@ -903,7 +983,7 @@ def settle_managed_resource_bundle(
 
     release_result = release(
         ReleaseRequest(
-            lease_id=resource_bundle.lease_id,
+            lease_id=lease_id,
             task_id=task_id,
             target_status_after_release=(
                 hint.target_status_after_release if hint is not None else "AVAILABLE"
