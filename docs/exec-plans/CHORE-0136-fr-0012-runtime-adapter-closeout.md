@@ -39,7 +39,7 @@
 - 当前执行分支：`issue-181-fr-0012-core-reference-adapter`
 - 当前 Work Item：`#181`
 - 当前受审 PR：`#182`
-- 当前实现 checkpoint：`11bf9a948fef69d96be5c261dfc241aa09609776`
+- 当前实现 checkpoint：`ddd4cda26f6889b0c0fd332496fe449d1cac1fc3`
 - 当前代码已完成以下收口：
   - `execute_task_internal()` 现在由 Core 持有 hybrid 资源策略、`acquire()`、host-side bundle 校验、adapter-facing capability projection、`resource_disposition_hint` 消费与统一 `release()` 收口。
   - lifecycle truth 的 `capability` 固定保持 `content_detail_by_url`；adapter-facing request 仅在进入 adapter 前投影为 `content_detail`。
@@ -57,12 +57,16 @@
     - bootstrap 入口允许两种 account 来源：直接提供 canonical account material JSON，或读取 legacy `xhs` / `douyin` session 文件并迁移为 canonical account.material；两种路径都会在写入 store 前按 adapter runtime contract 做 host-side 校验
     - bootstrap 入口只在 host-side 解析默认 lifecycle store；adapter 层仍只消费 Core 注入的 `resource_bundle`，不重新打开 session-file 执行来源面
     - bootstrap 入口最终落在 `syvert/` runtime 包内，而不是 `scripts/` governance 面，确保 `implementation` PR 的路径分类与交付边界保持一致
+  - guardian 第四轮 review 指出的阻断已收口：
+    - shared lifecycle store 中的 `account` 资源现在带 `managed_adapter_key` 受管标签，`acquire()` 只会选择与当前 `adapter_key` 兼容的账号，不再把 xhs / douyin 账号混成同一个无差别池
+    - 新增 shared-store 双适配器 bootstrap 回归与 mismatch fail-closed 回归，验证同一份 store 中同时存在 xhs / douyin 账号时不会串号
 - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 Work Item 上下文、checkpoint、review 与 merge gate，不要求其静态 SHA 穷尽到后续纯元数据提交。
 
 ## 下一步动作
 
 - 推送包含 bootstrap / migration 入口的新 head，并同步 PR 描述中的 rollout truth。
-- 基于 `11bf9a948fef69d96be5c261dfc241aa09609776` 重新提交 guardian。
+- 推送包含 adapter-aware account 选择修复的新 head，并同步 PR 描述中的 shared-store 隔离真相。
+- 基于 `ddd4cda26f6889b0c0fd332496fe449d1cac1fc3` 重新提交 guardian。
 - 若 guardian 转为 `APPROVE`，直接进入受控 `merge_pr`。
 - 若仍有阻断，继续优先检查 host-side rollout / lifecycle truth 是否存在新的 contract 漂移。
 
@@ -88,11 +92,17 @@
   - 结果：`Ran 111 tests in 955.860s`，`OK (skipped=6)`
 - `python3 -m unittest tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 5 tests in 0.318s`，`OK`
+- `python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_bootstrap`
+  - 结果：`Ran 49 tests in 0.409s`，`OK`
+- `python3 -m unittest tests.runtime.test_resource_lifecycle_store tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
+  - 结果：`Ran 332 tests in 41.452s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 311 tests in 40.169s`，`OK`
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_executor tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_cli tests.runtime.test_real_adapter_regression tests.runtime.test_version_gate tests.runtime.test_resource_bootstrap`
   - 结果：`Ran 311 tests in 39.455s`，`OK`
 - `python3 -m py_compile syvert/resource_bootstrap.py syvert/resource_bootstrap_cli.py tests/runtime/test_resource_bootstrap.py`
+  - 结果：通过
+- `python3 -m py_compile syvert/resource_lifecycle.py syvert/resource_bootstrap.py syvert/resource_bootstrap_cli.py tests/runtime/test_resource_lifecycle.py tests/runtime/test_resource_bootstrap.py`
   - 结果：通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main`
   - 结果：通过（最新 head 已不再触碰 `scripts/` governance 路径）
@@ -117,6 +127,10 @@
   - 已修复阻断：
     - 增加受支持的非测试 bootstrap / migration 路径：`python3 -m syvert.resource_bootstrap_cli` 可把 canonical account material JSON 或 legacy session 文件迁移为 host-side managed `account` 资源，并与 `proxy` 资源一起 seed 到默认 lifecycle store
     - 新增 `tests.runtime.test_resource_bootstrap`，覆盖 canonical material 校验、legacy session migration、store seed 与脚本级 bootstrap 回归
+  - 结果：第四轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - shared lifecycle store 中的 `account` 资源现在带 `managed_adapter_key` 受管标签，`acquire()` 只会选择与当前 `adapter_key` 兼容的账号，不再把 xhs / douyin 账号混成同一个无差别池
+    - 新增 shared-store 双适配器 bootstrap 回归与 mismatch fail-closed 回归，验证同一份 store 中同时存在 xhs / douyin 账号时不会串号
 
 ## 支持的 rollout / bootstrap 流程
 
@@ -126,6 +140,7 @@
 - bootstrap 命令固定通过 host-side 入口执行，例如：
   - `python3 -m syvert.resource_bootstrap_cli --adapter xhs --account-resource-id xhs-account-main --account-session-file ~/.config/syvert/xhs.session.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
   - `python3 -m syvert.resource_bootstrap_cli --adapter douyin --account-resource-id douyin-account-main --account-material-file ./ops/douyin-account.json --proxy-resource-id proxy-main --proxy-material-file ./ops/proxy-main.json`
+- 同一份 lifecycle store 若同时装入多套 reference adapter 账号，host-side `acquire()` 会只选择 `managed_adapter_key` 与当前 `adapter_key` 一致的 `account` 资源；若只有不兼容账号，则在进入 adapter 前按 `resource_unavailable` fail-closed。
 - store 位置默认继续遵循 `SYVERT_RESOURCE_LIFECYCLE_STORE_FILE` / `~/.syvert/resource-lifecycle.json`；若需要显式切换文件，可追加 `--store-file <path>`。
 
 ## 未决风险
@@ -140,5 +155,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `44ebe38f2a7e9d13cd239afe130407ee7272c06f`
+- `ddd4cda26f6889b0c0fd332496fe449d1cac1fc3`
 - 当前回合已进入 `metadata-only closeout follow-up`；后续 PR / review / merge gate 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
