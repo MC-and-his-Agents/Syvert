@@ -163,8 +163,13 @@ def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tupl
     bundle_task_ids: dict[str, str] = {}
     lease_bundle_ids: dict[str, str] = {}
     bundle_lease_ids: dict[str, str] = {}
+    lease_adapter_keys: dict[str, str] = {}
+    lease_capabilities: dict[str, str] = {}
+    bundle_adapter_keys: dict[str, str] = {}
+    bundle_capabilities: dict[str, str] = {}
     resource_timeline_closeouts: dict[tuple[str, str], str | None] = {}
     resource_timeline_has_acquired: dict[tuple[str, str], bool] = {}
+    resource_timeline_types: dict[tuple[str, str], str] = {}
     for event in canonical_events:
         existing_lease_task_id = lease_task_ids.get(event.lease_id)
         if existing_lease_task_id is not None and existing_lease_task_id != event.task_id:
@@ -190,7 +195,37 @@ def validate_resource_trace_stream(events: Sequence[ResourceTraceEvent]) -> tupl
                 f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能复用多个 lease_id"
             )
         bundle_lease_ids[event.bundle_id] = event.lease_id
+        existing_lease_adapter_key = lease_adapter_keys.get(event.lease_id)
+        if existing_lease_adapter_key is not None and existing_lease_adapter_key != event.adapter_key:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` 不能复用多个 adapter_key"
+            )
+        lease_adapter_keys[event.lease_id] = event.adapter_key
+        existing_lease_capability = lease_capabilities.get(event.lease_id)
+        if existing_lease_capability is not None and existing_lease_capability != event.capability:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` 不能复用多个 capability"
+            )
+        lease_capabilities[event.lease_id] = event.capability
+        existing_bundle_adapter_key = bundle_adapter_keys.get(event.bundle_id)
+        if existing_bundle_adapter_key is not None and existing_bundle_adapter_key != event.adapter_key:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能复用多个 adapter_key"
+            )
+        bundle_adapter_keys[event.bundle_id] = event.adapter_key
+        existing_bundle_capability = bundle_capabilities.get(event.bundle_id)
+        if existing_bundle_capability is not None and existing_bundle_capability != event.capability:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: bundle_id `{event.bundle_id}` 不能复用多个 capability"
+            )
+        bundle_capabilities[event.bundle_id] = event.capability
         timeline_key = (event.lease_id, event.resource_id)
+        existing_resource_type = resource_timeline_types.get(timeline_key)
+        if existing_resource_type is not None and existing_resource_type != event.resource_type:
+            raise ResourceTraceContractError(
+                f"resource trace stream 非法: lease_id `{event.lease_id}` / resource_id `{event.resource_id}` 不能复用多个 resource_type"
+            )
+        resource_timeline_types[timeline_key] = event.resource_type
         if event.event_type == "acquired":
             if resource_timeline_has_acquired.get(timeline_key):
                 raise ResourceTraceContractError(
