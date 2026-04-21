@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from syvert.runtime import AdapterTaskRequest, PlatformAdapterError
+from syvert.runtime import AdapterExecutionContext, PlatformAdapterError
 
 FakeAdapterScenario = Literal["success", "legal_failure", "illegal_payload"]
 
@@ -42,13 +42,13 @@ def _build_success_payload(url: str) -> dict[str, Any]:
 @dataclass
 class FakeContractAdapter:
     scenario: FakeAdapterScenario = "success"
-    last_request: AdapterTaskRequest | None = None
+    last_request: AdapterExecutionContext | None = None
 
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
 
-    def execute(self, request: AdapterTaskRequest) -> dict[str, Any]:
+    def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
         self.last_request = request
         if self.scenario == "success":
             return _build_success_payload(request.target_value)

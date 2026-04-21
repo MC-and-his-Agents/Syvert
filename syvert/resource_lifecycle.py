@@ -14,6 +14,7 @@ RESOURCE_LIFECYCLE_VERSION = "v0.4.0"
 RESOURCE_TYPES = frozenset({"account", "proxy"})
 RESOURCE_STATUSES = frozenset({"AVAILABLE", "IN_USE", "INVALID"})
 RELEASE_TARGET_STATUSES = frozenset({"AVAILABLE", "INVALID"})
+MANAGED_ACCOUNT_ADAPTER_KEY_FIELD = "managed_adapter_key"
 
 
 class ResourceLifecycleContractError(ValueError):
@@ -138,7 +139,11 @@ def acquire(
     try:
         current_snapshot = snapshot
         while True:
-            selected = select_available_resources(current_snapshot, normalized_request.requested_slots)
+            selected = select_available_resources(
+                current_snapshot,
+                normalized_request.requested_slots,
+                adapter_key=normalized_request.adapter_key,
+            )
             selected_resource_ids = {slot: record.resource_id for slot, record in selected.items()}
             acquired_at = now_rfc3339_utc()
             bundle = build_resource_bundle(
@@ -170,6 +175,7 @@ def acquire(
                     refreshed_selected = select_available_resources(
                         refreshed_snapshot,
                         normalized_request.requested_slots,
+                        adapter_key=normalized_request.adapter_key,
                     )
                 except ResourceLifecycleContractError as refreshed_error:
                     raise state_conflict_error("revision 冲突后资源选择已过期") from refreshed_error
@@ -666,6 +672,8 @@ def build_resource_lease(bundle: ResourceBundle) -> ResourceLease:
 def select_available_resources(
     snapshot: ResourceLifecycleSnapshot,
     requested_slots: tuple[str, ...],
+    *,
+    adapter_key: str,
 ) -> dict[str, ResourceRecord]:
     resources_by_type: dict[str, list[ResourceRecord]] = {slot: [] for slot in RESOURCE_TYPES}
     active_resource_ids = {
@@ -682,7 +690,14 @@ def select_available_resources(
 
     selected: dict[str, ResourceRecord] = {}
     for slot in requested_slots:
-        candidates = sorted(resources_by_type[slot], key=lambda record: record.resource_id)
+        candidates = sorted(
+            (
+                record
+                for record in resources_by_type[slot]
+                if resource_is_slot_compatible(record, slot=slot, adapter_key=adapter_key)
+            ),
+            key=lambda record: record.resource_id,
+        )
         if not candidates:
             raise unavailable_error(f"slot `{slot}` 缺少 AVAILABLE 资源")
         candidate = candidates[0]
@@ -695,6 +710,18 @@ def select_available_resources(
             material=candidate.material,
         )
     return selected
+
+
+def resource_is_slot_compatible(record: ResourceRecord, *, slot: str, adapter_key: str) -> bool:
+    if slot != "account":
+        return True
+    material = record.material
+    if not isinstance(material, Mapping):
+        return False
+    managed_adapter_key = material.get(MANAGED_ACCOUNT_ADAPTER_KEY_FIELD)
+    if managed_adapter_key is None:
+        return False
+    return isinstance(managed_adapter_key, str) and bool(managed_adapter_key) and managed_adapter_key == adapter_key
 
 
 def apply_acquire_transition(

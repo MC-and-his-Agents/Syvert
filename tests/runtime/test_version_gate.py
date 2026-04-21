@@ -20,6 +20,7 @@ from syvert.version_gate import (
     validate_real_adapter_regression_source_report,
 )
 from tests.runtime.platform_leakage_fixtures import canonical_platform_leakage_payload
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
 DEFAULT_REQUIRED_HARNESS_SAMPLE_IDS = ["sample-success", "sample-legal-failure"]
@@ -30,7 +31,7 @@ def orchestrate_version_gate(**kwargs: object) -> dict[str, object]:
     return version_gate_module.orchestrate_version_gate(**kwargs)
 
 
-class VersionGateTests(unittest.TestCase):
+class VersionGateTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_version_gate_passes_when_all_sources_pass(self) -> None:
         harness_report = build_harness_source_report(
             self.valid_harness_results(),

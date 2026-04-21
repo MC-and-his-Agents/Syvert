@@ -15,9 +15,10 @@ from syvert.task_record import (
     task_record_from_dict,
     task_record_to_dict,
 )
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
-class TaskRecordStoreEnvMixin:
+class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
         self._task_record_store_dir = tempfile.TemporaryDirectory()

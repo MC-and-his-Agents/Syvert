@@ -15,6 +15,7 @@ from syvert.task_record import (
     start_task_record,
 )
 from syvert.task_record_store import LocalTaskRecordStore, TaskRecordStoreError
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
 class SuccessfulAdapter:
@@ -132,7 +133,7 @@ class BrokenInvalidationAndMoveLocalStore(BrokenInvalidationLocalStore):
         raise OSError("record-move-broken")
 
 
-class TaskRecordStoreTests(unittest.TestCase):
+class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_runtime_can_persist_and_reload_success_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))

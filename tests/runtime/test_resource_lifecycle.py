@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from syvert.resource_lifecycle import (
+    MANAGED_ACCOUNT_ADAPTER_KEY_FIELD,
     AcquireRequest,
     ReleaseRequest,
     ResourceBundle,
@@ -43,6 +44,12 @@ class ResourceStoreEnvMixin:
         return default_resource_lifecycle_store()
 
 
+def managed_account_material(material: dict[str, object], *, adapter_key: str = "xhs") -> dict[str, object]:
+    if MANAGED_ACCOUNT_ADAPTER_KEY_FIELD in material:
+        return dict(material)
+    return {**material, MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key}
+
+
 class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
     def seed_default_resources(self) -> None:
         self.make_store().seed_resources(
@@ -51,7 +58,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
                 ResourceRecord(
                     resource_id="proxy-001",
@@ -110,13 +117,13 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
                 ResourceRecord(
                     resource_id="account-002",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-002"},
+                    material=managed_account_material({"provider_account_id": "pa-002"}),
                 ),
             ]
         )
@@ -189,7 +196,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -225,7 +232,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -247,6 +254,138 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         snapshot = self.make_store().load_snapshot()
         self.assertEqual(snapshot.leases, ())
         self.assertEqual(snapshot.resources[0].status, "AVAILABLE")
+
+    def test_acquire_selects_only_adapter_compatible_managed_accounts(self) -> None:
+        self.make_store().seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="douyin-account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: "douyin", "provider_account_id": "pa-douyin"},
+                ),
+                ResourceRecord(
+                    resource_id="proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material={"proxy_endpoint": "http://proxy-001"},
+                ),
+                ResourceRecord(
+                    resource_id="xhs-account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: "xhs", "provider_account_id": "pa-xhs"},
+                ),
+            ]
+        )
+
+        xhs_bundle = acquire(
+            AcquireRequest(
+                task_id="task-adapter-xhs",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account", "proxy"),
+            ),
+            self.make_store(),
+            "task-context-adapter-xhs",
+        )
+
+        self.assertIsInstance(xhs_bundle, ResourceBundle)
+        assert isinstance(xhs_bundle, ResourceBundle)
+        assert xhs_bundle.account is not None
+        self.assertEqual(xhs_bundle.account.resource_id, "xhs-account-001")
+        release(
+            ReleaseRequest(
+                task_id="task-adapter-xhs",
+                lease_id=xhs_bundle.lease_id,
+                target_status_after_release="AVAILABLE",
+                reason="test",
+            ),
+            self.make_store(),
+            "task-context-adapter-xhs",
+        )
+
+        douyin_bundle = acquire(
+            AcquireRequest(
+                task_id="task-adapter-douyin",
+                adapter_key="douyin",
+                capability="content_detail_by_url",
+                requested_slots=("account", "proxy"),
+            ),
+            self.make_store(),
+            "task-context-adapter-douyin",
+        )
+
+        self.assertIsInstance(douyin_bundle, ResourceBundle)
+        assert isinstance(douyin_bundle, ResourceBundle)
+        assert douyin_bundle.account is not None
+        self.assertEqual(douyin_bundle.account.resource_id, "douyin-account-001")
+
+    def test_acquire_fails_closed_when_only_mismatched_managed_account_exists(self) -> None:
+        self.make_store().seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="douyin-account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: "douyin", "provider_account_id": "pa-douyin"},
+                ),
+                ResourceRecord(
+                    resource_id="proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material={"proxy_endpoint": "http://proxy-001"},
+                ),
+            ]
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-adapter-xhs-mismatch",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account", "proxy"),
+            ),
+            self.make_store(),
+            "task-context-adapter-xhs-mismatch",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_unavailable")
+
+    def test_acquire_fails_closed_when_legacy_account_lacks_managed_adapter_key(self) -> None:
+        self.make_store().seed_resources(
+            [
+                ResourceRecord(
+                    resource_id="legacy-account-001",
+                    resource_type="account",
+                    status="AVAILABLE",
+                    material={"provider_account_id": "pa-legacy"},
+                ),
+                ResourceRecord(
+                    resource_id="proxy-001",
+                    resource_type="proxy",
+                    status="AVAILABLE",
+                    material={"proxy_endpoint": "http://proxy-001"},
+                ),
+            ]
+        )
+
+        result = acquire(
+            AcquireRequest(
+                task_id="task-adapter-xhs-legacy",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account", "proxy"),
+            ),
+            self.make_store(),
+            "task-context-adapter-xhs-legacy",
+        )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["category"], "runtime_contract")
+        self.assertEqual(result["error"]["code"], "resource_unavailable")
 
     def test_acquire_rejects_duplicate_slots(self) -> None:
         self.seed_default_resources()
@@ -307,7 +446,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="INVALID",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -659,7 +798,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -729,7 +868,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -808,7 +947,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
                 ResourceRecord(
                     resource_id="proxy-001",
@@ -936,7 +1075,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                         resource_id="account-in-use",
                         resource_type="account",
                         status="IN_USE",
-                        material={"provider_account_id": "pa-in-use"},
+                        material=managed_account_material({"provider_account_id": "pa-in-use"}),
                     )
                 ]
             )
@@ -1155,7 +1294,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             resource_id="",
                             resource_type="account",
                             status="AVAILABLE",
-                            material={"provider_account_id": "pa-invalid"},
+                            material=managed_account_material({"provider_account_id": "pa-invalid"}),
                         ),
                     ),
                     leases=(),
@@ -1190,7 +1329,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             "resource_id": "account-mapping",
                             "resource_type": "account",
                             "status": "AVAILABLE",
-                            "material": {"vals": ("a", "b")},
+                            "material": managed_account_material({"vals": ("a", "b")}),
                         }
                     ],
                     "leases": [],
@@ -1213,7 +1352,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIsInstance(result, ResourceBundle)
         assert isinstance(result, ResourceBundle)
         assert result.account is not None
-        self.assertEqual(result.account.material, {"vals": ["a", "b"]})
+        self.assertEqual(result.account.material, managed_account_material({"vals": ["a", "b"]}))
 
     def test_acquire_canonicalizes_material_from_in_memory_snapshot(self) -> None:
         class TupleMaterialStore:
@@ -1226,7 +1365,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             resource_id="account-tuple",
                             resource_type="account",
                             status="AVAILABLE",
-                            material={"vals": ("a", "b")},
+                            material=managed_account_material({"vals": ("a", "b")}),
                         ),
                     ),
                     leases=(),
@@ -1249,7 +1388,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIsInstance(result, ResourceBundle)
         assert isinstance(result, ResourceBundle)
         assert result.account is not None
-        self.assertEqual(result.account.material, {"vals": ["a", "b"]})
+        self.assertEqual(result.account.material, managed_account_material({"vals": ["a", "b"]}))
 
     def test_acquire_returns_failed_envelope_for_invalid_mapping_snapshot(self) -> None:
         class InvalidMappingSnapshotStore:
@@ -1290,7 +1429,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             resource_id="account-001",
                             resource_type="account",
                             status="AVAILABLE",
-                            material={"provider_account_id": "pa-001"},
+                            material=managed_account_material({"provider_account_id": "pa-001"}),
                         ),
                     ),
                     leases=(),
@@ -1333,7 +1472,7 @@ class ResourceLifecycleTests(ResourceStoreEnvMixin, unittest.TestCase):
                             resource_id="account-001",
                             resource_type="account",
                             status="AVAILABLE",
-                            material={"provider_account_id": "pa-001"},
+                            material=managed_account_material({"provider_account_id": "pa-001"}),
                         ),
                     ),
                     leases=(),

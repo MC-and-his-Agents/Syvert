@@ -6,9 +6,12 @@ import unittest
 from unittest import mock
 
 from syvert.runtime import TaskInput, TaskRequest, execute_task
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
 
 
-class TaskRecordStoreEnvMixin:
+class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
+    resource_store_adapter_key = "xhs"
+
     def setUp(self) -> None:
         super().setUp()
         self._task_record_store_dir = tempfile.TemporaryDirectory()

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Mapping
+from pathlib import Path
+import tempfile
 from typing import Any
 
 from syvert.adapters.douyin import DouyinAdapter, default_page_state_transport
 from syvert.adapters.xhs import XhsAdapter
+from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceRecord
+from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.runtime import TaskInput, TaskRequest, execute_task
 from syvert.version_gate import validate_real_adapter_regression_source_report
 
@@ -85,6 +89,61 @@ class ReferenceAdapterBindingError(ValueError):
         self.details = dict(details)
 
 
+def _xhs_account_material() -> dict[str, Any]:
+    return {
+        "cookies": "a=1; b=2",
+        "user_agent": "Mozilla/5.0 TestAgent",
+        "sign_base_url": "http://127.0.0.1:8000",
+        "timeout_seconds": 5,
+    }
+
+
+def _douyin_account_material() -> dict[str, Any]:
+    return {
+        "cookies": "a=1; b=2",
+        "user_agent": "Mozilla/5.0 TestAgent",
+        "verify_fp": "verify-1",
+        "ms_token": "ms-token-1",
+        "webid": "webid-1",
+        "sign_base_url": "http://127.0.0.1:8000",
+        "timeout_seconds": 5,
+    }
+
+
+def _proxy_material() -> dict[str, Any]:
+    return {"proxy_endpoint": "http://proxy-001"}
+
+
+def seed_reference_regression_resources(
+    *,
+    store: LocalResourceLifecycleStore,
+    adapter_key: str,
+) -> None:
+    if adapter_key == "xhs":
+        account_material = _xhs_account_material()
+    elif adapter_key == "douyin":
+        account_material = _douyin_account_material()
+    else:
+        raise ValueError(f"unsupported adapter_key for regression resource seed: {adapter_key}")
+    account_material[MANAGED_ACCOUNT_ADAPTER_KEY_FIELD] = adapter_key
+    store.seed_resources(
+        [
+            ResourceRecord(
+                resource_id=f"{adapter_key}-account-001",
+                resource_type="account",
+                status="AVAILABLE",
+                material=account_material,
+            ),
+            ResourceRecord(
+                resource_id=f"{adapter_key}-proxy-001",
+                resource_type="proxy",
+                status="AVAILABLE",
+                material=_proxy_material(),
+            ),
+        ]
+    )
+
+
 def build_real_adapter_regression_payload(
     *,
     version: str,
@@ -100,15 +159,19 @@ def build_real_adapter_regression_payload(
             expected_outcome = str(case_definition["expected_outcome"])
             if expected_outcome not in _EXPECTED_OUTCOMES:
                 raise ValueError(f"unsupported expected_outcome: {expected_outcome}")
-            envelope = execute_task(
-                TaskRequest(
-                    adapter_key=adapter_key,
-                    capability=_SEMANTIC_OPERATION,
-                    input=TaskInput(url=str(case_definition["url"])),
-                ),
-                adapters=reference_adapters,
-                task_id_factory=lambda case_id=str(case_definition["case_id"]): f"task-regression-{case_id}",
-            )
+            with tempfile.TemporaryDirectory(prefix=f"syvert-regression-{adapter_key}-") as temp_dir:
+                resource_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+                seed_reference_regression_resources(store=resource_store, adapter_key=adapter_key)
+                envelope = execute_task(
+                    TaskRequest(
+                        adapter_key=adapter_key,
+                        capability=_SEMANTIC_OPERATION,
+                        input=TaskInput(url=str(case_definition["url"])),
+                    ),
+                    adapters=reference_adapters,
+                    task_id_factory=lambda case_id=str(case_definition["case_id"]): f"task-regression-{case_id}",
+                    resource_lifecycle_store=resource_store,
+                )
             cases.append(build_regression_case_from_envelope(case_definition=case_definition, envelope=envelope))
             evidence_refs.append(str(case_definition["evidence_ref"]))
         adapter_results.append({"adapter_key": adapter_key, "cases": cases})

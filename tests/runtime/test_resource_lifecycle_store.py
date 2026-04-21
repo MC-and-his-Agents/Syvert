@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from syvert.resource_lifecycle import (
+    MANAGED_ACCOUNT_ADAPTER_KEY_FIELD,
     AcquireRequest,
     ReleaseRequest,
     ResourceBundle,
@@ -42,6 +43,12 @@ class ResourceStoreEnvMixin:
         return default_resource_lifecycle_store()
 
 
+def managed_account_material(material: dict[str, object], *, adapter_key: str = "xhs") -> dict[str, object]:
+    if MANAGED_ACCOUNT_ADAPTER_KEY_FIELD in material:
+        return dict(material)
+    return {**material, MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key}
+
+
 class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_seed_resources_rejects_non_sequence_input(self) -> None:
         with self.assertRaises(ResourceLifecycleContractError):
@@ -56,7 +63,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -76,7 +83,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
                 ResourceRecord(
                     resource_id="proxy-001",
@@ -123,7 +130,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -191,7 +198,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -220,7 +227,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -233,7 +240,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "first"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "first"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -248,7 +255,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "stale"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "stale"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -276,7 +283,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -289,7 +296,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "a"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "a"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -302,7 +309,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001", "marker": "b"},
+                    material=managed_account_material({"provider_account_id": "pa-001", "marker": "b"}),
                 ),
             ),
             leases=base_snapshot.leases,
@@ -342,7 +349,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -375,7 +382,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                         resource_id="account-001",
                         resource_type="account",
                         status="AVAILABLE",
-                        material={"provider_account_id": "pa-001", "marker": "revived"},
+                        material=managed_account_material({"provider_account_id": "pa-001", "marker": "revived"}),
                     )
                 ]
             )
@@ -388,7 +395,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -400,7 +407,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                         resource_id="account-001",
                         resource_type="account",
                         status="INVALID",
-                        material={"provider_account_id": "pa-001"},
+                        material=managed_account_material({"provider_account_id": "pa-001"}),
                     )
                 ]
             )
@@ -413,7 +420,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 )
             ]
         )
@@ -445,7 +452,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             resource_id="account-001",
             resource_type="account",
             status="AVAILABLE",
-            material={"vals": ("a", "b")},
+            material=managed_account_material({"vals": ("a", "b")}),
         )
 
         seeded = store.seed_resources([original])
@@ -455,7 +462,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(len(seeded), 1)
         self.assertEqual(len(replayed), 1)
         self.assertEqual(snapshot.revision, 1)
-        self.assertEqual(snapshot.resources[0].material, {"vals": ["a", "b"]})
+        self.assertEqual(snapshot.resources[0].material, {"managed_adapter_key": "xhs", "vals": ["a", "b"]})
 
     def test_seed_resources_merges_disjoint_concurrent_inserts(self) -> None:
         store = self.make_store()
@@ -476,7 +483,7 @@ class ResourceLifecycleStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                     resource_id="account-001",
                     resource_type="account",
                     status="AVAILABLE",
-                    material={"provider_account_id": "pa-001"},
+                    material=managed_account_material({"provider_account_id": "pa-001"}),
                 ),
             ),
         )

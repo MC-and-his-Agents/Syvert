@@ -10,7 +10,7 @@ from urllib import error, parse, request
 
 from syvert.adapters.douyin_browser_bridge import extract_aweme_detail_from_page_state
 from syvert.adapters.douyin_browser_bridge import DouyinAuthenticatedBrowserBridge
-from syvert.runtime import AdapterTaskRequest, CONTENT_DETAIL, PlatformAdapterError, TaskRequest
+from syvert.runtime import AdapterExecutionContext, CONTENT_DETAIL, PlatformAdapterError
 
 
 DOUYIN_API_BASE_URL = "https://www.douyin.com"
@@ -64,10 +64,11 @@ class DouyinAdapter:
         self._detail_transport = detail_transport or default_detail_transport
         self._page_state_transport = page_state_transport or default_page_state_transport
 
-    def execute(self, request: TaskRequest | AdapterTaskRequest) -> dict[str, Any]:
-        input_url = resolve_input_url(request=request)
+    def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
+        context = resolve_execution_context(request=request)
+        input_url = resolve_input_url(request=context)
         url_info = parse_douyin_detail_url(input_url)
-        session = self._session_provider(self._session_path)
+        session = build_session_config_from_context(context)
         try:
             params = self._build_detail_params(session, url_info)
             raw_response = self._fetch_detail(session, params)
@@ -183,37 +184,82 @@ def build_adapters() -> dict[str, object]:
     return {"douyin": DouyinAdapter()}
 
 
-def resolve_input_url(*, request: TaskRequest | AdapterTaskRequest) -> str:
-    if type(request) is AdapterTaskRequest:
-        if request.capability != CONTENT_DETAIL:
-            raise PlatformAdapterError(
-                code="invalid_douyin_request",
-                message="douyin adapter 不支持该 capability family",
-                details={"capability": request.capability},
-                category="invalid_input",
-            )
-        if request.target_type != "url":
-            raise PlatformAdapterError(
-                code="invalid_douyin_request",
-                message="douyin adapter 仅支持 target_type=url",
-                details={"target_type": request.target_type},
-                category="invalid_input",
-            )
-        if request.collection_mode != "hybrid":
-            raise PlatformAdapterError(
-                code="invalid_douyin_request",
-                message="douyin adapter 仅支持 collection_mode=hybrid",
-                details={"collection_mode": request.collection_mode},
-                category="invalid_input",
-            )
-        return request.target_value
-    if type(request) is TaskRequest:
-        return request.input.url
+def resolve_execution_context(*, request: AdapterExecutionContext) -> AdapterExecutionContext:
+    if type(request) is not AdapterExecutionContext:
+        raise PlatformAdapterError(
+            code="invalid_douyin_request",
+            message="douyin adapter request 顶层形状不合法",
+            details={"request_type": type(request).__name__},
+            category="invalid_input",
+        )
+    if request.request.capability != CONTENT_DETAIL:
+        raise PlatformAdapterError(
+            code="invalid_douyin_request",
+            message="douyin adapter 不支持该 capability family",
+            details={"capability": request.request.capability},
+            category="invalid_input",
+        )
+    if request.request.target_type != "url":
+        raise PlatformAdapterError(
+            code="invalid_douyin_request",
+            message="douyin adapter 仅支持 target_type=url",
+            details={"target_type": request.request.target_type},
+            category="invalid_input",
+        )
+    if request.request.collection_mode != "hybrid":
+        raise PlatformAdapterError(
+            code="invalid_douyin_request",
+            message="douyin adapter 仅支持 collection_mode=hybrid",
+            details={"collection_mode": request.request.collection_mode},
+            category="invalid_input",
+        )
+    return request
+
+
+def resolve_input_url(*, request: AdapterExecutionContext) -> str:
+    if type(request) is AdapterExecutionContext:
+        return request.request.target_value
     raise PlatformAdapterError(
         code="invalid_douyin_request",
         message="douyin adapter request 顶层形状不合法",
         details={"request_type": type(request).__name__},
         category="invalid_input",
+    )
+
+
+def build_session_config_from_context(context: AdapterExecutionContext) -> DouyinSessionConfig:
+    resource_bundle = context.resource_bundle
+    if resource_bundle is None:
+        raise PlatformAdapterError(
+            code="douyin_resource_bundle_missing",
+            message="douyin adapter 需要 Core 注入 resource_bundle",
+            details={},
+            category="invalid_input",
+        )
+    account = resource_bundle.account
+    if account is None:
+        raise PlatformAdapterError(
+            code="douyin_account_material_missing",
+            message="douyin adapter 需要 account 资源",
+            details={},
+            category="invalid_input",
+        )
+    material = account.material
+    if not isinstance(material, Mapping):
+        raise PlatformAdapterError(
+            code="douyin_account_material_missing",
+            message="douyin account.material 必须是对象",
+            details={"actual_type": type(material).__name__},
+            category="invalid_input",
+        )
+    return DouyinSessionConfig(
+        cookies=require_material_string(material, "cookies", error_code="douyin_account_material_missing"),
+        user_agent=require_material_string(material, "user_agent", error_code="douyin_account_material_missing"),
+        verify_fp=optional_string(material.get("verify_fp")),
+        ms_token=optional_string(material.get("ms_token")),
+        webid=optional_string(material.get("webid")),
+        sign_base_url=optional_string(material.get("sign_base_url")),
+        timeout_seconds=coerce_timeout_seconds(material.get("timeout_seconds")),
     )
 
 
@@ -305,6 +351,23 @@ def require_string(data: Mapping[str, Any], field: str, path: Path) -> str:
             code="douyin_session_missing",
             message=f"抖音会话文件缺少 `{field}`",
             details={"session_path": str(path), "field": field},
+        )
+    return value
+
+
+def require_material_string(
+    data: Mapping[str, Any],
+    field: str,
+    *,
+    error_code: str,
+) -> str:
+    value = data.get(field)
+    if not isinstance(value, str) or not value:
+        raise PlatformAdapterError(
+            code=error_code,
+            message=f"douyin account.material 缺少 `{field}`",
+            details={"field": field},
+            category="invalid_input",
         )
     return value
 
