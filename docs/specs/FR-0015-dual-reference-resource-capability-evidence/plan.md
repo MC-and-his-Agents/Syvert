@@ -10,6 +10,7 @@
 - 关联 exec-plan：
   - `docs/exec-plans/FR-0015-dual-reference-resource-capability-evidence.md`
   - `docs/exec-plans/CHORE-0140-fr-0015-formal-spec-closeout.md`
+  - `docs/exec-plans/CHORE-0144-fr-0015-evidence-registry-reconciliation.md`
 
 ## 实施目标
 
@@ -18,6 +19,7 @@
 ## 分阶段拆分
 
 - 阶段 1：`#194` 收口 formal spec，冻结 `DualReferenceResourceCapabilityEvidenceRecord`、批准规则与 `research.md` 入口。
+- 阶段 1.1：`#206` 作为 formal-spec follow-up，补齐 `research.md` 中 implementation closeout 需要消费的 stable evidence ref registry 与示例基线，避免 formal truth 与 evidence closeout 漂移。
 - 阶段 2：后续 evidence closeout Work Item 消费本 formal spec，把双参考适配器事实沉淀到稳定 evidence registry，而不是继续依赖会话判断。
 - 阶段 3：`FR-0013` 与 `FR-0014` 在不反向改写证据规则的前提下，分别消费本 FR 的批准词汇与引用边界。
 
@@ -38,7 +40,7 @@
   - `python3 scripts/spec_guard.py --mode ci --all`
   - `python3 scripts/docs_guard.py --mode ci`
   - `python3 scripts/workflow_guard.py --mode ci`
-  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-194-fr-0015-formal-spec`
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-206-fr-0015-formal-evidence-registry`
 - implementation 阶段：
   - 双参考 evidence registry 验证：同一候选能力必须同时存在 `xhs` / `douyin` 的稳定证据记录，才能被投影到批准词汇
   - review 验证：对 `adapter_only` / `rejected` 候选进行抽查，确保没有被下游 FR 误消费
