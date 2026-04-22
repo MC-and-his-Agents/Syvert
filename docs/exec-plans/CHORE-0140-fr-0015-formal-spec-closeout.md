@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
-- 关联 PR：
+- 关联 PR：`#198`
 - 状态：`active`
 - active 收口事项：`CHORE-0140-fr-0015-formal-spec-closeout`
 
@@ -35,7 +35,8 @@
 - `FR-0015` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
 - 当前 closeout 已把 `DualReferenceResourceCapabilityEvidenceRecord`、`shared_status` 枚举、有限词汇表与 research 边界写入 formal suite。
 - 最新 formal spec 语义 checkpoint `82250e919f0aa1316dc0c33723d75454126a3f3f` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
-- 当前停点是把 checkpoint / 验证真相同步回 requirement container 与 closeout exec-plan，然后创建 spec PR 进入 review / merge gate。
+- spec PR `#198` 已创建并绑定当前分支。
+- 当前停点是等待 reviewer / merge gate 基于当前 live head 继续收口。
 
 ## 下一步动作
 

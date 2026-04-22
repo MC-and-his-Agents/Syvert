@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
-- 关联 PR：
+- 关联 PR：`#198`
 - 状态：`inactive requirement container`
 
 ## 说明
