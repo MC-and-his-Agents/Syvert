@@ -8,6 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
+- 关联 PR：`#198`
 - 状态：`active`
 - active 收口事项：`CHORE-0140-fr-0015-formal-spec-closeout`
 
@@ -33,13 +34,13 @@
 
 - `issue-194-fr-0015-formal-spec` 已作为 `#194` 的独立 spec worktree 建立。
 - `FR-0015` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 最新 formal spec 语义 checkpoint `10e468f99c5ed4f7ea39a4987803df4a77e4242a` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
+- 最新 formal spec 语义 checkpoint `10e468f99c5ed4f7ea39a4987803df4a77e4242a` 已生成，当前受审 spec PR 为 `#198`；当前停点是把最新门禁结果与 PR 真相同步回 exec-plan，并等待 review / guardian / merge gate。
 
 ## 下一步动作
 
 - 运行 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`，修复 `FR-0015` 套件的一致性问题。
-- 形成首个 semantic checkpoint 后回填 requirement container 与 closeout exec-plan 的 checkpoint SHA。
-- 通过受控入口创建 spec PR，并把当前受审 PR、checks 与 checkpoint 真相同步回 exec-plan。
+- 在当前受审 PR `#198` 上继续消费 review / guardian / merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的语义 checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -59,6 +60,16 @@
 - 已核对 `FR-0010`、`FR-0012` 与当前 runtime / reference adapters / regression 基线，确认当前最小共享能力词汇应收敛为 `account`、`proxy`。
 - `git commit -m 'docs(spec): 冻结 FR-0015 双参考资源能力证据基线'`
   - 结果：已生成最新语义 checkpoint `10e468f99c5ed4f7ea39a4987803df4a77e4242a`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-194-fr-0015-formal-spec`
+  - 结果：通过
+- `gh pr list --state all --head issue-194-fr-0015-formal-spec --json number,title,url,state,headRefName,baseRefName`
+  - 结果：当前受审 spec PR 为 `#198 https://github.com/MC-and-his-Agents/Syvert/pull/198`
 
 ## 未决风险
 
@@ -77,3 +88,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `10e468f99c5ed4f7ea39a4987803df4a77e4242a`
+- review-sync 说明：当前 live head 已包含 checkpoint SHA、门禁结果与 PR metadata；后续若只追加同类同步，不把 metadata-only follow-up 伪装成新的语义 checkpoint。
