@@ -15,12 +15,8 @@
 
 - `FR-0015` 作为 canonical requirement 容器，不直接承载 worktree、PR 或 active 执行回合。
 - 当前 formal spec closeout 由 `docs/exec-plans/CHORE-0140-fr-0015-formal-spec-closeout.md` 承担 `#194` 的执行轮次，当前受审 PR 为 `#198`；本 FR 自身不直接成为执行入口。
-<<<<<<< HEAD
 - 当前 formal evidence registry follow-up 由 `docs/exec-plans/CHORE-0144-fr-0015-evidence-registry-reconciliation.md` 承担 `#206` 的执行轮次，并已通过 PR `#208` 合入 `main`；该 follow-up 只补齐 `research.md` 的 traceable evidence ref registry 与示例基线，不改写本 requirement container 已冻结的能力边界。
 - 当前 implementation closeout 由 `docs/exec-plans/CHORE-0143-fr-0015-evidence-closeout.md` 承担 `#197` 的执行轮次，当前受审 implementation PR 为 `#204`；canonical implementation carriers 为 `syvert/resource_capability_evidence.py` 与 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`。
-=======
-- 当前 implementation closeout 由 `docs/exec-plans/CHORE-0143-fr-0015-evidence-closeout.md` 承担 `#197` 的执行轮次，当前受审 implementation PR 为 `#204`；canonical implementation carriers 为 `syvert/resource_capability_evidence.py` 与 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`。
->>>>>>> d170235 (docs(exec-plan): 同步 FR-0015 证据基线 PR 追溯)
 - `FR-0015` 只冻结双参考适配器资源能力证据记录 carrier、批准规则与 `v0.5.0` 最小能力词汇，不实现证据采集流水线，也不定义 matcher / scheduler / provider 生态。
 - `FR-0015` 冻结的 `account`、`proxy` 词汇是 `FR-0013` 资源需求声明与 `FR-0014` 能力匹配可以消费的唯一共享资源能力标识；下游事项不得自行新增能力名或反向改写本 FR 的批准基线。
 - `#195` 与 `#196` 后续实现必须直接消费 `syvert.resource_capability_evidence` 中的 approved capability ids 与 canonical evidence refs，不得在各自事项内重新硬编码 `account`、`proxy` 或复制证据字符串。
