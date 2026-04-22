@@ -37,7 +37,8 @@
 
 - `origin/main@d2be4bf90dd7d26e389abee5fd93e5ceb52a737e` 已包含 `v0.4.0` 所需的全部 formal spec、runtime、reference adapter 收口与回归修复：PR `#169/#170/#171/#176/#178/#180/#182/#184`。
 - `#162` 已关闭，`#163/#165/#167` 及其下属 Work Item 也已关闭，`v0.4.0` 的功能与 FR closeout 目标已经完成。
-- 当前仍缺 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md`、git tag `v0.4.0` 与 GitHub Release `v0.4.0`。
+- 当前分支已补齐 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md`、本事项 decision 与 active exec-plan，阶段 A carrier 已形成独立 docs checkpoint。
+- 主干当前仍缺 `v0.4.0` git tag、GitHub Release 与阶段 A carrier 合入后的仓内发布索引。
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0`。
 - 本事项按同一 Work Item 的两阶段模型推进：当前阶段 A 负责建立仓内 carrier；阶段 A 合入后，阶段 B 负责建立发布锚点并回写最终发布真相。
@@ -89,9 +90,12 @@
   - `FR-0010` formal spec / runtime / store bootstrap traceability 已由 PR `#170/#176/#178` 合入主干
   - `FR-0012` formal spec / runtime 已由 PR `#171/#182` 合入主干
   - `FR-0007` 回归基线修复已由 PR `#180` 合入主干
+- 阶段 A carrier 证据：
+  - `docs/releases/v0.4.0.md`
+  - `docs/sprints/2026-S17.md`
+  - `docs/decisions/ADR-GOV-0034-v0-4-0-phase-and-release-closeout.md`
+  - `docs/exec-plans/GOV-0034-v0-4-0-phase-and-release-closeout.md`
 - 当前缺失的发布锚点证据：
-  - `docs/releases/v0.4.0.md` 尚未入库
-  - `docs/sprints/2026-S17.md` 尚未入库
   - `v0.4.0` tag 尚未创建
   - GitHub Release `v0.4.0` 尚未创建
 
@@ -129,5 +133,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `d2be4bf90dd7d26e389abee5fd93e5ceb52a737e`
-- 说明：该 checkpoint 对应 `v0.4.0` 所需 formal spec、runtime、reference adapter 收口与回归修复已全部合入主干的发布前基线。当前阶段 A 只补 release carrier，不改写该功能 checkpoint 的语义。
+- `ac557837e5284c31043bc3527f1bf31c002a2bf9`
+- 说明：该 checkpoint 在 `v0.4.0` 发布前基线之上补齐了阶段 A release/sprint carrier、decision 与 active exec-plan。当前 head 只建立发布入口与治理证据，不改写既有功能 checkpoint 语义。
