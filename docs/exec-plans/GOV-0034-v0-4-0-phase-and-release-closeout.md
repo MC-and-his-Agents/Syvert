@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0034-v0-4-0-phase-and-release-closeout.md`
-- 关联 PR：`#186`
+- 关联 PR：`#186`、`#187`
 - 状态：`active`
 - active 收口事项：`GOV-0034-v0-4-0-phase-and-release-closeout`
 
@@ -35,21 +35,19 @@
 
 ## 当前停点
 
-- `origin/main@d2be4bf90dd7d26e389abee5fd93e5ceb52a737e` 已包含 `v0.4.0` 所需的全部 formal spec、runtime、reference adapter 收口与回归修复：PR `#169/#170/#171/#176/#178/#180/#182/#184`。
+- `origin/main@c9ce7362215c2748df6d7f3c541ae613a62fdeea` 已包含 `v0.4.0` 所需的全部 formal spec、runtime、reference adapter 收口、发布 carrier 与回归修复：PR `#169/#170/#171/#176/#178/#180/#182/#184/#186`。
 - `#162` 已关闭，`#163/#165/#167` 及其下属 Work Item 也已关闭，`v0.4.0` 的功能与 FR closeout 目标已经完成。
-- 当前分支已补齐 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md`、本事项 decision 与 active exec-plan，阶段 A carrier 已形成独立 docs checkpoint。
-- 主干当前仍缺 `v0.4.0` git tag、GitHub Release 与阶段 A carrier 合入后的仓内发布索引。
+- `v0.4.0` tag 已创建并推送，GitHub Release `v0.4.0` 已发布。
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0`。
-- 阶段 A docs PR `#186` 已创建，当前回合正在补齐 review carrier 后重新进入 guardian / merge gate。
-- 本事项按同一 Work Item 的两阶段模型推进：当前阶段 A 负责建立仓内 carrier；阶段 A 合入后，阶段 B 负责建立发布锚点并回写最终发布真相。
+- 当前回合已进入 `metadata-only closeout follow-up`：当前分支只负责把 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md` 与本 exec-plan 从阶段 A 发布前真相同步到正式发布完成真相。
+- 阶段 B metadata-only/docs PR `#187` 已创建，当前回合正等待 guardian / merge gate。
+- 本事项按同一 Work Item 的两阶段模型推进：阶段 A 已完成仓内 carrier 合入；阶段 B 正在回写最终发布真相并收口 GitHub closeout。
 
 ## 下一步动作
 
-- 同步 PR `#186` 的审查载体与验证信息。
-- 在当前 head 上完成 guardian 与 merge gate，并合入阶段 A。
-- 基于阶段 A 合入后的主干提交创建并推送 annotated tag `v0.4.0`，随后创建 GitHub Release `v0.4.0`。
-- 以同一 Work Item 发起阶段 B metadata-only/docs PR，把 release / sprint 索引与本 exec-plan 从“待发布锚点”同步到最终发布完成真相。
+- 在当前分支把 release / sprint 索引与本 exec-plan 同步到正式发布完成真相。
+- 通过受控 docs PR 合入阶段 B metadata-only closeout follow-up。
 - 合并阶段 B 后回写并关闭 `#185`，并补 `#162` 的最终 closeout 评论。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -60,10 +58,12 @@
 
 - 角色：`v0.4.0` 的 phase / release 发布 closeout Work Item。
 - 阻塞：
-  - `#185` 之外不存在合法执行入口，tag / Release 不能直接挂到 Phase 或 FR 容器上执行。
-  - 发布锚点必须等阶段 A 文档 PR 合入主干后才能建立，避免 tag / Release 指向未入主干的 carrier。
+  - 阶段 B 需要把阶段 A 发布前基线与最终 published truth 严格区分，不能把 `#186/c9ce736...` 误写成已经承载最终仓内发布真相。
+  - active `exec-plan` 的历史负证据必须按阶段标注，不能和当前阶段 B 的已发布事实混写成同一组当前验证结果。
 
 ## 已验证项
+
+### 阶段 A 基线验证
 
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 162 --json state`
   - 结果：`#162` 为 `CLOSED`
@@ -73,8 +73,6 @@
   - 结果：`#165` 为 `CLOSED`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 167 --json state`
   - 结果：`#167` 为 `CLOSED`
-- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 185 --json state`
-  - 结果：`#185` 为 `OPEN`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh release view v0.4.0`
   - 结果：`release not found`
 - `git tag --list 'v0.4.0'`
@@ -98,6 +96,39 @@
   - 结果：第二轮 `REQUEST_CHANGES`
   - 已识别阻断：
     - `docs/releases/v0.4.0.md` 与 `docs/sprints/2026-S17.md` 不得把阶段 A 发布前真相误写成“发布完成真相”；当前分支已统一改为阶段 A 发布前表述
+  - 结果：第三轮 `APPROVE`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh pr view 186 --json state,mergeCommit`
+  - 结果：PR `#186` 已 `MERGED`，merge commit 为 `c9ce7362215c2748df6d7f3c541ae613a62fdeea`
+
+### 阶段 B 当前验证
+
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue reopen 185`
+  - 结果：已重新打开 `#185`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 185 --json state`
+  - 结果：`#185` 为 `OPEN`
+- `git tag -a v0.4.0 -m 'v0.4.0'`
+  - 结果：已在主干提交 `c9ce7362215c2748df6d7f3c541ae613a62fdeea` 上创建 annotated tag `v0.4.0`
+- `git push origin v0.4.0`
+  - 结果：已推送 tag `v0.4.0`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh release create v0.4.0 --title 'v0.4.0' --notes-file /tmp/v0.4.0-release.md`
+  - 结果：已创建 GitHub Release `v0.4.0`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-185-v0-4-0`
+  - 结果：通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes --dry-run`
+  - 结果：通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes`
+  - 结果：已创建 PR `#187`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 187 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`
+  - 已识别阻断：
+    - `#186/c9ce736...` 只能表述为阶段 A 发布 carrier 基线，不能误写成已经承载最终仓内发布真相
+    - active `exec-plan` 需要把阶段 A 历史负证据与阶段 B 当前验证结果按 phase 隔离
 
 ## closeout 证据
 
@@ -111,15 +142,12 @@
   - `docs/sprints/2026-S17.md`
   - `docs/decisions/ADR-GOV-0034-v0-4-0-phase-and-release-closeout.md`
   - `docs/exec-plans/GOV-0034-v0-4-0-phase-and-release-closeout.md`
-- 当前缺失的发布锚点证据：
-  - `v0.4.0` tag 尚未创建
-  - GitHub Release `v0.4.0` 尚未创建
+- 发布锚点证据：
+  - `v0.4.0` tag 已创建并推送
+  - GitHub Release `v0.4.0` 已创建
 
 ## 剩余 closeout 动作
 
-- 合入阶段 A docs PR
-- 创建并推送 tag `v0.4.0`
-- 创建 GitHub Release `v0.4.0`
 - 合入阶段 B metadata-only/docs PR
 - 回写并关闭 `#185`
 - 补 `#162` 的最终 closeout 评论
@@ -149,5 +177,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ac557837e5284c31043bc3527f1bf31c002a2bf9`
-- 说明：该 checkpoint 在 `v0.4.0` 发布前基线之上补齐了阶段 A release/sprint carrier、decision 与 active exec-plan。当前 head 只建立发布入口与治理证据，不改写既有功能 checkpoint 语义。
+- `c9ce7362215c2748df6d7f3c541ae613a62fdeea`
+- 说明：该 checkpoint 对应阶段 A carrier 已合入主干且 `v0.4.0` tag / GitHub Release 已建立后的发布完成基线。当前阶段 B 仅回写仓内最终发布真相与 GitHub closeout 元数据，不改写功能或发布锚点语义。
