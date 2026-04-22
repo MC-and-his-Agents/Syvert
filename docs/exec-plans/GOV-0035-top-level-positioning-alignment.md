@@ -9,7 +9,7 @@
 - sprint：`2026-S18`
 - 关联 spec：`无`
 - 关联 decision：`docs/decisions/ADR-GOV-0035-top-level-positioning-alignment.md`
-- 关联 PR：`待补充`
+- 关联 PR：`#207`
 - 状态：`active`
 - active 收口事项：`GOV-0035-top-level-positioning-alignment`
 
@@ -38,13 +38,13 @@
 
 - 已完成定位讨论，结论收敛为：`Syvert 是一个统一承载和治理互联网操作任务及其资源的稳定底座。`
 - 已完成影响分析：本轮最小修订集固定为 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md`；formal spec 与历史工件暂不回写。
-- `#205` 已建立为当前治理 Work Item，bootstrap decision 与 active exec-plan 已落盘，三份顶层文档的首轮定位修订已经完成且本地门禁通过；当前停点是整理差异、提交并创建 governance PR。
+- `#205` 已建立为当前治理 Work Item，bootstrap decision 与 active exec-plan 已落盘；三份顶层文档的定位修订已由 semantic checkpoint `2febef239aa50094275a42439452420ada4a1d38` 提交到分支，并通过受控入口创建 governance PR `#207`。
+- 当前停点是把 PR metadata 与当前 review 停点同步回 exec-plan，随后进入 review / guardian / merge gate。
 
 ## 下一步动作
 
-- 提交当前定位修订与治理 bootstrap 工件。
-- 推送分支，并通过受控入口创建单独的 governance PR。
-- 在 PR 建立后同步 `关联 PR`、review 停点与当前受审 head 的 metadata。
+- 等待 review / guardian / merge gate，并按反馈继续收口。
+- 若后续只追加 PR / checks / metadata，同步回 exec-plan 时保持 metadata-only follow-up 口径，不伪装成新的语义 checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -71,6 +71,8 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-205-syvert`
   - 结果：通过
+- `python3 scripts/open_pr.py --class governance --issue 205 --item-key GOV-0035-top-level-positioning-alignment --item-type GOV --release v0.5.0 --sprint 2026-S18 --title 'governance: 收敛 Syvert 顶层定位叙事' --closing fixes`
+  - 结果：已创建 PR `#207 https://github.com/MC-and-his-Agents/Syvert/pull/207`
 
 ## 未决风险
 
@@ -84,4 +86,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `d7dc70934b15b2f4812795a9c16b71b4de41f367`
+- `2febef239aa50094275a42439452420ada4a1d38`
+- review-sync 说明：当前 live head 只追加 PR metadata follow-up 时，不把 metadata-only 提交伪装成新的语义 checkpoint。
