@@ -313,7 +313,8 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     if not records:
         raise ValueError("frozen evidence records must not be empty")
 
-    approved_record_keys: set[tuple[str, str]] = set()
+    shared_records_by_capability: dict[str, list[DualReferenceResourceCapabilityEvidenceRecord]] = {}
+    shared_record_keys: set[tuple[str, str]] = set()
     for record in records:
         if record.adapter_key not in _ALLOWED_ADAPTER_KEYS:
             raise ValueError(f"unsupported adapter_key in frozen evidence record: {record.adapter_key}")
@@ -333,22 +334,41 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         if any(ref not in evidence_entry_index for ref in record.evidence_refs):
             raise ValueError("frozen evidence record references unknown evidence_ref")
         if record.shared_status == "shared":
-            approved_record_keys.add((record.adapter_key, record.candidate_abstract_capability))
+            shared_record_key = (record.candidate_abstract_capability, record.adapter_key)
+            if shared_record_key in shared_record_keys:
+                raise ValueError("shared evidence records must not duplicate capability/adapter pairs")
+            shared_record_keys.add(shared_record_key)
+            shared_records_by_capability.setdefault(record.candidate_abstract_capability, []).append(record)
 
     vocabulary_entries = approved_resource_capability_vocabulary_entries()
     vocabulary_index = {entry.capability_id: entry for entry in vocabulary_entries}
     if len(vocabulary_index) != len(vocabulary_entries):
         raise ValueError("approved capability vocabulary entries must use unique capability_id values")
-    if approved_resource_capability_ids() != frozenset(_APPROVED_RESOURCE_CAPABILITY_IDS):
+    approved_capability_ids = approved_resource_capability_ids()
+    if approved_capability_ids != frozenset(_APPROVED_RESOURCE_CAPABILITY_IDS):
         raise ValueError("approved capability ids must stay frozen to account and proxy")
+    shared_capability_ids = frozenset(shared_records_by_capability)
+    if shared_capability_ids != approved_capability_ids:
+        raise ValueError("shared evidence records must stay frozen to the approved capability ids")
+    expected_shared_record_keys = {
+        (capability_id, adapter_key)
+        for capability_id in _APPROVED_RESOURCE_CAPABILITY_IDS
+        for adapter_key in _ALLOWED_ADAPTER_KEYS
+    }
+    if shared_record_keys != expected_shared_record_keys:
+        raise ValueError("shared evidence records must stay frozen to one xhs and one douyin record per approved capability")
 
     rejected_or_adapter_only = {
         record.candidate_abstract_capability
         for record in records
         if record.shared_status != "shared"
     }
-    if approved_resource_capability_ids() & rejected_or_adapter_only:
+    if approved_capability_ids & rejected_or_adapter_only:
         raise ValueError("adapter_only or rejected candidates must not leak into approved capability ids")
+
+    expected_vocabulary_entries = _expected_approved_vocabulary_entries(shared_records_by_capability)
+    if vocabulary_entries != expected_vocabulary_entries:
+        raise ValueError("approved capability vocabulary entries must stay equal to the canonical mapping derived from shared evidence records")
 
     for capability_id, vocabulary_entry in vocabulary_index.items():
         if vocabulary_entry.status not in _ALLOWED_APPROVAL_STATUS:
@@ -359,7 +379,9 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         )
         if any(ref not in evidence_entry_index for ref in vocabulary_entry.approval_basis_evidence_refs):
             raise ValueError("approved vocabulary entry references unknown evidence_ref")
-        if ("xhs", capability_id) not in approved_record_keys or ("douyin", capability_id) not in approved_record_keys:
+        shared_records = shared_records_by_capability.get(capability_id, [])
+        shared_adapters = {record.adapter_key for record in shared_records}
+        if shared_adapters != _ALLOWED_ADAPTER_KEYS:
             raise ValueError("approved capability ids must be backed by shared xhs and douyin evidence records")
 
 
@@ -377,3 +399,31 @@ def _require_unique_non_empty_strings(values: tuple[str, ...], *, field_name: st
         raise ValueError(f"{field_name} must not contain duplicates")
     for value in values:
         _require_non_empty_string(value, field_name=field_name)
+
+
+def _canonical_approval_basis_evidence_refs(
+    shared_records: list[DualReferenceResourceCapabilityEvidenceRecord],
+) -> tuple[str, ...]:
+    ordered_refs: list[str] = []
+    records_by_adapter = {record.adapter_key: record for record in shared_records}
+    for adapter_key in ("xhs", "douyin"):
+        record = records_by_adapter[adapter_key]
+        for evidence_ref in record.evidence_refs:
+            if evidence_ref not in ordered_refs:
+                ordered_refs.append(evidence_ref)
+    return tuple(ordered_refs)
+
+
+def _expected_approved_vocabulary_entries(
+    shared_records_by_capability: dict[str, list[DualReferenceResourceCapabilityEvidenceRecord]],
+) -> tuple[ApprovedResourceCapabilityVocabularyEntry, ...]:
+    return tuple(
+        ApprovedResourceCapabilityVocabularyEntry(
+            capability_id=capability_id,
+            approval_basis_evidence_refs=_canonical_approval_basis_evidence_refs(
+                shared_records_by_capability[capability_id]
+            ),
+            status="approved",
+        )
+        for capability_id in _APPROVED_RESOURCE_CAPABILITY_IDS
+    )

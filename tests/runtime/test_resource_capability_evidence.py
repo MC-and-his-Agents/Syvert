@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from syvert.adapters.douyin import build_session_config_from_context as build_douyin_session_config_from_context
 from syvert.adapters.xhs import build_session_config_from_context as build_xhs_session_config_from_context
 from syvert.real_adapter_regression import seed_reference_regression_resources
+from syvert import resource_capability_evidence
 from syvert.resource_capability_evidence import (
     approved_resource_capability_ids,
     approved_resource_capability_vocabulary_entries,
@@ -41,6 +44,24 @@ class ResourceCapabilityEvidenceTests(unittest.TestCase):
             {"account", "proxy"},
         )
         self.assertEqual(
+            {
+                entry.capability_id: entry.approval_basis_evidence_refs
+                for entry in approved_resource_capability_vocabulary_entries()
+            },
+            {
+                "account": (
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:xhs:content-detail:url:hybrid:account-material",
+                    "fr-0015:douyin:content-detail:url:hybrid:account-material",
+                ),
+                "proxy": (
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:regression:xhs:managed-proxy-seed",
+                    "fr-0015:regression:douyin:managed-proxy-seed",
+                ),
+            },
+        )
+        self.assertEqual(
             {entry.evidence_ref for entry in frozen_evidence_reference_entries()},
             {
                 "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
@@ -73,6 +94,71 @@ class ResourceCapabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(records[("douyin", "sign_base_url")].shared_status, "rejected")
         self.assertEqual(records[("xhs", "browser_state")].shared_status, "rejected")
         self.assertEqual(records[("douyin", "browser_state")].shared_status, "rejected")
+
+    def test_validate_fails_closed_when_unapproved_shared_capability_is_added(self) -> None:
+        records = frozen_dual_reference_resource_capability_evidence_records()
+        expanded_records = (
+            *records,
+            replace(
+                records[0],
+                candidate_abstract_capability="browser_profile",
+                evidence_refs=(
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:xhs:content-detail:url:hybrid:account-material",
+                ),
+            ),
+            replace(
+                records[1],
+                candidate_abstract_capability="browser_profile",
+                evidence_refs=(
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:douyin:content-detail:url:hybrid:account-material",
+                ),
+            ),
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
+            expanded_records,
+        ):
+            with self.assertRaisesRegex(ValueError, "approved capability ids"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_shared_record_duplicates_adapter_pair(self) -> None:
+        records = frozen_dual_reference_resource_capability_evidence_records()
+        duplicated_records = (*records, records[0])
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
+            duplicated_records,
+        ):
+            with self.assertRaisesRegex(ValueError, "duplicate capability/adapter pairs"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_approved_vocabulary_evidence_refs_drift(self) -> None:
+        tampered_entries = tuple(
+            replace(
+                entry,
+                approval_basis_evidence_refs=(
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:regression:xhs:managed-proxy-seed",
+                    "fr-0015:regression:douyin:managed-proxy-seed",
+                ),
+            )
+            if entry.capability_id == "account"
+            else entry
+            for entry in approved_resource_capability_vocabulary_entries()
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES",
+            tampered_entries,
+        ):
+            with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
+                validate_frozen_resource_capability_evidence_contract()
 
     def test_runtime_requested_slots_match_account_and_proxy_evidence(self) -> None:
         self.assertEqual(
