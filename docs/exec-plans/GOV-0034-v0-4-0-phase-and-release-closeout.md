@@ -58,10 +58,12 @@
 
 - 角色：`v0.4.0` 的 phase / release 发布 closeout Work Item。
 - 阻塞：
-  - `#185` 之外不存在合法执行入口，tag / Release 不能直接挂到 Phase 或 FR 容器上执行。
-  - 发布锚点必须等阶段 A 文档 PR 合入主干后才能建立，避免 tag / Release 指向未入主干的 carrier。
+  - 阶段 B 需要把阶段 A 发布前基线与最终 published truth 严格区分，不能把 `#186/c9ce736...` 误写成已经承载最终仓内发布真相。
+  - active `exec-plan` 的历史负证据必须按阶段标注，不能和当前阶段 B 的已发布事实混写成同一组当前验证结果。
 
 ## 已验证项
+
+### 阶段 A 基线验证
 
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 162 --json state`
   - 结果：`#162` 为 `CLOSED`
@@ -71,8 +73,6 @@
   - 结果：`#165` 为 `CLOSED`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 167 --json state`
   - 结果：`#167` 为 `CLOSED`
-- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 185 --json state`
-  - 结果：`#185` 为 `OPEN`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh release view v0.4.0`
   - 结果：`release not found`
 - `git tag --list 'v0.4.0'`
@@ -96,20 +96,39 @@
   - 结果：第二轮 `REQUEST_CHANGES`
   - 已识别阻断：
     - `docs/releases/v0.4.0.md` 与 `docs/sprints/2026-S17.md` 不得把阶段 A 发布前真相误写成“发布完成真相”；当前分支已统一改为阶段 A 发布前表述
-- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 186 --post-review`
   - 结果：第三轮 `APPROVE`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh pr view 186 --json state,mergeCommit`
   - 结果：PR `#186` 已 `MERGED`，merge commit 为 `c9ce7362215c2748df6d7f3c541ae613a62fdeea`
+
+### 阶段 B 当前验证
+
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue reopen 185`
+  - 结果：已重新打开 `#185`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 185 --json state`
+  - 结果：`#185` 为 `OPEN`
 - `git tag -a v0.4.0 -m 'v0.4.0'`
   - 结果：已在主干提交 `c9ce7362215c2748df6d7f3c541ae613a62fdeea` 上创建 annotated tag `v0.4.0`
 - `git push origin v0.4.0`
   - 结果：已推送 tag `v0.4.0`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh release create v0.4.0 --title 'v0.4.0' --notes-file /tmp/v0.4.0-release.md`
   - 结果：已创建 GitHub Release `v0.4.0`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-185-v0-4-0`
+  - 结果：通过
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes --dry-run`
   - 结果：通过
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes`
   - 结果：已创建 PR `#187`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 187 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`
+  - 已识别阻断：
+    - `#186/c9ce736...` 只能表述为阶段 A 发布 carrier 基线，不能误写成已经承载最终仓内发布真相
+    - active `exec-plan` 需要把阶段 A 历史负证据与阶段 B 当前验证结果按 phase 隔离
 
 ## closeout 证据
 
