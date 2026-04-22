@@ -41,7 +41,7 @@
 - 当前执行分支：`issue-197-fr-0015`
 - 当前 Work Item：`#197`
 - 当前受审 PR：`#204`
-- 当前实现 checkpoint：`70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`
+- 当前实现 checkpoint：`58c93c71f541a3f9b83205ffbc42d518fbfad3e2`
 - 当前实现已把 `FR-0015` evidence baseline 落成 `syvert.resource_capability_evidence`，冻结了 `EvidenceReferenceEntry`、`DualReferenceResourceCapabilityEvidenceRecord`、`ApprovedResourceCapabilityVocabularyEntry` 与对应 helper / validator。
 - 当前实现已把 canonical evidence baseline artifact 落到 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`，与 machine-readable registry 一一对应。
 - 当前实现已新增 runtime 测试，直接复验 runtime 请求 slot、reference adapter account material 消费面与 real adapter regression 资源 seed 仍与 frozen evidence refs 对齐。
@@ -56,8 +56,9 @@
   - `browser_state` rejected records 现在只绑定 browser / page-state fallback 路径证据，不再复用无关的 `account-material` 引用
   - validator 现在同时要求 evidence ref registry 与 candidate outcome matrix 精确等于 canonical baseline，避免 future drift 只改一侧表格或漏掉负向候选仍被静默放行
 - `#206 / PR #208` 已于 `main@7102fdc28cd28a4360e32b95a70ae68d30335f92` 合入，本分支已线性吸收最新 formal evidence registry truth，不再停留在 pre-reconciliation research 基线。
-- 当前实现已新增 formal research coverage guard：`tests/runtime/test_resource_capability_evidence.py` 现在要求 frozen evidence registry 的全部 `evidence_ref` 都能从 `docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md` 回指，防止同类 drift 只能靠 guardian 在 PR 阶段发现。
-- 当前 head 处于 rebase 后的 review-sync 恢复回合；最近一次实现 checkpoint 为 `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`，基于该 checkpoint 的本地完整验证已通过，当前停点是推送分支并重跑 guardian。
+- 当前实现已按 latest guardian 阻断把 formal research traceability guard 收紧到 `证据登记项` registry 本身：`tests/runtime/test_resource_capability_evidence.py` 现在会逐行解析 formal evidence registry 表，并把 `evidence_ref -> (source_file, source_symbol)` 与 frozen registry 精确比对，而不是只检查文档中是否出现过字符串。
+- 当前实现已把公开 accessor 的 fail-closed 校验改成按 frozen baseline key 缓存，并在单次 validator 执行中复用已解析的 AST，避免下游每次读取 approved capability data 都重复触发 repo 源码 I/O 与 AST 解析。
+- 当前 head 处于 latest guardian 阻断修复后的 review-sync 恢复回合；最近一次实现 checkpoint 为 `58c93c71f541a3f9b83205ffbc42d518fbfad3e2`，基于该 checkpoint 的本地完整验证已通过，当前停点是推送分支并重跑 guardian。
 
 ## 下一步动作
 
@@ -133,6 +134,20 @@
   - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
+- `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过
+- `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过，`Ran 92 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha "$(git merge-base origin/main HEAD)" --head-sha "$(git rev-parse HEAD)" --head-ref issue-197-fr-0015`
+  - 结果：在 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2` 上通过
+- `git commit -m 'fix(runtime): 收紧 FR-0015 research traceability guard'`
+  - 结果：已生成实现 checkpoint `58c93c71f541a3f9b83205ffbc42d518fbfad3e2`
 
 ## 未决风险
 
@@ -148,5 +163,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`
+- `58c93c71f541a3f9b83205ffbc42d518fbfad3e2`
 - 当前 head 若只继续追加 exec-plan / guardian / merge gate metadata，同步必须保持该实现 checkpoint 不变；若实现代码再次变化，则必须显式推进新的 checkpoint 真相。
