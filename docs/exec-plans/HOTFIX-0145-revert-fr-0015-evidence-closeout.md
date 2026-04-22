@@ -1,0 +1,99 @@
+# HOTFIX-0145-revert-fr-0015-evidence-closeout 执行计划
+
+## 关联信息
+
+- item_key：`HOTFIX-0145-revert-fr-0015-evidence-closeout`
+- Issue：`#209`
+- item_type：`HOTFIX`
+- release：`v0.5.0`
+- sprint：`2026-S18`
+- 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
+- 关联 PR：`#210`
+- 状态：`active`
+- active 收口事项：`HOTFIX-0145-revert-fr-0015-evidence-closeout`
+
+## 目标
+
+- 通过独立 revert PR 回退 `PR #204`（merge commit `a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`）带入 `main` 的 `FR-0015` implementation closeout 增量。
+- 恢复 `latest guardian verdict=APPROVE`、`safe_to_merge=true`、checks 全绿、review/merge 同一 head 这一 merge gate 真相，不让 `main` 继续承载一次越过门禁的实现 closeout。
+- 为后续在新 Work Item 下重新推进 `#197` 留出干净主干，而不是在已越界合入的基础上继续补丁。
+
+## 范围
+
+- 本次纳入：
+  - 回退 `#204` 带入的 machine-readable evidence registry module
+  - 回退 `#204` 带入的 FR-0015 runtime traceability tests
+  - 回退 `#204` 带入的 evidence baseline artifact
+  - 回退 `#204` 带入的 implementation closeout exec-plan
+  - 修正 `docs/exec-plans/FR-0015-dual-reference-resource-capability-evidence.md` 的追溯口径
+  - 新增当前 hotfix 回合的 active exec-plan
+- 本次不纳入：
+  - 重新实现 `#197`
+  - 修改 `docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
+  - 修改 `#195/#196` 的实现或 formal spec
+  - release / sprint 索引扩写
+
+## 当前停点
+
+- `PR #204` 已于 `2026-04-22` 合入 `main`，merge commit 为 `a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`。
+- 该次合入发生时，latest guardian 并未对当前受审 head 给出明确 `APPROVE`；虽然 checks 全绿，但 merge gate 真相未闭合。
+- 当前 hotfix worktree 已从 `main@a8b6ffc87b41afae5d4d9c4e95de74791e521b5b` 建立：`/Users/mc/code/worktrees/syvert/issue-209-pr-204-latest-guardian-approve`。
+- 当前分支已生成 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`，完成对 `#204` 主体实现增量的逆向撤销。
+- 当前受审 revert PR 已创建为 `#210`，后续 guardian / checks / merge gate 反馈统一回写到本 exec-plan。
+- 当前 head 为 metadata-only follow-up `5153edb4ba4e9c9e5c1dbc65155ffdc4a8d978c8`，已完成 revert-trace 工件补齐与本地验证；当前停点是等待 latest guardian `APPROVE` 后执行受控 squash merge。
+
+## 下一步动作
+
+- 等待当前受审 PR `#210` 拿到 latest guardian `APPROVE` 与 `safe_to_merge=true`。
+- 在 guardian verdict 绑定当前 head 且 GitHub checks 继续全绿的前提下，执行受控 squash merge。
+- 合并后同步 `#209` 与 `main` 真相，并为后续重新推进 `#197` 留下新的合法执行入口。
+
+## 当前 checkpoint 推进的 release 目标
+
+- 撤销一次未满足 latest guardian APPROVE merge gate 的 `v0.5.0` implementation closeout 合入，恢复主干对 `FR-0015` 的可信发布前提。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`FR-0015` implementation closeout 的 hotfix revert Work Item。
+- 阻塞：
+  - 在本事项合入前，`main` 上的 `FR-0015` implementation truth 与 merge gate 真相不一致。
+  - 在本事项合入前，不应继续把 `#204` 带入的 machine-readable evidence registry 当作可继续演进的主干基线。
+
+## 已验证项
+
+- `gh issue create`
+  - 结果：已创建当前 Work Item `#209 https://github.com/MC-and-his-Agents/Syvert/issues/209`
+- `python3 scripts/create_worktree.py --issue 209 --class implementation --base main`
+  - 结果：已创建当前 worktree `issue-209-pr-204-latest-guardian-approve`，base SHA=`a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`
+- `git revert --no-edit a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`
+  - 结果：已生成 revert 变更，并重提为中文 Conventional Commit
+- `git commit -m 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线'`
+  - 结果：已生成当前 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha "$(git merge-base origin/main HEAD)" --head-sha "$(git rev-parse HEAD)" --head-ref issue-209-pr-204-latest-guardian-approve`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 head 上通过，`PR class=implementation`
+- `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在当前受审 head 上通过，`Ran 76 tests`，`OK`
+- `python3 scripts/open_pr.py --class implementation --issue 209 --item-key HOTFIX-0145-revert-fr-0015-evidence-closeout --item-type HOTFIX --release v0.5.0 --sprint 2026-S18 --title 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线' --base main --closing fixes`
+  - 结果：已创建当前受审 revert PR `#210 https://github.com/MC-and-his-Agents/Syvert/pull/210`
+
+## 未决风险
+
+- 若只回退代码文件而不修正 requirement / exec-plan 追溯口径，仓内仍会保留“`#204` 是当前有效 implementation closeout”的错误真相。
+- 若在 revert PR 上再次跳过 latest guardian `APPROVE`，会重复同一类流程违背。
+- 若后续重新推进 `#197` 时复用旧分支/旧 PR，而不是新 Work Item / 新 PR，GitHub 调度层会再次混淆关闭语义。
+
+## 回滚方式
+
+- 如需恢复 `#204` 的内容，必须在新的受控 Work Item 下重新提交 implementation PR，并满足 latest guardian `APPROVE` merge gate；不得直接反向回滚当前 hotfix。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `0f55583c20200ce071ddb58d203243cc35e4af92`
