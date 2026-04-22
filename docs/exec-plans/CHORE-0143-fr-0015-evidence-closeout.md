@@ -41,17 +41,18 @@
 - 当前执行分支：`issue-197-fr-0015`
 - 当前 Work Item：`#197`
 - 当前受审 PR：`#204`
-- 当前实现 checkpoint：`dd7934d07b062157de89a807668772df75ed1fa5`
+- 当前实现 checkpoint：`aa3f41f2a7d2e9567edc951ab9ee2a4ce30b61f8`
 - 当前实现已把 `FR-0015` evidence baseline 落成 `syvert.resource_capability_evidence`，冻结了 `EvidenceReferenceEntry`、`DualReferenceResourceCapabilityEvidenceRecord`、`ApprovedResourceCapabilityVocabularyEntry` 与对应 helper / validator。
 - 当前实现已把 canonical evidence baseline artifact 落到 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`，与 machine-readable registry 一一对应。
 - 当前实现已新增 runtime 测试，直接复验 runtime 请求 slot、reference adapter account material 消费面与 real adapter regression 资源 seed 仍与 frozen evidence refs 对齐。
-- 当前回合正进入 metadata-only follow-up：在不改写 `dd7934d07b062157de89a807668772df75ed1fa5` 这条实现真相的前提下，补 active exec-plan、FR requirement container 追溯入口、PR 与 merge gate 元数据。
+- 当前实现已按 guardian 同类阻断把 validator 收紧为“由 shared records 派生 canonical approved vocabulary，并要求 frozen vocabulary 与该派生结果精确等价”的 fail-closed 模式，不再只做局部字段检查。
+- 当前实现已新增负向测试，覆盖未批准 shared capability 漂移、duplicate shared adapter/capability pair，以及 approved vocabulary evidence refs 漂移三类同源回归。
+- 当前回合再次进入 metadata-only follow-up：在不改写 `aa3f41f2a7d2e9567edc951ab9ee2a4ce30b61f8` 这条实现真相的前提下，同步最新 checkpoint、guardian 恢复状态与 merge gate 元数据。
 
 ## 下一步动作
 
-- 运行 `py_compile`、focused runtime 回归、`docs_guard`、`workflow_guard` 与 `pr_scope_guard`。
-- 对当前受审 PR `#204` 的 live head 运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge。
-- 若 guardian 或 checks 暴露阻断，仅允许继续以 metadata-only 或最小修复回合收口，不得重写 `dd7934d07b062157de89a807668772df75ed1fa5` 的 evidence baseline 语义。
+- 对当前受审 PR `#204` 的 live head 重新运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge。
+- 若 guardian 或 checks 继续暴露阻断，只允许围绕 shared-record-to-vocabulary canonical mapping 同类边界做最小修复，不得扩张为 runtime / version gate 语义改写。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,16 +70,25 @@
 - `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
   - 结果：通过
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence`
-  - 结果：`Ran 6 tests`，`OK`
+  - 结果：`Ran 9 tests`，`OK`
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 76 tests`，`OK`
 - `git commit -m 'feat(runtime): 落盘 FR-0015 资源能力证据基线'`
   - 结果：已生成实现 checkpoint `dd7934d07b062157de89a807668772df75ed1fa5`
+- `python3 scripts/pr_guardian.py review 204 --post-review`
+  - 结果：guardian 首轮 `REQUEST_CHANGES`
+  - 同类阻断已按系统性方式收口：
+    - validator 现在会从 shared records 派生 canonical approved vocabulary，并反向拒绝任何不属于冻结批准词汇的 `shared + approve_for_v0_5_0` 记录
+    - validator 现在要求 approved vocabulary entries 与 shared records 派生出的 canonical approval basis evidence refs 精确一致
+    - 新增负向测试覆盖 stray shared capability、duplicate shared pair 与 approval basis drift 三类回归
+- `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在 checkpoint `aa3f41f2a7d2e9567edc951ab9ee2a4ce30b61f8` 上通过，`Ran 85 tests`，`OK`
 
 ## 未决风险
 
 - 若 `#195 / #196` 仍在实现中手写 `account`、`proxy` 或复制 evidence ref 字符串，`FR-0015` 的单一证据真相会再次分叉。
 - 若后续事项试图把 `adapter_only` / `rejected` 候选重新提升为 matcher / declaration 的合法能力名，仍会破坏 `FR-0015` 的 fail-closed 边界。
+- 若后续修改重新把 shared records 与 approved vocabulary 拆成两套独立 truth，而不是保持派生式精确等价，guardian 同类阻断仍会再次出现。
 
 ## 回滚方式
 
@@ -86,5 +96,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `dd7934d07b062157de89a807668772df75ed1fa5`
+- `aa3f41f2a7d2e9567edc951ab9ee2a4ce30b61f8`
 - 当前回合已进入 `metadata-only follow-up`；后续 PR / guardian / merge gate / closeout 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
