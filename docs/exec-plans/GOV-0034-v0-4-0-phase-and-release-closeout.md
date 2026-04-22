@@ -39,7 +39,7 @@
 - `#162` 已关闭，`#163/#165/#167` 及其下属 Work Item 也已关闭，`v0.4.0` 的功能与 FR closeout 目标已经完成。
 - `v0.4.0` tag 已创建并推送，GitHub Release `v0.4.0` 已发布。
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
-- 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0-phase-b`。
+- 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0`。
 - 当前回合已进入 `metadata-only closeout follow-up`：当前分支只负责把 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md` 与本 exec-plan 从阶段 A 发布前真相同步到正式发布完成真相。
 - 阶段 B metadata-only/docs PR `#187` 已创建，当前回合正等待 guardian / merge gate。
 - 本事项按同一 Work Item 的两阶段模型推进：阶段 A 已完成仓内 carrier 合入；阶段 B 正在回写最终发布真相并收口 GitHub closeout。
