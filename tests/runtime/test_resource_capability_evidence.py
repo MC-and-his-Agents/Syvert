@@ -26,15 +26,57 @@ from syvert.runtime import (
     CONTENT_DETAIL_BY_URL,
     LEGACY_COLLECTION_MODE,
     RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
+    TaskInput,
+    TaskRequest,
+    execute_task,
 )
 from tests.runtime.resource_fixtures import (
+    ResourceStoreEnvMixin,
     build_managed_resource_bundle,
     douyin_account_material,
     xhs_account_material,
 )
 
 
-class ResourceCapabilityEvidenceTests(unittest.TestCase):
+class ProxyPathCaptureAdapter:
+    adapter_key = "stub"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+
+    def execute(self, request: AdapterExecutionContext) -> dict[str, object]:
+        self.last_request = request
+        return {
+            "raw": {"url": request.input.url},
+            "normalized": {
+                "platform": "stub",
+                "content_id": "content-proxy-path",
+                "content_type": "unknown",
+                "canonical_url": request.input.url,
+                "title": "",
+                "body_text": "",
+                "published_at": None,
+                "author": {
+                    "author_id": None,
+                    "display_name": None,
+                    "avatar_url": None,
+                },
+                "stats": {
+                    "like_count": None,
+                    "comment_count": None,
+                    "share_count": None,
+                    "collect_count": None,
+                },
+                "media": {
+                    "cover_url": None,
+                    "video_url": None,
+                    "image_urls": [],
+                },
+            },
+        }
+
+
+class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_validate_frozen_resource_capability_evidence_contract_accepts_current_baseline(self) -> None:
         validate_frozen_resource_capability_evidence_contract()
 
@@ -160,11 +202,46 @@ class ResourceCapabilityEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 validate_frozen_resource_capability_evidence_contract()
 
+    def test_validate_fails_closed_when_evidence_source_symbol_drifts(self) -> None:
+        entries = frozen_evidence_reference_entries()
+        tampered_entries = (
+            replace(entries[0], source_symbol="MISSING_RUNTIME_RESOURCE_SLOTS_SYMBOL"),
+            *entries[1:],
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_EVIDENCE_REFERENCE_ENTRIES",
+            tampered_entries,
+        ):
+            with self.assertRaisesRegex(ValueError, "source_symbol must resolve"):
+                validate_frozen_resource_capability_evidence_contract()
+
     def test_runtime_requested_slots_match_account_and_proxy_evidence(self) -> None:
         self.assertEqual(
             RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE[(CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE)],
             ("account", "proxy"),
         )
+
+    def test_proxy_shared_evidence_is_exercised_through_runtime_bundle_binding(self) -> None:
+        adapter = ProxyPathCaptureAdapter()
+
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key="stub",
+                capability=CONTENT_DETAIL_BY_URL,
+                input=TaskInput(url="https://example.com/runtime-proxy-evidence"),
+            ),
+            adapters={"stub": adapter},
+            task_id_factory=lambda: "task-proxy-evidence",
+        )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account", "proxy"))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNotNone(adapter.last_request.resource_bundle.proxy)
+        self.assertEqual(adapter.last_request.resource_bundle.capability, CONTENT_DETAIL_BY_URL)
+        self.assertEqual(adapter.last_request.resource_bundle.proxy.resource_type, "proxy")
 
     def test_xhs_account_material_consumption_matches_evidence_baseline(self) -> None:
         material = xhs_account_material()

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
+from pathlib import Path
 
 
 _ALLOWED_ADAPTER_KEYS = frozenset({"xhs", "douyin"})
@@ -19,6 +21,7 @@ _FROZEN_EXECUTION_PATH = {
     "target_type": "url",
     "collection_mode": "hybrid",
 }
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True)
@@ -308,6 +311,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         _require_non_empty_string(entry.source_file, field_name="source_file")
         _require_non_empty_string(entry.source_symbol, field_name="source_symbol")
         _require_non_empty_string(entry.summary, field_name="summary")
+        _validate_traceable_evidence_source(entry)
 
     records = frozen_dual_reference_resource_capability_evidence_records()
     if not records:
@@ -427,3 +431,43 @@ def _expected_approved_vocabulary_entries(
         )
         for capability_id in _APPROVED_RESOURCE_CAPABILITY_IDS
     )
+
+
+def _validate_traceable_evidence_source(entry: EvidenceReferenceEntry) -> None:
+    source_path = (_REPO_ROOT / entry.source_file).resolve()
+    if not source_path.is_file():
+        raise ValueError("evidence source_file must resolve to a real file")
+    try:
+        syntax_tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+    except (OSError, UnicodeDecodeError, SyntaxError) as error:
+        raise ValueError("evidence source_file must be readable as Python source") from error
+    if not _source_symbol_exists(syntax_tree, entry.source_symbol):
+        raise ValueError("evidence source_symbol must resolve inside the declared source_file")
+
+
+def _source_symbol_exists(syntax_tree: ast.AST, source_symbol: str) -> bool:
+    for node in getattr(syntax_tree, "body", []):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == source_symbol:
+            return True
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            for target_name in _assignment_target_names(node):
+                if target_name == source_symbol:
+                    return True
+    return False
+
+
+def _assignment_target_names(node: ast.Assign | ast.AnnAssign) -> tuple[str, ...]:
+    if isinstance(node, ast.Assign):
+        targets = node.targets
+    else:
+        targets = [node.target]
+
+    names: list[str] = []
+    for target in targets:
+        if isinstance(target, ast.Name):
+            names.append(target.id)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                if isinstance(element, ast.Name):
+                    names.append(element.id)
+    return tuple(names)
