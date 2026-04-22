@@ -38,14 +38,15 @@
 - `PR #204` 已于 `2026-04-22` 合入 `main`，merge commit 为 `a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`。
 - 该次合入发生时，latest guardian 并未对当前受审 head 给出明确 `APPROVE`；虽然 checks 全绿，但 merge gate 真相未闭合。
 - 当前 hotfix worktree 已从 `main@a8b6ffc87b41afae5d4d9c4e95de74791e521b5b` 建立：`/Users/mc/code/worktrees/syvert/issue-209-pr-204-latest-guardian-approve`。
-- 当前分支已生成 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`，完成对 `#204` 主体实现增量的逆向撤销；当前停点是补齐 revert 回合所需的最小治理追溯工件并进入验证。
+- 当前分支已生成 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`，完成对 `#204` 主体实现增量的逆向撤销。
 - 当前受审 revert PR 已创建为 `#210`，后续 guardian / checks / merge gate 反馈统一回写到本 exec-plan。
+- 当前 head 为 metadata-only follow-up `5153edb4ba4e9c9e5c1dbc65155ffdc4a8d978c8`，已完成 revert-trace 工件补齐与本地验证；当前停点是等待 latest guardian `APPROVE` 后执行受控 squash merge。
 
 ## 下一步动作
 
-- 完成 `FR-0015` requirement container 的 revert-trace 修正，使其不再把 `#204` 作为当前有效 implementation closeout 真相。
-- 运行当前 revert PR 所需的本地门禁与最小回归。
-- 通过 `open_pr` 创建受控 revert PR，随后等待 latest guardian `APPROVE` 与 checks 全绿，再执行 squash merge。
+- 等待当前受审 PR `#210` 拿到 latest guardian `APPROVE` 与 `safe_to_merge=true`。
+- 在 guardian verdict 绑定当前 head 且 GitHub checks 继续全绿的前提下，执行受控 squash merge。
+- 合并后同步 `#209` 与 `main` 真相，并为后续重新推进 `#197` 留下新的合法执行入口。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -68,6 +69,18 @@
   - 结果：已生成 revert 变更，并重提为中文 Conventional Commit
 - `git commit -m 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线'`
   - 结果：已生成当前 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha "$(git merge-base origin/main HEAD)" --head-sha "$(git rev-parse HEAD)" --head-ref issue-209-pr-204-latest-guardian-approve`
+  - 结果：在当前受审 head 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在当前受审 head 上通过，`PR class=implementation`
+- `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在当前受审 head 上通过，`Ran 76 tests`，`OK`
 - `python3 scripts/open_pr.py --class implementation --issue 209 --item-key HOTFIX-0145-revert-fr-0015-evidence-closeout --item-type HOTFIX --release v0.5.0 --sprint 2026-S18 --title 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线' --base main --closing fixes`
   - 结果：已创建当前受审 revert PR `#210 https://github.com/MC-and-his-Agents/Syvert/pull/210`
 
