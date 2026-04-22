@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
-- 关联 PR：`待创建`
+- 关联 PR：`#210`
 - 状态：`active`
 - active 收口事项：`HOTFIX-0145-revert-fr-0015-evidence-closeout`
 
@@ -39,6 +39,7 @@
 - 该次合入发生时，latest guardian 并未对当前受审 head 给出明确 `APPROVE`；虽然 checks 全绿，但 merge gate 真相未闭合。
 - 当前 hotfix worktree 已从 `main@a8b6ffc87b41afae5d4d9c4e95de74791e521b5b` 建立：`/Users/mc/code/worktrees/syvert/issue-209-pr-204-latest-guardian-approve`。
 - 当前分支已生成 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`，完成对 `#204` 主体实现增量的逆向撤销；当前停点是补齐 revert 回合所需的最小治理追溯工件并进入验证。
+- 当前受审 revert PR 已创建为 `#210`，后续 guardian / checks / merge gate 反馈统一回写到本 exec-plan。
 
 ## 下一步动作
 
@@ -67,6 +68,8 @@
   - 结果：已生成 revert 变更，并重提为中文 Conventional Commit
 - `git commit -m 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线'`
   - 结果：已生成当前 revert checkpoint `0f55583c20200ce071ddb58d203243cc35e4af92`
+- `python3 scripts/open_pr.py --class implementation --issue 209 --item-key HOTFIX-0145-revert-fr-0015-evidence-closeout --item-type HOTFIX --release v0.5.0 --sprint 2026-S18 --title 'revert(runtime): 回退 FR-0015 双参考资源能力证据基线' --base main --closing fixes`
+  - 结果：已创建当前受审 revert PR `#210 https://github.com/MC-and-his-Agents/Syvert/pull/210`
 
 ## 未决风险
 
