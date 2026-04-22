@@ -37,7 +37,7 @@
 - `#197 / PR #204` 的 guardian 已明确指出：implementation closeout 当前引入的 `evidence_ref` 无法从 `FR-0015 research.md` 的 formal registry 回指，导致 formal spec truth 与实现真相分叉。
 - `issue-206-fr-0015-formal-evidence-registry` 已作为 `#206` 的独立 spec worktree 建立。
 - 当前回合只负责补齐 `research.md` evidence registry 与示例基线，不在本事项内改写 runtime / tests / release-sprint 索引。
-- 最新 follow-up 语义 checkpoint `b3e05228ffc418da2655b3329400b5c4eca6edf1` 已生成，当前停点是吸收最新 `main`、继续消费 guardian / merge gate 反馈，并把 checkpoint / PR metadata 同步回 formal spec 工件。
+- 最新 follow-up 语义 checkpoint `aea613b49992f57235fc56b42c1adcd92e37cde2` 已生成；当前分支已线性吸收 `origin/main@f7728057ba3c68722c58df093b93433420c116cd`，当前停点是继续消费 guardian / merge gate 反馈，并把最新 checkpoint truth 同步回 formal spec 工件。
 - 当前受审 formal-spec follow-up PR 为 `#208`，后续 guardian / merge gate 反馈统一回写到本 exec-plan。
 
 ## 下一步动作
@@ -62,7 +62,9 @@
 - 已核对 `#197 / PR #204` guardian 最新 review，确认当前 formal spec 缺口集中在 `research.md` evidence registry 与 `browser_state` evidence basis。
 - 已核对 `FR-0015` 当前 formal spec 套件与 requirement container，确认 follow-up 只需补齐 formal evidence traceability，不应扩张为新的 runtime 语义变更。
 - `git commit -m 'docs(spec): 补齐 FR-0015 evidence registry 追溯入口'`
-  - 结果：已生成最新语义 checkpoint `b3e05228ffc418da2655b3329400b5c4eca6edf1`
+  - 结果：已生成 evidence registry reconciliation 的首个语义 checkpoint `d5a8d8fec6f6dbe101bc776939cb7107804cf94f`
+- `git commit -m 'docs(spec): 修正 FR-0015 evidence registry follow-up 一致性'`
+  - 结果：已生成当前最新语义 checkpoint `aea613b49992f57235fc56b42c1adcd92e37cde2`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -90,4 +92,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `b3e05228ffc418da2655b3329400b5c4eca6edf1`
+- `aea613b49992f57235fc56b42c1adcd92e37cde2`
