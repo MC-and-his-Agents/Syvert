@@ -281,27 +281,31 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
 
 
 def frozen_evidence_reference_entries() -> tuple[EvidenceReferenceEntry, ...]:
+    validate_frozen_resource_capability_evidence_contract()
     return _FROZEN_EVIDENCE_REFERENCE_ENTRIES
 
 
 
 def frozen_dual_reference_resource_capability_evidence_records() -> tuple[DualReferenceResourceCapabilityEvidenceRecord, ...]:
+    validate_frozen_resource_capability_evidence_contract()
     return _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
 
 
 
 def approved_resource_capability_vocabulary_entries() -> tuple[ApprovedResourceCapabilityVocabularyEntry, ...]:
+    validate_frozen_resource_capability_evidence_contract()
     return _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
 
 
 
 def approved_resource_capability_ids() -> frozenset[str]:
-    return frozenset(entry.capability_id for entry in approved_resource_capability_vocabulary_entries())
+    validate_frozen_resource_capability_evidence_contract()
+    return frozenset(entry.capability_id for entry in _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES)
 
 
 
 def validate_frozen_resource_capability_evidence_contract() -> None:
-    evidence_entries = frozen_evidence_reference_entries()
+    evidence_entries = _FROZEN_EVIDENCE_REFERENCE_ENTRIES
     evidence_entry_index = {entry.evidence_ref: entry for entry in evidence_entries}
     if len(evidence_entry_index) != len(evidence_entries):
         raise ValueError("frozen evidence reference entries must use unique evidence_ref values")
@@ -313,7 +317,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         _require_non_empty_string(entry.summary, field_name="summary")
         _validate_traceable_evidence_source(entry)
 
-    records = frozen_dual_reference_resource_capability_evidence_records()
+    records = _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
     if not records:
         raise ValueError("frozen evidence records must not be empty")
 
@@ -344,11 +348,11 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
             shared_record_keys.add(shared_record_key)
             shared_records_by_capability.setdefault(record.candidate_abstract_capability, []).append(record)
 
-    vocabulary_entries = approved_resource_capability_vocabulary_entries()
+    vocabulary_entries = _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
     vocabulary_index = {entry.capability_id: entry for entry in vocabulary_entries}
     if len(vocabulary_index) != len(vocabulary_entries):
         raise ValueError("approved capability vocabulary entries must use unique capability_id values")
-    approved_capability_ids = approved_resource_capability_ids()
+    approved_capability_ids = frozenset(entry.capability_id for entry in vocabulary_entries)
     if approved_capability_ids != frozenset(_APPROVED_RESOURCE_CAPABILITY_IDS):
         raise ValueError("approved capability ids must stay frozen to account and proxy")
     shared_capability_ids = frozenset(shared_records_by_capability)

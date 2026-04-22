@@ -202,6 +202,29 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 validate_frozen_resource_capability_evidence_contract()
 
+    def test_public_accessors_fail_closed_when_baseline_drifts(self) -> None:
+        tampered_entries = tuple(
+            replace(
+                entry,
+                approval_basis_evidence_refs=(
+                    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                    "fr-0015:regression:xhs:managed-proxy-seed",
+                    "fr-0015:regression:douyin:managed-proxy-seed",
+                ),
+            )
+            if entry.capability_id == "account"
+            else entry
+            for entry in approved_resource_capability_vocabulary_entries()
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES",
+            tampered_entries,
+        ):
+            with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
+                resource_capability_evidence.approved_resource_capability_ids()
+
     def test_validate_fails_closed_when_evidence_source_symbol_drifts(self) -> None:
         entries = frozen_evidence_reference_entries()
         tampered_entries = (
