@@ -78,6 +78,16 @@ class ProxyPathCaptureAdapter:
 
 
 class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
+    @staticmethod
+    def _patched_research_text_with_duplicate_row(row_fragment: str) -> str:
+        research_path = (
+            Path(__file__).resolve().parents[2]
+            / "docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md"
+        )
+        research_text = research_path.read_text(encoding="utf-8")
+        duplicate_row = next(line for line in research_text.splitlines() if row_fragment in line)
+        return research_text.replace(duplicate_row, f"{duplicate_row}\n{duplicate_row}", 1)
+
     def test_frozen_evidence_refs_are_traceable_from_formal_research_registry(self) -> None:
         research_text = (
             Path(__file__).resolve().parents[2]
@@ -180,6 +190,54 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 ),
             },
         )
+
+    def test_validate_fails_closed_when_formal_research_duplicates_evidence_ref_row(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        original_read_text = Path.read_text
+        patched_research_text = self._patched_research_text_with_duplicate_row(
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots"
+        )
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                return patched_research_text
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with self.assertRaisesRegex(ValueError, "must not duplicate evidence_ref rows"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_formal_research_duplicates_approved_capability_row(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        original_read_text = Path.read_text
+        patched_research_text = self._patched_research_text_with_duplicate_row(
+            "| `account` | `shared + approve_for_v0_5_0` |"
+        )
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                return patched_research_text
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with self.assertRaisesRegex(ValueError, "must not duplicate capability_id rows"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_formal_research_duplicates_evidence_record_row(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        original_read_text = Path.read_text
+        patched_research_text = self._patched_research_text_with_duplicate_row(
+            "| `xhs` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `account` |"
+        )
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                return patched_research_text
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with self.assertRaisesRegex(ValueError, "must not duplicate adapter/candidate rows"):
+                validate_frozen_resource_capability_evidence_contract()
 
     def test_canonical_records_freeze_shared_adapter_only_and_rejected_outcomes(self) -> None:
         self.assertEqual(

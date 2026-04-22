@@ -815,6 +815,21 @@ def _load_formal_research_baseline() -> FormalResearchBaseline:
         raise ValueError("formal research registry must enumerate approved capabilities")
     if not evidence_record_entries:
         raise ValueError("formal research registry must enumerate evidence records")
+    _require_unique_formal_research_rows(
+        evidence_reference_entries,
+        key_fn=lambda entry: entry.evidence_ref,
+        error_message="formal research evidence registry must not duplicate evidence_ref rows",
+    )
+    _require_unique_formal_research_rows(
+        approved_capability_entries,
+        key_fn=lambda entry: entry.capability_id,
+        error_message="formal research approved capability table must not duplicate capability_id rows",
+    )
+    _require_unique_formal_research_rows(
+        evidence_record_entries,
+        key_fn=lambda entry: (entry.adapter_key, entry.candidate_abstract_capability),
+        error_message="formal research evidence record table must not duplicate adapter/candidate rows",
+    )
     return FormalResearchBaseline(
         evidence_reference_entries=evidence_reference_entries,
         approved_capability_entries=approved_capability_entries,
@@ -929,6 +944,17 @@ def _parse_execution_path_descriptor(value: str) -> ExecutionPathDescriptor:
         target_type=parts["target_type"],
         collection_mode=parts["collection_mode"],
     )
+
+
+def _require_unique_formal_research_rows(
+    entries: tuple[object, ...],
+    *,
+    key_fn,
+    error_message: str,
+) -> None:
+    keys = [key_fn(entry) for entry in entries]
+    if len(set(keys)) != len(keys):
+        raise ValueError(error_message)
 
 
 def _validate_traceable_evidence_source(
