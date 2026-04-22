@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0034-v0-4-0-phase-and-release-closeout.md`
-- 关联 PR：
+- 关联 PR：`#186`
 - 状态：`active`
 - active 收口事项：`GOV-0034-v0-4-0-phase-and-release-closeout`
 
@@ -41,12 +41,13 @@
 - 主干当前仍缺 `v0.4.0` git tag、GitHub Release 与阶段 A carrier 合入后的仓内发布索引。
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0`。
+- 阶段 A docs PR `#186` 已创建，当前 head `199ccdf1459cce0f1ace3b311ce0c1011518e194` 正等待 guardian / merge gate。
 - 本事项按同一 Work Item 的两阶段模型推进：当前阶段 A 负责建立仓内 carrier；阶段 A 合入后，阶段 B 负责建立发布锚点并回写最终发布真相。
 
 ## 下一步动作
 
-- 完成阶段 A carrier 文档落盘，并在当前分支跑完 docs、workflow、scope 与 governance 门禁。
-- 通过受控 docs PR 合入阶段 A。
+- 同步 PR `#186` 的审查载体与验证信息。
+- 在当前 head 上完成 guardian 与 merge gate，并合入阶段 A。
 - 基于阶段 A 合入后的主干提交创建并推送 annotated tag `v0.4.0`，随后创建 GitHub Release `v0.4.0`。
 - 以同一 Work Item 发起阶段 B metadata-only/docs PR，把 release / sprint 索引与本 exec-plan 从“待发布锚点”同步到最终发布完成真相。
 - 合并阶段 B 后回写并关闭 `#185`，并补 `#162` 的最终 closeout 评论。
@@ -82,6 +83,14 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha $(git rev-parse HEAD) --head-ref issue-185-v0-4-0`
+  - 结果：通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 建立 v0.4.0 发布收口 carrier' --closing fixes --dry-run`
+  - 结果：通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 建立 v0.4.0 发布收口 carrier' --closing fixes`
+  - 结果：已创建 PR `#186`
 
 ## closeout 证据
 
