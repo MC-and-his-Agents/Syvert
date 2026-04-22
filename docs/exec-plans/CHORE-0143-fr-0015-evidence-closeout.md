@@ -41,7 +41,7 @@
 - 当前执行分支：`issue-197-fr-0015`
 - 当前 Work Item：`#197`
 - 当前受审 PR：`#204`
-- 当前实现 checkpoint：`e5792555821f6afed2a96d8a095a672a0bc46d53`
+- 当前实现 checkpoint：`70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`
 - 当前实现已把 `FR-0015` evidence baseline 落成 `syvert.resource_capability_evidence`，冻结了 `EvidenceReferenceEntry`、`DualReferenceResourceCapabilityEvidenceRecord`、`ApprovedResourceCapabilityVocabularyEntry` 与对应 helper / validator。
 - 当前实现已把 canonical evidence baseline artifact 落到 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`，与 machine-readable registry 一一对应。
 - 当前实现已新增 runtime 测试，直接复验 runtime 请求 slot、reference adapter account material 消费面与 real adapter regression 资源 seed 仍与 frozen evidence refs 对齐。
@@ -55,11 +55,13 @@
   - frozen machine-readable registry 现在显式冻结 formal spec 已收口的负向候选全集：`cookies`、`user_agent`、`a_bogus`、`xsec_token`、`xsec_source`
   - `browser_state` rejected records 现在只绑定 browser / page-state fallback 路径证据，不再复用无关的 `account-material` 引用
   - validator 现在同时要求 evidence ref registry 与 candidate outcome matrix 精确等于 canonical baseline，避免 future drift 只改一侧表格或漏掉负向候选仍被静默放行
-- 当前回合已从 metadata-only follow-up 返回到实现恢复回合；当前 head 用于收敛 guardian 第四轮阻断并重新进入 merge gate。
+- `#206 / PR #208` 已于 `main@7102fdc28cd28a4360e32b95a70ae68d30335f92` 合入，本分支已线性吸收最新 formal evidence registry truth，不再停留在 pre-reconciliation research 基线。
+- 当前实现已新增 formal research coverage guard：`tests/runtime/test_resource_capability_evidence.py` 现在要求 frozen evidence registry 的全部 `evidence_ref` 都能从 `docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md` 回指，防止同类 drift 只能靠 guardian 在 PR 阶段发现。
+- 当前 head 处于 rebase 后的 review-sync 恢复回合；最近一次实现 checkpoint 为 `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`，基于该 checkpoint 的本地完整验证已通过，当前停点是推送分支并重跑 guardian。
 
 ## 下一步动作
 
-- 对当前受审 PR `#204` 的 live head 重新运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge，并同步 issue / PR / main 真相。
+- 推送当前 rebased 分支到 `#204`，然后基于已吸收 `#208` 的 live head 重新运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge，并同步 issue / PR / main 真相。
 - 若 guardian 或 checks 继续暴露阻断，只允许围绕 shared-record-to-vocabulary canonical mapping 同类边界做最小修复，不得扩张为 runtime / version gate 语义改写。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -82,7 +84,7 @@
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：`Ran 76 tests`，`OK`
 - `git commit -m 'feat(runtime): 落盘 FR-0015 资源能力证据基线'`
-  - 结果：已生成实现 checkpoint `dd7934d07b062157de89a807668772df75ed1fa5`
+  - 结果：已生成实现 checkpoint `8c1f427ab117f4e44794a48d38b8435a2ffd8fd2`
 - `python3 scripts/pr_guardian.py review 204 --post-review`
   - 结果：guardian 首轮 `REQUEST_CHANGES`
   - 同类阻断已按系统性方式收口：
@@ -90,33 +92,47 @@
     - validator 现在要求 approved vocabulary entries 与 shared records 派生出的 canonical approval basis evidence refs 精确一致
     - 新增负向测试覆盖 stray shared capability、duplicate shared pair 与 approval basis drift 三类回归
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在 checkpoint `aa3f41f2a7d2e9567edc951ab9ee2a4ce30b61f8` 上通过，`Ran 85 tests`，`OK`
+  - 结果：在 checkpoint `288f04aa765b35ba255d2967a2f0a739f38ea795` 上通过，`Ran 85 tests`，`OK`
 - `python3 scripts/pr_guardian.py review 204 --post-review`
   - 结果：guardian 第二轮 `REQUEST_CHANGES`
   - 同类阻断已按系统性方式继续收口：
     - 新增运行时级验证，直接覆盖 `content_detail_by_url + hybrid` 路径上 `proxy` slot 的解析、acquire 与 bundle 绑定闭环
     - evidence registry 现在要求 `source_file` 可读且 `source_symbol` 能从对应源码 AST 解析到，避免追溯指针静默失效
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在 checkpoint `4076e02a68b802b8d1b94ff0bd7ab57a45472790` 上通过，`Ran 87 tests`，`OK`
+  - 结果：在 checkpoint `08d86215eb8614d651b2d03cbc683b9f7b9a1161` 上通过，`Ran 87 tests`，`OK`
 - `python3 scripts/pr_guardian.py review 204 --post-review`
   - 结果：guardian 第三轮 `REQUEST_CHANGES`
   - 同类阻断已按系统性方式继续收口：
     - 所有对外 accessor 现在都会先执行 `validate_frozen_resource_capability_evidence_contract()`，把 fail-closed 从 validator 扩展到公开消费边界
     - 新增回归，证明 downstream-facing accessor 在 baseline 漂移时不会静默返回 frozen data
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在 checkpoint `c6272cecd11f070c43c5c1f06ed949dbac109f0a` 上通过，`Ran 88 tests`，`OK`
+  - 结果：在 checkpoint `3563ff85f6de9bef481683121520742ee1ec97f2` 上通过，`Ran 88 tests`，`OK`
 - `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
-  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+  - 结果：在 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef` 上通过
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过，`Ran 90 tests`，`OK`
+  - 结果：在 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef` 上通过，`Ran 90 tests`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+  - 结果：在 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef` 上通过
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+  - 结果：在 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef` 上通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+  - 结果：在 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef` 上通过
 - `git commit -m 'fix(runtime): 补齐 FR-0015 证据负向基线'`
-  - 结果：已生成实现 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53`
+  - 结果：已生成实现 checkpoint `441e15991b29b10806f4204d362d9aca5c305bef`
+- `python3 -m unittest tests.runtime.test_resource_capability_evidence`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过，`Ran 15 tests`，`OK`
+- `git rebase origin/main`
+  - 结果：已线性吸收 `main@7102fdc28cd28a4360e32b95a70ae68d30335f92`，`#208 / PR #208` 的 formal evidence registry reconciliation 已进入当前分支基线
+- `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
+- `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过，`Ran 91 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在 checkpoint `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5` 上通过
 
 ## 未决风险
 
@@ -130,7 +146,7 @@
 
 - 如需回滚，使用独立 revert PR 撤销 `syvert/resource_capability_evidence.py`、新增测试、artifact 与本 exec-plan / requirement container 追溯入口的增量修改。
 
-## 最近一次 checkpoint 对应的 head SHA
+## 最近一次 implementation checkpoint 对应的 head SHA
 
-- `e5792555821f6afed2a96d8a095a672a0bc46d53`
-- 当前 head 已重新对应实现真相；后续 guardian / merge gate / closeout 元数据必须以该 checkpoint 为恢复基线。
+- `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`
+- 当前 head 若只继续追加 exec-plan / guardian / merge gate metadata，同步必须保持该实现 checkpoint 不变；若实现代码再次变化，则必须显式推进新的 checkpoint 真相。
