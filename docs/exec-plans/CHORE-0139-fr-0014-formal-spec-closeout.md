@@ -33,7 +33,7 @@
 
 - `issue-193-fr-0014-formal-spec` 已作为 `#193` 的独立 spec worktree 建立。
 - `FR-0014` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 当前停点是补齐 formal spec 语义、通过门禁、生成首个 semantic checkpoint，并创建当前 spec PR。
+- 最新 formal spec 语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
 
 ## 下一步动作
 
@@ -57,6 +57,8 @@
 - 已核对 `#188`、`#190`、`#193` 对 `v0.5.0` Core 资源能力匹配事项的目标、非目标与关闭条件描述。
 - 已核对 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md`、`WORKFLOW.md` 与 `spec_review.md` 的上位约束。
 - 已核对 `FR-0010`、`FR-0012` 与当前 `FR-0013 / FR-0015` 规划边界，确认 matcher 只应承担能力满足性判断，而不承担 acquire / 注入 / provider 选择责任。
+- `git commit -m 'docs(spec): 冻结 FR-0014 Core 资源能力匹配 contract'`
+  - 结果：已生成最新语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9`
 
 ## 未决风险
 
@@ -74,4 +76,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待回填`
+- `d5360230e4a1938be460bba2e9ae97554caf37f9`

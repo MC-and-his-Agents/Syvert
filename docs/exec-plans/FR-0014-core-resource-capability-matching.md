@@ -17,8 +17,8 @@
 - `FR-0014` 只冻结 matcher 的输入 / 输出 / fail-closed 边界：它只判断“当前能力集合是否满足声明”，不定义 scheduler、provider selector、资源编排 DSL 或技术桥接逻辑。
 - `FR-0014` 只能消费 `FR-0013` 已冻结的 `AdapterResourceRequirementDeclaration` 与 `FR-0015` 已批准的 `account / proxy` 词汇；下游实现不得通过 matcher 反向改写这些上游真相。
 - `FR-0014` 不重写 `FR-0010` 的 bundle / lease / slot 语义，也不重写 `FR-0012` 的注入边界；相邻事项不得把这些语义重新塞回 matcher。
-- 最新 canonical checkpoint head SHA：待当前 formal spec closeout 完成后回填。
+- 当前分支已形成最新 formal spec 语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9`；其后若只追加当前受审 PR、checks 或 checkpoint metadata，只作为 review-sync follow-up，不改写 requirement 语义。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待回填`
+- `d5360230e4a1938be460bba2e9ae97554caf37f9`
