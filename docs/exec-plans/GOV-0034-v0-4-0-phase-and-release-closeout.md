@@ -45,7 +45,7 @@
 
 ## 下一步动作
 
-- 完成阶段 A carrier 文档落盘，并在当前分支跑完 docs/workflow/scope/governance 门禁。
+- 完成阶段 A carrier 文档落盘，并在当前分支跑完 docs、workflow、scope 与 governance 门禁。
 - 通过受控 docs PR 合入阶段 A。
 - 基于阶段 A 合入后的主干提交创建并推送 annotated tag `v0.4.0`，随后创建 GitHub Release `v0.4.0`。
 - 以同一 Work Item 发起阶段 B metadata-only/docs PR，把 release / sprint 索引与本 exec-plan 从“待发布锚点”同步到最终发布完成真相。
