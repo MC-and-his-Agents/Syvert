@@ -95,6 +95,9 @@
   - 结果：首轮 `REQUEST_CHANGES`
   - 已识别阻断：
     - active `exec-plan` 不得把可变的 live review head 写成当前真相；当前分支已移除该绑定，改回只保留 checkpoint truth 与 review 状态描述
+  - 结果：第二轮 `REQUEST_CHANGES`
+  - 已识别阻断：
+    - `docs/releases/v0.4.0.md` 与 `docs/sprints/2026-S17.md` 不得把阶段 A 发布前真相误写成“发布完成真相”；当前分支已统一改为阶段 A 发布前表述
 
 ## closeout 证据
 
