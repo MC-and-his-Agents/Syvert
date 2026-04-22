@@ -450,7 +450,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 resource_capability_evidence.approved_resource_capability_ids()
 
-    def test_public_accessors_fail_closed_when_formal_research_registry_becomes_unreadable_after_first_success(self) -> None:
+    def test_validate_fails_closed_when_formal_research_registry_becomes_unreadable_after_first_success(self) -> None:
         research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
         original_read_text = Path.read_text
 
@@ -459,13 +459,13 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 raise OSError("research registry unavailable")
             return original_read_text(path_obj, *args, **kwargs)
 
-        resource_capability_evidence.approved_resource_capability_ids()
+        validate_frozen_resource_capability_evidence_contract()
 
         with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
             with self.assertRaisesRegex(ValueError, "formal research registry must be readable"):
-                resource_capability_evidence.approved_resource_capability_ids()
+                validate_frozen_resource_capability_evidence_contract()
 
-    def test_public_accessors_fail_closed_when_source_file_disappears_after_first_success(self) -> None:
+    def test_validate_fails_closed_when_source_file_disappears_after_first_success(self) -> None:
         runtime_path = (resource_capability_evidence._REPO_ROOT / "syvert/runtime.py").resolve()
         original_is_file = Path.is_file
 
@@ -474,11 +474,35 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 return False
             return original_is_file(path_obj)
 
-        resource_capability_evidence.approved_resource_capability_ids()
+        validate_frozen_resource_capability_evidence_contract()
 
         with mock.patch("pathlib.Path.is_file", autospec=True, side_effect=fake_is_file):
             with self.assertRaisesRegex(ValueError, "evidence source_file must resolve to a real file"):
-                resource_capability_evidence.approved_resource_capability_ids()
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_public_accessors_stay_available_without_formal_research_or_source_checkout(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        runtime_path = (resource_capability_evidence._REPO_ROOT / "syvert/runtime.py").resolve()
+        original_read_text = Path.read_text
+        original_is_file = Path.is_file
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                raise OSError("research registry unavailable")
+            return original_read_text(path_obj, *args, **kwargs)
+
+        def fake_is_file(path_obj: Path) -> bool:
+            if path_obj.resolve() == runtime_path:
+                return False
+            return original_is_file(path_obj)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with mock.patch("pathlib.Path.is_file", autospec=True, side_effect=fake_is_file):
+                self.assertEqual(resource_capability_evidence.approved_resource_capability_ids(), frozenset({"account", "proxy"}))
+                self.assertEqual(
+                    {entry.capability_id for entry in resource_capability_evidence.approved_resource_capability_vocabulary_entries()},
+                    {"account", "proxy"},
+                )
 
     def test_validate_fails_closed_when_nested_evidence_source_pointer_drifts(self) -> None:
         tampered_entries = tuple(

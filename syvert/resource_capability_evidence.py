@@ -573,54 +573,43 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
 
 
 def frozen_evidence_reference_entries() -> tuple[EvidenceReferenceEntry, ...]:
-    validate_frozen_resource_capability_evidence_contract()
+    _validate_internal_frozen_resource_capability_evidence_baseline()
     return _FROZEN_EVIDENCE_REFERENCE_ENTRIES
 
 
 
 def frozen_dual_reference_resource_capability_evidence_records() -> tuple[DualReferenceResourceCapabilityEvidenceRecord, ...]:
-    validate_frozen_resource_capability_evidence_contract()
+    _validate_internal_frozen_resource_capability_evidence_baseline()
     return _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
 
 
 
 def approved_resource_capability_vocabulary_entries() -> tuple[ApprovedResourceCapabilityVocabularyEntry, ...]:
-    validate_frozen_resource_capability_evidence_contract()
+    _validate_internal_frozen_resource_capability_evidence_baseline()
     return _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
 
 
 
 def approved_resource_capability_ids() -> frozenset[str]:
-    validate_frozen_resource_capability_evidence_contract()
+    _validate_internal_frozen_resource_capability_evidence_baseline()
     return frozenset(entry.capability_id for entry in _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES)
 
 
 
-def validate_frozen_resource_capability_evidence_contract() -> None:
-    formal_research_baseline = _load_formal_research_baseline()
-    formal_evidence_entry_index = {
-        entry.evidence_ref: entry for entry in formal_research_baseline.evidence_reference_entries
-    }
+def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
+    dict[str, EvidenceReferenceEntry],
+    dict[tuple[str, str], DualReferenceResourceCapabilityEvidenceRecord],
+    dict[str, ApprovedResourceCapabilityVocabularyEntry],
+]:
     evidence_entries = _FROZEN_EVIDENCE_REFERENCE_ENTRIES
     evidence_entry_index = {entry.evidence_ref: entry for entry in evidence_entries}
     if len(evidence_entry_index) != len(evidence_entries):
         raise ValueError("frozen evidence reference entries must use unique evidence_ref values")
-    if frozenset(evidence_entry_index) != frozenset(formal_evidence_entry_index):
-        raise ValueError("frozen evidence reference entries must stay aligned with the formal research registry")
-
-    parsed_source_trees: dict[Path, ast.AST] = {}
     for entry in evidence_entries:
         _require_non_empty_string(entry.evidence_ref, field_name="evidence_ref")
         _require_non_empty_string(entry.source_file, field_name="source_file")
         _require_non_empty_string(entry.source_symbol, field_name="source_symbol")
         _require_non_empty_string(entry.summary, field_name="summary")
-        expected_entry = formal_evidence_entry_index[entry.evidence_ref]
-        if (
-            entry.source_file != expected_entry.source_file
-            or entry.source_symbol != expected_entry.source_symbol
-        ):
-            raise ValueError("frozen evidence reference entries must keep canonical source pointers from the formal research registry")
-        _validate_traceable_evidence_source(entry, parsed_source_trees)
 
     records = _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
     if not records:
@@ -670,23 +659,6 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         ):
             raise ValueError("frozen evidence records must keep canonical signals, evidence refs, and outcomes")
 
-    formal_record_index = {
-        (record.adapter_key, record.candidate_abstract_capability): record
-        for record in formal_research_baseline.evidence_record_entries
-    }
-    if frozenset(record_index) != frozenset(formal_record_index):
-        raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
-    for record_key, formal_record in formal_record_index.items():
-        record = record_index[record_key]
-        if (
-            record.capability != formal_record.capability
-            or record.execution_path != formal_record.execution_path
-            or record.shared_status != formal_record.shared_status
-            or record.decision != formal_record.decision
-            or record.evidence_refs != formal_record.evidence_refs
-        ):
-            raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
-
     vocabulary_entries = _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
     vocabulary_index = {entry.capability_id: entry for entry in vocabulary_entries}
     if len(vocabulary_index) != len(vocabulary_entries):
@@ -717,11 +689,6 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     if vocabulary_entries != expected_vocabulary_entries:
         raise ValueError("approved capability vocabulary entries must stay equal to the canonical mapping derived from shared evidence records")
 
-    formal_approved_capability_index = {
-        entry.capability_id: entry for entry in formal_research_baseline.approved_capability_entries
-    }
-    if approved_capability_ids != frozenset(formal_approved_capability_index):
-        raise ValueError("approved capability ids must stay aligned with the formal research baseline")
     for capability_id, vocabulary_entry in vocabulary_index.items():
         if vocabulary_entry.status not in _ALLOWED_APPROVAL_STATUS:
             raise ValueError(f"unsupported approval status: {vocabulary_entry.status}")
@@ -735,6 +702,53 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         shared_adapters = {record.adapter_key for record in shared_records}
         if shared_adapters != _ALLOWED_ADAPTER_KEYS:
             raise ValueError("approved capability ids must be backed by shared xhs and douyin evidence records")
+
+    return evidence_entry_index, record_index, vocabulary_index
+
+
+
+def validate_frozen_resource_capability_evidence_contract() -> None:
+    evidence_entry_index, record_index, vocabulary_index = _validate_internal_frozen_resource_capability_evidence_baseline()
+    formal_research_baseline = _load_formal_research_baseline()
+    formal_evidence_entry_index = {
+        entry.evidence_ref: entry for entry in formal_research_baseline.evidence_reference_entries
+    }
+    if frozenset(evidence_entry_index) != frozenset(formal_evidence_entry_index):
+        raise ValueError("frozen evidence reference entries must stay aligned with the formal research registry")
+    parsed_source_trees: dict[Path, ast.AST] = {}
+    for evidence_ref, entry in evidence_entry_index.items():
+        formal_entry = formal_evidence_entry_index[evidence_ref]
+        if (
+            entry.source_file != formal_entry.source_file
+            or entry.source_symbol != formal_entry.source_symbol
+        ):
+            raise ValueError("frozen evidence reference entries must keep canonical source pointers from the formal research registry")
+        _validate_traceable_evidence_source(entry, parsed_source_trees)
+
+    formal_record_index = {
+        (record.adapter_key, record.candidate_abstract_capability): record
+        for record in formal_research_baseline.evidence_record_entries
+    }
+    if frozenset(record_index) != frozenset(formal_record_index):
+        raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
+    for record_key, formal_record in formal_record_index.items():
+        record = record_index[record_key]
+        if (
+            record.capability != formal_record.capability
+            or record.execution_path != formal_record.execution_path
+            or record.shared_status != formal_record.shared_status
+            or record.decision != formal_record.decision
+            or record.evidence_refs != formal_record.evidence_refs
+        ):
+            raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
+
+    approved_capability_ids = frozenset(vocabulary_index)
+    formal_approved_capability_index = {
+        entry.capability_id: entry for entry in formal_research_baseline.approved_capability_entries
+    }
+    if approved_capability_ids != frozenset(formal_approved_capability_index):
+        raise ValueError("approved capability ids must stay aligned with the formal research baseline")
+    for capability_id, vocabulary_entry in vocabulary_index.items():
         formal_capability_entry = formal_approved_capability_index[capability_id]
         if vocabulary_entry.approval_basis_evidence_refs != formal_capability_entry.evidence_refs:
             raise ValueError("approved capability vocabulary entries must stay aligned with the formal research baseline")
