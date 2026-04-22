@@ -40,7 +40,7 @@
   - `python3 scripts/spec_guard.py --mode ci --all`
   - `python3 scripts/docs_guard.py --mode ci`
   - `python3 scripts/workflow_guard.py --mode ci`
-  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-194-fr-0015-formal-spec`
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-206-fr-0015-formal-evidence-registry`
 - implementation 阶段：
   - 双参考 evidence registry 验证：同一候选能力必须同时存在 `xhs` / `douyin` 的稳定证据记录，才能被投影到批准词汇
   - review 验证：对 `adapter_only` / `rejected` 候选进行抽查，确保没有被下游 FR 误消费
