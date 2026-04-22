@@ -41,7 +41,7 @@
 - 主干当前仍缺 `v0.4.0` git tag、GitHub Release 与阶段 A carrier 合入后的仓内发布索引。
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0`。
-- 阶段 A docs PR `#186` 已创建，当前 head `199ccdf1459cce0f1ace3b311ce0c1011518e194` 正等待 guardian / merge gate。
+- 阶段 A docs PR `#186` 已创建，当前回合正在补齐 review carrier 后重新进入 guardian / merge gate。
 - 本事项按同一 Work Item 的两阶段模型推进：当前阶段 A 负责建立仓内 carrier；阶段 A 合入后，阶段 B 负责建立发布锚点并回写最终发布真相。
 
 ## 下一步动作
@@ -91,6 +91,10 @@
   - 结果：通过
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 建立 v0.4.0 发布收口 carrier' --closing fixes`
   - 结果：已创建 PR `#186`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 186 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`
+  - 已识别阻断：
+    - active `exec-plan` 不得把可变的 live review head 写成当前真相；当前分支已移除该绑定，改回只保留 checkpoint truth 与 review 状态描述
 
 ## closeout 证据
 
