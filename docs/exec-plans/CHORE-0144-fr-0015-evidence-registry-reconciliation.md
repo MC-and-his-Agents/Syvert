@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
-- 关联 PR：`待创建`
+- 关联 PR：`#208`
 - 状态：`active`
 - active 收口事项：`CHORE-0144-fr-0015-evidence-registry-reconciliation`
 
@@ -38,6 +38,7 @@
 - `issue-206-fr-0015-formal-evidence-registry` 已作为 `#206` 的独立 spec worktree 建立。
 - 当前回合只负责补齐 `research.md` evidence registry 与示例基线，不在本事项内改写 runtime / tests / release-sprint 索引。
 - 最新 follow-up 语义 checkpoint `b3e0522f437ddb1b74dd091ced6735228042b357` 已生成，当前停点是回填 formal-spec 门禁结果并准备创建 spec-only follow-up PR。
+- 当前受审 formal-spec follow-up PR 为 `#208`，后续 guardian / merge gate 反馈统一回写到本 exec-plan。
 
 ## 下一步动作
 
@@ -70,6 +71,8 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); python3 scripts/governance_gate.py --mode ci --base-sha \"$BASE\" --head-sha $(git rev-parse HEAD) --head-ref issue-206-fr-0015-formal-evidence-registry`
   - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 206 --item-key CHORE-0144-fr-0015-evidence-registry-reconciliation --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'docs(spec): 补齐 FR-0015 evidence registry 追溯入口' --base main --closing fixes`
+  - 结果：已创建当前受审 PR `#208 https://github.com/MC-and-his-Agents/Syvert/pull/208`
 
 ## 未决风险
 
