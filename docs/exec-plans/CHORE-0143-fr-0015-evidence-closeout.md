@@ -41,7 +41,7 @@
 - 当前执行分支：`issue-197-fr-0015`
 - 当前 Work Item：`#197`
 - 当前受审 PR：`#204`
-- 当前实现 checkpoint：`c6272cecd11f070c43c5c1f06ed949dbac109f0a`
+- 当前实现 checkpoint：`e5792555821f6afed2a96d8a095a672a0bc46d53`
 - 当前实现已把 `FR-0015` evidence baseline 落成 `syvert.resource_capability_evidence`，冻结了 `EvidenceReferenceEntry`、`DualReferenceResourceCapabilityEvidenceRecord`、`ApprovedResourceCapabilityVocabularyEntry` 与对应 helper / validator。
 - 当前实现已把 canonical evidence baseline artifact 落到 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`，与 machine-readable registry 一一对应。
 - 当前实现已新增 runtime 测试，直接复验 runtime 请求 slot、reference adapter account material 消费面与 real adapter regression 资源 seed 仍与 frozen evidence refs 对齐。
@@ -51,11 +51,15 @@
   - `proxy` shared evidence 现在直接穿过 `execute_task()` 的公开运行时路径，验证 `content_detail_by_url + hybrid` 上的 slot 解析、resource acquire 与 bundle 绑定确实包含 `proxy`
   - evidence registry 现在会对 `source_file` 与 `source_symbol` 做 fail-closed 追溯校验，要求文件真实存在且符号仍能从源码 AST 解析到
 - 当前实现已按 guardian 第三轮阻断继续把 fail-closed 落到公开消费边界：所有对外 accessor 现在都会先执行 `validate_frozen_resource_capability_evidence_contract()`，不再允许下游在 drifted baseline 上静默读取 approved capability ids 或 frozen registry。
-- 当前回合再次进入 metadata-only follow-up：在不改写 `c6272cecd11f070c43c5c1f06ed949dbac109f0a` 这条实现真相的前提下，同步最新 checkpoint、guardian 恢复状态与 merge gate 元数据。
+- 当前实现已按 guardian 第四轮阻断把证据真相进一步收紧为“完整 canonical candidate / evidence matrix”：
+  - frozen machine-readable registry 现在显式冻结 formal spec 已收口的负向候选全集：`cookies`、`user_agent`、`a_bogus`、`xsec_token`、`xsec_source`
+  - `browser_state` rejected records 现在只绑定 browser / page-state fallback 路径证据，不再复用无关的 `account-material` 引用
+  - validator 现在同时要求 evidence ref registry 与 candidate outcome matrix 精确等于 canonical baseline，避免 future drift 只改一侧表格或漏掉负向候选仍被静默放行
+- 当前回合已从 metadata-only follow-up 返回到实现恢复回合；当前 head 用于收敛 guardian 第四轮阻断并重新进入 merge gate。
 
 ## 下一步动作
 
-- 对当前受审 PR `#204` 的 live head 重新运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge。
+- 对当前受审 PR `#204` 的 live head 重新运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge，并同步 issue / PR / main 真相。
 - 若 guardian 或 checks 继续暴露阻断，只允许围绕 shared-record-to-vocabulary canonical mapping 同类边界做最小修复，不得扩张为 runtime / version gate 语义改写。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -101,12 +105,24 @@
     - 新增回归，证明 downstream-facing accessor 在 baseline 漂移时不会静默返回 frozen data
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
   - 结果：在 checkpoint `c6272cecd11f070c43c5c1f06ed949dbac109f0a` 上通过，`Ran 88 tests`，`OK`
+- `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
+  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+- `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
+  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过，`Ran 90 tests`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：在 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53` 上通过
+- `git commit -m 'fix(runtime): 补齐 FR-0015 证据负向基线'`
+  - 结果：已生成实现 checkpoint `e5792555821f6afed2a96d8a095a672a0bc46d53`
 
 ## 未决风险
 
 - 若 `#195 / #196` 仍在实现中手写 `account`、`proxy` 或复制 evidence ref 字符串，`FR-0015` 的单一证据真相会再次分叉。
 - 若后续事项试图把 `adapter_only` / `rejected` 候选重新提升为 matcher / declaration 的合法能力名，仍会破坏 `FR-0015` 的 fail-closed 边界。
-- 若后续修改重新把 shared records 与 approved vocabulary 拆成两套独立 truth，而不是保持派生式精确等价，guardian 同类阻断仍会再次出现。
+- 若后续修改重新把 shared records、negative candidate matrix 与 approved vocabulary 拆成多套独立 truth，而不是保持 canonical baseline 精确等价，guardian 同类阻断仍会再次出现。
 - 若后续重构改变运行时路径或源码入口而没有同步 evidence registry，新的 source-pointer 校验和 runtime-path 校验会直接 fail-closed；这类失败应优先视为证据基线漂移，而不是测试偶发。
 - 若后续实现直接读取底层 frozen 常量而不是走公开 accessor，仍会绕开 fail-closed；`#195 / #196` 必须坚持只消费公开 accessor。
 
@@ -116,5 +132,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `c6272cecd11f070c43c5c1f06ed949dbac109f0a`
-- 当前回合已进入 `metadata-only follow-up`；后续 PR / guardian / merge gate / closeout 元数据同步不要求该 checkpoint SHA 与最新 HEAD 完全一致。
+- `e5792555821f6afed2a96d8a095a672a0bc46d53`
+- 当前 head 已重新对应实现真相；后续 guardian / merge gate / closeout 元数据必须以该 checkpoint 为恢复基线。
