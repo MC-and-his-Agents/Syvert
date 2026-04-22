@@ -8,6 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0014-core-resource-capability-matching/`
+- 关联 PR：`#199`
 - 状态：`active`
 - active 收口事项：`CHORE-0139-fr-0014-formal-spec-closeout`
 
@@ -33,13 +34,13 @@
 
 - `issue-193-fr-0014-formal-spec` 已作为 `#193` 的独立 spec worktree 建立。
 - `FR-0014` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 最新 formal spec 语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
+- 最新 formal spec 语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9` 已生成，当前受审 spec PR 为 `#199`；当前停点是把最新门禁结果与 PR 真相同步回 exec-plan，并等待 review / guardian / merge gate。
 
 ## 下一步动作
 
 - 运行 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`，修复 `FR-0014` 套件的一致性问题。
-- 形成首个 semantic checkpoint 后回填 requirement container 与 closeout exec-plan 的 checkpoint SHA。
-- 通过受控入口创建 spec PR，并把当前受审 PR、checks 与 checkpoint 真相同步回 exec-plan。
+- 在当前受审 PR `#199` 上继续消费 review / guardian / merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的语义 checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -59,6 +60,16 @@
 - 已核对 `FR-0010`、`FR-0012` 与当前 `FR-0013 / FR-0015` 规划边界，确认 matcher 只应承担能力满足性判断，而不承担 acquire / 注入 / provider 选择责任。
 - `git commit -m 'docs(spec): 冻结 FR-0014 Core 资源能力匹配 contract'`
   - 结果：已生成最新语义 checkpoint `d5360230e4a1938be460bba2e9ae97554caf37f9`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-193-fr-0014-formal-spec`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 193 --item-key CHORE-0139-fr-0014-formal-spec-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'docs(spec): 收口 FR-0014 Core 资源能力匹配 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#199 https://github.com/MC-and-his-Agents/Syvert/pull/199`
 
 ## 未决风险
 
@@ -77,3 +88,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `d5360230e4a1938be460bba2e9ae97554caf37f9`
+- review-sync 说明：当前 live head 已包含 checkpoint SHA、门禁结果与 PR metadata；后续若只追加同类同步，不把 metadata-only follow-up 伪装成新的语义 checkpoint。

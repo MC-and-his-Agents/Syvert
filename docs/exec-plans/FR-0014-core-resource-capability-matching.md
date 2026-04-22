@@ -8,12 +8,13 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0014-core-resource-capability-matching/`
+- 关联 PR：`#199`
 - 状态：`inactive requirement container`
 
 ## 说明
 
 - `FR-0014` 作为 canonical requirement 容器，不直接承载 worktree、PR 或 active 执行回合。
-- 当前 formal spec closeout 由 `docs/exec-plans/CHORE-0139-fr-0014-formal-spec-closeout.md` 承担 `#193` 的执行轮次；本 FR 自身不直接成为执行入口。
+- 当前 formal spec closeout 由 `docs/exec-plans/CHORE-0139-fr-0014-formal-spec-closeout.md` 承担 `#193` 的执行轮次，当前受审 PR 为 `#199`；本 FR 自身不直接成为执行入口。
 - `FR-0014` 只冻结 matcher 的输入 / 输出 / fail-closed 边界：它只判断“当前能力集合是否满足声明”，不定义 scheduler、provider selector、资源编排 DSL 或技术桥接逻辑。
 - `FR-0014` 只能消费 `FR-0013` 已冻结的 `AdapterResourceRequirementDeclaration` 与 `FR-0015` 已批准的 `account / proxy` 词汇；下游实现不得通过 matcher 反向改写这些上游真相。
 - `FR-0014` 不重写 `FR-0010` 的 bundle / lease / slot 语义，也不重写 `FR-0012` 的注入边界；相邻事项不得把这些语义重新塞回 matcher。
