@@ -22,6 +22,7 @@ _FROZEN_EXECUTION_PATH = {
     "collection_mode": "hybrid",
 }
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_VALIDATED_CONTRACT_KEY: tuple[int, int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -610,6 +611,15 @@ def approved_resource_capability_ids() -> frozenset[str]:
 
 
 def validate_frozen_resource_capability_evidence_contract() -> None:
+    global _VALIDATED_CONTRACT_KEY
+    validation_key = (
+        id(_FROZEN_EVIDENCE_REFERENCE_ENTRIES),
+        id(_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS),
+        id(_APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES),
+    )
+    if _VALIDATED_CONTRACT_KEY == validation_key:
+        return
+
     evidence_entries = _FROZEN_EVIDENCE_REFERENCE_ENTRIES
     evidence_entry_index = {entry.evidence_ref: entry for entry in evidence_entries}
     if len(evidence_entry_index) != len(evidence_entries):
@@ -617,6 +627,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     if frozenset(evidence_entry_index) != frozenset(_EXPECTED_EVIDENCE_REFERENCE_BASELINE):
         raise ValueError("frozen evidence reference entries must keep the full canonical registry")
 
+    parsed_source_trees: dict[Path, ast.AST] = {}
     for entry in evidence_entries:
         _require_non_empty_string(entry.evidence_ref, field_name="evidence_ref")
         _require_non_empty_string(entry.source_file, field_name="source_file")
@@ -629,7 +640,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
             or entry.summary != expected_entry["summary"]
         ):
             raise ValueError("frozen evidence reference entries must keep canonical source pointers and summaries")
-        _validate_traceable_evidence_source(entry)
+        _validate_traceable_evidence_source(entry, parsed_source_trees)
 
     records = _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
     if not records:
@@ -723,6 +734,8 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         if shared_adapters != _ALLOWED_ADAPTER_KEYS:
             raise ValueError("approved capability ids must be backed by shared xhs and douyin evidence records")
 
+    _VALIDATED_CONTRACT_KEY = validation_key
+
 
 
 def _require_non_empty_string(value: str, *, field_name: str) -> None:
@@ -768,14 +781,20 @@ def _expected_approved_vocabulary_entries(
     )
 
 
-def _validate_traceable_evidence_source(entry: EvidenceReferenceEntry) -> None:
+def _validate_traceable_evidence_source(
+    entry: EvidenceReferenceEntry,
+    parsed_source_trees: dict[Path, ast.AST],
+) -> None:
     source_path = (_REPO_ROOT / entry.source_file).resolve()
     if not source_path.is_file():
         raise ValueError("evidence source_file must resolve to a real file")
-    try:
-        syntax_tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
-    except (OSError, UnicodeDecodeError, SyntaxError) as error:
-        raise ValueError("evidence source_file must be readable as Python source") from error
+    syntax_tree = parsed_source_trees.get(source_path)
+    if syntax_tree is None:
+        try:
+            syntax_tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+        except (OSError, UnicodeDecodeError, SyntaxError) as error:
+            raise ValueError("evidence source_file must be readable as Python source") from error
+        parsed_source_trees[source_path] = syntax_tree
     if not _source_symbol_exists(syntax_tree, entry.source_symbol):
         raise ValueError("evidence source_symbol must resolve inside the declared source_file")
 

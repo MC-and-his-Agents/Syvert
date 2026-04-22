@@ -78,15 +78,37 @@ class ProxyPathCaptureAdapter:
 
 
 class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
-    def test_frozen_evidence_refs_are_traceable_from_formal_research(self) -> None:
+    def test_frozen_evidence_refs_are_traceable_from_formal_research_registry(self) -> None:
         research_text = (
             Path(__file__).resolve().parents[2]
             / "docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md"
         ).read_text(encoding="utf-8")
-        research_refs = set(re.findall(r"`(fr-0015:[^`]+)`", research_text))
-        frozen_refs = {entry.evidence_ref for entry in frozen_evidence_reference_entries()}
+        registry_match = re.search(
+            r"## 证据登记项\n\n(?P<table>(?:\|.*\n)+?)\n## ",
+            research_text,
+            flags=re.MULTILINE,
+        )
+        self.assertIsNotNone(registry_match)
 
-        self.assertFalse(frozen_refs - research_refs)
+        registry_entries = {}
+        for line in registry_match.group("table").splitlines():
+            match = re.match(
+                r"^\| `(?P<evidence_ref>fr-0015:[^`]+)` \| `(?P<source_file>[^`]+)` 中 `(?P<source_symbol>[^`]+)` \| ",
+                line,
+            )
+            if match:
+                registry_entries[match.group("evidence_ref")] = (
+                    match.group("source_file"),
+                    match.group("source_symbol").removesuffix("()"),
+                )
+
+        self.assertEqual(
+            registry_entries,
+            {
+                entry.evidence_ref: (entry.source_file, entry.source_symbol)
+                for entry in frozen_evidence_reference_entries()
+            },
+        )
 
     def test_validate_frozen_resource_capability_evidence_contract_accepts_current_baseline(self) -> None:
         validate_frozen_resource_capability_evidence_contract()
@@ -427,6 +449,19 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 resource_capability_evidence.approved_resource_capability_ids()
+
+    def test_public_accessors_reuse_cached_validation_after_first_success(self) -> None:
+        with mock.patch.object(resource_capability_evidence, "_VALIDATED_CONTRACT_KEY", None):
+            with mock.patch.object(
+                resource_capability_evidence,
+                "_validate_traceable_evidence_source",
+                wraps=resource_capability_evidence._validate_traceable_evidence_source,
+            ) as validate_source:
+                resource_capability_evidence.approved_resource_capability_ids()
+                resource_capability_evidence.approved_resource_capability_ids()
+                resource_capability_evidence.approved_resource_capability_vocabulary_entries()
+
+        self.assertEqual(validate_source.call_count, len(frozen_evidence_reference_entries()))
 
     def test_validate_fails_closed_when_nested_evidence_source_pointer_drifts(self) -> None:
         tampered_entries = tuple(
