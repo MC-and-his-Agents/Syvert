@@ -34,7 +34,8 @@
 - `issue-194-fr-0015-formal-spec` 已作为 `#194` 的独立 spec worktree 建立。
 - `FR-0015` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
 - 当前 closeout 已把 `DualReferenceResourceCapabilityEvidenceRecord`、`shared_status` 枚举、有限词汇表与 research 边界写入 formal suite。
-- 当前停点是先完成 formal suite 首次落盘，再运行 spec/docs/workflow/governance 四组 guard 并形成首个 semantic checkpoint。
+- 最新 formal spec 语义 checkpoint `82250e919f0aa1316dc0c33723d75454126a3f3f` 已生成，并已通过本地 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
+- 当前停点是把 checkpoint / 验证真相同步回 requirement container 与 closeout exec-plan，然后创建 spec PR 进入 review / merge gate。
 
 ## 下一步动作
 
@@ -58,6 +59,16 @@
 - 已核对 `#188`、`#191`、`#194` 对 `v0.5.0` 资源能力抽象收敛与本 Work Item 的目标、非目标与关闭条件描述。
 - 已核对 `AGENTS.md`、`docs/roadmap-v0-to-v1.md`、`WORKFLOW.md` 与 `spec_review.md` 的上位约束。
 - 已核对 `FR-0010`、`FR-0011`、`FR-0012` 的 formal suite 与 requirement container / formal-spec-closeout exec-plan 模式，确保 `FR-0015` 套件形状与既有 closeout 基线一致。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-194-fr-0015-formal-spec`
+  - 结果：通过
+- `git commit -m 'docs(spec): 冻结 FR-0015 双参考适配器资源能力证据 formal spec'`
+  - 结果：已生成首个 semantic checkpoint `82250e919f0aa1316dc0c33723d75454126a3f3f`
 
 ## 未决风险
 
@@ -70,4 +81,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `56d4860b21023fc2c0db71b6ba2e266f69911d9f`
+- `82250e919f0aa1316dc0c33723d75454126a3f3f`
+- review-sync 说明：当前提交只同步 checkpoint 与验证真相；若后续仅追加 PR metadata，不把 metadata-only follow-up 伪装成新的语义 checkpoint。
