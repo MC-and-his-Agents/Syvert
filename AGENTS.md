@@ -2,14 +2,14 @@
 
 ## 项目使命
 
-Syvert 是任务驱动、适配器可插拔的采集底座。
-本仓库聚焦 `Core + Adapter SDK + 参考适配器 + 探索/验证工具`，不以平台数量增长定义成功。
+Syvert 是一个统一承载和治理互联网操作任务及其资源的稳定底座。
+本仓库聚焦 `Core + Adapter SDK + 参考适配器 + 探索/验证工具`，用统一任务、资源与结果契约承载互联网操作，不以适配对象数量增长定义成功。
 
 ## 宪法规则
 
-1. Core 负责运行时语义，Adapter 负责平台语义。
-2. 平台特定逻辑不得渗入 Core。
-3. Adapter 对外运行时契约必须统一，且返回 `raw payload` 与 `normalized result`。
+1. Core 负责运行时语义，Adapter 负责目标系统语义。
+2. 目标系统特定逻辑不得渗入 Core。
+3. Adapter 对外运行时契约必须统一；当前验证切片中的成功结果继续返回 `raw payload` 与 `normalized result`。
 4. 禁止直推 `main`，所有变更必须经分支与 PR 合入。
 5. 合入 `main` 默认使用 Squash Merge。
 6. Commit Message 必须使用中文 Conventional Commits。
