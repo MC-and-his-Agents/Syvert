@@ -239,6 +239,26 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "must not duplicate adapter/candidate rows"):
                 validate_frozen_resource_capability_evidence_contract()
 
+    def test_validate_fails_closed_when_formal_research_execution_path_duplicates_key(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        original_read_text = Path.read_text
+        original_segment = "target_type=url, collection_mode=hybrid, operation=content_detail_by_url"
+        duplicated_segment = (
+            "target_type=url, collection_mode=hybrid, operation=content_detail_by_url, operation=content_detail_by_url"
+        )
+        patched_research_text = (
+            research_path.read_text(encoding="utf-8").replace(original_segment, duplicated_segment, 1)
+        )
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                return patched_research_text
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with self.assertRaisesRegex(ValueError, "execution_path cells must not duplicate keys"):
+                validate_frozen_resource_capability_evidence_contract()
+
     def test_canonical_records_freeze_shared_adapter_only_and_rejected_outcomes(self) -> None:
         self.assertEqual(
             {

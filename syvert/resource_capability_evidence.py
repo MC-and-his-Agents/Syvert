@@ -936,6 +936,8 @@ def _parse_execution_path_descriptor(value: str) -> ExecutionPathDescriptor:
         key, separator, raw_value = segment.strip().partition("=")
         if separator != "=" or not key or not raw_value:
             raise ValueError("formal research execution_path cells must keep key=value segments")
+        if key in parts:
+            raise ValueError("formal research execution_path cells must not duplicate keys")
         parts[key] = raw_value
     if frozenset(parts) != frozenset(_FROZEN_EXECUTION_PATH):
         raise ValueError("formal research execution_path cells must stay aligned with the frozen execution path")
