@@ -78,6 +78,30 @@ _FROZEN_EVIDENCE_REFERENCE_ENTRIES = (
         summary="douyin adapter 在共享路径上从 resource_bundle.account.material 消费 cookies、user_agent、verify_fp、ms_token、webid、sign_base_url、timeout_seconds。",
     ),
     EvidenceReferenceEntry(
+        evidence_ref="fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",
+        source_file="syvert/adapters/xhs.py",
+        source_symbol="build_detail_body",
+        summary="xhs adapter 只在平台私有 detail body 中透传 xsec_token 与 xsec_source 两个 URL / request token。",
+    ),
+    EvidenceReferenceEntry(
+        evidence_ref="fr-0015:douyin:content-detail:url:hybrid:request-signature-token",
+        source_file="syvert/adapters/douyin.py",
+        source_symbol="DouyinAdapter._build_detail_params",
+        summary="douyin adapter 在平台私有签名步骤中生成并注入 a_bogus 请求 token。",
+    ),
+    EvidenceReferenceEntry(
+        evidence_ref="fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",
+        source_file="syvert/adapters/xhs.py",
+        source_symbol="XhsAdapter._recover_note_card_from_html",
+        summary="xhs adapter 在 detail / html 路径失败时会退回 browser page-state 恢复链路，这属于技术绑定回退。",
+    ),
+    EvidenceReferenceEntry(
+        evidence_ref="fr-0015:douyin:content-detail:url:hybrid:page-state-fallback",
+        source_file="syvert/adapters/douyin.py",
+        source_symbol="DouyinAdapter._recover_aweme_detail_from_page_state",
+        summary="douyin adapter 在 detail 路径失败时会退回 browser page-state 恢复链路，这属于技术绑定回退。",
+    ),
+    EvidenceReferenceEntry(
         evidence_ref="fr-0015:regression:xhs:managed-proxy-seed",
         source_file="syvert/real_adapter_regression.py",
         source_symbol="seed_reference_regression_resources",
@@ -200,6 +224,48 @@ _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS = (
         decision="keep_adapter_local",
     ),
     DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="douyin",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "adapter_private_request_token=a_bogus",
+        ),
+        candidate_abstract_capability="a_bogus",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:douyin:content-detail:url:hybrid:request-signature-token",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "adapter_private_request_token=xsec_token",
+        ),
+        candidate_abstract_capability="xsec_token",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "adapter_private_request_token=xsec_source",
+        ),
+        candidate_abstract_capability="xsec_source",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
         adapter_key="xhs",
         capability="content_detail",
         execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
@@ -232,12 +298,68 @@ _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS = (
         capability="content_detail",
         execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
         resource_signals=(
+            "account_material_field=cookies",
+        ),
+        candidate_abstract_capability="cookies",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="douyin",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "account_material_field=cookies",
+        ),
+        candidate_abstract_capability="cookies",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "account_material_field=user_agent",
+        ),
+        candidate_abstract_capability="user_agent",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="douyin",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
+            "account_material_field=user_agent",
+        ),
+        candidate_abstract_capability="user_agent",
+        shared_status="rejected",
+        evidence_refs=(
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+        decision="reject_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_signals=(
             "technical_binding_candidate=browser_state",
         ),
         candidate_abstract_capability="browser_state",
         shared_status="rejected",
         evidence_refs=(
-            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            "fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",
         ),
         decision="reject_for_v0_5_0",
     ),
@@ -251,11 +373,194 @@ _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS = (
         candidate_abstract_capability="browser_state",
         shared_status="rejected",
         evidence_refs=(
-            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+            "fr-0015:douyin:content-detail:url:hybrid:page-state-fallback",
         ),
         decision="reject_for_v0_5_0",
     ),
 )
+
+_EXPECTED_EVIDENCE_REFERENCE_BASELINE = {
+    "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots": {
+        "source_file": "syvert/runtime.py",
+        "source_symbol": "RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
+        "summary": "共享 Core 路径在 content_detail_by_url + hybrid 上统一请求 account 与 proxy 两个受管资源 slot。",
+    },
+    "fr-0015:xhs:content-detail:url:hybrid:account-material": {
+        "source_file": "syvert/adapters/xhs.py",
+        "source_symbol": "build_session_config_from_context",
+        "summary": "xhs adapter 在共享路径上从 resource_bundle.account.material 消费 cookies、user_agent、sign_base_url、timeout_seconds。",
+    },
+    "fr-0015:douyin:content-detail:url:hybrid:account-material": {
+        "source_file": "syvert/adapters/douyin.py",
+        "source_symbol": "build_session_config_from_context",
+        "summary": "douyin adapter 在共享路径上从 resource_bundle.account.material 消费 cookies、user_agent、verify_fp、ms_token、webid、sign_base_url、timeout_seconds。",
+    },
+    "fr-0015:xhs:content-detail:url:hybrid:url-request-tokens": {
+        "source_file": "syvert/adapters/xhs.py",
+        "source_symbol": "build_detail_body",
+        "summary": "xhs adapter 只在平台私有 detail body 中透传 xsec_token 与 xsec_source 两个 URL / request token。",
+    },
+    "fr-0015:douyin:content-detail:url:hybrid:request-signature-token": {
+        "source_file": "syvert/adapters/douyin.py",
+        "source_symbol": "DouyinAdapter._build_detail_params",
+        "summary": "douyin adapter 在平台私有签名步骤中生成并注入 a_bogus 请求 token。",
+    },
+    "fr-0015:xhs:content-detail:url:hybrid:page-state-fallback": {
+        "source_file": "syvert/adapters/xhs.py",
+        "source_symbol": "XhsAdapter._recover_note_card_from_html",
+        "summary": "xhs adapter 在 detail / html 路径失败时会退回 browser page-state 恢复链路，这属于技术绑定回退。",
+    },
+    "fr-0015:douyin:content-detail:url:hybrid:page-state-fallback": {
+        "source_file": "syvert/adapters/douyin.py",
+        "source_symbol": "DouyinAdapter._recover_aweme_detail_from_page_state",
+        "summary": "douyin adapter 在 detail 路径失败时会退回 browser page-state 恢复链路，这属于技术绑定回退。",
+    },
+    "fr-0015:regression:xhs:managed-proxy-seed": {
+        "source_file": "syvert/real_adapter_regression.py",
+        "source_symbol": "seed_reference_regression_resources",
+        "summary": "xhs 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
+    },
+    "fr-0015:regression:douyin:managed-proxy-seed": {
+        "source_file": "syvert/real_adapter_regression.py",
+        "source_symbol": "seed_reference_regression_resources",
+        "summary": "douyin 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
+    },
+}
+
+_EXPECTED_FROZEN_RECORD_BASELINE = {
+    ("xhs", "account"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+            "adapter_consumes_account_material=cookies,user_agent,sign_base_url,timeout_seconds",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "account"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+            "adapter_consumes_account_material=cookies,user_agent,verify_fp,ms_token,webid,sign_base_url,timeout_seconds",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("xhs", "proxy"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+            "regression_seeded_resources=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:regression:xhs:managed-proxy-seed",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "proxy"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+            "regression_seeded_resources=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:regression:douyin:managed-proxy-seed",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "verify_fp"): {
+        "resource_signals": ("adapter_private_account_field=verify_fp",),
+        "shared_status": "adapter_only",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "keep_adapter_local",
+    },
+    ("douyin", "ms_token"): {
+        "resource_signals": ("adapter_private_account_field=ms_token",),
+        "shared_status": "adapter_only",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "keep_adapter_local",
+    },
+    ("douyin", "webid"): {
+        "resource_signals": ("adapter_private_account_field=webid",),
+        "shared_status": "adapter_only",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "keep_adapter_local",
+    },
+    ("douyin", "a_bogus"): {
+        "resource_signals": ("adapter_private_request_token=a_bogus",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:request-signature-token",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "xsec_token"): {
+        "resource_signals": ("adapter_private_request_token=xsec_token",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "xsec_source"): {
+        "resource_signals": ("adapter_private_request_token=xsec_source",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "sign_base_url"): {
+        "resource_signals": ("technical_binding_field=sign_base_url",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("douyin", "sign_base_url"): {
+        "resource_signals": ("technical_binding_field=sign_base_url",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "cookies"): {
+        "resource_signals": ("account_material_field=cookies",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("douyin", "cookies"): {
+        "resource_signals": ("account_material_field=cookies",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "user_agent"): {
+        "resource_signals": ("account_material_field=user_agent",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("douyin", "user_agent"): {
+        "resource_signals": ("account_material_field=user_agent",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("xhs", "browser_state"): {
+        "resource_signals": ("technical_binding_candidate=browser_state",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",),
+        "decision": "reject_for_v0_5_0",
+    },
+    ("douyin", "browser_state"): {
+        "resource_signals": ("technical_binding_candidate=browser_state",),
+        "shared_status": "rejected",
+        "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:page-state-fallback",),
+        "decision": "reject_for_v0_5_0",
+    },
+}
 
 
 _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
@@ -309,12 +614,21 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     evidence_entry_index = {entry.evidence_ref: entry for entry in evidence_entries}
     if len(evidence_entry_index) != len(evidence_entries):
         raise ValueError("frozen evidence reference entries must use unique evidence_ref values")
+    if frozenset(evidence_entry_index) != frozenset(_EXPECTED_EVIDENCE_REFERENCE_BASELINE):
+        raise ValueError("frozen evidence reference entries must keep the full canonical registry")
 
     for entry in evidence_entries:
         _require_non_empty_string(entry.evidence_ref, field_name="evidence_ref")
         _require_non_empty_string(entry.source_file, field_name="source_file")
         _require_non_empty_string(entry.source_symbol, field_name="source_symbol")
         _require_non_empty_string(entry.summary, field_name="summary")
+        expected_entry = _EXPECTED_EVIDENCE_REFERENCE_BASELINE[entry.evidence_ref]
+        if (
+            entry.source_file != expected_entry["source_file"]
+            or entry.source_symbol != expected_entry["source_symbol"]
+            or entry.summary != expected_entry["summary"]
+        ):
+            raise ValueError("frozen evidence reference entries must keep canonical source pointers and summaries")
         _validate_traceable_evidence_source(entry)
 
     records = _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS
@@ -322,6 +636,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         raise ValueError("frozen evidence records must not be empty")
 
     shared_records_by_capability: dict[str, list[DualReferenceResourceCapabilityEvidenceRecord]] = {}
+    record_index: dict[tuple[str, str], DualReferenceResourceCapabilityEvidenceRecord] = {}
     shared_record_keys: set[tuple[str, str]] = set()
     for record in records:
         if record.adapter_key not in _ALLOWED_ADAPTER_KEYS:
@@ -341,12 +656,28 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         _require_unique_non_empty_strings(record.evidence_refs, field_name="evidence_refs")
         if any(ref not in evidence_entry_index for ref in record.evidence_refs):
             raise ValueError("frozen evidence record references unknown evidence_ref")
+        record_key = (record.adapter_key, record.candidate_abstract_capability)
+        if record_key in record_index:
+            raise ValueError("frozen evidence records must not duplicate candidate/adapter pairs")
+        record_index[record_key] = record
         if record.shared_status == "shared":
             shared_record_key = (record.candidate_abstract_capability, record.adapter_key)
             if shared_record_key in shared_record_keys:
                 raise ValueError("shared evidence records must not duplicate capability/adapter pairs")
             shared_record_keys.add(shared_record_key)
             shared_records_by_capability.setdefault(record.candidate_abstract_capability, []).append(record)
+
+    if frozenset(record_index) != frozenset(_EXPECTED_FROZEN_RECORD_BASELINE):
+        raise ValueError("frozen evidence records must keep the full canonical candidate matrix")
+    for record_key, expected_record in _EXPECTED_FROZEN_RECORD_BASELINE.items():
+        record = record_index[record_key]
+        if (
+            record.resource_signals != expected_record["resource_signals"]
+            or record.shared_status != expected_record["shared_status"]
+            or record.evidence_refs != expected_record["evidence_refs"]
+            or record.decision != expected_record["decision"]
+        ):
+            raise ValueError("frozen evidence records must keep canonical signals, evidence refs, and outcomes")
 
     vocabulary_entries = _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
     vocabulary_index = {entry.capability_id: entry for entry in vocabulary_entries}
@@ -450,12 +781,22 @@ def _validate_traceable_evidence_source(entry: EvidenceReferenceEntry) -> None:
 
 
 def _source_symbol_exists(syntax_tree: ast.AST, source_symbol: str) -> bool:
-    for node in getattr(syntax_tree, "body", []):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == source_symbol:
-            return True
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+    symbol_path = tuple(part for part in source_symbol.split(".") if part)
+    if not symbol_path:
+        return False
+    return _symbol_path_exists(getattr(syntax_tree, "body", []), symbol_path)
+
+
+def _symbol_path_exists(nodes: list[ast.stmt], symbol_path: tuple[str, ...]) -> bool:
+    head, *tail = symbol_path
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == head:
+            if not tail:
+                return True
+            return _symbol_path_exists(getattr(node, "body", []), tuple(tail))
+        if not tail and isinstance(node, (ast.Assign, ast.AnnAssign)):
             for target_name in _assignment_target_names(node):
-                if target_name == source_symbol:
+                if target_name == head:
                     return True
     return False
 

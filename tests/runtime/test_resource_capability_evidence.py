@@ -104,38 +104,196 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             },
         )
         self.assertEqual(
-            {entry.evidence_ref for entry in frozen_evidence_reference_entries()},
             {
-                "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
-                "fr-0015:xhs:content-detail:url:hybrid:account-material",
-                "fr-0015:douyin:content-detail:url:hybrid:account-material",
-                "fr-0015:regression:xhs:managed-proxy-seed",
-                "fr-0015:regression:douyin:managed-proxy-seed",
+                entry.evidence_ref: (entry.source_file, entry.source_symbol)
+                for entry in frozen_evidence_reference_entries()
+            },
+            {
+                "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots": (
+                    "syvert/runtime.py",
+                    "RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
+                ),
+                "fr-0015:xhs:content-detail:url:hybrid:account-material": (
+                    "syvert/adapters/xhs.py",
+                    "build_session_config_from_context",
+                ),
+                "fr-0015:douyin:content-detail:url:hybrid:account-material": (
+                    "syvert/adapters/douyin.py",
+                    "build_session_config_from_context",
+                ),
+                "fr-0015:xhs:content-detail:url:hybrid:url-request-tokens": (
+                    "syvert/adapters/xhs.py",
+                    "build_detail_body",
+                ),
+                "fr-0015:douyin:content-detail:url:hybrid:request-signature-token": (
+                    "syvert/adapters/douyin.py",
+                    "DouyinAdapter._build_detail_params",
+                ),
+                "fr-0015:xhs:content-detail:url:hybrid:page-state-fallback": (
+                    "syvert/adapters/xhs.py",
+                    "XhsAdapter._recover_note_card_from_html",
+                ),
+                "fr-0015:douyin:content-detail:url:hybrid:page-state-fallback": (
+                    "syvert/adapters/douyin.py",
+                    "DouyinAdapter._recover_aweme_detail_from_page_state",
+                ),
+                "fr-0015:regression:xhs:managed-proxy-seed": (
+                    "syvert/real_adapter_regression.py",
+                    "seed_reference_regression_resources",
+                ),
+                "fr-0015:regression:douyin:managed-proxy-seed": (
+                    "syvert/real_adapter_regression.py",
+                    "seed_reference_regression_resources",
+                ),
             },
         )
 
     def test_canonical_records_freeze_shared_adapter_only_and_rejected_outcomes(self) -> None:
-        records = {
-            (record.adapter_key, record.candidate_abstract_capability): record
-            for record in frozen_dual_reference_resource_capability_evidence_records()
-        }
-
-        self.assertEqual(records[("xhs", "account")].shared_status, "shared")
-        self.assertEqual(records[("xhs", "account")].decision, "approve_for_v0_5_0")
-        self.assertEqual(records[("douyin", "account")].shared_status, "shared")
-        self.assertEqual(records[("douyin", "account")].decision, "approve_for_v0_5_0")
-        self.assertEqual(records[("xhs", "proxy")].shared_status, "shared")
-        self.assertEqual(records[("douyin", "proxy")].shared_status, "shared")
-
-        self.assertEqual(records[("douyin", "verify_fp")].shared_status, "adapter_only")
-        self.assertEqual(records[("douyin", "verify_fp")].decision, "keep_adapter_local")
-        self.assertEqual(records[("douyin", "ms_token")].shared_status, "adapter_only")
-        self.assertEqual(records[("douyin", "webid")].shared_status, "adapter_only")
-
-        self.assertEqual(records[("xhs", "sign_base_url")].shared_status, "rejected")
-        self.assertEqual(records[("douyin", "sign_base_url")].shared_status, "rejected")
-        self.assertEqual(records[("xhs", "browser_state")].shared_status, "rejected")
-        self.assertEqual(records[("douyin", "browser_state")].shared_status, "rejected")
+        self.assertEqual(
+            {
+                (record.adapter_key, record.candidate_abstract_capability): (
+                    record.resource_signals,
+                    record.shared_status,
+                    record.decision,
+                    record.evidence_refs,
+                )
+                for record in frozen_dual_reference_resource_capability_evidence_records()
+            },
+            {
+                ("xhs", "account"): (
+                    (
+                        "runtime_requested_slots=account,proxy",
+                        "adapter_consumes_account_material=cookies,user_agent,sign_base_url,timeout_seconds",
+                    ),
+                    "shared",
+                    "approve_for_v0_5_0",
+                    (
+                        "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                        "fr-0015:xhs:content-detail:url:hybrid:account-material",
+                    ),
+                ),
+                ("douyin", "account"): (
+                    (
+                        "runtime_requested_slots=account,proxy",
+                        "adapter_consumes_account_material=cookies,user_agent,verify_fp,ms_token,webid,sign_base_url,timeout_seconds",
+                    ),
+                    "shared",
+                    "approve_for_v0_5_0",
+                    (
+                        "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                        "fr-0015:douyin:content-detail:url:hybrid:account-material",
+                    ),
+                ),
+                ("xhs", "proxy"): (
+                    (
+                        "runtime_requested_slots=account,proxy",
+                        "regression_seeded_resources=account,proxy",
+                    ),
+                    "shared",
+                    "approve_for_v0_5_0",
+                    (
+                        "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                        "fr-0015:regression:xhs:managed-proxy-seed",
+                    ),
+                ),
+                ("douyin", "proxy"): (
+                    (
+                        "runtime_requested_slots=account,proxy",
+                        "regression_seeded_resources=account,proxy",
+                    ),
+                    "shared",
+                    "approve_for_v0_5_0",
+                    (
+                        "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                        "fr-0015:regression:douyin:managed-proxy-seed",
+                    ),
+                ),
+                ("douyin", "verify_fp"): (
+                    ("adapter_private_account_field=verify_fp",),
+                    "adapter_only",
+                    "keep_adapter_local",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "ms_token"): (
+                    ("adapter_private_account_field=ms_token",),
+                    "adapter_only",
+                    "keep_adapter_local",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "webid"): (
+                    ("adapter_private_account_field=webid",),
+                    "adapter_only",
+                    "keep_adapter_local",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "a_bogus"): (
+                    ("adapter_private_request_token=a_bogus",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:douyin:content-detail:url:hybrid:request-signature-token",),
+                ),
+                ("xhs", "xsec_token"): (
+                    ("adapter_private_request_token=xsec_token",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
+                ),
+                ("xhs", "xsec_source"): (
+                    ("adapter_private_request_token=xsec_source",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
+                ),
+                ("xhs", "sign_base_url"): (
+                    ("technical_binding_field=sign_base_url",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "sign_base_url"): (
+                    ("technical_binding_field=sign_base_url",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("xhs", "cookies"): (
+                    ("account_material_field=cookies",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "cookies"): (
+                    ("account_material_field=cookies",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("xhs", "user_agent"): (
+                    ("account_material_field=user_agent",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+                ),
+                ("douyin", "user_agent"): (
+                    ("account_material_field=user_agent",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
+                ),
+                ("xhs", "browser_state"): (
+                    ("technical_binding_candidate=browser_state",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",),
+                ),
+                ("douyin", "browser_state"): (
+                    ("technical_binding_candidate=browser_state",),
+                    "rejected",
+                    "reject_for_v0_5_0",
+                    ("fr-0015:douyin:content-detail:url:hybrid:page-state-fallback",),
+                ),
+            },
+        )
 
     def test_validate_fails_closed_when_unapproved_shared_capability_is_added(self) -> None:
         records = frozen_dual_reference_resource_capability_evidence_records()
@@ -164,7 +322,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
             expanded_records,
         ):
-            with self.assertRaisesRegex(ValueError, "approved capability ids"):
+            with self.assertRaisesRegex(ValueError, "full canonical candidate matrix"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_validate_fails_closed_when_shared_record_duplicates_adapter_pair(self) -> None:
@@ -176,7 +334,41 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
             duplicated_records,
         ):
-            with self.assertRaisesRegex(ValueError, "duplicate capability/adapter pairs"):
+            with self.assertRaisesRegex(ValueError, "duplicate candidate/adapter pairs"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_negative_candidate_disappears(self) -> None:
+        records = tuple(
+            record
+            for record in frozen_dual_reference_resource_capability_evidence_records()
+            if (record.adapter_key, record.candidate_abstract_capability) != ("xhs", "xsec_token")
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
+            records,
+        ):
+            with self.assertRaisesRegex(ValueError, "full canonical candidate matrix"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_browser_state_evidence_refs_drift(self) -> None:
+        records = tuple(
+            replace(
+                record,
+                evidence_refs=("fr-0015:xhs:content-detail:url:hybrid:account-material",),
+            )
+            if (record.adapter_key, record.candidate_abstract_capability) == ("xhs", "browser_state")
+            else record
+            for record in frozen_dual_reference_resource_capability_evidence_records()
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
+            records,
+        ):
+            with self.assertRaisesRegex(ValueError, "canonical signals, evidence refs, and outcomes"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_validate_fails_closed_when_approved_vocabulary_evidence_refs_drift(self) -> None:
@@ -225,11 +417,15 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 resource_capability_evidence.approved_resource_capability_ids()
 
-    def test_validate_fails_closed_when_evidence_source_symbol_drifts(self) -> None:
-        entries = frozen_evidence_reference_entries()
-        tampered_entries = (
-            replace(entries[0], source_symbol="MISSING_RUNTIME_RESOURCE_SLOTS_SYMBOL"),
-            *entries[1:],
+    def test_validate_fails_closed_when_nested_evidence_source_pointer_drifts(self) -> None:
+        tampered_entries = tuple(
+            replace(
+                entry,
+                source_symbol="DouyinAdapter.missing_signature_method",
+            )
+            if entry.evidence_ref == "fr-0015:douyin:content-detail:url:hybrid:request-signature-token"
+            else entry
+            for entry in frozen_evidence_reference_entries()
         )
 
         with mock.patch.object(
@@ -237,7 +433,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "_FROZEN_EVIDENCE_REFERENCE_ENTRIES",
             tampered_entries,
         ):
-            with self.assertRaisesRegex(ValueError, "source_symbol must resolve"):
+            with self.assertRaisesRegex(ValueError, "canonical source pointers and summaries"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_runtime_requested_slots_match_account_and_proxy_evidence(self) -> None:
