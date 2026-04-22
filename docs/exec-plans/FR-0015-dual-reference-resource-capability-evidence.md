@@ -22,7 +22,7 @@
 - 当前分支已形成最新 formal spec 语义 checkpoint `aea613b49992f57235fc56b42c1adcd92e37cde2`；其后若只追加当前受审 PR、checks 或 checkpoint metadata，只作为 review-sync follow-up，不改写 requirement 语义。
 - `#197` 曾通过 PR `#204` / merge commit `a8b6ffc87b41afae5d4d9c4e95de74791e521b5b` 把 implementation closeout 合入 `main`，但该回合未满足 latest guardian `APPROVE` merge gate，现仅作为历史 implementation truth 保留在 `docs/exec-plans/CHORE-0143-fr-0015-evidence-closeout.md`。
 - `#209` 已通过 `docs/exec-plans/HOTFIX-0145-revert-fr-0015-evidence-closeout.md` 承接独立 revert 回合，并经 PR `#210` / merge commit `b1f918885b751f4278cf2216204cbb90c0e57b2d` 把 `#204` 带入的实现增量从 `main` 回退；该 hotfix 只恢复主干门禁真相，不改写本 requirement container 的 formal 语义。
-- 当前 implementation rerun 由 `docs/exec-plans/CHORE-0146-fr-0015-evidence-closeout-rerun.md` 承接 `#211` 的执行轮次；在新的受控 PR 合入前，`main` 上仍只有 `#206/#208` 提供的 formal evidence registry truth，没有 machine-readable evidence registry truth。
+- 当前 implementation rerun 由 `docs/exec-plans/CHORE-0146-fr-0015-evidence-closeout-rerun.md` 承接 `#211` 的执行轮次，当前受审 PR 为 `#212`；在新的受控 PR 合入前，`main` 上仍只有 `#206/#208` 提供的 formal evidence registry truth，没有 machine-readable evidence registry truth。
 - `#206` 作为 formal evidence registry reconciliation follow-up，由 `docs/exec-plans/CHORE-0144-fr-0015-evidence-registry-reconciliation.md` 承接当前 spec-only traceability 修复，已通过 PR `#208` 合入 `main`。
 
 ## 最近一次 checkpoint 对应的 head SHA
