@@ -33,7 +33,7 @@
 
 - `issue-192-fr-0013-formal-spec` 已作为 `#192` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0013` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / 相邻 FR。
-- 当前停点是首次落盘 `FR-0013` requirement container、formal spec 套件和 closeout exec-plan，并在完成后记录本地守卫结果与 checkpoint SHA。
+- 最新 formal spec 语义 checkpoint `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
 
 ## 下一步动作
 
@@ -56,10 +56,14 @@
 
 - 已核对 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md`、`WORKFLOW.md` 的上位边界。
 - 已核对 `FR-0010` / `FR-0012` formal spec 与 closeout 风格，确认 `FR-0013` 只新增声明层，不反写生命周期与注入边界。
-- 固定验证命令：
-  - `python3 scripts/spec_guard.py --mode ci --all`
-  - `python3 scripts/docs_guard.py --mode ci`
-  - `python3 scripts/workflow_guard.py --mode ci`
+- `git commit -m 'docs(spec): 冻结 FR-0013 适配器资源需求声明 contract'`
+  - 结果：已生成最新语义 checkpoint `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
 
 ## 未决风险
 
@@ -73,5 +77,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<checkpoint_commit_sha>`
-- 记录方式：仅在形成新的 formal spec 语义 checkpoint 后刷新该字段；若后续只追加 review-sync、PR metadata 或 checkpoint 同步说明，不把 metadata-only follow-up 伪装成新的语义 checkpoint。
+- `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6`
+- review-sync 说明：后续若只追加门禁、PR metadata 或 checkpoint 同步说明，不把 metadata-only follow-up 伪装成新的语义 checkpoint。

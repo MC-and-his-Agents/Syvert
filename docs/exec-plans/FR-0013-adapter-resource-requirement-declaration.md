@@ -18,7 +18,8 @@
 - `FR-0013` 不重写 `FR-0010` 的资源生命周期主 contract，也不重写 `FR-0012` 的 Core 注入 bundle 与 Adapter 资源边界；后续实现 Work Item 只能消费这些既有边界之上的声明层 contract。
 - `FR-0013` 不得被 `FR-0014`、`FR-0015` 反向改写主语义；若后续事项需要扩张声明 carrier、共享能力词汇或共享证据真相，必须通过新的 formal spec 显式推进，而不是在相邻 FR 中侧写回填。
 - 当前 formal spec 只服务 `v0.5.0` 的“在双参考适配器共同语义下声明资源依赖”目标；`preferred_capabilities`、`optional_capabilities`、`fallback`、`priority`、`provider_selection` 以及 Playwright/CDP/Chromium 一类技术字段都不属于本 FR。
+- 当前分支已形成最新 formal spec 语义 checkpoint `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6`；其后若只追加当前受审 PR、checks 或 checkpoint metadata，只作为 review-sync follow-up，不改写 requirement 语义。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<checkpoint_commit_sha>`
+- `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6`
