@@ -35,12 +35,13 @@
 
 - `#197 / PR #204` 曾把同一实现合入 `main`，merge commit 为 `a8b6ffc87b41afae5d4d9c4e95de74791e521b5b`。
 - 由于该次合入未等待 latest guardian 对当前受审 head 给出明确 `APPROVE`，已由 `#209 / PR #210` 回退，回退后 `main` 基线为 `b1f918885b751f4278cf2216204cbb90c0e57b2d`。
-- 当前 rerun worktree 为 `/Users/mc/code/worktrees/syvert/issue-211-fr-0015`，最新实现 checkpoint 已推进到 `5eae6c3637bd1083c40677fddd16a40de738d009`。
+- 当前 rerun worktree 为 `/Users/mc/code/worktrees/syvert/issue-211-fr-0015`，最新实现 checkpoint 已推进到 `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6`。
 - 当前受审 implementation PR 已创建为 `#212`，latest guardian 曾在前一受审 head 上给出 `REQUEST_CHANGES`，阻断点集中在 formal research traceability 未由 carrier 自身强制，以及 id-based 缓存会放过 post-validation drift。
 - latest guardian 随后又在后一受审 head 上给出 `REQUEST_CHANGES`，指出 runtime accessor 不应对 `research.md` 与源码 AST checkout 形成硬依赖。
 - latest guardian 第三次又在更新后的受审 head 上给出 `REQUEST_CHANGES`，指出 strict validator 对 formal research duplicate rows 没有 fail-closed。
 - latest guardian 第四次又在更新后的受审 head 上给出 `REQUEST_CHANGES`，指出 `execution_path` 片段解析仍会放过重复 key。
-- 当前 head `5eae6c3637bd1083c40677fddd16a40de738d009` 已把 runtime accessor 与 strict validator 分层，并补上 formal research `evidence_ref` / `capability_id` / `(adapter_key, candidate)` 重复行以及 `execution_path` 重复 key 的显式拒绝；后续 GitHub checks、guardian verdict 与 merge gate 结果统一回写到本 exec-plan。
+- latest guardian 第五次又在更新后的受审 head 上给出 `REQUEST_CHANGES`，指出 public accessor 仍需对 evidence entry source pointer drift fail-closed。
+- 当前 head `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 已把 runtime accessor 与 strict validator 分层，并补上 formal research `evidence_ref` / `capability_id` / `(adapter_key, candidate)` 重复行、`execution_path` 重复 key，以及 frozen evidence entry pointer drift 的显式拒绝；后续 GitHub checks、guardian verdict 与 merge gate 结果统一回写到本 exec-plan。
 
 ## 下一步动作
 
@@ -93,20 +94,23 @@
 - latest guardian review（绑定第四个受审 head）
   - 结果：`REQUEST_CHANGES`
   - 阻断摘要：`execution_path` 解析必须对重复 key fail-closed，不能让后值覆盖前值
+- latest guardian review（绑定第五个受审 head）
+  - 结果：`REQUEST_CHANGES`
+  - 阻断摘要：public accessor 也必须冻结 canonical evidence entry baseline，不能放过 evidence entry source pointer drift
 - `python3 -m py_compile syvert/resource_capability_evidence.py tests/runtime/test_resource_capability_evidence.py`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过
 - `python3 -m unittest tests.runtime.test_resource_capability_evidence tests.runtime.test_real_adapter_regression tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过，`Ran 98 tests`，`OK`
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过，`Ran 99 tests`，`OK`
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过，`PR class=implementation`
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过，`PR class=implementation`
 - `python3 scripts/governance_gate.py --mode ci --base-sha \"$(git merge-base origin/main HEAD)\" --head-sha \"$(git rev-parse HEAD)\" --head-ref issue-211-fr-0015`
-  - 结果：在 checkpoint `5eae6c3637bd1083c40677fddd16a40de738d009` 上通过
+  - 结果：在 checkpoint `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6` 上通过
 
 ## 未决风险
 
@@ -120,4 +124,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5eae6c3637bd1083c40677fddd16a40de738d009`
+- `f8fbb73be3fec6adc4d6a9b98e71c465dc16fbf6`
