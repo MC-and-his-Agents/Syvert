@@ -528,6 +528,27 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical mapping derived from shared evidence records"):
                 resource_capability_evidence.approved_resource_capability_ids()
 
+    def test_public_accessors_fail_closed_when_evidence_entry_source_pointer_drifts(self) -> None:
+        tampered_entries = tuple(
+            replace(
+                entry,
+                source_symbol="missing_symbol",
+            )
+            if entry.evidence_ref == "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots"
+            else entry
+            for entry in frozen_evidence_reference_entries()
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_EVIDENCE_REFERENCE_ENTRIES",
+            tampered_entries,
+        ):
+            with self.assertRaisesRegex(ValueError, "canonical source pointers and summaries"):
+                resource_capability_evidence.frozen_evidence_reference_entries()
+            with self.assertRaisesRegex(ValueError, "canonical source pointers and summaries"):
+                resource_capability_evidence.approved_resource_capability_ids()
+
     def test_validate_fails_closed_when_formal_research_registry_becomes_unreadable_after_first_success(self) -> None:
         research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
         original_read_text = Path.read_text
@@ -598,7 +619,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "_FROZEN_EVIDENCE_REFERENCE_ENTRIES",
             tampered_entries,
         ):
-            with self.assertRaisesRegex(ValueError, "canonical source pointers from the formal research registry"):
+            with self.assertRaisesRegex(ValueError, "canonical source pointers and summaries"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_runtime_requested_slots_match_account_and_proxy_evidence(self) -> None:
