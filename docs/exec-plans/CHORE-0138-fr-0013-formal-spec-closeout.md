@@ -8,6 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0013-adapter-resource-requirement-declaration/`
+- 关联 PR：`#200`
 - 状态：`active`
 - active 收口事项：`CHORE-0138-fr-0013-formal-spec-closeout`
 
@@ -33,13 +34,12 @@
 
 - `issue-192-fr-0013-formal-spec` 已作为 `#192` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0013` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / 相邻 FR。
-- 最新 formal spec 语义 checkpoint `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
+- 最新 formal spec 语义 checkpoint `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6` 已生成，当前受审 spec PR 为 `#200`；当前停点是把最新门禁结果与 PR 真相同步回 exec-plan，并等待 review / guardian / merge gate。
 
 ## 下一步动作
 
-- 按既有 formal spec 模板与 `FR-0010` / `FR-0012` 风格补齐 `spec.md`、`plan.md`、`data-model.md`、`contracts/README.md`、`risks.md`、`research.md`。
-- 运行固定文档守卫命令，确认 formal spec、docs 与 workflow 约束通过。
-- 记录当前 checkpoint SHA 与守卫结果，作为后续 review / guardian 输入基线。
+- 在当前受审 PR `#200` 上继续消费 review / guardian / merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的语义 checkpoint。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -64,6 +64,10 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-192-fr-0013-formal-spec`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 192 --item-key CHORE-0138-fr-0013-formal-spec-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'docs(spec): 收口 FR-0013 适配器资源需求声明 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#200 https://github.com/MC-and-his-Agents/Syvert/pull/200`
 
 ## 未决风险
 
@@ -78,4 +82,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `1199c85cfeb57c9f8d6a17f3c4ba70f44cca25e6`
-- review-sync 说明：后续若只追加门禁、PR metadata 或 checkpoint 同步说明，不把 metadata-only follow-up 伪装成新的语义 checkpoint。
+- review-sync 说明：当前 live head 已包含 checkpoint SHA、门禁结果与 PR metadata；后续若只追加同类同步，不把 metadata-only follow-up 伪装成新的语义 checkpoint。
