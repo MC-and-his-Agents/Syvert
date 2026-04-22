@@ -9,7 +9,7 @@
 - sprint：`2026-S17`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0034-v0-4-0-phase-and-release-closeout.md`
-- 关联 PR：`#186`
+- 关联 PR：`#186`、`#187`
 - 状态：`active`
 - active 收口事项：`GOV-0034-v0-4-0-phase-and-release-closeout`
 
@@ -41,6 +41,7 @@
 - `#185` 已建立为承接 `v0.4.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-185-v0-4-0`，当前分支为 `issue-185-v0-4-0-phase-b`。
 - 当前回合已进入 `metadata-only closeout follow-up`：当前分支只负责把 `docs/releases/v0.4.0.md`、`docs/sprints/2026-S17.md` 与本 exec-plan 从阶段 A 发布前真相同步到正式发布完成真相。
+- 阶段 B metadata-only/docs PR `#187` 已创建，当前回合正等待 guardian / merge gate。
 - 本事项按同一 Work Item 的两阶段模型推进：阶段 A 已完成仓内 carrier 合入；阶段 B 正在回写最终发布真相并收口 GitHub closeout。
 
 ## 下一步动作
@@ -105,6 +106,10 @@
   - 结果：已推送 tag `v0.4.0`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh release create v0.4.0 --title 'v0.4.0' --notes-file /tmp/v0.4.0-release.md`
   - 结果：已创建 GitHub Release `v0.4.0`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes --dry-run`
+  - 结果：通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 185 --item-key GOV-0034-v0-4-0-phase-and-release-closeout --item-type GOV --release v0.4.0 --sprint 2026-S17 --title 'docs(release): 同步 v0.4.0 发布完成真相' --closing fixes`
+  - 结果：已创建 PR `#187`
 
 ## closeout 证据
 
