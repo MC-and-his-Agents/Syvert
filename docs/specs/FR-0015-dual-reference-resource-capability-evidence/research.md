@@ -43,8 +43,11 @@
   - 拒绝原因：它们属于 `account.material` 的内部字段；单独提升会把字段形状误当成资源能力 taxonomy。
 - `a_bogus`、`xsec_token`、`xsec_source`
   - 拒绝原因：这些都是平台私有 token 或 URL / 请求链路细节，虽然存在稳定证据，但不满足双参考共享抽象条件。
+
+## 保留为 `adapter_only` 的候选
+
 - `verify_fp`、`ms_token`、`webid`
-  - 拒绝原因：这些字段目前只被抖音账号材料证明成立，因此只能作为 `adapter_only` 保留在 adapter 私有层。
+  - 收口原因：这些字段目前只被抖音账号材料证明成立，因此只能作为 `adapter_only + keep_adapter_local` 保留在 adapter 私有层，不能提升为共享能力。
 
 ## 冻结的 `v0.5.0` 最小能力词汇
 
