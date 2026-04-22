@@ -146,7 +146,7 @@
 
 - 如需回滚，使用独立 revert PR 撤销 `syvert/resource_capability_evidence.py`、新增测试、artifact 与本 exec-plan / requirement container 追溯入口的增量修改。
 
-## 最近一次 implementation checkpoint 对应的 head SHA
+## 最近一次 checkpoint 对应的 head SHA
 
 - `70a5d2e13d9a316b95f8acbcc5aa9453e67c44b5`
 - 当前 head 若只继续追加 exec-plan / guardian / merge gate metadata，同步必须保持该实现 checkpoint 不变；若实现代码再次变化，则必须显式推进新的 checkpoint 真相。
