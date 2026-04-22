@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -77,6 +78,16 @@ class ProxyPathCaptureAdapter:
 
 
 class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
+    def test_frozen_evidence_refs_are_traceable_from_formal_research(self) -> None:
+        research_text = (
+            Path(__file__).resolve().parents[2]
+            / "docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md"
+        ).read_text(encoding="utf-8")
+        research_refs = set(re.findall(r"`(fr-0015:[^`]+)`", research_text))
+        frozen_refs = {entry.evidence_ref for entry in frozen_evidence_reference_entries()}
+
+        self.assertFalse(frozen_refs - research_refs)
+
     def test_validate_frozen_resource_capability_evidence_contract_accepts_current_baseline(self) -> None:
         validate_frozen_resource_capability_evidence_contract()
 
