@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
-- 关联 PR：
+- 关联 PR：`#204`
 - 状态：`active`
 - active 收口事项：`CHORE-0143-fr-0015-evidence-closeout`
 
@@ -40,6 +40,7 @@
 - 当前执行现场：`/Users/mc/code/worktrees/syvert/issue-197-fr-0015`
 - 当前执行分支：`issue-197-fr-0015`
 - 当前 Work Item：`#197`
+- 当前受审 PR：`#204`
 - 当前实现 checkpoint：`dd7934d07b062157de89a807668772df75ed1fa5`
 - 当前实现已把 `FR-0015` evidence baseline 落成 `syvert.resource_capability_evidence`，冻结了 `EvidenceReferenceEntry`、`DualReferenceResourceCapabilityEvidenceRecord`、`ApprovedResourceCapabilityVocabularyEntry` 与对应 helper / validator。
 - 当前实现已把 canonical evidence baseline artifact 落到 `docs/exec-plans/artifacts/CHORE-0143-fr-0015-resource-capability-evidence-baseline.md`，与 machine-readable registry 一一对应。
@@ -49,8 +50,8 @@
 ## 下一步动作
 
 - 运行 `py_compile`、focused runtime 回归、`docs_guard`、`workflow_guard` 与 `pr_scope_guard`。
-- 通过受控入口创建 implementation PR，并把 `#197` 与 `FR-0015` requirement container / artifact 追溯对齐。
-- 对当前 PR head 运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge。
+- 对当前受审 PR `#204` 的 live head 运行 guardian；若 verdict=`APPROVE` 且 checks 全绿，则进入受控 squash merge。
+- 若 guardian 或 checks 暴露阻断，仅允许继续以 metadata-only 或最小修复回合收口，不得重写 `dd7934d07b062157de89a807668772df75ed1fa5` 的 evidence baseline 语义。
 
 ## 当前 checkpoint 推进的 release 目标
 
