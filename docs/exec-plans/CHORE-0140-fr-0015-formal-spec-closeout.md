@@ -33,7 +33,7 @@
 
 - `issue-194-fr-0015-formal-spec` 已作为 `#194` 的独立 spec worktree 建立。
 - `FR-0015` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘。
-- 当前停点是补齐 formal spec 语义、通过门禁、生成首个 semantic checkpoint，并创建当前 spec PR。
+- 最新 formal spec 语义 checkpoint `10e468f99c5ed4f7ea39a4987803df4a77e4242a` 已生成；当前停点是补齐门禁记录、创建当前 spec PR，并把当前受审 PR / checks 真相同步回 exec-plan。
 
 ## 下一步动作
 
@@ -57,6 +57,8 @@
 - 已核对 `#188`、`#191`、`#194` 对 `v0.5.0` 证据记录事项的目标、非目标与关闭条件描述。
 - 已核对 `AGENTS.md`、`vision.md`、`docs/roadmap-v0-to-v1.md`、`WORKFLOW.md` 与 `spec_review.md` 的上位约束。
 - 已核对 `FR-0010`、`FR-0012` 与当前 runtime / reference adapters / regression 基线，确认当前最小共享能力词汇应收敛为 `account`、`proxy`。
+- `git commit -m 'docs(spec): 冻结 FR-0015 双参考资源能力证据基线'`
+  - 结果：已生成最新语义 checkpoint `10e468f99c5ed4f7ea39a4987803df4a77e4242a`
 
 ## 未决风险
 
@@ -74,4 +76,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待回填`
+- `10e468f99c5ed4f7ea39a4987803df4a77e4242a`
