@@ -10,6 +10,7 @@
 - 关联 exec-plan：
   - `docs/exec-plans/FR-0015-dual-reference-resource-capability-evidence.md`
   - `docs/exec-plans/CHORE-0140-fr-0015-formal-spec-closeout.md`
+  - `docs/exec-plans/CHORE-0144-fr-0015-evidence-registry-reconciliation.md`
 
 ## 实施目标
 
@@ -18,6 +19,7 @@
 ## 分阶段拆分
 
 - 阶段 1：`#194` 收口 formal spec，冻结 `DualReferenceResourceCapabilityEvidenceRecord`、批准规则与 `research.md` 入口。
+- 阶段 1.1：`#206` 作为 formal-spec follow-up，补齐 `research.md` 中 implementation closeout 需要消费的 stable evidence ref registry 与示例基线，避免 formal truth 与 evidence closeout 漂移。
 - 阶段 2：后续 evidence closeout Work Item 消费本 formal spec，把双参考适配器事实沉淀到稳定 evidence registry，而不是继续依赖会话判断。
 - 阶段 3：`FR-0013` 与 `FR-0014` 在不反向改写证据规则的前提下，分别消费本 FR 的批准词汇与引用边界。
 
