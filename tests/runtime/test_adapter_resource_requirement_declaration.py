@@ -78,29 +78,25 @@ class AdapterResourceRequirementDeclarationTests(unittest.TestCase):
         self.assertEqual(declaration.required_capabilities, ("account", "proxy"))
         self.assertEqual(declaration.resource_dependency_mode, "required")
 
-    def test_registry_accepts_none_mode_with_empty_required_capabilities(self) -> None:
-        registry = AdapterRegistry.from_mapping(
-            {
-                "stub": StubDeclarativeAdapter(
-                    resource_requirement_declarations=(
-                        {
-                            "adapter_key": "stub",
-                            "capability": "content_detail",
-                            "resource_dependency_mode": "none",
-                            "required_capabilities": (),
-                            "evidence_refs": (frozen_evidence_reference_entries()[0].evidence_ref,),
-                        },
-                    ),
-                )
-            }
-        )
+    def test_registry_rejects_none_mode_without_traceable_frozen_evidence_baseline(self) -> None:
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping(
+                {
+                    "stub": StubDeclarativeAdapter(
+                        resource_requirement_declarations=(
+                            {
+                                "adapter_key": "stub",
+                                "capability": "content_detail",
+                                "resource_dependency_mode": "none",
+                                "required_capabilities": (),
+                                "evidence_refs": (frozen_evidence_reference_entries()[0].evidence_ref,),
+                            },
+                        ),
+                    )
+                }
+            )
 
-        declaration = registry.lookup_resource_requirement("stub", "content_detail")
-
-        self.assertIsNotNone(declaration)
-        assert declaration is not None
-        self.assertEqual(declaration.resource_dependency_mode, "none")
-        self.assertEqual(declaration.required_capabilities, ())
+        self.assertEqual(context.exception.code, "invalid_adapter_resource_requirements")
 
     def test_registry_rejects_invalid_resource_dependency_mode(self) -> None:
         with self.assertRaises(RegistryError) as context:

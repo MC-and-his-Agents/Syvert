@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from syvert.resource_capability_evidence import approved_resource_capability_ids
-from syvert.resource_capability_evidence import approved_resource_capability_vocabulary_entries
 from syvert.resource_capability_evidence import frozen_dual_reference_resource_capability_evidence_records
 
 
@@ -41,19 +40,20 @@ _FORBIDDEN_RESOURCE_REQUIREMENT_KEYS = frozenset(
         "sign_service",
     }
 )
-_APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = approved_resource_capability_vocabulary_entries()
-_APPROVED_RESOURCE_CAPABILITY_ORDER = tuple(
-    entry.capability_id for entry in _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES
-)
+_FROZEN_REQUIRED_CAPABILITY_IDS = ("account", "proxy")
+_REQUIRED_CAPABILITY_ORDER = _FROZEN_REQUIRED_CAPABILITY_IDS
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
+if _APPROVED_RESOURCE_CAPABILITY_IDS != frozenset(_FROZEN_REQUIRED_CAPABILITY_IDS):
+    raise ValueError("FR-0013 required capability vocabulary must stay frozen to account and proxy")
 _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
     record
     for record in frozen_dual_reference_resource_capability_evidence_records()
-    if record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
+    if (
+        record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
+        and record.capability == "content_detail"
+    )
 )
-_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
-    record.capability for record in _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS
-)
+_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset({"content_detail"})
 _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS = frozenset(
     evidence_ref
     for record in _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS
@@ -192,7 +192,7 @@ def baseline_required_resource_requirement_declaration(
     adapter_key: str,
     capability: str,
 ) -> AdapterResourceRequirementDeclaration:
-    required_capabilities = tuple(_APPROVED_RESOURCE_CAPABILITY_ORDER)
+    required_capabilities = _REQUIRED_CAPABILITY_ORDER
     return AdapterResourceRequirementDeclaration(
         adapter_key=adapter_key,
         capability=capability,
@@ -534,23 +534,24 @@ def _validate_resource_requirement_declaration(
                 "unknown_evidence_refs": unknown_evidence_refs,
             },
         )
-    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_REQUIRED:
-        canonical_evidence_refs = _canonical_required_evidence_refs(
-            adapter_key=adapter_key,
-            capability=capability,
-            required_capabilities=required_capabilities,
+    canonical_evidence_refs = _canonical_declaration_evidence_refs(
+        adapter_key=adapter_key,
+        capability=capability,
+        resource_dependency_mode=resource_dependency_mode,
+        required_capabilities=required_capabilities,
+    )
+    if evidence_refs != canonical_evidence_refs:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementDeclaration.evidence_refs 必须等于当前声明的 FR-0015 frozen baseline",
+            details={
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "resource_dependency_mode": resource_dependency_mode,
+                "expected_evidence_refs": canonical_evidence_refs,
+                "actual_evidence_refs": evidence_refs,
+            },
         )
-        if evidence_refs != canonical_evidence_refs:
-            raise RegistryError(
-                "invalid_adapter_resource_requirements",
-                "required declaration 的 evidence_refs 必须等于 FR-0015 frozen baseline 的最小集合",
-                details={
-                    "adapter_key": adapter_key,
-                    "capability": capability,
-                    "expected_evidence_refs": canonical_evidence_refs,
-                    "actual_evidence_refs": evidence_refs,
-                },
-            )
 
     return AdapterResourceRequirementDeclaration(
         adapter_key=normalized_adapter_key,
@@ -704,7 +705,7 @@ def _canonical_required_evidence_refs(
 ) -> tuple[str, ...]:
     ordered_required_capabilities = [
         capability_id
-        for capability_id in _APPROVED_RESOURCE_CAPABILITY_ORDER
+        for capability_id in _REQUIRED_CAPABILITY_ORDER
         if capability_id in frozenset(required_capabilities)
     ]
     ordered_refs: list[str] = []
@@ -724,3 +725,27 @@ def _canonical_required_evidence_refs(
             if evidence_ref not in ordered_refs:
                 ordered_refs.append(evidence_ref)
     return tuple(ordered_refs)
+
+
+def _canonical_declaration_evidence_refs(
+    *,
+    adapter_key: str,
+    capability: str,
+    resource_dependency_mode: str,
+    required_capabilities: tuple[str, ...],
+) -> tuple[str, ...]:
+    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_REQUIRED:
+        return _canonical_required_evidence_refs(
+            adapter_key=adapter_key,
+            capability=capability,
+            required_capabilities=required_capabilities,
+        )
+    raise RegistryError(
+        "invalid_adapter_resource_requirements",
+        "resource_dependency_mode=none 当前缺少可追溯到 FR-0015 的 frozen evidence baseline",
+        details={
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "resource_dependency_mode": resource_dependency_mode,
+        },
+    )
