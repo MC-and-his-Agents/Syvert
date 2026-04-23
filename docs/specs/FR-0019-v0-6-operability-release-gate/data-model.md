@@ -30,6 +30,18 @@
   - 约束：非空数组，必须覆盖四类必选维度：`timeout_retry_concurrency`、`failure_log_metrics`、`http_submit_status_result`、`cli_api_same_path`。
 - `OperabilityGateResult.summary`
   - 约束：至少包含 pass / fail case 数、失败 case id 列表与失败维度。
+- `OperabilityGateResult.metrics_snapshot`
+  - 约束：必须固定包含可机判的最小计数集合：
+    - `submit_total`
+    - `success_total`
+    - `failure_total`
+    - `timeout_total`
+    - `retry_attempt_total`
+    - `concurrency_case_total`
+    - `concurrency_case_failure_total`
+    - `same_path_case_total`
+    - `same_path_case_failure_total`
+  - 任一字段缺失、不可判定或无法追溯到当前 gate revision 时都必须使 gate fail。
 - `OperabilityGateResult.evidence_refs`
   - 约束：非空、去重、稳定，且可从仓内命令输出或 CI artifact 复验。
 - `OperabilityGateResult.verdict`
@@ -93,7 +105,7 @@
 | `trc-retryable-platform-retry-once` | `content_detail_by_url` | `error.category=platform` 且 `error.details.retryable=true`，并通过 idempotency safety gate | `error.category=platform`; `error.details.retryable=true`; `policy.retry.max_attempts=1`; `idempotency_safety_gate=pass` | retry attempt 计数递增一次；不超出一次额外 retry |
 | `trc-non-retryable-fail-closed` | `content_detail_by_url` | 不满足 retryable predicate 的 failure | `retry.predicate.match=none`; `policy.retry.max_attempts=1` | 不生成新的 retry attempt；保留原 failed envelope |
 | `trc-retry-budget-exhausted` | `content_detail_by_url` | 唯一批准 retry 已被消费 | `policy.retry.max_attempts=1`; `retry.attempts=1`; `retry.exhausted=true` | 不生成第二次 retry attempt；最终 verdict=failed |
-| `trc-pre-accept-concurrency-reject` | `content_detail_by_url` | 进入 admission 前命中全局并发上限 | `request_ref != ""`; `error.category=invalid_input`; `policy.concurrency.scope=global`; `policy.concurrency.max_in_flight=1`; `policy.concurrency.on_limit=reject`; `metrics.concurrency_case_total>=1` | `TaskRecord` 未创建 |
+| `trc-pre-accept-concurrency-reject` | `content_detail_by_url` | 进入 admission 前命中全局并发上限 | `request_ref != ""`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `policy.concurrency.scope=global`; `policy.concurrency.max_in_flight=1`; `policy.concurrency.on_limit=reject`; `metrics.concurrency_case_total>=1` | `TaskRecord` 未创建 |
 | `trc-concurrent-status-shared-truth` | `content_detail_by_url` | 同一 `task_id` 被并发执行状态查询 | `status.read_a.task_id == status.read_b.task_id`; `status.read_a.status == status.read_b.status`; `case.verdict=pass`; `metrics.concurrency_case_total>=1` | 不创建额外 `TaskRecord`；不出现状态回退 |
 | `trc-concurrent-result-shared-truth` | `content_detail_by_url` | 同一 `task_id` 被并发执行结果读取 | `result.read_a.task_id == result.read_b.task_id`; `result.read_a.envelope_ref == result.read_b.envelope_ref`; `case.verdict=pass`; `metrics.concurrency_case_total>=1` | 不创建影子结果；终态不被重复改写 |
 | `trc-post-accept-reacquire-reject` | `content_detail_by_url` | 首次 attempt 完成后，retry reacquire 被拒绝 | `policy.retry.max_attempts=1`; `policy.concurrency.scope=global`; `policy.concurrency.on_limit=reject`; `metrics.concurrency_case_total>=1` | 新增 `ExecutionControlEvent.details.reacquire_rejected=true`；保留上一 attempt 的终态 `error.code` / `error.category` |
@@ -108,24 +120,24 @@
 | `flm-timeout-observable` | `content_detail_by_url` | timeout 作为失败结论对外可观测 | `error.category=platform`; `error.details.control_code=execution_timeout`; `metrics.timeout_total>=1` | 结构化日志包含 `task_id`、`stage`、`error.category`、`error.details.control_code` |
 | `flm-retry-exhausted-observable` | `content_detail_by_url` | 唯一批准 retry 已耗尽 | `policy.retry.max_attempts=1`; `retry.exhausted=true`; `metrics.retry_attempt_total>=1` | 结构化日志包含 retry attempt 序号与最终失败分类 |
 | `flm-store-unavailable-fail-closed` | `content_detail_by_url` | durable store / record lookup 不可用 | `error.code=task_record_unavailable`; `error.category=runtime_contract`; `gate.verdict=fail` | 结构化日志包含 store unavailable 原因；不输出看似成功的 `status/result` |
-| `flm-http-invalid-input-observable` | `content_detail_by_url` | HTTP 参数错误 | `request_ref != ""`; `entrypoint=http`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 HTTP validation failure；不创建 `TaskRecord` |
-| `flm-cli-invalid-input-observable` | `content_detail_by_url` | CLI 参数错误 | `request_ref != ""`; `entrypoint=cli`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 CLI validation failure；不创建 `TaskRecord` |
+| `flm-http-invalid-input-observable` | `content_detail_by_url` | HTTP 参数错误 | `request_ref != ""`; `entrypoint=http`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 HTTP validation failure；不创建 `TaskRecord` |
+| `flm-cli-invalid-input-observable` | `content_detail_by_url` | CLI 参数错误 | `request_ref != ""`; `entrypoint=cli`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 CLI validation failure；不创建 `TaskRecord` |
 | `flm-same-path-violation-observable` | `content_detail_by_url` | CLI / HTTP shared truth 被证明发生偏离 | `same_path.verdict=fail`; `metrics.same_path_failure_total>=1` | 结构化日志包含 `shared_truth_mismatch_reason`; overall gate verdict=fail |
 
 ### `http_submit_status_result`
 
 | case_id | capability | 前置条件摘要 | expected_result.fields（必须命中） | expected_result.side_effects（必须命中） |
 | --- | --- | --- | --- | --- |
-| `http-submit-status-result-shared-truth` | `content_detail_by_url` | HTTP `submit` 后依次查询 `status` / `result` | `submit.request.capability=content_detail_by_url`; `status.task_id == result.task_id`; `status.task_record_ref == result.task_record_ref`; `result.envelope_ref != ""` | 只存在一条共享 `TaskRecord`；`result` 读取同一 shared envelope |
+| `http-submit-status-result-shared-truth` | `content_detail_by_url` | HTTP `submit` 后依次查询 `status` / `result` | `submit.request.capability=content_detail_by_url`; `metrics.submit_total>=1`; `status.task_id == result.task_id`; `status.task_record_ref == result.task_record_ref`; `result.envelope_ref != ""` | 只存在一条共享 `TaskRecord`；`result` 读取同一 shared envelope |
 
 ### `cli_api_same_path`
 
 | case_id | capability | 前置条件摘要 | expected_result.fields（必须命中） | expected_result.side_effects（必须命中） |
 | --- | --- | --- | --- | --- |
-| `same-path-success-shared-truth` | `content_detail_by_url` | CLI 与 HTTP 处理等价成功请求 | `cli.task_record_ref == http.task_record_ref`; `cli.envelope_ref == http.envelope_ref` | CLI 与 HTTP 观察到同一状态迁移 |
-| `same-path-pre-admission-invalid-input` | `content_detail_by_url` | CLI 与 HTTP 处理等价 pre-admission 参数失败 | `cli.request_ref != ""`; `http.request_ref != ""`; `cli.error.category == http.error.category == invalid_input`; `cli.error.code == http.error.code` | CLI 与 HTTP 都不创建 `TaskRecord` |
-| `same-path-durable-record-unavailable` | `content_detail_by_url` | CLI 与 HTTP 读取同一不可用 durable record | `cli.error.code == http.error.code == task_record_unavailable`; `cli.error.category == http.error.category == runtime_contract` | CLI 与 HTTP 均 fail-closed，不输出影子状态或影子结果 |
-| `same-path-terminal-result-read` | `content_detail_by_url` | CLI `query` 与 HTTP `result` 读取同一终态任务 | `cli.result.task_id == http.result.task_id`; `cli.result.envelope_ref == http.result.envelope_ref` | CLI 与 HTTP 读取同一终态 `TaskRecord` 与同一组 `runtime_result_refs` |
+| `same-path-success-shared-truth` | `content_detail_by_url` | CLI 与 HTTP 处理等价成功请求 | `cli.task_record_ref == http.task_record_ref`; `cli.envelope_ref == http.envelope_ref`; `same_path.verdict=pass`; `metrics.same_path_case_total>=1` | CLI 与 HTTP 观察到同一状态迁移 |
+| `same-path-pre-admission-invalid-input` | `content_detail_by_url` | CLI 与 HTTP 处理等价 pre-admission 参数失败 | `cli.request_ref != ""`; `http.request_ref != ""`; `cli.stage == http.stage == pre_admission`; `cli.result.status == http.result.status == failed`; `cli.error.category == http.error.category == invalid_input`; `cli.error.code == http.error.code`; `same_path.verdict=pass`; `metrics.same_path_case_total>=1` | CLI 与 HTTP 都不创建 `TaskRecord` |
+| `same-path-durable-record-unavailable` | `content_detail_by_url` | CLI 与 HTTP 读取同一不可用 durable record | `cli.error.code == http.error.code == task_record_unavailable`; `cli.error.category == http.error.category == runtime_contract`; `same_path.verdict=pass`; `metrics.same_path_case_total>=1` | CLI 与 HTTP 均 fail-closed，不输出影子状态或影子结果 |
+| `same-path-terminal-result-read` | `content_detail_by_url` | CLI `query` 与 HTTP `result` 读取同一终态任务 | `cli.result.task_id == http.result.task_id`; `cli.result.envelope_ref == http.result.envelope_ref`; `same_path.verdict=pass`; `metrics.same_path_case_total>=1` | CLI 与 HTTP 读取同一终态 `TaskRecord` 与同一组 `runtime_result_refs` |
 
 ## 生命周期
 

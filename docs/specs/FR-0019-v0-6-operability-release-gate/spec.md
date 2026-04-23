@@ -69,7 +69,7 @@
   - `failure_log_metrics` 的最小 mandatory case set 至少固定为：`flm-success-observable`、`flm-business-failure-observable`、`flm-contract-failure-fail-closed`、`flm-timeout-observable`、`flm-retry-exhausted-observable`、`flm-store-unavailable-fail-closed`、`flm-http-invalid-input-observable`、`flm-cli-invalid-input-observable`、`flm-same-path-violation-observable`。
   - failure 输出必须继续复用已批准的 shared failed envelope 和错误分类语义；不得为 HTTP 或 CLI 单独定义不可映射的失败格式。
   - log 证据必须至少可追溯到 durable `task_id`（当请求已进入 `accepted` 后）；对 pre-admission 且无 `TaskRecord` 的 case，必须改为可追溯到稳定 `request_ref`（或等价 `admission_ref`）、入口类型、生命周期阶段、结果状态与失败分类；不得要求记录 raw payload、账号材料、平台 token 或平台私有调试细节。
-  - metrics 证据必须至少能表达可本地复验的计数或聚合结论：提交数、成功数、失败数、超时数、retry attempt 数、并发 case 计数 / case verdict、same-path case 计数 / case verdict。它可以是本地测试输出、结构化文件或进程内聚合，不要求外部监控系统。
+  - metrics 证据必须至少能表达可本地复验的计数或聚合结论：提交数、成功数、失败数、超时数、retry attempt 数、并发 case 计数 / case verdict、same-path case 计数 / case verdict；该最小集合必须在 gate result 的 machine-readable `metrics_snapshot`（或等价结构）中落盘。它可以是本地测试输出、结构化文件或进程内聚合，不要求外部监控系统。
   - HTTP submit / status / result 矩阵必须证明 HTTP 入口提交任务后产生的任务记录、状态查询与结果读取均消费同一条 Core / task-record / store truth。
   - HTTP `submit` 不得绕过共享 admission、共享请求投影、Core 执行主路径或持久化建档；HTTP `status` 不得维护独立状态缓存；HTTP `result` 不得读取第二套结果文件或拼装 HTTP 私有 envelope。
   - `http_submit_status_result` 的最小 mandatory case set 至少固定为：`http-submit-status-result-shared-truth`；该 case 必须同时证明 submit durable 建档、status 回读共享 `TaskRecord`、result 回读同一 shared envelope。
