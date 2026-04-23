@@ -36,8 +36,9 @@
     - 约束：正整数；包含首次执行；`1` 表示不重试
   - `backoff_ms`
     - 约束：非负整数毫秒；表达相邻 attempts 之间的固定等待
-- Core 固定 retryable outcome rule
-  - 约束：该规则不是 `RetryPolicy` 字段，也不是 caller-visible policy 载荷；`v0.6.0` 固定为 `execution_timeout` 与 `error.category=platform`
+- Core 固定 retryable outcome predicate
+  - 约束：该 predicate 不是 `RetryPolicy` 字段，也不是 caller-visible policy 载荷；`v0.6.0` 固定为完成 timeout closeout 的 `execution_timeout`，以及 `error.category=platform` 且 `error.details.retryable=true` 的 transient adapter failure
+  - 约束：所有 retryable outcome 还必须通过 Core 的 idempotency safety gate；当前批准可 retry 的共享 capability 仅限 `content_detail_by_url`，任何新增 capability 在新的 formal spec 批准前默认不可 retry
   - 禁止：调用方在 policy 载荷中传入 `retryable_outcomes` 或等价 predicate；若显式出现，必须按未知策略字段 fail-closed
   - 禁止：调用方提供正则、脚本、错误码 DSL 或 adapter 私有 retry 规则
 - `ConcurrencyLimitPolicy`
@@ -89,7 +90,7 @@
 - 更新：
   - 每次 attempt 只能产生一个 outcome
   - adapter failure 或 success 必须结束当前 attempt 并释放 concurrency slot；timeout 必须先完成 closeout、late-result quarantine、资源释放/失效与 slot release，之后才形成 `execution_timeout` outcome
-  - 若 outcome 属于 Core 固定 retryable outcome rule，且 `attempt_index < max_attempts`，Core 必须在前一 attempt 已安全释放 slot 后等待 `retry.backoff_ms`，再进入下一个 attempt；只有 success、不可重试失败、timeout closeout failure、retry 预算耗尽或 retry slot reacquire 被拒绝可以终止同一 TaskRecord
+  - 若 outcome 属于 Core 固定 retryable outcome predicate，且 `attempt_index < max_attempts`，Core 必须在前一 attempt 已安全释放 slot 后等待 `retry.backoff_ms`，再进入下一个 attempt；只有 success、不可重试失败、timeout closeout failure、retry 预算耗尽或 retry slot reacquire 被拒绝可以终止同一 TaskRecord
 - 失效/归档：
   - attempt outcome 不单独成为 durable task truth；它只能作为 TaskRecord 日志、failed envelope details、结构化日志或指标的输入
   - 若 late completion 在 timeout deadline 后到达，它必须被 quarantine；不得重新激活 attempt，也不得改写 TaskRecord 终态
@@ -98,7 +99,7 @@
 
 - `execution_timeout`
   - 触发条件：attempt deadline 已过，Core 未得到可信成功或失败结果，且 timeout closeout、late-result quarantine、资源释放/失效与 slot release 已完成
-  - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
+  - 错误分类：当 adapter execution 已进入平台语义边界且 timeout closeout 安全完成时，复用 `FR-0005` 的 `platform`，并在 `error.details` 中标记 `control_code=execution_timeout`；不得把正常 timeout 默认投影为 `runtime_contract`
 - caller-supplied policy violation
   - 触发条件：调用方显式传入的 `ExecutionControlPolicy` 缺必需字段、字段类型非法或字段值越界
   - 错误分类：复用 `FR-0005` 的 `invalid_input`，不得归入 `runtime_contract`
@@ -107,8 +108,8 @@
   - 错误分类：复用 `FR-0005` 的 `runtime_contract`
 - `concurrency_limit_exceeded`
   - 触发条件：目标 scope 已达到 `max_in_flight`，且 `on_limit=reject`
-  - 载体：pre-accepted 拒绝必须作为 `ExecutionControlEvent(event_type=admission_concurrency_rejected)` 或 failed envelope details 出现且 `task_record_ref=none`；post-accepted retry reacquire 拒绝必须作为 `ExecutionControlEvent(event_type=retry_concurrency_rejected)` 出现并引用同一 TaskRecord
-  - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
+  - 载体：pre-accepted 拒绝必须作为 `ExecutionControlEvent(event_type=admission_concurrency_rejected)` 或 failed envelope details 出现且 `task_record_ref=none`；post-accepted retry reacquire 拒绝必须作为 `ExecutionControlEvent(event_type=retry_concurrency_rejected)` 出现并引用同一 TaskRecord，且不得创建新的 attempt outcome
+  - 错误分类：pre-accepted admission rejection 的 failed envelope 在 `FR-0005` 闭集内投影为 `invalid_input`，语义是当前 caller-visible execution-control admission contract 拒绝本次提交；post-accepted retry reacquire rejection 不改写终态 envelope 的顶层 code/category，终态必须保留上一已完成 attempt 的最终失败原因，并通过 event/details 暴露 `concurrency_limit_exceeded`
 - `retry_exhausted`
   - 触发条件：retry controller 已用尽 `max_attempts` 且未获得 success
   - 载体：必须作为 `ExecutionControlEvent(event_type=retry_exhausted)` 或 failed envelope details 中的 task-level 聚合事实出现，不得序列化为单次 attempt outcome

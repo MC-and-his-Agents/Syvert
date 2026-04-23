@@ -67,7 +67,7 @@
   - 结果：已创建当前受审 spec PR `#237 https://github.com/MC-and-his-Agents/Syvert/pull/237`
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 字段漂移、attempt outcome 与 admission/聚合事实混用、缺少数据迁移说明
-- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，固定 Core retryable rule 为 `execution_timeout` 与 `error.category=platform`；新增 `ExecutionControlEvent` 区分 `concurrency_rejected` 与 `retry_exhausted`；补充数据模型与迁移说明
+- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，改由 Core-owned retryable predicate 承载重试判断；新增 `ExecutionControlEvent` 区分 `concurrency_rejected` 与 `retry_exhausted`；补充数据模型与迁移说明
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 post-accepted retry 重新获取 concurrency slot 的状态转移未闭合、`on_limit` public contract 不一致、默认 policy 未冻结
 - 已修复：冻结完整默认 `ExecutionControlPolicy`；将 `on_limit=reject` 定义为 caller-visible required field；补充 `retry_concurrency_rejected` control event 与同一 TaskRecord failed 终态语义
@@ -80,11 +80,14 @@
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 timeout quarantine 与 concurrency slot 释放/重试启动冲突，以及 caller-visible policy validation 被归入 `runtime_contract`
 - 已修复：timeout deadline 只进入 closeout，完成 late-result quarantine、资源释放/失效与 slot release 后才形成 retryable `execution_timeout`；caller-supplied policy 形状/值错误归入 `invalid_input`，Core 默认/内部控制状态失败才归入 `runtime_contract`
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retry contract 过度批准全部 `platform` 失败，以及正常 timeout / concurrency control-plane failure 被默认投影为 `runtime_contract`
+- 已修复：retryable predicate 收窄为完成 closeout 的 `execution_timeout` 与显式 `error.details.retryable=true` 的 transient `platform` 失败，并增加 Core idempotency safety gate；正常 `execution_timeout` 在 adapter execution 已进入平台语义边界且 closeout 安全完成时投影为 `platform`，pre-accepted concurrency rejection 投影为 `invalid_input`，post-accepted retry reacquire rejection 仅作为 control event/details 收口且不改写上一 attempt 的终态错误分类
 
 ## 未决风险
 
 - timeout 若落在 adapter 私有层，后续 CLI / HTTP / TaskRecord 无法共享同一运行时真相。
-- retry 若默认覆盖 `invalid_input`、`unsupported` 或一般 `runtime_contract`，会掩盖 contract violation。
+- retry 若默认覆盖整个 `platform` category、`invalid_input`、`unsupported` 或一般 `runtime_contract`，会掩盖 deterministic failure 或 contract violation。
 - concurrency 若引入 queue / priority / fairness，会提前进入调度器语义并扩大 HTTP API 范围。
 - late completion 若能改写终态，会破坏 TaskRecord durable truth 与 guardian / gate 可复验性。
 

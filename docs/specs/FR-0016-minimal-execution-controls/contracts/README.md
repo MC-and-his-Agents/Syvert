@@ -16,6 +16,7 @@
 - 值域：正整数毫秒
 - 语义：单次 adapter execution attempt 的 deadline；deadline 到达后必须先完成 timeout closeout、late-result quarantine、资源释放/失效与 slot release，之后才形成 retryable timeout outcome
 - 失败 code：`execution_timeout`
+- 错误分类：adapter execution 已进入平台语义边界且 closeout 安全完成时投影为 `platform`，并通过 `error.details.control_code=execution_timeout` 暴露控制面来源；timeout closeout 或内部控制状态失效才使用独立 `runtime_contract` failure
 - 禁止：total deadline、无限 timeout 表达、adapter 私有 timeout 替代 Core timeout
 
 ## Retry Contract
@@ -23,7 +24,7 @@
 - Caller-visible 字段：`max_attempts`、`backoff_ms`
 - `max_attempts`：正整数，包含首次执行；`1` 表示不重试
 - `backoff_ms`：非负整数毫秒，固定等待
-- Core 固定可重试 outcome：`execution_timeout` 与 `error.category=platform`；该集合不是 caller-visible policy 字段。若 outcome 命中该集合且 `attempt_index < max_attempts`，Core 必须等待 `backoff_ms` 后进入下一 attempt
+- Core 固定可重试 predicate：完成 closeout 的 `execution_timeout`，以及 `error.category=platform` 且 `error.details.retryable=true` 的 transient adapter failure；两类 outcome 都必须通过 Core idempotency safety gate，且当前批准可 retry 的共享 capability 仅限 `content_detail_by_url`。该 predicate 不是 caller-visible policy 字段。若 outcome 命中该 predicate 且 `attempt_index < max_attempts`，Core 必须等待 `backoff_ms` 后进入下一 attempt
 - 禁止：指数退避、jitter、自定义 predicate、错误码 DSL、无限 retry、caller-supplied `retryable_outcomes`
 
 ## Concurrency Contract
@@ -40,7 +41,8 @@
 - 同一任务的所有 attempts 共享同一 `task_id` 与同一条 TaskRecord。
 - attempt 不单独创建 durable TaskRecord。
 - durable `accepted` 前发生的 concurrency rejection 不创建伪造 TaskRecord。
-- durable `accepted` 后发生的 retry slot reacquire rejection 必须把同一 TaskRecord 收口为 `failed`，使用 `concurrency_limit_exceeded`，且不得再继续 retry。
+- durable `accepted` 前发生的 concurrency rejection 使用 `concurrency_limit_exceeded` failed envelope，并在 `FR-0005` 闭集内投影为 `invalid_input`，语义是当前 caller-visible admission contract 拒绝本次提交。
+- durable `accepted` 后发生的 retry slot reacquire rejection 必须把同一 TaskRecord 收口为 `failed`，保留上一已完成 attempt 的最终失败 code/category，通过 `ExecutionControlEvent(event_type=retry_concurrency_rejected, control_code=concurrency_limit_exceeded)` 与 failed envelope details 暴露控制事件，且不得再继续 retry。
 - caller-supplied policy 形状或值错误使用 `invalid_input`；Core 默认 policy、slot accounting 或 timeout closeout 内部状态失效使用 `runtime_contract`。
 - timeout / retry / concurrency 失败继续复用 `FR-0005` failed envelope 顶层结构。
 - 成功结果不改写 `raw` / `normalized` contract。
