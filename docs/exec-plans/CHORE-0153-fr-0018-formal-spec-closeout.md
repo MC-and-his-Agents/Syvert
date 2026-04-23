@@ -37,14 +37,13 @@
 - `issue-229-fr-0018-formal-spec` 已作为 `#229` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0018` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / 相邻 FR。
 - 本轮目标是把 HTTP `submit/status/result` service surface、same-core-path 边界、`TaskRecord` durable truth 复用约束、`FR-0016` control 语义投影、`FR-0017` observability 依赖、风险与后续拆分一次性落盘到 implementation-ready formal spec。
-- 当前 formal spec 语义基线以 `d235e37569e0d74b5005c98d302c1f165aea16c8` 为恢复起点；在形成新的显式 checkpoint 前，后续 metadata-only 同步不改写该基线口径。
+- 当前 formal spec 语义基线以 `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 为恢复起点；该 checkpoint 已冻结最小 HTTP transport contract、canonical endpoint path / method、固定状态码映射与 shared failed envelope transport carrier。
 
 ## 下一步动作
 
-- 继续核对 `FR-0008`、`FR-0009`、`FR-0016`、`FR-0017` 与 `v0.6.0` 路线图边界，避免把 HTTP service 写成第二套执行面。
-- 完成 formal spec suite、requirement container 与 active closeout exec-plan 的一致性校验。
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard`，把验证结果回写到本 exec-plan。
-- 等待 `spec review`，通过后切换到 `#230` HTTP endpoint implementation，再由 `#231`、`#232` 继续收口。
+- 回写 semantic checkpoint `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 对应的 PR checks、guardian verdict 与可复核证据，关闭 “evidence 不可复核” 阻断。
+- 确认 `#241` 当前 head 满足 merge gate 后执行受控合并，并核对 GitHub / `origin/main` / 分支删除状态一致。
+- `#241` 合并后切换到 `#233`，rebase `FR-0019` formal spec 分支并继续收口 `v0.6.0` operability gate matrix。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -81,12 +80,26 @@
   - 结果：已核对 `v0.6.0` 目标、必备能力与明确不在范围内列表。
 - `rg -n "v0\\.6|FR-0018|HTTP task API|same core path|submit|status|result|service surface|HTTP API" vision.md docs/roadmap-v0-to-v1.md docs`
   - 结果：已确认仓内尚无现成 `FR-0018` formal spec；直接相关权威边界来自 `v0.6.0` 路线图、`FR-0008` 与 `FR-0009`。
+- `sed -n '58,92p' docs/specs/FR-0018-http-task-api-same-core-path/spec.md`
+  - 结果：已确认最小 HTTP transport contract 已冻结 `POST /v0/tasks`、`GET /v0/tasks/{task_id}`、`GET /v0/tasks/{task_id}/result`，并明确 `202/200/400/404/409/500` 状态码映射与 shared failed envelope transport carrier。
+- `sed -n '1,80p' docs/specs/FR-0018-http-task-api-same-core-path/contracts/README.md`
+  - 结果：已确认 contracts README 与 canonical spec 对齐，固定 path-segment `task_id`、endpoint-level status/body mapping，并禁止 framework 默认 HTML / 纯文本错误页替代 shared failed envelope。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过
+  - 结果：已确认 semantic checkpoint `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 通过
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过
+  - 结果：已确认 semantic checkpoint `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 通过
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过
+  - 结果：已确认 semantic checkpoint `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-229-fr-0018-formal-spec`
+  - 结果：已确认 semantic checkpoint `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 通过
+- `gh pr view 241 --json headRefOid,mergeStateStatus,statusCheckRollup,url`
+  - 结果：已确认受审 PR `#241` 绑定 head `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1`，且 required checks 全绿；可复核锚点如下：
+    - `Validate Commit Messages`：`https://github.com/MC-and-his-Agents/Syvert/actions/runs/24850990694/job/72751066518`
+    - `Validate Docs And Guard Scripts`：`https://github.com/MC-and-his-Agents/Syvert/actions/runs/24850990732/job/72751066499`
+    - `Validate Governance Tooling`：`https://github.com/MC-and-his-Agents/Syvert/actions/runs/24850990695/job/72751066676`
+    - `Validate Spec Review Boundaries`：`https://github.com/MC-and-his-Agents/Syvert/actions/runs/24850990717/job/72751066512`
+- `python3 scripts/pr_guardian.py review 241`
+  - 结果：已确认在 head `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1` 上 verdict=`APPROVE`；此前关于最小 HTTP transport contract 冻结粒度不足与 evidence 不可复核的阻断已关闭
 
 ## 未决风险
 
@@ -97,10 +110,6 @@
 - 若 `ExecutionControlPolicy` 的 HTTP 可见性、默认值与 caller-supplied policy 非法输入边界没有在 formal spec closeout 中钉死，实现层容易在 handler 中私自补默认值或吞掉 `invalid_input`。
 - 若 `status/result` 没有明确依赖 `FR-0017` 的结构化日志、指标与 `runtime_result_refs`，后续证据链会只剩 transport 输出，无法证明未吞错、未吞观测真相。
 - 若 requirement container 与 closeout exec-plan 没有明确 `#230/#231/#232` 的串行关系，后续回合可能重复在实现中做 requirement 决策。
-- `python3 scripts/pr_guardian.py review 241`
-  - 结果：`REQUEST_CHANGES`；阻断点为 `result_not_ready` 返回契约存在包裹歧义、success 字段命名口径不一致、非法 `task_id` 分类未冻结
-- 已修复：明确 `result` 响应体本身必须直接等于共享 envelope，不得新增 `HttpTaskResultView` 包裹层；success 字段统一为 `raw` / `normalized`；冻结 `task_id` 缺失、非法、记录不存在、store/contract 异常的 shared failed envelope code 与分类边界
-
 ## 依赖与收口语义
 
 - 上游依赖：
@@ -118,7 +127,11 @@
 
 - 如需回滚，使用独立 revert PR 撤销 `docs/specs/FR-0018-http-task-api-same-core-path/`、`docs/exec-plans/FR-0018-http-task-api-same-core-path.md` 与当前 closeout exec-plan 的文档增量，不回退其他 FR 或实现改动。
 
+## checkpoint 记录方式
+
+- semantic checkpoint：`2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1`，对应最小 HTTP transport contract 与状态码映射补齐后的 formal spec 语义基线。
+- review-sync follow-up：后续若只回写当前受审 PR、门禁或审查元数据，只作为 metadata-only follow-up，不伪装成新的语义 checkpoint。
+
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `d235e37569e0d74b5005c98d302c1f165aea16c8`
-- review-sync 说明：在生成新的显式 checkpoint 之前，当前回合若只追加 PR / checks / guard / review metadata，同样按 metadata-only follow-up 处理，不伪装成新的语义 checkpoint。
+- `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1`
