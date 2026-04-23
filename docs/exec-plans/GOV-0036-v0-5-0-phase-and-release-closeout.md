@@ -140,5 +140,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `caef0abc3071d554e599fbae473b3348868a2bf0`
-- 说明：该 checkpoint 对应阶段 A release carrier 已合入主干，且 `v0.5.0` tag / GitHub Release 已建立；当前阶段 B 仅回写仓内最终发布真相与 GitHub closeout metadata。
+- `f05556581cbba094c702c659e0ac994903fbd87d`
+- 说明：最近一次真实 checkpoint 对应 `FR-0014` runtime implementation 已合入主干、`v0.5.0` 已具备 formal spec / implementation / evidence baseline 的发布前主干基线。阶段 A carrier 合入、`v0.5.0` tag / GitHub Release 建立，以及当前阶段 B metadata-only 回写都属于该 checkpoint 之后的发布收口动作，不单独改写 checkpoint head 真相。
