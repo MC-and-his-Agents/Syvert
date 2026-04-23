@@ -11,8 +11,6 @@ from syvert.registry import (
     AdapterRegistry,
     AdapterResourceRequirementDeclaration,
     RegistryError,
-    RESOURCE_DEPENDENCY_MODE_NONE,
-    approved_resource_requirement_evidence_refs_for,
 )
 from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.task_record import (
@@ -914,9 +912,7 @@ def match_resource_capabilities(input_value: ResourceCapabilityMatcherInput) -> 
     validated_input = validate_resource_capability_matcher_input(input_value)
     required_capabilities = frozenset(validated_input.requirement_declaration.required_capabilities)
     available_resource_capabilities = frozenset(validated_input.available_resource_capabilities)
-    if validated_input.requirement_declaration.resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE:
-        match_status = MATCH_STATUS_MATCHED
-    elif required_capabilities.issubset(available_resource_capabilities):
+    if required_capabilities.issubset(available_resource_capabilities):
         match_status = MATCH_STATUS_MATCHED
     else:
         match_status = MATCH_STATUS_UNMATCHED
@@ -1519,54 +1515,6 @@ def _validate_matcher_requirement_declaration(
         field_name="requirement_declaration.resource_dependency_mode",
         details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
     )
-    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE:
-        required_capabilities = _normalize_available_resource_capabilities(
-            raw_value.required_capabilities,
-            task_id=task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            field_name="requirement_declaration.required_capabilities",
-        )
-        if required_capabilities:
-            raise ResourceCapabilityMatcherContractError(
-                "matcher requirement_declaration 在 none 模式下不得声明 required_capabilities",
-                details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
-            )
-        evidence_refs = _normalize_non_empty_string_tuple(
-            raw_value.evidence_refs,
-            task_id=task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            field_name="requirement_declaration.evidence_refs",
-            allow_empty=False,
-        )
-        approved_evidence_refs = approved_resource_requirement_evidence_refs_for(
-            adapter_key=adapter_key,
-            capability=capability,
-        )
-        unknown_evidence_refs = tuple(
-            evidence_ref
-            for evidence_ref in evidence_refs
-            if evidence_ref not in approved_evidence_refs
-        )
-        if unknown_evidence_refs:
-            raise ResourceCapabilityMatcherContractError(
-                "matcher requirement_declaration.evidence_refs 必须绑定到 FR-0015 已批准共享证据",
-                details={
-                    "task_id": task_id,
-                    "adapter_key": adapter_key,
-                    "capability": capability,
-                    "unknown_evidence_refs": unknown_evidence_refs,
-                },
-            )
-        return AdapterResourceRequirementDeclaration(
-            adapter_key=adapter_key,
-            capability=capability,
-            resource_dependency_mode=resource_dependency_mode,
-            required_capabilities=required_capabilities,
-            evidence_refs=evidence_refs,
-        )
-
     try:
         registry = AdapterRegistry.from_mapping(
             {
