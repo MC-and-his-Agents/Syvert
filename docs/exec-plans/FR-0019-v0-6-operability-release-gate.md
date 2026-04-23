@@ -49,12 +49,12 @@
 
 - `issue-233-fr-0019-formal-spec` 已作为 `#233` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / scripts / release / sprint 索引。
-- 当前目标是通过 `#243` 将 rebase 到 `origin/main`（已包含 `#237`、`#239`、`#241`）后的 formal spec checkpoint 送入 spec review。
+- 当前目标是通过 `#243` 将 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e`（已包含 latest mandatory matrix 与 same-path failure metrics 字段统一）送入 spec review。
 
 ## 下一步动作
 
-- 等待 `#243` 的 required checks 与 guardian 通过。
-- 若审查仅要求 metadata-only follow-up，则在当前分支回写 review-sync 元数据；否则保持语义 checkpoint 不变进入合并。
+- 等待 `#243` 当前 review-sync head 的 required checks 与 guardian 通过。
+- 当前若只需回写 PR / checks / guardian / checkpoint metadata，统一按 metadata-only follow-up 处理，不再改写 `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 的语义。
 - spec review 通过后，由 `#234` 进入 release gate matrix implementation。
 - `#235` 负责 parent closeout，把目标、文档、审查、门禁、主干真相与 GitHub 状态收成一致。
 
@@ -89,4 +89,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8bc424f21834da91d8582555af958b695265910b`
+- `e59daf986e53f768cfa09357b7c3590db7d1ca4e`
+- review-sync 说明：后续若只回写当前受审 PR、门禁或审查元数据，只作为 metadata-only follow-up，不伪装成新的 requirement 语义 checkpoint。

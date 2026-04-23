@@ -43,11 +43,12 @@
 - `issue-233-fr-0019-formal-spec` worktree 已用于 `#233` formal spec closeout。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan。
 - 已完成初版 formal spec、plan、risks、data-model、contracts README 与两个 exec-plan 的落盘，并已 rebase 到包含 `#237`、`#239`、`#241` 的 `origin/main`。
-- 当前停点是 `#243` 已创建，等待 required checks、guardian 与 merge gate 收口。
+- 当前停点是把 live review head 之前的 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 与验证证据回写到 exec-plan，使当前 head 只承担 review-sync。
 
 ## 下一步动作
 
-- 等待 `#243` 的 required checks 完成后运行 guardian。
+- 回写 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 对应的 guard 结果与 checkpoint 元数据，确保验证结论覆盖当前语义。
+- 等待 `#243` 当前 review-sync head 的 required checks 完成后运行 guardian。
 - 若 guardian 通过，则按受控入口合并 `#243`，并核对主干真相、远端分支删除与 issue/project 状态。
 - spec review 通过后，由 `#234` 进入 release gate matrix implementation；`#235` 继续 parent closeout。
 
@@ -73,13 +74,13 @@
 - 已按本事项要求对齐 `FR-0016`、`FR-0017`、以及已合入 `origin/main` 的 `FR-0018` / `#241` 语义，并同步到 `FR-0019` gate matrix 字段级断言。
 - 已核对参考 exec-plan：`docs/exec-plans/CHORE-0138-fr-0013-formal-spec-closeout.md`。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+  - 结果：已确认 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 通过。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+  - 结果：已确认 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+  - 结果：已确认 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-233-fr-0019-formal-spec`
-  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+  - 结果：已确认 semantic checkpoint `e59daf986e53f768cfa09357b7c3590db7d1ca4e` 通过。
 - `python3 scripts/open_pr.py --class spec --issue 233 --item-key CHORE-0157-fr-0019-formal-spec-closeout ...`
   - 结果：已创建 formal spec PR `#243`，进入受控 review / CI / merge gate 链路。
 
@@ -94,6 +95,11 @@
 
 - 如需回滚，使用独立 revert PR 撤销 `FR-0019` formal spec 套件与两个 exec-plan 的文档增量，不回退其他 Work Item、相邻 FR 或 runtime 变更。
 
+## checkpoint 记录方式
+
+- semantic checkpoint：`e59daf986e53f768cfa09357b7c3590db7d1ca4e`，对应 mandatory matrix 扩表后 latest same-path failure metrics 字段统一的 formal spec 语义基线。
+- review-sync follow-up：后续若只回写当前受审 PR、门禁或审查元数据，只作为 metadata-only follow-up，不伪装成新的语义 checkpoint。
+
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `8bc424f21834da91d8582555af958b695265910b`
+- `e59daf986e53f768cfa09357b7c3590db7d1ca4e`
