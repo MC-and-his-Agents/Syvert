@@ -274,6 +274,9 @@ def execute_task_internal(
         registry = AdapterRegistry.from_mapping(adapters)
     except RegistryError as error:
         if error.code == "invalid_adapter_resource_requirements":
+            # Runtime only admits declarations that registry can materialize.
+            # Pure matcher-only `none` semantics stay unreachable here until FR-0013
+            # freezes a canonical runtime declaration baseline for that mode.
             return TaskExecutionResult(
                 failure_envelope(
                     task_id,

@@ -12,6 +12,7 @@ from unittest import mock
 import syvert.runtime as runtime_module
 from syvert.adapters.douyin import DouyinAdapter
 from syvert.adapters.xhs import XhsAdapter
+from syvert.registry import baseline_required_resource_requirement_declaration
 from syvert.resource_lifecycle import ResourceRecord
 from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
@@ -379,6 +380,28 @@ class InvalidResourceRequirementDeclarationAdapter:
             "resource_dependency_mode": "required",
             "required_capabilities": ("account", "browser_state"),
             "evidence_refs": ("fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",),
+        },
+    )
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class NoneModeResourceRequirementDeclarationAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "content_detail",
+            "resource_dependency_mode": "none",
+            "required_capabilities": (),
+            "evidence_refs": baseline_required_resource_requirement_declaration(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail",
+            ).evidence_refs,
         },
     )
 
@@ -860,6 +883,29 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             adapters={TEST_ADAPTER_KEY: InvalidResourceRequirementDeclarationAdapter()},
             task_id_factory=lambda: "task-bad-resource-requirement",
         )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_resource_requirement")
+        self.assertEqual(
+            envelope["error"]["details"]["registry_error_code"],
+            "invalid_adapter_resource_requirements",
+        )
+
+    def test_execute_task_keeps_none_mode_declarations_unreachable_until_registry_baseline_exists(self) -> None:
+        with mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=AssertionError("acquire should not run for none-mode runtime declarations"),
+        ):
+            envelope = execute_task(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/posts/none-mode-runtime-path"),
+                ),
+                adapters={TEST_ADAPTER_KEY: NoneModeResourceRequirementDeclarationAdapter()},
+                task_id_factory=lambda: "task-none-mode-runtime-path",
+            )
 
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
