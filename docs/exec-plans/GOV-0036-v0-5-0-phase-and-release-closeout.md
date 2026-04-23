@@ -25,13 +25,12 @@
   - `docs/decisions/ADR-GOV-0036-v0-5-0-phase-and-release-closeout.md`
   - `docs/releases/v0.5.0.md`
   - `docs/sprints/2026-S18.md`
-  - GitHub `#188/#189/#190/#191/#215` 的 issue 正文、关闭语义与最终评论对齐
-  - git tag `v0.5.0`
-  - GitHub Release `v0.5.0`
 - 本次不纳入：
   - 任何新的 runtime / adapter / test 实现
   - `FR-0013` / `FR-0014` / `FR-0015` formal spec 语义改写
   - `v0.6.0` 规划或跨版本治理重构
+  - 阶段 B 的 tag / GitHub Release 建立
+  - GitHub `#188/#189/#190/#191/#215` 的最终 closeout 对账与关闭
 
 ## 当前停点
 
