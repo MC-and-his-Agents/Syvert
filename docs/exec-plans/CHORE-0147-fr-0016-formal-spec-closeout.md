@@ -1,0 +1,103 @@
+# CHORE-0147-fr-0016-formal-spec-closeout 执行计划
+
+## 关联信息
+
+- item_key：`CHORE-0147-fr-0016-formal-spec-closeout`
+- Issue：`#223`
+- item_type：`CHORE`
+- release：`v0.6.0`
+- sprint：`2026-S19`
+- 关联 spec：`docs/specs/FR-0016-minimal-execution-controls/`
+- 关联 PR：`#237`
+- 状态：`active`
+- active 收口事项：`CHORE-0147-fr-0016-formal-spec-closeout`
+
+## 目标
+
+- 建立并收口 `FR-0016` formal spec 套件，冻结 `ExecutionControlPolicy`、attempt timeout、基础 retry 与 fail-fast concurrency gate 的最小运行时 contract。
+
+## 范围
+
+- 本次纳入：
+  - `docs/specs/FR-0016-minimal-execution-controls/`
+  - `docs/exec-plans/FR-0016-minimal-execution-controls.md`
+  - `docs/exec-plans/CHORE-0147-fr-0016-formal-spec-closeout.md`
+- 本次不纳入：
+  - `syvert/**`
+  - `tests/**`
+  - `scripts/**`
+  - `.github/**`
+  - HTTP API、runtime timeout / retry / concurrency 实现、release gate runtime、release / sprint 索引与 GitHub closeout
+
+## 当前停点
+
+- `issue-223-fr-0016-formal-spec` 已作为 `#223` 的独立 spec worktree 建立。
+- 当前回合只允许修改 `FR-0016` formal spec 套件与两个 exec-plan，禁止越界到 runtime、tests、HTTP API 或相邻 FR。
+- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `8d1b56183fc18c21454c461f1102baa26123bedf`，覆盖 retry / concurrency / default policy、timeout closeout、policy validation 分类、platform retry 收窄与 control-plane failure 分类的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
+
+## 下一步动作
+
+- 在 PR `#237` 上消费 GitHub checks、spec review、guardian 与 merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的 requirement 语义变更。
+
+## 当前 checkpoint 推进的 release 目标
+
+- 为 `v0.6.0` 把最小执行控制从调用方/adapter 私有细节收敛为 Core-owned formal contract，使后续 runtime、observability、HTTP API 与 gate matrix 都能消费同一控制语义。
+
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`FR-0016` 的 formal spec closeout Work Item。
+- 阻塞：
+  - 若 timeout / retry / concurrency contract 不冻结，`FR-0017` 无法稳定记录控制结果，`FR-0018` HTTP API 也无法证明没有绕过 Core。
+  - 若当前 spec 把 retry 或 concurrency 扩张为 DSL / queue / scheduler，会越过 `v0.6.0` 最小边界并阻塞后续实现。
+
+## 已验证项
+
+- 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 的 formal spec 与 Work Item 边界。
+- 已核对 `FR-0005` 错误模型、`FR-0008` TaskRecord、`FR-0009` CLI/Core 同路径、`FR-0010` 到 `FR-0015` 资源相关 contract。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-223-fr-0016-formal-spec`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 223 --item-key CHORE-0147-fr-0016-formal-spec-closeout --item-type CHORE --release v0.6.0 --sprint 2026-S19 --title 'docs(spec): 收口 FR-0016 最小执行控制 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#237 https://github.com/MC-and-his-Agents/Syvert/pull/237`
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 字段漂移、attempt outcome 与 admission/聚合事实混用、缺少数据迁移说明
+- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，改由 Core-owned retryable predicate 承载重试判断；新增 `ExecutionControlEvent(event_type=admission_concurrency_rejected | retry_concurrency_rejected | retry_exhausted)`；补充数据模型与迁移说明
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 post-accepted retry 重新获取 concurrency slot 的状态转移未闭合、`on_limit` public contract 不一致、默认 policy 未冻结
+- 已修复：冻结完整默认 `ExecutionControlPolicy`；将 `on_limit=reject` 定义为 caller-visible required field；补充 `retry_concurrency_rejected` control event 与同一 TaskRecord failed 终态语义
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 在仍有预算时仍被写成可选推进
+- 已修复：明确 retryable outcome 且 `attempt_index < max_attempts` 时，Core 必须等待 `backoff_ms` 后启动下一 attempt，只有 success、不可重试失败、预算耗尽或 retry slot reacquire 被拒绝可终止任务
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 active exec-plan checkpoint 仍指向早期语义状态
+- 已修复：当轮将 latest semantic checkpoint 刷新到当时最新语义提交；后续 checkpoint 会随新的 guardian 语义修复继续前移
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 timeout quarantine 与 concurrency slot 释放/重试启动冲突，以及 caller-visible policy validation 被归入 `runtime_contract`
+- 已修复：timeout deadline 只进入 closeout，完成 late-result quarantine、资源释放/失效与 slot release 后才形成 retryable `execution_timeout`；caller-supplied policy 形状/值错误归入 `invalid_input`，Core 默认/内部控制状态失败才归入 `runtime_contract`
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retry contract 过度批准全部 `platform` 失败，以及正常 timeout / concurrency control-plane failure 被默认投影为 `runtime_contract`
+- 已修复：retryable predicate 收窄为完成 closeout 的 `execution_timeout` 与显式 `error.details.retryable=true` 的 transient `platform` 失败，并增加 Core idempotency safety gate；正常 `execution_timeout` 在 adapter execution 已进入平台语义边界且 closeout 安全完成时投影为 `platform`，pre-accepted concurrency rejection 投影为 `invalid_input`，post-accepted retry reacquire rejection 仅作为 control event/details 收口且不改写上一 attempt 的终态错误分类
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 control-state failure code 未在 formal contract 中闭合，以及 exec-plan 使用了不在 formal 枚举内的事件简称
+- 已修复：冻结唯一 canonical control-state failure code 为 `execution_control_state_invalid`，并将 exec-plan 中的事件命名与 formal `ExecutionControlEvent` 枚举对齐
+
+## 未决风险
+
+- timeout 若落在 adapter 私有层，后续 CLI / HTTP / TaskRecord 无法共享同一运行时真相。
+- retry 若默认覆盖整个 `platform` category、`invalid_input`、`unsupported` 或一般 `runtime_contract`，会掩盖 deterministic failure 或 contract violation。
+- concurrency 若引入 queue / priority / fairness，会提前进入调度器语义并扩大 HTTP API 范围。
+- late completion 若能改写终态，会破坏 TaskRecord durable truth 与 guardian / gate 可复验性。
+
+## 回滚方式
+
+- 如需回滚，使用独立 revert PR 撤销 `FR-0016` formal spec 套件与当前 closeout exec-plan 的文档增量，不回退其他 FR、runtime 或治理工件。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `8d1b56183fc18c21454c461f1102baa26123bedf`
