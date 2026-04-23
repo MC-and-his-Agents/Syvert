@@ -932,7 +932,7 @@ def match_resource_capabilities(input_value: ResourceCapabilityMatcherInput) -> 
 def validate_resource_capability_matcher_input(
     input_value: ResourceCapabilityMatcherInput,
 ) -> ResourceCapabilityMatcherInput:
-    if not isinstance(input_value, ResourceCapabilityMatcherInput):
+    if type(input_value) is not ResourceCapabilityMatcherInput:
         raise ResourceCapabilityMatcherContractError(
             "matcher 输入必须为 ResourceCapabilityMatcherInput",
             details={"actual_type": type(input_value).__name__},
@@ -1482,7 +1482,7 @@ def _validate_matcher_requirement_declaration(
     expected_capability: str,
     task_id: str,
 ) -> AdapterResourceRequirementDeclaration:
-    if not isinstance(raw_value, AdapterResourceRequirementDeclaration):
+    if type(raw_value) is not AdapterResourceRequirementDeclaration:
         raise ResourceCapabilityMatcherContractError(
             "matcher requirement_declaration 必须是 AdapterResourceRequirementDeclaration",
             details={"task_id": task_id, "actual_type": type(raw_value).__name__},

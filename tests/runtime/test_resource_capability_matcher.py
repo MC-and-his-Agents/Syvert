@@ -142,6 +142,49 @@ class ResourceCapabilityMatcherTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_resource_requirement")
 
+    def test_matcher_rejects_subclassed_matcher_input_carrier(self) -> None:
+        class ShadowMatcherInput(ResourceCapabilityMatcherInput):
+            pass
+
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ShadowMatcherInput(
+                    task_id="task-match-shadow-input-subclass",
+                    adapter_key="xhs",
+                    capability="content_detail",
+                    requirement_declaration=baseline_required_resource_requirement_declaration(
+                        adapter_key="xhs",
+                        capability="content_detail",
+                    ),
+                    available_resource_capabilities=("account", "proxy"),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
+
+    def test_matcher_rejects_subclassed_requirement_declaration_carrier(self) -> None:
+        class ShadowRequirementDeclaration(AdapterResourceRequirementDeclaration):
+            pass
+
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ResourceCapabilityMatcherInput(
+                    task_id="task-match-shadow-declaration-subclass",
+                    adapter_key="xhs",
+                    capability="content_detail",
+                    requirement_declaration=ShadowRequirementDeclaration(
+                        adapter_key="xhs",
+                        capability="content_detail",
+                        resource_dependency_mode="required",
+                        required_capabilities=("account", "proxy"),
+                        evidence_refs=("xhs:content_detail:account", "xhs:content_detail:proxy"),
+                    ),
+                    available_resource_capabilities=("account", "proxy"),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
+
 
 if __name__ == "__main__":
     unittest.main()
