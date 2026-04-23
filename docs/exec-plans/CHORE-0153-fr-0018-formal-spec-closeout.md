@@ -4,6 +4,7 @@
 
 - item_key：`CHORE-0153-fr-0018-formal-spec-closeout`
 - Issue：`#229`
+- FR Issue：`#221`
 - item_type：`CHORE`
 - release：`v0.6.0`
 - sprint：`2026-S19`

@@ -44,6 +44,11 @@
     - 约束：可选数组；若 durable record 或共享结果已记录相关 ref，HTTP status 视图不得裁剪或改名这些引用
   - `execution_control_events`
     - 约束：可选投影视图；若共享路径已把控制结果固化为 `ExecutionControlEvent`，HTTP 只能透传其共享事实，不得改写为 transport 私有状态机
+  - 失败映射
+    - 约束：若请求缺少 `task_id`，必须返回 `invalid_input` 的 shared failed envelope
+    - 约束：若 `task_id` 形状非法或不满足共享任务键 contract，必须返回 `invalid_task_id` / `runtime_contract` 的 shared failed envelope
+    - 约束：若 `task_id` 对应 durable record 不存在，必须返回 `task_record_not_found` / `invalid_input` 的 shared failed envelope
+    - 约束：若 store、record contract、closeout/control-state truth 或共享序列化不可信，必须返回 `task_record_unavailable` / `runtime_contract` 的 shared failed envelope
 - `HttpTaskResultView`
   - 响应体
     - 约束：必须直接等于共享 envelope，而不是 `{task_id, record_status, result_envelope}` 形式的 transport 包裹对象

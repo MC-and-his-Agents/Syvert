@@ -65,7 +65,10 @@
 - `status`
   - 成功：返回 durable `TaskRecord` 的当前状态视图，最少可回映 `task_id`、`status`、`created_at`、`updated_at`、`terminal_at?`
   - 成功：若共享 truth 已持有 `ExecutionControlEvent` 或 `runtime_result_refs`，HTTP 不得吞掉这些字段
-  - 失败：record 不存在、不可用、control-state truth 不可信或请求非法时，复用 shared failed envelope
+  - `task_id` 缺失：返回 `invalid_input` 的 shared failed envelope
+  - `task_id` 形状非法或不满足共享任务键 contract：返回 `invalid_task_id` / `runtime_contract` 的 shared failed envelope
+  - `task_id` 不存在 durable record：返回 `task_record_not_found` / `invalid_input` 的 shared failed envelope
+  - record / store / closeout-control-state truth / 共享序列化不可信：返回 `task_record_unavailable` / `runtime_contract` 的 shared failed envelope
 - `result`
   - `record.status=succeeded`：直接返回 durable success envelope，继续包含共享字段 `raw` 与 `normalized`
   - `record.status=failed`：返回 durable failed envelope，并继续保留共享 `error.category` / `error.code` / `error.details`
@@ -73,7 +76,7 @@
   - `task_id` 缺失：返回 `invalid_input` 的 shared failed envelope
   - `task_id` 形状非法或不满足共享任务键 contract：返回 `invalid_task_id` / `runtime_contract` 的 shared failed envelope
   - `task_id` 不存在 durable record：返回 `task_record_not_found` / `invalid_input` 的 shared failed envelope
-  - store / record contract / 共享序列化不可用：返回 `task_record_unavailable` / `runtime_contract` 的 shared failed envelope
+  - store / record contract / closeout-control-state truth / 共享序列化不可用：返回 `task_record_unavailable` / `runtime_contract` 的 shared failed envelope
   - 若共享结果中已有 `runtime_result_refs`：HTTP 必须继续透传这些 ref
 
 ## Fail-Closed Cases
