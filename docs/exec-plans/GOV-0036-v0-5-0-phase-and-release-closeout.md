@@ -9,7 +9,7 @@
 - sprint：`2026-S18`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0036-v0-5-0-phase-and-release-closeout.md`
-- 关联 PR：待创建
+- 关联 PR：`#216`
 - 状态：`active`
 - active 收口事项：`GOV-0036-v0-5-0-phase-and-release-closeout`
 
