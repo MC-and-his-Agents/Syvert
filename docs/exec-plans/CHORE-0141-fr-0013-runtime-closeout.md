@@ -8,7 +8,7 @@
 - release：`v0.5.0`
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0013-adapter-resource-requirement-declaration/`
-- 关联 PR：`待补充`
+- 关联 PR：`#213`
 - 状态：`active`
 - active 收口事项：`CHORE-0141-fr-0013-runtime-closeout`
 
@@ -42,13 +42,13 @@
   - `AdapterResourceRequirementDeclaration` 已在 registry 层落地 canonical carrier、discover/lookup API 与 fail-closed 校验。
   - xhs / douyin reference adapter 已声明 `content_detail -> required [account, proxy]` baseline declaration，并绑定到 `FR-0015` frozen evidence baseline。
   - declaration contract tests、registry tests、resource capability evidence tests 与运行时回归已经通过。
-  - 待完成提交、推送、`open_pr`、guardian 与 merge gate。
+  - 当前受审 implementation PR 已创建为 `#213`，待 guardian 与 merge gate。
   - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `db3e5b3642f58f4d2fdad7802b8d99670b6da2c9` 对应的实现 checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
 - 提交当前 implementation 增量并推送 `issue-195-fr-0013`。
-- 通过受控入口创建 implementation PR，回填 PR 编号与 head 绑定状态。
+- 对 `#213` 运行 guardian review，并同步最新 verdict / merge gate 状态。
 - 运行 guardian review；若存在阻断，按根因继续收口；若 `APPROVE`，进入 `merge-if-safe`。
 - 在合入后同步 `#195`、exec-plan、PR、guardian 与 main 真相。
 
@@ -80,6 +80,10 @@
   - 结果：当前工作树尚未形成提交时返回“当前分支相对基线没有变更，无法创建或校验 PR”；待提交后复跑
 - `python3 scripts/governance_gate.py --mode ci --base-sha \"$(git merge-base origin/main HEAD)\" --head-sha \"$(git rev-parse HEAD)\" --head-ref issue-195-fr-0013`
   - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 195 --item-key CHORE-0141-fr-0013-runtime-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'feat(runtime): 落地 FR-0013 适配器资源需求声明' --base main --closing fixes --dry-run`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 195 --item-key CHORE-0141-fr-0013-runtime-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'feat(runtime): 落地 FR-0013 适配器资源需求声明' --base main --closing fixes`
+  - 结果：已创建当前受审 implementation PR `#213 https://github.com/MC-and-his-Agents/Syvert/pull/213`
 
 ## 未决风险
 
