@@ -9,7 +9,7 @@
 - sprint：`2026-S18`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0036-v0-5-0-phase-and-release-closeout.md`
-- 关联 PR：`#216`
+- 关联 PR：`#216`、`#217`
 - 状态：`active`
 - active 收口事项：`GOV-0036-v0-5-0-phase-and-release-closeout`
 
@@ -36,31 +36,33 @@
 
 - `origin/main@f05556581cbba094c702c659e0ac994903fbd87d` 已包含 `v0.5.0` 所需的全部 formal spec、runtime、evidence rerun 与顶层定位治理：PR `#198/#199/#200/#207/#208/#212/#213/#214`。
 - `#192/#193/#194/#195/#196/#205/#206/#211` 均已关闭，`v0.5.0` 的 formal spec、implementation 与 evidence 基线已经完成。
-- `#188/#189/#190/#191` 仍为 `OPEN`，仓库尚无 `docs/releases/v0.5.0.md`、`docs/sprints/2026-S18.md`、`v0.5.0` tag 与 GitHub Release `v0.5.0`。
+- 阶段 A docs carrier 已由 PR `#216` 合入主干，merge commit 为 `caef0abc3071d554e599fbae473b3348868a2bf0`。
+- `v0.5.0` tag 与 GitHub Release `v0.5.0` 已建立。
+- `#188/#189/#190/#191` 仍为 `OPEN`，当前仅剩 GitHub closeout 对账与关闭动作。
 - `#215` 已建立为承接 `v0.5.0` phase / release closeout 的合法治理 Work Item。
 - 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-215-v0-5-0`，当前分支为 `issue-215-v0-5-0`。
-- 当前回合先进入阶段 A：建立 release / sprint / decision / exec-plan carrier，不提前宣称正式发布完成真相。
+- 当前执行现场已进入阶段 B published-truth follow-up：phase A carrier 已合入主干，`v0.5.0` tag 与 GitHub Release 已建立，当前 PR `#217` 只负责把仓内索引与 active exec-plan 回写到 published truth，并为后续 GitHub closeout 对账提供一致基线。
 
 ## 下一步动作
 
-- 在当前分支建立 `v0.5.0` 的 release / sprint / decision / exec-plan carrier。
-- 通过受控 docs PR 合入阶段 A closeout carrier。
-- 阶段 A 合入后在主干建立 `v0.5.0` tag 与 GitHub Release。
-- 继续同一 Work Item 的阶段 B metadata-only/docs PR，回写正式发布完成真相。
+- 在当前分支把 release / sprint 索引与 active exec-plan 同步到正式发布完成真相。
+- 通过受控 docs PR 合入阶段 B metadata-only/docs follow-up。
 - 完成 `#188/#189/#190/#191/#215` 的 GitHub closeout 对账与关闭。
 
 ## 当前 checkpoint 推进的 release 目标
 
-- 为 `v0.5.0` 建立正式发布前的仓内 closeout carrier，使后续 tag / GitHub Release 与 GitHub closeout 有单一落点可以对齐。
+- 为 `v0.5.0` 完成“从功能收口到正式发布”的最后一段链路，使 release/sprint 索引、发布锚点与 GitHub closeout 进入一致完成态。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`v0.5.0` 的 phase / release 发布 closeout Work Item。
 - 阻塞：
-  - 阶段 A 不能误写成已发布完成态；当前主干还没有 `v0.5.0` tag / GitHub Release。
-  - 阶段 B 必须基于阶段 A 已合入的主干提交建立发布锚点，不能让 tag 指向非主干事实。
+- 阶段 B 需要把 `#216/caef0ab...` 与最终 published truth 严格区分，不能误写成仓内最终发布真相已经由阶段 A 单独完成。
+- active `exec-plan` 需要把阶段 A 的历史基线与阶段 B 当前验证结果按 phase 隔离，避免 review 输入混写。
 
 ## 已验证项
+
+### 阶段 A 基线验证
 
 - `GH_TOKEN=\"$GH_TOKEN\" gh issue view 188 --json state`
   - 结果：`#188` 为 `OPEN`
@@ -74,6 +76,37 @@
   - 结果：当前不存在 `v0.5.0` GitHub Release
 - `git tag --list 'v0.5.0'`
   - 结果：当前未找到 `v0.5.0`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `python3 scripts/governance_gate.py --mode ci --base-sha \"$(git merge-base origin/main HEAD)\" --head-sha \"$(git rev-parse HEAD)\" --head-ref issue-215-v0-5-0`
+  - 结果：通过
+- `GH_TOKEN=\"$GH_TOKEN\" python3 scripts/open_pr.py --class docs --issue 215 --item-key GOV-0036-v0-5-0-phase-and-release-closeout --item-type GOV --release v0.5.0 --sprint 2026-S18 --title 'docs(release): 建立 v0.5.0 发布收口 carrier' --base main --closing fixes --dry-run`
+  - 结果：通过
+- `GH_TOKEN=\"$GH_TOKEN\" python3 scripts/open_pr.py --class docs --issue 215 --item-key GOV-0036-v0-5-0-phase-and-release-closeout --item-type GOV --release v0.5.0 --sprint 2026-S18 --title 'docs(release): 建立 v0.5.0 发布收口 carrier' --base main --closing fixes`
+  - 结果：已创建 PR `#216`
+- guardian review（绑定 PR `#216` 最新受审 head）
+  - 结果：`APPROVE`
+- `GH_TOKEN=\"$GH_TOKEN\" gh pr view 216 --json state,mergedAt`
+  - 结果：PR `#216` 已 `MERGED`，merge commit 为 `caef0abc3071d554e599fbae473b3348868a2bf0`
+
+### 阶段 B 当前验证
+
+- `git -C /Users/mc/dev/syvert pull --ff-only origin main`
+  - 结果：本地主仓库 `main` 已 fast-forward 到 `caef0abc3071d554e599fbae473b3348868a2bf0`
+- `git -C /Users/mc/dev/syvert tag -a v0.5.0 -m 'v0.5.0' caef0abc3071d554e599fbae473b3348868a2bf0`
+  - 结果：已在阶段 A merge commit 上创建 annotated tag `v0.5.0`
+- `git -C /Users/mc/dev/syvert push origin v0.5.0`
+  - 结果：已推送 tag `v0.5.0`
+- `GH_TOKEN=\"$GH_TOKEN\" gh release create v0.5.0 --repo MC-and-his-Agents/Syvert --title 'v0.5.0' --notes-file /tmp/v0.5.0-release.md`
+  - 结果：已创建 GitHub Release `v0.5.0`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：当前阶段 B 变更已通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：当前阶段 B 变更已通过
 
 ## closeout 证据
 
@@ -84,11 +117,12 @@
   - `GOV-0035` 顶层定位治理已由 PR `#207` 合入主干
 - 当前发布前基线：
   - `origin/main@f05556581cbba094c702c659e0ac994903fbd87d`
+- 发布锚点证据：
+  - `v0.5.0` tag 已创建并推送
+  - GitHub Release `v0.5.0` 已创建
 
 ## 剩余 closeout 动作
 
-- 合入阶段 A docs carrier PR
-- 建立 `v0.5.0` tag 与 GitHub Release
 - 合入阶段 B metadata-only/docs PR
 - 回写并关闭 `#188/#189/#190/#191/#215`
 
@@ -107,4 +141,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `f05556581cbba094c702c659e0ac994903fbd87d`
-- 说明：该 checkpoint 对应 `v0.5.0` 的 formal spec、implementation、evidence 与治理前置都已合入主干，但尚未建立正式发布锚点。
+- 说明：最近一次真实 checkpoint 对应 `FR-0014` runtime implementation 已合入主干、`v0.5.0` 已具备 formal spec / implementation / evidence baseline 的发布前主干基线。阶段 A carrier 合入、`v0.5.0` tag / GitHub Release 建立，以及当前阶段 B metadata-only 回写都属于该 checkpoint 之后的发布收口动作，不单独改写 checkpoint head 真相。
