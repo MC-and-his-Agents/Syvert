@@ -9,7 +9,7 @@
 - sprint：`2026-S18`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0036-v0-5-0-phase-and-release-closeout.md`
-- 关联 PR：`#216`、阶段 B published-truth follow-up（当前分支待创建）
+- 关联 PR：`#216`、`#217`
 - 状态：`active`
 - active 收口事项：`GOV-0036-v0-5-0-phase-and-release-closeout`
 
@@ -40,8 +40,8 @@
 - `v0.5.0` tag 与 GitHub Release `v0.5.0` 已建立。
 - `#188/#189/#190/#191` 仍为 `OPEN`，当前仅剩 GitHub closeout 对账与关闭动作。
 - `#215` 已建立为承接 `v0.5.0` phase / release closeout 的合法治理 Work Item。
-- 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-215-v0-5-0`，当前分支为 `issue-215-v0-5-0-phase-b`。
-- 当前执行现场已进入阶段 B published-truth follow-up：phase A carrier 已合入主干，`v0.5.0` tag 与 GitHub Release 已建立，当前分支只负责把仓内索引与 active exec-plan 回写到正式发布完成真相。
+- 当前执行现场为独立 worktree：`/Users/mc/code/worktrees/syvert/issue-215-v0-5-0`，当前分支为 `issue-215-v0-5-0`。
+- 当前执行现场已进入阶段 B published-truth follow-up：phase A carrier 已合入主干，`v0.5.0` tag 与 GitHub Release 已建立，当前 PR `#217` 只负责把仓内索引与 active exec-plan 回写到 published truth，并为后续 GitHub closeout 对账提供一致基线。
 
 ## 下一步动作
 
