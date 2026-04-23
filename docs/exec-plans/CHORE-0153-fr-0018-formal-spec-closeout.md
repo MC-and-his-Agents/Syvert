@@ -36,7 +36,7 @@
 - `issue-229-fr-0018-formal-spec` 已作为 `#229` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0018` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / 相邻 FR。
 - 本轮目标是把 HTTP `submit/status/result` service surface、same-core-path 边界、`TaskRecord` durable truth 复用约束、`FR-0016` control 语义投影、`FR-0017` observability 依赖、风险与后续拆分一次性落盘到 implementation-ready formal spec。
-- 当前 formal spec 语义基线以 `49b1e4a3fa1dc61b8ffb866c50293bd8843d2fb4` 为恢复起点；在形成新的显式 checkpoint 前，后续 metadata-only 同步不改写该基线口径。
+- 当前 formal spec 语义基线以 `1b4da09413a82a7c52e8324f2e45d4dc8587336c` 为恢复起点；在形成新的显式 checkpoint 前，后续 metadata-only 同步不改写该基线口径。
 
 ## 下一步动作
 
@@ -116,5 +116,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `49b1e4a3fa1dc61b8ffb866c50293bd8843d2fb4`
+- `1b4da09413a82a7c52e8324f2e45d4dc8587336c`
 - review-sync 说明：在生成新的显式 checkpoint 之前，当前回合若只追加 PR / checks / guard / review metadata，同样按 metadata-only follow-up 处理，不伪装成新的语义 checkpoint。
