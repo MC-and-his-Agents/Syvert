@@ -915,6 +915,39 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             "invalid_adapter_resource_requirements",
         )
 
+    def test_execute_task_rejects_invalid_runtime_capability_projection_before_task_record(self) -> None:
+        with mock.patch.dict(
+            runtime_module.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
+            {
+                (
+                    runtime_module.CONTENT_DETAIL_BY_URL,
+                    runtime_module.LEGACY_COLLECTION_MODE,
+                ): ("account", "browser_state")
+            },
+            clear=True,
+        ), mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=AssertionError("acquire should not run for invalid runtime capability projections"),
+        ):
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/posts/invalid-runtime-capability-projection"),
+                ),
+                adapters={TEST_ADAPTER_KEY: NeverCalledAdapter()},
+                task_id_factory=lambda: "task-invalid-runtime-capability-projection",
+            )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "invalid_resource_requirement")
+        self.assertEqual(
+            outcome.envelope["error"]["details"]["unknown_capabilities"],
+            ("browser_state",),
+        )
+        self.assertIsNone(outcome.task_record)
+
     def test_execute_task_returns_resource_unavailable_when_runtime_capability_projection_is_unmatched(self) -> None:
         with mock.patch.dict(
             runtime_module.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,

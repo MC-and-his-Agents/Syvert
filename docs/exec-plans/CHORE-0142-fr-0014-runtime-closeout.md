@@ -21,6 +21,7 @@
 ## 范围
 
 - 本次纳入：
+  - `syvert/registry.py`
   - `syvert/runtime.py`
   - `docs/exec-plans/CHORE-0142-fr-0014-runtime-closeout.md`
   - `tests/runtime/test_resource_capability_matcher.py`
@@ -46,9 +47,10 @@
 - 当前实现 checkpoint：`ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6`
 - 当前状态：
   - `syvert/runtime.py` 已新增 canonical matcher surface：`ResourceCapabilityMatcherInput`、`ResourceCapabilityMatchResult`、`match_resource_capabilities(...)`、`resolve_runtime_available_resource_capabilities(...)`。
-  - `execute_task_internal()` 已消费 `lookup_resource_requirement(adapter_key, capability_family)`，并在 acquire 前完成 matcher gate：缺声明/坏声明/坏 projection 收口为 `invalid_resource_requirement`，合法但不满足声明的情况收口为 `resource_unavailable`。
+  - `execute_task_internal()` 已消费 `lookup_resource_requirement(adapter_key, capability_family)`，并在 acquire 前完成 matcher gate：缺声明、坏声明以及未批准 capability projection 收口为 `invalid_resource_requirement`，合法但不满足声明的情况收口为 `resource_unavailable`。
   - runtime-reaching stub / CLI / contract harness 夹具已统一迁移到可追溯的 `xhs` canonical declaration truth，避免继续依赖无效 `stub`/`fake:*` baseline。
-  - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已在实现 checkpoint `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 上通过。
+  - `syvert/registry.py` 已补充 matcher 复用的 approved evidence refs 入口，避免为 `none` 语义另造第二套 evidence 真相。
+  - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已覆盖：required/unmatched、未批准 projection fail-closed、pure matcher `none` 语义与 runtime entrypoint 的当前 registry baseline 边界。
   - 当前 implementation PR 已创建为 `#214`，当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 对应的 implementation checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
@@ -73,7 +75,7 @@
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool`
   - 结果：`Ran 278 tests in 5.435s`，`OK`
 - `python3 -m unittest tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
-  - 结果：在 checkpoint `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 上 `Ran 230 tests in 5.332s`，`OK`
+  - 结果：当前受审实现已覆盖 matcher / runtime / 未批准 projection / adapter regression 路径；最新本地复跑 `Ran 245 tests in 5.382s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
