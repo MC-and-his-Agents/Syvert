@@ -56,7 +56,7 @@
   - `adapter_key` / `capability`
     - 约束：必须与共享请求上下文一致
   - `started_at` / `ended_at`
-    - 约束：RFC3339 UTC 时间；`ended_at` 不得早于 `started_at`
+    - 约束：RFC3339 UTC 时间；`ended_at` 不得早于 `started_at`；timeout outcome 的 `ended_at` 表示 timeout closeout、late-result quarantine、资源释放/失效与 slot release 已完成的时间，而不是 deadline 到达时间
   - `outcome`
     - 约束：只允许 `succeeded`、`failed`、`timeout`
   - `terminal_envelope`
@@ -88,17 +88,23 @@
   - 已 accepted 任务的 retry attempt 重新获取 slot 失败时，创建 `ExecutionControlEvent(event_type=retry_concurrency_rejected)`，并把同一 TaskRecord 收口为 failed
 - 更新：
   - 每次 attempt 只能产生一个 outcome
-  - timeout、adapter failure 或 success 都必须结束当前 attempt 并释放 concurrency slot
-  - 若 outcome 属于 Core 固定 retryable outcome rule，且 `attempt_index < max_attempts`，Core 必须等待 `retry.backoff_ms` 后进入下一个 attempt；只有 success、不可重试失败、retry 预算耗尽或 retry slot reacquire 被拒绝可以终止同一 TaskRecord
+  - adapter failure 或 success 必须结束当前 attempt 并释放 concurrency slot；timeout 必须先完成 closeout、late-result quarantine、资源释放/失效与 slot release，之后才形成 `execution_timeout` outcome
+  - 若 outcome 属于 Core 固定 retryable outcome rule，且 `attempt_index < max_attempts`，Core 必须在前一 attempt 已安全释放 slot 后等待 `retry.backoff_ms`，再进入下一个 attempt；只有 success、不可重试失败、timeout closeout failure、retry 预算耗尽或 retry slot reacquire 被拒绝可以终止同一 TaskRecord
 - 失效/归档：
   - attempt outcome 不单独成为 durable task truth；它只能作为 TaskRecord 日志、failed envelope details、结构化日志或指标的输入
-  - 若 late completion 在 timeout 后到达，它不得重新激活 attempt，也不得改写 TaskRecord 终态
+  - 若 late completion 在 timeout deadline 后到达，它必须被 quarantine；不得重新激活 attempt，也不得改写 TaskRecord 终态
 
 ## 错误口径投影
 
 - `execution_timeout`
-  - 触发条件：attempt deadline 已过，Core 未得到可信成功或失败结果
+  - 触发条件：attempt deadline 已过，Core 未得到可信成功或失败结果，且 timeout closeout、late-result quarantine、资源释放/失效与 slot release 已完成
   - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
+- caller-supplied policy violation
+  - 触发条件：调用方显式传入的 `ExecutionControlPolicy` 缺必需字段、字段类型非法或字段值越界
+  - 错误分类：复用 `FR-0005` 的 `invalid_input`，不得归入 `runtime_contract`
+- Core default/control state violation
+  - 触发条件：Core 默认 policy 物化失败、slot accounting 不可信、timeout closeout 无法安全完成或内部控制状态冲突
+  - 错误分类：复用 `FR-0005` 的 `runtime_contract`
 - `concurrency_limit_exceeded`
   - 触发条件：目标 scope 已达到 `max_in_flight`，且 `on_limit=reject`
   - 载体：pre-accepted 拒绝必须作为 `ExecutionControlEvent(event_type=admission_concurrency_rejected)` 或 failed envelope details 出现且 `task_record_ref=none`；post-accepted retry reacquire 拒绝必须作为 `ExecutionControlEvent(event_type=retry_concurrency_rejected)` 出现并引用同一 TaskRecord

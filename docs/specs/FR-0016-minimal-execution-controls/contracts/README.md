@@ -14,7 +14,7 @@
 
 - 字段：`timeout_ms`
 - 值域：正整数毫秒
-- 语义：单次 adapter execution attempt 的 deadline
+- 语义：单次 adapter execution attempt 的 deadline；deadline 到达后必须先完成 timeout closeout、late-result quarantine、资源释放/失效与 slot release，之后才形成 retryable timeout outcome
 - 失败 code：`execution_timeout`
 - 禁止：total deadline、无限 timeout 表达、adapter 私有 timeout 替代 Core timeout
 
@@ -41,5 +41,6 @@
 - attempt 不单独创建 durable TaskRecord。
 - durable `accepted` 前发生的 concurrency rejection 不创建伪造 TaskRecord。
 - durable `accepted` 后发生的 retry slot reacquire rejection 必须把同一 TaskRecord 收口为 `failed`，使用 `concurrency_limit_exceeded`，且不得再继续 retry。
+- caller-supplied policy 形状或值错误使用 `invalid_input`；Core 默认 policy、slot accounting 或 timeout closeout 内部状态失效使用 `runtime_contract`。
 - timeout / retry / concurrency 失败继续复用 `FR-0005` failed envelope 顶层结构。
 - 成功结果不改写 `raw` / `normalized` contract。
