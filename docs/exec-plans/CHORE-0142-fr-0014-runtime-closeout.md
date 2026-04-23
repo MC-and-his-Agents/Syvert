@@ -44,14 +44,14 @@
 
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-196-fr-0014-core`
 - 当前分支：`issue-196-fr-0014-core`
-- 当前实现 checkpoint：`5f9d5d821882490071ec624979840d75c36311a5`
+- 当前实现 checkpoint：`e4e8f1dc896b681db632ab1409b41ec451c5f70d`
 - 当前状态：
   - `syvert/runtime.py` 已新增 canonical matcher surface：`ResourceCapabilityMatcherInput`、`ResourceCapabilityMatchResult`、`match_resource_capabilities(...)`、`resolve_runtime_available_resource_capabilities(...)`。
   - `execute_task_internal()` 已消费 `lookup_resource_requirement(adapter_key, capability_family)`，并在 acquire 前完成 matcher gate：缺声明、坏声明以及未批准 capability projection 收口为 `invalid_resource_requirement`，合法但不满足声明的情况收口为 `resource_unavailable`。
   - runtime-reaching stub / CLI / contract harness 夹具已统一迁移到可追溯的 `xhs` canonical declaration truth，避免继续依赖无效 `stub`/`fake:*` baseline。
   - `syvert/registry.py` 已补充 matcher 复用的 approved evidence refs 入口，使 pure matcher 可以消费 `FR-0015` 批准词汇与共享证据，同时不改变 production declaration materialization 的 current baseline。
   - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已覆盖：required/unmatched、未批准 projection fail-closed、pure matcher `none` 语义，以及 runtime entrypoint 在当前 registry baseline 下对 `none` declaration 继续 fail-closed 的边界。
-  - 当前 implementation PR 已创建为 `#214`，本文件用于绑定 `5f9d5d821882490071ec624979840d75c36311a5` 对应的 implementation checkpoint 与后续 review / merge gate 真相。
+  - 当前 implementation PR 已创建为 `#214`，本文件用于绑定 `e4e8f1dc896b681db632ab1409b41ec451c5f70d` 对应的 implementation checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
@@ -101,4 +101,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5f9d5d821882490071ec624979840d75c36311a5`
+- `e4e8f1dc896b681db632ab1409b41ec451c5f70d`
