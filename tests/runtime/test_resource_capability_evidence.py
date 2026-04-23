@@ -28,31 +28,39 @@ from syvert.runtime import (
     CONTENT_DETAIL,
     CONTENT_DETAIL_BY_URL,
     LEGACY_COLLECTION_MODE,
+    MATCH_STATUS_MATCHED,
     RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
+    ResourceCapabilityMatcherInput,
     TaskInput,
     TaskRequest,
     execute_task,
+    match_resource_capabilities,
+    resolve_runtime_available_resource_capabilities,
 )
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
+    baseline_resource_requirement_declarations,
     build_managed_resource_bundle,
     douyin_account_material,
     xhs_account_material,
 )
 
+TEST_ADAPTER_KEY = "xhs"
+
 
 class ProxyPathCaptureAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, object]:
         self.last_request = request
         return {
             "raw": {"url": request.input.url},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-proxy-path",
                 "content_type": "unknown",
                 "canonical_url": request.input.url,
@@ -651,17 +659,30 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE[(CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE)],
             ("account", "proxy"),
         )
+        self.assertEqual(
+            resolve_runtime_available_resource_capabilities(
+                type("Request", (), {
+                    "target": type(
+                        "Target",
+                        (),
+                        {"adapter_key": TEST_ADAPTER_KEY, "capability": CONTENT_DETAIL_BY_URL},
+                    )(),
+                    "policy": type("Policy", (), {"collection_mode": LEGACY_COLLECTION_MODE})(),
+                })()
+            ),
+            ("account", "proxy"),
+        )
 
     def test_proxy_shared_evidence_is_exercised_through_runtime_bundle_binding(self) -> None:
         adapter = ProxyPathCaptureAdapter()
 
         envelope = execute_task(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability=CONTENT_DETAIL_BY_URL,
                 input=TaskInput(url="https://example.com/runtime-proxy-evidence"),
             ),
-            adapters={"stub": adapter},
+            adapters={TEST_ADAPTER_KEY: adapter},
             task_id_factory=lambda: "task-proxy-evidence",
         )
 
@@ -671,6 +692,62 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIsNotNone(adapter.last_request.resource_bundle.proxy)
         self.assertEqual(adapter.last_request.resource_bundle.capability, CONTENT_DETAIL_BY_URL)
         self.assertEqual(adapter.last_request.resource_bundle.proxy.resource_type, "proxy")
+
+    def test_matcher_stays_aligned_with_reference_adapter_required_capability_baseline(self) -> None:
+        declaration = baseline_required_resource_requirement_declaration(
+            adapter_key="xhs",
+            capability=CONTENT_DETAIL,
+        )
+
+        result = match_resource_capabilities(
+            ResourceCapabilityMatcherInput(
+                task_id="task-evidence-match-1",
+                adapter_key="xhs",
+                capability=CONTENT_DETAIL,
+                requirement_declaration=declaration,
+                available_resource_capabilities=resolve_runtime_available_resource_capabilities(
+                    type("Request", (), {
+                        "target": type(
+                            "Target",
+                            (),
+                            {"adapter_key": "xhs", "capability": CONTENT_DETAIL_BY_URL},
+                        )(),
+                        "policy": type("Policy", (), {"collection_mode": LEGACY_COLLECTION_MODE})(),
+                    })()
+                ),
+            )
+        )
+
+        self.assertEqual(result.match_status, MATCH_STATUS_MATCHED)
+
+    def test_registry_lookup_declaration_stays_matcher_compatible_with_approved_capability_ids(self) -> None:
+        registry = AdapterRegistry.from_mapping(build_adapters())
+        declaration = registry.lookup_resource_requirement("xhs", CONTENT_DETAIL)
+        self.assertIsNotNone(declaration)
+        assert declaration is not None
+        self.assertEqual(declaration.required_capabilities, ("account", "proxy"))
+        self.assertEqual(frozenset(declaration.required_capabilities), approved_resource_capability_ids())
+
+        available_capabilities = resolve_runtime_available_resource_capabilities(
+            type(
+                "Request",
+                (),
+                {
+                    "target": type("Target", (), {"adapter_key": "xhs", "capability": CONTENT_DETAIL_BY_URL})(),
+                    "policy": type("Policy", (), {"collection_mode": LEGACY_COLLECTION_MODE})(),
+                },
+            )()
+        )
+        match_outcome = match_resource_capabilities(
+            ResourceCapabilityMatcherInput(
+                task_id="task-196-registry-lookup-match",
+                adapter_key="xhs",
+                capability=CONTENT_DETAIL,
+                requirement_declaration=declaration,
+                available_resource_capabilities=available_capabilities,
+            )
+        )
+        self.assertEqual(match_outcome.match_status, MATCH_STATUS_MATCHED)
 
     def test_xhs_account_material_consumption_matches_evidence_baseline(self) -> None:
         material = xhs_account_material()

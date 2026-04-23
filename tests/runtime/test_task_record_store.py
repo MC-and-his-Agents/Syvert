@@ -15,14 +15,17 @@ from syvert.task_record import (
     start_task_record,
 )
 from syvert.task_record_store import LocalTaskRecordStore, TaskRecordStoreError
-from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_resource_requirement_declarations
+
+TEST_ADAPTER_KEY = "xhs"
 
 
 class SuccessfulAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def __init__(self) -> None:
         self.calls = 0
@@ -32,7 +35,7 @@ class SuccessfulAdapter:
         return {
             "raw": {"id": "raw-store-1"},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-store-1",
                 "content_type": "unknown",
                 "canonical_url": request.input.url,
@@ -73,10 +76,11 @@ class RunningVisibleAdapter(SuccessfulAdapter):
 
 
 class PlatformFailureAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         from syvert.runtime import PlatformAdapterError
@@ -139,11 +143,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = LocalTaskRecordStore(Path(temp_dir))
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-1"),
                 ),
-                adapters={"stub": SuccessfulAdapter()},
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                 task_id_factory=lambda: "task-store-1",
                 task_record_store=store,
             )
@@ -157,11 +161,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = LocalTaskRecordStore(Path(temp_dir))
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-2"),
                 ),
-                adapters={"stub": PlatformFailureAdapter()},
+                adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
                 task_id_factory=lambda: "task-store-2",
                 task_record_store=store,
             )
@@ -176,11 +180,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             with mock.patch.dict(os.environ, {"SYVERT_TASK_RECORD_STORE_DIR": temp_dir}, clear=False):
                 outcome = execute_task_with_record(
                     TaskRequest(
-                        adapter_key="stub",
+                        adapter_key=TEST_ADAPTER_KEY,
                         capability="content_detail_by_url",
                         input=TaskInput(url="https://example.com/post/store-default"),
                     ),
-                    adapters={"stub": SuccessfulAdapter()},
+                    adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                     task_id_factory=lambda: "task-store-default",
                 )
 
@@ -193,20 +197,20 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             with mock.patch.dict(os.environ, {"SYVERT_TASK_RECORD_STORE_DIR": temp_dir}, clear=False):
                 first = execute_task(
                     TaskRequest(
-                        adapter_key="stub",
+                        adapter_key=TEST_ADAPTER_KEY,
                         capability="content_detail_by_url",
                         input=TaskInput(url="https://example.com/post/store-stateless"),
                     ),
-                    adapters={"stub": SuccessfulAdapter()},
+                    adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                     task_id_factory=lambda: "task-store-stateless",
                 )
                 second = execute_task(
                     TaskRequest(
-                        adapter_key="stub",
+                        adapter_key=TEST_ADAPTER_KEY,
                         capability="content_detail_by_url",
                         input=TaskInput(url="https://example.com/post/store-stateless"),
                     ),
-                    adapters={"stub": SuccessfulAdapter()},
+                    adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                     task_id_factory=lambda: "task-store-stateless",
                 )
 
@@ -219,11 +223,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         adapter = SuccessfulAdapter()
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/store-3"),
             ),
-            adapters={"stub": adapter},
+            adapters={TEST_ADAPTER_KEY: adapter},
             task_id_factory=lambda: "task-store-3",
             task_record_store=SelectiveFailingStore("accepted"),
         )
@@ -239,11 +243,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         adapter = SuccessfulAdapter()
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/store-3b"),
             ),
-            adapters={"stub": adapter},
+            adapters={TEST_ADAPTER_KEY: adapter},
             task_id_factory=lambda: "task-store-3b",
             task_record_store=SelectiveFailingStore("running"),
         )
@@ -260,22 +264,22 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = LocalTaskRecordStore(Path(temp_dir))
             first = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-conflict"),
                 ),
-                adapters={"stub": SuccessfulAdapter()},
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                 task_id_factory=lambda: "task-store-conflict",
                 task_record_store=store,
             )
 
             second = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-conflict"),
                 ),
-                adapters={"stub": SuccessfulAdapter()},
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
                 task_id_factory=lambda: "task-store-conflict",
                 task_record_store=store,
             )
@@ -293,11 +297,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
 
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-running-visible"),
                 ),
-                adapters={"stub": adapter},
+                adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: task_id,
                 task_record_store=store,
             )
@@ -312,11 +316,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = TerminalFailingLocalStore(Path(temp_dir))
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-4"),
                 ),
-                adapters={"stub": adapter},
+                adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-store-4",
                 task_record_store=store,
             )
@@ -335,11 +339,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = BrokenInvalidationLocalStore(Path(temp_dir))
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-4b"),
                 ),
-                adapters={"stub": adapter},
+                adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-store-4b",
                 task_record_store=store,
             )
@@ -350,7 +354,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaises((TaskRecordStoreError, FileNotFoundError)):
                 store.load("task-store-4b")
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-4b",
@@ -366,11 +370,11 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             store = BrokenInvalidationAndMoveLocalStore(Path(temp_dir))
             outcome = execute_task_with_record(
                 TaskRequest(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     input=TaskInput(url="https://example.com/post/store-4c"),
                 ),
-                adapters={"stub": adapter},
+                adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-store-4c",
                 task_record_store=store,
             )
@@ -380,7 +384,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaises(TaskRecordStoreError):
                 store.load("task-store-4c")
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-4c",
@@ -394,7 +398,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-5b",
@@ -412,7 +416,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-5",
@@ -427,7 +431,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-accepted-idempotent",
@@ -455,7 +459,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             accepted = create_task_record(
                 "task-store-accepted-conflict",
                 TaskRequestSnapshot(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     target_type="url",
                     target_value="https://example.com/post/store-accepted-conflict",
@@ -466,7 +470,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             conflicting = create_task_record(
                 "task-store-accepted-conflict",
                 TaskRequestSnapshot(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     target_type="url",
                     target_value="https://example.com/post/store-accepted-conflict-changed",
@@ -484,7 +488,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-running-idempotent",
@@ -507,7 +511,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-6",
@@ -517,7 +521,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             running = start_task_record(accepted, occurred_at="2026-04-17T12:00:01Z")
             envelope = {
                 "task_id": "task-store-6",
-                "adapter_key": "stub",
+                "adapter_key": TEST_ADAPTER_KEY,
                 "capability": "content_detail_by_url",
                 "status": "failed",
                 "error": {
@@ -544,7 +548,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))
             snapshot = TaskRequestSnapshot(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 target_type="url",
                 target_value="https://example.com/post/store-7",
@@ -554,12 +558,12 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             running = start_task_record(accepted, occurred_at="2026-04-17T12:00:01Z")
             envelope = {
                 "task_id": "task-store-7",
-                "adapter_key": "stub",
+                "adapter_key": TEST_ADAPTER_KEY,
                 "capability": "content_detail_by_url",
                 "status": "success",
                 "raw": {"id": "raw-store-7"},
                 "normalized": {
-                    "platform": "stub",
+                    "platform": TEST_ADAPTER_KEY,
                     "content_id": "content-store-7",
                     "content_type": "unknown",
                     "canonical_url": "https://example.com/post/store-7",

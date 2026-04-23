@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tempfile
 import unittest
 
+from syvert.resource_lifecycle import ResourceRecord
+from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from tests.runtime.contract_harness import (
     ContractSampleDefinition,
+    DEFAULT_HARNESS_ADAPTER_KEY,
     FakeContractAdapter,
     HarnessExecutionResult,
     HarnessExecutionInput,
@@ -11,6 +16,7 @@ from tests.runtime.contract_harness import (
     validate_contract_samples,
     execute_harness_sample,
 )
+from tests.runtime.resource_fixtures import generic_account_material, managed_account_material, proxy_material
 
 def build_success_envelope() -> dict[str, object]:
     return {
@@ -214,15 +220,37 @@ class ContractHarnessValidationToolTests(unittest.TestCase):
 
     def test_host_legal_failure_output_can_be_consumed_by_validator(self) -> None:
         sample = ContractSampleDefinition(sample_id="sample-host-legal-failure", expected_outcome="legal_failure")
-        runtime_envelope = execute_harness_sample(
-            HarnessExecutionInput(
-                sample_id="sample-host-legal-failure",
-                url="https://example.com/legal-failure",
-                adapter_key="fake:platform-failure",
-            ),
-            adapters={"fake:platform-failure": FakeContractAdapter(scenario="legal_failure")},
-            task_id="task-host-legal-failure",
-        )
+        with tempfile.TemporaryDirectory(prefix="syvert-harness-validator-") as temp_dir:
+            resource_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            resource_store.seed_resources(
+                [
+                    ResourceRecord(
+                        resource_id="validator-account-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(
+                            generic_account_material(),
+                            adapter_key=DEFAULT_HARNESS_ADAPTER_KEY,
+                        ),
+                    ),
+                    ResourceRecord(
+                        resource_id="validator-proxy-001",
+                        resource_type="proxy",
+                        status="AVAILABLE",
+                        material=proxy_material(),
+                    ),
+                ]
+            )
+            runtime_envelope = execute_harness_sample(
+                HarnessExecutionInput(
+                    sample_id="sample-host-legal-failure",
+                    url="https://example.com/legal-failure",
+                    adapter_key=DEFAULT_HARNESS_ADAPTER_KEY,
+                ),
+                adapters={DEFAULT_HARNESS_ADAPTER_KEY: FakeContractAdapter(scenario="legal_failure")},
+                task_id="task-host-legal-failure",
+                resource_lifecycle_store=resource_store,
+            )
         execution_result = HarnessExecutionResult(runtime_envelope=runtime_envelope)
 
         result = validate_contract_sample(sample, execution_result)
