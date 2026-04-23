@@ -37,15 +37,15 @@
 
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-195-fr-0013`
 - 当前分支：`issue-195-fr-0013`
-- 当前实现 checkpoint：`2983cdb8088591982db96cfed2f4b69f554d9f3d`
+- 当前实现 checkpoint：`bc620485c524628d95a29cf5072a8ff3d1df29aa`
 - 当前状态：
   - `AdapterResourceRequirementDeclaration` 已在 registry 层落地 canonical carrier、discover/lookup API 与 fail-closed 校验。
   - xhs / douyin reference adapter 已声明 `content_detail -> required [account, proxy]` baseline declaration，并绑定到 `FR-0015` frozen evidence baseline。
-  - guardian 首轮 review 已返回 `REQUEST_CHANGES`，阻断集中在两点：`FR-0013` 允许词汇被 `FR-0015` 动态放宽，以及 `none` 模式未对证据绑定 fail-closed。
-  - 当前 checkpoint `2983cdb8088591982db96cfed2f4b69f554d9f3d` 已按根因收口：`FR-0013` 词汇冻结为 `content_detail` / `account|proxy`，同时把 `none` 模式收紧为当前 frozen baseline 下默认拒绝。
+  - guardian 前两轮 review 已返回 `REQUEST_CHANGES`；阻断先后集中在三点：`FR-0013` 允许词汇被 `FR-0015` 动态放宽、`none` 模式未对证据绑定 fail-closed、以及 registry 被错误收紧为必须覆盖全部 `supported_capabilities`。
+  - 当前 checkpoint `bc620485c524628d95a29cf5072a8ff3d1df29aa` 已按根因收口：`FR-0013` 词汇冻结为 `content_detail` / `account|proxy`，`none` 模式在缺少 frozen baseline 时默认拒绝，同时 registry 只校验“已声明 capability 必须属于 supported_capabilities”，不再要求全量覆盖。
   - declaration contract tests、registry tests、resource capability evidence tests 与运行时回归已经在修复后重新通过。
   - 当前受审 implementation PR 已创建为 `#213`，待 guardian 与 merge gate。
-  - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `2983cdb8088591982db96cfed2f4b69f554d9f3d` 对应的实现 checkpoint 与后续 review / merge gate 真相。
+  - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `bc620485c524628d95a29cf5072a8ff3d1df29aa` 对应的实现 checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
@@ -78,6 +78,10 @@
   - 结果：在 guardian 修复后通过
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
   - 结果：在 guardian 修复后 `Ran 168 tests in 2.831s`，`OK`
+- `python3 -m unittest tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_resource_capability_evidence`
+  - 结果：在第二轮 guardian 修复后 `Ran 44 tests in 0.108s`，`OK`
+- `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
+  - 结果：在第二轮 guardian 修复后 `Ran 169 tests in 2.929s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -95,6 +99,10 @@
   - 已修复阻断：
     - `FR-0013` 声明允许词汇不再跟随 `FR-0015` 动态扩张，registry 现在冻结为 `content_detail` 与 `account|proxy`，并把 `FR-0015` 只作为一致性校验入口
     - `resource_dependency_mode=none` 现在在缺少 frozen evidence baseline 时直接 fail-closed，不再接受与声明无关的 `evidence_refs`
+  - 结果：第二轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `resource_requirement_declarations` 不再被强制要求覆盖全部 `supported_capabilities`
+    - 新增多 capability adapter 仅声明 `content_detail` 的注册回归，确认 registry 只约束已声明 capability 的合法性
 
 ## 未决风险
 
@@ -109,4 +117,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2983cdb8088591982db96cfed2f4b69f554d9f3d`
+- `bc620485c524628d95a29cf5072a8ff3d1df29aa`
