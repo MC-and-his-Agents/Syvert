@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0019-v0-6-operability-release-gate/`
-- 关联 PR：`待创建`
+- 关联 PR：`#243`
 - 状态：`active`
 - active 收口事项：`CHORE-0157-fr-0019-formal-spec-closeout`
 
@@ -43,12 +43,12 @@
 - `issue-233-fr-0019-formal-spec` worktree 已用于 `#233` formal spec closeout。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan。
 - 已完成初版 formal spec、plan、risks、data-model、contracts README 与两个 exec-plan 的落盘，并已 rebase 到包含 `#237`、`#239`、`#241` 的 `origin/main`。
-- 当前停点是同步 rebase 后 checkpoint 与 guard 结果，并进入 PR 创建链路。
+- 当前停点是 `#243` 已创建，等待 required checks、guardian 与 merge gate 收口。
 
 ## 下一步动作
 
-- 创建 spec PR；关联 PR 创建后将 `关联 PR` 从 `待创建` 更新为实际 PR。
-- 回填 PR 编号、guardian verdict 与最终 merge gate 证据。
+- 等待 `#243` 的 required checks 完成后运行 guardian。
+- 若 guardian 通过，则按受控入口合并 `#243`，并核对主干真相、远端分支删除与 issue/project 状态。
 - spec review 通过后，由 `#234` 进入 release gate matrix implementation；`#235` 继续 parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -80,6 +80,8 @@
   - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-233-fr-0019-formal-spec`
   - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+- `python3 scripts/open_pr.py --class spec --issue 233 --item-key CHORE-0157-fr-0019-formal-spec-closeout ...`
+  - 结果：已创建 formal spec PR `#243`，进入受控 review / CI / merge gate 链路。
 
 ## 未决风险
 

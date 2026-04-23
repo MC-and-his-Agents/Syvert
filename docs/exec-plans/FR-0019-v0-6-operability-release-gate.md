@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0019-v0-6-operability-release-gate/`
-- 关联 PR：`待创建`
+- 关联 PR：`N/A（requirement container 不直接承载 PR；当前 formal spec 执行 PR 见 #243）`
 - 状态：`inactive requirement container`
 
 ## 目标
@@ -49,12 +49,12 @@
 
 - `issue-233-fr-0019-formal-spec` 已作为 `#233` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / scripts / release / sprint 索引。
-- 当前目标是将 rebase 到 `origin/main`（已包含 `#237`、`#239`、`#241`）后的 formal spec checkpoint 送入 spec review / PR 创建链路。
+- 当前目标是通过 `#243` 将 rebase 到 `origin/main`（已包含 `#237`、`#239`、`#241`）后的 formal spec checkpoint 送入 spec review。
 
 ## 下一步动作
 
-- 回填 rebase 后 checkpoint 与 guard 结果，确保 `FR-0016`、`FR-0017`、`FR-0018` 依赖锚点全部对齐 `origin/main` 真相。
-- 创建 spec PR，并在关联 PR 建立后把 `待创建` 回写为实际 PR 编号。
+- 等待 `#243` 的 required checks 与 guardian 通过。
+- 若审查仅要求 metadata-only follow-up，则在当前分支回写 review-sync 元数据；否则保持语义 checkpoint 不变进入合并。
 - spec review 通过后，由 `#234` 进入 release gate matrix implementation。
 - `#235` 负责 parent closeout，把目标、文档、审查、门禁、主干真相与 GitHub 状态收成一致。
 
