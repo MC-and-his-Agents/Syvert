@@ -110,7 +110,7 @@
 | `flm-store-unavailable-fail-closed` | `error.code=task_record_unavailable`; `error.category=runtime_contract`; `gate.verdict=fail` |
 | `flm-http-invalid-input-observable` | `request_ref != ""`; `entrypoint=http`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1`; 不创建 `TaskRecord` |
 | `flm-cli-invalid-input-observable` | `request_ref != ""`; `entrypoint=cli`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1`; 不创建 `TaskRecord` |
-| `flm-same-path-violation-observable` | `same_path.verdict=fail`; `metrics.same_path_failure_total>=1`; overall gate verdict=fail |
+| `flm-same-path-violation-observable` | `same_path.verdict=fail`; `metrics.same_path_case_failure_total>=1`; overall gate verdict=fail |
 
 #### `http_submit_status_result`
 

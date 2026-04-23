@@ -122,7 +122,7 @@
 | `flm-store-unavailable-fail-closed` | `content_detail_by_url` | durable store / record lookup 不可用 | `error.code=task_record_unavailable`; `error.category=runtime_contract`; `gate.verdict=fail` | 结构化日志包含 store unavailable 原因；不输出看似成功的 `status/result` |
 | `flm-http-invalid-input-observable` | `content_detail_by_url` | HTTP 参数错误 | `request_ref != ""`; `entrypoint=http`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 HTTP validation failure；不创建 `TaskRecord` |
 | `flm-cli-invalid-input-observable` | `content_detail_by_url` | CLI 参数错误 | `request_ref != ""`; `entrypoint=cli`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 CLI validation failure；不创建 `TaskRecord` |
-| `flm-same-path-violation-observable` | `content_detail_by_url` | CLI / HTTP shared truth 被证明发生偏离 | `same_path.verdict=fail`; `metrics.same_path_failure_total>=1` | 结构化日志包含 `shared_truth_mismatch_reason`; overall gate verdict=fail |
+| `flm-same-path-violation-observable` | `content_detail_by_url` | CLI / HTTP shared truth 被证明发生偏离 | `same_path.verdict=fail`; `metrics.same_path_case_failure_total>=1` | 结构化日志包含 `shared_truth_mismatch_reason`; overall gate verdict=fail |
 
 ### `http_submit_status_result`
 
