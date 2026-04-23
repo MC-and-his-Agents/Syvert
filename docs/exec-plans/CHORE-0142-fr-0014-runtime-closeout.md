@@ -49,8 +49,8 @@
   - `syvert/runtime.py` 已新增 canonical matcher surface：`ResourceCapabilityMatcherInput`、`ResourceCapabilityMatchResult`、`match_resource_capabilities(...)`、`resolve_runtime_available_resource_capabilities(...)`。
   - `execute_task_internal()` 已消费 `lookup_resource_requirement(adapter_key, capability_family)`，并在 acquire 前完成 matcher gate：缺声明、坏声明以及未批准 capability projection 收口为 `invalid_resource_requirement`，合法但不满足声明的情况收口为 `resource_unavailable`。
   - runtime-reaching stub / CLI / contract harness 夹具已统一迁移到可追溯的 `xhs` canonical declaration truth，避免继续依赖无效 `stub`/`fake:*` baseline。
-  - `validate_resource_capability_matcher_input()` 现已直接经 `AdapterRegistry.from_mapping(...)` 复用 `FR-0013` canonical materialization，避免 matcher/public runtime 与 registry 对 `none` 模式或 evidence baseline 产生双真相。
-  - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已覆盖：required/unmatched、未批准 projection fail-closed、缺声明/坏声明 fail-closed，以及 `none` 模式在当前 registry baseline 下继续收口为 `invalid_resource_requirement`。
+  - `syvert/registry.py` 已补充 matcher 复用的 approved evidence refs 入口，使 pure matcher 可以消费 `FR-0015` 批准词汇与共享证据，同时不改变 production declaration materialization 的 current baseline。
+  - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已覆盖：required/unmatched、未批准 projection fail-closed、pure matcher `none` 语义，以及 runtime entrypoint 在当前 registry baseline 下对 `none` declaration 继续 fail-closed 的边界。
   - 当前 implementation PR 已创建为 `#214`，本文件用于绑定 `5f9d5d821882490071ec624979840d75c36311a5` 对应的 implementation checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
@@ -73,9 +73,9 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool`
-  - 结果：`Ran 286 tests in 5.911s`，`OK`
+  - 结果：`Ran 288 tests in 5.837s`，`OK`
 - `python3 -m unittest tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
-  - 结果：当前受审实现已覆盖 matcher / runtime / 未批准 projection / adapter regression 路径；最新本地复跑 `Ran 248 tests in 5.332s`，`OK`
+  - 结果：当前受审实现已覆盖 matcher / runtime / 未批准 projection / adapter regression 路径；最新本地复跑 `Ran 250 tests in 6.493s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
