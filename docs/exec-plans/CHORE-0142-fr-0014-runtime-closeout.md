@@ -9,41 +9,53 @@
 - sprint：`2026-S18`
 - 关联 spec：`docs/specs/FR-0014-core-resource-capability-matching/`
 - 关联 decision：`docs/decisions/ADR-0001-governance-bootstrap-contract.md`
-- 关联 PR：`待创建`
+- 关联 PR：`#214`
 - 状态：`active`
 - active 收口事项：`CHORE-0142-fr-0014-runtime-closeout`
 
 ## 目标
 
-- 收口 `FR-0014` runtime implementation 回合中与 matcher truth、evidence baseline、declaration lookup 直接相关的执行证据。
-- 确保 `#196` 在进入受控 PR 前具备可复验的 test truth：`FR-0014 matcher` 与 `FR-0015 approved capability baseline`、`#195 declaration lookup` 三者一致。
+- 收口 `FR-0014` runtime implementation 回合，确保 Core 只基于 `#195` 已冻结的声明 carrier 与当前 runtime 能力集合执行纯粹的 `matched / unmatched` 判断。
+- 把 `#196` 的执行真相统一沉淀到单一 active `exec-plan`，使 matcher truth、error taxonomy、测试证据、PR head 与后续 guardian / merge gate 可以对齐到同一上下文。
 
 ## 范围
 
 - 本次纳入：
+  - `syvert/runtime.py`
   - `docs/exec-plans/CHORE-0142-fr-0014-runtime-closeout.md`
+  - `tests/runtime/test_resource_capability_matcher.py`
+  - `tests/runtime/test_runtime.py`
+  - `tests/runtime/test_task_record.py`
+  - `tests/runtime/test_task_record_store.py`
+  - `tests/runtime/test_cli.py`
   - `tests/runtime/test_resource_capability_evidence.py`
+  - `tests/runtime/test_xhs_adapter.py`
+  - `tests/runtime/test_douyin_adapter.py`
+  - `tests/runtime/test_real_adapter_regression.py`
+  - 与 runtime-reaching matcher 回归直接相关的 test fixture / contract harness 文件
 - 本次不纳入：
-  - CLI / contract harness 变更
-  - formal spec 语义改写（`FR-0014` / `FR-0015`）
-  - 非 `#196` 事项的执行计划与治理工件
+  - `FR-0013` / `FR-0014` / `FR-0015` formal spec 语义改写
+  - acquire contract 改写或 `requested_slots` 真相迁移
+  - provider 选择、排序、偏好、fallback 语义
+  - 非 `#196` 事项的治理工件
 
 ## 当前停点
 
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-196-fr-0014-core`
 - 当前分支：`issue-196-fr-0014-core`
-- 当前实现 checkpoint：`7fa2f9715f8e831fa6032b793287623f0d2f6e28`
+- 当前实现 checkpoint：`ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6`
 - 当前状态：
-  - `#196` 的 GitHub Work Item 元数据已存在（`item_key/item_type/release/sprint`），但此前缺少 active `exec-plan` 文件，导致 `open_pr` preflight 阻断。
-  - `tests/runtime/test_resource_capability_evidence.py` 已覆盖 frozen evidence、runtime slots、matcher 对齐、以及 fail-closed 漂移路径。
-  - 当前回合补充了“`#195` declaration lookup -> `FR-0014 matcher` -> `FR-0015 approved capability ids`”的直接联动断言，避免仅通过 helper baseline 间接验证。
+  - `syvert/runtime.py` 已新增 canonical matcher surface：`ResourceCapabilityMatcherInput`、`ResourceCapabilityMatchResult`、`match_resource_capabilities(...)`、`resolve_runtime_available_resource_capabilities(...)`。
+  - `execute_task_internal()` 已消费 `lookup_resource_requirement(adapter_key, capability_family)`，并在 acquire 前完成 matcher gate：缺声明/坏声明/坏 projection 收口为 `invalid_resource_requirement`，合法但不满足声明的情况收口为 `resource_unavailable`。
+  - runtime-reaching stub / CLI / contract harness 夹具已统一迁移到可追溯的 `xhs` canonical declaration truth，避免继续依赖无效 `stub`/`fake:*` baseline。
+  - matcher unit tests、runtime / task-record / CLI / evidence / dual-reference adapter / contract harness 回归已在实现 checkpoint `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 上通过。
+  - 当前 implementation PR 已创建为 `#214`，当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 对应的 implementation checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
-- 基于当前 active `exec-plan` 继续补齐 `#196` implementation 变更与验证证据。
-- 在当前分支形成可审查提交后，执行 `open_pr --class implementation --issue 196 ... --dry-run` 验证受控入口。
-- 创建 implementation PR，进入 guardian review 与 merge gate。
-- 合入后同步 `#196` / exec-plan / PR / guardian / main truth 一致性。
+- 对 `#214` 运行 guardian review，并以当前 PR head 为准收口 verdict / `safe_to_merge`。
+- 等待 GitHub checks 绑定到当前 PR head 全绿后，经 `merge_pr` 执行受控 squash merge。
+- 合入后同步 `#196` / exec-plan / guardian / main truth 一致性。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -58,12 +70,22 @@
 
 ## 已验证项
 
-- `python3 -m unittest tests.runtime.test_resource_capability_evidence -v`
-  - 结果：`Ran 25 tests`，`OK`
-- `python3 -m unittest tests.runtime.test_resource_capability_matcher tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_resource_capability_evidence -v`
-  - 结果：`Ran 42 tests`，`OK`
-- `python3 scripts/governance_status.py --issue 196 --format json`
-  - 结果：当前分支/worktree 绑定到 `#196`，此前 `item_context` 为空（缺 active exec-plan）；本文件创建后可作为 `open_pr` 前置上下文载体。
+- `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_executor tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_automation tests.runtime.test_contract_harness_validation_tool`
+  - 结果：`Ran 278 tests in 5.435s`，`OK`
+- `python3 -m unittest tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_task_record_store tests.runtime.test_cli tests.runtime.test_resource_capability_evidence tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
+  - 结果：在 checkpoint `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6` 上 `Ran 230 tests in 5.332s`，`OK`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过（`PR class: implementation` / `变更类别: docs, implementation`）
+- `python3 scripts/governance_gate.py --mode ci --base-sha \"$(git merge-base origin/main HEAD)\" --head-sha \"$(git rev-parse HEAD)\" --head-ref issue-196-fr-0014-core`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 196 --item-key CHORE-0142-fr-0014-runtime-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'feat(runtime): 落地 FR-0014 Core 资源能力匹配' --base main --closing fixes --dry-run`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class implementation --issue 196 --item-key CHORE-0142-fr-0014-runtime-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'feat(runtime): 落地 FR-0014 Core 资源能力匹配' --base main --closing fixes`
+  - 结果：已创建当前受审 implementation PR `#214 https://github.com/MC-and-his-Agents/Syvert/pull/214`
 
 ## 未决风险
 
@@ -77,4 +99,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `7fa2f9715f8e831fa6032b793287623f0d2f6e28`
+- `ab994a0e9859f2357cc21c4ee3fa6d1388a3fea6`
