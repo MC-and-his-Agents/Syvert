@@ -29,13 +29,40 @@
   - 不引入分布式压测、跨机器队列、真实生产流量回放或容量规划基准。
   - 不修改 `syvert/**`、`tests/**`、`scripts/**` 的实现或测试代码；本 Work Item 只冻结 formal spec。
 
+## 规范性依赖（Normative Dependencies）
+
+- `FR-0007`（baseline gate）：
+  - `FR-0019` 只做 `v0.6.0` operability 叠加层；`baseline_gate_ref` 缺失或不可追溯时，`verdict` 必须为 `fail`。
+- `FR-0016`（timeout / retry / concurrency control semantics）：
+  - 默认 policy 固定为：
+    - `policy.timeout_ms=30000`
+    - `policy.retry.max_attempts=1`
+    - `policy.retry.backoff_ms=0`
+    - `policy.concurrency.scope=global`
+    - `policy.concurrency.max_in_flight=1`
+    - `policy.concurrency.on_limit=reject`
+  - retryable predicate 固定为：仅 `execution_timeout`，或 `error.category=platform` 且 `error.details.retryable=true` 的 transient failure，并且必须先通过 idempotency safety gate。
+  - 当前批准 capability 固定为 `content_detail_by_url`；矩阵不得引入未批准 capability。
+  - `execution_timeout` 的 failed envelope 归类为 `error.category=platform`，并固定写入 `error.details.control_code=execution_timeout` 表示控制面来源。
+  - `closeout/control-state` failure 才归类为 `runtime_contract`；不得把正常 `execution_timeout` 映射到 `runtime_contract`。
+  - pre-accepted concurrency rejection 必须投影为 `invalid_input`，且不得创建 `TaskRecord`。
+  - post-accepted retry reacquire rejection 只能写入 `ExecutionControlEvent.details`，不得改写上一已完成 attempt 的终态 `error.code` / `error.category`。
+- `FR-0017`（failure / structured log / metrics / refs）：
+  - `failure_log_metrics` 维度必须使用结构化日志字段、结构化指标计数与 evidence refs 的统一 contract，不允许只给抽象描述或文本同义词。
+- `FR-0018`（HTTP + CLI through same Core path）：
+  - `http_submit_status_result` 与 `cli_api_same_path` 维度必须证明 HTTP 与 CLI 都走同一 Core / TaskRecord / envelope 语义，不允许入口私有 truth。
+
 ## 需求说明
 
 - 功能需求：
   - `v0.6.0` 发布门禁必须先满足 `FR-0007` 的版本级 gate 语义，再叠加本 FR 定义的 operability gate；本 FR 不得把旧 gate 合并、弱化或替换成新的单一矩阵。
   - operability gate 必须形成可复验的回归矩阵，至少包含四个维度：`timeout_retry_concurrency`、`failure_log_metrics`、`http_submit_status_result`、`cli_api_same_path`。
   - timeout / retry / concurrency 矩阵必须覆盖：单任务超时、可重试失败、不可重试失败、重试上限、并发提交、并发状态查询、并发结果读取，以及同一 `task_id` 终态不可被并发路径重复改写。
-  - retry 语义必须保持 fail-closed：只有被共享错误分类明确允许的 transient / retryable failure 才能进入 retry；参数错误、contract violation、非法持久化记录、平台泄漏、不可归类错误不得被宽松重试掩盖。
+  - timeout / retry / concurrency 维度的每个 case 必须显式断言以下 policy 字段和值：`timeout_ms=30000`、`retry.max_attempts=1`、`retry.backoff_ms=0`、`concurrency.scope=global`、`concurrency.max_in_flight=1`、`concurrency.on_limit=reject`。
+  - retry 语义必须保持 fail-closed：只有 `execution_timeout`，或 `error.category=platform && error.details.retryable=true` 且通过 idempotency safety gate 的 transient failure 才能进入 retry；参数错误、contract violation、非法持久化记录、平台泄漏、不可归类错误不得被宽松重试掩盖。
+  - `execution_timeout` case 的期望字段必须固定为 `error.category=platform` 与 `error.details.control_code=execution_timeout`；不得把该类错误投影成 `runtime_contract`。
+  - pre-accepted 并发拒绝 case 的期望字段必须固定为 `error.category=invalid_input`，且期望副作用必须固定为“无 TaskRecord 创建”。
+  - post-accepted retry reacquire rejection case 的期望字段必须固定为“新增 `ExecutionControlEvent.details`”，并且固定断言“不改写上一已完成 attempt 的终态 `error.code` / `error.category`”。
   - concurrency 语义必须证明共享任务记录、状态迁移、终态 envelope 与日志追加在并发入口下仍保持单一 durable truth；不得出现双终态、状态回退、重复 task record、影子结果或竞态覆盖。
   - failure / log / metrics 矩阵必须覆盖成功、业务失败、contract failure、timeout、retry exhausted、store unavailable、HTTP 参数错误、CLI 参数错误与 same-path violation 的可观测输出。
   - failure 输出必须继续复用已批准的 shared failed envelope 和错误分类语义；不得为 HTTP 或 CLI 单独定义不可映射的失败格式。
@@ -45,7 +72,7 @@
   - HTTP `submit` 不得绕过共享 admission、共享请求投影、Core 执行主路径或持久化建档；HTTP `status` 不得维护独立状态缓存；HTTP `result` 不得读取第二套结果文件或拼装 HTTP 私有 envelope。
   - CLI / API same-path 矩阵必须证明 CLI `run/query` 与 HTTP `submit/status/result` 在等价请求下最终回指同一类 `TaskRecord`、同一类 shared success / failed envelope、同一套状态迁移与同一套 failure classification。
   - same-path 证明必须覆盖成功态与失败态，至少包含一个成功 case、一个 pre-admission 参数失败 case、一个 durable record 不可用 case 与一个终态结果读取 case。
-  - 每个 matrix case 必须有稳定 case id、验证对象、入口组合、前置条件、预期结果、失败时的 gate 影响与证据引用；缺失任何必需字段都必须使该 case fail-closed。
+  - 每个 matrix case 必须有稳定 case id、验证对象、入口组合、前置条件、预期结果、失败时的 gate 影响与证据引用；`expected_result` 必须写明字段路径与精确值（例如 `error.category=platform`），不得仅写“与上游一致”或同义词描述。缺失任何必需字段都必须使该 case fail-closed。
   - operability gate 的总体结论必须可追溯到 `release=v0.6.0`、`FR-0019`、执行 head 或等价 revision、回归矩阵版本、必选 case 集合与每个 case 的证据。
 - 契约需求：
   - 本 FR 冻结的是 release gate 与回归矩阵 contract，不绑定唯一脚本、唯一 CI workflow、唯一 HTTP 框架、唯一 metrics 后端或唯一日志实现。
@@ -143,6 +170,9 @@ Then formal spec 必须把该 gate result 视为 `fail`，并阻止它作为 `v0
   - `#222` 是本 FR 的 canonical requirement 容器。
   - `#233` 是当前 formal spec closeout Work Item。
   - `FR-0007` 已冻结版本级基础 gate，`FR-0019` 必须消费并叠加其结论。
+  - `FR-0016` 提供 timeout / retry / concurrency 控制面与 retry predicate 的规范真相；`FR-0019` 必须按其字段级语义定义矩阵预期。
+  - `FR-0017` 提供 failure / structured log / metrics / refs 的规范真相；`FR-0019` 必须引用其结构化字段而非抽象同义词。
+  - `FR-0018` 提供 HTTP 与 CLI 同 Core path 的规范真相；`FR-0019` 必须以其 same-path 语义定义入口一致性矩阵。
   - 既有 `FR-0008` / `FR-0009` 为 durable `TaskRecord`、CLI query 与 same-path 基线提供上游语义。
 - 上下游影响：
   - `#234` 在 spec review 通过后实现 release gate matrix，不得改写本 FR requirement。

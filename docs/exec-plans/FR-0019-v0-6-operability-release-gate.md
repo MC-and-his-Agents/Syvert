@@ -15,6 +15,21 @@
 
 - 冻结 `v0.6.0` operability release gate 与回归矩阵 formal contract，覆盖 timeout / retry / concurrency、failure / log / metrics、HTTP submit / status / result、CLI / API same-path，并明确其只叠加 `FR-0007` 基础 gate，不重写旧 gate。
 
+## 规范性依赖
+
+- `FR-0016`：`timeout/retry/concurrency` 维度必须固化默认 policy 与控制面语义：
+  - `timeout_ms=30000`
+  - `retry.max_attempts=1`
+  - `retry.backoff_ms=0`
+  - `concurrency.scope=global`
+  - `concurrency.max_in_flight=1`
+  - `concurrency.on_limit=reject`
+  - retryable predicate 只允许 `execution_timeout` 或 `platform+details.retryable=true` 的 transient failure（且通过 idempotency safety gate）
+  - pre-accepted 并发拒绝：`invalid_input` 且无 `TaskRecord`
+  - post-accepted reacquire 拒绝：仅写 `ExecutionControlEvent.details`，不改写上一 attempt 终态
+- `FR-0017`：`failure_log_metrics` 维度必须基于结构化日志/指标/refs 字段断言，不接受抽象同义词。
+- `FR-0018`：`http_submit_status_result` 与 `cli_api_same_path` 维度必须证明 HTTP/CLI 走同一 Core path 与同一 `TaskRecord`/envelope truth。
+
 ## 范围
 
 - 本次纳入：
@@ -58,11 +73,13 @@
 
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 与 formal spec 模板。
 - 已核对 `FR-0007` / `FR-0008` / `FR-0009` / `FR-0015` 的 formal spec 风格与相关语义边界。
+- 已按本事项输入同步 `FR-0016`（timeout/retry/concurrency 控制面）、`FR-0017`（结构化 log/metrics/refs）、`FR-0018`（HTTP+CLI same Core path）的规范性依赖到 FR-0019 文档。
 - 已核对 `CHORE-0138-fr-0013-formal-spec-closeout.md` 的 active closeout exec-plan 结构。
 
 ## 未决风险
 
 - 若后续实现把 `FR-0019` 当作 `FR-0007` 替代品，会破坏版本 gate 继承关系。
+- 若 `#234` 未按字段级值断言（仅使用抽象同义词），gate case 会失去可机判性并引入语义漂移。
 - 若 HTTP 与 CLI same-path 只比较展示输出，不比较 shared task truth，会遗漏影子状态风险。
 - 若 metrics / logs 证据依赖外部 SaaS 或生产环境，当前 repo 无法复验发布门禁。
 

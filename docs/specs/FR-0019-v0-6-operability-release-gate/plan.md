@@ -13,6 +13,21 @@
 
 - 本次实施要交付的能力：冻结 `v0.6.0` operability release gate 与回归矩阵的 formal contract，使后续 `#234` 可以在不改写需求的前提下实现 timeout / retry / concurrency、failure / log / metrics、HTTP submit / status / result、CLI / API same-path 的门禁矩阵，并由 `#235` 完成 parent closeout。
 
+## 规范性依赖同步
+
+- `FR-0016`：后续实现必须按固定默认 policy 与 retry/concurrency 语义落地矩阵断言：
+  - `timeout_ms=30000`
+  - `retry.max_attempts=1`
+  - `retry.backoff_ms=0`
+  - `concurrency.scope=global`
+  - `concurrency.max_in_flight=1`
+  - `concurrency.on_limit=reject`
+  - retryable predicate 只允许 `execution_timeout` 或 `platform+details.retryable=true` 的 transient failure（且通过 idempotency safety gate）
+  - pre-accepted 并发拒绝：`invalid_input + 无 TaskRecord`
+  - post-accepted retry reacquire 拒绝：只写 `ExecutionControlEvent.details`，不得改写上一 attempt 终态
+- `FR-0017`：failure/log/metrics/refs 必须使用结构化字段；不得只做文本同义词对比。
+- `FR-0018`：HTTP 与 CLI 必须共用 Core path；矩阵需断言同一 `TaskRecord` 与 shared envelope。
+
 ## 分阶段拆分
 
 - 阶段 1：`#233` formal spec closeout。
@@ -81,6 +96,9 @@
 
 - [ ] `spec review` 已通过。
 - [ ] `FR-0019` 与 `FR-0007` 的承接关系已被 reviewer 接受。
+- [ ] `FR-0016` 默认 policy 与 retry/concurrency 控制面语义已在 matrix case 中字段级固化。
+- [ ] `FR-0017` 的结构化日志/指标/refs 语义已在 `failure_log_metrics` 维度字段级固化。
+- [ ] `FR-0018` 的 HTTP/CLI 同 Core path 语义已在 `http_submit_status_result` 与 `cli_api_same_path` 维度字段级固化。
 - [ ] timeout / retry / concurrency、failure / log / metrics、HTTP submit / status / result、CLI / API same-path 四类矩阵维度均无阻断性需求缺口。
 - [ ] `contracts/README.md`、`data-model.md`、`risks.md` 已与 `spec.md` 对齐。
 - [ ] `#234` 已确认作为 release gate matrix implementation 的后续执行入口。

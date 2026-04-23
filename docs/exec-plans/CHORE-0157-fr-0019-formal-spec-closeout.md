@@ -16,6 +16,12 @@
 
 - 建立并收口 `FR-0019` formal spec 套件，冻结 `v0.6.0` 可运维发布门禁与回归矩阵，并把后续实现明确交给 `#234` release gate matrix implementation，再由 `#235` parent closeout 收口。
 
+## 规范性依赖
+
+- `FR-0016`：本次 closeout 必须把默认 policy、retryable predicate、`execution_timeout` 控制码、pre/post accepted 并发拒绝语义写成字段级 gate 预期。
+- `FR-0017`：本次 closeout 必须把 failure/log/metrics/refs 的结构化字段要求写入矩阵 contract。
+- `FR-0018`：本次 closeout 必须把 HTTP submit/status/result 与 CLI run/query 同 Core path 的证明要求写入矩阵 contract。
+
 ## 范围
 
 - 本次纳入：
@@ -63,6 +69,7 @@
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md`。
 - 已核对 formal spec 模板：`docs/specs/_template/spec.md`、`docs/specs/_template/plan.md`、`docs/specs/_template/risks.md`、`docs/specs/_template/data-model.md`。
 - 已核对参考 spec：`FR-0007`、`FR-0008`、`FR-0009`、`FR-0015`。
+- 已按本事项要求对齐 `FR-0016`、`FR-0017`、`FR-0018` 最新语义，并同步到 `FR-0019` gate matrix 字段级断言。
 - 已核对参考 exec-plan：`docs/exec-plans/CHORE-0138-fr-0013-formal-spec-closeout.md`。
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过。
@@ -74,6 +81,7 @@
 ## 未决风险
 
 - 若 reviewer 要求 HTTP contract 固定更具体的 endpoint shape，需要确认是否仍属于 formal spec 层，避免提前绑定实现框架。
+- 若 `#234` 使用抽象同义词而非字段级断言实现 matrix case，将导致 FR-0016/17/18 语义无法自动化验收。
 - 若后续 `#234` 发现现有 runtime 缺少可构造 timeout / concurrency case 的测试 seam，应在实现 PR 中补测试 seam，而不是回写本 Work Item 的实现代码。
 - 若 GitHub 状态字段与仓内 exec-plan 不一致，应以 GitHub 为调度真相、repo 为语义真相分别收口，不能在 repo 内创建状态镜像。
 

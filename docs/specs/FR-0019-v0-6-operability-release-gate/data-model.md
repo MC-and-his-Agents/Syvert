@@ -34,6 +34,17 @@
   - 约束：非空、去重、稳定，且可从仓内命令输出或 CI artifact 复验。
 - `OperabilityGateResult.verdict`
   - 约束：只允许 `pass` 或 `fail`；任何未知、缺失或部分通过状态都必须映射为 `fail`。
+- `OperabilityGateResult.normative_dependencies`
+  - 约束：必须包含 `FR-0007`、`FR-0016`、`FR-0017`、`FR-0018`；缺失任一依赖时 verdict 必须为 `fail`。
+- `OperabilityGateResult.policy_snapshot`
+  - 约束：必须固定包含：
+    - `timeout_ms=30000`
+    - `retry.max_attempts=1`
+    - `retry.backoff_ms=0`
+    - `concurrency.scope=global`
+    - `concurrency.max_in_flight=1`
+    - `concurrency.on_limit=reject`
+  - 任一字段缺失或值漂移都必须使 gate fail。
 
 - `OperabilityMatrixCase.case_id`
   - 约束：稳定、唯一、可在 gate result 与测试输出中交叉引用。
@@ -45,10 +56,17 @@
   - 约束：列出请求、store、错误分类、并发条件或 baseline gate 前提。
 - `OperabilityMatrixCase.expected_result`
   - 约束：必须可判定，且说明成功 / 失败 envelope、状态迁移、日志或 metrics 的预期。
+  - 子字段：
+    - `expected_result.fields`：数组，每项都包含 `path`、`operator`、`value`，用于字段级断言。
+    - `expected_result.side_effects`：数组，显式断言 `TaskRecord` / `ExecutionControlEvent` / metrics / logs 的副作用。
+    - `expected_result.forbidden_mutations`：数组，显式断言禁止改写的字段（例如上一 attempt 的终态 code/category）。
+  - case 只写抽象同义词（例如“应一致”“应可重试”）而无字段路径和值时必须 fail。
 - `OperabilityMatrixCase.actual_result_ref`
   - 约束：必须引用可复验证据；缺失时 case fail。
 - `OperabilityMatrixCase.gate_impact`
   - 约束：必选 case 失败必须使 overall verdict fail。
+- `OperabilityMatrixCase.capability`
+  - 约束：当前只允许 `content_detail_by_url`；出现其他 capability 时 case 必须 fail。
 
 - `SamePathProof.cli_entrypoint`
   - 约束：指向 CLI `run` 或 `query` 语义，不固定具体命令实现。
@@ -62,6 +80,18 @@
   - 约束：必须回指 shared success / failed envelope；不得是入口私有 schema。
 - `SamePathProof.verdict`
   - 约束：只允许 `pass` 或 `fail`。
+
+## 最小必选矩阵（字段级期望）
+
+| case_id | dimension | capability | 前置条件摘要 | expected_result.fields（必须命中） | expected_result.side_effects（必须命中） |
+| --- | --- | --- | --- | --- | --- |
+| `trc-timeout-platform-control-code` | `timeout_retry_concurrency` | `content_detail_by_url` | 任务被控制面超时终止 | `error.category=platform`; `error.details.control_code=execution_timeout`; `policy.timeout_ms=30000`; `policy.retry.max_attempts=1`; `policy.retry.backoff_ms=0` | 写入 `ExecutionControlEvent.details.control_code=execution_timeout`; `TaskRecord.status=failed` |
+| `trc-pre-accept-concurrency-reject` | `timeout_retry_concurrency` | `content_detail_by_url` | 进入 admission 前命中全局并发上限 | `error.category=invalid_input`; `policy.concurrency.scope=global`; `policy.concurrency.max_in_flight=1`; `policy.concurrency.on_limit=reject` | `TaskRecord` 未创建 |
+| `trc-post-accept-reacquire-reject` | `timeout_retry_concurrency` | `content_detail_by_url` | 首次 attempt 完成后，retry reacquire 被拒绝 | `policy.retry.max_attempts=1`; `policy.concurrency.scope=global`; `policy.concurrency.on_limit=reject` | 新增 `ExecutionControlEvent.details.reacquire_rejected=true`；保留上一 attempt 的终态 `error.code` / `error.category` |
+| `flm-retryable-predicate-idempotency-gate` | `failure_log_metrics` | `content_detail_by_url` | 同时覆盖 `execution_timeout` 与 `error.category=platform + details.retryable=true` | `retry.predicate.match in {execution_timeout, platform_retryable}`; `idempotency_safety_gate=pass` | `metrics.retry_attempt_total>=1`; 结构化日志包含 `task_id`、`entrypoint`、`stage`、`error.category` |
+| `flm-non-retryable-fail-closed` | `failure_log_metrics` | `content_detail_by_url` | 非 retryable failure | `idempotency_safety_gate` 未放行；`retry.attempts=0` 或不递增 | `metrics.failure_total>=1`; 不生成新的 retry attempt 事件 |
+| `http-submit-status-result-shared-truth` | `http_submit_status_result` | `content_detail_by_url` | HTTP submit 后查询 status/result | `submit.request.capability=content_detail_by_url`; `status.task_id == result.task_id` | 只存在一条共享 `TaskRecord`；读取同一 shared envelope |
+| `same-path-cli-http-success-and-failure` | `cli_api_same_path` | `content_detail_by_url` | CLI run/query 与 HTTP submit/status/result 等价请求 | `cli.envelope.schema == http.envelope.schema`; `cli.error.category == http.error.category`（失败态） | CLI 与 HTTP 都回指同一 `TaskRecord.task_id` 与同一状态迁移 |
 
 ## 生命周期
 
