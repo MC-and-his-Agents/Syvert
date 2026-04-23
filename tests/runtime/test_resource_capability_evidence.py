@@ -7,10 +7,12 @@ import tempfile
 import unittest
 from unittest import mock
 
+from syvert.adapters import build_adapters
 from syvert.adapters.douyin import build_session_config_from_context as build_douyin_session_config_from_context
 from syvert.adapters.xhs import build_session_config_from_context as build_xhs_session_config_from_context
 from syvert.real_adapter_regression import seed_reference_regression_resources
 from syvert import resource_capability_evidence
+from syvert.registry import AdapterRegistry, baseline_required_resource_requirement_declaration
 from syvert.resource_capability_evidence import (
     approved_resource_capability_ids,
     approved_resource_capability_vocabulary_entries,
@@ -146,6 +148,28 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 ),
             },
         )
+
+    def test_reference_adapter_resource_requirement_declarations_stay_aligned_with_frozen_baseline(self) -> None:
+        registry = AdapterRegistry.from_mapping(build_adapters())
+
+        for adapter_key in ("xhs", "douyin"):
+            with self.subTest(adapter_key=adapter_key):
+                declaration = registry.lookup_resource_requirement(adapter_key, CONTENT_DETAIL)
+                self.assertIsNotNone(declaration)
+                assert declaration is not None
+                self.assertEqual(
+                    declaration,
+                    baseline_required_resource_requirement_declaration(
+                        adapter_key=adapter_key,
+                        capability=CONTENT_DETAIL,
+                    ),
+                )
+                self.assertEqual(
+                    declaration.required_capabilities,
+                    RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE[
+                        (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE)
+                    ],
+                )
         self.assertEqual(
             {
                 entry.evidence_ref: (entry.source_file, entry.source_symbol)
