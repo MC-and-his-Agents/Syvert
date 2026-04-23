@@ -33,7 +33,7 @@
 
 - `issue-223-fr-0016-formal-spec` 已作为 `#223` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0016` formal spec 套件与两个 exec-plan，禁止越界到 runtime、tests、HTTP API 或相邻 FR。
-- formal spec 套件已落盘并创建当前受审 spec PR `#237`；当前停点是等待 GitHub checks、spec review、guardian 与受控 merge gate。
+- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `c77ec6c87292d0c0b5dd82c30fcd92b3e97b2e8f`，覆盖 retry / concurrency / default policy 的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
 
 ## 下一步动作
 
@@ -74,6 +74,9 @@
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 在仍有预算时仍被写成可选推进
 - 已修复：明确 retryable outcome 且 `attempt_index < max_attempts` 时，Core 必须等待 `backoff_ms` 后启动下一 attempt，只有 success、不可重试失败、预算耗尽或 retry slot reacquire 被拒绝可终止任务
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 active exec-plan checkpoint 仍指向早期语义状态
+- 已修复：将 latest semantic checkpoint 刷新为 `c77ec6c87292d0c0b5dd82c30fcd92b3e97b2e8f`，当前提交仅为 review-sync metadata follow-up，不改写 FR-0016 requirement 语义
 
 ## 未决风险
 
@@ -88,4 +91,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `952c26d6240df61eb714a6c9f388541dd5197d31`
+- `c77ec6c87292d0c0b5dd82c30fcd92b3e97b2e8f`
