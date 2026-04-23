@@ -65,6 +65,9 @@
   - 结果：通过
 - `python3 scripts/open_pr.py --class spec --issue 223 --item-key CHORE-0147-fr-0016-formal-spec-closeout --item-type CHORE --release v0.6.0 --sprint 2026-S19 --title 'docs(spec): 收口 FR-0016 最小执行控制 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建当前受审 spec PR `#237 https://github.com/MC-and-his-Agents/Syvert/pull/237`
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 字段漂移、attempt outcome 与 admission/聚合事实混用、缺少数据迁移说明
+- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，固定 Core retryable rule 为 `execution_timeout` 与 `error.category=platform`；新增 `ExecutionControlEvent` 区分 `concurrency_rejected` 与 `retry_exhausted`；补充数据模型与迁移说明
 
 ## 未决风险
 
@@ -79,4 +82,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `86614fefe9ebfef77fea8c858c8d30cfd10ebe6c`
+- `952c26d6240df61eb714a6c9f388541dd5197d31`
