@@ -12,6 +12,7 @@ from syvert.registry import (
     AdapterResourceRequirementDeclaration,
     RegistryError,
     RESOURCE_DEPENDENCY_MODE_NONE,
+    approved_resource_requirement_evidence_refs,
 )
 from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.task_record import (
@@ -49,6 +50,7 @@ MATCH_STATUS_UNMATCHED = "unmatched"
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
 _ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL})
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
+_APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS = approved_resource_requirement_evidence_refs()
 
 if TYPE_CHECKING:
     from syvert.resource_lifecycle import ResourceBundle
@@ -1540,6 +1542,21 @@ def _validate_matcher_requirement_declaration(
             field_name="requirement_declaration.evidence_refs",
             allow_empty=False,
         )
+        unknown_evidence_refs = tuple(
+            evidence_ref
+            for evidence_ref in evidence_refs
+            if evidence_ref not in _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS
+        )
+        if unknown_evidence_refs:
+            raise ResourceCapabilityMatcherContractError(
+                "matcher requirement_declaration.evidence_refs 必须绑定到 FR-0015 已批准共享证据",
+                details={
+                    "task_id": task_id,
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "unknown_evidence_refs": unknown_evidence_refs,
+                },
+            )
         return AdapterResourceRequirementDeclaration(
             adapter_key=adapter_key,
             capability=capability,

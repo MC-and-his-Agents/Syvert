@@ -53,23 +53,47 @@ class ResourceCapabilityMatcherTests(unittest.TestCase):
         self.assertEqual(result.match_status, MATCH_STATUS_UNMATCHED)
 
     def test_matcher_keeps_none_mode_semantics_in_pure_matcher_layer(self) -> None:
+        approved_evidence_refs = baseline_required_resource_requirement_declaration(
+            adapter_key="xhs",
+            capability="content_detail",
+        ).evidence_refs
         result = match_resource_capabilities(
             ResourceCapabilityMatcherInput(
                 task_id="task-match-none",
-                adapter_key="stub",
+                adapter_key="xhs",
                 capability="content_detail",
                 requirement_declaration=AdapterResourceRequirementDeclaration(
-                    adapter_key="stub",
+                    adapter_key="xhs",
                     capability="content_detail",
                     resource_dependency_mode="none",
                     required_capabilities=(),
-                    evidence_refs=("matcher:none-mode",),
+                    evidence_refs=approved_evidence_refs,
                 ),
                 available_resource_capabilities=(),
             )
         )
 
         self.assertEqual(result.match_status, MATCH_STATUS_MATCHED)
+
+    def test_matcher_rejects_none_mode_declaration_with_unapproved_evidence_refs(self) -> None:
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ResourceCapabilityMatcherInput(
+                    task_id="task-match-none-invalid-evidence",
+                    adapter_key="xhs",
+                    capability="content_detail",
+                    requirement_declaration=AdapterResourceRequirementDeclaration(
+                        adapter_key="xhs",
+                        capability="content_detail",
+                        resource_dependency_mode="none",
+                        required_capabilities=(),
+                        evidence_refs=("matcher:none-mode",),
+                    ),
+                    available_resource_capabilities=(),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
 
     def test_matcher_rejects_context_mismatch_between_input_and_declaration(self) -> None:
         with self.assertRaises(ResourceCapabilityMatcherContractError) as context:

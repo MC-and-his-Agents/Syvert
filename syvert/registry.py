@@ -206,6 +206,10 @@ def baseline_required_resource_requirement_declaration(
     )
 
 
+def approved_resource_requirement_evidence_refs() -> frozenset[str]:
+    return _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS
+
+
 def _build_adapter_declaration(adapter_key: str, adapter: Any) -> AdapterDeclaration:
     _validate_adapter_execute(adapter_key, adapter)
     capabilities = _get_adapter_attribute(adapter, "supported_capabilities")
