@@ -14,7 +14,7 @@
 
 ## 目标
 
-- 建立并收口 `FR-0017` formal spec 套件，冻结运行时失败可观测性的最小 failure signal、structured log、execution metric contract，并明确其与 `task_id`、TaskRecord、failed envelope、resource trace、`FR-0016` timeout / retry / concurrency 结果的关联规则。
+- 建立并收口 `FR-0017` formal spec 套件，冻结运行时失败可观测性的最小 failure signal、structured log、execution metric contract，并明确其与 `task_id`、TaskRecord、failed envelope、resource trace、`FR-0016` 的 `ExecutionAttemptOutcome` / `ExecutionControlEvent` 的关联规则。
 
 ## 范围
 
@@ -52,12 +52,15 @@
 - 角色：`FR-0017` 的 formal spec closeout Work Item。
 - 阻塞：
   - 若失败分类投影不先冻结，`#227` runtime implementation 可能把 timeout / retry / concurrency 误写成新的错误分类。
-  - 若 TaskRecord、failed envelope、resource trace 与 runtime result 的关联规则不先冻结，后续失败排查会继续依赖不可审查的 adapter 私有日志。
+  - 若正常 `execution_timeout` 不继续保持 `platform + error.details.control_code=execution_timeout`，`#227` runtime implementation 会把正常 timeout 错误抬升为 `runtime_contract`。
+  - 若 accepted 前后的 concurrency rejection 不拆成 `admission_concurrency_rejected` / `retry_concurrency_rejected`，`#227` runtime implementation 会把 post-accepted retry reacquire rejection 错投为 admission rejection，或错误改写最终 failed envelope 的顶层原因。
+  - 若 TaskRecord、failed envelope、resource trace 与 `ExecutionAttemptOutcome` / `ExecutionControlEvent` 的关联规则不先冻结，后续失败排查会继续依赖不可审查的 adapter 私有日志。
 
 ## 已验证项
 
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 与 formal spec 模板要求。
 - 已核对 `FR-0005`、`FR-0008`、`FR-0011`、`FR-0013` 与 `CHORE-0138` 的相关边界和 closeout 风格。
+- 已核对 `issue-223-fr-0016-formal-spec@abba28c` 的最新 formal spec 口径，并按其 `ExecutionAttemptOutcome` / `ExecutionControlEvent`、timeout 分类、固定 retryable predicate 与 accepted 前后 concurrency rejection 边界收紧本 FR 文案。
 - 已确认当前 worktree 初始状态未存在 `FR-0017` formal spec 套件或目标 exec-plan。
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
@@ -68,7 +71,6 @@
 
 ## 未决风险
 
-- `FR-0016` formal spec 当前不在本 worktree 可见范围内；本 FR 只能以“消费 timeout / retry / concurrency 运行时结果引用”的方式表达关联，不能替代其本体 contract。
 - 若后续审查要求更严格的字段命名或 runtime result ref 形状，需要在本 formal spec 内调整，但仍不得越界到实现文件。
 
 ## 回滚方式

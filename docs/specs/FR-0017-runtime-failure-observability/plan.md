@@ -13,7 +13,7 @@
 
 ## 实施目标
 
-- 在进入 runtime implementation 前，冻结运行时失败可观测性的最小 formal contract：失败分类投影、结构化日志、最小执行指标，以及它们与 `task_id`、TaskRecord、failed envelope、resource trace、timeout / retry / concurrency 运行时结果的关联规则。
+- 在进入 runtime implementation 前，冻结运行时失败可观测性的最小 formal contract：失败分类投影、结构化日志、最小执行指标，以及它们与 `task_id`、TaskRecord、failed envelope、resource trace、`FR-0016` 的 `ExecutionAttemptOutcome` / `ExecutionControlEvent` 的关联规则。
 
 ## 分阶段拆分
 
@@ -29,6 +29,7 @@
   - 不得重写 `FR-0008` TaskRecord 状态机、终态 envelope 或持久化语义
   - 不得重写 `FR-0011` ResourceTraceEvent 或资源状态机
   - 不得重写 `FR-0016` timeout / retry / concurrency 策略
+  - 不得放宽 `FR-0016` 固定 retryable predicate、正常 timeout 分类，或 accepted 前后 concurrency rejection 边界
   - 不得创建 release / sprint 索引
 - 与上位文档的一致性约束：
   - 与 `AGENTS.md` 对“Core 负责运行时语义、Adapter 负责目标系统语义”的规则保持一致
@@ -43,8 +44,8 @@
   - `python3 scripts/workflow_guard.py --mode ci`
 - implementation 阶段：
   - unit tests：验证 `RuntimeFailureSignal` 从 failed envelope 投影 `error_category / error_code`，并拒绝分类漂移
-  - contract tests：验证结构化日志、指标与 failure signal 共享 `task_id`，并能关联 TaskRecord / envelope / resource trace / runtime result refs
-  - runtime tests：覆盖 timeout、retry exhausted、concurrency rejected、resource acquire 后 adapter failure、observability write failure 的最小分支
+  - contract tests：验证结构化日志、指标与 failure signal 共享 `task_id`，并能关联 TaskRecord / envelope / resource trace / `ExecutionAttemptOutcome` / `ExecutionControlEvent`
+  - runtime tests：覆盖正常 `execution_timeout -> platform + error.details.control_code=execution_timeout`、closeout/control-state failure -> `runtime_contract`、命中固定 retryable predicate 才允许 `retry_scheduled`、pre-accepted `admission_concurrency_rejected`、post-accepted `retry_concurrency_rejected`、resource acquire 后 adapter failure、observability write failure 的最小分支
 - 手动验证：
   - 核对文档没有引入完整 observability 平台、采集后端、指标存储或 dashboard
   - 核对 success envelope 的 `raw` / `normalized` 未被本 FR 改写
@@ -54,7 +55,7 @@
 
 - 先写测试的模块：
   - 本事项为 formal spec closeout，不涉及运行时代码或测试文件变更
-  - `#227` runtime implementation 必须先补 failure signal projection、structured log schema、minimal metrics 与 timeout / retry / concurrency 投影相关测试
+  - `#227` runtime implementation 必须先补 failure signal projection、structured log schema、minimal metrics 与 `ExecutionAttemptOutcome` / `ExecutionControlEvent` 投影相关测试
 - 暂不纳入 TDD 的模块与理由：
   - 日志采集后端、指标存储、dashboard、observability 平台集成不属于 `v0.6.0` 本 FR 范围
 
@@ -68,12 +69,15 @@
   - `#228` parent closeout 必须等待 `#227` implementation 完成、审查通过并与主干真相一致
 - 阻塞项：
   - 若失败分类投影没有先冻结，runtime implementation 会把 timeout / retry / concurrency 误写成新的错误分类
-  - 若 TaskRecord / envelope / resource trace / runtime result 的关联规则没有先冻结，后续失败排查会继续依赖不可审查的私有日志
+  - 若 TaskRecord / envelope / resource trace / runtime result carrier 的关联规则没有先冻结，后续失败排查会继续依赖不可审查的私有日志
+  - 若 accepted 前后的 concurrency rejection 不拆开，runtime implementation 会把 post-accepted retry reacquire rejection 错投为 admission rejection，或错误改写最终 failed envelope 的顶层 `error_code / error_category`
 
 ## 进入实现前条件
 
 - [ ] `spec review` 已通过
 - [ ] 关键风险已记录并有缓解策略
 - [ ] `RuntimeFailureSignal`、`RuntimeStructuredLogEvent`、`RuntimeExecutionMetricSample` 的最小字段与关联规则已冻结
+- [ ] 正常 `execution_timeout` 与 closeout/control-state failure 的 observability 投影已按 `platform` / `runtime_contract` 分界冻结
+- [ ] `admission_concurrency_rejected` 与 `retry_concurrency_rejected` 的日志/指标区分及 envelope 投影边界已冻结
 - [ ] 已明确 `#227` 是 runtime implementation 入口，`#228` 是 parent closeout 入口
 - [ ] 当前 formal spec PR 未混入实现代码、脚本、测试或 release / sprint 索引
