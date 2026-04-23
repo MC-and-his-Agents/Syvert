@@ -56,7 +56,7 @@
   - `ExecutionControlPolicy` 的非法形状必须在进入 adapter execution attempt 前 fail-closed，并复用 `FR-0005` 的 `runtime_contract` 分类；不得被宽松修复为默认无限等待、无限重试或无限并发。
   - `execution_timeout` 是 Core 控制面失败 code，必须使用 `FR-0005` 已批准的失败 envelope 顶层结构；`error.category` 继续限定在既有闭集内，不得新增 `timeout`、`retry` 或 `concurrency` category。
   - `concurrency_limit_exceeded` 是 Core control admission rejection code；当它发生在 durable `accepted` 前，调用方只能得到 failed envelope，不得查询到对应 TaskRecord。
-  - `retry_exhausted` 只能用于表达 retry 控制器已按 policy 用尽 attempts 的聚合事实；终态 envelope 不得丢失最后一次 attempt 的原始失败 code / category。后续实现可通过 `error.details.last_error` 或 `FR-0017` 冻结的 attempt signal 暴露该信息。
+  - `retry_exhausted` 只能用于表达 retry 控制器已按 policy 用尽 attempts 的 task-level 聚合事实；它不得被建模为单次 attempt outcome。终态 envelope 不得丢失最后一次 attempt 的原始失败 code / category。后续实现可通过 `error.details.last_error`、`ExecutionControlEvent` 或 `FR-0017` 冻结的 signal 暴露该信息。
   - timeout / retry / concurrency 的实现不得改写 success envelope 的 `raw` 与 `normalized` contract；成功结果继续由既有 Core success envelope 持有。
   - 执行控制不得绕过 `FR-0010` / `FR-0011` / `FR-0012` 的资源生命周期、资源追踪与 Core 注入边界；任一 timeout 或 retry path 都必须按既有资源释放 contract 结束当前 attempt。
   - CLI 与后续 HTTP API 必须把执行控制交给同一 Core 入口消费；任何只在 CLI wrapper、HTTP handler 或 adapter 私有层实现的 timeout / retry / concurrency 都不满足本 FR。
@@ -143,6 +143,14 @@ Then timeout / retry / concurrency 判断必须发生在同一 Core 控制路径
 - [ ] formal spec 明确并发限制在 `v0.6.0` 是 fail-fast，不提供队列、优先级、公平性或分布式 slot
 - [ ] formal spec 明确 late completion、资源释放、slot release 与终态幂等的 fail-closed 边界
 - [ ] formal spec 明确 CLI 与 HTTP API 必须消费同一 Core execution control path
+
+## 数据模型与迁移说明
+
+- 本 formal spec PR 只新增 requirement、data-model 与 contract 文档，不执行 runtime、store 或历史数据迁移。
+- `ExecutionControlPolicy`、`ExecutionAttemptOutcome` 与 `ExecutionControlEvent` 是 `#224` implementation 的输入 contract；它们不要求当前 PR 修改 `TaskRecord` 主状态集合、store 文件布局或既有 success / failed envelope 顶层结构。
+- `#224` 若把 attempt / control event 写入 TaskRecord 日志或 failed envelope `error.details`，必须保持 JSON-safe、append-only 与既有 TaskRecord 终态幂等语义；不得要求迁移历史 TaskRecord 才能读取旧任务。
+- `FR-0017` 可以消费本 FR 的 attempt outcome 与 control event 作为 observability 输入，但不得反向要求本 FR 引入日志后端、指标存储或新的错误 category。
+- 若后续实现发现必须新增持久化字段、store schema 或历史记录迁移，必须在对应 implementation Work Item 中显式补充迁移风险、回滚方式与测试证据；不能把该迁移隐含在当前 formal spec PR 中。
 
 ## 依赖与外部前提
 

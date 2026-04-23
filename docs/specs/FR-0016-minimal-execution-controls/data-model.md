@@ -11,7 +11,9 @@
 - 实体：`ConcurrencyLimitPolicy`
   - 用途：表达 Core 在执行 attempt 前如何按 scope 获取并发 slot
 - 实体：`ExecutionAttemptOutcome`
-  - 用途：表达单次 attempt 的控制结果，供 TaskRecord 终态、结构化日志与指标消费
+  - 用途：表达单次 adapter execution attempt 的结果，供 TaskRecord 终态、结构化日志与指标消费
+- 实体：`ExecutionControlEvent`
+  - 用途：表达不属于单次 attempt 的控制面事实，例如 admission 阶段并发拒绝与 retry 预算耗尽聚合
 
 ## 关键字段
 
@@ -29,11 +31,12 @@
 - `RetryPolicy`
   - `max_attempts`
     - 约束：正整数；包含首次执行；`1` 表示不重试
-  - `retryable_outcomes`
-    - 约束：`v0.6.0` 固定由 Core 定义，只包含 `execution_timeout` 与 `platform_failure`
-    - 禁止：调用方提供自定义 predicate、正则、脚本、错误码 DSL 或 adapter 私有 retry 规则
   - `backoff_ms`
     - 约束：非负整数毫秒；表达相邻 attempts 之间的固定等待
+- Core 固定 retryable outcome rule
+  - 约束：该规则不是 `RetryPolicy` 字段，也不是 caller-visible policy 载荷；`v0.6.0` 固定为 `execution_timeout` 与 `error.category=platform`
+  - 禁止：调用方在 policy 载荷中传入 `retryable_outcomes` 或等价 predicate；若显式出现，必须按未知策略字段 fail-closed
+  - 禁止：调用方提供正则、脚本、错误码 DSL 或 adapter 私有 retry 规则
 - `ConcurrencyLimitPolicy`
   - `scope`
     - 约束：只允许 `global`、`adapter`、`adapter_capability`
@@ -55,7 +58,23 @@
   - `terminal_envelope`
     - 约束：仅当该 attempt 形成可消费 success / failed envelope 时出现；必须复用既有 Core envelope
   - `control_code`
-    - 约束：控制面失败时使用；当前允许 `execution_timeout`、`concurrency_limit_exceeded`、`retry_exhausted`
+    - 约束：仅表达当前 attempt 自身的控制面结果；当前只允许 `execution_timeout`
+    - 禁止：在 attempt outcome 上承载 admission 阶段的 `concurrency_limit_exceeded` 或 task-level 聚合的 `retry_exhausted`
+- `ExecutionControlEvent`
+  - `task_id`
+    - 约束：非空字符串；pre-accepted admission rejection 可使用 fallback task id，但不得声称存在 durable TaskRecord
+  - `event_type`
+    - 约束：只允许 `concurrency_rejected`、`retry_exhausted`
+  - `adapter_key` / `capability`
+    - 约束：必须与请求上下文一致；无法恢复时必须使用共享 failed envelope 已批准的空值 / fallback 语义
+  - `attempt_count`
+    - 约束：`retry_exhausted` 必须为正整数且不超过 `retry.max_attempts`；`concurrency_rejected` 必须为 `0`
+  - `control_code`
+    - 约束：`concurrency_rejected -> concurrency_limit_exceeded`；`retry_exhausted -> retry_exhausted`
+  - `task_record_ref`
+    - 约束：pre-accepted concurrency rejection 必须为 `none`；retry exhausted 必须引用同一 `task_id` 的 TaskRecord
+  - `occurred_at`
+    - 约束：RFC3339 UTC 时间
 
 ## 状态与生命周期
 
@@ -80,4 +99,5 @@
   - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
 - `retry_exhausted`
   - 触发条件：retry controller 已用尽 `max_attempts` 且未获得 success
+  - 载体：必须作为 `ExecutionControlEvent(event_type=retry_exhausted)` 或 failed envelope details 中的 task-level 聚合事实出现，不得序列化为单次 attempt outcome
   - 错误分类：复用最终失败 attempt 的分类；若需要聚合 code，必须保留 `last_error`，不得丢失最终失败原因
