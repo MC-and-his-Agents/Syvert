@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0018-http-task-api-same-core-path/`
-- 关联 PR：`待创建`
+- 关联 PR：`#241`
 - 状态：`active`
 - active 收口事项：`CHORE-0153-fr-0018-formal-spec-closeout`
 
@@ -36,7 +36,7 @@
 - `issue-229-fr-0018-formal-spec` 已作为 `#229` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0018` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / 相邻 FR。
 - 本轮目标是把 HTTP `submit/status/result` service surface、same-core-path 边界、`TaskRecord` durable truth 复用约束、`FR-0016` control 语义投影、`FR-0017` observability 依赖、风险与后续拆分一次性落盘到 implementation-ready formal spec。
-- 当前 formal spec 语义基线以 `1b4da09413a82a7c52e8324f2e45d4dc8587336c` 为恢复起点；在形成新的显式 checkpoint 前，后续 metadata-only 同步不改写该基线口径。
+- 当前 formal spec 语义基线以 `d4158cb91c8429ee176b588fdeac24e8d6631813` 为恢复起点；在形成新的显式 checkpoint 前，后续 metadata-only 同步不改写该基线口径。
 
 ## 下一步动作
 
@@ -96,6 +96,9 @@
 - 若 `ExecutionControlPolicy` 的 HTTP 可见性、默认值与 caller-supplied policy 非法输入边界没有在 formal spec closeout 中钉死，实现层容易在 handler 中私自补默认值或吞掉 `invalid_input`。
 - 若 `status/result` 没有明确依赖 `FR-0017` 的结构化日志、指标与 `runtime_result_refs`，后续证据链会只剩 transport 输出，无法证明未吞错、未吞观测真相。
 - 若 requirement container 与 closeout exec-plan 没有明确 `#230/#231/#232` 的串行关系，后续回合可能重复在实现中做 requirement 决策。
+- `python3 scripts/pr_guardian.py review 241`
+  - 结果：`REQUEST_CHANGES`；阻断点为 `result_not_ready` 返回契约存在包裹歧义、success 字段命名口径不一致、非法 `task_id` 分类未冻结
+- 已修复：明确 `result` 响应体本身必须直接等于共享 envelope，不得新增 `HttpTaskResultView` 包裹层；success 字段统一为 `raw` / `normalized`；冻结 `task_id` 缺失、非法、记录不存在、store/contract 异常的 shared failed envelope code 与分类边界
 
 ## 依赖与收口语义
 
@@ -116,5 +119,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1b4da09413a82a7c52e8324f2e45d4dc8587336c`
+- `d4158cb91c8429ee176b588fdeac24e8d6631813`
 - review-sync 说明：在生成新的显式 checkpoint 之前，当前回合若只追加 PR / checks / guard / review metadata，同样按 metadata-only follow-up 处理，不伪装成新的语义 checkpoint。

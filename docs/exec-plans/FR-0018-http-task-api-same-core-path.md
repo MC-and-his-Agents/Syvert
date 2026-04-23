@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0018-http-task-api-same-core-path/`
-- 关联 PR：`待创建`
+- 关联 PR：`N/A（requirement container 不直接承载 PR；当前 formal spec 执行 PR 见 #241）`
 - 状态：`inactive requirement container`
 
 ## 说明
@@ -23,7 +23,7 @@
 - `FR-0018` 还必须消费 `FR-0017` 的失败可观测性 contract：HTTP `submit/status/result` 暴露的失败、状态与结果语义不得吞掉结构化日志、最小执行指标、`runtime_result_refs`、`task_record_ref` 或与 shared failed envelope 对应的观测真相；若 transport 无法证明这些 shared signal 已与同一 `task_id` 对齐，则必须 fail-closed，而不是返回 transport 私有摘要。
 - `FR-0018` 不纳入认证、多租户、RBAC、分布式队列、复杂查询 DSL、完整控制台或 adapter 直连旁路；若后续需要扩张这些能力，必须进入新的 formal spec。
 - `#230` 只负责落地 HTTP endpoint implementation；`#231` 只负责 CLI/API same-path regression evidence；`#232` 只负责 FR parent closeout。上述后续 Work Item 都只能消费本 requirement container 已冻结的边界，不得自行扩张 requirement。
-- 当前执行回合的 formal spec 语义基线绑定到 `1b4da09413a82a7c52e8324f2e45d4dc8587336c`；其后若只追加 PR / checks / review-sync metadata，不改写本 requirement container 的共享语义。
+- 当前执行回合的 formal spec 语义基线绑定到 `d4158cb91c8429ee176b588fdeac24e8d6631813`；其后若只追加 PR / checks / review-sync metadata，不改写本 requirement container 的共享语义。
 
 ## 依赖关系
 
@@ -33,5 +33,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1b4da09413a82a7c52e8324f2e45d4dc8587336c`
+- `d4158cb91c8429ee176b588fdeac24e8d6631813`
 - review-sync 说明：后续若只回写当前受审 PR、门禁或审查元数据，只作为 metadata-only follow-up，不伪装成新的 requirement 语义 checkpoint。
