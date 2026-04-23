@@ -57,16 +57,16 @@
 - 功能需求：
   - `v0.6.0` 发布门禁必须先满足 `FR-0007` 的版本级 gate 语义，再叠加本 FR 定义的 operability gate；本 FR 不得把旧 gate 合并、弱化或替换成新的单一矩阵。
   - operability gate 必须形成可复验的回归矩阵，至少包含四个维度：`timeout_retry_concurrency`、`failure_log_metrics`、`http_submit_status_result`、`cli_api_same_path`。
-  - timeout / retry / concurrency 矩阵必须覆盖：单任务超时、可重试失败、不可重试失败、重试上限、并发提交、并发状态查询、并发结果读取，以及同一 `task_id` 终态不可被并发路径重复改写。
-  - timeout / retry / concurrency 维度的每个 case 必须显式断言以下 policy 字段和值：`timeout_ms=30000`、`retry.max_attempts=1`、`retry.backoff_ms=0`、`concurrency.scope=global`、`concurrency.max_in_flight=1`、`concurrency.on_limit=reject`。
+  - timeout / retry / concurrency 矩阵必须覆盖：单任务超时、retryable failure 在默认 retry budget 下的 fail-closed 收口、不可重试失败、并发提交、并发状态查询、并发结果读取，以及同一 `task_id` 终态不可被并发路径重复改写。
+  - timeout / retry / concurrency 维度必须通过 gate result 的 `policy_snapshot` 固定断言以下 policy 字段和值：`timeout_ms=30000`、`retry.max_attempts=1`、`retry.backoff_ms=0`、`concurrency.scope=global`、`concurrency.max_in_flight=1`、`concurrency.on_limit=reject`；各 case 只需断言与自身直接相关的字段子集，但不得与 `policy_snapshot` 冲突。
   - retry 语义必须保持 fail-closed：只有 `execution_timeout`，或 `error.category=platform && error.details.retryable=true` 且通过 idempotency safety gate 的 transient failure 才能进入 retry；参数错误、contract violation、非法持久化记录、平台泄漏、不可归类错误不得被宽松重试掩盖。
   - `execution_timeout` case 的期望字段必须固定为 `error.category=platform` 与 `error.details.control_code=execution_timeout`；不得把该类错误投影成 `runtime_contract`。
   - pre-accepted 并发拒绝 case 的期望字段必须固定为 `error.category=invalid_input`，且期望副作用必须固定为“无 TaskRecord 创建”。
-  - post-accepted retry reacquire rejection case 的期望字段必须固定为“新增 `ExecutionControlEvent.details`”，并且固定断言“不改写上一已完成 attempt 的终态 `error.code` / `error.category`”。
+  - 若后续实现显式测试非默认 caller-supplied retry policy，则 post-accepted retry reacquire rejection 分支的期望字段必须固定为“新增 `ExecutionControlEvent.details`”，并且固定断言“不改写上一已完成 attempt 的终态 `error.code` / `error.category`”；当前默认 policy 下不把该分支列为 `v0.6.0` mandatory case。
   - concurrency 语义必须证明共享任务记录、状态迁移、终态 envelope 与日志追加在并发入口下仍保持单一 durable truth；不得出现双终态、状态回退、重复 task record、影子结果或竞态覆盖。
-  - `timeout_retry_concurrency` 的最小 mandatory case set 至少固定为：`trc-timeout-platform-control-code`、`trc-retryable-platform-retry-once`、`trc-non-retryable-fail-closed`、`trc-retry-budget-exhausted`、`trc-pre-accept-concurrency-reject`、`trc-concurrent-status-shared-truth`、`trc-concurrent-result-shared-truth`、`trc-post-accept-reacquire-reject`。
-  - failure / log / metrics 矩阵必须覆盖成功、业务失败、contract failure、timeout、retry exhausted、store unavailable、HTTP 参数错误、CLI 参数错误与 same-path violation 的可观测输出。
-  - `failure_log_metrics` 的最小 mandatory case set 至少固定为：`flm-success-observable`、`flm-business-failure-observable`、`flm-contract-failure-fail-closed`、`flm-timeout-observable`、`flm-retry-exhausted-observable`、`flm-store-unavailable-fail-closed`、`flm-http-invalid-input-observable`、`flm-cli-invalid-input-observable`、`flm-same-path-violation-observable`。
+  - `timeout_retry_concurrency` 的最小 mandatory case set 至少固定为：`trc-timeout-platform-control-code`、`trc-retryable-platform-budget-closed`、`trc-non-retryable-fail-closed`、`trc-pre-accept-concurrency-reject`、`trc-concurrent-status-shared-truth`、`trc-concurrent-result-shared-truth`。
+  - failure / log / metrics 矩阵必须覆盖成功、业务失败、contract failure、timeout、默认 retry budget 未放大、store unavailable、HTTP 参数错误、CLI 参数错误与 same-path violation 的可观测输出。
+  - `failure_log_metrics` 的最小 mandatory case set 至少固定为：`flm-success-observable`、`flm-business-failure-observable`、`flm-contract-failure-fail-closed`、`flm-timeout-observable`、`flm-retry-budget-closed-observable`、`flm-store-unavailable-fail-closed`、`flm-http-invalid-input-observable`、`flm-cli-invalid-input-observable`、`flm-same-path-violation-observable`。
   - failure 输出必须继续复用已批准的 shared failed envelope 和错误分类语义；不得为 HTTP 或 CLI 单独定义不可映射的失败格式。
   - log 证据必须至少可追溯到 durable `task_id`（当请求已进入 `accepted` 后）；对 pre-admission 且无 `TaskRecord` 的 case，必须改为可追溯到稳定 `request_ref`（或等价 `admission_ref`）、入口类型、生命周期阶段、结果状态与失败分类；不得要求记录 raw payload、账号材料、平台 token 或平台私有调试细节。
   - metrics 证据必须至少能表达可本地复验的计数或聚合结论：提交数、成功数、失败数、超时数、retry attempt 数、并发 case 计数 / case verdict、same-path case 计数 / case verdict；该最小集合必须在 gate result 的 machine-readable `metrics_snapshot`（或等价结构）中落盘。它可以是本地测试输出、结构化文件或进程内聚合，不要求外部监控系统。
@@ -80,7 +80,7 @@
   - operability gate 的总体结论必须可追溯到 `release=v0.6.0`、`FR-0019`、执行 head 或等价 revision、回归矩阵版本、必选 case 集合与每个 case 的证据。
 - 契约需求：
   - 本 FR 冻结的是 release gate 与回归矩阵 contract，不绑定唯一脚本、唯一 CI workflow、唯一 HTTP 框架、唯一 metrics 后端或唯一日志实现。
-  - gate result 至少必须表达：`release`、`fr_item_key`、`gate_id`、`baseline_gate_ref`、`matrix_version`、`cases`、`summary`、`evidence_refs`、`verdict`。
+  - gate result 至少必须表达：`release`、`fr_item_key`、`gate_id`、`execution_revision`、`baseline_gate_ref`、`matrix_version`、`cases`、`summary`、`metrics_snapshot`、`evidence_refs`、`verdict`。
   - `baseline_gate_ref` 必须指向 `FR-0007` gate 结论或其后续受控实现证据；若无法证明旧 gate 已被消费，本 FR 的 operability gate 不得单独放行。
   - `verdict` 只允许 `pass` 或 `fail`；任何缺失必选 case、case 证据不可追溯、case 结论不可信、或旧 gate 未完成的状态都必须落为 `fail`。
   - HTTP contract 只冻结 `submit/status/result` 三类能力语义，不在本 FR 固定具体 URL path、方法名、端口、鉴权方案或序列化框架；后续实现必须在 contracts 文档中保持这些入口映射到共享语义。

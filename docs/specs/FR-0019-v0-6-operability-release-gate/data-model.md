@@ -21,7 +21,9 @@
 - `OperabilityGateResult.fr_item_key`
   - 约束：固定为 `FR-0019-v0-6-operability-release-gate`。
 - `OperabilityGateResult.gate_id`
-  - 约束：稳定字符串，用于区分一次 gate 执行或一个 gate 定义版本。
+  - 约束：稳定字符串，用于区分一个 gate 定义版本；不得与执行 revision 复用同一语义。
+- `OperabilityGateResult.execution_revision`
+  - 约束：必须绑定当前 gate 执行对应的 `head_sha` 或等价 revision；缺失、不可追溯或与 evidence refs 不匹配时 gate fail。
 - `OperabilityGateResult.baseline_gate_ref`
   - 约束：必须引用 `FR-0007` 基础 gate 的可信结论；缺失时 verdict 必须为 `fail`。
 - `OperabilityGateResult.matrix_version`
@@ -102,13 +104,11 @@
 | case_id | capability | 前置条件摘要 | expected_result.fields（必须命中） | expected_result.side_effects（必须命中） |
 | --- | --- | --- | --- | --- |
 | `trc-timeout-platform-control-code` | `content_detail_by_url` | 任务被控制面超时终止 | `error.category=platform`; `error.details.control_code=execution_timeout`; `policy.timeout_ms=30000`; `policy.retry.max_attempts=1`; `policy.retry.backoff_ms=0` | 写入 `ExecutionControlEvent.details.control_code=execution_timeout`; `TaskRecord.status=failed` |
-| `trc-retryable-platform-retry-once` | `content_detail_by_url` | `error.category=platform` 且 `error.details.retryable=true`，并通过 idempotency safety gate | `error.category=platform`; `error.details.retryable=true`; `policy.retry.max_attempts=1`; `idempotency_safety_gate=pass` | retry attempt 计数递增一次；不超出一次额外 retry |
+| `trc-retryable-platform-budget-closed` | `content_detail_by_url` | `error.category=platform` 且 `error.details.retryable=true`，但默认 retry budget 不放大 | `error.category=platform`; `error.details.retryable=true`; `policy.retry.max_attempts=1`; `idempotency_safety_gate=pass`; `retry.attempts=0` | 不生成额外 retry attempt；保留原 failed envelope |
 | `trc-non-retryable-fail-closed` | `content_detail_by_url` | 不满足 retryable predicate 的 failure | `retry.predicate.match=none`; `policy.retry.max_attempts=1` | 不生成新的 retry attempt；保留原 failed envelope |
-| `trc-retry-budget-exhausted` | `content_detail_by_url` | 唯一批准 retry 已被消费 | `policy.retry.max_attempts=1`; `retry.attempts=1`; `retry.exhausted=true` | 不生成第二次 retry attempt；最终 verdict=failed |
 | `trc-pre-accept-concurrency-reject` | `content_detail_by_url` | 进入 admission 前命中全局并发上限 | `request_ref != ""`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `policy.concurrency.scope=global`; `policy.concurrency.max_in_flight=1`; `policy.concurrency.on_limit=reject`; `metrics.concurrency_case_total>=1` | `TaskRecord` 未创建 |
 | `trc-concurrent-status-shared-truth` | `content_detail_by_url` | 同一 `task_id` 被并发执行状态查询 | `status.read_a.task_id == status.read_b.task_id`; `status.read_a.status == status.read_b.status`; `case.verdict=pass`; `metrics.concurrency_case_total>=1` | 不创建额外 `TaskRecord`；不出现状态回退 |
 | `trc-concurrent-result-shared-truth` | `content_detail_by_url` | 同一 `task_id` 被并发执行结果读取 | `result.read_a.task_id == result.read_b.task_id`; `result.read_a.envelope_ref == result.read_b.envelope_ref`; `case.verdict=pass`; `metrics.concurrency_case_total>=1` | 不创建影子结果；终态不被重复改写 |
-| `trc-post-accept-reacquire-reject` | `content_detail_by_url` | 首次 attempt 完成后，retry reacquire 被拒绝 | `policy.retry.max_attempts=1`; `policy.concurrency.scope=global`; `policy.concurrency.on_limit=reject`; `metrics.concurrency_case_total>=1` | 新增 `ExecutionControlEvent.details.reacquire_rejected=true`；保留上一 attempt 的终态 `error.code` / `error.category` |
 
 ### `failure_log_metrics`
 
@@ -118,10 +118,10 @@
 | `flm-business-failure-observable` | `content_detail_by_url` | 非 timeout 的业务失败 | `error.category in {invalid_input, unsupported, platform}`; `metrics.failure_total>=1` | 结构化日志包含 `task_id`、`entrypoint`、`stage`、`error.category` |
 | `flm-contract-failure-fail-closed` | `content_detail_by_url` | shared contract / closeout / serialization truth 无法证明 | `error.category=runtime_contract`; `gate.verdict=fail` | 结构化日志包含 `error.category=runtime_contract`; 不输出 success envelope |
 | `flm-timeout-observable` | `content_detail_by_url` | timeout 作为失败结论对外可观测 | `error.category=platform`; `error.details.control_code=execution_timeout`; `metrics.timeout_total>=1` | 结构化日志包含 `task_id`、`stage`、`error.category`、`error.details.control_code` |
-| `flm-retry-exhausted-observable` | `content_detail_by_url` | 唯一批准 retry 已耗尽 | `policy.retry.max_attempts=1`; `retry.exhausted=true`; `metrics.retry_attempt_total>=1` | 结构化日志包含 retry attempt 序号与最终失败分类 |
+| `flm-retry-budget-closed-observable` | `content_detail_by_url` | retryable failure 在默认 retry budget 下未放大 | `policy.retry.max_attempts=1`; `retry.attempts=0`; `metrics.retry_attempt_total=0` | 结构化日志包含 retry budget closed、最终失败分类与 `error.details.retryable=true` |
 | `flm-store-unavailable-fail-closed` | `content_detail_by_url` | durable store / record lookup 不可用 | `error.code=task_record_unavailable`; `error.category=runtime_contract`; `gate.verdict=fail` | 结构化日志包含 store unavailable 原因；不输出看似成功的 `status/result` |
-| `flm-http-invalid-input-observable` | `content_detail_by_url` | HTTP 参数错误 | `request_ref != ""`; `entrypoint=http`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 HTTP validation failure；不创建 `TaskRecord` |
-| `flm-cli-invalid-input-observable` | `content_detail_by_url` | CLI 参数错误 | `request_ref != ""`; `entrypoint=cli`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 CLI validation failure；不创建 `TaskRecord` |
+| `flm-http-invalid-input-observable` | `content_detail_by_url` | HTTP 参数错误 | `request_ref != ""`; `entrypoint=http`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 `request_ref`、`entrypoint`、`stage`、`result.status`、`error.category`; 不创建 `TaskRecord` |
+| `flm-cli-invalid-input-observable` | `content_detail_by_url` | CLI 参数错误 | `request_ref != ""`; `entrypoint=cli`; `stage=pre_admission`; `result.status=failed`; `error.category=invalid_input`; `metrics.failure_total>=1` | 结构化日志包含 `request_ref`、`entrypoint`、`stage`、`result.status`、`error.category`; 不创建 `TaskRecord` |
 | `flm-same-path-violation-observable` | `content_detail_by_url` | CLI / HTTP shared truth 被证明发生偏离 | `same_path.verdict=fail`; `metrics.same_path_case_failure_total>=1` | 结构化日志包含 `shared_truth_mismatch_reason`; overall gate verdict=fail |
 
 ### `http_submit_status_result`
