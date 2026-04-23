@@ -95,6 +95,31 @@ class ResourceCapabilityMatcherTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_resource_requirement")
 
+    def test_matcher_rejects_none_mode_declaration_with_wrong_adapter_evidence_provenance(self) -> None:
+        wrong_provenance_refs = baseline_required_resource_requirement_declaration(
+            adapter_key="douyin",
+            capability="content_detail",
+        ).evidence_refs
+
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ResourceCapabilityMatcherInput(
+                    task_id="task-match-none-wrong-provenance",
+                    adapter_key="xhs",
+                    capability="content_detail",
+                    requirement_declaration=AdapterResourceRequirementDeclaration(
+                        adapter_key="xhs",
+                        capability="content_detail",
+                        resource_dependency_mode="none",
+                        required_capabilities=(),
+                        evidence_refs=wrong_provenance_refs,
+                    ),
+                    available_resource_capabilities=(),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
+
     def test_matcher_rejects_context_mismatch_between_input_and_declaration(self) -> None:
         with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
             match_resource_capabilities(

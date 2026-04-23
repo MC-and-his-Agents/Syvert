@@ -210,6 +210,19 @@ def approved_resource_requirement_evidence_refs() -> frozenset[str]:
     return _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS
 
 
+def approved_resource_requirement_evidence_refs_for(
+    *,
+    adapter_key: str,
+    capability: str,
+) -> frozenset[str]:
+    return frozenset(
+        evidence_ref
+        for record in _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS
+        if record.adapter_key == adapter_key and record.capability == capability
+        for evidence_ref in record.evidence_refs
+    )
+
+
 def _build_adapter_declaration(adapter_key: str, adapter: Any) -> AdapterDeclaration:
     _validate_adapter_execute(adapter_key, adapter)
     capabilities = _get_adapter_attribute(adapter, "supported_capabilities")
