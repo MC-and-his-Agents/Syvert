@@ -315,14 +315,14 @@ def _validate_resource_requirement_declarations(
         validated.append(validated_declaration)
 
     declared_capabilities = frozenset(declaration.capability for declaration in validated)
-    if declared_capabilities != supported_capabilities:
+    unexpected_capabilities = tuple(sorted(declared_capabilities - supported_capabilities))
+    if unexpected_capabilities:
         raise RegistryError(
             "invalid_adapter_resource_requirements",
-            "resource_requirement_declarations 必须完整覆盖 supported_capabilities",
+            "resource_requirement_declarations 只能声明 adapter 已支持的 capability",
             details={
                 "adapter_key": adapter_key,
-                "missing_capabilities": tuple(sorted(supported_capabilities - declared_capabilities)),
-                "unexpected_capabilities": tuple(sorted(declared_capabilities - supported_capabilities)),
+                "unexpected_capabilities": unexpected_capabilities,
             },
         )
     return tuple(validated)

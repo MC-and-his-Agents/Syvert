@@ -70,11 +70,34 @@ class DeclarativeAdapter:
         raise AssertionError("registry tests must not execute adapters")
 
 
-class IncompleteDeclarationAdapter:
+class PartialDeclarationAdapter:
+    supported_capabilities = frozenset({"content_detail", "creator_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        baseline_required_resource_requirement_declaration(
+            adapter_key="xhs",
+            capability="content_detail",
+        ),
+    )
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
+class UnsupportedDeclarationAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
-    resource_requirement_declarations = ()
+    resource_requirement_declarations = (
+        {
+            "adapter_key": "stub",
+            "capability": "creator_detail",
+            "resource_dependency_mode": "none",
+            "required_capabilities": (),
+            "evidence_refs": ("fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",),
+        },
+    )
 
     def execute(self) -> None:
         raise AssertionError("registry tests must not execute adapters")
@@ -136,9 +159,26 @@ class RegistryTests(unittest.TestCase):
             (declaration,),
         )
 
-    def test_registry_rejects_incomplete_resource_requirement_coverage(self) -> None:
+    def test_registry_allows_partial_resource_requirement_coverage(self) -> None:
+        registry = AdapterRegistry.from_mapping({"xhs": PartialDeclarationAdapter()})
+
+        declaration = registry.lookup("xhs")
+
+        self.assertIsNotNone(declaration)
+        assert declaration is not None
+        self.assertEqual(
+            declaration.resource_requirement_declarations,
+            (
+                baseline_required_resource_requirement_declaration(
+                    adapter_key="xhs",
+                    capability="content_detail",
+                ),
+            ),
+        )
+
+    def test_registry_rejects_declaration_for_unsupported_capability(self) -> None:
         with self.assertRaises(RegistryError) as context:
-            AdapterRegistry.from_mapping({"stub": IncompleteDeclarationAdapter()})
+            AdapterRegistry.from_mapping({"stub": UnsupportedDeclarationAdapter()})
 
         self.assertEqual(context.exception.code, "invalid_adapter_resource_requirements")
 
