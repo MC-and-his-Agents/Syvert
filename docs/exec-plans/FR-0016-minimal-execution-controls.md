@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0016-minimal-execution-controls/`
-- 关联 PR：`待创建`
+- 关联 PR：`#237`
 - 状态：`inactive requirement container`
 
 ## 说明

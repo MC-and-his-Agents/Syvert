@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0016-minimal-execution-controls/`
-- 关联 PR：`待创建`
+- 关联 PR：`#237`
 - 状态：`active`
 - active 收口事项：`CHORE-0147-fr-0016-formal-spec-closeout`
 
@@ -33,14 +33,12 @@
 
 - `issue-223-fr-0016-formal-spec` 已作为 `#223` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0016` formal spec 套件与两个 exec-plan，禁止越界到 runtime、tests、HTTP API 或相邻 FR。
-- formal spec 初稿已落盘，当前停点是运行本地门禁、生成 checkpoint commit，并通过受控入口创建 spec PR。
+- formal spec 套件已落盘并创建当前受审 spec PR `#237`；当前停点是等待 GitHub checks、spec review、guardian 与受控 merge gate。
 
 ## 下一步动作
 
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
-- 生成中文 Conventional Commit checkpoint。
-- 使用 `scripts/open_pr.py --class spec` 创建 `#223` 的 formal spec PR。
-- 后续在该 PR 上消费 spec review、guardian、CI 与受控 merge gate。
+- 在 PR `#237` 上消费 GitHub checks、spec review、guardian 与 merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的 requirement 语义变更。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -63,7 +61,10 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
-- 待运行：`python3 scripts/governance_gate.py --mode ci --base-sha "$(git merge-base origin/main HEAD)" --head-sha "$(git rev-parse HEAD)" --head-ref issue-223-fr-0016-formal-spec`
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-223-fr-0016-formal-spec`
+  - 结果：通过
+- `python3 scripts/open_pr.py --class spec --issue 223 --item-key CHORE-0147-fr-0016-formal-spec-closeout --item-type CHORE --release v0.6.0 --sprint 2026-S19 --title 'docs(spec): 收口 FR-0016 最小执行控制 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#237 https://github.com/MC-and-his-Agents/Syvert/pull/237`
 
 ## 未决风险
 
