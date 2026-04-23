@@ -33,7 +33,7 @@
 
 - `issue-223-fr-0016-formal-spec` 已作为 `#223` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0016` formal spec 套件与两个 exec-plan，禁止越界到 runtime、tests、HTTP API 或相邻 FR。
-- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `258239f759b276c2e0f4f0d1662e5a9b0aaecc4e`，覆盖 retry / concurrency / default policy、timeout closeout 与 policy validation 分类的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
+- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `ad14f84f8e2c6b7a3df8b266fbd204859a5b2257`，覆盖 retry / concurrency / default policy、timeout closeout、policy validation 分类、platform retry 收窄与 control-plane failure 分类的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
 
 ## 下一步动作
 
@@ -76,7 +76,7 @@
 - 已修复：明确 retryable outcome 且 `attempt_index < max_attempts` 时，Core 必须等待 `backoff_ms` 后启动下一 attempt，只有 success、不可重试失败、预算耗尽或 retry slot reacquire 被拒绝可终止任务
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 active exec-plan checkpoint 仍指向早期语义状态
-- 已修复：将 latest semantic checkpoint 刷新为 `258239f759b276c2e0f4f0d1662e5a9b0aaecc4e`，当前提交仅为 review-sync metadata follow-up，不改写 FR-0016 requirement 语义
+- 已修复：当轮将 latest semantic checkpoint 刷新到当时最新语义提交；后续 checkpoint 会随新的 guardian 语义修复继续前移
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 timeout quarantine 与 concurrency slot 释放/重试启动冲突，以及 caller-visible policy validation 被归入 `runtime_contract`
 - 已修复：timeout deadline 只进入 closeout，完成 late-result quarantine、资源释放/失效与 slot release 后才形成 retryable `execution_timeout`；caller-supplied policy 形状/值错误归入 `invalid_input`，Core 默认/内部控制状态失败才归入 `runtime_contract`
@@ -97,4 +97,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `258239f759b276c2e0f4f0d1662e5a9b0aaecc4e`
+- `ad14f84f8e2c6b7a3df8b266fbd204859a5b2257`
