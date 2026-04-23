@@ -52,24 +52,25 @@ class ResourceCapabilityMatcherTests(unittest.TestCase):
 
         self.assertEqual(result.match_status, MATCH_STATUS_UNMATCHED)
 
-    def test_matcher_keeps_none_mode_semantics_in_pure_matcher_layer(self) -> None:
-        result = match_resource_capabilities(
-            ResourceCapabilityMatcherInput(
-                task_id="task-match-none",
-                adapter_key="stub",
-                capability="content_detail",
-                requirement_declaration=AdapterResourceRequirementDeclaration(
+    def test_matcher_rejects_none_mode_declaration_without_canonical_evidence_baseline(self) -> None:
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ResourceCapabilityMatcherInput(
+                    task_id="task-match-none",
                     adapter_key="stub",
                     capability="content_detail",
-                    resource_dependency_mode="none",
-                    required_capabilities=(),
-                    evidence_refs=("matcher:none-mode",),
-                ),
-                available_resource_capabilities=(),
+                    requirement_declaration=AdapterResourceRequirementDeclaration(
+                        adapter_key="stub",
+                        capability="content_detail",
+                        resource_dependency_mode="none",
+                        required_capabilities=(),
+                        evidence_refs=("matcher:none-mode",),
+                    ),
+                    available_resource_capabilities=(),
+                )
             )
-        )
 
-        self.assertEqual(result.match_status, MATCH_STATUS_MATCHED)
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
 
     def test_matcher_rejects_context_mismatch_between_input_and_declaration(self) -> None:
         with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
@@ -117,6 +118,26 @@ class ResourceCapabilityMatcherTests(unittest.TestCase):
                         capability="content_detail",
                     ),
                     available_resource_capabilities=("account", "account"),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
+
+    def test_matcher_rejects_required_declaration_with_noncanonical_evidence_refs(self) -> None:
+        with self.assertRaises(ResourceCapabilityMatcherContractError) as context:
+            match_resource_capabilities(
+                ResourceCapabilityMatcherInput(
+                    task_id="task-match-forged-evidence",
+                    adapter_key="xhs",
+                    capability="content_detail",
+                    requirement_declaration=AdapterResourceRequirementDeclaration(
+                        adapter_key="xhs",
+                        capability="content_detail",
+                        resource_dependency_mode="required",
+                        required_capabilities=("account", "proxy"),
+                        evidence_refs=("forged:evidence",),
+                    ),
+                    available_resource_capabilities=("account", "proxy"),
                 )
             )
 

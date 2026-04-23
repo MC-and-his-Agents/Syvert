@@ -12,7 +12,6 @@ from syvert.registry import (
     AdapterResourceRequirementDeclaration,
     RegistryError,
     RESOURCE_DEPENDENCY_MODE_NONE,
-    RESOURCE_DEPENDENCY_MODE_REQUIRED,
 )
 from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.task_record import (
@@ -1515,55 +1514,38 @@ def _validate_matcher_requirement_declaration(
             },
         )
 
-    resource_dependency_mode = _require_matcher_non_empty_string(
-        raw_value.resource_dependency_mode,
-        field_name="requirement_declaration.resource_dependency_mode",
-        details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
-    )
-    if resource_dependency_mode not in {RESOURCE_DEPENDENCY_MODE_NONE, RESOURCE_DEPENDENCY_MODE_REQUIRED}:
+    try:
+        registry = AdapterRegistry.from_mapping(
+            {
+                expected_adapter_key: _MatcherRequirementValidationAdapter(
+                    supported_capability=expected_capability,
+                    requirement_declaration=raw_value,
+                )
+            }
+        )
+    except RegistryError as error:
         raise ResourceCapabilityMatcherContractError(
-            "matcher requirement_declaration.resource_dependency_mode 仅允许 none|required",
+            "matcher requirement_declaration 必须满足 FR-0013 canonical contract",
             details={
                 "task_id": task_id,
-                "adapter_key": adapter_key,
-                "capability": capability,
-                "resource_dependency_mode": resource_dependency_mode,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
+                "registry_error_code": error.code,
+                **error.details,
+            },
+        ) from error
+
+    validated_requirement = registry.lookup_resource_requirement(expected_adapter_key, expected_capability)
+    if validated_requirement is None:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须与当前 adapter/capability 上下文对齐",
+            details={
+                "task_id": task_id,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
             },
         )
-
-    required_capabilities = _normalize_available_resource_capabilities(
-        raw_value.required_capabilities,
-        task_id=task_id,
-        adapter_key=adapter_key,
-        capability=capability,
-        field_name="requirement_declaration.required_capabilities",
-    )
-    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE and required_capabilities:
-        raise ResourceCapabilityMatcherContractError(
-            "matcher requirement_declaration 在 none 模式下不得声明 required_capabilities",
-            details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
-        )
-    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_REQUIRED and not required_capabilities:
-        raise ResourceCapabilityMatcherContractError(
-            "matcher requirement_declaration 在 required 模式下必须声明 required_capabilities",
-            details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
-        )
-
-    evidence_refs = _normalize_non_empty_string_tuple(
-        raw_value.evidence_refs,
-        task_id=task_id,
-        adapter_key=adapter_key,
-        capability=capability,
-        field_name="requirement_declaration.evidence_refs",
-        allow_empty=False,
-    )
-    return AdapterResourceRequirementDeclaration(
-        adapter_key=adapter_key,
-        capability=capability,
-        resource_dependency_mode=resource_dependency_mode,
-        required_capabilities=required_capabilities,
-        evidence_refs=evidence_refs,
-    )
+    return validated_requirement
 
 
 def _normalize_available_resource_capabilities(
@@ -1673,3 +1655,20 @@ def _normalize_non_empty_string_tuple(
             details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
         )
     return tuple(values)
+
+
+class _MatcherRequirementValidationAdapter:
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({LEGACY_COLLECTION_MODE})
+
+    def __init__(
+        self,
+        *,
+        supported_capability: str,
+        requirement_declaration: AdapterResourceRequirementDeclaration,
+    ) -> None:
+        self.supported_capabilities = frozenset({supported_capability})
+        self.resource_requirement_declarations = (requirement_declaration,)
+
+    def execute(self, request: Any) -> dict[str, Any]:
+        raise AssertionError("matcher validation adapter must never execute")
