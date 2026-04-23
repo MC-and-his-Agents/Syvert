@@ -9,7 +9,7 @@
 - 实体：`HttpTaskStatusView`
   - 用途：表达 durable `TaskRecord` 当前状态的 HTTP 投影视图
 - 实体：`HttpTaskResultView`
-  - 用途：表达 durable `TaskRecord` 结果语义的 HTTP 投影视图；终态复用 shared envelope，非终态显式表示结果未就绪
+  - 用途：表达 HTTP `result` endpoint 的共享结果语义别名；它不是新的顶层包裹 schema，响应体本身必须直接等于共享 envelope
 
 ## 关键字段
 
@@ -45,21 +45,18 @@
   - `execution_control_events`
     - 约束：可选投影视图；若共享路径已把控制结果固化为 `ExecutionControlEvent`，HTTP 只能透传其共享事实，不得改写为 transport 私有状态机
 - `HttpTaskResultView`
-  - `task_id`
-    - 约束：非空字符串；来源于 durable `TaskRecord.task_id`
-  - `record_status`
-    - 约束：直接复用 durable `TaskRecord.status`
-  - `result_envelope`
-    - 约束：仅 `succeeded` / `failed` 允许出现；必须与 durable record 中的终态 envelope 完全一致
-    - 约束：success envelope 继续包含 `raw` 与 `normalized`
-    - 约束：failed envelope 继续包含 `error`
+  - 响应体
+    - 约束：必须直接等于共享 envelope，而不是 `{task_id, record_status, result_envelope}` 形式的 transport 包裹对象
+    - 约束：当 `TaskRecord.status=succeeded` 时，响应体必须与 durable record 中的 success envelope 完全一致，并继续包含共享字段 `raw` 与 `normalized`
+    - 约束：当 `TaskRecord.status=failed` 时，响应体必须与 durable record 中的 failed envelope 完全一致，并继续包含共享 `error`
+    - 约束：当 `TaskRecord.status=accepted|running` 时，响应体必须固定为 `result_not_ready` / `invalid_input` 的 shared failed envelope
+    - 约束：若 `task_id` 对应 durable record 不存在，响应体必须固定为 `task_record_not_found` / `invalid_input` 的 shared failed envelope
+    - 约束：若 `task_id` 形状非法或不满足共享任务键 contract，响应体必须固定为 `invalid_task_id` / `runtime_contract` 的 shared failed envelope
+    - 约束：若 store、record contract、closeout/control-state truth 或共享序列化不可信，响应体必须固定为 `task_record_unavailable` / `runtime_contract` 的 shared failed envelope
     - 约束：若失败由控制面 `execution_timeout` 收口，必须保留 `error.category=platform` 与 `error.details.control_code=execution_timeout`
     - 约束：若失败属于 closeout/control-state truth 失效，必须保留 `runtime_contract` 分类
     - 约束：post-accepted retry reacquire rejection 不得借由 HTTP result 改写上一已完成 attempt 的终态 `error.code` / `error.category`
-  - `runtime_result_refs`
-    - 约束：可选数组；若共享结果已持有相关 ref，HTTP result 视图必须原样保留这些 ref
-  - `error`
-    - 约束：当结果未就绪、record 不存在、record 不可用或共享 contract 无法证明时，继续复用 shared failed envelope 语义；不得引入 API 私有错误 carrier
+    - 约束：若共享 envelope 已持有 `runtime_result_refs`，HTTP result 响应体必须原样保留这些 ref
     - 约束：retryable predicate 不是整个 `platform` category；只有 `execution_timeout` 控制结果，或 `error.category=platform` 且 `error.details.retryable=true` 的瞬态失败，才允许进入共享 retry 判定
 
 ## 生命周期
