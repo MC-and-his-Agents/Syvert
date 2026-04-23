@@ -49,12 +49,12 @@
 
 - `issue-233-fr-0019-formal-spec` 已作为 `#233` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / scripts / release / sprint 索引。
-- 当前目标是形成可进入 spec review 的 formal spec checkpoint。
+- 当前目标是将 rebase 到 `origin/main`（已包含 `#237`、`#239`、`#241`）后的 formal spec checkpoint 送入 spec review / PR 创建链路。
 
 ## 下一步动作
 
-- 运行 formal spec、docs、workflow 三项 guard。
-- 若 guard 通过，进入 spec review / PR 创建链路。
+- 回填 rebase 后 checkpoint 与 guard 结果，确保 `FR-0016`、`FR-0017`、`FR-0018` 依赖锚点全部对齐 `origin/main` 真相。
+- 创建 spec PR，并在关联 PR 建立后把 `待创建` 回写为实际 PR 编号。
 - spec review 通过后，由 `#234` 进入 release gate matrix implementation。
 - `#235` 负责 parent closeout，把目标、文档、审查、门禁、主干真相与 GitHub 状态收成一致。
 
@@ -73,7 +73,7 @@
 
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 与 formal spec 模板。
 - 已核对 `FR-0007` / `FR-0008` / `FR-0009` / `FR-0015` 的 formal spec 风格与相关语义边界。
-- 已按本事项输入同步 `FR-0016`（timeout/retry/concurrency 控制面）、`FR-0017`（结构化 log/metrics/refs）、`FR-0018`（HTTP+CLI same Core path）的规范性依赖到 FR-0019 文档。
+- 已按本事项输入同步 `FR-0016`（timeout/retry/concurrency 控制面）、`FR-0017`（结构化 log/metrics/refs）、以及已合入 `origin/main` 的 `FR-0018` / `#241`（HTTP+CLI same Core path）的规范性依赖到 FR-0019 文档。
 - 已核对 `CHORE-0138-fr-0013-formal-spec-closeout.md` 的 active closeout exec-plan 结构。
 
 ## 未决风险
@@ -89,4 +89,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `25117581a4f24a50cedaf86f380270f0663e4712`
+- `8bc424f21834da91d8582555af958b695265910b`

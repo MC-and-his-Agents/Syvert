@@ -42,15 +42,14 @@
 
 - `issue-233-fr-0019-formal-spec` worktree 已用于 `#233` formal spec closeout。
 - 当前回合只允许修改 `FR-0019` formal spec 套件与两个 exec-plan。
-- 已完成初版 formal spec、plan、risks、data-model、contracts README 与两个 exec-plan 的落盘。
-- 当前停点是运行三项 guard，并把实际验证命令与结果同步回本 exec-plan。
+- 已完成初版 formal spec、plan、risks、data-model、contracts README 与两个 exec-plan 的落盘，并已 rebase 到包含 `#237`、`#239`、`#241` 的 `origin/main`。
+- 当前停点是同步 rebase 后 checkpoint 与 guard 结果，并进入 PR 创建链路。
 
 ## 下一步动作
 
-- 运行：`python3 scripts/spec_guard.py --mode ci --all`。
-- 运行：`python3 scripts/docs_guard.py --mode ci`。
-- 运行：`python3 scripts/workflow_guard.py --mode ci`。
-- 若 guard 通过，准备进入 spec review / PR 创建链路；关联 PR 创建后将 `关联 PR` 从 `待创建` 更新为实际 PR。
+- 创建 spec PR；关联 PR 创建后将 `关联 PR` 从 `待创建` 更新为实际 PR。
+- 回填 PR 编号、guardian verdict 与最终 merge gate 证据。
+- spec review 通过后，由 `#234` 进入 release gate matrix implementation；`#235` 继续 parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,14 +68,18 @@
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md`。
 - 已核对 formal spec 模板：`docs/specs/_template/spec.md`、`docs/specs/_template/plan.md`、`docs/specs/_template/risks.md`、`docs/specs/_template/data-model.md`。
 - 已核对参考 spec：`FR-0007`、`FR-0008`、`FR-0009`、`FR-0015`。
-- 已按本事项要求对齐 `FR-0016`、`FR-0017`、`FR-0018` 最新语义，并同步到 `FR-0019` gate matrix 字段级断言。
+- `git rebase origin/main`
+  - 结果：已将当前 checkpoint 重放到包含 `#237`、`#239`、`#241` 的 `origin/main`，确保 `FR-0016`、`FR-0017`、`FR-0018` 依赖以主干真相为准。
+- 已按本事项要求对齐 `FR-0016`、`FR-0017`、以及已合入 `origin/main` 的 `FR-0018` / `#241` 语义，并同步到 `FR-0019` gate matrix 字段级断言。
 - 已核对参考 exec-plan：`docs/exec-plans/CHORE-0138-fr-0013-formal-spec-closeout.md`。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过。
+  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-233-fr-0019-formal-spec`
+  - 结果：已确认 checkpoint `8bc424f21834da91d8582555af958b695265910b` 通过。
 
 ## 未决风险
 
@@ -91,4 +94,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `25117581a4f24a50cedaf86f380270f0663e4712`
+- `8bc424f21834da91d8582555af958b695265910b`
