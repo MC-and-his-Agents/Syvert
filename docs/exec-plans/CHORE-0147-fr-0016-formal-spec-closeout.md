@@ -33,7 +33,7 @@
 
 - `issue-223-fr-0016-formal-spec` 已作为 `#223` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0016` formal spec 套件与两个 exec-plan，禁止越界到 runtime、tests、HTTP API 或相邻 FR。
-- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `ad14f84f8e2c6b7a3df8b266fbd204859a5b2257`，覆盖 retry / concurrency / default policy、timeout closeout、policy validation 分类、platform retry 收窄与 control-plane failure 分类的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
+- formal spec 套件已落盘并创建当前受审 spec PR `#237`；最新语义 checkpoint 已刷新到 `8d1b56183fc18c21454c461f1102baa26123bedf`，覆盖 retry / concurrency / default policy、timeout closeout、policy validation 分类、platform retry 收窄与 control-plane failure 分类的 guardian 反馈修复；当前停点是等待 latest guardian 与受控 merge gate。
 
 ## 下一步动作
 
@@ -100,4 +100,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `ad14f84f8e2c6b7a3df8b266fbd204859a5b2257`
+- `8d1b56183fc18c21454c461f1102baa26123bedf`
