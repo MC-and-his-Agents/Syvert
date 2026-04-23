@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | observability 层重新发明错误分类 | 与 `FR-0005` 冲突，导致同一失败在 envelope、日志与指标中分类不一致 | 明确 `error_category` 只能从 failed envelope 投影，timeout / retry / concurrency 只能进入 `failure_phase` 或引用 | 回滚私有分类字段，恢复 `FR-0005` 分类投影 |
 | 正常 `execution_timeout` 被误投影为 `runtime_contract` | timeout 失败被错误视为 contract breakage，破坏 `FR-0016` closeout 语义 | 明确正常 timeout 继续投影为 `platform`，并保留 `error.details.control_code=execution_timeout`；只有 closeout / control-state failure 才是 `runtime_contract` | 回滚错误分类漂移，恢复 `execution_timeout -> platform` 投影 |
-| 结构化日志脱离 `task_id` / TaskRecord | 失败无法从 GitHub / repo 语义真相追溯到具体任务历史 | 所有 signal、event、metric 均强制携带 `task_id`；进入 `accepted` 后必须引用 TaskRecord | 回滚不可关联日志，恢复 task-bound carrier |
+| 结构化日志脱离 `task_id` / TaskRecord | 失败无法从 GitHub / repo 语义真相追溯到具体任务历史 | 所有 signal、event、metric 均强制携带 `task_id`；进入 `accepted` 后必须能通过 `task_id + failure_signal_id + envelope_ref/task_record_ref` 追溯到同一任务历史 | 回滚不可关联日志，恢复 task-bound carrier |
 | observability 写入失败吞掉原始业务失败 | 排查时只能看到日志失败，看不到真正业务失败 envelope | 规定 observability 自身失败必须暴露 `observability_write_failed`，且不得丢弃原始 failed envelope | 回滚吞错路径，恢复原始 failed envelope 优先 |
 | accepted 前后 concurrency rejection 被混写成同一事件 | post-accepted retry reacquire rejection 可能被误投影成 admission rejection，或错误改写最终 failed envelope 顶层原因 | 日志与指标显式区分 `admission_concurrency_rejected` / `retry_concurrency_rejected`；前者保留 `invalid_input + task_record_ref=none`，后者只通过 `ExecutionControlEvent` / details 暴露控制事件 | 回滚混写事件名和指标名，恢复 accepted 前后分流 |
 | 与 `FR-0016` timeout / retry / concurrency 本体边界混淆 | 本 FR 反向定义调度、重试、锁或并发策略，造成相邻 FR 冲突 | 本 FR 只消费 `FR-0016` 的 `ExecutionAttemptOutcome` / `ExecutionControlEvent`，不定义策略或状态机 | 回滚策略性语句，只保留 carrier 引用与可观测投影 |

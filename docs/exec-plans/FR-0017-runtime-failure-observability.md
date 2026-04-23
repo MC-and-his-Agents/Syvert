@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0017-runtime-failure-observability/`
-- 关联 PR：`待创建`
+- 关联 PR：`N/A（requirement container 不直接承载 PR；当前 formal spec 执行 PR 见 #239）`
 - 状态：`inactive requirement container`
 
 ## 说明

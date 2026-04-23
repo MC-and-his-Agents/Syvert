@@ -71,6 +71,9 @@
 - `python3 scripts/pr_guardian.py review 239`
   - 结果：`REQUEST_CHANGES`；阻断点为 metric carrier 必填字段与 spec 冻结字段冲突、structured log 字段清单缺少 `adapter_key / capability`、failure signal 引用字段口径未统一
 - 已修复：统一 `RuntimeExecutionMetricSample` 的 `error_category / error_code / failure_phase` 为必填字段；补齐 `RuntimeStructuredLogEvent.adapter_key / capability`；明确 `RuntimeFailureSignal.resource_trace_refs / runtime_result_refs` 必须存在且无相关事实时为空集合
+- `python3 scripts/pr_guardian.py review 239`
+  - 结果：`REQUEST_CHANGES`；阻断点为 `RuntimeFailureSignal` 在 spec 中缺少 refs 字段闭包、observability 自身故障语义未闭合、requirement container PR 元数据与风险缓解表述不一致
+- 已修复：在 spec 中补齐 `resource_trace_refs / runtime_result_refs`；明确 observability 链路故障只通过 `observability_write_failed` 结构化事件暴露，不单独伪造新的 `RuntimeFailureSignal`；将 requirement container `关联 PR` 改为 `N/A` 并修正风险项的 TaskRecord 追溯表述
 
 ## 未决风险
 

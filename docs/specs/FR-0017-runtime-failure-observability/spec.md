@@ -52,6 +52,8 @@
     - `failure_phase`
     - `envelope_ref`
     - `task_record_ref`
+    - `resource_trace_refs`
+    - `runtime_result_refs`
     - `occurred_at`
   - `error_category` 必须复用 `FR-0005` 已冻结分类集合：`invalid_input`、`unsupported`、`runtime_contract`、`platform`。本 FR 不新增 `timeout`、`retry_exhausted`、`concurrency_rejected` 等顶层错误分类；这些事实只能进入 `error_code`、`failure_phase`、运行时结果引用或 `details` 投影。
   - `error_code` 必须来自 failed envelope 的 `error.code`；结构化日志或指标不得自行把同一失败重新命名为另一 code。
@@ -83,6 +85,7 @@
     - `resource_trace_refs`
     - `runtime_result_refs`
   - `event_type` 在 `v0.6.0` 的最小集合固定为：`task_accepted`、`task_running`、`attempt_started`、`attempt_finished`、`retry_scheduled`、`timeout_triggered`、`admission_concurrency_rejected`、`retry_concurrency_rejected`、`task_failed`、`task_succeeded`、`observability_write_failed`。
+  - `observability_write_failed` 只允许作为 `RuntimeStructuredLogEvent` 暴露 observability 链路自身故障；除非原始业务 failed envelope 本身就是该失败来源，否则不得为 observability 写入故障单独创建第二条 `RuntimeFailureSignal`。
   - `retry_scheduled` 只允许在前一失败命中 `FR-0016` 固定 retryable predicate 时出现：该失败必须是 closeout 完成后的 `execution_timeout`，或 `error.category=platform` 且 `error.details.retryable=true` 的 transient failure，并通过 idempotency safety gate；当前批准 capability 仅限 `content_detail_by_url`。
   - `level` 只表达日志严重度，最小允许 `info`、`warning`、`error`；不得把 `level` 当作错误分类或失败阶段。
   - `RuntimeExecutionMetricSample` 至少必须包含：
@@ -170,7 +173,7 @@ Then 失败日志或失败信号必须能通过引用关联相关 `lease_id / bu
 
 Given observability 写入结构化日志或指标时发生自身错误  
 When 原始业务失败已经产生 failed envelope  
-Then Core 不得丢弃原始 failed envelope；必须以 `observability_write_failed` 事件或等价失败信号暴露 observability 链路故障，并保持原始失败可追溯
+Then Core 不得丢弃原始 failed envelope；必须以 `observability_write_failed` 结构化事件暴露 observability 链路故障，并保持原始 failed envelope、failure signal 与相关引用可追溯；不得为该链路故障再伪造一条脱离业务 failed envelope 的独立 `RuntimeFailureSignal`
 
 ## 异常与边界场景
 

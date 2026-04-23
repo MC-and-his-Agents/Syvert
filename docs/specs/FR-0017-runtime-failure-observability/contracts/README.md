@@ -20,7 +20,7 @@
   - 约束：`status` 固定为 `failed`；`error_category` 与 `error_code` 必须从 failed envelope 投影；pre-accepted admission rejection 也必须引用 failed envelope；`resource_trace_refs` / `runtime_result_refs` 必须存在，无相关上游事实时使用空集合
 - `RuntimeStructuredLogEvent`
   - 必填字段：`event_id`、`task_id`、`event_type`、`level`、`occurred_at`、`message`、`adapter_key`、`capability`、`attempt_index`、`failure_signal_id`、`resource_trace_refs`、`runtime_result_refs`
-  - 约束：失败相关日志必须引用对应 failure signal；生命周期日志不得把 `level` 当作错误分类；`retry_scheduled` 只允许用于命中 `FR-0016` 固定 retryable predicate 且通过 idempotency safety gate 的结果，当前批准 capability 仅 `content_detail_by_url`
+  - 约束：失败相关日志必须引用对应 failure signal；生命周期日志不得把 `level` 当作错误分类；`retry_scheduled` 只允许用于命中 `FR-0016` 固定 retryable predicate 且通过 idempotency safety gate 的结果，当前批准 capability 仅 `content_detail_by_url`；`observability_write_failed` 仅用于暴露 observability 链路自身故障，不得因此单独伪造一条脱离业务 failed envelope 的 `RuntimeFailureSignal`
 - `RuntimeExecutionMetricSample`
   - 必填字段：`metric_id`、`task_id`、`metric_name`、`metric_value`、`unit`、`adapter_key`、`capability`、`error_category`、`error_code`、`failure_phase`、`attempt_index`、`occurred_at`
   - 约束：失败相关指标必须可关联 `error_category`、`error_code` 与 `failure_phase`；成功或生命周期指标必须保留这些字段并以空字符串表达不适用，不得省略字段

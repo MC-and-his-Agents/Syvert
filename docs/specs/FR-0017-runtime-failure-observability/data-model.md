@@ -64,6 +64,8 @@
     - 约束：人类可读摘要；不得作为唯一机器判定来源
   - `occurred_at`
     - 约束：RFC3339 UTC 时间戳
+  - `observability_write_failed` 特例
+    - 约束：仅用于表达 observability 链路自身故障；不得因此单独创建第二条脱离业务 failed envelope 的 `RuntimeFailureSignal`
 - `RuntimeExecutionMetricSample`
   - `metric_id`
     - 约束：非空字符串；相同 id 重复写入必须 payload 完全一致
