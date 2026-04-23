@@ -105,6 +105,7 @@
   - 错误分类：复用 `FR-0005` 的 `invalid_input`，不得归入 `runtime_contract`
 - Core default/control state violation
   - 触发条件：Core 默认 policy 物化失败、slot accounting 不可信、timeout closeout 无法安全完成或内部控制状态冲突
+  - canonical `error.code`：`execution_control_state_invalid`
   - 错误分类：复用 `FR-0005` 的 `runtime_contract`
 - `concurrency_limit_exceeded`
   - 触发条件：目标 scope 已达到 `max_in_flight`，且 `on_limit=reject`

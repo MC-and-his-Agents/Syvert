@@ -17,6 +17,7 @@
 - 语义：单次 adapter execution attempt 的 deadline；deadline 到达后必须先完成 timeout closeout、late-result quarantine、资源释放/失效与 slot release，之后才形成 retryable timeout outcome
 - 失败 code：`execution_timeout`
 - 错误分类：adapter execution 已进入平台语义边界且 closeout 安全完成时投影为 `platform`，并通过 `error.details.control_code=execution_timeout` 暴露控制面来源；timeout closeout 或内部控制状态失效才使用独立 `runtime_contract` failure
+- canonical control-state failure code：`execution_control_state_invalid`
 - 禁止：total deadline、无限 timeout 表达、adapter 私有 timeout 替代 Core timeout
 
 ## Retry Contract
@@ -43,6 +44,6 @@
 - durable `accepted` 前发生的 concurrency rejection 不创建伪造 TaskRecord。
 - durable `accepted` 前发生的 concurrency rejection 使用 `concurrency_limit_exceeded` failed envelope，并在 `FR-0005` 闭集内投影为 `invalid_input`，语义是当前 caller-visible admission contract 拒绝本次提交。
 - durable `accepted` 后发生的 retry slot reacquire rejection 必须把同一 TaskRecord 收口为 `failed`，保留上一已完成 attempt 的最终失败 code/category，通过 `ExecutionControlEvent(event_type=retry_concurrency_rejected, control_code=concurrency_limit_exceeded)` 与 failed envelope details 暴露控制事件，且不得再继续 retry。
-- caller-supplied policy 形状或值错误使用 `invalid_input`；Core 默认 policy、slot accounting 或 timeout closeout 内部状态失效使用 `runtime_contract`。
+- caller-supplied policy 形状或值错误使用 `invalid_input`；Core 默认 policy、slot accounting 或 timeout closeout 内部状态失效使用 `runtime_contract + execution_control_state_invalid`。
 - timeout / retry / concurrency 失败继续复用 `FR-0005` failed envelope 顶层结构。
 - 成功结果不改写 `raw` / `normalized` contract。

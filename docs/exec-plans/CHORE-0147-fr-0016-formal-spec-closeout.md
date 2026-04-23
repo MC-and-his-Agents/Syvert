@@ -67,7 +67,7 @@
   - 结果：已创建当前受审 spec PR `#237 https://github.com/MC-and-his-Agents/Syvert/pull/237`
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 字段漂移、attempt outcome 与 admission/聚合事实混用、缺少数据迁移说明
-- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，改由 Core-owned retryable predicate 承载重试判断；新增 `ExecutionControlEvent` 区分 `concurrency_rejected` 与 `retry_exhausted`；补充数据模型与迁移说明
+- 已修复：移除 caller-visible `retryable_outcomes` 字段语义，改由 Core-owned retryable predicate 承载重试判断；新增 `ExecutionControlEvent(event_type=admission_concurrency_rejected | retry_concurrency_rejected | retry_exhausted)`；补充数据模型与迁移说明
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 post-accepted retry 重新获取 concurrency slot 的状态转移未闭合、`on_limit` public contract 不一致、默认 policy 未冻结
 - 已修复：冻结完整默认 `ExecutionControlPolicy`；将 `on_limit=reject` 定义为 caller-visible required field；补充 `retry_concurrency_rejected` control event 与同一 TaskRecord failed 终态语义
@@ -83,6 +83,9 @@
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 retry contract 过度批准全部 `platform` 失败，以及正常 timeout / concurrency control-plane failure 被默认投影为 `runtime_contract`
 - 已修复：retryable predicate 收窄为完成 closeout 的 `execution_timeout` 与显式 `error.details.retryable=true` 的 transient `platform` 失败，并增加 Core idempotency safety gate；正常 `execution_timeout` 在 adapter execution 已进入平台语义边界且 closeout 安全完成时投影为 `platform`，pre-accepted concurrency rejection 投影为 `invalid_input`，post-accepted retry reacquire rejection 仅作为 control event/details 收口且不改写上一 attempt 的终态错误分类
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 control-state failure code 未在 formal contract 中闭合，以及 exec-plan 使用了不在 formal 枚举内的事件简称
+- 已修复：冻结唯一 canonical control-state failure code 为 `execution_control_state_invalid`，并将 exec-plan 中的事件命名与 formal `ExecutionControlEvent` 枚举对齐
 
 ## 未决风险
 
