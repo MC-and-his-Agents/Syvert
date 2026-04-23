@@ -83,4 +83,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待生成`
+- `25117581a4f24a50cedaf86f380270f0663e4712`
