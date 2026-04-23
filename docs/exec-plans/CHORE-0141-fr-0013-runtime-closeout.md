@@ -37,11 +37,13 @@
 
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-195-fr-0013`
 - 当前分支：`issue-195-fr-0013`
+- 当前实现 checkpoint：`db3e5b3642f58f4d2fdad7802b8d99670b6da2c9`
 - 当前状态：
   - `AdapterResourceRequirementDeclaration` 已在 registry 层落地 canonical carrier、discover/lookup API 与 fail-closed 校验。
   - xhs / douyin reference adapter 已声明 `content_detail -> required [account, proxy]` baseline declaration，并绑定到 `FR-0015` frozen evidence baseline。
   - declaration contract tests、registry tests、resource capability evidence tests 与运行时回归已经通过。
   - 待完成提交、推送、`open_pr`、guardian 与 merge gate。
+  - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `db3e5b3642f58f4d2fdad7802b8d99670b6da2c9` 对应的实现 checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
@@ -92,4 +94,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `cf5fafbf467810715d19d201ed9382268531b967`
+- `db3e5b3642f58f4d2fdad7802b8d99670b6da2c9`
