@@ -89,7 +89,7 @@
 - 更新：
   - 每次 attempt 只能产生一个 outcome
   - timeout、adapter failure 或 success 都必须结束当前 attempt 并释放 concurrency slot
-  - 若 outcome 可重试且 `attempt_index < max_attempts`，Core 可以进入下一个 attempt；否则必须收口为同一 TaskRecord 的终态
+  - 若 outcome 属于 Core 固定 retryable outcome rule，且 `attempt_index < max_attempts`，Core 必须等待 `retry.backoff_ms` 后进入下一个 attempt；只有 success、不可重试失败、retry 预算耗尽或 retry slot reacquire 被拒绝可以终止同一 TaskRecord
 - 失效/归档：
   - attempt outcome 不单独成为 durable task truth；它只能作为 TaskRecord 日志、failed envelope details、结构化日志或指标的输入
   - 若 late completion 在 timeout 后到达，它不得重新激活 attempt，也不得改写 TaskRecord 终态

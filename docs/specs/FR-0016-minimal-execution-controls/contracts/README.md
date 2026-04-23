@@ -23,7 +23,7 @@
 - Caller-visible 字段：`max_attempts`、`backoff_ms`
 - `max_attempts`：正整数，包含首次执行；`1` 表示不重试
 - `backoff_ms`：非负整数毫秒，固定等待
-- Core 固定可重试 outcome：`execution_timeout` 与 `error.category=platform`；该集合不是 caller-visible policy 字段
+- Core 固定可重试 outcome：`execution_timeout` 与 `error.category=platform`；该集合不是 caller-visible policy 字段。若 outcome 命中该集合且 `attempt_index < max_attempts`，Core 必须等待 `backoff_ms` 后进入下一 attempt
 - 禁止：指数退避、jitter、自定义 predicate、错误码 DSL、无限 retry、caller-supplied `retryable_outcomes`
 
 ## Concurrency Contract

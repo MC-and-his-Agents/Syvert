@@ -42,10 +42,10 @@
   - 若底层 adapter 或宿主无法被安全抢占，Core 仍必须隔离 late completion：deadline 后到达的 adapter 结果不得改写已产生的 failed TaskRecord 终态、不得追加第二个终态，也不得泄漏资源释放职责。
   - `retry.max_attempts` 表达包含首次执行在内的最大 attempt 数，必须为正整数；`max_attempts=1` 表示不重试。
   - `v0.6.0` 的可重试范围固定为：Core 产生的 `execution_timeout`，以及 adapter 平台执行返回的 `error.category=platform` 失败；不得把 `invalid_input`、`unsupported` 或一般 `runtime_contract` 失败默认纳入重试。
-  - `retry.backoff_ms` 表达 attempt 之间的固定等待时间，必须为非负整数毫秒；`v0.6.0` 不定义指数退避、抖动、重试预算、按错误码 DSL 或调用方自定义 predicate。
+  - `retry.backoff_ms` 表达 attempt 之间的固定等待时间，必须为非负整数毫秒；当 attempt outcome 属于固定可重试集合且 `attempt_index < max_attempts` 时，Core 必须等待 `backoff_ms` 后启动下一 attempt。`v0.6.0` 不定义指数退避、抖动、重试预算、按错误码 DSL 或调用方自定义 predicate。
   - 同一任务的所有 attempts 必须共享同一个 `task_id` 与同一条 TaskRecord 聚合根；不得为每次 retry 创建新的 durable task truth。
   - 只要任务已进入 durable `accepted` 生命周期，所有 attempt outcome 都必须最终收口到同一条 `succeeded` 或 `failed` 终态；成功 attempt 后不得继续执行后续 attempts。
-  - 当全部 attempts 耗尽仍未成功时，任务必须进入 `failed` 终态；终态 failed envelope 必须保留最终失败原因，并在 `error.details` 或后续 `FR-0017` 观测信号中表达 attempts 总数与最后一次 attempt outcome。
+  - 当全部 attempts 耗尽仍未成功时，任务必须进入 `failed` 终态；Core 不得在仍有 retry 预算且 outcome 可重试时提前终止。终态 failed envelope 必须保留最终失败原因，并在 `error.details` 或后续 `FR-0017` 观测信号中表达 attempts 总数与最后一次 attempt outcome。
   - `concurrency.max_in_flight` 表达同一并发 scope 内允许同时处于 adapter execution attempt 阶段的最大数量，必须为正整数。
   - `concurrency.on_limit` 是 caller-visible required field，`v0.6.0` 只允许 `reject`；缺失、`queue`、`wait` 或任何其他值都必须作为 policy contract violation fail-closed。
   - `concurrency.scope` 在 `v0.6.0` 只允许 `global`、`adapter`、`adapter_capability` 三类；scope 只用于 Core 内部 slot 计数，不表达租户、用户、优先级或资源 provider 选择。
@@ -147,7 +147,7 @@ Then Core 必须把同一 TaskRecord 置为 `failed`，产生 `concurrency_limit
 
 - [ ] formal spec 明确冻结 `ExecutionControlPolicy`、attempt timeout、基础 retry 与 fail-fast concurrency gate
 - [ ] formal spec 明确 `timeout_ms`、`max_attempts`、`backoff_ms`、`concurrency.scope`、`max_in_flight` 与 `on_limit=reject` 的最小字段和值域
-- [ ] formal spec 明确 retry 只覆盖 `execution_timeout` 与 `platform` 失败，不默认重试 `invalid_input`、`unsupported` 或一般 `runtime_contract`
+- [ ] formal spec 明确 retry 只覆盖 `execution_timeout` 与 `platform` 失败，并要求可重试 outcome 在仍有预算时必须进入下一 attempt；不默认重试 `invalid_input`、`unsupported` 或一般 `runtime_contract`
 - [ ] formal spec 明确所有 attempts 共享同一 `task_id` 与同一条 TaskRecord，不创建 attempt 级影子任务记录
 - [ ] formal spec 明确 timeout / retry / concurrency 失败继续复用 `FR-0005` failed envelope，不新增 error category
 - [ ] formal spec 明确并发限制在 `v0.6.0` 是 fail-fast，不提供队列、优先级、公平性或分布式 slot，并关闭 post-accepted retry reacquire 被拒绝时的 TaskRecord 终态语义
