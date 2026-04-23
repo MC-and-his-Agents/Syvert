@@ -8,7 +8,7 @@
 - release：`v0.6.0`
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0017-runtime-failure-observability/`
-- 关联 PR：`待创建`
+- 关联 PR：`#239`
 - 状态：`active`
 - active 收口事项：`CHORE-0150-fr-0017-formal-spec-closeout`
 
@@ -36,11 +36,11 @@
 
 - `issue-226-fr-0017-formal-spec` 已作为 `#226` 的独立 spec worktree 建立。
 - 当前回合只允许修改 `FR-0017` formal spec 套件与两个 exec-plan，禁止越界到 runtime / tests / scripts / release / sprint 索引或相邻 FR。
-- `FR-0017` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支首次落盘；当前 PR 尚未创建。
+- `FR-0017` formal spec 套件与 requirement container / Work Item exec-plan 已在当前分支落盘；当前受审 PR 为 `#239`。
 
 ## 下一步动作
 
-- 指定 formal spec / docs / workflow guard 已通过；下一步进入 spec review / PR 创建流程，并保持 `关联 PR` 与 GitHub 真相同步。
+- 指定 formal spec / docs / workflow guard 已通过；下一步继续完成 guardian / merge gate，并保持 `关联 PR` 与 GitHub 真相同步。
 - `spec review` 通过后，按 `plan.md` 进入 `#227` runtime implementation，再由 `#228` parent closeout 收口。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -60,7 +60,7 @@
 
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 与 formal spec 模板要求。
 - 已核对 `FR-0005`、`FR-0008`、`FR-0011`、`FR-0013` 与 `CHORE-0138` 的相关边界和 closeout 风格。
-- 已核对 `issue-223-fr-0016-formal-spec@abba28c` 的最新 formal spec 口径，并按其 `ExecutionAttemptOutcome` / `ExecutionControlEvent`、timeout 分类、固定 retryable predicate 与 accepted 前后 concurrency rejection 边界收紧本 FR 文案。
+- 已核对 `FR-0016` 已合入主干的 formal spec（PR `#237`，merge commit `295b565`）口径，并按其 `ExecutionAttemptOutcome` / `ExecutionControlEvent`、timeout 分类、固定 retryable predicate 与 accepted 前后 concurrency rejection 边界收紧本 FR 文案。
 - 已确认当前 worktree 初始状态未存在 `FR-0017` formal spec 套件或目标 exec-plan。
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
@@ -68,6 +68,9 @@
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过
+- `python3 scripts/pr_guardian.py review 239`
+  - 结果：`REQUEST_CHANGES`；阻断点为 metric carrier 必填字段与 spec 冻结字段冲突、structured log 字段清单缺少 `adapter_key / capability`、failure signal 引用字段口径未统一
+- 已修复：统一 `RuntimeExecutionMetricSample` 的 `error_category / error_code / failure_phase` 为必填字段；补齐 `RuntimeStructuredLogEvent.adapter_key / capability`；明确 `RuntimeFailureSignal.resource_trace_refs / runtime_result_refs` 必须存在且无相关事实时为空集合
 
 ## 未决风险
 

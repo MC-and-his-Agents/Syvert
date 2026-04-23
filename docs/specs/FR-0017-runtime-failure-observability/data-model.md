@@ -44,6 +44,10 @@
     - 约束：非空字符串；相同 id 的重复写入只能是 identical replay
   - `task_id`
     - 约束：非空字符串；不得出现脱离 task 的失败日志
+  - `adapter_key`
+    - 约束：必须与执行 envelope 或 admission failure 上下文一致；无法恢复时沿用共享 failed envelope 已批准的 fallback 语义
+  - `capability`
+    - 约束：必须与执行 envelope 或 admission failure 上下文一致；无法恢复时沿用共享 failed envelope 已批准的 fallback 语义
   - `event_type`
     - 约束：只允许 `task_accepted`、`task_running`、`attempt_started`、`attempt_finished`、`retry_scheduled`、`timeout_triggered`、`admission_concurrency_rejected`、`retry_concurrency_rejected`、`task_failed`、`task_succeeded`、`observability_write_failed`
   - `level`
@@ -74,7 +78,7 @@
   - `adapter_key` / `capability`
     - 约束：必须与执行上下文一致
   - `error_category` / `error_code` / `failure_phase`
-    - 约束：失败相关指标必须与 `RuntimeFailureSignal` 一致；成功或生命周期计数可为空
+    - 约束：字段必须存在；失败相关指标必须与 `RuntimeFailureSignal` 一致；成功或生命周期计数可使用空字符串表达不适用，不得省略字段
   - `attempt_index`
     - 约束：非负整数；非 attempt 指标可使用 `0`；`admission_concurrency_rejected_total` 必须为 `0`，`retry_concurrency_rejected_total` 表达上一已完成 attempt 的索引，不表示创建了新的 attempt outcome
   - `occurred_at`

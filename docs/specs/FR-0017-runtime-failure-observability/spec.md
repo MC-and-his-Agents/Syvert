@@ -100,6 +100,7 @@
     - `occurred_at`
   - `metric_name` 在 `v0.6.0` 的最小集合固定为：`task_started_total`、`task_succeeded_total`、`task_failed_total`、`attempt_started_total`、`retry_scheduled_total`、`timeout_total`、`admission_concurrency_rejected_total`、`retry_concurrency_rejected_total`、`execution_duration_ms`。
   - 计数型指标的 `metric_value` 必须为非负整数；duration 型指标的 `metric_value` 必须为非负数且 `unit=ms`。
+  - `RuntimeExecutionMetricSample.error_category`、`error_code`、`failure_phase` 是必填字段；失败相关指标必须与同一 `RuntimeFailureSignal` 一致，成功或生命周期指标必须以空字符串表达不适用，不得省略字段。
   - timeout / retry / concurrency 事实必须通过 `runtime_result_refs` 关联 `FR-0016` carrier：attempt 级结果只允许引用 `ExecutionAttemptOutcome`，task-level control fact 只允许引用 `ExecutionControlEvent`；不得在本 FR 中重新定义其调度、锁、队列或重试策略。
   - pre-accepted concurrency rejection 的 observability 投影必须保留 `concurrency_limit_exceeded` failed envelope 与 `invalid_input` 分类，同时显式记录 `task_record_ref=none`；post-accepted retry reacquire rejection 只能通过 `ExecutionControlEvent(event_type=retry_concurrency_rejected, control_code=concurrency_limit_exceeded)`、结构化日志、指标或 envelope details 记录，不得改写上一已完成 attempt 的终态 `error_code / error_category`。
   - 若存在 `FR-0011` 的资源追踪事件，结构化日志和失败信号必须通过 `resource_trace_refs` 或等价引用关联相关 `lease_id / bundle_id / resource_id`；若失败发生在资源 acquire 前，则必须显式为空集合。
