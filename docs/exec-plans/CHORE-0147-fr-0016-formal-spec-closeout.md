@@ -57,9 +57,12 @@
 
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/README.md` 的 formal spec 与 Work Item 边界。
 - 已核对 `FR-0005` 错误模型、`FR-0008` TaskRecord、`FR-0009` CLI/Core 同路径、`FR-0010` 到 `FR-0015` 资源相关 contract。
-- 待运行：`python3 scripts/spec_guard.py --mode ci --all`
-- 待运行：`python3 scripts/docs_guard.py --mode ci`
-- 待运行：`python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
 - 待运行：`python3 scripts/governance_gate.py --mode ci --base-sha "$(git merge-base origin/main HEAD)" --head-sha "$(git rev-parse HEAD)" --head-ref issue-223-fr-0016-formal-spec`
 
 ## 未决风险
@@ -75,4 +78,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `待生成`
+- `86614fefe9ebfef77fea8c858c8d30cfd10ebe6c`
