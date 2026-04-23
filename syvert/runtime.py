@@ -272,7 +272,10 @@ def execute_task_internal(
     try:
         registry = AdapterRegistry.from_mapping(adapters)
     except RegistryError as error:
-        if error.code == "invalid_adapter_resource_requirements":
+        if (
+            error.code == "invalid_adapter_resource_requirements"
+            and error.details.get("adapter_key") == adapter_key
+        ):
             # Runtime only admits declarations that registry can materialize.
             # Pure matcher-only `none` semantics stay unreachable here until FR-0013
             # freezes a canonical runtime declaration baseline for that mode.

@@ -387,6 +387,25 @@ class InvalidResourceRequirementDeclarationAdapter:
         raise AssertionError("execute should not be called")
 
 
+class InvalidSiblingResourceRequirementDeclarationAdapter:
+    adapter_key = "douyin"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        {
+            "adapter_key": "douyin",
+            "capability": "content_detail",
+            "resource_dependency_mode": "required",
+            "required_capabilities": ("account", "browser_state"),
+            "evidence_refs": ("fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",),
+        },
+    )
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
 class NoneModeResourceRequirementDeclarationAdapter:
     adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
@@ -891,6 +910,25 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             envelope["error"]["details"]["registry_error_code"],
             "invalid_adapter_resource_requirements",
         )
+
+    def test_execute_task_does_not_misclassify_sibling_declaration_failure_as_requested_invalid_resource_requirement(self) -> None:
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/posts/valid-request-invalid-sibling"),
+            ),
+            adapters={
+                TEST_ADAPTER_KEY: SuccessfulAdapter(),
+                "douyin": InvalidSiblingResourceRequirementDeclarationAdapter(),
+            },
+            task_id_factory=lambda: "task-valid-request-invalid-sibling",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_resource_requirements")
+        self.assertNotIn("registry_error_code", envelope["error"]["details"])
 
     def test_execute_task_keeps_none_mode_declarations_unreachable_until_registry_baseline_exists(self) -> None:
         with mock.patch(
