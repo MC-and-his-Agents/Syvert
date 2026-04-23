@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import unittest
 from typing import Iterator, Tuple
 
-from syvert.registry import AdapterRegistry, RegistryError
+from syvert.registry import AdapterRegistry, RegistryError, baseline_required_resource_requirement_declaration
 
 
 class SuccessfulAdapter:
@@ -55,6 +55,31 @@ class MissingExecuteAdapter:
     supported_collection_modes = frozenset({"hybrid"})
 
 
+class DeclarativeAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        baseline_required_resource_requirement_declaration(
+            adapter_key="xhs",
+            capability="content_detail",
+        ),
+    )
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
+class IncompleteDeclarationAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = ()
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
 class DuplicateAdapterRegistry(Mapping[str, object]):
     def __init__(self, adapter: object) -> None:
         self._adapter = adapter
@@ -85,6 +110,7 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("content_detail", declaration.supported_capabilities)
         self.assertIn("url", declaration.supported_targets)
         self.assertIn("hybrid", declaration.supported_collection_modes)
+        self.assertEqual(declaration.resource_requirement_declarations, ())
 
     def test_registry_discovery_is_side_effect_free(self) -> None:
         registry = AdapterRegistry.from_mapping({"stub": DiscoveryOnlyAdapter()})
@@ -92,6 +118,29 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(registry.discover_capabilities("stub"), frozenset({"content_detail"}))
         self.assertEqual(registry.discover_targets("stub"), frozenset({"url"}))
         self.assertEqual(registry.discover_collection_modes("stub"), frozenset({"hybrid"}))
+        self.assertEqual(registry.discover_resource_requirements("stub"), ())
+
+    def test_registry_materializes_resource_requirement_declaration(self) -> None:
+        registry = AdapterRegistry.from_mapping({"xhs": DeclarativeAdapter()})
+
+        declaration = registry.lookup_resource_requirement("xhs", "content_detail")
+
+        self.assertIsNotNone(declaration)
+        assert declaration is not None
+        self.assertEqual(declaration.adapter_key, "xhs")
+        self.assertEqual(declaration.capability, "content_detail")
+        self.assertEqual(declaration.resource_dependency_mode, "required")
+        self.assertEqual(declaration.required_capabilities, ("account", "proxy"))
+        self.assertEqual(
+            registry.discover_resource_requirements("xhs"),
+            (declaration,),
+        )
+
+    def test_registry_rejects_incomplete_resource_requirement_coverage(self) -> None:
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping({"stub": IncompleteDeclarationAdapter()})
+
+        self.assertEqual(context.exception.code, "invalid_adapter_resource_requirements")
 
     def test_registry_rejects_duplicate_keys(self) -> None:
         with self.assertRaises(RegistryError) as context:

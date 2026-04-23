@@ -9,6 +9,7 @@ import re
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
+from syvert.registry import baseline_required_resource_requirement_declaration
 from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 from syvert.runtime import AdapterExecutionContext, CONTENT_DETAIL, PlatformAdapterError
 
@@ -49,6 +50,12 @@ class XhsAdapter:
     supported_capabilities = frozenset({CONTENT_DETAIL})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        baseline_required_resource_requirement_declaration(
+            adapter_key=adapter_key,
+            capability=CONTENT_DETAIL,
+        ),
+    )
 
     def __init__(
         self,
