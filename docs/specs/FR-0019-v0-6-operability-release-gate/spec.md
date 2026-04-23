@@ -64,14 +64,18 @@
   - pre-accepted 并发拒绝 case 的期望字段必须固定为 `error.category=invalid_input`，且期望副作用必须固定为“无 TaskRecord 创建”。
   - post-accepted retry reacquire rejection case 的期望字段必须固定为“新增 `ExecutionControlEvent.details`”，并且固定断言“不改写上一已完成 attempt 的终态 `error.code` / `error.category`”。
   - concurrency 语义必须证明共享任务记录、状态迁移、终态 envelope 与日志追加在并发入口下仍保持单一 durable truth；不得出现双终态、状态回退、重复 task record、影子结果或竞态覆盖。
+  - `timeout_retry_concurrency` 的最小 mandatory case set 至少固定为：`trc-timeout-platform-control-code`、`trc-retryable-platform-retry-once`、`trc-non-retryable-fail-closed`、`trc-retry-budget-exhausted`、`trc-pre-accept-concurrency-reject`、`trc-concurrent-status-shared-truth`、`trc-concurrent-result-shared-truth`、`trc-post-accept-reacquire-reject`。
   - failure / log / metrics 矩阵必须覆盖成功、业务失败、contract failure、timeout、retry exhausted、store unavailable、HTTP 参数错误、CLI 参数错误与 same-path violation 的可观测输出。
+  - `failure_log_metrics` 的最小 mandatory case set 至少固定为：`flm-success-observable`、`flm-business-failure-observable`、`flm-contract-failure-fail-closed`、`flm-timeout-observable`、`flm-retry-exhausted-observable`、`flm-store-unavailable-fail-closed`、`flm-http-invalid-input-observable`、`flm-cli-invalid-input-observable`、`flm-same-path-violation-observable`。
   - failure 输出必须继续复用已批准的 shared failed envelope 和错误分类语义；不得为 HTTP 或 CLI 单独定义不可映射的失败格式。
   - log 证据必须至少可追溯到 `task_id`、入口类型、生命周期阶段、结果状态与失败分类；不得要求记录 raw payload、账号材料、平台 token 或平台私有调试细节。
   - metrics 证据必须至少能表达可本地复验的计数或聚合结论：提交数、成功数、失败数、超时数、retry attempt 数、并发 case 结论、same-path case 结论。它可以是本地测试输出、结构化文件或进程内聚合，不要求外部监控系统。
   - HTTP submit / status / result 矩阵必须证明 HTTP 入口提交任务后产生的任务记录、状态查询与结果读取均消费同一条 Core / task-record / store truth。
   - HTTP `submit` 不得绕过共享 admission、共享请求投影、Core 执行主路径或持久化建档；HTTP `status` 不得维护独立状态缓存；HTTP `result` 不得读取第二套结果文件或拼装 HTTP 私有 envelope。
+  - `http_submit_status_result` 的最小 mandatory case set 至少固定为：`http-submit-status-result-shared-truth`；该 case 必须同时证明 submit durable 建档、status 回读共享 `TaskRecord`、result 回读同一 shared envelope。
   - CLI / API same-path 矩阵必须证明 CLI `run/query` 与 HTTP `submit/status/result` 在等价请求下最终回指同一类 `TaskRecord`、同一类 shared success / failed envelope、同一套状态迁移与同一套 failure classification。
   - same-path 证明必须覆盖成功态与失败态，至少包含一个成功 case、一个 pre-admission 参数失败 case、一个 durable record 不可用 case 与一个终态结果读取 case。
+  - `cli_api_same_path` 的最小 mandatory case set 至少固定为：`same-path-success-shared-truth`、`same-path-pre-admission-invalid-input`、`same-path-durable-record-unavailable`、`same-path-terminal-result-read`。
   - 每个 matrix case 必须有稳定 case id、验证对象、入口组合、前置条件、预期结果、失败时的 gate 影响与证据引用；`expected_result` 必须写明字段路径与精确值（例如 `error.category=platform`），不得仅写“与上游一致”或同义词描述。缺失任何必需字段都必须使该 case fail-closed。
   - operability gate 的总体结论必须可追溯到 `release=v0.6.0`、`FR-0019`、执行 head 或等价 revision、回归矩阵版本、必选 case 集合与每个 case 的证据。
 - 契约需求：

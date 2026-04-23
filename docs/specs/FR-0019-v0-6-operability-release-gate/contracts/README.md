@@ -69,11 +69,46 @@
 
 ### Mandatory cases
 
+以下表格是 `data-model.md` 中 canonical mandatory matrix 的人类可读投影；`case_id` 集合、mandatory membership 与字段断言不得与 `data-model.md` 漂移。
+
+#### `timeout_retry_concurrency`
+
 | case_id | 必须断言字段和值 |
 | --- | --- |
 | `trc-timeout-platform-control-code` | `policy.timeout_ms=30000`; `policy.retry.max_attempts=1`; `policy.retry.backoff_ms=0`; `error.category=platform`; `error.details.control_code=execution_timeout` |
+| `trc-retryable-platform-retry-once` | `error.category=platform`; `error.details.retryable=true`; `policy.retry.max_attempts=1`; `idempotency_safety_gate=pass`; retry attempt 只允许增加一次 |
+| `trc-non-retryable-fail-closed` | `retry.predicate.match=none`; `policy.retry.max_attempts=1`; 不生成新的 retry attempt |
+| `trc-retry-budget-exhausted` | `policy.retry.max_attempts=1`; `retry.attempts=1`; `retry.exhausted=true`; 不生成第二次 retry attempt |
 | `trc-pre-accept-concurrency-reject` | `policy.concurrency.scope=global`; `policy.concurrency.max_in_flight=1`; `policy.concurrency.on_limit=reject`; `error.category=invalid_input`; `TaskRecord` 不存在 |
+| `trc-concurrent-status-shared-truth` | `status.read_a.task_id == status.read_b.task_id`; `status.read_a.status == status.read_b.status`; 不创建额外 `TaskRecord`；不出现状态回退 |
+| `trc-concurrent-result-shared-truth` | `result.read_a.task_id == result.read_b.task_id`; `result.read_a.envelope_ref == result.read_b.envelope_ref`; 不创建影子结果；终态不被重复改写 |
 | `trc-post-accept-reacquire-reject` | `ExecutionControlEvent.details.reacquire_rejected=true`; `forbidden_mutations` 包含“上一 attempt 终态 `error.code`/`error.category` 不变” |
-| `flm-retryable-predicate-idempotency-gate` | `retry.predicate.match` 只允许 `execution_timeout` 或 `platform_retryable`; `idempotency_safety_gate=pass`；日志字段含 `task_id/entrypoint/stage/error.category`；指标含 retry attempt 计数 |
-| `http-submit-status-result-shared-truth` | `submit.request.capability=content_detail_by_url`; `status.task_id == result.task_id`; 同一 `TaskRecord` |
-| `same-path-cli-http-success-and-failure` | 成功态：`cli.envelope.schema == http.envelope.schema`；失败态：`cli.error.category == http.error.category`；同一 `TaskRecord.task_id` |
+
+#### `failure_log_metrics`
+
+| case_id | 必须断言字段和值 |
+| --- | --- |
+| `flm-success-observable` | `result.status=succeeded`; `metrics.success_total>=1`; 结构化日志包含 `task_id/entrypoint/stage/result.status` |
+| `flm-business-failure-observable` | `error.category in {invalid_input, unsupported, platform}`; `metrics.failure_total>=1`; 结构化日志包含 `task_id/entrypoint/stage/error.category` |
+| `flm-contract-failure-fail-closed` | `error.category=runtime_contract`; `gate.verdict=fail`; 不输出 success envelope |
+| `flm-timeout-observable` | `error.category=platform`; `error.details.control_code=execution_timeout`; `metrics.timeout_total>=1` |
+| `flm-retry-exhausted-observable` | `policy.retry.max_attempts=1`; `retry.exhausted=true`; `metrics.retry_attempt_total>=1` |
+| `flm-store-unavailable-fail-closed` | `error.code=task_record_unavailable`; `error.category=runtime_contract`; `gate.verdict=fail` |
+| `flm-http-invalid-input-observable` | `entrypoint=http`; `error.category=invalid_input`; `metrics.failure_total>=1`; 不创建 `TaskRecord` |
+| `flm-cli-invalid-input-observable` | `entrypoint=cli`; `error.category=invalid_input`; `metrics.failure_total>=1`; 不创建 `TaskRecord` |
+| `flm-same-path-violation-observable` | `same_path.verdict=fail`; `metrics.same_path_failure_total>=1`; overall gate verdict=fail |
+
+#### `http_submit_status_result`
+
+| case_id | 必须断言字段和值 |
+| --- | --- |
+| `http-submit-status-result-shared-truth` | `submit.request.capability=content_detail_by_url`; `status.task_id == result.task_id`; `status.task_record_ref == result.task_record_ref`; 只存在一条共享 `TaskRecord` |
+
+#### `cli_api_same_path`
+
+| case_id | 必须断言字段和值 |
+| --- | --- |
+| `same-path-success-shared-truth` | `cli.task_record_ref == http.task_record_ref`; `cli.envelope_ref == http.envelope_ref`; 同一状态迁移 |
+| `same-path-pre-admission-invalid-input` | `cli.error.category == http.error.category == invalid_input`; `cli.error.code == http.error.code`; 两侧都不创建 `TaskRecord` |
+| `same-path-durable-record-unavailable` | `cli.error.code == http.error.code == task_record_unavailable`; `cli.error.category == http.error.category == runtime_contract`; 两侧都 fail-closed |
+| `same-path-terminal-result-read` | `cli.result.task_id == http.result.task_id`; `cli.result.envelope_ref == http.result.envelope_ref`; 共享同一组 `runtime_result_refs` |
