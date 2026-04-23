@@ -68,6 +68,9 @@
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 字段漂移、attempt outcome 与 admission/聚合事实混用、缺少数据迁移说明
 - 已修复：移除 caller-visible `retryable_outcomes` 字段语义，固定 Core retryable rule 为 `execution_timeout` 与 `error.category=platform`；新增 `ExecutionControlEvent` 区分 `concurrency_rejected` 与 `retry_exhausted`；补充数据模型与迁移说明
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 post-accepted retry 重新获取 concurrency slot 的状态转移未闭合、`on_limit` public contract 不一致、默认 policy 未冻结
+- 已修复：冻结完整默认 `ExecutionControlPolicy`；将 `on_limit=reject` 定义为 caller-visible required field；补充 `retry_concurrency_rejected` control event 与同一 TaskRecord failed 终态语义
 
 ## 未决风险
 
