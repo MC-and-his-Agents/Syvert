@@ -37,13 +37,15 @@
 
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-195-fr-0013`
 - 当前分支：`issue-195-fr-0013`
-- 当前实现 checkpoint：`db3e5b3642f58f4d2fdad7802b8d99670b6da2c9`
+- 当前实现 checkpoint：`2983cdb8088591982db96cfed2f4b69f554d9f3d`
 - 当前状态：
   - `AdapterResourceRequirementDeclaration` 已在 registry 层落地 canonical carrier、discover/lookup API 与 fail-closed 校验。
   - xhs / douyin reference adapter 已声明 `content_detail -> required [account, proxy]` baseline declaration，并绑定到 `FR-0015` frozen evidence baseline。
-  - declaration contract tests、registry tests、resource capability evidence tests 与运行时回归已经通过。
+  - guardian 首轮 review 已返回 `REQUEST_CHANGES`，阻断集中在两点：`FR-0013` 允许词汇被 `FR-0015` 动态放宽，以及 `none` 模式未对证据绑定 fail-closed。
+  - 当前 checkpoint `2983cdb8088591982db96cfed2f4b69f554d9f3d` 已按根因收口：`FR-0013` 词汇冻结为 `content_detail` / `account|proxy`，同时把 `none` 模式收紧为当前 frozen baseline 下默认拒绝。
+  - declaration contract tests、registry tests、resource capability evidence tests 与运行时回归已经在修复后重新通过。
   - 当前受审 implementation PR 已创建为 `#213`，待 guardian 与 merge gate。
-  - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `db3e5b3642f58f4d2fdad7802b8d99670b6da2c9` 对应的实现 checkpoint 与后续 review / merge gate 真相。
+  - 当前回合已进入 `metadata-only closeout follow-up`：本文件用于绑定 `2983cdb8088591982db96cfed2f4b69f554d9f3d` 对应的实现 checkpoint 与后续 review / merge gate 真相。
 
 ## 下一步动作
 
@@ -72,6 +74,10 @@
   - 结果：`Ran 43 tests in 0.099s`，`OK`
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
   - 结果：`Ran 168 tests in 2.528s`，`OK`
+- `python3 -m py_compile syvert/registry.py tests/runtime/test_adapter_resource_requirement_declaration.py tests/runtime/test_registry.py tests/runtime/test_resource_capability_evidence.py`
+  - 结果：在 guardian 修复后通过
+- `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression`
+  - 结果：在 guardian 修复后 `Ran 168 tests in 2.831s`，`OK`
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -84,6 +90,11 @@
   - 结果：通过
 - `python3 scripts/open_pr.py --class implementation --issue 195 --item-key CHORE-0141-fr-0013-runtime-closeout --item-type CHORE --release v0.5.0 --sprint 2026-S18 --title 'feat(runtime): 落地 FR-0013 适配器资源需求声明' --base main --closing fixes`
   - 结果：已创建当前受审 implementation PR `#213 https://github.com/MC-and-his-Agents/Syvert/pull/213`
+- `python3 scripts/pr_guardian.py review 213 --post-review`
+  - 结果：首轮 `REQUEST_CHANGES`
+  - 已修复阻断：
+    - `FR-0013` 声明允许词汇不再跟随 `FR-0015` 动态扩张，registry 现在冻结为 `content_detail` 与 `account|proxy`，并把 `FR-0015` 只作为一致性校验入口
+    - `resource_dependency_mode=none` 现在在缺少 frozen evidence baseline 时直接 fail-closed，不再接受与声明无关的 `evidence_refs`
 
 ## 未决风险
 
@@ -98,4 +109,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `db3e5b3642f58f4d2fdad7802b8d99670b6da2c9`
+- `2983cdb8088591982db96cfed2f4b69f554d9f3d`
