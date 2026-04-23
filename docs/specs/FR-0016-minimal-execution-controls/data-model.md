@@ -24,6 +24,9 @@
     - 约束：必须存在；必须满足 `RetryPolicy`
   - `concurrency`
     - 约束：必须存在；必须满足 `ConcurrencyLimitPolicy`
+  - 默认 policy
+    - 约束：当调用方整体缺省 policy 时，Core 必须物化 `timeout.timeout_ms=30000`、`retry.max_attempts=1`、`retry.backoff_ms=0`、`concurrency.scope=global`、`concurrency.max_in_flight=1`、`concurrency.on_limit=reject`
+    - 约束：部分缺字段的 policy 非法；不得把单个缺失字段宽松替换为默认值
 - `ExecutionTimeoutPolicy`
   - `timeout_ms`
     - 约束：正整数毫秒；表达单次 adapter execution attempt 的 deadline
@@ -43,7 +46,8 @@
   - `max_in_flight`
     - 约束：正整数；表达同一 scope 内同时处于 adapter execution attempt 阶段的最大数量
   - `on_limit`
-    - 约束：`v0.6.0` 固定为 `reject`；不得出现 `queue`、`wait`、`drop_oldest`、`priority` 或 `fair_share`
+    - 约束：caller-visible required field；`v0.6.0` 固定且只允许 `reject`
+    - 禁止：缺失、`queue`、`wait`、`drop_oldest`、`priority` 或 `fair_share`
 - `ExecutionAttemptOutcome`
   - `task_id`
     - 约束：非空字符串；同一任务的所有 attempts 必须一致
@@ -64,15 +68,15 @@
   - `task_id`
     - 约束：非空字符串；pre-accepted admission rejection 可使用 fallback task id，但不得声称存在 durable TaskRecord
   - `event_type`
-    - 约束：只允许 `concurrency_rejected`、`retry_exhausted`
+    - 约束：只允许 `admission_concurrency_rejected`、`retry_concurrency_rejected`、`retry_exhausted`
   - `adapter_key` / `capability`
     - 约束：必须与请求上下文一致；无法恢复时必须使用共享 failed envelope 已批准的空值 / fallback 语义
   - `attempt_count`
-    - 约束：`retry_exhausted` 必须为正整数且不超过 `retry.max_attempts`；`concurrency_rejected` 必须为 `0`
+    - 约束：`admission_concurrency_rejected` 必须为 `0`；`retry_concurrency_rejected` 必须等于已经完成的 attempt 数且至少为 `1`；`retry_exhausted` 必须为正整数且不超过 `retry.max_attempts`
   - `control_code`
-    - 约束：`concurrency_rejected -> concurrency_limit_exceeded`；`retry_exhausted -> retry_exhausted`
+    - 约束：`admission_concurrency_rejected -> concurrency_limit_exceeded`；`retry_concurrency_rejected -> concurrency_limit_exceeded`；`retry_exhausted -> retry_exhausted`
   - `task_record_ref`
-    - 约束：pre-accepted concurrency rejection 必须为 `none`；retry exhausted 必须引用同一 `task_id` 的 TaskRecord
+    - 约束：pre-accepted admission concurrency rejection 必须为 `none`；retry concurrency rejection 与 retry exhausted 必须引用同一 `task_id` 的 TaskRecord
   - `occurred_at`
     - 约束：RFC3339 UTC 时间
 
@@ -80,7 +84,8 @@
 
 - 创建：
   - Core 在共享 admission 通过、进入 adapter execution attempt 前，根据 `ExecutionControlPolicy` 创建 attempt 控制上下文
-  - 并发 slot 必须在 attempt 进入 adapter 前获取；获取失败时本次请求 fail-fast，不创建 durable accepted TaskRecord
+  - 并发 slot 必须在 attempt 进入 adapter 前获取；首次获取失败时本次请求 fail-fast，不创建 durable accepted TaskRecord
+  - 已 accepted 任务的 retry attempt 重新获取 slot 失败时，创建 `ExecutionControlEvent(event_type=retry_concurrency_rejected)`，并把同一 TaskRecord 收口为 failed
 - 更新：
   - 每次 attempt 只能产生一个 outcome
   - timeout、adapter failure 或 success 都必须结束当前 attempt 并释放 concurrency slot
@@ -96,6 +101,7 @@
   - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
 - `concurrency_limit_exceeded`
   - 触发条件：目标 scope 已达到 `max_in_flight`，且 `on_limit=reject`
+  - 载体：pre-accepted 拒绝必须作为 `ExecutionControlEvent(event_type=admission_concurrency_rejected)` 或 failed envelope details 出现且 `task_record_ref=none`；post-accepted retry reacquire 拒绝必须作为 `ExecutionControlEvent(event_type=retry_concurrency_rejected)` 出现并引用同一 TaskRecord
   - 错误分类：复用 `FR-0005` 的闭集，默认投影为 `runtime_contract`
 - `retry_exhausted`
   - 触发条件：retry controller 已用尽 `max_attempts` 且未获得 success

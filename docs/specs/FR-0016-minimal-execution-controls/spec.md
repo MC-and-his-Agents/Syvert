@@ -47,13 +47,16 @@
   - 只要任务已进入 durable `accepted` 生命周期，所有 attempt outcome 都必须最终收口到同一条 `succeeded` 或 `failed` 终态；成功 attempt 后不得继续执行后续 attempts。
   - 当全部 attempts 耗尽仍未成功时，任务必须进入 `failed` 终态；终态 failed envelope 必须保留最终失败原因，并在 `error.details` 或后续 `FR-0017` 观测信号中表达 attempts 总数与最后一次 attempt outcome。
   - `concurrency.max_in_flight` 表达同一并发 scope 内允许同时处于 adapter execution attempt 阶段的最大数量，必须为正整数。
+  - `concurrency.on_limit` 是 caller-visible required field，`v0.6.0` 只允许 `reject`；缺失、`queue`、`wait` 或任何其他值都必须作为 policy contract violation fail-closed。
   - `concurrency.scope` 在 `v0.6.0` 只允许 `global`、`adapter`、`adapter_capability` 三类；scope 只用于 Core 内部 slot 计数，不表达租户、用户、优先级或资源 provider 选择。
-  - `v0.6.0` 的并发限制固定为 fail-fast gate：当目标 scope 没有可用 slot 时，本次提交必须被拒绝，而不是排队等待、降级执行或绕过 gate。
+  - `v0.6.0` 的并发限制固定为 fail-fast gate：当目标 scope 没有可用 slot 时，本次提交或 retry reacquire 必须被拒绝，而不是排队等待、降级执行或绕过 gate。
   - 并发 slot 只能覆盖实际 adapter execution attempt 的运行窗口；attempt 结束、timeout、异常或任务终态收口后，Core 必须释放 slot。
   - 当并发 gate 在 durable `accepted` 建档前拒绝请求时，不得伪造已接受 TaskRecord；该失败必须返回 shared failed envelope，并由 `FR-0017` 后续定义的结构化信号记录为 admission/control rejection。
+  - 当任务已经进入 durable `accepted` 生命周期，且后续 retry attempt 在重新获取 concurrency slot 时被 fail-fast gate 拒绝时，不得创建新的 attempt outcome，也不得回退为 pre-admission failure；Core 必须把同一 TaskRecord 收口为 `failed`，使用 `concurrency_limit_exceeded` failed envelope，并通过 `ExecutionControlEvent(event_type=retry_concurrency_rejected)` 记录该 task-level control event。该失败不可重试。
   - 当任务已经持有 slot 并进入 TaskRecord 生命周期后，任何 timeout、retry exhausted、adapter 失败或资源释放异常都必须沿同一条 Core / TaskRecord 终态路径收口。
 - 契约需求：
   - `ExecutionControlPolicy` 的非法形状必须在进入 adapter execution attempt 前 fail-closed，并复用 `FR-0005` 的 `runtime_contract` 分类；不得被宽松修复为默认无限等待、无限重试或无限并发。
+  - 当调用方未提供 `ExecutionControlPolicy` 时，Core 必须物化完整默认 policy：`timeout.timeout_ms=30000`、`retry.max_attempts=1`、`retry.backoff_ms=0`、`concurrency.scope=global`、`concurrency.max_in_flight=1`、`concurrency.on_limit=reject`。只允许整体缺省；部分缺字段的 policy 仍属于非法形状。
   - `execution_timeout` 是 Core 控制面失败 code，必须使用 `FR-0005` 已批准的失败 envelope 顶层结构；`error.category` 继续限定在既有闭集内，不得新增 `timeout`、`retry` 或 `concurrency` category。
   - `concurrency_limit_exceeded` 是 Core control admission rejection code；当它发生在 durable `accepted` 前，调用方只能得到 failed envelope，不得查询到对应 TaskRecord。
   - `retry_exhausted` 只能用于表达 retry 控制器已按 policy 用尽 attempts 的 task-level 聚合事实；它不得被建模为单次 attempt outcome。终态 envelope 不得丢失最后一次 attempt 的原始失败 code / category。后续实现可通过 `error.details.last_error`、`ExecutionControlEvent` 或 `FR-0017` 冻结的 signal 暴露该信息。
@@ -119,15 +122,22 @@ Given CLI 与后续 HTTP API 提交同等请求并使用同一 `ExecutionControl
 When 二者进入 Core 执行  
 Then timeout / retry / concurrency 判断必须发生在同一 Core 控制路径，而不是分别由 CLI 或 HTTP handler 私有实现
 
+### 场景 8
+
+Given 某个任务已进入 durable `accepted` 生命周期，第一次 attempt 已释放 slot 并准备 retry，且 retry attempt 重新获取同一 scope 的 concurrency slot 时触发 `on_limit=reject`  
+When Core 收口该控制面失败  
+Then Core 必须把同一 TaskRecord 置为 `failed`，产生 `concurrency_limit_exceeded` failed envelope 与 `ExecutionControlEvent(event_type=retry_concurrency_rejected)`，不得把它当作 pre-admission failure、不得创建新的 attempt outcome，也不得继续 retry
+
 ## 异常与边界场景
 
 - 异常场景：
-  - `timeout_ms<=0`、缺失 timeout、`max_attempts<=0`、`backoff_ms<0`、`max_in_flight<=0` 或未知 concurrency scope 都必须视为 policy contract violation。
+  - `timeout_ms<=0`、缺失 timeout、`max_attempts<=0`、`backoff_ms<0`、`max_in_flight<=0`、缺失 `on_limit`、`on_limit` 非 `reject` 或未知 concurrency scope 都必须视为 policy contract violation。
   - retry controller 若试图重试 `invalid_input`、`unsupported` 或一般 `runtime_contract` 失败，必须视为越过最小重试边界。
   - timeout 后 late adapter result 试图写入 success 终态、追加第二个终态或覆盖 failed envelope，必须 fail-closed。
   - slot release 失败、slot 计数为负、同一 attempt 重复释放不同 slot 等情况必须被视为 control state violation。
 - 边界场景：
   - `max_attempts=1` 是合法最小策略，表示执行一次且不重试。
+  - 调用方整体缺省 policy 时必须使用本 spec 冻结的默认 policy；部分缺字段不是合法缺省。
   - `backoff_ms=0` 是合法最小策略，表示相邻 retry attempt 之间不额外等待。
   - 并发 gate 拒绝发生在 durable `accepted` 前时，不要求创建 TaskRecord；若未来引入队列或 accepted-before-run 语义，必须通过新的 formal spec 扩张状态机。
   - 本 FR 不要求跨进程或分布式 slot 一致性；`v0.6.0` 的并发限制只保证当前 Core runtime 边界内的最小控制语义。
@@ -136,11 +146,11 @@ Then timeout / retry / concurrency 判断必须发生在同一 Core 控制路径
 ## 验收标准
 
 - [ ] formal spec 明确冻结 `ExecutionControlPolicy`、attempt timeout、基础 retry 与 fail-fast concurrency gate
-- [ ] formal spec 明确 `timeout_ms`、`max_attempts`、`backoff_ms`、`max_in_flight` 与 `scope` 的最小字段和值域
+- [ ] formal spec 明确 `timeout_ms`、`max_attempts`、`backoff_ms`、`concurrency.scope`、`max_in_flight` 与 `on_limit=reject` 的最小字段和值域
 - [ ] formal spec 明确 retry 只覆盖 `execution_timeout` 与 `platform` 失败，不默认重试 `invalid_input`、`unsupported` 或一般 `runtime_contract`
 - [ ] formal spec 明确所有 attempts 共享同一 `task_id` 与同一条 TaskRecord，不创建 attempt 级影子任务记录
 - [ ] formal spec 明确 timeout / retry / concurrency 失败继续复用 `FR-0005` failed envelope，不新增 error category
-- [ ] formal spec 明确并发限制在 `v0.6.0` 是 fail-fast，不提供队列、优先级、公平性或分布式 slot
+- [ ] formal spec 明确并发限制在 `v0.6.0` 是 fail-fast，不提供队列、优先级、公平性或分布式 slot，并关闭 post-accepted retry reacquire 被拒绝时的 TaskRecord 终态语义
 - [ ] formal spec 明确 late completion、资源释放、slot release 与终态幂等的 fail-closed 边界
 - [ ] formal spec 明确 CLI 与 HTTP API 必须消费同一 Core execution control path
 
