@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import syvert.runtime as runtime_module
 from syvert.runtime import TaskInput, TaskRequest, execute_task, execute_task_with_record
 from syvert.task_record import (
     TaskRecordContractError,
@@ -15,7 +16,9 @@ from syvert.task_record import (
     task_record_from_dict,
     task_record_to_dict,
 )
-from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_resource_requirement_declarations
+
+TEST_ADAPTER_KEY = "xhs"
 
 
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
@@ -36,16 +39,17 @@ class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
 
 
 class SuccessfulAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         return {
             "raw": {"id": "raw-1"},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-1",
                 "content_type": "unknown",
                 "canonical_url": request.input.url,
@@ -73,10 +77,11 @@ class SuccessfulAdapter:
 
 
 class PlatformFailureAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         from syvert.runtime import PlatformAdapterError
@@ -89,7 +94,7 @@ class PlatformFailureAdapter:
 
 
 class UnsupportedCapabilityAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"creator_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
@@ -99,16 +104,17 @@ class UnsupportedCapabilityAdapter:
 
 
 class UnserializableSuccessAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         return {
             "raw": {"id": "raw-bad", "bad": object()},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-bad",
                 "content_type": "unknown",
                 "canonical_url": request.input.url,
@@ -136,16 +142,17 @@ class UnserializableSuccessAdapter:
 
 
 class OffsetTimestampSuccessAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         return {
             "raw": {"id": "raw-offset-1"},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-offset-1",
                 "content_type": "unknown",
                 "canonical_url": request.input.url,
@@ -176,11 +183,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/1"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-1",
         )
 
@@ -196,11 +203,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/2"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-2",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -211,7 +218,7 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
     def test_accepts_idempotent_terminal_rewrite_and_rejects_conflicting_terminal(self) -> None:
         snapshot = TaskRequestSnapshot(
-            adapter_key="stub",
+            adapter_key=TEST_ADAPTER_KEY,
             capability="content_detail_by_url",
             target_type="url",
             target_value="https://example.com/post/3",
@@ -221,7 +228,7 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         running = start_task_record(accepted, occurred_at="2026-04-17T10:30:01Z")
         envelope = {
             "task_id": "task-record-3",
-            "adapter_key": "stub",
+            "adapter_key": TEST_ADAPTER_KEY,
             "capability": "content_detail_by_url",
             "status": "failed",
             "error": {
@@ -244,11 +251,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_invalid_scalar_types_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3b"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-3b",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -260,11 +267,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_terminal_envelope_mismatch_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3c"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-3c",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -276,11 +283,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_success_envelope_nested_type_drift_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3cc"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-3cc",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -294,11 +301,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_failed_envelope_without_details_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3cf"),
             ),
-            adapters={"stub": PlatformFailureAdapter()},
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
             task_id_factory=lambda: "task-record-3cf",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -310,11 +317,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_failed_envelope_with_invalid_category_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3cg"),
             ),
-            adapters={"stub": PlatformFailureAdapter()},
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
             task_id_factory=lambda: "task-record-3cg",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -326,11 +333,11 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_untrusted_timeline_during_round_trip_load(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/3d"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-3d",
         )
         payload = task_record_to_dict(outcome.task_record)
@@ -344,7 +351,7 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             create_task_record(
                 "task-record-3e",
                 TaskRequestSnapshot(
-                    adapter_key="stub",
+                    adapter_key=TEST_ADAPTER_KEY,
                     capability="content_detail_by_url",
                     target_type="unsupported",
                     target_value="https://example.com/post/3e",
@@ -357,11 +364,11 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_with_record_keeps_preaccepted_failure_outside_durable_history(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/4"),
             ),
-            adapters={"stub": UnsupportedCapabilityAdapter()},
+            adapters={TEST_ADAPTER_KEY: UnsupportedCapabilityAdapter()},
             task_id_factory=lambda: "task-record-4",
         )
 
@@ -372,11 +379,11 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_with_record_builds_failed_record_for_business_failure(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/5"),
             ),
-            adapters={"stub": PlatformFailureAdapter()},
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
             task_id_factory=lambda: "task-record-5",
         )
 
@@ -385,14 +392,39 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(outcome.task_record.status, "failed")
         self.assertEqual(outcome.task_record.result.envelope["error"]["code"], "platform_broken")
 
+    def test_execute_task_with_record_builds_failed_record_for_unmatched_resource_capabilities(self) -> None:
+        with mock.patch.dict(
+            runtime_module.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
+            {(runtime_module.CONTENT_DETAIL_BY_URL, runtime_module.LEGACY_COLLECTION_MODE): ("account",)},
+            clear=True,
+        ), mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=AssertionError("acquire should not run when matcher is unmatched"),
+        ):
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/5b"),
+                ),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-record-5b",
+            )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["code"], "resource_unavailable")
+        self.assertIsNotNone(outcome.task_record)
+        self.assertEqual(outcome.task_record.status, "failed")
+        self.assertEqual(outcome.task_record.result.envelope["error"]["code"], "resource_unavailable")
+
     def test_execute_task_envelope_contract_stays_unchanged(self) -> None:
         envelope = execute_task(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/6"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-6",
         )
 
@@ -404,20 +436,20 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_preserves_stateless_replay_for_fixed_task_id(self) -> None:
         first = execute_task(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/6b"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-6b",
         )
         second = execute_task(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/6b"),
             ),
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             task_id_factory=lambda: "task-record-6b",
         )
 
@@ -427,11 +459,11 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_with_record_fails_closed_when_terminal_envelope_is_not_json_serializable(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/7"),
             ),
-            adapters={"stub": UnserializableSuccessAdapter()},
+            adapters={TEST_ADAPTER_KEY: UnserializableSuccessAdapter()},
             task_id_factory=lambda: "task-record-7",
         )
 
@@ -442,11 +474,11 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_preserves_public_envelope_when_task_record_fails_to_close(self) -> None:
         envelope = execute_task(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/8"),
             ),
-            adapters={"stub": UnserializableSuccessAdapter()},
+            adapters={TEST_ADAPTER_KEY: UnserializableSuccessAdapter()},
             task_id_factory=lambda: "task-record-8",
         )
 
@@ -458,11 +490,11 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_with_record_accepts_offset_utc_timestamp_in_success_payload(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
-                adapter_key="stub",
+                adapter_key=TEST_ADAPTER_KEY,
                 capability="content_detail_by_url",
                 input=TaskInput(url="https://example.com/post/9"),
             ),
-            adapters={"stub": OffsetTimestampSuccessAdapter()},
+            adapters={TEST_ADAPTER_KEY: OffsetTimestampSuccessAdapter()},
             task_id_factory=lambda: "task-record-9",
         )
 

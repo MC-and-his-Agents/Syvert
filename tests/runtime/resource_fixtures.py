@@ -5,6 +5,7 @@ import tempfile
 from typing import Any
 from unittest import mock
 
+from syvert.registry import baseline_required_resource_requirement_declaration
 from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceBundle, ResourceRecord
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
 from syvert.resource_trace_store import default_resource_trace_store
@@ -49,6 +50,19 @@ def proxy_material() -> dict[str, Any]:
 
 def managed_account_material(material: dict[str, Any], *, adapter_key: str) -> dict[str, Any]:
     return {**material, MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: adapter_key}
+
+
+def baseline_resource_requirement_declarations(
+    *,
+    adapter_key: str,
+    capability: str = "content_detail",
+) -> tuple[object, ...]:
+    return (
+        baseline_required_resource_requirement_declaration(
+            adapter_key=adapter_key,
+            capability=capability,
+        ),
+    )
 
 
 def build_managed_resource_bundle(
@@ -123,7 +137,7 @@ def seed_default_runtime_resources(
 
 
 class ResourceStoreEnvMixin:
-    resource_store_adapter_key = "stub"
+    resource_store_adapter_key = "xhs"
 
     def setUp(self) -> None:
         super().setUp()

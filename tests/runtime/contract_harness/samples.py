@@ -7,7 +7,10 @@ from enum import Enum
 from typing import Sequence
 
 from syvert.runtime import CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE
-from tests.runtime.contract_harness.fake_adapter import FakeAdapterScenario
+from tests.runtime.contract_harness.fake_adapter import (
+    FakeAdapterScenario,
+    HARNESS_DECLARATION_ADAPTER_KEY,
+)
 
 
 class ExpectedVerdict(Enum):
@@ -46,7 +49,7 @@ class ContractSample:
 
 
 SUCCESS_PROFILE = FakeAdapterProfile(
-    adapter_key="fake:contract-success",
+    adapter_key=HARNESS_DECLARATION_ADAPTER_KEY,
     scenario="success",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),
@@ -54,7 +57,7 @@ SUCCESS_PROFILE = FakeAdapterProfile(
 )
 
 LEGAL_FAILURE_PROFILE = FakeAdapterProfile(
-    adapter_key="fake:contract-legal-failure",
+    adapter_key=HARNESS_DECLARATION_ADAPTER_KEY,
     scenario="legal_failure",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),
@@ -62,7 +65,7 @@ LEGAL_FAILURE_PROFILE = FakeAdapterProfile(
 )
 
 VIOLATION_PROFILE = FakeAdapterProfile(
-    adapter_key="fake:contract-violation",
+    adapter_key=HARNESS_DECLARATION_ADAPTER_KEY,
     scenario="illegal_payload",
     declared_capabilities=("content_detail",),
     supported_targets=("url",),

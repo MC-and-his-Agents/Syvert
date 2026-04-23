@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from tests.runtime.resource_fixtures import baseline_resource_requirement_declarations
 from syvert.runtime import AdapterExecutionContext, PlatformAdapterError
 
 FakeAdapterScenario = Literal["success", "legal_failure", "illegal_payload"]
+HARNESS_DECLARATION_ADAPTER_KEY = "xhs"
 
 
 def _build_success_payload(url: str) -> dict[str, Any]:
@@ -47,6 +49,9 @@ class FakeContractAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=HARNESS_DECLARATION_ADAPTER_KEY
+    )
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
         self.last_request = request

@@ -32,6 +32,7 @@ from syvert.adapters.xhs import (
 )
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
+    baseline_resource_requirement_declarations,
     build_managed_resource_bundle,
     seed_default_runtime_resources,
     xhs_account_material,
@@ -1655,6 +1656,7 @@ class XhsAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
             supported_capabilities = frozenset({"content_detail"})
             supported_targets = frozenset({"url"})
             supported_collection_modes = frozenset({"hybrid"})
+            resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key="xhs")
 
             def execute(self, request: TaskRequest) -> dict[str, Any]:
                 return {

@@ -6,7 +6,7 @@ import unittest
 from unittest import mock
 
 from syvert.runtime import TaskInput, TaskRequest, execute_task
-from tests.runtime.resource_fixtures import ResourceStoreEnvMixin
+from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_resource_requirement_declarations
 
 
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
@@ -33,6 +33,7 @@ class SuccessfulAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key="xhs")
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         return {

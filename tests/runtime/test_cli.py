@@ -22,26 +22,29 @@ from syvert.task_record import (
 from syvert.task_record_store import LocalTaskRecordStore
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
+    baseline_resource_requirement_declarations,
     douyin_account_material,
     seed_default_runtime_resources,
 )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+TEST_ADAPTER_KEY = "xhs"
 
 
 class SuccessfulAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         url = request.input.url
         return {
             "raw": {"id": "raw-cli-1", "url": url},
             "normalized": {
-                "platform": "stub",
+                "platform": TEST_ADAPTER_KEY,
                 "content_id": "content-cli-1",
                 "content_type": "unknown",
                 "canonical_url": url,
@@ -69,10 +72,11 @@ class SuccessfulAdapter:
 
 
 class PlatformFailureAdapter:
-    adapter_key = "stub"
+    adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(adapter_key=TEST_ADAPTER_KEY)
 
     def execute(self, request):
         from syvert.runtime import PlatformAdapterError
@@ -155,7 +159,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "-m",
                 "syvert.cli",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
             ],
             cwd=REPO_ROOT,
             env=env,
@@ -168,7 +172,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.stdout, "")
         payload = json.loads(result.stderr)
         self.assertEqual(payload["status"], "failed")
-        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["adapter_key"], TEST_ADAPTER_KEY)
         self.assertEqual(payload["error"]["category"], "invalid_input")
         self.assertEqual(payload["error"]["code"], "invalid_cli_arguments")
 
@@ -229,7 +233,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "-m",
                 "syvert.cli",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
@@ -247,7 +251,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["adapter_key"], TEST_ADAPTER_KEY)
 
     def test_cli_persists_task_record_through_default_store_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -262,14 +266,14 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                 {"SYVERT_RESOURCE_LIFECYCLE_STORE_FILE": str(resource_store_path)},
                 clear=False,
             ):
-                seed_default_runtime_resources()
+                seed_default_runtime_resources(adapter_key=TEST_ADAPTER_KEY)
             result = subprocess.run(
                 [
                     sys.executable,
                     "-m",
                     "syvert.cli",
                     "--adapter",
-                    "stub",
+                    TEST_ADAPTER_KEY,
                     "--capability",
                     "content_detail_by_url",
                     "--url",
@@ -298,13 +302,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
             [
                 "run",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/run-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=stdout,
             stderr=stderr,
             task_id_factory=lambda: "task-cli-run-001",
@@ -315,7 +319,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["task_id"], "task-cli-run-001")
         self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["adapter_key"], TEST_ADAPTER_KEY)
 
     def test_query_subcommand_returns_persisted_success_record(self) -> None:
         store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
@@ -325,13 +329,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         legacy_exit_code = main(
             [
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/query-success-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=legacy_stdout,
             stderr=legacy_stderr,
             task_id_factory=lambda: "task-cli-query-success-1",
@@ -414,13 +418,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         legacy_exit_code = main(
             [
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/query-failed-1",
             ],
-            adapters={"stub": PlatformFailureAdapter()},
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
             stdout=legacy_stdout,
             stderr=legacy_stderr,
             task_id_factory=lambda: "task-cli-query-failed-1",
@@ -533,13 +537,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         legacy_exit_code = main(
             [
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/query-invalid-marker-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=legacy_stdout,
             stderr=legacy_stderr,
             task_id_factory=lambda: "task-cli-query-invalid-marker-1",
@@ -723,13 +727,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
             [
                 "run",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/shared-run-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=run_stdout,
             stderr=run_stderr,
             task_id_factory=lambda: "task-cli-shared-run-1",
@@ -758,13 +762,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         legacy_exit_code = main(
             [
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/shared-legacy-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=legacy_stdout,
             stderr=legacy_stderr,
             task_id_factory=lambda: "task-cli-shared-legacy-1",
@@ -779,13 +783,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
             [
                 "run",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/shared-legacy-1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=run_stdout,
             stderr=run_stderr,
             task_id_factory=lambda: "task-cli-shared-run-equivalent-1",
@@ -981,14 +985,17 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        with mock.patch("syvert.adapters.build_xhs_adapters", return_value={"dup": SuccessfulAdapter()}), mock.patch(
+        with mock.patch(
+            "syvert.adapters.build_xhs_adapters",
+            return_value={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+        ), mock.patch(
             "syvert.adapters.build_douyin_adapters",
-            return_value={"dup": SuccessfulAdapter()},
+            return_value={TEST_ADAPTER_KEY: SuccessfulAdapter()},
         ):
             exit_code = main(
                 [
                     "--adapter",
-                    "dup",
+                    TEST_ADAPTER_KEY,
                     "--capability",
                     "content_detail_by_url",
                     "--url",
@@ -1014,13 +1021,13 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         exit_code = main(
             [
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
                 "https://example.com/posts/1",
             ],
-            adapters={"stub": SuccessfulAdapter()},
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
             stdout=stdout,
             stderr=stderr,
             task_id_factory=lambda: "task-cli-001",
@@ -1031,7 +1038,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["task_id"], "task-cli-001")
         self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["adapter_key"], "stub")
+        self.assertEqual(payload["adapter_key"], TEST_ADAPTER_KEY)
         self.assertEqual(payload["capability"], "content_detail_by_url")
 
     def test_main_returns_non_zero_for_failed_envelope(self) -> None:
@@ -1093,7 +1100,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "-m",
                 "syvert.cli",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",
@@ -1178,7 +1185,7 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "-m",
                 "syvert.cli",
                 "--adapter",
-                "stub",
+                TEST_ADAPTER_KEY,
                 "--capability",
                 "content_detail_by_url",
                 "--url",

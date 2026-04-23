@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import re
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 from uuid import uuid4
 
-from syvert.registry import AdapterRegistry, RegistryError
+from syvert.registry import (
+    AdapterRegistry,
+    AdapterResourceRequirementDeclaration,
+    RegistryError,
+    RESOURCE_DEPENDENCY_MODE_NONE,
+    approved_resource_requirement_evidence_refs_for,
+)
+from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.task_record import (
     TaskRecord,
     TaskRecordContractError,
@@ -37,6 +45,11 @@ DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
 DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
 DEFAULT_FAILURE_RELEASE_REASON = "adapter_failed_without_disposition_hint"
 DEFAULT_INVALID_HINT_RELEASE_REASON = "invalid_resource_disposition_hint"
+MATCH_STATUS_MATCHED = "matched"
+MATCH_STATUS_UNMATCHED = "unmatched"
+_ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
+_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL})
+_APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 
 if TYPE_CHECKING:
     from syvert.resource_lifecycle import ResourceBundle
@@ -142,6 +155,31 @@ class TaskExecutionResult:
     task_record: TaskRecord | None
 
 
+@dataclass(frozen=True)
+class ResourceCapabilityMatcherInput:
+    task_id: str
+    adapter_key: str
+    capability: str
+    requirement_declaration: AdapterResourceRequirementDeclaration
+    available_resource_capabilities: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ResourceCapabilityMatchResult:
+    task_id: str
+    adapter_key: str
+    capability: str
+    match_status: str
+
+
+class ResourceCapabilityMatcherContractError(Exception):
+    def __init__(self, message: str, *, details: Mapping[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.code = "invalid_resource_requirement"
+        self.message = message
+        self.details = dict(details or {})
+
+
 def execute_task(
     request: TaskRequest | CoreTaskRequest,
     *,
@@ -234,6 +272,21 @@ def execute_task_internal(
     try:
         registry = AdapterRegistry.from_mapping(adapters)
     except RegistryError as error:
+        requested_resource_requirement_error = _requested_adapter_resource_requirement_error(
+            adapters=adapters,
+            adapter_key=adapter_key,
+            error=error,
+        )
+        if requested_resource_requirement_error is not None:
+            return TaskExecutionResult(
+                failure_envelope(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    requested_resource_requirement_error,
+                ),
+                None,
+            )
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -248,8 +301,8 @@ def execute_task_internal(
             None,
         )
 
-    declaration = registry.lookup(adapter_key)
-    if declaration is None:
+    adapter_declaration = registry.lookup(adapter_key)
+    if adapter_declaration is None:
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -260,7 +313,7 @@ def execute_task_internal(
             None,
         )
 
-    supported_capabilities = declaration.supported_capabilities
+    supported_capabilities = adapter_declaration.supported_capabilities
     if capability_family not in supported_capabilities:
         return TaskExecutionResult(
             failure_envelope(
@@ -279,7 +332,7 @@ def execute_task_internal(
             None,
         )
 
-    supported_targets = declaration.supported_targets
+    supported_targets = adapter_declaration.supported_targets
     if normalized_request.target.target_type not in supported_targets:
         return TaskExecutionResult(
             failure_envelope(
@@ -295,7 +348,7 @@ def execute_task_internal(
             None,
         )
 
-    supported_collection_modes = declaration.supported_collection_modes
+    supported_collection_modes = adapter_declaration.supported_collection_modes
     if normalized_request.policy.collection_mode not in supported_collection_modes:
         return TaskExecutionResult(
             failure_envelope(
@@ -307,6 +360,43 @@ def execute_task_internal(
                     f"adapter `{adapter_key}` 不支持 collection_mode `{normalized_request.policy.collection_mode}`",
                     details={"supported_collection_modes": sorted(supported_collection_modes)},
                 ),
+            ),
+            None,
+        )
+
+    resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
+    if resource_requirement_declaration is None:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_resource_requirement_error(
+                    f"adapter `{adapter_key}` 缺少 `{capability_family}` 的资源需求声明",
+                    details={"adapter_key": adapter_key, "capability": capability_family},
+                ),
+            ),
+            None,
+        )
+
+    try:
+        available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
+        matcher_input = validate_resource_capability_matcher_input(
+            ResourceCapabilityMatcherInput(
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability_family,
+                requirement_declaration=resource_requirement_declaration,
+                available_resource_capabilities=available_resource_capabilities,
+            )
+        )
+    except ResourceCapabilityMatcherContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_resource_requirement_error(error.message, details=error.details),
             ),
             None,
         )
@@ -364,6 +454,32 @@ def execute_task_internal(
         return persistence_error
     if persisted_record is not None:
         record = persisted_record
+
+    match_result = match_resource_capabilities(matcher_input)
+    if match_result.match_status == MATCH_STATUS_UNMATCHED:
+        return finalize_task_execution_result(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                resource_unavailable_error(
+                    f"adapter `{adapter_key}` 的资源能力声明与当前 runtime 能力集合不匹配",
+                    details={
+                        "adapter_key": adapter_key,
+                        "capability": capability_family,
+                        "match_status": match_result.match_status,
+                        "required_capabilities": list(matcher_input.requirement_declaration.required_capabilities),
+                        "available_resource_capabilities": list(matcher_input.available_resource_capabilities),
+                    },
+                ),
+            ),
+            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+            task_record_store=store,
+        )
 
     requested_slots = resolve_requested_resource_slots(normalized_request)
     managed_resource_store = None
@@ -453,7 +569,7 @@ def execute_task_internal(
     disposition_hint: ResourceDispositionHint | None = None
     default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
     try:
-        payload = declaration.adapter.execute(adapter_context)
+        payload = adapter_declaration.adapter.execute(adapter_context)
         payload_error = validate_success_payload(payload)
         if payload_error is not None:
             envelope = failure_envelope(task_id, adapter_key, capability, payload_error)
@@ -794,6 +910,78 @@ def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dic
     )
 
 
+def match_resource_capabilities(input_value: ResourceCapabilityMatcherInput) -> ResourceCapabilityMatchResult:
+    validated_input = validate_resource_capability_matcher_input(input_value)
+    required_capabilities = frozenset(validated_input.requirement_declaration.required_capabilities)
+    available_resource_capabilities = frozenset(validated_input.available_resource_capabilities)
+    if required_capabilities.issubset(available_resource_capabilities):
+        match_status = MATCH_STATUS_MATCHED
+    else:
+        match_status = MATCH_STATUS_UNMATCHED
+    return ResourceCapabilityMatchResult(
+        task_id=validated_input.task_id,
+        adapter_key=validated_input.adapter_key,
+        capability=validated_input.capability,
+        match_status=match_status,
+    )
+
+
+def validate_resource_capability_matcher_input(
+    input_value: ResourceCapabilityMatcherInput,
+) -> ResourceCapabilityMatcherInput:
+    if type(input_value) is not ResourceCapabilityMatcherInput:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher 输入必须为 ResourceCapabilityMatcherInput",
+            details={"actual_type": type(input_value).__name__},
+        )
+
+    task_id = _require_matcher_non_empty_string(
+        input_value.task_id,
+        field_name="task_id",
+        details={"field_name": "task_id"},
+    )
+    adapter_key = _require_matcher_non_empty_string(
+        input_value.adapter_key,
+        field_name="adapter_key",
+        details={"task_id": task_id},
+    )
+    capability = _require_matcher_non_empty_string(
+        input_value.capability,
+        field_name="capability",
+        details={"task_id": task_id, "adapter_key": adapter_key},
+    )
+    if capability not in _ALLOWED_MATCHER_CAPABILITIES:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher capability 必须是当前已冻结的 adapter-facing capability",
+            details={
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+            },
+        )
+
+    requirement_declaration = _validate_matcher_requirement_declaration(
+        input_value.requirement_declaration,
+        expected_adapter_key=adapter_key,
+        expected_capability=capability,
+        task_id=task_id,
+    )
+    available_resource_capabilities = _normalize_available_resource_capabilities(
+        input_value.available_resource_capabilities,
+        task_id=task_id,
+        adapter_key=adapter_key,
+        capability=capability,
+    )
+
+    return ResourceCapabilityMatcherInput(
+        task_id=task_id,
+        adapter_key=adapter_key,
+        capability=capability,
+        requirement_declaration=requirement_declaration,
+        available_resource_capabilities=available_resource_capabilities,
+    )
+
+
 def resolve_requested_resource_slots(request: CoreTaskRequest) -> tuple[str, ...] | None:
     slots = RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE.get(
         (request.target.capability, request.policy.collection_mode)
@@ -801,6 +989,21 @@ def resolve_requested_resource_slots(request: CoreTaskRequest) -> tuple[str, ...
     if slots is None:
         return None
     return tuple(slots)
+
+
+def resolve_runtime_available_resource_capabilities(request: CoreTaskRequest) -> tuple[str, ...]:
+    requested_slots = resolve_requested_resource_slots(request)
+    raw_capabilities: tuple[str, ...] | Iterable[str]
+    if requested_slots is None:
+        raw_capabilities = ()
+    else:
+        raw_capabilities = requested_slots
+    return _normalize_available_resource_capabilities(
+        raw_capabilities,
+        task_id="",
+        adapter_key=request.target.adapter_key,
+        capability=CAPABILITY_FAMILY_BY_OPERATION.get(request.target.capability, request.target.capability),
+    )
 
 
 def default_runtime_resource_lifecycle_store():
@@ -1217,6 +1420,14 @@ def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any
     }
 
 
+def invalid_resource_requirement_error(message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    return runtime_contract_error("invalid_resource_requirement", message, details=details)
+
+
+def resource_unavailable_error(message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    return runtime_contract_error("resource_unavailable", message, details=details)
+
+
 def classify_adapter_error(error: PlatformAdapterError) -> dict[str, Any]:
     details = error.details if isinstance(error.details, Mapping) else {}
     if error.category == "invalid_input":
@@ -1245,3 +1456,304 @@ def unsupported_error(code: str, message: str, *, details: Mapping[str, Any] | N
         "message": message,
         "details": dict(details or {}),
     }
+
+
+def _require_matcher_non_empty_string(
+    raw_value: Any,
+    *,
+    field_name: str,
+    details: Mapping[str, Any] | None = None,
+) -> str:
+    if not isinstance(raw_value, str) or not raw_value:
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher 输入字段 `{field_name}` 必须为非空字符串",
+            details=details,
+        )
+    return raw_value
+
+
+def _validate_matcher_requirement_declaration(
+    raw_value: Any,
+    *,
+    expected_adapter_key: str,
+    expected_capability: str,
+    task_id: str,
+) -> AdapterResourceRequirementDeclaration:
+    if type(raw_value) is not AdapterResourceRequirementDeclaration:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须是 AdapterResourceRequirementDeclaration",
+            details={"task_id": task_id, "actual_type": type(raw_value).__name__},
+        )
+
+    adapter_key = _require_matcher_non_empty_string(
+        raw_value.adapter_key,
+        field_name="requirement_declaration.adapter_key",
+        details={"task_id": task_id},
+    )
+    capability = _require_matcher_non_empty_string(
+        raw_value.capability,
+        field_name="requirement_declaration.capability",
+        details={"task_id": task_id, "adapter_key": adapter_key},
+    )
+    if capability not in _ALLOWED_MATCHER_CAPABILITIES:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration.capability 未被批准",
+            details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
+        )
+    if adapter_key != expected_adapter_key or capability != expected_capability:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher 输入上下文必须与 requirement_declaration 保持一致",
+            details={
+                "task_id": task_id,
+                "expected_adapter_key": expected_adapter_key,
+                "actual_adapter_key": adapter_key,
+                "expected_capability": expected_capability,
+                "actual_capability": capability,
+            },
+        )
+
+    resource_dependency_mode = _require_matcher_non_empty_string(
+        raw_value.resource_dependency_mode,
+        field_name="requirement_declaration.resource_dependency_mode",
+        details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
+    )
+    if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE:
+        required_capabilities = _normalize_available_resource_capabilities(
+            raw_value.required_capabilities,
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            field_name="requirement_declaration.required_capabilities",
+        )
+        if required_capabilities:
+            raise ResourceCapabilityMatcherContractError(
+                "matcher requirement_declaration 在 none 模式下不得声明 required_capabilities",
+                details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
+            )
+        evidence_refs = _normalize_non_empty_string_tuple(
+            raw_value.evidence_refs,
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            field_name="requirement_declaration.evidence_refs",
+            allow_empty=False,
+        )
+        approved_evidence_refs = approved_resource_requirement_evidence_refs_for(
+            adapter_key=adapter_key,
+            capability=capability,
+        )
+        unknown_evidence_refs = tuple(
+            evidence_ref
+            for evidence_ref in evidence_refs
+            if evidence_ref not in approved_evidence_refs
+        )
+        if unknown_evidence_refs:
+            raise ResourceCapabilityMatcherContractError(
+                "matcher requirement_declaration.evidence_refs 必须绑定到 FR-0015 已批准共享证据",
+                details={
+                    "task_id": task_id,
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "unknown_evidence_refs": unknown_evidence_refs,
+                },
+            )
+        return AdapterResourceRequirementDeclaration(
+            adapter_key=adapter_key,
+            capability=capability,
+            resource_dependency_mode=resource_dependency_mode,
+            required_capabilities=required_capabilities,
+            evidence_refs=evidence_refs,
+        )
+
+    try:
+        registry = AdapterRegistry.from_mapping(
+            {
+                expected_adapter_key: _MatcherRequirementValidationAdapter(
+                    supported_capability=expected_capability,
+                    requirement_declaration=raw_value,
+                )
+            }
+        )
+    except RegistryError as error:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须满足 FR-0013 canonical contract",
+            details={
+                "task_id": task_id,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
+                "registry_error_code": error.code,
+                **error.details,
+            },
+        ) from error
+
+    validated_requirement = registry.lookup_resource_requirement(expected_adapter_key, expected_capability)
+    if validated_requirement is None:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须与当前 adapter/capability 上下文对齐",
+            details={
+                "task_id": task_id,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
+            },
+        )
+    return validated_requirement
+
+
+def _normalize_available_resource_capabilities(
+    raw_values: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    field_name: str = "available_resource_capabilities",
+) -> tuple[str, ...]:
+    capabilities = _normalize_non_empty_string_tuple(
+        raw_values,
+        task_id=task_id,
+        adapter_key=adapter_key,
+        capability=capability,
+        field_name=field_name,
+        allow_empty=True,
+    )
+    unknown_capabilities = tuple(
+        value for value in capabilities if value not in _APPROVED_RESOURCE_CAPABILITY_IDS
+    )
+    if unknown_capabilities:
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher `{field_name}` 只能使用 FR-0015 已批准的 resource capability ids",
+            details={
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "unknown_capabilities": unknown_capabilities,
+            },
+        )
+    return capabilities
+
+
+def _normalize_non_empty_string_tuple(
+    raw_values: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    field_name: str,
+    allow_empty: bool,
+) -> tuple[str, ...]:
+    if raw_values is None:
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher `{field_name}` 必须为去重字符串集合",
+            details={
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "actual_type": "NoneType",
+            },
+        )
+    if isinstance(raw_values, (str, bytes)):
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher `{field_name}` 必须为去重字符串集合",
+            details={
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "actual_type": type(raw_values).__name__,
+            },
+        )
+    try:
+        iterator = iter(raw_values)
+    except TypeError as error:
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher `{field_name}` 必须为去重字符串集合",
+            details={
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "actual_type": type(raw_values).__name__,
+                "error_type": error.__class__.__name__,
+            },
+        ) from error
+
+    values: list[str] = []
+    seen: set[str] = set()
+    for raw_value in iterator:
+        if not isinstance(raw_value, str) or not raw_value:
+            raise ResourceCapabilityMatcherContractError(
+                f"matcher `{field_name}` 只能包含非空字符串",
+                details={
+                    "task_id": task_id,
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "invalid_value": raw_value,
+                },
+            )
+        if raw_value in seen:
+            raise ResourceCapabilityMatcherContractError(
+                f"matcher `{field_name}` 不得包含重复 capability",
+                details={
+                    "task_id": task_id,
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "duplicate_value": raw_value,
+                },
+            )
+        seen.add(raw_value)
+        values.append(raw_value)
+
+    if not allow_empty and not values:
+        raise ResourceCapabilityMatcherContractError(
+            f"matcher `{field_name}` 不得为空",
+            details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
+        )
+    return tuple(values)
+
+
+def _requested_adapter_resource_requirement_error(
+    *,
+    adapters: Mapping[str, Any],
+    adapter_key: str,
+    error: RegistryError,
+) -> dict[str, Any] | None:
+    if error.code != "invalid_adapter_resource_requirements":
+        return None
+    if error.details.get("adapter_key") == adapter_key:
+        return invalid_resource_requirement_error(
+            error.message,
+            details={"registry_error_code": error.code, **error.details},
+        )
+
+    try:
+        requested_adapter = adapters[adapter_key]
+    except Exception:
+        return None
+
+    try:
+        AdapterRegistry.from_mapping({adapter_key: requested_adapter})
+    except RegistryError as requested_error:
+        if requested_error.code != "invalid_adapter_resource_requirements":
+            return None
+        return invalid_resource_requirement_error(
+            requested_error.message,
+            details={
+                "registry_error_code": requested_error.code,
+                **requested_error.details,
+            },
+        )
+    return None
+
+
+class _MatcherRequirementValidationAdapter:
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({LEGACY_COLLECTION_MODE})
+
+    def __init__(
+        self,
+        *,
+        supported_capability: str,
+        requirement_declaration: AdapterResourceRequirementDeclaration,
+    ) -> None:
+        self.supported_capabilities = frozenset({supported_capability})
+        self.resource_requirement_declarations = (requirement_declaration,)
+
+    def execute(self, request: Any) -> dict[str, Any]:
+        raise AssertionError("matcher validation adapter must never execute")

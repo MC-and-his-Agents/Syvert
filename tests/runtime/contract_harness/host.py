@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from syvert.runtime import TaskInput, TaskRequest, execute_task
+from tests.runtime.contract_harness.fake_adapter import HARNESS_DECLARATION_ADAPTER_KEY
 
-DEFAULT_HARNESS_ADAPTER_KEY = "fake"
+DEFAULT_HARNESS_ADAPTER_KEY = HARNESS_DECLARATION_ADAPTER_KEY
 DEFAULT_HARNESS_CAPABILITY = "content_detail_by_url"
 
 
