@@ -9,6 +9,36 @@
 - `result`
   - 用途：按 `task_id` 回读 durable `TaskRecord` 的结果语义
 
+## Minimal HTTP Transport Contract
+
+- canonical endpoint / method：
+  - `POST /v0/tasks`
+    - 对应：`submit`
+  - `GET /v0/tasks/{task_id}`
+    - 对应：`status`
+  - `GET /v0/tasks/{task_id}/result`
+    - 对应：`result`
+- `status` / `result` 的共享 `task_id` 只允许来自 path segment `task_id`
+- 当前切片不批准 query alias、批量查询、多任务复合路由或 transport 私有 result endpoint
+- HTTP 状态码映射必须按“transport phase + shared truth condition”决定，而不是按 shared `error.category` 粗暴映射：
+  - `POST /v0/tasks`
+    - `202 Accepted`：任务已进入 shared durable path，并返回最小 receipt
+    - `400 Bad Request`：请求形状非法、`ExecutionControlPolicy` 无法投影，或其他 ingress 级 contract 校验失败
+    - `409 Conflict`：pre-accepted `concurrency_limit_exceeded`
+    - `500 Internal Server Error`：任何无法安全证明已进入 durable truth 的 fail-closed 分支
+  - `GET /v0/tasks/{task_id}`
+    - `200 OK`：成功回读 durable `TaskRecord` truth
+    - `400 Bad Request`：`task_id` 缺失或形状不满足共享任务键 contract
+    - `404 Not Found`：`task_record_not_found`
+    - `500 Internal Server Error`：`task_record_unavailable` 或其他无法安全读取 shared truth 的分支
+  - `GET /v0/tasks/{task_id}/result`
+    - `200 OK`：成功回读 terminal success envelope 或 terminal failed envelope
+    - `400 Bad Request`：`task_id` 缺失或形状不满足共享任务键 contract
+    - `404 Not Found`：`task_record_not_found`
+    - `409 Conflict`：`result_not_ready`
+    - `500 Internal Server Error`：`task_record_unavailable` 或其他无法安全读取 shared truth 的分支
+- 不论 HTTP 状态码是 `2xx`、`4xx` 还是 `5xx`，只要当前分支要求返回 shared failed envelope，transport 就不得退化成 HTML、纯文本或 framework 私有错误对象
+
 ## Shared Path Contract
 
 - HTTP API 只负责 transport ingress/egress

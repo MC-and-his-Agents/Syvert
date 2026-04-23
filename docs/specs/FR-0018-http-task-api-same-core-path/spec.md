@@ -56,6 +56,20 @@
   - 若 `task_id` 不存在 durable record，`status` 与 `result` 都必须返回 machine-readable shared failed envelope，且错误语义必须与“记录不存在”一致，而不是混同为 transport 层 404 页面或 store 损坏。
   - 若 durable store 不可用、record 损坏、contract 非法、closeout/control-state truth 不可信或无法安全输出，`status` 与 `result` 都必须 fail-closed 为 shared failed envelope；不得宽松修复为看似合法的任务历史。
 - 契约需求：
+  - 最小 HTTP transport contract 也在当前 formal spec 冻结：
+    - `submit` endpoint 固定为 `POST /v0/tasks`
+    - `status` endpoint 固定为 `GET /v0/tasks/{task_id}`
+    - `result` endpoint 固定为 `GET /v0/tasks/{task_id}/result`
+    - `status` / `result` 的共享 `task_id` 只允许来自 path segment `task_id`；当前切片不批准 query alias、批量查询或多任务复合路由
+  - HTTP 状态码映射必须按“transport phase + shared truth condition”冻结，而不是按 `error.category` 粗暴一刀切：
+    - `POST /v0/tasks` 在任务已进入 shared durable path 并返回最小 receipt 时，固定返回 `202 Accepted`
+    - `GET /v0/tasks/{task_id}` 在成功回读 durable `TaskRecord` truth 时，固定返回 `200 OK`；即使 record 当前状态是 `accepted`、`running`、`succeeded` 或 `failed`，也不得改写成 transport 私有状态轴
+    - `GET /v0/tasks/{task_id}/result` 在成功回读 terminal success envelope 或 terminal failed envelope 时，固定返回 `200 OK`
+    - 缺少必填字段、请求 payload 形状非法、`ExecutionControlPolicy` 无法投影到共享 contract，或 `task_id` 不满足共享任务键 contract 时，固定返回 `400 Bad Request`
+    - `task_record_not_found` 固定返回 `404 Not Found`
+    - pre-accepted `concurrency_limit_exceeded` 与 `result_not_ready` 固定返回 `409 Conflict`
+    - `task_record_unavailable`、store/record contract/closeout-control-state truth 不可信，或任何无法安全投影 shared truth 的 fail-closed 分支，固定返回 `500 Internal Server Error`
+    - 无论返回 `4xx/5xx` 的 shared failed envelope，还是 `200 OK` 的 terminal failed envelope，响应体都必须继续复用 shared failed envelope；transport 不得退化成 HTML、纯文本或 framework 私有错误页
   - HTTP ingress 只允许把 transport 细节映射到共享请求 / 共享任务查询 contract；一旦进入 Core，`task_id`、`adapter_key`、`capability`、任务状态、终态结果、执行控制结果与错误分类语义都必须复用既有 shared contract。
   - `submit` 成功响应必须至少包含：`task_id`、`status`，以及一个可判定该任务已进入 shared durable path 的最小确认载荷；该响应不得额外创造与 `TaskRecord` 冲突的 shadow status 字段。
   - `submit` 的成功状态只允许表达“任务已进入共享 durable path”，不得把尚未产生 durable truth 的 ingress 接收动作伪装成已提交任务。
@@ -161,7 +175,7 @@ Then 它只能继续返回上一已完成 attempt 的终态 `error.code` / `erro
   - 若 API 把整个 `platform` category 粗暴视为 retryable，或隐藏 `error.details.retryable` / `error.details.control_code` / `runtime_result_refs`，则违反共享执行控制与观测 truth。
   - 若 post-accepted retry reacquire rejection 被 API 重新包装为新的终态失败，进而覆盖上一已完成 attempt 的 `error.code` / `error.category`，则违反共享 closeout 语义。
 - 边界场景：
-  - 当前 formal spec 只定义最小 HTTP service surface，不定义具体路径命名、HTTP method、状态码映射、OpenAPI 文档格式或 framework 目录结构。
+  - 当前 formal spec 只冻结最小 HTTP service surface 的 canonical 路径、HTTP method、状态码映射与共享 JSON 语义；不定义 OpenAPI 文档格式、router / framework 目录结构或生成链。
   - 当前 formal spec 允许 HTTP service 与 CLI 并存，但两者必须共享同一 durable store truth；不允许出现“CLI 看见一种状态，API 看见另一种状态”的分叉。
   - 当前 formal spec 不要求 `submit` 必须暴露同步等待终态、长轮询、流式返回或 webhook；这些能力若需要引入，必须进入新的 formal spec。
   - 当前 formal spec 不把 HTTP transport 身份、租户、权限或审计字段提升为共享任务 request / record contract 的一部分。
@@ -170,6 +184,7 @@ Then 它只能继续返回上一已完成 attempt 的终态 `error.code` / `erro
 ## 验收标准
 
 - [ ] formal spec 明确冻结最小 HTTP service surface 仅包含 `submit`、`status`、`result`
+- [ ] formal spec 明确冻结 `POST /v0/tasks`、`GET /v0/tasks/{task_id}`、`GET /v0/tasks/{task_id}/result` 与最小 HTTP 状态码映射
 - [ ] formal spec 明确要求 HTTP `submit` 与 CLI `run` 共享同一条 Core / `TaskRecord` durable path，禁止 adapter 直连与旁路写入
 - [ ] formal spec 明确要求 HTTP `status/result` 与 CLI `query` 共享同一 durable `TaskRecord` truth，而不是影子状态或影子结果 schema
 - [ ] formal spec 明确要求成功终态与失败终态继续复用 shared envelope，禁止 API 新建第二套 envelope
