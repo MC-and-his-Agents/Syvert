@@ -272,25 +272,18 @@ def execute_task_internal(
     try:
         registry = AdapterRegistry.from_mapping(adapters)
     except RegistryError as error:
-        if (
-            error.code == "invalid_adapter_resource_requirements"
-            and error.details.get("adapter_key") == adapter_key
-        ):
-            # Runtime only admits declarations that registry can materialize.
-            # Pure matcher-only `none` semantics stay unreachable here until FR-0013
-            # freezes a canonical runtime declaration baseline for that mode.
+        requested_resource_requirement_error = _requested_adapter_resource_requirement_error(
+            adapters=adapters,
+            adapter_key=adapter_key,
+            error=error,
+        )
+        if requested_resource_requirement_error is not None:
             return TaskExecutionResult(
                 failure_envelope(
                     task_id,
                     adapter_key,
                     capability,
-                    invalid_resource_requirement_error(
-                        error.message,
-                        details={
-                            "registry_error_code": error.code,
-                            **error.details,
-                        },
-                    ),
+                    requested_resource_requirement_error,
                 ),
                 None,
             )
@@ -1715,6 +1708,40 @@ def _normalize_non_empty_string_tuple(
             details={"task_id": task_id, "adapter_key": adapter_key, "capability": capability},
         )
     return tuple(values)
+
+
+def _requested_adapter_resource_requirement_error(
+    *,
+    adapters: Mapping[str, Any],
+    adapter_key: str,
+    error: RegistryError,
+) -> dict[str, Any] | None:
+    if error.code != "invalid_adapter_resource_requirements":
+        return None
+    if error.details.get("adapter_key") == adapter_key:
+        return invalid_resource_requirement_error(
+            error.message,
+            details={"registry_error_code": error.code, **error.details},
+        )
+
+    try:
+        requested_adapter = adapters[adapter_key]
+    except Exception:
+        return None
+
+    try:
+        AdapterRegistry.from_mapping({adapter_key: requested_adapter})
+    except RegistryError as requested_error:
+        if requested_error.code != "invalid_adapter_resource_requirements":
+            return None
+        return invalid_resource_requirement_error(
+            requested_error.message,
+            details={
+                "registry_error_code": requested_error.code,
+                **requested_error.details,
+            },
+        )
+    return None
 
 
 class _MatcherRequirementValidationAdapter:

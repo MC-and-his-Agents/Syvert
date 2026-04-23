@@ -406,6 +406,40 @@ class InvalidSiblingResourceRequirementDeclarationAdapter:
         raise AssertionError("execute should not be called")
 
 
+class NoneResourceRequirementCollectionAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = None
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class ExtraFieldResourceRequirementDeclarationAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "content_detail",
+            "resource_dependency_mode": "required",
+            "required_capabilities": ("account", "proxy"),
+            "evidence_refs": baseline_required_resource_requirement_declaration(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail",
+            ).evidence_refs,
+            "unexpected_field": "shadow",
+        },
+    )
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
 class NoneModeResourceRequirementDeclarationAdapter:
     adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"content_detail"})
@@ -929,6 +963,44 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["category"], "runtime_contract")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_resource_requirements")
         self.assertNotIn("registry_error_code", envelope["error"]["details"])
+
+    def test_execute_task_maps_none_resource_requirement_collection_to_invalid_resource_requirement(self) -> None:
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/posts/none-resource-requirement-collection"),
+            ),
+            adapters={TEST_ADAPTER_KEY: NoneResourceRequirementCollectionAdapter()},
+            task_id_factory=lambda: "task-none-resource-requirement-collection",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_resource_requirement")
+        self.assertEqual(
+            envelope["error"]["details"]["registry_error_code"],
+            "invalid_adapter_resource_requirements",
+        )
+
+    def test_execute_task_maps_extra_field_resource_requirement_declaration_to_invalid_resource_requirement(self) -> None:
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/posts/extra-field-resource-requirement"),
+            ),
+            adapters={TEST_ADAPTER_KEY: ExtraFieldResourceRequirementDeclarationAdapter()},
+            task_id_factory=lambda: "task-extra-field-resource-requirement",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "invalid_resource_requirement")
+        self.assertEqual(
+            envelope["error"]["details"]["registry_error_code"],
+            "invalid_adapter_resource_requirements",
+        )
 
     def test_execute_task_keeps_none_mode_declarations_unreachable_until_registry_baseline_exists(self) -> None:
         with mock.patch(
