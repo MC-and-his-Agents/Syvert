@@ -71,6 +71,9 @@
 - `python3 scripts/pr_guardian.py review 237`
   - 结果：`REQUEST_CHANGES`；阻断点为 post-accepted retry 重新获取 concurrency slot 的状态转移未闭合、`on_limit` public contract 不一致、默认 policy 未冻结
 - 已修复：冻结完整默认 `ExecutionControlPolicy`；将 `on_limit=reject` 定义为 caller-visible required field；补充 `retry_concurrency_rejected` control event 与同一 TaskRecord failed 终态语义
+- `python3 scripts/pr_guardian.py review 237`
+  - 结果：`REQUEST_CHANGES`；阻断点为 retryable outcome 在仍有预算时仍被写成可选推进
+- 已修复：明确 retryable outcome 且 `attempt_index < max_attempts` 时，Core 必须等待 `backoff_ms` 后启动下一 attempt，只有 success、不可重试失败、预算耗尽或 retry slot reacquire 被拒绝可终止任务
 
 ## 未决风险
 
