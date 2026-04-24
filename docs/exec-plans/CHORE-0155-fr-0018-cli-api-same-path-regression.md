@@ -9,7 +9,7 @@
 - sprint：`2026-S19`
 - 关联 spec：`docs/specs/FR-0018-http-task-api-same-core-path/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#246`
 
 ## 目标
 
@@ -38,6 +38,7 @@
 - 已新增 `tests/runtime/test_cli_http_same_path.py`，集中承载 CLI/API same-path regression evidence。
 - 已完成本地定点验证与既有回归验证；新增 same-path 用例当前通过。
 - 已按 `FR-0018` / `FR-0019` 当前文档要求补齐控制面失败证据：pre-accepted concurrency rejection、execution timeout、closeout/control-state failure、post-accepted retry reacquire rejection 与 runtime refs 可见性。
+- PR `#246` 已创建，后续 review / guardian / CI 结果以 PR live head 与 guardian state 为准。
 
 ## 下一步动作
 
@@ -76,7 +77,9 @@
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
 - `python3 -m unittest discover -s tests/runtime -p 'test_cli_http_same_path.py' -v`
-  - 结果：通过，`Ran 8 tests`，`OK`；用于确认新增 runtime 测试文件可由 runtime start-dir discovery 捕获。
+  - 结果：首轮通过，`Ran 8 tests`，`OK`；补齐控制面 same-path evidence 后再次通过，`Ran 12 tests`，`OK`；用于确认新增 runtime 测试文件可由 runtime start-dir discovery 捕获。
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh pr create --base main --title 'test(runtime): 补齐 FR-0018 CLI/API 同路径回归证据' --body-file <open_pr-dry-run-body>`
+  - 结果：通过，创建 PR `#246`。说明：`scripts/open_pr.py` 的 preflight / dry-run 通过，但直接创建时未透出 `gh pr create` 错误详情；已复用同一受控 body 创建 PR。
 
 ## Evidence case mapping
 
