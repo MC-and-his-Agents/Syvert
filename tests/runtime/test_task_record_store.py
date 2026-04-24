@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from syvert.task_record import (
     create_task_record,
     finish_task_record,
     start_task_record,
+    task_record_to_dict,
 )
 from syvert.task_record_store import LocalTaskRecordStore, TaskRecordStoreError
 from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_resource_requirement_declarations
@@ -92,6 +94,13 @@ class PlatformFailureAdapter:
         )
 
 
+class NonJsonRawAdapter(SuccessfulAdapter):
+    def execute(self, request):
+        payload = super().execute(request)
+        payload["raw"] = {"bad": {"not-json-safe"}}
+        return payload
+
+
 class SelectiveFailingStore:
     def __init__(self, fail_stage: str) -> None:
         self.fail_stage = fail_stage
@@ -109,6 +118,44 @@ class SelectiveFailingStore:
         return self.records[task_id]
 
     def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        self.records[f"invalid:{task_id}"] = {"stage": stage, "reason": reason}
+
+
+class ContractFailingStore:
+    def __init__(self, *, fail_stage: str | None = None, invalidation_raises: bool = False) -> None:
+        self.fail_stage = fail_stage
+        self.invalidation_raises = invalidation_raises
+        self.records: dict[str, object] = {}
+
+    def write(self, record):
+        if record.status == self.fail_stage or (
+            self.fail_stage == "completion" and record.status in {"succeeded", "failed"}
+        ):
+            raise TaskRecordContractError("write-contract-broken")
+        self.records[record.task_id] = record
+        return record
+
+    def load(self, task_id: str):
+        return self.records[task_id]
+
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        if self.invalidation_raises:
+            raise TaskRecordContractError("invalidation-contract-broken")
+        self.records[f"invalid:{task_id}"] = {"stage": stage, "reason": reason}
+
+
+class RuntimeFailingStore(ContractFailingStore):
+    def write(self, record):
+        if record.status == self.fail_stage or (
+            self.fail_stage == "completion" and record.status in {"succeeded", "failed"}
+        ):
+            raise RuntimeError("boom-write")
+        self.records[record.task_id] = record
+        return record
+
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        if self.invalidation_raises:
+            raise RuntimeError("boom-invalidation")
         self.records[f"invalid:{task_id}"] = {"stage": stage, "reason": reason}
 
 
@@ -219,6 +266,13 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 LocalTaskRecordStore(Path(temp_dir)).load("task-store-stateless")
 
+    def test_local_store_load_fails_closed_when_root_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir) / "missing-root")
+
+            with self.assertRaises(TaskRecordStoreError):
+                store.load("task-store-missing-root")
+
     def test_runtime_fails_closed_before_adapter_execute_when_accepted_persistence_fails(self) -> None:
         adapter = SuccessfulAdapter()
         outcome = execute_task_with_record(
@@ -239,6 +293,47 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
+    def test_runtime_fails_closed_before_adapter_execute_when_store_write_raises_contract_error(self) -> None:
+        adapter = SuccessfulAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-contract-write"),
+            ),
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-store-contract-write",
+            task_record_store=ContractFailingStore(fail_stage="accepted"),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "accepted")
+        self.assertEqual(adapter.calls, 0)
+        self.assertIsNone(outcome.task_record)
+
+    def test_runtime_fails_closed_before_adapter_execute_when_store_write_raises_unexpected_error(self) -> None:
+        adapter = SuccessfulAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-runtime-write"),
+            ),
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-store-runtime-write",
+            task_record_store=RuntimeFailingStore(fail_stage="accepted"),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "accepted")
+        self.assertEqual(outcome.envelope["error"]["details"]["reason"], "boom-write")
+        self.assertEqual(adapter.calls, 0)
+        self.assertIsNone(outcome.task_record)
+
     def test_runtime_fails_closed_before_adapter_execute_when_running_persistence_fails(self) -> None:
         adapter = SuccessfulAdapter()
         outcome = execute_task_with_record(
@@ -256,6 +351,49 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
         self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(adapter.calls, 0)
+        self.assertIsNone(outcome.task_record)
+
+    def test_runtime_fails_closed_when_store_write_and_invalidation_raise_contract_error(self) -> None:
+        adapter = SuccessfulAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-contract-invalid"),
+            ),
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-store-contract-invalid",
+            task_record_store=ContractFailingStore(fail_stage="running", invalidation_raises=True),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(outcome.envelope["error"]["details"]["invalidation_reason"], "invalidation-contract-broken")
+        self.assertEqual(adapter.calls, 0)
+        self.assertIsNone(outcome.task_record)
+
+    def test_runtime_fails_closed_when_store_write_and_invalidation_raise_unexpected_error(self) -> None:
+        adapter = SuccessfulAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-runtime-invalid"),
+            ),
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-store-runtime-invalid",
+            task_record_store=RuntimeFailingStore(fail_stage="running", invalidation_raises=True),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(outcome.envelope["error"]["details"]["reason"], "boom-write")
+        self.assertEqual(outcome.envelope["error"]["details"]["invalidation_reason"], "boom-invalidation")
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
@@ -332,6 +470,26 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             self.assertIsNone(outcome.task_record)
             with self.assertRaises(TaskRecordStoreError):
                 store.load("task-store-4")
+
+    def test_runtime_fails_closed_when_terminal_invalidation_raises_contract_error(self) -> None:
+        adapter = NonJsonRawAdapter()
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/store-terminal-contract-invalid"),
+            ),
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-store-terminal-contract-invalid",
+            task_record_store=ContractFailingStore(invalidation_raises=True),
+        )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "envelope_not_json_serializable")
+        self.assertEqual(outcome.envelope["error"]["details"]["invalidation_reason"], "invalidation-contract-broken")
+        self.assertEqual(adapter.calls, 1)
+        self.assertIsNone(outcome.task_record)
 
     def test_runtime_rejects_half_history_even_when_invalidation_marker_cannot_be_written(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -543,6 +701,49 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             conflicting["error"]["code"] = "changed"
             with self.assertRaises((TaskRecordStoreError, TaskRecordContractError)):
                 store.write(finish_task_record(running, conflicting, occurred_at="2026-04-17T12:00:02Z"))
+
+    def test_store_allows_idempotent_rewrite_after_loading_legacy_terminal_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            snapshot = TaskRequestSnapshot(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                target_type="url",
+                target_value="https://example.com/post/store-legacy-terminal",
+                collection_mode="hybrid",
+            )
+            accepted = create_task_record("task-store-legacy-terminal", snapshot, occurred_at="2026-04-17T12:00:00Z")
+            running = start_task_record(accepted, occurred_at="2026-04-17T12:00:01Z")
+            failed = finish_task_record(
+                running,
+                {
+                    "task_id": "task-store-legacy-terminal",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "capability": "content_detail_by_url",
+                    "status": "failed",
+                    "error": {
+                        "category": "platform",
+                        "code": "platform_broken",
+                        "message": "boom",
+                        "details": {"reason": "bad"},
+                    },
+                },
+                occurred_at="2026-04-17T12:00:02Z",
+            )
+            payload = task_record_to_dict(failed)
+            payload.pop("task_record_ref")
+            payload["result"]["envelope"].pop("task_record_ref")
+            store.root.mkdir(parents=True, exist_ok=True)
+            store.record_path("task-store-legacy-terminal").write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            loaded = store.load("task-store-legacy-terminal")
+
+            self.assertEqual(loaded.task_record_ref, "task_record:task-store-legacy-terminal")
+            self.assertEqual(loaded.result.envelope["task_record_ref"], "task_record:task-store-legacy-terminal")
+            self.assertEqual(store.write(loaded), loaded)
 
     def test_store_rejects_terminal_write_when_running_checkpoint_was_not_persisted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

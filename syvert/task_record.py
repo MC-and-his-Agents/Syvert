@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import math
 import re
@@ -60,10 +60,17 @@ class TaskRecord:
     terminal_at: str | None
     result: TaskTerminalResult | None
     logs: tuple[TaskLogEntry, ...]
+    task_record_ref: str | None = None
+    runtime_result_refs: tuple[Any, ...] = field(default_factory=tuple)
+    execution_control_events: tuple[Any, ...] = field(default_factory=tuple)
 
 
 def now_rfc3339_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def task_record_ref_for(task_id: str) -> str:
+    return f"task_record:{task_id}"
 
 
 def build_task_request_snapshot(request: Any) -> TaskRequestSnapshot:
@@ -121,6 +128,7 @@ def create_task_record(
                 message="task accepted",
             ),
         ),
+        task_record_ref=task_record_ref_for(task_id),
     )
     validate_task_record(record)
     return record
@@ -153,6 +161,9 @@ def start_task_record(record: TaskRecord, *, occurred_at: str | None = None) -> 
                 message="task execution started",
             ),
         ),
+        task_record_ref=record.task_record_ref,
+        runtime_result_refs=record.runtime_result_refs,
+        execution_control_events=record.execution_control_events,
     )
     validate_task_record(updated)
     return updated
@@ -164,6 +175,9 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
     normalized_envelope = normalize_json_value(envelope, field="result.envelope")
     if not isinstance(normalized_envelope, dict):
         raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
+    task_record_ref = _observability_task_record_ref(normalized_envelope, record)
+    if task_record_ref is not None and "task_record_ref" not in normalized_envelope:
+        normalized_envelope["task_record_ref"] = task_record_ref
     if record.status in {"succeeded", "failed"}:
         if record.result is None:
             raise TaskRecordContractError("终态记录缺少终态结果")
@@ -206,6 +220,13 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
                 code=log_code,
             ),
         ),
+        task_record_ref=task_record_ref,
+        runtime_result_refs=_observability_entries(normalized_envelope, "runtime_result_refs", record.runtime_result_refs),
+        execution_control_events=_observability_entries(
+            normalized_envelope,
+            "execution_control_events",
+            record.execution_control_events,
+        ),
     )
     validate_task_record(updated)
     return updated
@@ -228,6 +249,9 @@ def task_record_to_dict(record: TaskRecord) -> dict[str, Any]:
         "updated_at": record.updated_at,
         "terminal_at": record.terminal_at,
         "result": None,
+        "task_record_ref": record.task_record_ref,
+        "runtime_result_refs": list(record.runtime_result_refs),
+        "execution_control_events": list(record.execution_control_events),
         "logs": [
             {
                 "sequence": entry.sequence,
@@ -256,6 +280,7 @@ def task_record_from_dict(payload: Mapping[str, Any]) -> TaskRecord:
     logs_payload = payload.get("logs")
     if not isinstance(logs_payload, list):
         raise TaskRecordContractError("TaskRecord.logs 必须是数组")
+    task_id = require_string(payload.get("task_id"), field="task_id")
     result_payload = payload.get("result")
     result: TaskTerminalResult | None = None
     if result_payload is not None:
@@ -264,11 +289,13 @@ def task_record_from_dict(payload: Mapping[str, Any]) -> TaskRecord:
         envelope = result_payload.get("envelope")
         if not isinstance(envelope, Mapping):
             raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
-        result = TaskTerminalResult(envelope=dict(normalize_json_value(envelope, field="result.envelope")))
+        normalized_envelope = dict(normalize_json_value(envelope, field="result.envelope"))
+        normalized_envelope.setdefault("task_record_ref", task_record_ref_for(task_id))
+        result = TaskTerminalResult(envelope=normalized_envelope)
 
     record = TaskRecord(
         schema_version=require_string(payload.get("schema_version"), field="schema_version"),
-        task_id=require_string(payload.get("task_id"), field="task_id"),
+        task_id=task_id,
         request=TaskRequestSnapshot(
             adapter_key=require_string(request_payload.get("adapter_key"), field="request.adapter_key"),
             capability=require_string(request_payload.get("capability"), field="request.capability"),
@@ -293,6 +320,12 @@ def task_record_from_dict(payload: Mapping[str, Any]) -> TaskRecord:
             for entry in logs_payload
             if isinstance(entry, Mapping)
         ),
+        task_record_ref=require_optional_string(
+            payload.get("task_record_ref", task_record_ref_for(task_id)),
+            field="task_record_ref",
+        ),
+        runtime_result_refs=_observability_entries(payload, "runtime_result_refs", ()),
+        execution_control_events=_observability_entries(payload, "execution_control_events", ()),
     )
     if len(record.logs) != len(logs_payload):
         raise TaskRecordContractError("TaskRecord.logs 项必须全部为对象")
@@ -305,6 +338,16 @@ def validate_task_record(record: TaskRecord) -> None:
         raise TaskRecordContractError("TaskRecord.schema_version 不合法")
     if not isinstance(record.task_id, str) or not record.task_id:
         raise TaskRecordContractError("TaskRecord.task_id 必须为非空字符串")
+    task_record_ref = require_optional_string(record.task_record_ref, field="TaskRecord.task_record_ref")
+    if task_record_ref != task_record_ref_for(record.task_id):
+        raise TaskRecordContractError("TaskRecord.task_record_ref 必须与 task_id 绑定一致")
+    if _observability_entries({"runtime_result_refs": record.runtime_result_refs}, "runtime_result_refs", ()) != record.runtime_result_refs:
+        raise TaskRecordContractError("TaskRecord.runtime_result_refs 必须预先满足 JSON-safe 约束")
+    if (
+        _observability_entries({"execution_control_events": record.execution_control_events}, "execution_control_events", ())
+        != record.execution_control_events
+    ):
+        raise TaskRecordContractError("TaskRecord.execution_control_events 必须预先满足 JSON-safe 约束")
     validate_request_snapshot(record.request)
     if record.status not in TASK_RECORD_STATUSES:
         raise TaskRecordContractError("TaskRecord.status 不在允许值范围内")
@@ -436,6 +479,19 @@ def terminal_record_status(envelope: Mapping[str, Any]) -> str:
     raise TaskRecordContractError("终态 envelope.status 必须为 success 或 failed")
 
 
+def _observability_task_record_ref(envelope: Mapping[str, Any], record: TaskRecord) -> str | None:
+    raw_ref = envelope.get("task_record_ref", record.task_record_ref)
+    return require_optional_string(raw_ref, field="task_record_ref")
+
+
+def _observability_entries(source: Mapping[str, Any], field_name: str, default: tuple[Any, ...]) -> tuple[Any, ...]:
+    raw_entries = source.get(field_name, list(default))
+    normalized = normalize_json_value(raw_entries, field=field_name)
+    if not isinstance(normalized, list):
+        raise TaskRecordContractError(f"{field_name} 必须是数组")
+    return tuple(normalized)
+
+
 def coerce_int(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TaskRecordContractError(f"{field} 必须为整数")
@@ -466,6 +522,7 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
         raise TaskRecordContractError("TaskTerminalResult.envelope.adapter_key 与请求快照不一致")
     if capability != record.request.capability:
         raise TaskRecordContractError("TaskTerminalResult.envelope.capability 与请求快照不一致")
+    validate_terminal_envelope_observability_contract(record, envelope)
 
     status = terminal_record_status(envelope)
     if status == "succeeded":
@@ -477,6 +534,23 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
     validate_failed_terminal_envelope(envelope)
     if "raw" in envelope or "normalized" in envelope:
         raise TaskRecordContractError("failed TaskTerminalResult.envelope 不得包含 success payload 字段")
+
+
+def validate_terminal_envelope_observability_contract(record: TaskRecord, envelope: Mapping[str, Any]) -> None:
+    if "task_record_ref" in envelope:
+        envelope_task_record_ref = require_optional_string(envelope.get("task_record_ref"), field="result.envelope.task_record_ref")
+        if envelope_task_record_ref != record.task_record_ref:
+            raise TaskRecordContractError("TaskTerminalResult.envelope.task_record_ref 与 TaskRecord.task_record_ref 不一致")
+    if "runtime_result_refs" in envelope:
+        envelope_runtime_result_refs = _observability_entries(envelope, "runtime_result_refs", ())
+        if envelope_runtime_result_refs != record.runtime_result_refs:
+            raise TaskRecordContractError("TaskTerminalResult.envelope.runtime_result_refs 与 TaskRecord.runtime_result_refs 不一致")
+    if "execution_control_events" in envelope:
+        envelope_execution_control_events = _observability_entries(envelope, "execution_control_events", ())
+        if envelope_execution_control_events != record.execution_control_events:
+            raise TaskRecordContractError(
+                "TaskTerminalResult.envelope.execution_control_events 与 TaskRecord.execution_control_events 不一致"
+            )
 
 
 def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:

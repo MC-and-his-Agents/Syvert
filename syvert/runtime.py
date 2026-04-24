@@ -35,6 +35,7 @@ CONTENT_DETAIL = "content_detail"
 LEGACY_COLLECTION_MODE = "hybrid"
 ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
 ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
+ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {CONTENT_DETAIL_BY_URL: CONTENT_DETAIL}
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
@@ -76,9 +77,43 @@ class CollectionPolicy:
 
 
 @dataclass(frozen=True)
+class ExecutionTimeoutPolicy:
+    timeout_ms: int
+
+
+@dataclass(frozen=True)
+class ExecutionRetryPolicy:
+    max_attempts: int
+    backoff_ms: int
+
+
+@dataclass(frozen=True)
+class ExecutionConcurrencyPolicy:
+    scope: str
+    max_in_flight: int
+    on_limit: str
+
+
+@dataclass(frozen=True)
+class ExecutionControlPolicy:
+    timeout: ExecutionTimeoutPolicy
+    retry: ExecutionRetryPolicy
+    concurrency: ExecutionConcurrencyPolicy
+
+
+def default_execution_control_policy() -> ExecutionControlPolicy:
+    return ExecutionControlPolicy(
+        timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+        retry=ExecutionRetryPolicy(max_attempts=1, backoff_ms=0),
+        concurrency=ExecutionConcurrencyPolicy(scope="global", max_in_flight=1, on_limit="reject"),
+    )
+
+
+@dataclass(frozen=True)
 class CoreTaskRequest:
     target: InputTarget
     policy: CollectionPolicy
+    execution_control_policy: ExecutionControlPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +121,7 @@ class TaskRequest:
     adapter_key: str
     capability: str
     input: TaskInput
+    execution_control_policy: ExecutionControlPolicy | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -111,6 +147,7 @@ class ResourceDispositionHint:
 class AdapterExecutionContext:
     request: AdapterTaskRequest
     resource_bundle: "ResourceBundle | None"
+    execution_control_policy: ExecutionControlPolicy | None = None
 
     @property
     def capability(self) -> str:
@@ -565,6 +602,7 @@ def execute_task_internal(
     adapter_context = AdapterExecutionContext(
         request=adapter_request,
         resource_bundle=resource_bundle,
+        execution_control_policy=normalized_request.execution_control_policy,
     )
     disposition_hint: ResourceDispositionHint | None = None
     default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
@@ -653,7 +691,9 @@ def finalize_task_execution_result(
         invalidation_details: dict[str, Any] = {}
         try:
             task_record_store.mark_invalid(task_id, stage="completion", reason=str(error))
-        except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
+        except (AttributeError, TaskRecordContractError, TaskRecordStoreError, OSError) as invalidation_error:
+            invalidation_details["invalidation_reason"] = str(invalidation_error)
+        except Exception as invalidation_error:
             invalidation_details["invalidation_reason"] = str(invalidation_error)
         if preserve_envelope_on_record_error and task_record_store is None:
             return TaskExecutionResult(dict(envelope), None)
@@ -710,25 +750,55 @@ def persist_task_record(
             ),
             None,
         )
-    except (TaskRecordStoreError, OSError) as error:
-        invalidation_details: dict[str, Any] = {}
-        try:
-            task_record_store.mark_invalid(task_id, stage=stage, reason=str(error))
-        except (AttributeError, TaskRecordStoreError, OSError) as invalidation_error:
-            invalidation_details["invalidation_reason"] = str(invalidation_error)
-        return None, TaskExecutionResult(
-            failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                runtime_contract_error(
-                    "task_record_persistence_failed",
-                    "共享任务记录无法可靠写入本地稳定存储",
-                    details={"stage": stage, "reason": str(error), **invalidation_details},
-                ),
-            ),
-            None,
+    except (TaskRecordContractError, TaskRecordStoreError, OSError) as error:
+        return _fail_closed_task_record_persistence(
+            task_id,
+            adapter_key,
+            capability,
+            stage=stage,
+            task_record_store=task_record_store,
+            error=error,
         )
+    except Exception as error:
+        return _fail_closed_task_record_persistence(
+            task_id,
+            adapter_key,
+            capability,
+            stage=stage,
+            task_record_store=task_record_store,
+            error=error,
+        )
+
+
+def _fail_closed_task_record_persistence(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    *,
+    stage: str,
+    task_record_store: TaskRecordStore,
+    error: Exception,
+) -> tuple[TaskRecord | None, TaskExecutionResult | None]:
+    invalidation_details: dict[str, Any] = {}
+    try:
+        task_record_store.mark_invalid(task_id, stage=stage, reason=str(error))
+    except (AttributeError, TaskRecordContractError, TaskRecordStoreError, OSError) as invalidation_error:
+        invalidation_details["invalidation_reason"] = str(invalidation_error)
+    except Exception as invalidation_error:
+        invalidation_details["invalidation_reason"] = str(invalidation_error)
+    return None, TaskExecutionResult(
+        failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "task_record_persistence_failed",
+                "共享任务记录无法可靠写入本地稳定存储",
+                details={"stage": stage, "reason": str(error), **invalidation_details},
+            ),
+        ),
+        None,
+    )
 
 
 def validate_request(request: Any) -> dict[str, Any] | None:
@@ -749,6 +819,10 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
             return None, invalid_input_error("invalid_task_request", "input 必须为对象")
         if not isinstance(request.input.url, str) or not request.input.url:
             return None, invalid_input_error("invalid_task_request", "input.url 不能为空")
+        execution_control_error = validate_execution_control_policy(request.execution_control_policy)
+        if execution_control_error is not None:
+            return None, execution_control_error
+        execution_control_policy = request.execution_control_policy or default_execution_control_policy()
         return (
             CoreTaskRequest(
                 target=InputTarget(
@@ -758,6 +832,7 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
                     target_value=request.input.url,
                 ),
                 policy=CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+                execution_control_policy=execution_control_policy,
             ),
             None,
         )
@@ -767,6 +842,9 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         return None, invalid_input_error("invalid_task_request", "target 必须为对象")
     if type(request.policy) is not CollectionPolicy:
         return None, invalid_input_error("invalid_task_request", "policy 必须为对象")
+    execution_control_error = validate_execution_control_policy(request.execution_control_policy)
+    if execution_control_error is not None:
+        return None, execution_control_error
 
     target = request.target
     policy = request.policy
@@ -783,7 +861,61 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         return None, invalid_input_error("invalid_task_request", "target_type 不合法")
     if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
         return None, invalid_input_error("invalid_task_request", "collection_mode 不合法")
-    return request, None
+    execution_control_policy = request.execution_control_policy or default_execution_control_policy()
+    if execution_control_policy is request.execution_control_policy:
+        return request, None
+    return (
+        CoreTaskRequest(
+            target=request.target,
+            policy=request.policy,
+            execution_control_policy=execution_control_policy,
+        ),
+        None,
+    )
+
+
+def validate_execution_control_policy(policy: Any) -> dict[str, Any] | None:
+    if policy is None:
+        return None
+    if type(policy) is not ExecutionControlPolicy:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy 必须为共享 ExecutionControlPolicy")
+    if type(policy.timeout) is not ExecutionTimeoutPolicy:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.timeout 必须为对象")
+    if type(policy.retry) is not ExecutionRetryPolicy:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.retry 必须为对象")
+    if type(policy.concurrency) is not ExecutionConcurrencyPolicy:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.concurrency 必须为对象")
+    if isinstance(policy.timeout.timeout_ms, bool) or not isinstance(policy.timeout.timeout_ms, int) or policy.timeout.timeout_ms <= 0:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.timeout.timeout_ms 必须为正整数")
+    if (
+        isinstance(policy.retry.max_attempts, bool)
+        or not isinstance(policy.retry.max_attempts, int)
+        or policy.retry.max_attempts < 1
+    ):
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.retry.max_attempts 必须为正整数")
+    if isinstance(policy.retry.backoff_ms, bool) or not isinstance(policy.retry.backoff_ms, int) or policy.retry.backoff_ms < 0:
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.retry.backoff_ms 必须为非负整数")
+    if (
+        not isinstance(policy.concurrency.scope, str)
+        or policy.concurrency.scope not in ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES
+    ):
+        return invalid_input_error(
+            "invalid_execution_control_policy",
+            "execution_control_policy.concurrency.scope 不在共享 contract 批准值域内",
+            details={"allowed_scopes": sorted(ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES)},
+        )
+    if (
+        isinstance(policy.concurrency.max_in_flight, bool)
+        or not isinstance(policy.concurrency.max_in_flight, int)
+        or policy.concurrency.max_in_flight < 1
+    ):
+        return invalid_input_error(
+            "invalid_execution_control_policy",
+            "execution_control_policy.concurrency.max_in_flight 必须为正整数",
+        )
+    if not isinstance(policy.concurrency.on_limit, str) or policy.concurrency.on_limit != "reject":
+        return invalid_input_error("invalid_execution_control_policy", "execution_control_policy.concurrency.on_limit 当前仅支持 reject")
+    return None
 
 
 def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, Any] | None]:

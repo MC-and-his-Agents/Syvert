@@ -96,11 +96,15 @@ class BrokenWriteStream(io.StringIO):
 def normalize_persisted_task_record_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = json.loads(json.dumps(payload))
     normalized["task_id"] = "normalized-task-id"
+    if isinstance(normalized.get("task_record_ref"), str):
+        normalized["task_record_ref"] = "normalized-task-record-ref"
     result = normalized.get("result")
     if isinstance(result, dict):
         envelope = result.get("envelope")
         if isinstance(envelope, dict) and isinstance(envelope.get("task_id"), str):
             envelope["task_id"] = "normalized-task-id"
+        if isinstance(envelope, dict) and isinstance(envelope.get("task_record_ref"), str):
+            envelope["task_record_ref"] = "normalized-task-record-ref"
     for field in ("created_at", "updated_at", "terminal_at"):
         if isinstance(normalized.get(field), str):
             normalized[field] = f"normalized-{field}"
