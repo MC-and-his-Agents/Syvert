@@ -22,6 +22,10 @@ from syvert.runtime import (
     AdapterTaskRequest,
     CollectionPolicy,
     CoreTaskRequest,
+    ExecutionConcurrencyPolicy,
+    ExecutionControlPolicy,
+    ExecutionRetryPolicy,
+    ExecutionTimeoutPolicy,
     InputTarget,
     PlatformAdapterError,
     TaskInput,
@@ -111,6 +115,14 @@ class SuccessfulAdapter(StubContentDetailDeclarationMixin):
                 },
             },
         }
+
+
+def make_execution_control_policy(scope: str) -> ExecutionControlPolicy:
+    return ExecutionControlPolicy(
+        timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+        retry=ExecutionRetryPolicy(max_attempts=1, backoff_ms=0),
+        concurrency=ExecutionConcurrencyPolicy(scope=scope, max_in_flight=1, on_limit="reject"),
+    )
 
 
 class MissingRawAdapter(StubContentDetailDeclarationMixin):
@@ -659,6 +671,26 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(adapter.last_request.request.collection_mode, "hybrid")
         self.assertIsNotNone(adapter.last_request.resource_bundle)
         self.assertEqual(adapter.last_request.resource_bundle.capability, "content_detail_by_url")
+
+    def test_execute_task_accepts_all_shared_execution_control_concurrency_scopes(self) -> None:
+        for scope in ("global", "adapter", "adapter_capability"):
+            with self.subTest(scope=scope):
+                adapter = SuccessfulAdapter()
+                request = TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url=f"https://example.com/posts/{scope}"),
+                    execution_control_policy=make_execution_control_policy(scope),
+                )
+
+                envelope = execute_task(
+                    request,
+                    adapters={TEST_ADAPTER_KEY: adapter},
+                    task_id_factory=lambda scope=scope: f"task-policy-{scope}",
+                )
+
+                self.assertEqual(envelope["status"], "success")
+                self.assertEqual(adapter.last_request.execution_control_policy.concurrency.scope, scope)
 
     def test_execute_task_maps_legacy_and_native_requests_to_same_adapter_projection(self) -> None:
         legacy_adapter = SuccessfulAdapter()

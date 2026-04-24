@@ -216,6 +216,54 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_migrates_missing_and_rejects_mismatched_task_record_ref(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/ref"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-ref-1",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+
+        missing_ref = dict(payload)
+        missing_ref.pop("task_record_ref")
+        restored = task_record_from_dict(missing_ref)
+        self.assertEqual(restored.task_record_ref, "task_record:task-record-ref-1")
+
+        mismatched_ref = dict(payload)
+        mismatched_ref["task_record_ref"] = "task_record:other"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(mismatched_ref)
+
+    def test_rejects_mismatched_terminal_observability_fields(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-observability-1",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+
+        for field, value in (
+            ("task_record_ref", "task_record:other"),
+            ("runtime_result_refs", [{"kind": "artifact", "id": "other"}]),
+            ("execution_control_events", [{"event": "other"}]),
+        ):
+            with self.subTest(field=field):
+                corrupted = dict(payload)
+                corrupted["result"] = {
+                    "envelope": dict(payload["result"]["envelope"]),
+                }
+                corrupted["result"]["envelope"][field] = value
+                with self.assertRaises(TaskRecordContractError):
+                    task_record_from_dict(corrupted)
+
     def test_accepts_idempotent_terminal_rewrite_and_rejects_conflicting_terminal(self) -> None:
         snapshot = TaskRequestSnapshot(
             adapter_key=TEST_ADAPTER_KEY,

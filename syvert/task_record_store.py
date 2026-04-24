@@ -64,6 +64,10 @@ class LocalTaskRecordStore:
         return candidate
 
     def load(self, task_id: str) -> TaskRecord:
+        if not self.root.exists():
+            raise TaskRecordStoreError(f"任务记录存储根路径 `{self.root}` 不存在")
+        if not self.root.is_dir():
+            raise TaskRecordStoreError(f"任务记录存储根路径 `{self.root}` 不是目录")
         path = self.record_path(task_id)
         invalid_marker = self.invalid_marker_path(task_id)
         if invalid_marker.exists():
