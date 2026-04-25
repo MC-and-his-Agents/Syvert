@@ -1,12 +1,12 @@
 {
-  "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:685e703a25ede635fb1158357d0a51bdeee13683",
+  "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:d5611f303b54b6421d3826af88eafcd9dd3df92b",
   "baseline_gate_result": {
-    "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:685e703a25ede635fb1158357d0a51bdeee13683",
+    "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:d5611f303b54b6421d3826af88eafcd9dd3df92b",
     "evidence_refs": [
-      "FR-0007:version_gate:v0.6.0:baseline:685e703a25ede635fb1158357d0a51bdeee13683",
-      "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_version_gate"
+      "FR-0007:version_gate:v0.6.0:baseline:d5611f303b54b6421d3826af88eafcd9dd3df92b",
+      "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_version_gate"
     ],
-    "execution_revision": "685e703a25ede635fb1158357d0a51bdeee13683",
+    "execution_revision": "d5611f303b54b6421d3826af88eafcd9dd3df92b",
     "release": "v0.6.0",
     "safe_to_release": true,
     "verdict": "pass"
@@ -40,7 +40,7 @@
           "TaskRecord.status=failed"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-timeout-platform-control-code",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-timeout-platform-control-code",
       "capability": "content_detail_by_url",
       "case_id": "trc-timeout-platform-control-code",
       "dimension": "timeout_retry_concurrency",
@@ -48,8 +48,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-timeout-platform-control-code",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-timeout-platform-control-code"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-timeout-platform-control-code",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-timeout-platform-control-code"
       ],
       "expected_result": {
         "fields": [
@@ -97,10 +97,10 @@
         "policy.timeout_ms=30000"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -134,7 +134,7 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-retryable-platform-budget-closed",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-retryable-platform-budget-closed",
       "capability": "content_detail_by_url",
       "case_id": "trc-retryable-platform-budget-closed",
       "dimension": "timeout_retry_concurrency",
@@ -142,8 +142,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-retryable-platform-budget-closed",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-retryable-platform-budget-closed"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-retryable-platform-budget-closed",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-retryable-platform-budget-closed"
       ],
       "expected_result": {
         "fields": [
@@ -191,10 +191,10 @@
         "default retry budget allows no extra attempt"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -223,7 +223,7 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-non-retryable-fail-closed",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-non-retryable-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "trc-non-retryable-fail-closed",
       "dimension": "timeout_retry_concurrency",
@@ -231,8 +231,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-non-retryable-fail-closed",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-non-retryable-fail-closed"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-non-retryable-fail-closed",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-non-retryable-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -264,10 +264,10 @@
         "default retry budget is active"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -303,7 +303,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-pre-accept-concurrency-reject",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-pre-accept-concurrency-reject",
       "capability": "content_detail_by_url",
       "case_id": "trc-pre-accept-concurrency-reject",
       "dimension": "timeout_retry_concurrency",
@@ -313,8 +313,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-pre-accept-concurrency-reject",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-pre-accept-concurrency-reject"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-pre-accept-concurrency-reject",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-pre-accept-concurrency-reject"
       ],
       "expected_result": {
         "fields": [
@@ -375,10 +375,10 @@
         "request has not entered durable accepted lifecycle"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -411,7 +411,7 @@
           }
         }
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-status-shared-truth",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-status-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "trc-concurrent-status-shared-truth",
       "dimension": "timeout_retry_concurrency",
@@ -420,8 +420,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-status-shared-truth",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-status-shared-truth"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-status-shared-truth",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-status-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -463,10 +463,10 @@
         "durable TaskRecord is the only status truth"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -499,7 +499,7 @@
           "terminal_state_not_rewritten"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-result-shared-truth",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-result-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "trc-concurrent-result-shared-truth",
       "dimension": "timeout_retry_concurrency",
@@ -508,8 +508,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-result-shared-truth",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-result-shared-truth"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-result-shared-truth",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-result-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -551,10 +551,10 @@
         "terminal envelope is stored in the durable TaskRecord"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -582,7 +582,7 @@
           "evidence_refs.non_empty"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-success-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-success-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-success-observable",
       "dimension": "failure_log_metrics",
@@ -590,8 +590,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-success-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-success-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-success-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-success-observable"
       ],
       "expected_result": {
         "fields": [
@@ -626,10 +626,10 @@
         "structured log and metrics carriers are enabled"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -656,7 +656,7 @@
           "structured_log.error.category"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-business-failure-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-business-failure-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-business-failure-observable",
       "dimension": "failure_log_metrics",
@@ -664,8 +664,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-business-failure-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-business-failure-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-business-failure-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-business-failure-observable"
       ],
       "expected_result": {
         "fields": [
@@ -703,10 +703,10 @@
         "failure category is approved by FR-0005"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -731,7 +731,7 @@
           "no_success_envelope"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-contract-failure-fail-closed",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-contract-failure-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "flm-contract-failure-fail-closed",
       "dimension": "failure_log_metrics",
@@ -739,8 +739,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-contract-failure-fail-closed",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-contract-failure-fail-closed"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-contract-failure-fail-closed",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-contract-failure-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -772,10 +772,10 @@
         "gate must fail closed without success envelope"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -805,7 +805,7 @@
           "structured_log.error.details.control_code"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-timeout-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-timeout-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-timeout-observable",
       "dimension": "failure_log_metrics",
@@ -813,8 +813,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-timeout-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-timeout-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-timeout-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-timeout-observable"
       ],
       "expected_result": {
         "fields": [
@@ -853,10 +853,10 @@
         "control_code=execution_timeout"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -887,7 +887,7 @@
           "structured_log.error.details.retryable=true"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-retry-budget-closed-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-retry-budget-closed-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-retry-budget-closed-observable",
       "dimension": "failure_log_metrics",
@@ -895,8 +895,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-retry-budget-closed-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-retry-budget-closed-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-retry-budget-closed-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-retry-budget-closed-observable"
       ],
       "expected_result": {
         "fields": [
@@ -934,10 +934,10 @@
         "policy.retry.max_attempts=1"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -963,7 +963,7 @@
           "no_shadow_status_or_result"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-store-unavailable-fail-closed",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-store-unavailable-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "flm-store-unavailable-fail-closed",
       "dimension": "failure_log_metrics",
@@ -973,8 +973,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-store-unavailable-fail-closed",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-store-unavailable-fail-closed"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-store-unavailable-fail-closed",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-store-unavailable-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -1011,10 +1011,10 @@
         "status/result must not synthesize shadow truth"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1049,7 +1049,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-http-invalid-input-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-http-invalid-input-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-http-invalid-input-observable",
       "dimension": "failure_log_metrics",
@@ -1057,8 +1057,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-http-invalid-input-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-http-invalid-input-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-http-invalid-input-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-http-invalid-input-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1114,10 +1114,10 @@
         "request_ref is available because no TaskRecord exists"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1152,7 +1152,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-cli-invalid-input-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-cli-invalid-input-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-cli-invalid-input-observable",
       "dimension": "failure_log_metrics",
@@ -1160,8 +1160,8 @@
         "cli"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-cli-invalid-input-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-cli-invalid-input-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-cli-invalid-input-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-cli-invalid-input-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1217,10 +1217,10 @@
         "request_ref is available because no TaskRecord exists"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1245,7 +1245,7 @@
           "overall_gate.verdict=fail"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-same-path-violation-observable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-same-path-violation-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-same-path-violation-observable",
       "dimension": "failure_log_metrics",
@@ -1254,8 +1254,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-same-path-violation-observable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-same-path-violation-observable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-same-path-violation-observable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-same-path-violation-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1287,10 +1287,10 @@
         "overall gate must fail closed"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1326,7 +1326,7 @@
           }
         }
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:http-submit-status-result-shared-truth",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:http-submit-status-result-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "http-submit-status-result-shared-truth",
       "dimension": "http_submit_status_result",
@@ -1334,8 +1334,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:http-submit-status-result-shared-truth",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:http-submit-status-result-shared-truth"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:http-submit-status-result-shared-truth",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:http-submit-status-result-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -1382,10 +1382,10 @@
         "HTTP status and result read the same shared record"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1417,7 +1417,7 @@
           "same_state_transition"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-success-shared-truth",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-success-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "same-path-success-shared-truth",
       "dimension": "cli_api_same_path",
@@ -1426,8 +1426,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-success-shared-truth",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-success-shared-truth"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-success-shared-truth",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-success-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -1468,10 +1468,10 @@
         "both entrypoints observe shared task truth"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1518,7 +1518,7 @@
           "http_no_TaskRecord"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-pre-admission-invalid-input",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-pre-admission-invalid-input",
       "capability": "content_detail_by_url",
       "case_id": "same-path-pre-admission-invalid-input",
       "dimension": "cli_api_same_path",
@@ -1527,8 +1527,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-pre-admission-invalid-input",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-pre-admission-invalid-input"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-pre-admission-invalid-input",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-pre-admission-invalid-input"
       ],
       "expected_result": {
         "fields": [
@@ -1605,10 +1605,10 @@
         "neither entrypoint creates TaskRecord"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1645,7 +1645,7 @@
           "http_fail_closed"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-durable-record-unavailable",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-durable-record-unavailable",
       "capability": "content_detail_by_url",
       "case_id": "same-path-durable-record-unavailable",
       "dimension": "cli_api_same_path",
@@ -1654,8 +1654,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-durable-record-unavailable",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-durable-record-unavailable"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-durable-record-unavailable",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-durable-record-unavailable"
       ],
       "expected_result": {
         "fields": [
@@ -1707,10 +1707,10 @@
         "both entrypoints fail closed"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     },
@@ -1747,7 +1747,7 @@
           "shared_runtime_result_refs"
         ]
       },
-      "actual_result_ref": "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-terminal-result-read",
+      "actual_result_ref": "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-terminal-result-read",
       "capability": "content_detail_by_url",
       "case_id": "same-path-terminal-result-read",
       "dimension": "cli_api_same_path",
@@ -1756,8 +1756,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-terminal-result-read",
-        "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-terminal-result-read"
+        "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-terminal-result-read",
+        "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-terminal-result-read"
       ],
       "expected_result": {
         "fields": [
@@ -1799,63 +1799,63 @@
         "runtime_result_refs are preserved"
       ],
       "upstream_refs": [
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-        "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path"
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+        "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path"
       ],
       "verdict": "pass"
     }
   ],
   "evidence_refs": [
-    "FR-0007:version_gate:v0.6.0:baseline:685e703a25ede635fb1158357d0a51bdeee13683",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-business-failure-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-cli-invalid-input-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-contract-failure-fail-closed",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-http-invalid-input-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-retry-budget-closed-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-same-path-violation-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-store-unavailable-fail-closed",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-success-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:flm-timeout-observable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:http-submit-status-result-shared-truth",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-durable-record-unavailable",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-pre-admission-invalid-input",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-success-shared-truth",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:same-path-terminal-result-read",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-result-shared-truth",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-status-shared-truth",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-non-retryable-fail-closed",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-pre-accept-concurrency-reject",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-retryable-platform-budget-closed",
-    "operability:685e703a25ede635fb1158357d0a51bdeee13683:trc-timeout-platform-control-code",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-business-failure-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-cli-invalid-input-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-contract-failure-fail-closed",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-http-invalid-input-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-retry-budget-closed-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-same-path-violation-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-store-unavailable-fail-closed",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-success-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:flm-timeout-observable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:http-submit-status-result-shared-truth",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-durable-record-unavailable",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-pre-admission-invalid-input",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-success-shared-truth",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:same-path-terminal-result-read",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-result-shared-truth",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-concurrent-status-shared-truth",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-non-retryable-fail-closed",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-pre-accept-concurrency-reject",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-retryable-platform-budget-closed",
-    "test_evidence:685e703a25ede635fb1158357d0a51bdeee13683:trc-timeout-platform-control-code",
-    "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_cli_http_same_path",
-    "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_execution_control",
-    "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_http_api",
-    "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_runtime_observability",
-    "tests:685e703a25ede635fb1158357d0a51bdeee13683:tests.runtime.test_version_gate"
+    "FR-0007:version_gate:v0.6.0:baseline:d5611f303b54b6421d3826af88eafcd9dd3df92b",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-business-failure-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-cli-invalid-input-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-contract-failure-fail-closed",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-http-invalid-input-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-retry-budget-closed-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-same-path-violation-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-store-unavailable-fail-closed",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-success-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-timeout-observable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:http-submit-status-result-shared-truth",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-durable-record-unavailable",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-pre-admission-invalid-input",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-success-shared-truth",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-terminal-result-read",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-result-shared-truth",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-status-shared-truth",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-non-retryable-fail-closed",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-pre-accept-concurrency-reject",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-retryable-platform-budget-closed",
+    "operability:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-timeout-platform-control-code",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-business-failure-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-cli-invalid-input-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-contract-failure-fail-closed",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-http-invalid-input-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-retry-budget-closed-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-same-path-violation-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-store-unavailable-fail-closed",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-success-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:flm-timeout-observable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:http-submit-status-result-shared-truth",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-durable-record-unavailable",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-pre-admission-invalid-input",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-success-shared-truth",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:same-path-terminal-result-read",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-result-shared-truth",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-concurrent-status-shared-truth",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-non-retryable-fail-closed",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-pre-accept-concurrency-reject",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-retryable-platform-budget-closed",
+    "test_evidence:d5611f303b54b6421d3826af88eafcd9dd3df92b:trc-timeout-platform-control-code",
+    "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_cli_http_same_path",
+    "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_execution_control",
+    "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_http_api",
+    "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_runtime_observability",
+    "tests:d5611f303b54b6421d3826af88eafcd9dd3df92b:tests.runtime.test_version_gate"
   ],
-  "execution_revision": "685e703a25ede635fb1158357d0a51bdeee13683",
+  "execution_revision": "d5611f303b54b6421d3826af88eafcd9dd3df92b",
   "failures": [],
   "fr_item_key": "FR-0019-v0-6-operability-release-gate",
   "gate_id": "v0.6.0-operability-gate",
