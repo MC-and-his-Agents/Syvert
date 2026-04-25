@@ -352,6 +352,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
         self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(outcome.envelope["runtime_failure_signal"]["task_record_ref"], "task_record:task-store-3b")
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 

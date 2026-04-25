@@ -697,9 +697,14 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         self.assertIsNotNone(result.task_record)
         self.assertEqual(result.envelope["status"], "failed")
-        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(result.envelope["error"]["code"], "execution_control_state_invalid")
-        self.assertNotIn("execution_control_events", result.envelope)
+        self.assertEqual(result.envelope["error"]["category"], "platform")
+        self.assertEqual(result.envelope["error"]["code"], "transient_platform")
+        self.assertEqual(result.envelope["execution_control_events"][0]["event_type"], "retry_concurrency_rejected")
+        self.assertEqual(
+            result.envelope["error"]["details"]["execution_control_event"],
+            result.envelope["execution_control_events"][0],
+        )
+        self.assertEqual(result.envelope["runtime_result_refs"][1], result.envelope["execution_control_events"][0])
         self.assertEqual(result.task_record.status, "failed")
 
     def test_concurrency_scope_keys_are_enforced_independently(self) -> None:

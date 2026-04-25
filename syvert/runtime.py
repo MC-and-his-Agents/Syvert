@@ -1066,7 +1066,8 @@ def execute_single_controlled_adapter_attempt(
             guard_release_error = release_attempt_admission_guard()
             if guard_release_error is not None:
                 envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
-            return AdapterAttemptResult(envelope, None)
+                event = None
+            return AdapterAttemptResult(envelope, None, execution_control_event=event)
         guard_release_error = release_attempt_admission_guard()
         if guard_release_error is not None:
             release_error = release_execution_concurrency_slot(slot)
@@ -2116,17 +2117,20 @@ def persist_task_record(
     try:
         return task_record_store.write(record), None
     except TaskRecordConflictError as error:
+        envelope = failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "task_record_conflict",
+                "共享任务记录写入与既有 durable truth 冲突",
+                details={"stage": stage, "reason": str(error)},
+            ),
+        )
+        if stage in {"running", "completion"}:
+            envelope = with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
         return None, TaskExecutionResult(
-            with_failure_observability(failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                runtime_contract_error(
-                    "task_record_conflict",
-                    "共享任务记录写入与既有 durable truth 冲突",
-                    details={"stage": stage, "reason": str(error)},
-                ),
-            )),
+            with_failure_observability(envelope),
             None,
         )
     except (TaskRecordContractError, TaskRecordStoreError, OSError) as error:
@@ -2136,6 +2140,7 @@ def persist_task_record(
             capability,
             stage=stage,
             task_record_store=task_record_store,
+            task_record_ref=record.task_record_ref or f"task_record:{task_id}" if stage in {"running", "completion"} else None,
             error=error,
         )
     except Exception as error:
@@ -2145,6 +2150,7 @@ def persist_task_record(
             capability,
             stage=stage,
             task_record_store=task_record_store,
+            task_record_ref=record.task_record_ref or f"task_record:{task_id}" if stage in {"running", "completion"} else None,
             error=error,
         )
 
@@ -2156,6 +2162,7 @@ def _fail_closed_task_record_persistence(
     *,
     stage: str,
     task_record_store: TaskRecordStore,
+    task_record_ref: str | None,
     error: Exception,
 ) -> tuple[TaskRecord | None, TaskExecutionResult | None]:
     invalidation_details: dict[str, Any] = {}
@@ -2165,6 +2172,9 @@ def _fail_closed_task_record_persistence(
         invalidation_details["invalidation_reason"] = str(invalidation_error)
     except Exception as invalidation_error:
         invalidation_details["invalidation_reason"] = str(invalidation_error)
+    details = {"stage": stage, "reason": str(error), **invalidation_details}
+    if task_record_ref:
+        details["task_record_ref"] = task_record_ref
     return None, TaskExecutionResult(
         with_failure_observability(failure_envelope(
             task_id,
@@ -2173,7 +2183,7 @@ def _fail_closed_task_record_persistence(
             runtime_contract_error(
                 "task_record_persistence_failed",
                 "共享任务记录无法可靠写入本地稳定存储",
-                details={"stage": stage, "reason": str(error), **invalidation_details},
+                details=details,
             ),
         )),
         None,
