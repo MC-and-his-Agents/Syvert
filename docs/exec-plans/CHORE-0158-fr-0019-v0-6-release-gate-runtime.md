@@ -65,7 +65,7 @@
 - `python3 -m py_compile syvert/operability_gate.py`
   - 结果：通过。
 - `python3 -m unittest tests.runtime.test_operability_gate`
-  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`；修复 guardian 三轮阻断后再次通过，`Ran 21 tests`，`OK`；修复 guardian 四轮阻断后再次通过，`Ran 23 tests`，`OK`；修复 guardian 五轮阻断后再次通过，`Ran 25 tests`，`OK`。
+  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`；修复 guardian 三轮阻断后再次通过，`Ran 21 tests`，`OK`；修复 guardian 四轮阻断后再次通过，`Ran 23 tests`，`OK`；修复 guardian 五轮阻断后再次通过，`Ran 25 tests`，`OK`；修复 guardian 六轮阻断后再次通过，`Ran 28 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_task_record_store tests.runtime.test_version_gate tests.runtime.test_operability_gate`
   - 结果：首轮通过，`Ran 251 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 254 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 258 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
@@ -82,8 +82,10 @@
   - 结果：`REQUEST_CHANGES`；指出 case data 不得由 runtime builder 自证、side effects / forbidden mutations 未求值、case verdict 未由 validator 回写。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-c5b90b7.json`
   - 结果：`REQUEST_CHANGES`；指出 baseline ref 未绑定 `v0.6.0`，以及 case-scoped metadata failure 未回写到 case verdict / summary。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-b62abb9.json`
+  - 结果：`REQUEST_CHANGES`；指出 `!= ""` 与 path-to-path equality 对缺字段未 fail-closed，以及 `failure_log_metrics` side-effect 证据需贴合 FR-0019 canonical matrix。
 - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
-  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=d340ec009ebc0424f0477f430be5c17f1530776d`，覆盖 20 个 mandatory cases，并包含 case-level evidence refs、actual_result、side_effects、forbidden_mutations_absent 与 `FR-0007` / `v0.6.0` baseline ref。
+  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=86c10b5afea0af9df10d9c5c1ce32a541a7209c3`，覆盖 20 个 mandatory cases，并包含 case-level evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent 与 `FR-0007` / `v0.6.0` baseline ref。
 
 ## 待完成
 
@@ -103,4 +105,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：`d340ec009ebc0424f0477f430be5c17f1530776d`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension 校验、baseline ref / release 绑定校验、case-scoped metadata failure attribution、gate/matrix identity freeze、actual_result 断言求值、side effects / forbidden mutations 机判校验、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
+- 当前可恢复 checkpoint：`86c10b5afea0af9df10d9c5c1ce32a541a7209c3`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension 校验、baseline ref / release 绑定校验、case-scoped metadata failure attribution、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
