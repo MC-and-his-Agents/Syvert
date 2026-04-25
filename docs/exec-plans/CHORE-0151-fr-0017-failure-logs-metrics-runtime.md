@@ -94,3 +94,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `3c57ec6ce6437b0e810645b104fd85d6bf1235ba` 为开始实现时的主干基线。
+- guardian review-sync 可恢复 checkpoint：`9a1239e70f1ff76580ee3a0775815d9a7cdf5ffd`。
+- 本次追加 checkpoint 元数据属于 `metadata-only review sync`，不推进新的 runtime / formal spec 语义。
