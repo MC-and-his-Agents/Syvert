@@ -353,15 +353,16 @@ def orchestrate_operability_gate(
         )
     if not _non_empty_string(execution_revision):
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
+    expected_baseline_gate_ref = f"FR-0007:version_gate:{RELEASE}:baseline:{execution_revision}"
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
-    elif not baseline_gate_ref.startswith(f"FR-0007:version_gate:{RELEASE}:"):
+    elif baseline_gate_ref != expected_baseline_gate_ref:
         failures.append(
             _failure(
                 "operability_gate",
                 "invalid_baseline_gate_ref",
-                "baseline_gate_ref must be traceable to the FR-0007 baseline gate",
-                details={"baseline_gate_ref": baseline_gate_ref},
+                "baseline_gate_ref must be bound to the current v0.6.0 FR-0007 baseline revision",
+                details={"expected_baseline_gate_ref": expected_baseline_gate_ref, "actual_baseline_gate_ref": baseline_gate_ref},
             )
         )
 
@@ -412,6 +413,8 @@ def orchestrate_operability_gate(
     for case in normalized_cases:
         if case["case_id"] in failed_case_ids:
             case["verdict"] = FAIL_VERDICT
+    normalized_case_ids = {str(case["case_id"]) for case in normalized_cases}
+    invalid_failed_case_ids = failed_case_ids - normalized_case_ids
     failed_dimensions = sorted(
         {
             str(case["dimension"])
@@ -420,8 +423,8 @@ def orchestrate_operability_gate(
         }
     )
     summary = {
-        "case_total": len(normalized_cases),
-        "pass_case_total": max(len(normalized_cases) - len(failed_case_ids), 0),
+        "case_total": len(normalized_cases) + len(invalid_failed_case_ids),
+        "pass_case_total": max(len(normalized_cases) - len(failed_case_ids & normalized_case_ids), 0),
         "fail_case_total": len(failed_case_ids),
         "failed_case_ids": sorted(failed_case_ids),
         "failed_dimensions": failed_dimensions,
@@ -452,7 +455,7 @@ def _case_from_definition(case_id: str, definition: Mapping[str, Any], *, verdic
         "dimension": definition["dimension"],
         "capability": APPROVED_CAPABILITY,
         "entrypoints": list(definition["entrypoints"]),
-        "preconditions": [f"precondition:{case_id}"],
+        "preconditions": _preconditions_for_case(case_id, definition),
         "expected_result": {
             "fields": [
                 {"path": path, "operator": operator, "value": deepcopy(value)}
@@ -466,6 +469,89 @@ def _case_from_definition(case_id: str, definition: Mapping[str, Any], *, verdic
         "evidence_refs": [],
         "verdict": verdict,
     }
+
+
+def _preconditions_for_case(case_id: str, definition: Mapping[str, Any]) -> list[str]:
+    base = [f"capability={APPROVED_CAPABILITY}", f"dimension={definition['dimension']}"]
+    specific = {
+        "trc-timeout-platform-control-code": [
+            "task enters Core execution path",
+            "execution control timeout is triggered",
+            "policy.timeout_ms=30000",
+        ],
+        "trc-retryable-platform-budget-closed": [
+            "platform failure marks error.details.retryable=true",
+            "idempotency safety gate passes",
+            "default retry budget allows no extra attempt",
+        ],
+        "trc-non-retryable-fail-closed": [
+            "failure does not match retryable predicate",
+            "default retry budget is active",
+        ],
+        "trc-pre-accept-concurrency-reject": [
+            "global concurrency slot is already occupied",
+            "request has not entered durable accepted lifecycle",
+        ],
+        "trc-concurrent-status-shared-truth": [
+            "same task_id is read through concurrent status calls",
+            "durable TaskRecord is the only status truth",
+        ],
+        "trc-concurrent-result-shared-truth": [
+            "same task_id is read through concurrent result calls",
+            "terminal envelope is stored in the durable TaskRecord",
+        ],
+        "flm-success-observable": ["Core execution succeeds", "structured log and metrics carriers are enabled"],
+        "flm-business-failure-observable": [
+            "Core execution returns a shared failed envelope",
+            "failure category is approved by FR-0005",
+        ],
+        "flm-contract-failure-fail-closed": [
+            "runtime contract truth cannot be proven",
+            "gate must fail closed without success envelope",
+        ],
+        "flm-timeout-observable": ["timeout outcome is projected to platform failure", "control_code=execution_timeout"],
+        "flm-retry-budget-closed-observable": [
+            "retryable platform failure is observed",
+            "policy.retry.max_attempts=1",
+        ],
+        "flm-store-unavailable-fail-closed": [
+            "durable TaskRecord store is unavailable",
+            "status/result must not synthesize shadow truth",
+        ],
+        "flm-http-invalid-input-observable": [
+            "HTTP request fails before admission",
+            "request_ref is available because no TaskRecord exists",
+        ],
+        "flm-cli-invalid-input-observable": [
+            "CLI request fails before admission",
+            "request_ref is available because no TaskRecord exists",
+        ],
+        "flm-same-path-violation-observable": [
+            "CLI/API shared truth mismatch is detected",
+            "overall gate must fail closed",
+        ],
+        "http-submit-status-result-shared-truth": [
+            "HTTP submit creates durable TaskRecord",
+            "HTTP status and result read the same shared record",
+        ],
+        "same-path-success-shared-truth": [
+            "CLI and HTTP process equivalent successful requests",
+            "both entrypoints observe shared task truth",
+        ],
+        "same-path-pre-admission-invalid-input": [
+            "CLI and HTTP process equivalent invalid pre-admission inputs",
+            "neither entrypoint creates TaskRecord",
+        ],
+        "same-path-durable-record-unavailable": [
+            "CLI and HTTP read the same unavailable durable record",
+            "both entrypoints fail closed",
+        ],
+        "same-path-terminal-result-read": [
+            "CLI query and HTTP result read the same terminal task",
+            "runtime_result_refs are preserved",
+        ],
+    }
+    return [*base, *specific.get(case_id, ["reviewable local evidence is available"])]
 
 
 def _normalize_cases(
@@ -489,11 +575,25 @@ def _normalize_cases(
     seen: set[str] = set()
     for index, raw_case in enumerate(candidates):
         if not isinstance(raw_case, Mapping):
-            failures.append(_failure("operability_gate", "invalid_case", "operability case must be a mapping", details={"index": index}))
+            failures.append(
+                _failure(
+                    "operability_gate",
+                    "invalid_case",
+                    "operability case must be a mapping",
+                    details={"index": index, "case_id": f"invalid-case-{index}"},
+                )
+            )
             continue
         case_id = _non_empty_string(raw_case.get("case_id"))
         if not case_id:
-            failures.append(_failure("operability_gate", "missing_case_id", "operability case requires case_id", details={"index": index}))
+            failures.append(
+                _failure(
+                    "operability_gate",
+                    "missing_case_id",
+                    "operability case requires case_id",
+                    details={"index": index, "case_id": f"invalid-case-{index}"},
+                )
+            )
             continue
         if case_id in seen:
             failures.append(_failure("operability_gate", "duplicate_case_id", "operability case ids must be unique", details={"case_id": case_id}))
@@ -1090,13 +1190,12 @@ def _dedupe_failures(failures: Sequence[Mapping[str, Any]]) -> list[dict[str, An
 
 def _failed_case_ids(cases: Sequence[Mapping[str, Any]], failures: Sequence[Mapping[str, Any]]) -> set[str]:
     failed_ids = {str(case["case_id"]) for case in cases if case.get("verdict") != PASS_VERDICT}
-    known_case_ids = {str(case["case_id"]) for case in cases}
     for failure in failures:
         details = failure.get("details")
         if not isinstance(details, Mapping):
             continue
         case_id = details.get("case_id")
-        if isinstance(case_id, str) and case_id in known_case_ids:
+        if isinstance(case_id, str) and case_id:
             failed_ids.add(case_id)
     return failed_ids
 

@@ -22,7 +22,7 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertTrue(result["safe_to_release"])
         self.assertEqual(result["release"], "v0.6.0")
         self.assertEqual(result["fr_item_key"], "FR-0019-v0-6-operability-release-gate")
-        self.assertEqual(result["baseline_gate_ref"], "FR-0007:version_gate:v0.6.0:baseline")
+        self.assertEqual(result["baseline_gate_ref"], "FR-0007:version_gate:v0.6.0:baseline:test-head-sha")
         self.assertEqual(set(result["normative_dependencies"]), {"FR-0007", "FR-0016", "FR-0017", "FR-0018"})
         self.assertEqual(result["policy_snapshot"], POLICY_SNAPSHOT)
         self.assertEqual({case["case_id"] for case in result["cases"]}, set(mandatory_operability_case_ids()))
@@ -56,6 +56,15 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
 
+    def test_baseline_gate_ref_rejects_wrong_tail_segment_or_revision(self) -> None:
+        wrong_tail = self.pass_result(baseline_gate_ref="FR-0007:version_gate:v0.6.0:other:test-head-sha")
+        wrong_revision = self.pass_result(baseline_gate_ref="FR-0007:version_gate:v0.6.0:baseline:other-head")
+
+        self.assertEqual(wrong_tail["verdict"], FAIL_VERDICT)
+        self.assertEqual(wrong_revision["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(wrong_tail))
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(wrong_revision))
+
     def test_gate_id_and_matrix_version_are_frozen(self) -> None:
         result = self.pass_result(gate_id="totally-different-gate", matrix_version="scratch-matrix")
 
@@ -73,6 +82,21 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("missing_mandatory_cases", self.failure_codes(result))
         missing_failure = next(item for item in result["failures"] if item["code"] == "missing_mandatory_cases")
         self.assertEqual(missing_failure["details"]["missing_case_ids"], ["same-path-terminal-result-read"])
+
+    def test_invalid_case_entries_are_reflected_in_summary(self) -> None:
+        result = self.pass_result(cases=[{}])
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_case_id", self.failure_codes(result))
+        self.assertGreaterEqual(result["summary"]["fail_case_total"], 1)
+        self.assertIn("invalid-case-0", result["summary"]["failed_case_ids"])
+
+    def test_generated_cases_have_reviewable_preconditions(self) -> None:
+        cases = self.valid_cases()
+
+        for case in cases:
+            self.assertNotIn(f"precondition:{case['case_id']}", case["preconditions"])
+            self.assertIn("capability=content_detail_by_url", case["preconditions"])
 
     def test_invalid_metrics_snapshot_fails_closed(self) -> None:
         metrics = self.valid_metrics()
@@ -368,7 +392,7 @@ class OperabilityGateTests(unittest.TestCase):
     def pass_result(self, **overrides: object) -> dict[str, object]:
         payload: dict[str, object] = {
             "execution_revision": "test-head-sha",
-            "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline",
+            "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:test-head-sha",
             "cases": self.valid_cases(),
             "metrics_snapshot": self.valid_metrics(),
             "evidence_refs": ["FR-0007:version_gate:v0.6.0:baseline:test-head-sha"],
