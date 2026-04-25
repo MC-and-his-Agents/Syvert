@@ -23,7 +23,7 @@
   - `syvert/operability_gate.py`
   - `tests/runtime/test_operability_gate.py`
   - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
-  - `scripts/render_operability_gate_artifact.py`
+  - `tests/runtime/render_operability_gate_artifact.py`
   - `docs/exec-plans/CHORE-0158-fr-0019-v0-6-release-gate-runtime.md`
 - 本次不纳入：
   - 修改 `FR-0019` formal spec 语义
@@ -65,7 +65,7 @@
   - 结果：已确认 `#234` open，item_key / release / sprint / 父 FR 与本执行计划一致。
 - `python3 -m py_compile syvert/operability_gate.py`
   - 结果：通过。
-- `python3 -m py_compile syvert/operability_gate.py scripts/render_operability_gate_artifact.py`
+- `python3 -m py_compile syvert/operability_gate.py tests/runtime/render_operability_gate_artifact.py`
   - 结果：修复 artifact 重放入口后通过。
 - `python3 -m unittest tests.runtime.test_operability_gate`
   - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`；修复 guardian 三轮阻断后再次通过，`Ran 21 tests`，`OK`；修复 guardian 四轮阻断后再次通过，`Ran 23 tests`，`OK`；修复 guardian 五轮阻断后再次通过，`Ran 25 tests`，`OK`；修复 guardian 六轮阻断后再次通过，`Ran 28 tests`，`OK`；修复 guardian 七轮阻断后再次通过，`Ran 31 tests`，`OK`；修复 guardian 八轮阻断后再次通过，`Ran 34 tests`，`OK`；补齐 exact baseline / invalid-case summary / reviewable preconditions / artifact reproduction entrypoint 后再次通过，`Ran 37 tests`，`OK`。
@@ -93,7 +93,7 @@
   - 结果：`REQUEST_CHANGES`；指出 case-local policy / metrics 不得被顶层 snapshot 覆盖、revision evidence 绑定不能用子串、`actual_result_ref` 需要受控 evidence 格式。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-32c4288.json`
   - 结果：`REQUEST_CHANGES`；指出 `baseline_gate_ref` 必须精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>`、invalid/missing case 不能从 summary 消失、generated matrix case 不能使用占位 preconditions、artifact 需要本地重放入口。
-- `python3 scripts/render_operability_gate_artifact.py --execution-revision a05cf45a3219ce173bd0d4b42379891e800ff593`
+- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision a05cf45a3219ce173bd0d4b42379891e800ff593`
   - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=a05cf45a3219ce173bd0d4b42379891e800ff593`。
 - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
   - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=a05cf45a3219ce173bd0d4b42379891e800ff593`，覆盖 20 个 mandatory cases，并包含 case-level local evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions 与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
