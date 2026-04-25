@@ -115,6 +115,34 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("missing_actual_result_ref", self.failure_codes(result))
         self.assertIn("missing_evidence_refs", self.failure_codes(result))
 
+    def test_case_missing_evidence_refs_field_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        cases[0].pop("evidence_refs")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_case_evidence_refs", self.failure_codes(result))
+
+    def test_execution_revision_must_be_bound_to_evidence_refs(self) -> None:
+        result = self.pass_result(execution_revision="other-head")
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_unapproved_extra_dimension_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        extra_case = deepcopy(cases[0])
+        extra_case["case_id"] = "experimental-extra-case"
+        extra_case["dimension"] = "totally_new_dimension"
+        extra_case["evidence_refs"] = ["operability:test-head-sha:experimental-extra-case"]
+        cases.append(extra_case)
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_case_dimension", self.failure_codes(result))
+
     def test_normative_dependency_drift_fails_closed(self) -> None:
         result = self.pass_result(normative_dependencies=["FR-0007", "FR-0016", "FR-0018"])
 
@@ -127,13 +155,17 @@ class OperabilityGateTests(unittest.TestCase):
             "baseline_gate_ref": "version_gate:v0.6.0:baseline",
             "cases": self.valid_cases(),
             "metrics_snapshot": self.valid_metrics(),
-            "evidence_refs": ["version_gate:v0.6.0:baseline"],
+            "evidence_refs": ["version_gate:v0.6.0:baseline:test-head-sha"],
         }
         payload.update(overrides)
         return orchestrate_operability_gate(**payload)
 
     def valid_cases(self) -> list[dict[str, object]]:
-        return build_mandatory_operability_cases()
+        cases = build_mandatory_operability_cases()
+        for case in cases:
+            case["actual_result_ref"] = f"operability:test-head-sha:{case['case_id']}"
+            case["evidence_refs"] = [f"operability:test-head-sha:{case['case_id']}"]
+        return cases
 
     def valid_metrics(self) -> dict[str, int]:
         return {

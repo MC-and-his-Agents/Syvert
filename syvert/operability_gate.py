@@ -17,6 +17,14 @@ DIMENSION_TIMEOUT_RETRY_CONCURRENCY = "timeout_retry_concurrency"
 DIMENSION_FAILURE_LOG_METRICS = "failure_log_metrics"
 DIMENSION_HTTP_SUBMIT_STATUS_RESULT = "http_submit_status_result"
 DIMENSION_CLI_API_SAME_PATH = "cli_api_same_path"
+ALLOWED_DIMENSIONS = frozenset(
+    {
+        DIMENSION_TIMEOUT_RETRY_CONCURRENCY,
+        DIMENSION_FAILURE_LOG_METRICS,
+        DIMENSION_HTTP_SUBMIT_STATUS_RESULT,
+        DIMENSION_CLI_API_SAME_PATH,
+    }
+)
 
 APPROVED_CAPABILITY = "content_detail_by_url"
 NORMATIVE_DEPENDENCIES = ("FR-0007", "FR-0016", "FR-0017", "FR-0018")
@@ -342,6 +350,7 @@ def orchestrate_operability_gate(
             )
 
     normalized_evidence_refs = _dedupe_sorted(normalized_evidence_refs)
+    _validate_revision_evidence_binding(execution_revision, normalized_evidence_refs, failures)
     if not normalized_evidence_refs:
         failures.append(_failure("operability_gate", "missing_evidence_refs", "operability gate requires evidence refs"))
         normalized_evidence_refs = ["operability_gate:failure:missing_evidence_refs"]
@@ -425,6 +434,15 @@ def _normalize_cases(raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[s
         dimension = _non_empty_string(raw_case.get("dimension"))
         if not dimension:
             failures.append(_case_failure(case_id, "missing_case_dimension", "operability case requires dimension"))
+        elif dimension not in ALLOWED_DIMENSIONS:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "invalid_case_dimension",
+                    "operability case dimension must be one of the FR-0019 allowed dimensions",
+                    details={"actual_dimension": dimension},
+                )
+            )
         elif definition and dimension != definition["dimension"]:
             failures.append(
                 _case_failure(
@@ -464,7 +482,11 @@ def _normalize_cases(raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[s
         actual_result_ref = _non_empty_string(raw_case.get("actual_result_ref"))
         if not actual_result_ref:
             failures.append(_case_failure(case_id, "missing_actual_result_ref", "operability case requires actual_result_ref"))
-        evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
+        if "evidence_refs" not in raw_case:
+            failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires evidence_refs"))
+            evidence_refs = []
+        else:
+            evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
         normalized.append(
             {
@@ -625,6 +647,25 @@ def _normalize_metrics_snapshot(raw_metrics: Mapping[str, Any], failures: list[d
         else:
             normalized[field] = raw_value
     return normalized
+
+
+def _validate_revision_evidence_binding(
+    execution_revision: str,
+    evidence_refs: Sequence[str],
+    failures: list[dict[str, Any]],
+) -> None:
+    revision = _non_empty_string(execution_revision)
+    if not revision:
+        return
+    if not any(revision in evidence_ref for evidence_ref in evidence_refs):
+        failures.append(
+            _failure(
+                "operability_gate",
+                "execution_revision_evidence_mismatch",
+                "execution_revision must be traceable from gate or case evidence refs",
+                details={"execution_revision": revision},
+            )
+        )
 
 
 def _normalize_string_list(
