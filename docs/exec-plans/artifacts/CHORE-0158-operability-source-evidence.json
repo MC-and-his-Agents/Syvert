@@ -1,4 +1,21 @@
 {
+  "baseline_gate_result": {
+    "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:{revision}",
+    "evidence_refs": [
+      "FR-0007:version_gate:v0.6.0:baseline:{revision}",
+      "tests:{revision}:tests.runtime.test_version_gate"
+    ],
+    "execution_revision": "{revision}",
+    "release": "v0.6.0",
+    "safe_to_release": true,
+    "source_reports": {
+      "version_gate_unittest": {
+        "command": "python3 -m unittest tests.runtime.test_version_gate",
+        "verdict": "pass"
+      }
+    },
+    "verdict": "pass"
+  },
   "cases": [
     {
       "actual_result": {
@@ -739,6 +756,18 @@
     "submit_total": 2,
     "success_total": 2,
     "timeout_total": 1
+  },
+  "policy_snapshot": {
+    "concurrency": {
+      "max_in_flight": 1,
+      "on_limit": "reject",
+      "scope": "global"
+    },
+    "retry": {
+      "backoff_ms": 0,
+      "max_attempts": 1
+    },
+    "timeout_ms": 30000
   },
   "release": "v0.6.0",
   "schema": "syvert.operability_source_evidence.v1"

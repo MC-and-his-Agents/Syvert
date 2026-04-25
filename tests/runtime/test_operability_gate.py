@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+from pathlib import Path
+import tempfile
 import unittest
 
 from syvert.operability_gate import (
@@ -451,6 +453,18 @@ class OperabilityGateTests(unittest.TestCase):
     def test_renderer_rejects_non_head_execution_revision(self) -> None:
         with self.assertRaises(SystemExit):
             assert_revision_is_current_head("not-current-head")
+
+    def test_renderer_missing_source_evidence_fails_closed_as_gate_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps({"cases": []}), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_not_passed", self.failure_codes(result))
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
 
     def test_external_actual_result_ref_fails_closed(self) -> None:
         cases = self.valid_cases()

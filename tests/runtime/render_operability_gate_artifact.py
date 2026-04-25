@@ -57,7 +57,10 @@ def build_gate_input_from_source_evidence(
     if run_upstream:
         assert_revision_is_current_head(revision)
     upstream_results = run_upstream_verifications(revision) if run_upstream else default_upstream_results(revision)
-    source = json.loads(source_path.read_text(encoding="utf-8"))
+    source = materialize_revision(json.loads(source_path.read_text(encoding="utf-8")), revision=revision)
+    failures = validate_source_evidence(source)
+    if failures:
+        return fail_closed_gate_input(revision=revision, failures=failures)
     actual_cases = {str(case["case_id"]): case for case in source["cases"]}
     cases = build_mandatory_operability_cases()
     for case in cases:
@@ -70,13 +73,13 @@ def build_gate_input_from_source_evidence(
         ]
         case["actual_result"] = evidence_case["actual_result"]
         case["upstream_refs"] = [f"tests:{revision}:{module}" for module in evidence_case["upstream_modules"]]
-    baseline_gate_result = build_baseline_gate_result(revision) if run_upstream else default_baseline_gate_result(revision)
     return {
         "execution_revision": revision,
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
-        "baseline_gate_result": baseline_gate_result,
+        "baseline_gate_result": source["baseline_gate_result"],
         "cases": cases,
         "metrics_snapshot": source["metrics_snapshot"],
+        "policy_snapshot": source["policy_snapshot"],
         "evidence_refs": [
             f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
             *upstream_results["evidence_refs"],
@@ -84,52 +87,32 @@ def build_gate_input_from_source_evidence(
     }
 
 
-def build_baseline_gate_result(revision: str) -> dict[str, Any]:
-    completed = subprocess.run(
-        [sys.executable, "-m", "unittest", "tests.runtime.test_version_gate"],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    passed = completed.returncode == 0
-    return {
-        "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
-        "execution_revision": revision,
-        "release": "v0.6.0",
-        "verdict": "pass" if passed else "fail",
-        "safe_to_release": passed,
-        "evidence_refs": [
-            f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
-            f"tests:{revision}:tests.runtime.test_version_gate",
-        ],
-        "source_reports": {
-            "version_gate_unittest": {
-                "command": "python3 -m unittest tests.runtime.test_version_gate",
-                "verdict": "pass" if passed else "fail",
-                "output_tail": completed.stdout[-4000:],
-            }
-        },
-    }
+def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
+    failures: list[dict[str, str]] = []
+    for key in ("baseline_gate_result", "policy_snapshot", "metrics_snapshot", "cases"):
+        if key not in source:
+            failures.append({"code": "missing_source_evidence_field", "field": key})
+    if "cases" in source and not isinstance(source["cases"], list):
+        failures.append({"code": "invalid_source_evidence_cases", "field": "cases"})
+    return failures
 
 
-def default_baseline_gate_result(revision: str) -> dict[str, Any]:
+def fail_closed_gate_input(*, revision: str, failures: list[dict[str, str]]) -> dict[str, Any]:
     return {
-        "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
         "execution_revision": revision,
-        "release": "v0.6.0",
-        "verdict": "pass",
-        "safe_to_release": True,
-        "evidence_refs": [
-            f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
-            f"tests:{revision}:tests.runtime.test_version_gate",
-        ],
-        "source_reports": {
-            "version_gate_unittest": {
-                "command": "python3 -m unittest tests.runtime.test_version_gate",
-                "verdict": "pass",
-            }
+        "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
+        "baseline_gate_result": {
+            "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
+            "execution_revision": revision,
+            "release": "v0.6.0",
+            "verdict": "fail",
+            "safe_to_release": False,
+            "evidence_refs": [f"local:{revision}:source-evidence-invalid"],
         },
+        "cases": [],
+        "metrics_snapshot": {},
+        "policy_snapshot": {},
+        "evidence_refs": [f"local:{revision}:source-evidence-invalid"],
     }
 
 
@@ -155,6 +138,16 @@ def run_upstream_verifications(revision: str) -> dict[str, Any]:
     ]
     subprocess.run([sys.executable, "-m", "unittest", *modules], check=True)
     return {"evidence_refs": [f"tests:{revision}:{module}" for module in modules]}
+
+
+def materialize_revision(value: Any, *, revision: str) -> Any:
+    if isinstance(value, str):
+        return value.replace("{revision}", revision)
+    if isinstance(value, list):
+        return [materialize_revision(item, revision=revision) for item in value]
+    if isinstance(value, dict):
+        return {str(key): materialize_revision(item, revision=revision) for key, item in value.items()}
+    return value
 
 
 def assert_revision_is_current_head(revision: str) -> None:
