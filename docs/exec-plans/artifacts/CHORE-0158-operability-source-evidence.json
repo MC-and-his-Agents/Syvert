@@ -1,0 +1,854 @@
+{
+  "baseline_gate_result": {
+    "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:{revision}",
+    "evidence_refs": [
+      "FR-0007:version_gate:v0.6.0:baseline:{revision}",
+      "tests:{revision}:tests.runtime.test_version_gate"
+    ],
+    "execution_revision": "{revision}",
+    "release": "v0.6.0",
+    "safe_to_release": true,
+    "source_reports": {
+      "version_gate_unittest": {
+        "command": "python3 -m unittest tests.runtime.test_version_gate",
+        "verdict": "pass"
+      }
+    },
+    "verdict": "pass"
+  },
+  "cases": [
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-timeout-platform-control-code"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "control_code": "execution_timeout"
+          }
+        },
+        "evidence_source": "tests/runtime/trc-timeout-platform-control-code",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "policy": {
+          "retry": {
+            "backoff_ms": 0,
+            "max_attempts": 1
+          },
+          "timeout_ms": 30000
+        },
+        "side_effects": [
+          "ExecutionControlEvent.details.control_code=execution_timeout",
+          "TaskRecord.status=failed"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-timeout-platform-control-code:actual_result",
+      "case_id": "trc-timeout-platform-control-code",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-timeout-platform-control-code:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-retryable-platform-budget-closed"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "retryable": true
+          }
+        },
+        "evidence_source": "tests/runtime/trc-retryable-platform-budget-closed",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "idempotency_safety_gate": "pass",
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "attempts": 0
+        },
+        "side_effects": [
+          "no_extra_retry_attempt",
+          "preserve_original_failed_envelope"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-retryable-platform-budget-closed:actual_result",
+      "case_id": "trc-retryable-platform-budget-closed",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-retryable-platform-budget-closed:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-non-retryable-fail-closed"
+        },
+        "evidence_source": "tests/runtime/trc-non-retryable-fail-closed",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "predicate": {
+            "match": "none"
+          }
+        },
+        "side_effects": [
+          "no_new_retry_attempt",
+          "preserve_original_failed_envelope"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-non-retryable-fail-closed:actual_result",
+      "case_id": "trc-non-retryable-fail-closed",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-non-retryable-fail-closed:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-pre-accept-concurrency-reject"
+        },
+        "error": {
+          "category": "invalid_input"
+        },
+        "evidence_source": "tests/runtime/trc-pre-accept-concurrency-reject",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "concurrency_case_total": 3
+        },
+        "policy": {
+          "concurrency": {
+            "max_in_flight": 1,
+            "on_limit": "reject",
+            "scope": "global"
+          }
+        },
+        "request_ref": "evidence:{revision}:trc-pre-accept-concurrency-reject:non_empty_ref",
+        "result": {
+          "status": "failed"
+        },
+        "side_effects": [
+          "TaskRecord.not_created"
+        ],
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-pre-accept-concurrency-reject:actual_result",
+      "case_id": "trc-pre-accept-concurrency-reject",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-pre-accept-concurrency-reject:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-concurrent-status-shared-truth",
+          "verdict": "pass"
+        },
+        "evidence_source": "tests/runtime/trc-concurrent-status-shared-truth",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "concurrency_case_total": 3
+        },
+        "side_effects": [
+          "no_extra_TaskRecord",
+          "no_status_regression"
+        ],
+        "status": {
+          "read_a": {
+            "status": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.task_id"
+          },
+          "read_b": {
+            "status": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.task_id"
+          }
+        }
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-concurrent-status-shared-truth:actual_result",
+      "case_id": "trc-concurrent-status-shared-truth",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-concurrent-status-shared-truth:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-concurrent-result-shared-truth",
+          "verdict": "pass"
+        },
+        "evidence_source": "tests/runtime/trc-concurrent-result-shared-truth",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "concurrency_case_total": 3
+        },
+        "result": {
+          "read_a": {
+            "envelope_ref": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.task_id"
+          },
+          "read_b": {
+            "envelope_ref": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.task_id"
+          }
+        },
+        "side_effects": [
+          "no_shadow_result",
+          "terminal_state_not_rewritten"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-concurrent-result-shared-truth:actual_result",
+      "case_id": "trc-concurrent-result-shared-truth",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-concurrent-result-shared-truth:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-success-observable"
+        },
+        "evidence_source": "tests/runtime/flm-success-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "success_total": 2
+        },
+        "result": {
+          "status": "succeeded"
+        },
+        "side_effects": [
+          "structured_log.task_id",
+          "structured_log.entrypoint",
+          "structured_log.stage",
+          "structured_log.result.status",
+          "evidence_refs.non_empty"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-success-observable:actual_result",
+      "case_id": "flm-success-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-success-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-business-failure-observable"
+        },
+        "error": {
+          "category": "invalid_input"
+        },
+        "evidence_source": "tests/runtime/flm-business-failure-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "failure_total": 8
+        },
+        "side_effects": [
+          "structured_log.task_id",
+          "structured_log.entrypoint",
+          "structured_log.stage",
+          "structured_log.error.category"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-business-failure-observable:actual_result",
+      "case_id": "flm-business-failure-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-business-failure-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-contract-failure-fail-closed"
+        },
+        "error": {
+          "category": "runtime_contract"
+        },
+        "evidence_source": "tests/runtime/flm-contract-failure-fail-closed",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "gate": {
+          "verdict": "fail"
+        },
+        "side_effects": [
+          "structured_log.error.category=runtime_contract",
+          "no_success_envelope"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-contract-failure-fail-closed:actual_result",
+      "case_id": "flm-contract-failure-fail-closed",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-contract-failure-fail-closed:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-timeout-observable"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "control_code": "execution_timeout"
+          }
+        },
+        "evidence_source": "tests/runtime/flm-timeout-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "timeout_total": 1
+        },
+        "side_effects": [
+          "structured_log.task_id",
+          "structured_log.stage",
+          "structured_log.error.category",
+          "structured_log.error.details.control_code"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-timeout-observable:actual_result",
+      "case_id": "flm-timeout-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-timeout-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-retry-budget-closed-observable"
+        },
+        "evidence_source": "tests/runtime/flm-retry-budget-closed-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "retry_attempt_total": 0
+        },
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "attempts": 0
+        },
+        "side_effects": [
+          "structured_log.retry_budget_closed",
+          "structured_log.final_failure_classification",
+          "structured_log.error.details.retryable=true"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-retry-budget-closed-observable:actual_result",
+      "case_id": "flm-retry-budget-closed-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-retry-budget-closed-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-store-unavailable-fail-closed"
+        },
+        "error": {
+          "category": "runtime_contract",
+          "code": "task_record_unavailable"
+        },
+        "evidence_source": "tests/runtime/flm-store-unavailable-fail-closed",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "gate": {
+          "verdict": "fail"
+        },
+        "side_effects": [
+          "structured_log.store_unavailable.reason",
+          "no_shadow_status_or_result"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-store-unavailable-fail-closed:actual_result",
+      "case_id": "flm-store-unavailable-fail-closed",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-store-unavailable-fail-closed:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-http-invalid-input-observable"
+        },
+        "entrypoint": "http",
+        "error": {
+          "category": "invalid_input"
+        },
+        "evidence_source": "tests/runtime/flm-http-invalid-input-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "failure_total": 8
+        },
+        "request_ref": "evidence:{revision}:flm-http-invalid-input-observable:non_empty_ref",
+        "result": {
+          "status": "failed"
+        },
+        "side_effects": [
+          "structured_log.request_ref",
+          "structured_log.entrypoint=http",
+          "structured_log.stage",
+          "structured_log.result.status",
+          "structured_log.error.category",
+          "TaskRecord.not_created"
+        ],
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-http-invalid-input-observable:actual_result",
+      "case_id": "flm-http-invalid-input-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-http-invalid-input-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-cli-invalid-input-observable"
+        },
+        "entrypoint": "cli",
+        "error": {
+          "category": "invalid_input"
+        },
+        "evidence_source": "tests/runtime/flm-cli-invalid-input-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "failure_total": 8
+        },
+        "request_ref": "evidence:{revision}:flm-cli-invalid-input-observable:non_empty_ref",
+        "result": {
+          "status": "failed"
+        },
+        "side_effects": [
+          "structured_log.request_ref",
+          "structured_log.entrypoint=cli",
+          "structured_log.stage",
+          "structured_log.result.status",
+          "structured_log.error.category",
+          "TaskRecord.not_created"
+        ],
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-cli-invalid-input-observable:actual_result",
+      "case_id": "flm-cli-invalid-input-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-cli-invalid-input-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-same-path-violation-observable"
+        },
+        "evidence_source": "tests/runtime/flm-same-path-violation-observable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "same_path_case_failure_total": 1
+        },
+        "same_path": {
+          "verdict": "fail"
+        },
+        "side_effects": [
+          "structured_log.shared_truth_mismatch_reason",
+          "overall_gate.verdict=fail"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-same-path-violation-observable:actual_result",
+      "case_id": "flm-same-path-violation-observable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:flm-same-path-violation-observable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "http-submit-status-result-shared-truth"
+        },
+        "evidence_source": "tests/runtime/http-submit-status-result-shared-truth",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "metrics": {
+          "submit_total": 2
+        },
+        "result": {
+          "envelope_ref": "evidence:{revision}:http-submit-status-result-shared-truth:non_empty_ref",
+          "task_id": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_record_ref"
+        },
+        "side_effects": [
+          "single_shared_TaskRecord",
+          "result_reads_shared_envelope"
+        ],
+        "status": {
+          "task_id": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_record_ref"
+        },
+        "submit": {
+          "request": {
+            "capability": "content_detail_by_url"
+          }
+        }
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:http-submit-status-result-shared-truth:actual_result",
+      "case_id": "http-submit-status-result-shared-truth",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:http-submit-status-result-shared-truth:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-success-shared-truth"
+        },
+        "cli": {
+          "envelope_ref": "evidence:{revision}:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:{revision}:same-path-success-shared-truth:cli.task_record_ref"
+        },
+        "evidence_source": "tests/runtime/same-path-success-shared-truth",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "http": {
+          "envelope_ref": "evidence:{revision}:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:{revision}:same-path-success-shared-truth:cli.task_record_ref"
+        },
+        "metrics": {
+          "same_path_case_total": 4
+        },
+        "same_path": {
+          "verdict": "pass"
+        },
+        "side_effects": [
+          "same_state_transition"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-success-shared-truth:actual_result",
+      "case_id": "same-path-success-shared-truth",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-success-shared-truth:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-pre-admission-invalid-input"
+        },
+        "cli": {
+          "error": {
+            "category": "invalid_input",
+            "code": "evidence:{revision}:same-path-pre-admission-invalid-input:cli.error.code"
+          },
+          "request_ref": "evidence:{revision}:same-path-pre-admission-invalid-input:non_empty_ref",
+          "result": {
+            "status": "failed"
+          },
+          "stage": "pre_admission"
+        },
+        "evidence_source": "tests/runtime/same-path-pre-admission-invalid-input",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "http": {
+          "error": {
+            "category": "invalid_input",
+            "code": "evidence:{revision}:same-path-pre-admission-invalid-input:cli.error.code"
+          },
+          "request_ref": "evidence:{revision}:same-path-pre-admission-invalid-input:non_empty_ref",
+          "result": {
+            "status": "failed"
+          },
+          "stage": "pre_admission"
+        },
+        "metrics": {
+          "same_path_case_total": 4
+        },
+        "same_path": {
+          "verdict": "pass"
+        },
+        "side_effects": [
+          "cli_no_TaskRecord",
+          "http_no_TaskRecord"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-pre-admission-invalid-input:actual_result",
+      "case_id": "same-path-pre-admission-invalid-input",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-pre-admission-invalid-input:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-durable-record-unavailable"
+        },
+        "cli": {
+          "error": {
+            "category": "runtime_contract",
+            "code": "task_record_unavailable"
+          }
+        },
+        "evidence_source": "tests/runtime/same-path-durable-record-unavailable",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "http": {
+          "error": {
+            "category": "runtime_contract",
+            "code": "task_record_unavailable"
+          }
+        },
+        "metrics": {
+          "same_path_case_total": 4
+        },
+        "same_path": {
+          "verdict": "pass"
+        },
+        "side_effects": [
+          "cli_fail_closed",
+          "http_fail_closed"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-durable-record-unavailable:actual_result",
+      "case_id": "same-path-durable-record-unavailable",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-durable-record-unavailable:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-terminal-result-read"
+        },
+        "cli": {
+          "result": {
+            "envelope_ref": "evidence:{revision}:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:{revision}:same-path-terminal-result-read:cli.result.task_id"
+          }
+        },
+        "evidence_source": "tests/runtime/same-path-terminal-result-read",
+        "forbidden_mutations_absent": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "http": {
+          "result": {
+            "envelope_ref": "evidence:{revision}:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:{revision}:same-path-terminal-result-read:cli.result.task_id"
+          }
+        },
+        "metrics": {
+          "same_path_case_total": 4
+        },
+        "same_path": {
+          "verdict": "pass"
+        },
+        "side_effects": [
+          "shared_terminal_TaskRecord",
+          "shared_runtime_result_refs"
+        ]
+      },
+      "actual_result_ref": "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-terminal-result-read:actual_result",
+      "case_id": "same-path-terminal-result-read",
+      "evidence_refs": [
+        "local:{revision}:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:same-path-terminal-result-read:source_case"
+      ],
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
+      ]
+    }
+  ],
+  "metrics_snapshot": {
+    "concurrency_case_failure_total": 1,
+    "concurrency_case_total": 3,
+    "failure_total": 8,
+    "retry_attempt_total": 0,
+    "same_path_case_failure_total": 1,
+    "same_path_case_total": 4,
+    "submit_total": 2,
+    "success_total": 2,
+    "timeout_total": 1
+  },
+  "policy_snapshot": {
+    "concurrency": {
+      "max_in_flight": 1,
+      "on_limit": "reject",
+      "scope": "global"
+    },
+    "retry": {
+      "backoff_ms": 0,
+      "max_attempts": 1
+    },
+    "timeout_ms": 30000
+  },
+  "release": "v0.6.0",
+  "schema": "syvert.operability_source_evidence.v1"
+}
