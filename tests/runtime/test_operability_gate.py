@@ -121,7 +121,9 @@ class OperabilityGateTests(unittest.TestCase):
 
     def test_reviewable_ci_log_metrics_evidence_refs_are_allowed(self) -> None:
         cases = self.valid_cases()
-        cases[0]["evidence_refs"] = ["ci:test-head-sha:fr-0019:trc-timeout-platform-control-code"]
+        cases[0]["evidence_refs"] = [
+            "local:test-head-sha:docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json:trc-timeout-platform-control-code:source_case"
+        ]
         cases[0]["upstream_refs"] = ["log:test-head-sha:tests.runtime.test_execution_control"]
 
         result = self.pass_result(
@@ -542,6 +544,33 @@ class OperabilityGateTests(unittest.TestCase):
             result = orchestrate_operability_gate(**gate_input)
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
+    def test_renderer_extra_source_evidence_case_fails_closed(self) -> None:
+        valid_source = json.loads(Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json").read_text())
+        extra_case = deepcopy(valid_source["cases"][0])
+        extra_case["case_id"] = "experimental-extra-case"
+        valid_source["cases"].append(extra_case)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps(valid_source), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
+    def test_renderer_malformed_source_evidence_fails_closed_as_gate_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text("{not-json", encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_not_passed", self.failure_codes(result))
         self.assertIn("missing_mandatory_cases", self.failure_codes(result))
 
     def test_renderer_case_without_id_or_upstream_modules_fails_closed(self) -> None:

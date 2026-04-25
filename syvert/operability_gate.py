@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 import re
 from typing import Any
 
@@ -37,6 +38,11 @@ APPROVED_UPSTREAM_MODULES = frozenset(
         "tests.runtime.test_http_api",
         "tests.runtime.test_cli_http_same_path",
         "tests.runtime.test_version_gate",
+    }
+)
+APPROVED_LOCAL_EVIDENCE_ARTIFACTS = frozenset(
+    {
+        "docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json",
     }
 )
 
@@ -783,12 +789,12 @@ def _normalize_cases(
                     details={"actual_result_ref": actual_result_ref, "execution_revision": execution_revision},
                 )
             )
-        elif not _is_case_scoped_evidence_ref(actual_result_ref, case_id):
+        elif not _is_backed_case_actual_result_ref(actual_result_ref, case_id):
             failures.append(
                 _case_failure(
                     case_id,
                     "actual_result_ref_scope_mismatch",
-                    "actual_result_ref must be scoped to the current operability case",
+                    "actual_result_ref must point to a backed local artifact scoped to the current operability case",
                     details={"actual_result_ref": actual_result_ref},
                 )
             )
@@ -799,13 +805,13 @@ def _normalize_cases(
             evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
             if not evidence_refs:
                 failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires non-empty evidence_refs"))
-            mismatched_evidence_refs = [ref for ref in evidence_refs if not _is_case_scoped_evidence_ref(ref, case_id)]
+            mismatched_evidence_refs = [ref for ref in evidence_refs if not _is_backed_case_evidence_ref(ref, case_id)]
             if mismatched_evidence_refs:
                 failures.append(
                     _case_failure(
                         case_id,
                         "case_evidence_ref_scope_mismatch",
-                        "case evidence_refs must be scoped to the current operability case",
+                        "case evidence_refs must point to backed local artifacts or approved upstream evidence scoped to the current operability case",
                         details={"mismatched_evidence_refs": mismatched_evidence_refs},
                     )
                 )
@@ -1500,6 +1506,33 @@ def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
 def _is_case_scoped_evidence_ref(evidence_ref: str, case_id: str) -> bool:
     parts = evidence_ref.split(":")
     return len(parts) >= 3 and not parts[0].startswith("FR-") and case_id in parts[2:]
+
+
+def _is_backed_case_actual_result_ref(evidence_ref: str, case_id: str) -> bool:
+    return _is_backed_local_case_ref(evidence_ref, case_id)
+
+
+def _is_backed_case_evidence_ref(evidence_ref: str, case_id: str) -> bool:
+    return _is_backed_local_case_ref(evidence_ref, case_id) or _is_backed_upstream_case_ref(evidence_ref, case_id)
+
+
+def _is_backed_local_case_ref(evidence_ref: str, case_id: str) -> bool:
+    if not _is_case_scoped_evidence_ref(evidence_ref, case_id):
+        return False
+    parts = evidence_ref.split(":")
+    if len(parts) < 4 or parts[0] != "local":
+        return False
+    artifact_path = parts[2]
+    return artifact_path in APPROVED_LOCAL_EVIDENCE_ARTIFACTS and Path(artifact_path).is_file()
+
+
+def _is_backed_upstream_case_ref(evidence_ref: str, case_id: str) -> bool:
+    if not _is_case_scoped_evidence_ref(evidence_ref, case_id):
+        return False
+    parts = evidence_ref.split(":")
+    if len(parts) != 4 or parts[0] not in {"tests", "log"}:
+        return False
+    return parts[2] in APPROVED_UPSTREAM_MODULES
 
 
 def _is_approved_upstream_ref(evidence_ref: str) -> bool:

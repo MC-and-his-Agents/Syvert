@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from json import JSONDecodeError
 from pathlib import Path
 import subprocess
 import sys
@@ -67,7 +68,13 @@ def build_gate_input_from_source_evidence(
         assert_revision_is_current_head(revision)
     upstream_results = run_upstream_verifications(revision) if run_upstream else default_upstream_results(revision)
     executed_modules = set(APPROVED_UPSTREAM_MODULES)
-    source = materialize_revision(json.loads(source_path.read_text(encoding="utf-8")), revision=revision)
+    try:
+        source = materialize_revision(json.loads(source_path.read_text(encoding="utf-8")), revision=revision)
+    except (OSError, JSONDecodeError) as exc:
+        return fail_closed_gate_input(
+            revision=revision,
+            failures=[{"code": "unreadable_source_evidence", "field": str(source_path), "message": str(exc)}],
+        )
     failures = validate_source_evidence(source)
     if failures:
         return fail_closed_gate_input(revision=revision, failures=failures)
@@ -109,8 +116,11 @@ def build_gate_input_from_source_evidence(
     }
 
 
-def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
+def validate_source_evidence(source: Any) -> list[dict[str, str]]:
     failures: list[dict[str, str]] = []
+    if not isinstance(source, dict):
+        return [{"code": "invalid_source_evidence_root", "field": "source"}]
+    mandatory_case_ids = {str(case["case_id"]) for case in build_mandatory_operability_cases()}
     for key in ("baseline_gate_result", "policy_snapshot", "metrics_snapshot", "cases"):
         if key not in source:
             failures.append({"code": "missing_source_evidence_field", "field": key})
@@ -129,6 +139,8 @@ def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
             if case_id in observed_case_ids:
                 failures.append({"code": "duplicate_source_evidence_case_id", "field": case_id})
             observed_case_ids.add(case_id)
+            if case_id not in mandatory_case_ids:
+                failures.append({"code": "unexpected_source_evidence_case", "field": case_id})
             if "actual_result" not in case:
                 failures.append({"code": "missing_source_evidence_actual_result", "field": case_id})
             if "actual_result_ref" not in case:
@@ -139,8 +151,7 @@ def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
                 failures.append({"code": "missing_source_evidence_upstream_modules", "field": case_id})
             elif not isinstance(case["upstream_modules"], list) or not set(case["upstream_modules"]) <= APPROVED_UPSTREAM_MODULES:
                 failures.append({"code": "unapproved_source_evidence_upstream_module", "field": case_id})
-        for mandatory_case in build_mandatory_operability_cases():
-            case_id = str(mandatory_case["case_id"])
+        for case_id in sorted(mandatory_case_ids):
             if case_id not in observed_case_ids:
                 failures.append({"code": "missing_source_evidence_case", "field": case_id})
     return failures
