@@ -248,6 +248,42 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertNotIn("runtime_structured_log_events", envelope)
         self.assertNotIn("runtime_execution_metric_samples", envelope)
 
+    def test_retry_success_persists_retry_scheduled_carriers_outside_success_envelope(self) -> None:
+        adapter = RetryableThenSuccessAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/retry-success-record"),
+            execution_control_policy=ExecutionControlPolicy(
+                timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+                retry=ExecutionRetryPolicy(max_attempts=2, backoff_ms=0),
+                concurrency=ExecutionConcurrencyPolicy(scope="global", max_in_flight=1, on_limit="reject"),
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as store_dir:
+            store = LocalTaskRecordStore(Path(store_dir))
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-observability-retry-success-record",
+                task_record_store=store,
+            )
+            loaded = store.load("task-observability-retry-success-record")
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertNotIn("runtime_structured_log_events", result.envelope)
+        payload = task_record_to_dict(loaded)
+        self.assertNotIn("runtime_structured_log_events", payload["result"]["envelope"])
+        self.assertIn(
+            "retry_scheduled",
+            {event["event_type"] for event in payload["runtime_structured_log_events"]},
+        )
+        self.assertIn(
+            "retry_scheduled_total",
+            {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]},
+        )
+
     def test_persistence_failures_project_persistence_phase(self) -> None:
         result = execute_task_with_record(
             make_request(),
@@ -259,6 +295,29 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "failed")
         self.assertEqual(result.envelope["error"]["code"], "task_record_persistence_failed")
         self.assertEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "persistence")
+
+    def test_failed_terminal_persistence_preserves_business_failure(self) -> None:
+        class CompletionFailingStore(LocalTaskRecordStore):
+            def write(self, record):
+                if record.status == "failed":
+                    raise OSError("boom-completion")
+                return super().write(record)
+
+        with tempfile.TemporaryDirectory() as store_dir:
+            result = execute_task_with_record(
+                make_request(),
+                adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
+                task_id_factory=lambda: "task-observability-failed-persist",
+                task_record_store=CompletionFailingStore(Path(store_dir)),
+            )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "platform")
+        self.assertEqual(result.envelope["error"]["code"], "content_not_found")
+        self.assertIn(
+            "observability_write_failed",
+            {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+        )
 
     def test_task_record_persists_observability_carriers(self) -> None:
         with tempfile.TemporaryDirectory() as store_dir:

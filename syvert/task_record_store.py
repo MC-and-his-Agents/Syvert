@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -192,6 +192,13 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
     except TaskRecordContractError as error:
         raise TaskRecordConflictError("本地持久化记录的生命周期推进不合法") from error
 
+    if candidate != incoming and incoming.status in {"succeeded", "failed"}:
+        candidate = replace(
+            candidate,
+            runtime_failure_signals=incoming.runtime_failure_signals,
+            runtime_structured_log_events=incoming.runtime_structured_log_events,
+            runtime_execution_metric_samples=incoming.runtime_execution_metric_samples,
+        )
     if candidate != incoming:
         raise TaskRecordConflictError("本地持久化记录与共享模型不一致")
     return candidate

@@ -63,10 +63,12 @@
   - 初始结果：通过，`Ran 5 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 8 tests`，`OK`。
   - guardian 第二轮 review-sync 后结果：通过，`Ran 9 tests`，`OK`。
+  - guardian 第三轮 review-sync 后结果：通过，`Ran 11 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability`
   - 初始结果：通过，`Ran 161 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 164 tests`，`OK`。
   - guardian 第二轮 review-sync 后结果：通过，`Ran 165 tests`，`OK`。
+  - guardian 第三轮 review-sync 后结果：通过，`Ran 167 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
@@ -85,6 +87,12 @@
 - 已处理阻断项：
   - failed envelope 再投影时只保留 `retry_scheduled` lifecycle carrier，并重建唯一一组 failure signal/log/metric，避免同一失败出现重复且不一致的 observability truth。
   - retry 成功路径只保留既有 `runtime_result_refs` 执行控制证据，不把 `runtime_failure_signal`、`runtime_structured_log_events` 或 `runtime_execution_metric_samples` 写入 success envelope。
+- PR `#249` 第三次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - `failure_phase` 改为按明确 stage / event / error code 投影，避免用宽泛 error category 伪造阶段。
+  - failed observability 默认 `task_record_ref=none`；进入 accepted/running/attempt 后由 runtime/finalize 明确补 `task_record:{task_id}`。
+  - failed terminal persistence / completion observability 写入失败时保留原业务 failed envelope，并追加 `observability_write_failed` structured log / metric。
+  - retry-then-success 的 `retry_scheduled` log/metric 只持久化到 `TaskRecord` 顶层 carrier，success result envelope 不新增 FR-0017 字段。
 
 ## 未决风险
 

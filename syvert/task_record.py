@@ -181,6 +181,13 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
     normalized_envelope = normalize_json_value(envelope, field="result.envelope")
     if not isinstance(normalized_envelope, dict):
         raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
+    private_structured_log_events = normalized_envelope.pop("_runtime_structured_log_events", None)
+    private_metric_samples = normalized_envelope.pop("_runtime_execution_metric_samples", None)
+    if terminal_status == "succeeded":
+        normalized_envelope.pop("runtime_failure_signal", None)
+        normalized_envelope.pop("runtime_failure_signals", None)
+        normalized_envelope.pop("runtime_structured_log_events", None)
+        normalized_envelope.pop("runtime_execution_metric_samples", None)
     task_record_ref = _observability_task_record_ref(normalized_envelope, record)
     if task_record_ref is not None and "task_record_ref" not in normalized_envelope:
         normalized_envelope["task_record_ref"] = task_record_ref
@@ -235,12 +242,20 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
         ),
         runtime_failure_signals=_runtime_failure_signals(normalized_envelope, record.runtime_failure_signals),
         runtime_structured_log_events=_observability_entries(
-            normalized_envelope,
+            (
+                {"runtime_structured_log_events": private_structured_log_events}
+                if private_structured_log_events is not None
+                else normalized_envelope
+            ),
             "runtime_structured_log_events",
             record.runtime_structured_log_events,
         ),
         runtime_execution_metric_samples=_observability_entries(
-            normalized_envelope,
+            (
+                {"runtime_execution_metric_samples": private_metric_samples}
+                if private_metric_samples is not None
+                else normalized_envelope
+            ),
             "runtime_execution_metric_samples",
             record.runtime_execution_metric_samples,
         ),

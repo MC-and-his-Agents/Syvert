@@ -1478,6 +1478,10 @@ def with_runtime_observability(
     if enriched.get("status") == "success":
         if runtime_result_refs and (len(runtime_result_refs) > 1 or execution_control_events):
             enriched["runtime_result_refs"] = list(runtime_result_refs)
+        if structured_log_events:
+            enriched["_runtime_structured_log_events"] = list(structured_log_events)
+        if metric_samples:
+            enriched["_runtime_execution_metric_samples"] = list(metric_samples)
         return enriched
     if runtime_result_refs and (enriched.get("status") == "failed" or len(runtime_result_refs) > 1 or execution_control_events):
         enriched["runtime_result_refs"] = list(runtime_result_refs)
@@ -1487,6 +1491,8 @@ def with_runtime_observability(
         enriched["runtime_structured_log_events"] = list(structured_log_events)
     if metric_samples:
         enriched["runtime_execution_metric_samples"] = list(metric_samples)
+    if enriched.get("status") == "failed" and runtime_result_refs:
+        enriched = with_failed_envelope_task_record_ref(enriched, f"task_record:{enriched.get('task_id')}")
     if enriched.get("status") == "failed":
         enriched = with_failure_observability(enriched)
     return enriched
@@ -1521,6 +1527,18 @@ def with_failed_envelope_resource_trace_refs(envelope: Mapping[str, Any], refs: 
     error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
     current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
     current_details.setdefault("resource_trace_refs", refs)
+    error["details"] = current_details
+    enriched["error"] = error
+    return enriched
+
+
+def with_failed_envelope_task_record_ref(envelope: Mapping[str, Any], task_record_ref: str) -> dict[str, Any]:
+    if envelope.get("status") != "failed":
+        return dict(envelope)
+    enriched = dict(envelope)
+    error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
+    current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    current_details.setdefault("task_record_ref", task_record_ref)
     error["details"] = current_details
     enriched["error"] = error
     return enriched
@@ -1601,6 +1619,66 @@ def build_retry_scheduled_observability(
     return log_event, metric_sample
 
 
+def with_observability_write_failed(
+    envelope: Mapping[str, Any],
+    *,
+    stage: str,
+    reason: str,
+    details: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    enriched = dict(envelope)
+    task_id = str(enriched.get("task_id") or "")
+    adapter_key = str(enriched.get("adapter_key") or "")
+    capability = str(enriched.get("capability") or "")
+    occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    event = {
+        "event_id": f"runtime_log:{task_id}:observability_write_failed:{stage}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": "observability_write_failed",
+        "level": "error",
+        "attempt_index": infer_attempt_index(
+            list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
+        ),
+        "failure_signal_id": "",
+        "resource_trace_refs": [],
+        "runtime_result_refs": list(
+            enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else []
+        ),
+        "message": f"observability write failed during {stage}: {reason}",
+        "details": dict(details or {}),
+        "occurred_at": occurred_at,
+    }
+    metric = {
+        "metric_id": f"runtime_metric:{task_id}:observability_write_failed_total:{stage}",
+        "task_id": task_id,
+        "metric_name": "observability_write_failed_total",
+        "metric_value": 1,
+        "unit": "count",
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": "runtime_contract",
+        "error_code": "observability_write_failed",
+        "failure_phase": "persistence",
+        "attempt_index": event["attempt_index"],
+        "occurred_at": occurred_at,
+    }
+    existing_events = list(
+        enriched.get("runtime_structured_log_events")
+        if isinstance(enriched.get("runtime_structured_log_events"), list)
+        else []
+    )
+    existing_metrics = list(
+        enriched.get("runtime_execution_metric_samples")
+        if isinstance(enriched.get("runtime_execution_metric_samples"), list)
+        else []
+    )
+    enriched["runtime_structured_log_events"] = [*existing_events, event]
+    enriched["runtime_execution_metric_samples"] = [*existing_metrics, metric]
+    return enriched
+
+
 def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     if envelope.get("status") != "failed" or not isinstance(envelope.get("error"), Mapping):
         return dict(envelope)
@@ -1616,7 +1694,7 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     task_record_ref = details.get("task_record_ref")
     if not isinstance(task_record_ref, str) or not task_record_ref:
-        task_record_ref = "none" if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED else f"task_record:{task_id}"
+        task_record_ref = "none"
     runtime_result_refs = list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
     resource_trace_refs = list(details.get("resource_trace_refs") if isinstance(details.get("resource_trace_refs"), list) else [])
     failure_phase = infer_failure_phase(error_category=error_category, error_code=error_code, details=details)
@@ -1705,6 +1783,8 @@ def infer_failure_phase(*, error_category: str, error_code: str, details: Mappin
         return "retry_exhausted"
     if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED:
         return "concurrency_rejected"
+    if details.get("stage") == "pre_admission":
+        return "admission"
     if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
         return "timeout"
     if error_code in {"resource_unavailable", "invalid_resource_requirement"}:
@@ -1713,10 +1793,16 @@ def infer_failure_phase(*, error_category: str, error_code: str, details: Mappin
         return "persistence"
     if details.get("stage") in {"accepted", "running", "completion", "persist_accepted", "persist_running"}:
         return "persistence"
+    if error_code in {"adapter_not_found", "capability_not_supported", "target_type_not_supported", "collection_mode_not_supported"}:
+        return "admission"
+    if error_code in {"invalid_adapter_success_payload", "adapter_execution_error"}:
+        return "adapter_execution"
     if error_category == "invalid_input":
         return "admission"
+    if error_category == "unsupported":
+        return "admission"
     if error_category == "runtime_contract":
-        return "pre_execution"
+        return "adapter_execution"
     return "adapter_execution"
 
 
@@ -1781,6 +1867,11 @@ def finalize_task_execution_result(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None,
 ) -> TaskExecutionResult:
+    envelope = (
+        with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
+        if envelope.get("status") == "failed"
+        else dict(envelope)
+    )
     try:
         terminal_record = finish_task_record(record, envelope)
     except TaskRecordContractError as error:
@@ -1793,6 +1884,11 @@ def finalize_task_execution_result(
             invalidation_details["invalidation_reason"] = str(invalidation_error)
         if preserve_envelope_on_record_error and task_record_store is None:
             return TaskExecutionResult(dict(envelope), None)
+        if envelope.get("status") == "failed":
+            return TaskExecutionResult(
+                with_observability_write_failed(envelope, stage="completion", reason=str(error), details=invalidation_details),
+                None,
+            )
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -1815,6 +1911,17 @@ def finalize_task_execution_result(
         task_record_store=task_record_store,
     )
     if persistence_error is not None:
+        if envelope.get("status") == "failed":
+            reason = persistence_error.envelope.get("error", {}).get("details", {}).get("reason", "")
+            return TaskExecutionResult(
+                with_observability_write_failed(
+                    envelope,
+                    stage="completion",
+                    reason=str(reason),
+                    details=dict(persistence_error.envelope.get("error", {}).get("details", {})),
+                ),
+                None,
+            )
         return persistence_error
     return TaskExecutionResult(dict(envelope), persisted_record or terminal_record)
 

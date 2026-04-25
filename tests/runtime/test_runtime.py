@@ -1217,7 +1217,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "platform")
         self.assertEqual(envelope["error"]["code"], "platform_broken")
-        self.assertEqual(set(envelope["error"]["details"]), {"resource_trace_refs"})
+        self.assertEqual(set(envelope["error"]["details"]), {"resource_trace_refs", "task_record_ref"})
         self.assertTrue(envelope["error"]["details"]["resource_trace_refs"])
 
     def test_execute_task_wraps_platform_error(self) -> None:
