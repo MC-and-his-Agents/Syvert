@@ -440,6 +440,15 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("actual_result_revision_mismatch", self.failure_codes(result))
 
+    def test_actual_result_non_evidence_refs_must_match_execution_revision(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["actual_result"]["request_ref"] = "operability:old-head:trc-timeout-platform-control-code:request_ref"
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_revision_mismatch", self.failure_codes(result))
+
     def test_case_scoped_metadata_failures_update_case_verdict(self) -> None:
         cases = self.valid_cases()
         cases[0]["entrypoints"] = ["core", ""]

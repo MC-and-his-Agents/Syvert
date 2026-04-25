@@ -1097,10 +1097,9 @@ def _validate_actual_result_revision_binding(
         return
     mismatched_values: list[str] = []
     for value in _iter_strings(actual_result):
-        if value.startswith("evidence:"):
-            observed_revision = _evidence_ref_revision(value)
-            if observed_revision and observed_revision != revision:
-                mismatched_values.append(value)
+        observed_revision = _evidence_ref_revision(value)
+        if observed_revision and observed_revision != revision:
+            mismatched_values.append(value)
     if mismatched_values:
         failures.append(
             _case_failure(
