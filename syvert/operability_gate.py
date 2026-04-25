@@ -27,6 +27,7 @@ ALLOWED_DIMENSIONS = frozenset(
 )
 
 APPROVED_CAPABILITY = "content_detail_by_url"
+ALLOWED_ENTRYPOINTS = frozenset({"core", "cli", "http"})
 NORMATIVE_DEPENDENCIES = ("FR-0007", "FR-0016", "FR-0017", "FR-0018")
 
 POLICY_SNAPSHOT = {
@@ -523,6 +524,16 @@ def _normalize_cases(
                 )
             )
         entrypoints = _normalize_string_list(raw_case.get("entrypoints"), "entrypoints", failures, failure_source=case_id)
+        invalid_entrypoints = sorted(set(entrypoints) - ALLOWED_ENTRYPOINTS)
+        if invalid_entrypoints:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "invalid_case_entrypoints",
+                    "operability case entrypoints must be limited to core, cli and http",
+                    details={"invalid_entrypoints": invalid_entrypoints},
+                )
+            )
         if definition and sorted(entrypoints) != sorted(definition["entrypoints"]):
             failures.append(
                 _case_failure(
@@ -662,6 +673,19 @@ def _normalize_expected_result(
                     "mandatory_case_side_effects_missing",
                     "mandatory case expected_result.side_effects must include the frozen side effects",
                     details={"missing_side_effects": missing_side_effects},
+                )
+            )
+        frozen_forbidden_mutations = set(["shadow_status", "shadow_result"])
+        if set(forbidden_mutations) != frozen_forbidden_mutations:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "mandatory_case_forbidden_mutations_mismatch",
+                    "mandatory case expected_result.forbidden_mutations must match the frozen mutation guards",
+                    details={
+                        "expected_forbidden_mutations": sorted(frozen_forbidden_mutations),
+                        "actual_forbidden_mutations": sorted(forbidden_mutations),
+                    },
                 )
             )
     return {"fields": fields, "side_effects": side_effects, "forbidden_mutations": forbidden_mutations}
@@ -955,7 +979,28 @@ def _normalize_evidence_refs(
 ) -> list[str]:
     if raw_evidence_refs is None:
         return []
-    return _normalize_string_list(raw_evidence_refs, "evidence_refs", failures, failure_source=source)
+    refs = _normalize_string_list(raw_evidence_refs, "evidence_refs", failures, failure_source=source)
+    for evidence_ref in refs:
+        if not _is_allowed_evidence_ref(evidence_ref):
+            if source == "operability_gate":
+                failures.append(
+                    _failure(
+                        source,
+                        "invalid_evidence_ref",
+                        "evidence_refs must use local, reviewable FR-0019 evidence ref formats",
+                        details={"evidence_ref": evidence_ref},
+                    )
+                )
+            else:
+                failures.append(
+                    _case_failure(
+                        source,
+                        "invalid_evidence_ref",
+                        "case evidence_refs must use local, reviewable FR-0019 evidence ref formats",
+                        details={"evidence_ref": evidence_ref},
+                    )
+                )
+    return refs
 
 
 def _failure(source: str, code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1004,6 +1049,18 @@ def _string_set_from_actual(value: Any) -> set[str]:
     if not isinstance(value, Iterable) or isinstance(value, (Mapping, str, bytes)):
         return set()
     return {item for item in value if isinstance(item, str) and item}
+
+
+def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
+    return evidence_ref.startswith(
+        (
+            "FR-0007:version_gate:v0.6.0:baseline:",
+            "operability:",
+            "test_evidence:",
+            "tests:",
+            "local:",
+        )
+    )
 
 
 def _non_empty_string(value: Any) -> str:

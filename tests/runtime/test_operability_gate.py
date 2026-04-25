@@ -134,6 +134,17 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("actual_result_forbidden_mutation_proof_missing", self.failure_codes(result))
 
+    def test_mandatory_forbidden_mutation_drift_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-concurrent-result-shared-truth")
+        target["expected_result"]["forbidden_mutations"] = []
+        target["actual_result"]["forbidden_mutations_absent"] = []
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("mandatory_case_forbidden_mutations_mismatch", self.failure_codes(result))
+
     def test_case_verdict_is_derived_from_validator_failures(self) -> None:
         cases = self.valid_cases()
         target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
@@ -286,6 +297,33 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("invalid_case_dimension", self.failure_codes(result))
+
+    def test_unapproved_entrypoint_fails_closed_for_extension_case(self) -> None:
+        cases = self.valid_cases()
+        extra_case = deepcopy(cases[0])
+        extra_case["case_id"] = "extension-case"
+        extra_case["dimension"] = "failure_log_metrics"
+        extra_case["entrypoints"] = ["ssh"]
+        extra_case["evidence_refs"] = ["test_evidence:test-head-sha:extension-case"]
+        extra_case["actual_result_ref"] = "operability:test-head-sha:extension-case"
+        cases.append(extra_case)
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_case_entrypoints", self.failure_codes(result))
+
+    def test_external_evidence_refs_fail_closed(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["evidence_refs"] = ["https://dashboard.example.invalid/test-head-sha/case"]
+
+        result = self.pass_result(
+            cases=cases,
+            evidence_refs=["https://dashboard.example.invalid/test-head-sha/baseline"],
+        )
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_evidence_ref", self.failure_codes(result))
 
     def test_normative_dependency_drift_fails_closed(self) -> None:
         result = self.pass_result(normative_dependencies=["FR-0007", "FR-0016", "FR-0018"])
