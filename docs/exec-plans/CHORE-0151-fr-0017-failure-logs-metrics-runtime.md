@@ -36,11 +36,11 @@
 - 当前主干基线为 `3c57ec6ce6437b0e810645b104fd85d6bf1235ba`，已包含 `FR-0016` closeout。
 - 已在 runtime helper 层为 failed envelope 投影最小 failure signal、structured log event 与 metric sample。
 - 已扩展 `TaskRecord` JSON-safe durable fields：`runtime_failure_signals`、`runtime_structured_log_events`、`runtime_execution_metric_samples`。
-- guardian 初审要求补齐 pre-accepted failure、admission concurrency control ref、retry scheduling、persistence phase 与 resource trace refs 五类 FR-0017 关联 truth；当前修复已落到同一 Core path。
+- guardian 多轮审查要求补齐 pre-accepted failure、admission concurrency control ref、retry scheduling、persistence phase、resource trace refs、success envelope 边界与 observability write failure 保留语义；当前修复已落到同一 Core path。
 
 ## 下一步动作
 
-- 推送 guardian review-sync 修复提交。
+- 推送第四轮 guardian review-sync 修复提交。
 - 重跑 CI、guardian、merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
@@ -64,15 +64,21 @@
   - guardian review-sync 后结果：通过，`Ran 8 tests`，`OK`。
   - guardian 第二轮 review-sync 后结果：通过，`Ran 9 tests`，`OK`。
   - guardian 第三轮 review-sync 后结果：通过，`Ran 11 tests`，`OK`。
+  - guardian 第四轮 review-sync 后结果：通过，`Ran 11 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability`
   - 初始结果：通过，`Ran 161 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 164 tests`，`OK`。
   - guardian 第二轮 review-sync 后结果：通过，`Ran 165 tests`，`OK`。
   - guardian 第三轮 review-sync 后结果：通过，`Ran 167 tests`，`OK`。
+  - guardian 第四轮 review-sync 后结果：通过，`Ran 167 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
+  - guardian 第四轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
+  - guardian 第四轮 review-sync 后结果：通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - guardian 第四轮 review-sync 后结果：通过。
 
 ## guardian review-sync
 
@@ -93,6 +99,11 @@
   - failed observability 默认 `task_record_ref=none`；进入 accepted/running/attempt 后由 runtime/finalize 明确补 `task_record:{task_id}`。
   - failed terminal persistence / completion observability 写入失败时保留原业务 failed envelope，并追加 `observability_write_failed` structured log / metric。
   - retry-then-success 的 `retry_scheduled` log/metric 只持久化到 `TaskRecord` 顶层 carrier，success result envelope 不新增 FR-0017 字段。
+- PR `#249` 第四次 guardian 结论：`REQUEST_CHANGES`，本地结果已写入 guardian cache，但 GitHub comment 因 GraphQL 配额耗尽未完成发布。
+- 已处理阻断项：
+  - retry-then-success 的内部 `_runtime_structured_log_events` / `_runtime_execution_metric_samples` 仅作为 `TaskRecord` 顶层持久化输入，`execute_task` / `execute_task_with_record` 公共 success envelope 返回前剥离私有字段。
+  - failure observability 重建时保留 `retry_scheduled` 与 `observability_write_failed` lifecycle carrier，避免 completion-time observability write failure 被后续投影覆盖。
+  - admission guard release failure 按 durable accepted 边界设置 `task_record_ref`：accepted 前为 `none`，accepted 后为 `task_record:{task_id}`。
 
 ## 未决风险
 
@@ -111,4 +122,5 @@
 - guardian review-sync 可恢复 checkpoint：`9a1239e70f1ff76580ee3a0775815d9a7cdf5ffd`。
 - guardian 第二轮 review-sync 可恢复 checkpoint：`3b2883728374972d02637d1e0e61a63306bbd549`。
 - guardian 第三轮 review-sync 可恢复 checkpoint：`288c26667e98a74e38feea26a777885fb093f98c`。
+- guardian 第四轮 review-sync 可恢复 checkpoint：`9ba4cf56f7837d24307227ec1db12101cba6fe66`。
 - 本次追加 checkpoint 元数据属于 `metadata-only review sync`，不推进新的 runtime / formal spec 语义。
