@@ -60,6 +60,21 @@ class RetryableThenSuccessAdapter(SuccessfulAdapter):
         return super().execute(request)
 
 
+class TwiceRetryableThenSuccessAdapter(SuccessfulAdapter):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def execute(self, request):
+        self.calls += 1
+        if self.calls <= 2:
+            raise PlatformAdapterError(
+                code="transient_platform",
+                message="try again later",
+                details={"retryable": True},
+            )
+        return super().execute(request)
+
+
 class AcceptedFailingStore:
     def write(self, record):
         raise OSError("boom")
@@ -88,12 +103,12 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertTrue(signal["resource_trace_refs"])
         self.assertEqual(signal["resource_trace_refs"], envelope["error"]["details"]["resource_trace_refs"])
 
-        log_event = envelope["runtime_structured_log_events"][0]
+        log_event = next(event for event in envelope["runtime_structured_log_events"] if event["event_type"] == "task_failed")
         self.assertEqual(log_event["event_type"], "task_failed")
         self.assertEqual(log_event["level"], "error")
         self.assertEqual(log_event["failure_signal_id"], signal["signal_id"])
 
-        metric = envelope["runtime_execution_metric_samples"][0]
+        metric = next(metric for metric in envelope["runtime_execution_metric_samples"] if metric["metric_name"] == "task_failed_total")
         self.assertEqual(metric["metric_name"], "task_failed_total")
         self.assertEqual(metric["metric_value"], 1)
         self.assertEqual(metric["error_category"], signal["error_category"])
@@ -214,18 +229,18 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
             "retry_scheduled_total",
             {metric["metric_name"] for metric in envelope["runtime_execution_metric_samples"]},
         )
-        non_retry_events = [
+        non_lifecycle_events = [
             event
             for event in envelope["runtime_structured_log_events"]
-            if event["event_type"] != "retry_scheduled"
+            if event["event_type"] not in {"attempt_started", "attempt_finished", "retry_scheduled"}
         ]
-        non_retry_metrics = [
+        non_lifecycle_metrics = [
             metric
             for metric in envelope["runtime_execution_metric_samples"]
-            if metric["metric_name"] != "retry_scheduled_total"
+            if metric["metric_name"] not in {"attempt_started_total", "execution_duration_ms", "retry_scheduled_total"}
         ]
-        self.assertEqual(len(non_retry_events), 1)
-        self.assertEqual(len(non_retry_metrics), 1)
+        self.assertEqual(len(non_lifecycle_events), 1)
+        self.assertEqual(len(non_lifecycle_metrics), 1)
         for runtime_ref in envelope["runtime_result_refs"]:
             if runtime_ref.get("ref_type") == "ExecutionAttemptOutcome":
                 self.assertNotIn("runtime_failure_signal", runtime_ref["terminal_envelope"])
@@ -414,7 +429,42 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIn("task_accepted", {event["event_type"] for event in payload["runtime_structured_log_events"]})
         self.assertIn("task_running", {event["event_type"] for event in payload["runtime_structured_log_events"]})
         self.assertIn("task_started_total", {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]})
+        self.assertIn("attempt_started_total", {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]})
+        self.assertIn("execution_duration_ms", {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]})
         self.assertEqual(payload["result"]["envelope"]["runtime_failure_signal"], signal)
+
+    def test_repeated_identical_retry_failures_have_distinct_signals_before_success(self) -> None:
+        adapter = TwiceRetryableThenSuccessAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/retry-twice-success-record"),
+            execution_control_policy=ExecutionControlPolicy(
+                timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+                retry=ExecutionRetryPolicy(max_attempts=3, backoff_ms=0),
+                concurrency=ExecutionConcurrencyPolicy(scope="global", max_in_flight=1, on_limit="reject"),
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as store_dir:
+            store = LocalTaskRecordStore(Path(store_dir))
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-observability-retry-twice-success-record",
+                task_record_store=store,
+            )
+            payload = task_record_to_dict(store.load("task-observability-retry-twice-success-record"))
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(adapter.calls, 3)
+        signal_ids = [signal["signal_id"] for signal in payload["runtime_failure_signals"]]
+        self.assertEqual(len(signal_ids), 2)
+        self.assertEqual(len(set(signal_ids)), 2)
+        self.assertEqual(
+            {event["failure_signal_id"] for event in payload["runtime_structured_log_events"] if event["event_type"] == "retry_scheduled"},
+            set(signal_ids),
+        )
 
 
 if __name__ == "__main__":

@@ -1805,7 +1805,8 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     failure_phase = infer_failure_phase(error_category=error_category, error_code=error_code, details=details)
     event_type = infer_failure_log_event_type(error_code=error_code, details=details, task_record_ref=task_record_ref)
     metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
-    signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}"
+    attempt_index = infer_attempt_index(runtime_result_refs)
+    signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}:{attempt_index}"
     envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}"
     existing_failure_signal = (
         enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
@@ -1825,8 +1826,8 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         id_field="signal_id",
         entry_id=signal_id,
     )
-    log_id = f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}"
-    metric_id = f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}"
+    log_id = f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}:{attempt_index}"
+    metric_id = f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}:{attempt_index}"
     log_occurred_at = stable_observability_occurred_at(
         next((event for event in existing_log_events if isinstance(event, Mapping) and event.get("event_id") == log_id), {}),
         id_field="event_id",
@@ -1859,7 +1860,7 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "capability": capability,
         "event_type": event_type,
         "level": "error",
-        "attempt_index": infer_attempt_index(runtime_result_refs),
+        "attempt_index": attempt_index,
         "failure_signal_id": signal_id,
         "resource_trace_refs": resource_trace_refs,
         "runtime_result_refs": runtime_result_refs,
@@ -1877,19 +1878,22 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "error_category": error_category,
         "error_code": error_code,
         "failure_phase": failure_phase,
-        "attempt_index": log_event["attempt_index"],
+        "attempt_index": attempt_index,
         "occurred_at": metric_occurred_at,
     }
     enriched["runtime_failure_signal"] = failure_signal
     retained_log_events = [
         event
         for event in existing_log_events
-        if isinstance(event, Mapping) and event.get("event_type") in {"retry_scheduled", "observability_write_failed"}
+        if isinstance(event, Mapping)
+        and event.get("event_type")
+        in {"attempt_started", "attempt_finished", "retry_scheduled", "observability_write_failed"}
     ]
     retained_metric_samples = [
         metric
         for metric in existing_metric_samples
-        if isinstance(metric, Mapping) and metric.get("metric_name") == "retry_scheduled_total"
+        if isinstance(metric, Mapping)
+        and metric.get("metric_name") in {"attempt_started_total", "execution_duration_ms", "retry_scheduled_total"}
     ]
     enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
     enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
