@@ -1,5 +1,5 @@
 {
-  "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:a05cf45a3219ce173bd0d4b42379891e800ff593",
+  "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:1b1c47aaad732387604ea2da3d9aefced9cba1ad",
   "cases": [
     {
       "actual_result": {
@@ -29,7 +29,7 @@
           "TaskRecord.status=failed"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-timeout-platform-control-code",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-timeout-platform-control-code",
       "capability": "content_detail_by_url",
       "case_id": "trc-timeout-platform-control-code",
       "dimension": "timeout_retry_concurrency",
@@ -37,8 +37,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-timeout-platform-control-code",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-timeout-platform-control-code"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-timeout-platform-control-code",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-timeout-platform-control-code"
       ],
       "expected_result": {
         "fields": [
@@ -117,7 +117,7 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-retryable-platform-budget-closed",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-retryable-platform-budget-closed",
       "capability": "content_detail_by_url",
       "case_id": "trc-retryable-platform-budget-closed",
       "dimension": "timeout_retry_concurrency",
@@ -125,8 +125,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-retryable-platform-budget-closed",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-retryable-platform-budget-closed"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-retryable-platform-budget-closed",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-retryable-platform-budget-closed"
       ],
       "expected_result": {
         "fields": [
@@ -200,7 +200,7 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-non-retryable-fail-closed",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-non-retryable-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "trc-non-retryable-fail-closed",
       "dimension": "timeout_retry_concurrency",
@@ -208,8 +208,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-non-retryable-fail-closed",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-non-retryable-fail-closed"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-non-retryable-fail-closed",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-non-retryable-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -265,7 +265,7 @@
             "scope": "global"
           }
         },
-        "request_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject:non_empty_ref",
+        "request_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -274,7 +274,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject",
       "capability": "content_detail_by_url",
       "case_id": "trc-pre-accept-concurrency-reject",
       "dimension": "timeout_retry_concurrency",
@@ -284,8 +284,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject"
       ],
       "expected_result": {
         "fields": [
@@ -367,16 +367,16 @@
         ],
         "status": {
           "read_a": {
-            "status": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth:status.read_a.status",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth:status.read_a.task_id"
+            "status": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth:status.read_a.task_id"
           },
           "read_b": {
-            "status": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth:status.read_a.status",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth:status.read_a.task_id"
+            "status": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth:status.read_a.task_id"
           }
         }
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "trc-concurrent-status-shared-truth",
       "dimension": "timeout_retry_concurrency",
@@ -385,8 +385,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -445,12 +445,12 @@
         },
         "result": {
           "read_a": {
-            "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth:result.read_a.task_id"
+            "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth:result.read_a.task_id"
           },
           "read_b": {
-            "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth:result.read_a.task_id"
+            "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth:result.read_a.task_id"
           }
         },
         "side_effects": [
@@ -458,7 +458,7 @@
           "terminal_state_not_rewritten"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "trc-concurrent-result-shared-truth",
       "dimension": "timeout_retry_concurrency",
@@ -467,8 +467,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -535,7 +535,7 @@
           "evidence_refs.non_empty"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-success-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-success-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-success-observable",
       "dimension": "failure_log_metrics",
@@ -543,8 +543,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-success-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-success-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-success-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-success-observable"
       ],
       "expected_result": {
         "fields": [
@@ -603,7 +603,7 @@
           "structured_log.error.category"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-business-failure-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-business-failure-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-business-failure-observable",
       "dimension": "failure_log_metrics",
@@ -611,8 +611,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-business-failure-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-business-failure-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-business-failure-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-business-failure-observable"
       ],
       "expected_result": {
         "fields": [
@@ -672,7 +672,7 @@
           "no_success_envelope"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-contract-failure-fail-closed",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-contract-failure-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "flm-contract-failure-fail-closed",
       "dimension": "failure_log_metrics",
@@ -680,8 +680,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-contract-failure-fail-closed",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-contract-failure-fail-closed"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-contract-failure-fail-closed",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-contract-failure-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -740,7 +740,7 @@
           "structured_log.error.details.control_code"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-timeout-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-timeout-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-timeout-observable",
       "dimension": "failure_log_metrics",
@@ -748,8 +748,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-timeout-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-timeout-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-timeout-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-timeout-observable"
       ],
       "expected_result": {
         "fields": [
@@ -816,7 +816,7 @@
           "structured_log.error.details.retryable=true"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-retry-budget-closed-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-retry-budget-closed-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-retry-budget-closed-observable",
       "dimension": "failure_log_metrics",
@@ -824,8 +824,8 @@
         "core"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-retry-budget-closed-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-retry-budget-closed-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-retry-budget-closed-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-retry-budget-closed-observable"
       ],
       "expected_result": {
         "fields": [
@@ -886,7 +886,7 @@
           "no_shadow_status_or_result"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-store-unavailable-fail-closed",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-store-unavailable-fail-closed",
       "capability": "content_detail_by_url",
       "case_id": "flm-store-unavailable-fail-closed",
       "dimension": "failure_log_metrics",
@@ -896,8 +896,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-store-unavailable-fail-closed",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-store-unavailable-fail-closed"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-store-unavailable-fail-closed",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-store-unavailable-fail-closed"
       ],
       "expected_result": {
         "fields": [
@@ -952,7 +952,7 @@
         "metrics": {
           "failure_total": 1
         },
-        "request_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable:non_empty_ref",
+        "request_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -966,7 +966,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-http-invalid-input-observable",
       "dimension": "failure_log_metrics",
@@ -974,8 +974,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1049,7 +1049,7 @@
         "metrics": {
           "failure_total": 1
         },
-        "request_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable:non_empty_ref",
+        "request_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -1063,7 +1063,7 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-cli-invalid-input-observable",
       "dimension": "failure_log_metrics",
@@ -1071,8 +1071,8 @@
         "cli"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1150,7 +1150,7 @@
           "overall_gate.verdict=fail"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-same-path-violation-observable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-same-path-violation-observable",
       "capability": "content_detail_by_url",
       "case_id": "flm-same-path-violation-observable",
       "dimension": "failure_log_metrics",
@@ -1159,8 +1159,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-same-path-violation-observable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-same-path-violation-observable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-same-path-violation-observable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-same-path-violation-observable"
       ],
       "expected_result": {
         "fields": [
@@ -1207,17 +1207,17 @@
           "submit_total": 1
         },
         "result": {
-          "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth:non_empty_ref",
-          "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth:status.task_id",
-          "task_record_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth:status.task_record_ref"
+          "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth:non_empty_ref",
+          "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth:status.task_record_ref"
         },
         "side_effects": [
           "single_shared_TaskRecord",
           "result_reads_shared_envelope"
         ],
         "status": {
-          "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth:status.task_id",
-          "task_record_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth:status.task_record_ref"
+          "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth:status.task_record_ref"
         },
         "submit": {
           "request": {
@@ -1225,7 +1225,7 @@
           }
         }
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "http-submit-status-result-shared-truth",
       "dimension": "http_submit_status_result",
@@ -1233,8 +1233,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -1288,8 +1288,8 @@
           "id": "same-path-success-shared-truth"
         },
         "cli": {
-          "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth:cli.envelope_ref",
-          "task_record_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth:cli.task_record_ref"
+          "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth:cli.task_record_ref"
         },
         "evidence_source": "tests/runtime/same-path-success-shared-truth",
         "forbidden_mutations_absent": [
@@ -1297,8 +1297,8 @@
           "shadow_result"
         ],
         "http": {
-          "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth:cli.envelope_ref",
-          "task_record_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth:cli.task_record_ref"
+          "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth:cli.task_record_ref"
         },
         "metrics": {
           "same_path_case_total": 1
@@ -1310,7 +1310,7 @@
           "same_state_transition"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth",
       "capability": "content_detail_by_url",
       "case_id": "same-path-success-shared-truth",
       "dimension": "cli_api_same_path",
@@ -1319,8 +1319,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth"
       ],
       "expected_result": {
         "fields": [
@@ -1370,9 +1370,9 @@
         "cli": {
           "error": {
             "category": "invalid_input",
-            "code": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input:cli.error.code"
+            "code": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input:cli.error.code"
           },
-          "request_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input:non_empty_ref",
+          "request_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input:non_empty_ref",
           "result": {
             "status": "failed"
           },
@@ -1386,9 +1386,9 @@
         "http": {
           "error": {
             "category": "invalid_input",
-            "code": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input:cli.error.code"
+            "code": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input:cli.error.code"
           },
-          "request_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input:non_empty_ref",
+          "request_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input:non_empty_ref",
           "result": {
             "status": "failed"
           },
@@ -1405,7 +1405,7 @@
           "http_no_TaskRecord"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input",
       "capability": "content_detail_by_url",
       "case_id": "same-path-pre-admission-invalid-input",
       "dimension": "cli_api_same_path",
@@ -1414,8 +1414,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input"
       ],
       "expected_result": {
         "fields": [
@@ -1526,7 +1526,7 @@
           "http_fail_closed"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-durable-record-unavailable",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-durable-record-unavailable",
       "capability": "content_detail_by_url",
       "case_id": "same-path-durable-record-unavailable",
       "dimension": "cli_api_same_path",
@@ -1535,8 +1535,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-durable-record-unavailable",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-durable-record-unavailable"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-durable-record-unavailable",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-durable-record-unavailable"
       ],
       "expected_result": {
         "fields": [
@@ -1596,8 +1596,8 @@
         },
         "cli": {
           "result": {
-            "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read:cli.result.envelope_ref",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read:cli.result.task_id"
+            "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read:cli.result.task_id"
           }
         },
         "evidence_source": "tests/runtime/same-path-terminal-result-read",
@@ -1607,8 +1607,8 @@
         ],
         "http": {
           "result": {
-            "envelope_ref": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read:cli.result.envelope_ref",
-            "task_id": "evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read:cli.result.task_id"
+            "envelope_ref": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read:cli.result.task_id"
           }
         },
         "metrics": {
@@ -1622,7 +1622,7 @@
           "shared_runtime_result_refs"
         ]
       },
-      "actual_result_ref": "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read",
+      "actual_result_ref": "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read",
       "capability": "content_detail_by_url",
       "case_id": "same-path-terminal-result-read",
       "dimension": "cli_api_same_path",
@@ -1631,8 +1631,8 @@
         "http"
       ],
       "evidence_refs": [
-        "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read",
-        "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read"
+        "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read",
+        "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read"
       ],
       "expected_result": {
         "fields": [
@@ -1677,49 +1677,49 @@
     }
   ],
   "evidence_refs": [
-    "FR-0007:version_gate:v0.6.0:baseline:a05cf45a3219ce173bd0d4b42379891e800ff593",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-business-failure-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-contract-failure-fail-closed",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-retry-budget-closed-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-same-path-violation-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-store-unavailable-fail-closed",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-success-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-timeout-observable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-durable-record-unavailable",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-non-retryable-fail-closed",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-retryable-platform-budget-closed",
-    "operability:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-timeout-platform-control-code",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-business-failure-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-cli-invalid-input-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-contract-failure-fail-closed",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-http-invalid-input-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-retry-budget-closed-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-same-path-violation-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-store-unavailable-fail-closed",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-success-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:flm-timeout-observable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:http-submit-status-result-shared-truth",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-durable-record-unavailable",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-pre-admission-invalid-input",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-success-shared-truth",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:same-path-terminal-result-read",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-result-shared-truth",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-concurrent-status-shared-truth",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-non-retryable-fail-closed",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-pre-accept-concurrency-reject",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-retryable-platform-budget-closed",
-    "test_evidence:a05cf45a3219ce173bd0d4b42379891e800ff593:trc-timeout-platform-control-code"
+    "FR-0007:version_gate:v0.6.0:baseline:1b1c47aaad732387604ea2da3d9aefced9cba1ad",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-business-failure-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-contract-failure-fail-closed",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-retry-budget-closed-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-same-path-violation-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-store-unavailable-fail-closed",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-success-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-timeout-observable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-durable-record-unavailable",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-non-retryable-fail-closed",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-retryable-platform-budget-closed",
+    "operability:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-timeout-platform-control-code",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-business-failure-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-cli-invalid-input-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-contract-failure-fail-closed",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-http-invalid-input-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-retry-budget-closed-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-same-path-violation-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-store-unavailable-fail-closed",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-success-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:flm-timeout-observable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:http-submit-status-result-shared-truth",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-durable-record-unavailable",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-pre-admission-invalid-input",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-success-shared-truth",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:same-path-terminal-result-read",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-result-shared-truth",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-concurrent-status-shared-truth",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-non-retryable-fail-closed",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-pre-accept-concurrency-reject",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-retryable-platform-budget-closed",
+    "test_evidence:1b1c47aaad732387604ea2da3d9aefced9cba1ad:trc-timeout-platform-control-code"
   ],
-  "execution_revision": "a05cf45a3219ce173bd0d4b42379891e800ff593",
+  "execution_revision": "1b1c47aaad732387604ea2da3d9aefced9cba1ad",
   "failures": [],
   "fr_item_key": "FR-0019-v0-6-operability-release-gate",
   "gate_id": "v0.6.0-operability-gate",

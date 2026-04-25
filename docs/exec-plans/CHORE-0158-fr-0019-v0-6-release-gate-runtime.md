@@ -93,10 +93,10 @@
   - 结果：`REQUEST_CHANGES`；指出 case-local policy / metrics 不得被顶层 snapshot 覆盖、revision evidence 绑定不能用子串、`actual_result_ref` 需要受控 evidence 格式。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-32c4288.json`
   - 结果：`REQUEST_CHANGES`；指出 `baseline_gate_ref` 必须精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>`、invalid/missing case 不能从 summary 消失、generated matrix case 不能使用占位 preconditions、artifact 需要本地重放入口。
-- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision a05cf45a3219ce173bd0d4b42379891e800ff593`
-  - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=a05cf45a3219ce173bd0d4b42379891e800ff593`。
+- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision 1b1c47aaad732387604ea2da3d9aefced9cba1ad`
+  - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=1b1c47aaad732387604ea2da3d9aefced9cba1ad`。
 - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
-  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=a05cf45a3219ce173bd0d4b42379891e800ff593`，覆盖 20 个 mandatory cases，并包含 case-level local evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions 与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
+  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=1b1c47aaad732387604ea2da3d9aefced9cba1ad`，覆盖 20 个 mandatory cases，并包含 case-level local evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions 与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
 
 ## 待完成
 
@@ -116,4 +116,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：`a05cf45a3219ce173bd0d4b42379891e800ff593`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
+- 当前可恢复 checkpoint：`1b1c47aaad732387604ea2da3d9aefced9cba1ad`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
