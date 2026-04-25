@@ -829,14 +829,15 @@ def _validate_case_actual_result(
     failures: list[dict[str, Any]],
 ) -> None:
     fact_source = actual_result
+    _validate_case_snapshot_consistency(case_id, actual_result, metrics_snapshot, policy_snapshot, failures)
     for field in fields:
         path = str(field.get("path") or "")
         operator = str(field.get("operator") or "")
         expected_value = field.get("value")
-        actual_value = _get_path(fact_source, path)
+        actual_value = _get_assertion_path(fact_source, metrics_snapshot, policy_snapshot, path)
         if operator == "==":
             if isinstance(expected_value, str) and "." in expected_value:
-                expected_comparison_value = _get_path(fact_source, expected_value)
+                expected_comparison_value = _get_assertion_path(fact_source, metrics_snapshot, policy_snapshot, expected_value)
             else:
                 expected_comparison_value = expected_value
             if actual_value is None or expected_comparison_value is None:
@@ -964,6 +965,76 @@ def _validate_case_actual_result(
                 details={"missing_forbidden_mutations": missing_forbidden_mutation_proofs},
             )
         )
+
+
+def _validate_case_snapshot_consistency(
+    case_id: str,
+    actual_result: Mapping[str, Any],
+    metrics_snapshot: Mapping[str, Any],
+    policy_snapshot: Mapping[str, Any],
+    failures: list[dict[str, Any]],
+) -> None:
+    actual_policy = actual_result.get("policy")
+    if isinstance(actual_policy, Mapping) and not _mapping_is_subset_of_snapshot(actual_policy, policy_snapshot):
+        failures.append(
+            _case_failure(
+                case_id,
+                "actual_result_snapshot_mismatch",
+                "actual_result.policy must match the gate-level policy snapshot",
+                details={"snapshot": "policy"},
+            )
+        )
+    actual_metrics = actual_result.get("metrics")
+    if isinstance(actual_metrics, Mapping):
+        mismatched_fields = sorted(
+            str(field)
+            for field, actual_value in actual_metrics.items()
+            if field in metrics_snapshot and actual_value != metrics_snapshot[field]
+        )
+        extra_fields = sorted(str(field) for field in actual_metrics if field not in metrics_snapshot)
+        if mismatched_fields or extra_fields:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "actual_result_snapshot_mismatch",
+                    "actual_result.metrics must match the gate-level metrics snapshot",
+                    details={
+                        "snapshot": "metrics",
+                        "mismatched_fields": mismatched_fields,
+                        "extra_fields": extra_fields,
+                    },
+                )
+            )
+
+
+def _mapping_is_subset_of_snapshot(candidate: Mapping[str, Any], snapshot: Mapping[str, Any]) -> bool:
+    for key, value in candidate.items():
+        if key not in snapshot:
+            return False
+        snapshot_value = snapshot[key]
+        if isinstance(value, Mapping) and isinstance(snapshot_value, Mapping):
+            if not _mapping_is_subset_of_snapshot(value, snapshot_value):
+                return False
+        elif value != snapshot_value:
+            return False
+    return True
+
+
+def _get_assertion_path(
+    actual_result: Mapping[str, Any],
+    metrics_snapshot: Mapping[str, Any],
+    policy_snapshot: Mapping[str, Any],
+    path: str,
+) -> Any:
+    if path == "policy":
+        return policy_snapshot
+    if path.startswith("policy."):
+        return _get_path(policy_snapshot, path.removeprefix("policy."))
+    if path == "metrics":
+        return metrics_snapshot
+    if path.startswith("metrics."):
+        return _get_path(metrics_snapshot, path.removeprefix("metrics."))
+    return _get_path(actual_result, path)
 
 
 def _validate_mandatory_case_coverage(normalized_cases: Sequence[Mapping[str, Any]], failures: list[dict[str, Any]]) -> None:

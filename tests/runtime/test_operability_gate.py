@@ -134,6 +134,44 @@ class OperabilityGateTests(unittest.TestCase):
         result = self.pass_result(cases=cases)
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_snapshot_mismatch", self.failure_codes(result))
+
+    def test_case_policy_assertions_use_gate_snapshot_not_case_forgery(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
+        target["actual_result"]["policy"]["timeout_ms"] = 99999
+        target["actual_result"]["policy"]["retry"]["max_attempts"] = 999
+        policy = deepcopy(POLICY_SNAPSHOT)
+        policy["timeout_ms"] = 99999
+        policy["retry"]["max_attempts"] = 999
+
+        result = self.pass_result(policy_snapshot=policy, cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("policy_snapshot_mismatch", self.failure_codes(result))
+        self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
+
+    def test_case_local_metrics_drift_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "flm-success-observable")
+        target["actual_result"]["metrics"]["success_total"] = 0
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_snapshot_mismatch", self.failure_codes(result))
+
+    def test_case_metrics_assertions_use_gate_snapshot_not_case_forgery(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "flm-success-observable")
+        target["actual_result"]["metrics"]["success_total"] = 99
+        metrics = self.valid_metrics()
+        metrics["success_total"] = 0
+
+        result = self.pass_result(metrics_snapshot=metrics, cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("metrics_snapshot_value_insufficient", self.failure_codes(result))
         self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
 
     def test_mandatory_case_expected_field_drift_fails_closed(self) -> None:
@@ -415,7 +453,11 @@ class OperabilityGateTests(unittest.TestCase):
             path = field["path"]
             operator = field["operator"]
             value = field["value"]
-            if isinstance(value, str) and "." in value and operator == "==":
+            if path.startswith("policy."):
+                self.set_path(actual_result, path, deepcopy(self.get_path(POLICY_SNAPSHOT, path.removeprefix("policy."))))
+            elif path.startswith("metrics."):
+                self.set_path(actual_result, path, self.valid_metrics()[path.removeprefix("metrics.")])
+            elif isinstance(value, str) and "." in value and operator == "==":
                 shared_value = f"tests.runtime.test_operability_gate:{case['case_id']}:{path}"
                 self.set_path(actual_result, path, shared_value)
                 self.set_path(actual_result, value, shared_value)
@@ -439,6 +481,14 @@ class OperabilityGateTests(unittest.TestCase):
                 current[segment] = child
             current = child
         current[segments[-1]] = value
+
+    def get_path(self, mapping: dict[str, object], path: str) -> object:
+        current: object = mapping
+        for segment in path.split("."):
+            if not isinstance(current, dict):
+                return None
+            current = current.get(segment)
+        return current
 
     def valid_metrics(self) -> dict[str, int]:
         return {

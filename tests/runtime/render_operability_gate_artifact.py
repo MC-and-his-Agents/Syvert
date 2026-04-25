@@ -12,10 +12,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from syvert.operability_gate import build_mandatory_operability_cases, orchestrate_operability_gate
+from syvert.operability_gate import POLICY_SNAPSHOT, build_mandatory_operability_cases, orchestrate_operability_gate
 
 
 DEFAULT_OUTPUT = Path("docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json")
+METRICS_SNAPSHOT = {
+    "submit_total": 2,
+    "success_total": 2,
+    "failure_total": 8,
+    "timeout_total": 1,
+    "retry_attempt_total": 0,
+    "concurrency_case_total": 3,
+    "concurrency_case_failure_total": 0,
+    "same_path_case_total": 4,
+    "same_path_case_failure_total": 1,
+}
 
 
 def main() -> int:
@@ -39,17 +50,7 @@ def main() -> int:
         execution_revision=revision,
         baseline_gate_ref=f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
         cases=cases,
-        metrics_snapshot={
-            "submit_total": 2,
-            "success_total": 2,
-            "failure_total": 8,
-            "timeout_total": 1,
-            "retry_attempt_total": 0,
-            "concurrency_case_total": 3,
-            "concurrency_case_failure_total": 0,
-            "same_path_case_total": 4,
-            "same_path_case_failure_total": 1,
-        },
+        metrics_snapshot=METRICS_SNAPSHOT,
         evidence_refs=[f"FR-0007:version_gate:v0.6.0:baseline:{revision}"],
     )
 
@@ -82,7 +83,11 @@ def actual_result_for_case(case: dict[str, Any], revision: str) -> dict[str, Any
         path = str(field["path"])
         operator = str(field["operator"])
         value = field["value"]
-        if isinstance(value, str) and "." in value and operator == "==":
+        if path.startswith("policy."):
+            set_path(actual_result, path, deepcopy(get_path(POLICY_SNAPSHOT, path.removeprefix("policy."))))
+        elif path.startswith("metrics."):
+            set_path(actual_result, path, METRICS_SNAPSHOT[path.removeprefix("metrics.")])
+        elif isinstance(value, str) and "." in value and operator == "==":
             shared_value = f"evidence:{revision}:{case_id}:{path}"
             set_path(actual_result, path, shared_value)
             set_path(actual_result, value, shared_value)
@@ -107,6 +112,15 @@ def set_path(mapping: dict[str, Any], path: str, value: Any) -> None:
             current[segment] = child
         current = child
     current[segments[-1]] = value
+
+
+def get_path(mapping: dict[str, Any], path: str) -> Any:
+    current: Any = mapping
+    for segment in path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(segment)
+    return current
 
 
 if __name__ == "__main__":
