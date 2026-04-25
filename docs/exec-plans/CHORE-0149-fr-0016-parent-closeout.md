@@ -20,6 +20,7 @@
 
 - 本次纳入：
   - `docs/exec-plans/CHORE-0149-fr-0016-parent-closeout.md`
+  - `docs/exec-plans/FR-0016-minimal-execution-controls.md` 的 inactive requirement container closeout 索引
   - 合入后 GitHub `#219/#225` 状态与 Project closeout 对齐
 - 本次不纳入：
   - `syvert/**` runtime 代码
@@ -66,6 +67,16 @@
   - 关键验证：`tests/runtime/test_execution_control.py` 覆盖 timeout closeout、retry、pre/post accepted concurrency rejection、accepted/resource-prep 窗口、slot accounting invariant 与 shared envelope 投影。
 ## 已验证项
 
+- `gh pr view 237 --json state,mergedAt,mergeCommit,headRefOid,url`
+  - 结果：`state=MERGED`，`mergedAt=2026-04-23T17:01:50Z`，`mergeCommit=295b565adae2a384d3a314755706d66c5ea59b09`
+- `gh pr view 247 --json state,mergedAt,mergeCommit,headRefOid,url`
+  - 结果：`state=MERGED`，`mergedAt=2026-04-25T02:49:07Z`，`mergeCommit=6590801d561a44db21fc07014948d33f427fd3a0`
+- `gh issue view 219 --json title,state,body,projectItems`
+  - 结果：`#219` 为 `OPEN`，Project 状态为 `Todo`
+- `gh issue view 223 --json title,state,projectItems`
+  - 结果：`#223` 为 `CLOSED`，Project 状态为 `Done`
+- `gh issue view 224 --json title,state,projectItems`
+  - 结果：`#224` 为 `CLOSED`，Project 状态为 `Done`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过，`spec-guard 通过。`
 - `python3 scripts/docs_guard.py --mode ci`
@@ -79,7 +90,7 @@
 
 ## 待完成
 
-- 创建并合入本 closeout PR。
+- 合入本 closeout PR `#248`。
 - 合入后将 `#225` 正文更新为已完成并关闭，Project 切到 `Done`。
 - 回写并关闭父 FR `#219`，说明 formal spec 与 runtime evidence 已合入主干。
 - fast-forward main，退役 `issue-225-chore-fr-0016` 分支与 worktree。
@@ -97,4 +108,6 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 本 exec-plan 是 `#225` 的首个版本化恢复工件；恢复点由 PR `#248` 的 live head 与 guardian / merge gate 绑定。
+- 当前可恢复 checkpoint：`b32f963c4277b7b837d46dfbe79d91baebfb59ab`
 - 不使用 `6590801d561a44db21fc07014948d33f427fd3a0` 作为本文件 checkpoint，因为该主干基线不包含 `CHORE-0149-fr-0016-parent-closeout.md`。
+- 本次追加 `FR-0016` inactive requirement container 索引与 GitHub 验证入口属于 `metadata-only closeout follow-up`，不推进新的 runtime / formal spec 语义。
