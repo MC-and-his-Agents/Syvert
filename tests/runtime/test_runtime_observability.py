@@ -20,7 +20,7 @@ from syvert.runtime import (
     release_execution_concurrency_slot,
     runtime_contract_error,
 )
-from syvert.task_record import task_record_to_dict
+from syvert.task_record import TaskRecordContractError, task_record_to_dict
 from syvert.task_record_store import LocalTaskRecordStore
 from tests.runtime.test_runtime import (
     TEST_ADAPTER_KEY,
@@ -93,6 +93,48 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertNotIn("runtime_failure_signal", envelope)
         self.assertNotIn("runtime_structured_log_events", envelope)
         self.assertNotIn("runtime_execution_metric_samples", envelope)
+
+    def test_record_lifecycle_contract_failures_project_failure_observability(self) -> None:
+        with mock.patch(
+            "syvert.runtime.create_task_record",
+            side_effect=TaskRecordContractError("bad-create"),
+        ):
+            create_failure = execute_task(
+                make_request(),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-observability-create-record-failed",
+            )
+
+        self.assertEqual(create_failure["status"], "failed")
+        self.assertIn("runtime_failure_signal", create_failure)
+        self.assertIn("runtime_structured_log_events", create_failure)
+        self.assertEqual(create_failure["runtime_failure_signal"]["task_record_ref"], "none")
+        self.assertEqual(
+            create_failure["runtime_structured_log_events"][0]["failure_signal_id"],
+            create_failure["runtime_failure_signal"]["signal_id"],
+        )
+
+        with mock.patch(
+            "syvert.runtime.start_task_record",
+            side_effect=TaskRecordContractError("bad-start"),
+        ):
+            start_failure = execute_task(
+                make_request(),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-observability-start-record-failed",
+            )
+
+        self.assertEqual(start_failure["status"], "failed")
+        self.assertIn("runtime_failure_signal", start_failure)
+        self.assertIn("runtime_structured_log_events", start_failure)
+        self.assertEqual(
+            start_failure["runtime_failure_signal"]["task_record_ref"],
+            "task_record:task-observability-start-record-failed",
+        )
+        self.assertEqual(
+            start_failure["runtime_structured_log_events"][0]["failure_signal_id"],
+            start_failure["runtime_failure_signal"]["signal_id"],
+        )
 
     def test_failed_envelope_projects_failure_signal_log_and_metric(self) -> None:
         envelope = execute_task(

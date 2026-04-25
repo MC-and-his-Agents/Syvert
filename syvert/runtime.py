@@ -554,7 +554,7 @@ def execute_task_internal(
         release_error = dict(release_error)
         release_error["details"] = release_details
         return TaskExecutionResult(
-            failure_envelope(task_id, adapter_key, capability, release_error),
+            with_failure_observability(failure_envelope(task_id, adapter_key, capability, release_error)),
             None,
         )
 
@@ -565,7 +565,7 @@ def execute_task_internal(
         if release_failure is not None:
             return release_failure
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -594,15 +594,28 @@ def execute_task_internal(
     except TaskRecordContractError as error:
         release_failure = release_admission_guard_or_failure("start_task_record")
         if release_failure is not None:
-            return release_failure
-        return TaskExecutionResult(
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                release_failure.envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
+        return finalize_task_execution_result(
+            task_id,
+            adapter_key,
+            capability,
+            record,
             failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
                 runtime_contract_error("invalid_task_record", str(error)),
             ),
-            None,
+            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+            task_record_store=store,
         )
     persisted_record, persistence_error = persist_task_record(
         task_id,
@@ -615,7 +628,15 @@ def execute_task_internal(
     if persistence_error is not None:
         release_failure = release_admission_guard_or_failure("persist_running")
         if release_failure is not None:
-            return release_failure
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                release_failure.envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
         return persistence_error
     if persisted_record is not None:
         record = persisted_record
@@ -2037,16 +2058,22 @@ def finalize_task_execution_result(
                 with_observability_write_failed(envelope, stage="completion", reason=str(error), details=invalidation_details),
                 None,
             )
+        failed_envelope = failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "envelope_not_json_serializable",
+                "共享终态结果无法收口为 JSON-safe TaskRecord",
+                details={"reason": str(error), **invalidation_details},
+            ),
+        )
         return TaskExecutionResult(
-            failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                runtime_contract_error(
-                    "envelope_not_json_serializable",
-                    "共享终态结果无法收口为 JSON-safe TaskRecord",
-                    details={"reason": str(error), **invalidation_details},
-                ),
+            with_failure_observability(
+                with_failed_envelope_task_record_ref(
+                    failed_envelope,
+                    record.task_record_ref or f"task_record:{task_id}",
+                )
             ),
             None,
         )

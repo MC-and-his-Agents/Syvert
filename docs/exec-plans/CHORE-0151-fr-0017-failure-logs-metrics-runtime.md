@@ -41,12 +41,12 @@
 - 已按 guardian 第五轮审查补齐 success/lifecycle structured logs 与 minimal metrics、post-accepted failed signal 的 durable `task_record_ref` 重投影、retry-then-success 中间失败 signal 顶层持久化，以及 observability 同 ID identical replay / conflict fail-closed 约束。
 - 已按 guardian 第六轮审查补齐 repeated identical retry failure 的 per-attempt signal identity，以及 failed terminal path 的 attempt lifecycle log/metric 保留。
 - 已按 guardian 第七轮审查收敛 FR-0017 注入边界、`envelope_ref` occurrence identity，以及 durable observability carrier 枚举校验。
+- 已按 guardian 第八轮审查补齐 record lifecycle fail-closed 分支的 FR-0017 carrier，并收紧 failed log / metric 必填引用和错误元数据校验。
 
 ## 下一步动作
 
-- 推送第四轮 guardian review-sync 修复提交。
-- 推送第五轮 guardian review-sync 修复提交。
-- 重跑 CI、guardian、merge gate。
+- 推送第八轮 guardian review-sync 修复提交。
+- 等待 CI 重新全绿后重跑 guardian 与 merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -85,6 +85,7 @@
   - guardian 第五轮 review-sync 后结果：通过，`Ran 190 tests`，`OK`。
   - guardian 第六轮 review-sync 后结果：通过，`Ran 191 tests`，`OK`。
   - guardian 第七轮 review-sync 后结果：通过，`Ran 193 tests`，`OK`。
+  - guardian 第八轮 review-sync 后结果：通过，`Ran 195 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
@@ -92,6 +93,7 @@
   - guardian 第五轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第六轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第七轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
+  - guardian 第八轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
   - guardian 第四轮 review-sync 后结果：通过。
@@ -99,12 +101,14 @@
   - guardian 第五轮 review-sync 后结果：通过。
   - guardian 第六轮 review-sync 后结果：通过。
   - guardian 第七轮 review-sync 后结果：通过。
+  - guardian 第八轮 review-sync 后结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - guardian 第四轮 review-sync 后结果：通过。
   - 本地 reviewer 复核修复后结果：通过。
   - guardian 第五轮 review-sync 后结果：通过。
   - guardian 第六轮 review-sync 后结果：通过。
   - guardian 第七轮 review-sync 后结果：通过。
+  - guardian 第八轮 review-sync 后结果：通过。
 
 ## guardian review-sync
 
@@ -150,6 +154,11 @@
   - `failure_envelope(...)` 重新收敛为纯 shared failed envelope helper，不再无条件注入 FR-0017 carrier；runtime 主路径通过 `pre_accepted_failure_envelope`、`with_runtime_observability` 与 `finalize_task_execution_result` 显式投影 observability。
   - `RuntimeFailureSignal.envelope_ref` 增加 attempt occurrence 维度，与 repeated identical failures 的 per-attempt `signal_id` 对齐。
   - `TaskRecord` durable observability carrier 校验固定枚举与语义：`failure_phase`、`event_type`、`level`、`metric_name`、metric unit/value、上下文绑定和失败日志 signal 引用。
+- PR `#249` 第八次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - record lifecycle fail-closed 分支统一注入 FR-0017 runtime observability：`create_task_record` 前失败走 pre-accepted carrier；`start_task_record` / running persistence 后失败走 durable `TaskRecord` completion finalize；success envelope 收口为 JSON-safe terminal record 失败时，转为 `runtime_contract/envelope_not_json_serializable` 并绑定 durable `task_record_ref`。
+  - `TaskRecord` durable validation 明确拒绝 failed structured log 缺失或悬空 `failure_signal_id`，覆盖 `admission_concurrency_rejected`、`retry_concurrency_rejected`、`task_failed`、`timeout_triggered`、`retry_scheduled`、`observability_write_failed`。
+  - `TaskRecord` durable validation 明确拒绝 failed metrics 缺失 `error_category/error_code/failure_phase`，覆盖 `task_failed_total`、`timeout_total`、`admission_concurrency_rejected_total`、`retry_concurrency_rejected_total`。
 
 ## 未决风险
 
@@ -169,4 +178,5 @@
 - guardian 第二轮 review-sync 可恢复 checkpoint：`3b2883728374972d02637d1e0e61a63306bbd549`。
 - guardian 第三轮 review-sync 可恢复 checkpoint：`288c26667e98a74e38feea26a777885fb093f98c`。
 - guardian 第四轮 review-sync 可恢复 checkpoint：`9ba4cf56f7837d24307227ec1db12101cba6fe66`。
-- 本次追加 checkpoint 元数据属于 `metadata-only review sync`，不推进新的 runtime / formal spec 语义。
+- guardian 第七轮 review-sync 可恢复 checkpoint：`8eb978c55a91143cb0c9fb975fe93bd8528b55c7`。
+- guardian 第八轮 review-sync 待提交；本轮不推进 formal spec 语义。

@@ -804,7 +804,14 @@ def validate_runtime_structured_log_events(record: TaskRecord) -> None:
         failure_signal_id = event.get("failure_signal_id", "")
         if failure_signal_id is not None and not isinstance(failure_signal_id, str):
             raise TaskRecordContractError("RuntimeStructuredLogEvent.failure_signal_id 必须是字符串")
-        if event_type in {"task_failed", "timeout_triggered", "retry_scheduled", "observability_write_failed"}:
+        if event_type in {
+            "admission_concurrency_rejected",
+            "retry_concurrency_rejected",
+            "task_failed",
+            "timeout_triggered",
+            "retry_scheduled",
+            "observability_write_failed",
+        }:
             if not failure_signal_id or failure_signal_id not in signal_ids:
                 raise TaskRecordContractError("失败相关 RuntimeStructuredLogEvent 必须引用对应 RuntimeFailureSignal")
         _observability_entries(event, "resource_trace_refs", ())
@@ -847,6 +854,14 @@ def validate_runtime_execution_metric_samples(record: TaskRecord) -> None:
             raise TaskRecordContractError("RuntimeExecutionMetricSample.failure_phase 必须是字符串")
         if phase and phase not in RUNTIME_FAILURE_PHASES:
             raise TaskRecordContractError("RuntimeExecutionMetricSample.failure_phase 不在允许值范围内")
+        if metric_name in {
+            "task_failed_total",
+            "timeout_total",
+            "admission_concurrency_rejected_total",
+            "retry_concurrency_rejected_total",
+        }:
+            if not category or not error_code or not phase:
+                raise TaskRecordContractError("失败相关 RuntimeExecutionMetricSample 必须携带错误元数据")
         attempt_index = coerce_int(metric.get("attempt_index"), field="RuntimeExecutionMetricSample.attempt_index")
         if attempt_index < 0:
             raise TaskRecordContractError("RuntimeExecutionMetricSample.attempt_index 必须为非负整数")
