@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from collections.abc import Iterable, Mapping, Sequence
+import re
 from typing import Any
 
 
@@ -356,7 +357,7 @@ def orchestrate_operability_gate(
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
-    elif not _is_allowed_evidence_ref(baseline_gate_ref) or "FR-0007" not in baseline_gate_ref:
+    elif not _is_allowed_evidence_ref(baseline_gate_ref) or not _is_fr0007_baseline_ref(baseline_gate_ref):
         failures.append(
             _failure(
                 "operability_gate",
@@ -1394,6 +1395,14 @@ def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
     if not _non_empty_string(evidence_ref) or evidence_ref.startswith(("http://", "https://")):
         return False
     return evidence_ref.startswith(("FR-", "operability:", "test_evidence:", "tests:", "local:", "ci:", "gate:", "log:", "metrics:"))
+
+
+def _is_fr0007_baseline_ref(evidence_ref: str) -> bool:
+    return bool(
+        re.search(r"(^|:)FR-0007(:|$)", evidence_ref)
+        and re.search(r"(^|:)baseline(:|$)", evidence_ref)
+        and re.search(r"(^|:)v0\.6\.0(:|$)", evidence_ref)
+    )
 
 
 def _evidence_ref_revision(evidence_ref: str) -> str | None:

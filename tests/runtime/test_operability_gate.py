@@ -109,6 +109,16 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("baseline_gate_ref_revision_mismatch", self.failure_codes(result))
 
+    def test_baseline_gate_ref_rejects_near_fr_number_forgery(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        forged = "FR-00070:version_gate:v0.6.0:test-head-sha:baseline"
+        baseline["baseline_gate_ref"] = forged
+
+        result = self.pass_result(baseline_gate_ref=forged, baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+
     def test_reviewable_ci_log_metrics_evidence_refs_are_allowed(self) -> None:
         cases = self.valid_cases()
         cases[0]["evidence_refs"] = ["ci:test-head-sha:fr-0019:trc-timeout-platform-control-code"]
@@ -464,6 +474,33 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("baseline_gate_not_passed", self.failure_codes(result))
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
+    def test_renderer_partial_source_evidence_fails_closed_as_gate_result(self) -> None:
+        valid_source = json.loads(Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json").read_text())
+        valid_source["cases"] = valid_source["cases"][:-1]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps(valid_source), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
+    def test_renderer_case_without_id_or_upstream_modules_fails_closed(self) -> None:
+        valid_source = json.loads(Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json").read_text())
+        valid_source["cases"][0].pop("case_id")
+        valid_source["cases"][1].pop("upstream_modules")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps(valid_source), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("missing_mandatory_cases", self.failure_codes(result))
 
     def test_external_actual_result_ref_fails_closed(self) -> None:

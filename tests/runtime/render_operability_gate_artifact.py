@@ -65,14 +65,25 @@ def build_gate_input_from_source_evidence(
     cases = build_mandatory_operability_cases()
     for case in cases:
         case_id = str(case["case_id"])
-        evidence_case = actual_cases[case_id]
+        evidence_case = actual_cases.get(case_id)
+        if not isinstance(evidence_case, dict):
+            return fail_closed_gate_input(
+                revision=revision,
+                failures=[{"code": "missing_source_evidence_case", "field": case_id}],
+            )
         case["actual_result_ref"] = f"operability:{revision}:{case_id}"
         case["evidence_refs"] = [
             f"operability:{revision}:{case_id}",
             f"test_evidence:{revision}:{case_id}",
         ]
-        case["actual_result"] = evidence_case["actual_result"]
-        case["upstream_refs"] = [f"tests:{revision}:{module}" for module in evidence_case["upstream_modules"]]
+        case["actual_result"] = evidence_case.get("actual_result", {})
+        upstream_modules = evidence_case.get("upstream_modules")
+        if not isinstance(upstream_modules, list) or not all(isinstance(module, str) and module for module in upstream_modules):
+            return fail_closed_gate_input(
+                revision=revision,
+                failures=[{"code": "invalid_source_evidence_upstream_modules", "field": case_id}],
+            )
+        case["upstream_refs"] = [f"tests:{revision}:{module}" for module in upstream_modules]
     return {
         "execution_revision": revision,
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
@@ -94,6 +105,25 @@ def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
             failures.append({"code": "missing_source_evidence_field", "field": key})
     if "cases" in source and not isinstance(source["cases"], list):
         failures.append({"code": "invalid_source_evidence_cases", "field": "cases"})
+    elif isinstance(source.get("cases"), list):
+        observed_case_ids = set()
+        for index, case in enumerate(source["cases"]):
+            if not isinstance(case, dict):
+                failures.append({"code": "invalid_source_evidence_case", "field": f"cases[{index}]"})
+                continue
+            case_id = case.get("case_id")
+            if not isinstance(case_id, str) or not case_id:
+                failures.append({"code": "missing_source_evidence_case_id", "field": f"cases[{index}].case_id"})
+                continue
+            observed_case_ids.add(case_id)
+            if "actual_result" not in case:
+                failures.append({"code": "missing_source_evidence_actual_result", "field": case_id})
+            if "upstream_modules" not in case:
+                failures.append({"code": "missing_source_evidence_upstream_modules", "field": case_id})
+        for mandatory_case in build_mandatory_operability_cases():
+            case_id = str(mandatory_case["case_id"])
+            if case_id not in observed_case_ids:
+                failures.append({"code": "missing_source_evidence_case", "field": case_id})
     return failures
 
 
