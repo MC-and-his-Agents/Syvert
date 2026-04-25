@@ -21,8 +21,12 @@
 - `FR-0017` 不重写 `FR-0005` 的错误分类，不重写 `FR-0008` 的 TaskRecord，不重写 `FR-0011` 的 resource tracing truth，也不重写 `FR-0016` 的 runtime control 语义；本 FR 只收紧正常 `execution_timeout` 的 observability 投影、固定 retryable predicate 的观测边界，以及 `admission_concurrency_rejected` / `retry_concurrency_rejected` 的日志与指标区分。
 - `FR-0017` 完成后为 `FR-0019/#234` 提供 `failure_log_metrics` 维度的 formal spec 与 runtime evidence 输入。
 
+## closeout 证据
+
+- formal spec closeout：PR `#239`，merge commit `3bff42393da63da3100a5a99dc0c16f043a6b180`。
+- runtime implementation：PR `#249`，merge commit `d0ae78b6c96789f0c16b541bac14694dd1ad9df4`。
+- parent closeout：`#228` / `CHORE-0152-fr-0017-parent-closeout` 负责同步 GitHub 状态、主干事实与后续 gate 引用。
+
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `7622327c418d78e1e0eb966c4ed51349cbec294b`
-- `3bff42393da63da3100a5a99dc0c16f043a6b180`：PR `#239` formal spec closeout merge commit。
-- `d0ae78b6c96789f0c16b541bac14694dd1ad9df4`：PR `#249` runtime implementation merge commit。
