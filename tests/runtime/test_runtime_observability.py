@@ -326,6 +326,26 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
             "retry_scheduled_total",
             {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]},
         )
+        self.assertEqual(
+            {signal["signal_id"] for signal in payload["runtime_failure_signals"]},
+            {event["failure_signal_id"] for event in payload["runtime_structured_log_events"] if event["event_type"] == "retry_scheduled"},
+        )
+        self.assertIn(
+            "task_succeeded",
+            {event["event_type"] for event in payload["runtime_structured_log_events"]},
+        )
+        self.assertIn(
+            "attempt_started",
+            {event["event_type"] for event in payload["runtime_structured_log_events"]},
+        )
+        self.assertIn(
+            "attempt_finished",
+            {event["event_type"] for event in payload["runtime_structured_log_events"]},
+        )
+        self.assertIn(
+            "task_succeeded_total",
+            {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]},
+        )
 
     def test_persistence_failures_project_persistence_phase(self) -> None:
         result = execute_task_with_record(
@@ -387,8 +407,13 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         payload = task_record_to_dict(loaded)
         signal = result.envelope["runtime_failure_signal"]
         self.assertEqual(payload["runtime_failure_signals"], [signal])
-        self.assertEqual(payload["runtime_structured_log_events"], result.envelope["runtime_structured_log_events"])
-        self.assertEqual(payload["runtime_execution_metric_samples"], result.envelope["runtime_execution_metric_samples"])
+        for event in result.envelope["runtime_structured_log_events"]:
+            self.assertIn(event, payload["runtime_structured_log_events"])
+        for metric in result.envelope["runtime_execution_metric_samples"]:
+            self.assertIn(metric, payload["runtime_execution_metric_samples"])
+        self.assertIn("task_accepted", {event["event_type"] for event in payload["runtime_structured_log_events"]})
+        self.assertIn("task_running", {event["event_type"] for event in payload["runtime_structured_log_events"]})
+        self.assertIn("task_started_total", {metric["metric_name"] for metric in payload["runtime_execution_metric_samples"]})
         self.assertEqual(payload["result"]["envelope"]["runtime_failure_signal"], signal)
 
 

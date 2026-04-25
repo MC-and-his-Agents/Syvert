@@ -38,10 +38,12 @@
 - 已扩展 `TaskRecord` JSON-safe durable fields：`runtime_failure_signals`、`runtime_structured_log_events`、`runtime_execution_metric_samples`。
 - guardian 多轮审查要求补齐 pre-accepted failure、admission concurrency control ref、retry scheduling、persistence phase、resource trace refs、success envelope 边界与 observability write failure 保留语义；当前修复已落到同一 Core path。
 - 已按本地 reviewer 复核补齐 `ExecutionAttemptOutcome.terminal_envelope` 与 FR-0017 carrier 去重边界、`observability_write_failed` metric allowlist 边界，以及 execution-control runtime_contract 的真实 phase 投影。
+- 已按 guardian 第五轮审查补齐 success/lifecycle structured logs 与 minimal metrics、post-accepted failed signal 的 durable `task_record_ref` 重投影、retry-then-success 中间失败 signal 顶层持久化，以及 observability 同 ID identical replay / conflict fail-closed 约束。
 
 ## 下一步动作
 
 - 推送第四轮 guardian review-sync 修复提交。
+- 推送第五轮 guardian review-sync 修复提交。
 - 重跑 CI、guardian、merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
@@ -67,6 +69,7 @@
   - guardian 第三轮 review-sync 后结果：通过，`Ran 11 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 11 tests`，`OK`。
   - 本地 reviewer 复核修复后结果：通过，`Ran 13 tests`，`OK`。
+  - guardian 第五轮 review-sync 后结果：通过，`Ran 13 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability`
   - 初始结果：通过，`Ran 161 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 164 tests`，`OK`。
@@ -74,17 +77,22 @@
   - guardian 第三轮 review-sync 后结果：通过，`Ran 167 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 167 tests`，`OK`。
   - 本地 reviewer 复核修复后结果：通过，`Ran 169 tests`，`OK`。
+- `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability tests.runtime.test_task_record`
+  - guardian 第五轮 review-sync 后结果：通过，`Ran 190 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - 本地 reviewer 复核修复后结果：通过，`Ran 376 tests`，`OK`。
+  - guardian 第五轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
   - guardian 第四轮 review-sync 后结果：通过。
   - 本地 reviewer 复核修复后结果：通过。
+  - guardian 第五轮 review-sync 后结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - guardian 第四轮 review-sync 后结果：通过。
   - 本地 reviewer 复核修复后结果：通过。
+  - guardian 第五轮 review-sync 后结果：通过。
 
 ## guardian review-sync
 
@@ -115,6 +123,12 @@
   - `ExecutionAttemptOutcome.terminal_envelope` 剥离 `runtime_failure_signal`、`runtime_structured_log_events`、`runtime_execution_metric_samples` 与内部私有 observability 字段，避免 attempt 快照和 canonical failed envelope 出现重复不一致 carrier。
   - `observability_write_failed` 仅作为 `RuntimeStructuredLogEvent` 暴露，不再生成未被 FR-0017 metric allowlist 批准的 `observability_write_failed_total`；该日志回指原业务 `RuntimeFailureSignal.signal_id` 并保留 resource trace refs。
   - 默认 execution-control policy 物化失败投影为 `failure_phase=pre_execution`；guarded admission 后 slot 消失投影为 `failure_phase=concurrency_rejected`，不再兜底成 `adapter_execution`。
+- PR `#249` 第五次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - `TaskRecord` 顶层持久化 `task_accepted`、`task_running`、`attempt_started`、`attempt_finished`、`task_succeeded` lifecycle structured logs，以及 `task_started_total`、`attempt_started_total`、`task_succeeded_total`、`execution_duration_ms` minimal metrics；success envelope 仍不新增 FR-0017 公共字段。
+  - `finalize_task_execution_result` 在 post-accepted failed envelope 补入 durable `task_record_ref` 后重投影 failure signal/log/metric，避免 `error.details.task_record_ref` 与 `RuntimeFailureSignal.task_record_ref` 漂移。
+  - retry-then-success 会把中间失败的 `RuntimeFailureSignal` 持久化到 `TaskRecord.runtime_failure_signals` 顶层，使 `retry_scheduled.failure_signal_id` 有可追溯目标，同时不污染 success result envelope。
+  - `TaskRecord` 校验同一 `signal_id` / `event_id` / `metric_id` 的 identical replay；store reconciliation 只允许 terminal incoming observability 作为无冲突 superset 合入，冲突性同 ID payload fail-closed。
 
 ## 未决风险
 

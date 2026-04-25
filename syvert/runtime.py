@@ -697,6 +697,7 @@ def execute_controlled_adapter_attempts(
     last_failed_envelope: dict[str, Any] | None = None
     runtime_result_refs: list[dict[str, Any]] = []
     execution_control_events: list[dict[str, Any]] = []
+    failure_signals: list[dict[str, Any]] = []
     structured_log_events: list[dict[str, Any]] = []
     metric_samples: list[dict[str, Any]] = []
 
@@ -717,6 +718,9 @@ def execute_controlled_adapter_attempts(
         envelope = attempt.envelope
         if attempt.attempt_outcome_ref is not None:
             runtime_result_refs.append(attempt.attempt_outcome_ref)
+            attempt_log_events, attempt_metric_samples = build_attempt_lifecycle_observability(attempt.attempt_outcome_ref)
+            structured_log_events.extend(attempt_log_events)
+            metric_samples.extend(attempt_metric_samples)
         if attempt.execution_control_event is not None:
             execution_control_events.append(attempt.execution_control_event)
             runtime_result_refs.append(attempt.execution_control_event)
@@ -735,6 +739,7 @@ def execute_controlled_adapter_attempts(
                 envelope,
                 runtime_result_refs,
                 execution_control_events,
+                failure_signals,
                 structured_log_events,
                 metric_samples,
             )
@@ -742,6 +747,7 @@ def execute_controlled_adapter_attempts(
             envelope,
             runtime_result_refs,
             execution_control_events,
+            failure_signals,
             structured_log_events,
             metric_samples,
         )
@@ -749,6 +755,9 @@ def execute_controlled_adapter_attempts(
             return envelope
 
         last_failed_envelope = envelope
+        failure_signal = envelope.get("runtime_failure_signal")
+        if isinstance(failure_signal, Mapping):
+            failure_signals.append(dict(failure_signal))
         retryable = is_retryable_attempt_outcome(
             envelope,
             capability=capability,
@@ -783,6 +792,7 @@ def execute_controlled_adapter_attempts(
                 exhausted_envelope,
                 runtime_result_refs,
                 execution_control_events,
+                failure_signals,
                 structured_log_events,
                 metric_samples,
             )
@@ -846,6 +856,7 @@ def execute_controlled_adapter_attempts(
                 rejected_envelope,
                 runtime_result_refs,
                 execution_control_events,
+                failure_signals,
                 structured_log_events,
                 metric_samples,
             )
@@ -1429,6 +1440,7 @@ def build_attempt_outcome_ref(
     terminal_envelope.pop("runtime_failure_signal", None)
     terminal_envelope.pop("runtime_structured_log_events", None)
     terminal_envelope.pop("runtime_execution_metric_samples", None)
+    terminal_envelope.pop("_runtime_failure_signals", None)
     terminal_envelope.pop("_runtime_structured_log_events", None)
     terminal_envelope.pop("_runtime_execution_metric_samples", None)
     ref = {
@@ -1486,6 +1498,7 @@ def with_runtime_observability(
     envelope: Mapping[str, Any],
     runtime_result_refs: list[dict[str, Any]],
     execution_control_events: list[dict[str, Any]],
+    failure_signals: list[dict[str, Any]] | None = None,
     structured_log_events: list[dict[str, Any]] | None = None,
     metric_samples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -1493,6 +1506,8 @@ def with_runtime_observability(
     if enriched.get("status") == "success":
         if runtime_result_refs and (len(runtime_result_refs) > 1 or execution_control_events):
             enriched["runtime_result_refs"] = list(runtime_result_refs)
+        if failure_signals:
+            enriched["_runtime_failure_signals"] = list(failure_signals)
         if structured_log_events:
             enriched["_runtime_structured_log_events"] = list(structured_log_events)
         if metric_samples:
@@ -1507,7 +1522,11 @@ def with_runtime_observability(
     if metric_samples:
         enriched["runtime_execution_metric_samples"] = list(metric_samples)
     if enriched.get("status") == "failed" and runtime_result_refs:
-        enriched = with_failed_envelope_task_record_ref(enriched, f"task_record:{enriched.get('task_id')}")
+        current_error = enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {}
+        current_details = current_error.get("details") if isinstance(current_error.get("details"), Mapping) else {}
+        current_task_record_ref = current_details.get("task_record_ref")
+        if current_task_record_ref != "none":
+            enriched = with_failed_envelope_task_record_ref(enriched, f"task_record:{enriched.get('task_id')}")
     if enriched.get("status") == "failed":
         enriched = with_failure_observability(enriched)
     return enriched
@@ -1515,6 +1534,7 @@ def with_runtime_observability(
 
 def public_task_execution_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
     public_envelope = dict(envelope)
+    public_envelope.pop("_runtime_failure_signals", None)
     public_envelope.pop("_runtime_structured_log_events", None)
     public_envelope.pop("_runtime_execution_metric_samples", None)
     return public_envelope
@@ -1557,7 +1577,7 @@ def with_failed_envelope_task_record_ref(envelope: Mapping[str, Any], task_recor
     enriched = dict(envelope)
     error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
     current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
-    current_details.setdefault("task_record_ref", task_record_ref)
+    current_details["task_record_ref"] = task_record_ref
     error["details"] = current_details
     enriched["error"] = error
     return enriched
@@ -1638,6 +1658,89 @@ def build_retry_scheduled_observability(
     return log_event, metric_sample
 
 
+def build_attempt_lifecycle_observability(
+    attempt_outcome_ref: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    task_id = str(attempt_outcome_ref.get("task_id") or "")
+    adapter_key = str(attempt_outcome_ref.get("adapter_key") or "")
+    capability = str(attempt_outcome_ref.get("capability") or "")
+    attempt_index = attempt_outcome_ref.get("attempt_index")
+    if isinstance(attempt_index, bool) or not isinstance(attempt_index, int) or attempt_index < 0:
+        attempt_index = 0
+    started_at = str(attempt_outcome_ref.get("started_at") or "")
+    ended_at = str(attempt_outcome_ref.get("ended_at") or started_at)
+    outcome = str(attempt_outcome_ref.get("outcome") or "")
+    duration_ms = 0
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        ended = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+        duration_ms = max(0, int((ended - started).total_seconds() * 1000))
+    except ValueError:
+        duration_ms = 0
+    runtime_refs = [dict(attempt_outcome_ref)]
+    log_events = [
+        {
+            "event_id": f"runtime_log:{task_id}:attempt_started:{attempt_index}",
+            "task_id": task_id,
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "event_type": "attempt_started",
+            "level": "info",
+            "attempt_index": attempt_index,
+            "failure_signal_id": "",
+            "resource_trace_refs": [],
+            "runtime_result_refs": runtime_refs,
+            "message": f"attempt {attempt_index} started",
+            "occurred_at": started_at,
+        },
+        {
+            "event_id": f"runtime_log:{task_id}:attempt_finished:{attempt_index}",
+            "task_id": task_id,
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "event_type": "attempt_finished",
+            "level": "error" if outcome in {"failed", "timeout"} else "info",
+            "attempt_index": attempt_index,
+            "failure_signal_id": "",
+            "resource_trace_refs": [],
+            "runtime_result_refs": runtime_refs,
+            "message": f"attempt {attempt_index} finished: {outcome or 'unknown'}",
+            "occurred_at": ended_at,
+        },
+    ]
+    metric_samples = [
+        {
+            "metric_id": f"runtime_metric:{task_id}:attempt_started_total:{attempt_index}",
+            "task_id": task_id,
+            "metric_name": "attempt_started_total",
+            "metric_value": 1,
+            "unit": "count",
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "error_category": "",
+            "error_code": "",
+            "failure_phase": "",
+            "attempt_index": attempt_index,
+            "occurred_at": started_at,
+        },
+        {
+            "metric_id": f"runtime_metric:{task_id}:execution_duration_ms:{attempt_index}",
+            "task_id": task_id,
+            "metric_name": "execution_duration_ms",
+            "metric_value": duration_ms,
+            "unit": "ms",
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "error_category": "",
+            "error_code": "",
+            "failure_phase": "",
+            "attempt_index": attempt_index,
+            "occurred_at": ended_at,
+        },
+    ]
+    return log_events, metric_samples
+
+
 def with_observability_write_failed(
     envelope: Mapping[str, Any],
     *,
@@ -1694,7 +1797,6 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     capability = str(enriched.get("capability") or "")
     error_category = str(error.get("category") or "")
     error_code = str(error.get("code") or "")
-    occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     task_record_ref = details.get("task_record_ref")
     if not isinstance(task_record_ref, str) or not task_record_ref:
         task_record_ref = "none"
@@ -1705,6 +1807,36 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
     signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}"
     envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}"
+    existing_failure_signal = (
+        enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
+    )
+    existing_log_events = list(
+        enriched.get("runtime_structured_log_events")
+        if isinstance(enriched.get("runtime_structured_log_events"), list)
+        else []
+    )
+    existing_metric_samples = list(
+        enriched.get("runtime_execution_metric_samples")
+        if isinstance(enriched.get("runtime_execution_metric_samples"), list)
+        else []
+    )
+    signal_occurred_at = stable_observability_occurred_at(
+        existing_failure_signal,
+        id_field="signal_id",
+        entry_id=signal_id,
+    )
+    log_id = f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}"
+    metric_id = f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}"
+    log_occurred_at = stable_observability_occurred_at(
+        next((event for event in existing_log_events if isinstance(event, Mapping) and event.get("event_id") == log_id), {}),
+        id_field="event_id",
+        entry_id=log_id,
+    )
+    metric_occurred_at = stable_observability_occurred_at(
+        next((metric for metric in existing_metric_samples if isinstance(metric, Mapping) and metric.get("metric_id") == metric_id), {}),
+        id_field="metric_id",
+        entry_id=metric_id,
+    )
     failure_signal = {
         "signal_id": signal_id,
         "task_id": task_id,
@@ -1718,10 +1850,10 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "task_record_ref": task_record_ref,
         "resource_trace_refs": resource_trace_refs,
         "runtime_result_refs": runtime_result_refs,
-        "occurred_at": occurred_at,
+        "occurred_at": signal_occurred_at,
     }
     log_event = {
-        "event_id": f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}",
+        "event_id": log_id,
         "task_id": task_id,
         "adapter_key": adapter_key,
         "capability": capability,
@@ -1732,10 +1864,10 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "resource_trace_refs": resource_trace_refs,
         "runtime_result_refs": runtime_result_refs,
         "message": f"task failed: {error_category}/{error_code}",
-        "occurred_at": occurred_at,
+        "occurred_at": log_occurred_at,
     }
     metric_sample = {
-        "metric_id": f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}",
+        "metric_id": metric_id,
         "task_id": task_id,
         "metric_name": metric_name,
         "metric_value": 1,
@@ -1746,19 +1878,9 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         "error_code": error_code,
         "failure_phase": failure_phase,
         "attempt_index": log_event["attempt_index"],
-        "occurred_at": occurred_at,
+        "occurred_at": metric_occurred_at,
     }
     enriched["runtime_failure_signal"] = failure_signal
-    existing_log_events = list(
-        enriched.get("runtime_structured_log_events")
-        if isinstance(enriched.get("runtime_structured_log_events"), list)
-        else []
-    )
-    existing_metric_samples = list(
-        enriched.get("runtime_execution_metric_samples")
-        if isinstance(enriched.get("runtime_execution_metric_samples"), list)
-        else []
-    )
     retained_log_events = [
         event
         for event in existing_log_events
@@ -1772,6 +1894,12 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
     enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
     return enriched
+
+
+def stable_observability_occurred_at(entry: Mapping[str, Any], *, id_field: str, entry_id: str) -> str:
+    if entry.get(id_field) == entry_id and isinstance(entry.get("occurred_at"), str) and entry["occurred_at"]:
+        return str(entry["occurred_at"])
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def infer_failure_phase(*, error_category: str, error_code: str, details: Mapping[str, Any]) -> str:
@@ -1880,7 +2008,9 @@ def finalize_task_execution_result(
     task_record_store: TaskRecordStore | None,
 ) -> TaskExecutionResult:
     envelope = (
-        with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
+        with_failure_observability(
+            with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
+        )
         if envelope.get("status") == "failed"
         else dict(envelope)
     )

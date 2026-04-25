@@ -216,6 +216,24 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_rejects_conflicting_observability_replay_id(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability-conflict"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-observability-conflict",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        duplicate_event = dict(payload["runtime_structured_log_events"][0])
+        duplicate_event["message"] = "conflicting replay"
+        payload["runtime_structured_log_events"].append(duplicate_event)
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
     def test_migrates_missing_and_rejects_mismatched_task_record_ref(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

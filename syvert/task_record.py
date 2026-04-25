@@ -76,6 +76,66 @@ def task_record_ref_for(task_id: str) -> str:
     return f"task_record:{task_id}"
 
 
+def _runtime_structured_log_event(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    event_type: str,
+    level: str,
+    occurred_at: str,
+    message: str,
+    attempt_index: int = 0,
+    failure_signal_id: str = "",
+    resource_trace_refs: tuple[Any, ...] | list[Any] | None = None,
+    runtime_result_refs: tuple[Any, ...] | list[Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "event_id": f"runtime_log:{task_id}:{event_type}:{attempt_index}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": event_type,
+        "level": level,
+        "attempt_index": attempt_index,
+        "failure_signal_id": failure_signal_id,
+        "resource_trace_refs": list(resource_trace_refs or []),
+        "runtime_result_refs": list(runtime_result_refs or []),
+        "message": message,
+        "occurred_at": occurred_at,
+    }
+
+
+def _runtime_execution_metric_sample(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    metric_name: str,
+    metric_value: int | float,
+    unit: str,
+    occurred_at: str,
+    attempt_index: int = 0,
+    error_category: str = "",
+    error_code: str = "",
+    failure_phase: str = "",
+) -> dict[str, Any]:
+    return {
+        "metric_id": f"runtime_metric:{task_id}:{metric_name}:{attempt_index}",
+        "task_id": task_id,
+        "metric_name": metric_name,
+        "metric_value": metric_value,
+        "unit": unit,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "attempt_index": attempt_index,
+        "occurred_at": occurred_at,
+    }
+
+
 def build_task_request_snapshot(request: Any) -> TaskRequestSnapshot:
     try:
         target = request.target
@@ -132,6 +192,28 @@ def create_task_record(
             ),
         ),
         task_record_ref=task_record_ref_for(task_id),
+        runtime_structured_log_events=(
+            _runtime_structured_log_event(
+                task_id=task_id,
+                adapter_key=request.adapter_key,
+                capability=request.capability,
+                event_type="task_accepted",
+                level="info",
+                occurred_at=timestamp,
+                message="task accepted",
+            ),
+        ),
+        runtime_execution_metric_samples=(
+            _runtime_execution_metric_sample(
+                task_id=task_id,
+                adapter_key=request.adapter_key,
+                capability=request.capability,
+                metric_name="task_started_total",
+                metric_value=1,
+                unit="count",
+                occurred_at=timestamp,
+            ),
+        ),
     )
     validate_task_record(record)
     return record
@@ -168,7 +250,18 @@ def start_task_record(record: TaskRecord, *, occurred_at: str | None = None) -> 
         runtime_result_refs=record.runtime_result_refs,
         execution_control_events=record.execution_control_events,
         runtime_failure_signals=record.runtime_failure_signals,
-        runtime_structured_log_events=record.runtime_structured_log_events,
+        runtime_structured_log_events=record.runtime_structured_log_events
+        + (
+            _runtime_structured_log_event(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                event_type="task_running",
+                level="info",
+                occurred_at=timestamp,
+                message="task running",
+            ),
+        ),
         runtime_execution_metric_samples=record.runtime_execution_metric_samples,
     )
     validate_task_record(updated)
@@ -181,6 +274,7 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
     normalized_envelope = normalize_json_value(envelope, field="result.envelope")
     if not isinstance(normalized_envelope, dict):
         raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
+    private_failure_signals = normalized_envelope.pop("_runtime_failure_signals", None)
     private_structured_log_events = normalized_envelope.pop("_runtime_structured_log_events", None)
     private_metric_samples = normalized_envelope.pop("_runtime_execution_metric_samples", None)
     if terminal_status == "succeeded":
@@ -213,6 +307,62 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
         if isinstance(code, str) and code:
             log_code = code
 
+    runtime_failure_signals = (
+        record.runtime_failure_signals
+        + _observability_entries({"runtime_failure_signals": private_failure_signals}, "runtime_failure_signals", ())
+        if private_failure_signals is not None
+        else _runtime_failure_signals(normalized_envelope, record.runtime_failure_signals)
+    )
+    runtime_structured_log_events = record.runtime_structured_log_events + _observability_entries(
+        {"runtime_structured_log_events": private_structured_log_events}
+        if private_structured_log_events is not None
+        else normalized_envelope,
+        "runtime_structured_log_events",
+        (),
+    )
+    runtime_execution_metric_samples = record.runtime_execution_metric_samples + _observability_entries(
+        {"runtime_execution_metric_samples": private_metric_samples}
+        if private_metric_samples is not None
+        else normalized_envelope,
+        "runtime_execution_metric_samples",
+        (),
+    )
+    if terminal_status == "succeeded":
+        runtime_structured_log_events = runtime_structured_log_events + (
+            _runtime_structured_log_event(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                event_type="task_succeeded",
+                level="info",
+                occurred_at=timestamp,
+                message="task succeeded",
+            ),
+        )
+        runtime_execution_metric_samples = runtime_execution_metric_samples + (
+            _runtime_execution_metric_sample(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                metric_name="task_succeeded_total",
+                metric_value=1,
+                unit="count",
+                occurred_at=timestamp,
+            ),
+            _runtime_execution_metric_sample(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                metric_name="execution_duration_ms",
+                metric_value=max(
+                    0,
+                    int((parse_timestamp(timestamp, field="terminal_at") - parse_timestamp(record.created_at, field="created_at")).total_seconds() * 1000),
+                ),
+                unit="ms",
+                occurred_at=timestamp,
+            ),
+        )
+
     updated = TaskRecord(
         schema_version=record.schema_version,
         task_id=record.task_id,
@@ -240,25 +390,9 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
             "execution_control_events",
             record.execution_control_events,
         ),
-        runtime_failure_signals=_runtime_failure_signals(normalized_envelope, record.runtime_failure_signals),
-        runtime_structured_log_events=_observability_entries(
-            (
-                {"runtime_structured_log_events": private_structured_log_events}
-                if private_structured_log_events is not None
-                else normalized_envelope
-            ),
-            "runtime_structured_log_events",
-            record.runtime_structured_log_events,
-        ),
-        runtime_execution_metric_samples=_observability_entries(
-            (
-                {"runtime_execution_metric_samples": private_metric_samples}
-                if private_metric_samples is not None
-                else normalized_envelope
-            ),
-            "runtime_execution_metric_samples",
-            record.runtime_execution_metric_samples,
-        ),
+        runtime_failure_signals=runtime_failure_signals,
+        runtime_structured_log_events=runtime_structured_log_events,
+        runtime_execution_metric_samples=runtime_execution_metric_samples,
     )
     validate_task_record(updated)
     return updated
@@ -391,6 +525,7 @@ def validate_task_record(record: TaskRecord) -> None:
         != record.runtime_failure_signals
     ):
         raise TaskRecordContractError("TaskRecord.runtime_failure_signals 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(record.runtime_failure_signals, id_field="signal_id", field="runtime_failure_signals")
     if (
         _observability_entries(
             {"runtime_structured_log_events": record.runtime_structured_log_events},
@@ -400,6 +535,11 @@ def validate_task_record(record: TaskRecord) -> None:
         != record.runtime_structured_log_events
     ):
         raise TaskRecordContractError("TaskRecord.runtime_structured_log_events 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(
+        record.runtime_structured_log_events,
+        id_field="event_id",
+        field="runtime_structured_log_events",
+    )
     if (
         _observability_entries(
             {"runtime_execution_metric_samples": record.runtime_execution_metric_samples},
@@ -409,6 +549,11 @@ def validate_task_record(record: TaskRecord) -> None:
         != record.runtime_execution_metric_samples
     ):
         raise TaskRecordContractError("TaskRecord.runtime_execution_metric_samples 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(
+        record.runtime_execution_metric_samples,
+        id_field="metric_id",
+        field="runtime_execution_metric_samples",
+    )
     validate_request_snapshot(record.request)
     if record.status not in TASK_RECORD_STATUSES:
         raise TaskRecordContractError("TaskRecord.status 不在允许值范围内")
@@ -553,6 +698,17 @@ def _observability_entries(source: Mapping[str, Any], field_name: str, default: 
     return tuple(normalized)
 
 
+def validate_observability_replay_ids(entries: tuple[Any, ...], *, id_field: str, field: str) -> None:
+    seen: dict[str, Any] = {}
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise TaskRecordContractError(f"TaskRecord.{field} 项必须是对象")
+        entry_id = require_string(entry.get(id_field), field=f"{field}.{id_field}")
+        if entry_id in seen and seen[entry_id] != entry:
+            raise TaskRecordContractError(f"TaskRecord.{field} 同一 {id_field} 不得对应不同 payload")
+        seen[entry_id] = entry
+
+
 def _runtime_failure_signals(envelope: Mapping[str, Any], default: tuple[Any, ...]) -> tuple[Any, ...]:
     if "runtime_failure_signal" in envelope:
         normalized = normalize_json_value(envelope["runtime_failure_signal"], field="runtime_failure_signal")
@@ -623,20 +779,29 @@ def validate_terminal_envelope_observability_contract(record: TaskRecord, envelo
             )
     if "runtime_failure_signal" in envelope or "runtime_failure_signals" in envelope:
         envelope_failure_signals = _runtime_failure_signals(envelope, ())
-        if envelope_failure_signals != record.runtime_failure_signals:
+        if not _observability_entries_are_subset(envelope_failure_signals, record.runtime_failure_signals):
             raise TaskRecordContractError("TaskTerminalResult.envelope.runtime_failure_signal 与 TaskRecord.runtime_failure_signals 不一致")
     if "runtime_structured_log_events" in envelope:
         envelope_log_events = _observability_entries(envelope, "runtime_structured_log_events", ())
-        if envelope_log_events != record.runtime_structured_log_events:
+        if not _observability_entries_are_subset(envelope_log_events, record.runtime_structured_log_events):
             raise TaskRecordContractError(
                 "TaskTerminalResult.envelope.runtime_structured_log_events 与 TaskRecord.runtime_structured_log_events 不一致"
             )
     if "runtime_execution_metric_samples" in envelope:
         envelope_metric_samples = _observability_entries(envelope, "runtime_execution_metric_samples", ())
-        if envelope_metric_samples != record.runtime_execution_metric_samples:
+        if not _observability_entries_are_subset(envelope_metric_samples, record.runtime_execution_metric_samples):
             raise TaskRecordContractError(
                 "TaskTerminalResult.envelope.runtime_execution_metric_samples 与 TaskRecord.runtime_execution_metric_samples 不一致"
             )
+
+
+def _observability_entries_are_subset(entries: tuple[Any, ...], superset: tuple[Any, ...]) -> bool:
+    remaining = list(superset)
+    for entry in entries:
+        if entry not in remaining:
+            return False
+        remaining.remove(entry)
+    return True
 
 
 def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:

@@ -183,6 +183,8 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
             candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
+            if candidate != incoming:
+                candidate = merge_incoming_terminal_observability(candidate, incoming)
         elif existing.status in {"succeeded", "failed"} and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
@@ -192,13 +194,54 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
     except TaskRecordContractError as error:
         raise TaskRecordConflictError("本地持久化记录的生命周期推进不合法") from error
 
-    if candidate != incoming and incoming.status in {"succeeded", "failed"}:
-        candidate = replace(
-            candidate,
-            runtime_failure_signals=incoming.runtime_failure_signals,
-            runtime_structured_log_events=incoming.runtime_structured_log_events,
-            runtime_execution_metric_samples=incoming.runtime_execution_metric_samples,
-        )
     if candidate != incoming:
         raise TaskRecordConflictError("本地持久化记录与共享模型不一致")
     return candidate
+
+
+def merge_incoming_terminal_observability(candidate: TaskRecord, incoming: TaskRecord) -> TaskRecord:
+    if candidate.result != incoming.result or candidate.logs != incoming.logs:
+        return candidate
+    ensure_observability_no_conflict(
+        candidate.runtime_failure_signals,
+        incoming.runtime_failure_signals,
+        id_field="signal_id",
+        field="runtime_failure_signals",
+    )
+    ensure_observability_no_conflict(
+        candidate.runtime_structured_log_events,
+        incoming.runtime_structured_log_events,
+        id_field="event_id",
+        field="runtime_structured_log_events",
+    )
+    ensure_observability_no_conflict(
+        candidate.runtime_execution_metric_samples,
+        incoming.runtime_execution_metric_samples,
+        id_field="metric_id",
+        field="runtime_execution_metric_samples",
+    )
+    return replace(
+        candidate,
+        runtime_failure_signals=incoming.runtime_failure_signals,
+        runtime_structured_log_events=incoming.runtime_structured_log_events,
+        runtime_execution_metric_samples=incoming.runtime_execution_metric_samples,
+    )
+
+
+def ensure_observability_no_conflict(
+    candidate_entries: tuple[object, ...],
+    incoming_entries: tuple[object, ...],
+    *,
+    id_field: str,
+    field: str,
+) -> None:
+    by_id: dict[str, object] = {}
+    for entry in candidate_entries:
+        if isinstance(entry, Mapping) and isinstance(entry.get(id_field), str):
+            by_id[str(entry[id_field])] = entry
+    for entry in incoming_entries:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get(id_field), str):
+            raise TaskRecordConflictError(f"本地持久化记录的 {field} 不满足共享模型")
+        entry_id = str(entry[id_field])
+        if entry_id in by_id and by_id[entry_id] != entry:
+            raise TaskRecordConflictError(f"本地持久化记录的 {field} 存在同 ID 冲突")
