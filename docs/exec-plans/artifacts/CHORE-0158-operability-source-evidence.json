@@ -45,7 +45,12 @@
           "TaskRecord.status=failed"
         ]
       },
+      "actual_result_ref": "operability:{revision}:trc-timeout-platform-control-code",
       "case_id": "trc-timeout-platform-control-code",
+      "evidence_refs": [
+        "operability:{revision}:trc-timeout-platform-control-code",
+        "test_evidence:{revision}:trc-timeout-platform-control-code"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -83,7 +88,12 @@
           "preserve_original_failed_envelope"
         ]
       },
+      "actual_result_ref": "operability:{revision}:trc-retryable-platform-budget-closed",
       "case_id": "trc-retryable-platform-budget-closed",
+      "evidence_refs": [
+        "operability:{revision}:trc-retryable-platform-budget-closed",
+        "test_evidence:{revision}:trc-retryable-platform-budget-closed"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -116,7 +126,12 @@
           "preserve_original_failed_envelope"
         ]
       },
+      "actual_result_ref": "operability:{revision}:trc-non-retryable-fail-closed",
       "case_id": "trc-non-retryable-fail-closed",
+      "evidence_refs": [
+        "operability:{revision}:trc-non-retryable-fail-closed",
+        "test_evidence:{revision}:trc-non-retryable-fail-closed"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -156,7 +171,12 @@
         ],
         "stage": "pre_admission"
       },
+      "actual_result_ref": "operability:{revision}:trc-pre-accept-concurrency-reject",
       "case_id": "trc-pre-accept-concurrency-reject",
+      "evidence_refs": [
+        "operability:{revision}:trc-pre-accept-concurrency-reject",
+        "test_evidence:{revision}:trc-pre-accept-concurrency-reject"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -193,7 +213,12 @@
           }
         }
       },
+      "actual_result_ref": "operability:{revision}:trc-concurrent-status-shared-truth",
       "case_id": "trc-concurrent-status-shared-truth",
+      "evidence_refs": [
+        "operability:{revision}:trc-concurrent-status-shared-truth",
+        "test_evidence:{revision}:trc-concurrent-status-shared-truth"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -230,7 +255,12 @@
           "terminal_state_not_rewritten"
         ]
       },
+      "actual_result_ref": "operability:{revision}:trc-concurrent-result-shared-truth",
       "case_id": "trc-concurrent-result-shared-truth",
+      "evidence_refs": [
+        "operability:{revision}:trc-concurrent-result-shared-truth",
+        "test_evidence:{revision}:trc-concurrent-result-shared-truth"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -262,7 +292,12 @@
           "evidence_refs.non_empty"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-success-observable",
       "case_id": "flm-success-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-success-observable",
+        "test_evidence:{revision}:flm-success-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -293,7 +328,12 @@
           "structured_log.error.category"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-business-failure-observable",
       "case_id": "flm-business-failure-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-business-failure-observable",
+        "test_evidence:{revision}:flm-business-failure-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -322,7 +362,12 @@
           "no_success_envelope"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-contract-failure-fail-closed",
       "case_id": "flm-contract-failure-fail-closed",
+      "evidence_refs": [
+        "operability:{revision}:flm-contract-failure-fail-closed",
+        "test_evidence:{revision}:flm-contract-failure-fail-closed"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -356,7 +401,12 @@
           "structured_log.error.details.control_code"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-timeout-observable",
       "case_id": "flm-timeout-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-timeout-observable",
+        "test_evidence:{revision}:flm-timeout-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -391,7 +441,12 @@
           "structured_log.error.details.retryable=true"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-retry-budget-closed-observable",
       "case_id": "flm-retry-budget-closed-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-retry-budget-closed-observable",
+        "test_evidence:{revision}:flm-retry-budget-closed-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -421,7 +476,12 @@
           "no_shadow_status_or_result"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-store-unavailable-fail-closed",
       "case_id": "flm-store-unavailable-fail-closed",
+      "evidence_refs": [
+        "operability:{revision}:flm-store-unavailable-fail-closed",
+        "test_evidence:{revision}:flm-store-unavailable-fail-closed"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -460,7 +520,12 @@
         ],
         "stage": "pre_admission"
       },
+      "actual_result_ref": "operability:{revision}:flm-http-invalid-input-observable",
       "case_id": "flm-http-invalid-input-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-http-invalid-input-observable",
+        "test_evidence:{revision}:flm-http-invalid-input-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -499,7 +564,12 @@
         ],
         "stage": "pre_admission"
       },
+      "actual_result_ref": "operability:{revision}:flm-cli-invalid-input-observable",
       "case_id": "flm-cli-invalid-input-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-cli-invalid-input-observable",
+        "test_evidence:{revision}:flm-cli-invalid-input-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -528,7 +598,12 @@
           "overall_gate.verdict=fail"
         ]
       },
+      "actual_result_ref": "operability:{revision}:flm-same-path-violation-observable",
       "case_id": "flm-same-path-violation-observable",
+      "evidence_refs": [
+        "operability:{revision}:flm-same-path-violation-observable",
+        "test_evidence:{revision}:flm-same-path-violation-observable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -568,7 +643,12 @@
           }
         }
       },
+      "actual_result_ref": "operability:{revision}:http-submit-status-result-shared-truth",
       "case_id": "http-submit-status-result-shared-truth",
+      "evidence_refs": [
+        "operability:{revision}:http-submit-status-result-shared-truth",
+        "test_evidence:{revision}:http-submit-status-result-shared-truth"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -604,7 +684,12 @@
           "same_state_transition"
         ]
       },
+      "actual_result_ref": "operability:{revision}:same-path-success-shared-truth",
       "case_id": "same-path-success-shared-truth",
+      "evidence_refs": [
+        "operability:{revision}:same-path-success-shared-truth",
+        "test_evidence:{revision}:same-path-success-shared-truth"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -655,7 +740,12 @@
           "http_no_TaskRecord"
         ]
       },
+      "actual_result_ref": "operability:{revision}:same-path-pre-admission-invalid-input",
       "case_id": "same-path-pre-admission-invalid-input",
+      "evidence_refs": [
+        "operability:{revision}:same-path-pre-admission-invalid-input",
+        "test_evidence:{revision}:same-path-pre-admission-invalid-input"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -696,7 +786,12 @@
           "http_fail_closed"
         ]
       },
+      "actual_result_ref": "operability:{revision}:same-path-durable-record-unavailable",
       "case_id": "same-path-durable-record-unavailable",
+      "evidence_refs": [
+        "operability:{revision}:same-path-durable-record-unavailable",
+        "test_evidence:{revision}:same-path-durable-record-unavailable"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",
@@ -737,7 +832,12 @@
           "shared_runtime_result_refs"
         ]
       },
+      "actual_result_ref": "operability:{revision}:same-path-terminal-result-read",
       "case_id": "same-path-terminal-result-read",
+      "evidence_refs": [
+        "operability:{revision}:same-path-terminal-result-read",
+        "test_evidence:{revision}:same-path-terminal-result-read"
+      ],
       "upstream_modules": [
         "tests.runtime.test_execution_control",
         "tests.runtime.test_runtime_observability",

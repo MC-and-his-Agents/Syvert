@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from syvert.operability_gate import build_mandatory_operability_cases, orchestrate_operability_gate
 
 
-DEFAULT_OUTPUT = Path("docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json")
+DEFAULT_OUTPUT = Path("/tmp/CHORE-0158-operability-gate-result.json")
 SOURCE_EVIDENCE = Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json")
 APPROVED_UPSTREAM_MODULES = frozenset(
     {
@@ -81,11 +81,8 @@ def build_gate_input_from_source_evidence(
                 revision=revision,
                 failures=[{"code": "missing_source_evidence_case", "field": case_id}],
             )
-        case["actual_result_ref"] = f"operability:{revision}:{case_id}"
-        case["evidence_refs"] = [
-            f"operability:{revision}:{case_id}",
-            f"test_evidence:{revision}:{case_id}",
-        ]
+        case["actual_result_ref"] = evidence_case.get("actual_result_ref", "")
+        case["evidence_refs"] = evidence_case.get("evidence_refs", [])
         case["actual_result"] = evidence_case.get("actual_result", {})
         upstream_modules = evidence_case.get("upstream_modules")
         if (
@@ -134,6 +131,10 @@ def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
             observed_case_ids.add(case_id)
             if "actual_result" not in case:
                 failures.append({"code": "missing_source_evidence_actual_result", "field": case_id})
+            if "actual_result_ref" not in case:
+                failures.append({"code": "missing_source_evidence_actual_result_ref", "field": case_id})
+            if "evidence_refs" not in case:
+                failures.append({"code": "missing_source_evidence_refs", "field": case_id})
             if "upstream_modules" not in case:
                 failures.append({"code": "missing_source_evidence_upstream_modules", "field": case_id})
             elif not isinstance(case["upstream_modules"], list) or not set(case["upstream_modules"]) <= APPROVED_UPSTREAM_MODULES:

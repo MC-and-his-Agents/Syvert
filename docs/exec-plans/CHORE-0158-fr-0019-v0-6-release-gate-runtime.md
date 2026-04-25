@@ -23,7 +23,6 @@
   - `syvert/operability_gate.py`
   - `tests/runtime/test_operability_gate.py`
   - `docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json`
-  - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
   - `tests/runtime/render_operability_gate_artifact.py`
   - `docs/exec-plans/CHORE-0158-fr-0019-v0-6-release-gate-runtime.md`
 - 本次不纳入：
@@ -119,12 +118,12 @@
 
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-f5e34e7.json`
   - 结果：`REQUEST_CHANGES`；指出提交内 gate artifact revision 滞后当前 PR HEAD、case-level upstream 模块需限制为实际执行且批准集合、source evidence 重复 `case_id` 必须 fail-closed。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-f2607c6.json`
+  - 结果：`REQUEST_CHANGES`；指出版本化 gate result 无法绑定 live PR head，且 case-level `evidence_refs` 不能由 renderer 自造，必须来自 source evidence 并缺失时 fail-closed。
 - `docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json`
-  - 结果：已新增 source evidence artifact，作为 renderer 输入，包含 resolved `baseline_gate_result`、metrics snapshot、case-level actual_result / local evidence refs / upstream test refs；renderer 现场运行 `tests.runtime.test_execution_control`、`tests.runtime.test_runtime_observability`、`tests.runtime.test_http_api`、`tests.runtime.test_cli_http_same_path`、`tests.runtime.test_version_gate` 作为上游 evidence，并保留 case-level `upstream_refs`；source artifact 只保存不含 revision 的观测事实，不再做 cached SHA 替换；renderer 显式 `--execution-revision` 必须等于当前 HEAD。
-- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision 673ad19b4c687414a9631796792ad891a913090c`
-  - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=673ad19b4c687414a9631796792ad891a913090c`。
-- `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
-  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=673ad19b4c687414a9631796792ad891a913090c`，覆盖 20 个 mandatory cases，并包含 resolved `baseline_gate_result`、case-level local evidence refs、upstream_refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions、顶层 snapshot 绑定断言与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
+  - 结果：已新增 source evidence artifact，作为 renderer 输入，包含 resolved `baseline_gate_result`、metrics snapshot、policy snapshot、case-level `actual_result_ref` / `evidence_refs` / `actual_result` / `upstream_modules`；renderer 现场运行 `tests.runtime.test_execution_control`、`tests.runtime.test_runtime_observability`、`tests.runtime.test_http_api`、`tests.runtime.test_cli_http_same_path`、`tests.runtime.test_version_gate` 作为上游 evidence，并保留 case-level `upstream_refs`；source artifact 只保存不含具体 commit revision 的观测事实，不做 cached SHA 替换。
+- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision $(git rev-parse HEAD)`
+  - 结果：通过，输出 `/tmp/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=<当前 HEAD>`；generated gate result 不再进入版本控制，避免 commit SHA 自引用导致 artifact 永远滞后 live PR head。
 
 ## 待完成
 
@@ -144,4 +143,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：`673ad19b4c687414a9631796792ad891a913090c`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、resolved FR-0007 `baseline_gate_result` pass evidence 校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、source evidence artifact consumption、renderer 现场运行上游 unittest evidence、upstream_refs revision binding、non-HEAD render fail-closed、contract-approved evidence ref grammar、extensible metrics counters、baseline runtime execution result、case policy/metrics observation required、concurrency failure metrics minimum、complete source evidence validation、malformed source fail-closed、near-FR baseline forgery rejection、case-level source completeness checks、approved upstream module set、duplicate source case rejection、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、顶层 normalized `policy_snapshot` / `metrics_snapshot` 断言来源绑定、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
+- 当前可恢复 checkpoint：以 PR live head 的 `git rev-parse HEAD` 为准；包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、resolved FR-0007 `baseline_gate_result` pass evidence 校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、source evidence artifact consumption、renderer 现场运行上游 unittest evidence、generated gate result 不入库、upstream_refs revision binding、non-HEAD render fail-closed、contract-approved evidence ref grammar、extensible metrics counters、baseline runtime execution result、case policy/metrics observation required、concurrency failure metrics minimum、complete source evidence validation、malformed source fail-closed、near-FR baseline forgery rejection、case-level source completeness checks、approved upstream module set、duplicate source case rejection、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、顶层 normalized `policy_snapshot` / `metrics_snapshot` 断言来源绑定、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
