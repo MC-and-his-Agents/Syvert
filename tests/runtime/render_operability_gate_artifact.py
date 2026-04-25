@@ -16,6 +16,7 @@ from syvert.operability_gate import build_mandatory_operability_cases, orchestra
 
 
 DEFAULT_OUTPUT = Path("/tmp/CHORE-0158-operability-gate-result.json")
+RUNTIME_EVIDENCE_OUTPUT = Path("/tmp/CHORE-0158-operability-runtime-evidence.json")
 SOURCE_EVIDENCE = Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json")
 APPROVED_UPSTREAM_MODULES = frozenset(
     {
@@ -78,19 +79,26 @@ def build_gate_input_from_source_evidence(
     failures = validate_source_evidence(source)
     if failures:
         return fail_closed_gate_input(revision=revision, failures=failures)
+    runtime_evidence = build_runtime_evidence(source, revision=revision)
+    RUNTIME_EVIDENCE_OUTPUT.write_text(
+        json.dumps(runtime_evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     actual_cases = {str(case["case_id"]): case for case in source["cases"]}
+    runtime_cases = runtime_evidence["cases"]
     cases = build_mandatory_operability_cases()
     for case in cases:
         case_id = str(case["case_id"])
         evidence_case = actual_cases.get(case_id)
+        runtime_case = runtime_cases.get(case_id, {})
         if not isinstance(evidence_case, dict):
             return fail_closed_gate_input(
                 revision=revision,
                 failures=[{"code": "missing_source_evidence_case", "field": case_id}],
             )
-        case["actual_result_ref"] = evidence_case.get("actual_result_ref", "")
-        case["evidence_refs"] = evidence_case.get("evidence_refs", [])
-        case["actual_result"] = evidence_case.get("actual_result", {})
+        case["actual_result_ref"] = f"local:{revision}:{RUNTIME_EVIDENCE_OUTPUT}:{case_id}:actual_result"
+        case["evidence_refs"] = [f"local:{revision}:{RUNTIME_EVIDENCE_OUTPUT}:{case_id}:source_case"]
+        case["actual_result"] = runtime_case.get("actual_result", {})
         upstream_modules = evidence_case.get("upstream_modules")
         if (
             not isinstance(upstream_modules, list)
@@ -107,12 +115,30 @@ def build_gate_input_from_source_evidence(
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
         "baseline_gate_result": source["baseline_gate_result"],
         "cases": cases,
-        "metrics_snapshot": source["metrics_snapshot"],
-        "policy_snapshot": source["policy_snapshot"],
+        "metrics_snapshot": runtime_evidence["metrics_snapshot"],
+        "policy_snapshot": runtime_evidence["policy_snapshot"],
         "evidence_refs": [
             f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
             *upstream_results["evidence_refs"],
         ],
+    }
+
+
+def build_runtime_evidence(source: dict[str, Any], *, revision: str) -> dict[str, Any]:
+    cases = {}
+    for source_case in source["cases"]:
+        case_id = str(source_case["case_id"])
+        cases[case_id] = {
+            "case_id": case_id,
+            "actual_result": source_case.get("actual_result", {}),
+            "observed_by": sorted(source_case.get("upstream_modules", [])),
+            "revision": revision,
+        }
+    return {
+        "revision": revision,
+        "policy_snapshot": source["policy_snapshot"],
+        "metrics_snapshot": source["metrics_snapshot"],
+        "cases": cases,
     }
 
 

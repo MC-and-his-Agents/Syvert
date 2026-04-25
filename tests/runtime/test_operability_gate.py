@@ -532,6 +532,15 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("actual_result_ref_scope_mismatch", self.failure_codes(result))
         self.assertIn("case_evidence_ref_scope_mismatch", self.failure_codes(result))
 
+    def test_case_actual_result_ref_must_match_runtime_evidence_payload(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["actual_result"] = {"result": {"status": "succeeded"}}
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_ref_scope_mismatch", self.failure_codes(result))
+
     def test_case_upstream_refs_must_point_to_approved_modules(self) -> None:
         cases = self.valid_cases()
         cases[0]["upstream_refs"] = ["tests:test-head-sha:tests.runtime.test_operability_gate"]

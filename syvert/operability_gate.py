@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from collections.abc import Iterable, Mapping, Sequence
+import json
 from pathlib import Path
 import re
 from typing import Any
@@ -43,6 +44,7 @@ APPROVED_UPSTREAM_MODULES = frozenset(
 APPROVED_LOCAL_EVIDENCE_ARTIFACTS = frozenset(
     {
         "docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json",
+        "/tmp/CHORE-0158-operability-runtime-evidence.json",
     }
 )
 
@@ -803,6 +805,10 @@ def _normalize_cases(
         gate_impact = _non_empty_string(raw_case.get("gate_impact")) or "mandatory"
         if definition and gate_impact != "mandatory":
             failures.append(_case_failure(case_id, "mandatory_case_gate_impact_mismatch", "mandatory case must have mandatory gate impact"))
+        actual_result = raw_case.get("actual_result")
+        if not isinstance(actual_result, Mapping):
+            failures.append(_case_failure(case_id, "invalid_actual_result", "operability case requires actual_result mapping"))
+            actual_result = {}
         actual_result_ref = _non_empty_string(raw_case.get("actual_result_ref"))
         if not actual_result_ref:
             failures.append(_case_failure(case_id, "missing_actual_result_ref", "operability case requires actual_result_ref"))
@@ -824,7 +830,7 @@ def _normalize_cases(
                     details={"actual_result_ref": actual_result_ref, "execution_revision": execution_revision},
                 )
             )
-        elif not _is_backed_case_actual_result_ref(actual_result_ref, case_id):
+        elif not _is_backed_case_actual_result_ref(actual_result_ref, case_id, actual_result):
             failures.append(
                 _case_failure(
                     case_id,
@@ -875,10 +881,6 @@ def _normalize_cases(
                     )
                 )
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
-        actual_result = raw_case.get("actual_result")
-        if not isinstance(actual_result, Mapping):
-            failures.append(_case_failure(case_id, "invalid_actual_result", "operability case requires actual_result mapping"))
-            actual_result = {}
         _validate_case_actual_result(
             case_id,
             expected_result.get("fields", []),
@@ -1543,8 +1545,9 @@ def _is_case_scoped_evidence_ref(evidence_ref: str, case_id: str) -> bool:
     return len(parts) >= 3 and not parts[0].startswith("FR-") and case_id in parts[2:]
 
 
-def _is_backed_case_actual_result_ref(evidence_ref: str, case_id: str) -> bool:
-    return _is_backed_local_case_ref(evidence_ref, case_id, allowed_slots={"actual_result"})
+def _is_backed_case_actual_result_ref(evidence_ref: str, case_id: str, actual_result: Mapping[str, Any]) -> bool:
+    payload = _local_case_ref_payload(evidence_ref, case_id, allowed_slots={"actual_result"})
+    return payload == _json_safe(actual_result)
 
 
 def _is_backed_case_evidence_ref(evidence_ref: str, case_id: str) -> bool:
@@ -1555,15 +1558,42 @@ def _is_backed_case_evidence_ref(evidence_ref: str, case_id: str) -> bool:
 
 
 def _is_backed_local_case_ref(evidence_ref: str, case_id: str, *, allowed_slots: set[str]) -> bool:
+    return _local_case_ref_payload(evidence_ref, case_id, allowed_slots=allowed_slots) is not None
+
+
+def _local_case_ref_payload(evidence_ref: str, case_id: str, *, allowed_slots: set[str]) -> Any:
     if not _is_case_scoped_evidence_ref(evidence_ref, case_id):
-        return False
+        return None
     parts = evidence_ref.split(":")
     if len(parts) != 5 or parts[0] != "local":
-        return False
+        return None
     artifact_path = parts[2]
-    if artifact_path not in APPROVED_LOCAL_EVIDENCE_ARTIFACTS or not Path(artifact_path).is_file():
-        return False
-    return parts[3] == case_id and parts[4] in allowed_slots
+    slot = parts[4]
+    if artifact_path not in APPROVED_LOCAL_EVIDENCE_ARTIFACTS or parts[3] != case_id or slot not in allowed_slots:
+        return None
+    path = Path(artifact_path)
+    if not path.is_file():
+        return None
+    try:
+        artifact = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(artifact, Mapping):
+        return None
+    cases = artifact.get("cases")
+    if isinstance(cases, Mapping):
+        case_payload = cases.get(case_id)
+    elif isinstance(cases, Sequence) and not isinstance(cases, (str, bytes, bytearray)):
+        case_payload = next((case for case in cases if isinstance(case, Mapping) and case.get("case_id") == case_id), None)
+    else:
+        case_payload = None
+    if not isinstance(case_payload, Mapping):
+        return None
+    if slot == "source_case":
+        return _json_safe(case_payload)
+    if slot not in case_payload:
+        return None
+    return _json_safe(case_payload.get(slot))
 
 
 def _is_backed_upstream_case_ref(evidence_ref: str, case_id: str) -> bool:
