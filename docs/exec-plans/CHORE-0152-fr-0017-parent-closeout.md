@@ -86,6 +86,10 @@
   - 结果：Project `Syvert 主交付看板` status 为 `In Progress`
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过，`governance-gate 通过。`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过，`docs-guard 通过。`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，`workflow-guard 通过。`
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，`PR class: docs`，`变更类别: docs`，`PR scope 校验通过。`
 
