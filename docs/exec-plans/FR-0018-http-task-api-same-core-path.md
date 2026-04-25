@@ -31,28 +31,6 @@
 - `FR-0018` 对上游依赖的消费边界固定为“HTTP transport 只做 ingress/egress 投影，不拥有独立执行真相”；任何 `submit/status/result` 返回都必须能回映到同一条 Core path、同一条 `TaskRecord`、同一份 failed/success envelope，以及同一组 control/observability 引用。
 - 下游收口依赖：`#230` 必须证明 HTTP endpoint 只调用 Core path；`#231` 必须证明 HTTP 与 CLI 对 `TaskRecord`、failed envelope、`runtime_result_refs` 与 control/observability truth 的观察一致；`#232` 只负责收口 GitHub 状态、PR、review 与主干真相，不得重新决定 `FR-0016` / `FR-0017` 已冻结的上游语义。
 
-## closeout 证据
-
-- formal spec closeout：
-  - Work Item：`#229`
-  - PR：`#241`
-  - merge commit：`212f479afab3712a70c7cd5390ef1346cb96ba04`
-  - 结果：最小 HTTP task API service surface、endpoint / method / status mapping、shared failed envelope transport carrier 与 same-core-path acceptance criteria 已冻结。
-- HTTP endpoint runtime：
-  - Work Item：`#230`
-  - PR：`#245`
-  - merge commit：`64e3ece230f0c587ba4b809c17177b1f37665504`
-  - 结果：`TaskHttpService` 与 stdlib WSGI app 已合入，HTTP submit / status / result 复用 Core path、`TaskRecordStore`、durable record 与 shared envelope。
-- CLI/API same-path regression evidence：
-  - Work Item：`#231`
-  - PR：`#246`
-  - merge commit：`65657a49536eb7ad83ea1cf666d0a43f233f67fa`
-  - 结果：CLI `run/query` 与 HTTP `submit/status/result` 对 shared durable truth、terminal envelope、failed envelope、execution-control truth 与 observability refs 的同路径证据已合入。
-- parent closeout：
-  - Work Item：`#232`
-  - exec-plan：`docs/exec-plans/CHORE-0156-fr-0018-parent-closeout.md`
-  - 结果：本 closeout 只回写 evidence / issue / Project / main truth，不新增 runtime 或 formal spec 语义。
-
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `2234fc8e20d53aeb4f1d436d662a9f5d44d7b4c1`
