@@ -64,15 +64,17 @@
 - `python3 -m py_compile syvert/operability_gate.py`
   - 结果：通过。
 - `python3 -m unittest tests.runtime.test_operability_gate`
-  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`。
+  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_task_record_store tests.runtime.test_version_gate tests.runtime.test_operability_gate`
-  - 结果：首轮通过，`Ran 251 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 254 tests`，`OK`。
+  - 结果：首轮通过，`Ran 251 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 254 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 258 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
-  - 结果：通过，`Ran 376 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 376 tests`，`OK`。
+  - 结果：通过，`Ran 376 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 376 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
-  - 结果：通过，`governance-gate 通过。`；修复 guardian 一轮阻断后再次通过。
+  - 结果：通过，`governance-gate 通过。`；修复 guardian 一轮、二轮阻断后均再次通过。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-33f9463.json`
   - 结果：`REQUEST_CHANGES`；指出 `execution_revision` 未与 evidence 绑定、case-level `evidence_refs` 缺失未 fail-closed、额外未批准 dimension 未拒绝。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-51b1ff4.json`
+  - 结果：`REQUEST_CHANGES`；指出 mandatory matrix assertions 未对 actual gate input 求值、`baseline_gate_ref` 只校验非空、`gate_id` / `matrix_version` 未冻结。
 
 ## 待完成
 
@@ -92,4 +94,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：`16f38754875b6f45541468988ae40339dbe79dc0`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension 校验、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
+- 当前可恢复 checkpoint：`f2cad8f6d53341bdaf8b9c31948950b6ad908c0a`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension 校验、baseline ref 校验、gate/matrix identity freeze、actual_result 断言求值、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
