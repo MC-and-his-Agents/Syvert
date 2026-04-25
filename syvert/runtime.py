@@ -543,6 +543,10 @@ def execute_task_internal(
             return None
         release_details = dict(release_error.get("details", {}))
         release_details["stage"] = stage
+        release_details.setdefault(
+            "task_record_ref",
+            "none" if stage in {"create_task_record", "persist_accepted"} else f"task_record:{task_id}",
+        )
         release_error = dict(release_error)
         release_error["details"] = release_details
         return TaskExecutionResult(
@@ -1498,6 +1502,13 @@ def with_runtime_observability(
     return enriched
 
 
+def public_task_execution_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    public_envelope = dict(envelope)
+    public_envelope.pop("_runtime_structured_log_events", None)
+    public_envelope.pop("_runtime_execution_metric_samples", None)
+    return public_envelope
+
+
 def pre_accepted_failure_envelope(
     task_id: str,
     adapter_key: str,
@@ -1759,12 +1770,13 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     retained_log_events = [
         event
         for event in existing_log_events
-        if isinstance(event, Mapping) and event.get("event_type") == "retry_scheduled"
+        if isinstance(event, Mapping) and event.get("event_type") in {"retry_scheduled", "observability_write_failed"}
     ]
     retained_metric_samples = [
         metric
         for metric in existing_metric_samples
-        if isinstance(metric, Mapping) and metric.get("metric_name") == "retry_scheduled_total"
+        if isinstance(metric, Mapping)
+        and metric.get("metric_name") in {"retry_scheduled_total", "observability_write_failed_total"}
     ]
     enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
     enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
@@ -1883,7 +1895,7 @@ def finalize_task_execution_result(
         except Exception as invalidation_error:
             invalidation_details["invalidation_reason"] = str(invalidation_error)
         if preserve_envelope_on_record_error and task_record_store is None:
-            return TaskExecutionResult(dict(envelope), None)
+            return TaskExecutionResult(public_task_execution_envelope(envelope), None)
         if envelope.get("status") == "failed":
             return TaskExecutionResult(
                 with_observability_write_failed(envelope, stage="completion", reason=str(error), details=invalidation_details),
@@ -1923,7 +1935,7 @@ def finalize_task_execution_result(
                 None,
             )
         return persistence_error
-    return TaskExecutionResult(dict(envelope), persisted_record or terminal_record)
+    return TaskExecutionResult(public_task_execution_envelope(envelope), persisted_record or terminal_record)
 
 
 def persist_task_record(

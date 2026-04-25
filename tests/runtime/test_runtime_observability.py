@@ -275,6 +275,10 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertNotIn("runtime_structured_log_events", result.envelope)
         payload = task_record_to_dict(loaded)
         self.assertNotIn("runtime_structured_log_events", payload["result"]["envelope"])
+        self.assertNotIn("_runtime_structured_log_events", result.envelope)
+        self.assertNotIn("_runtime_execution_metric_samples", result.envelope)
+        self.assertNotIn("_runtime_structured_log_events", payload["result"]["envelope"])
+        self.assertNotIn("_runtime_execution_metric_samples", payload["result"]["envelope"])
         self.assertIn(
             "retry_scheduled",
             {event["event_type"] for event in payload["runtime_structured_log_events"]},
