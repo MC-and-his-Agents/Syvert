@@ -138,13 +138,24 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
         "entrypoints": ("core",),
         "fields": (("result.status", "==", "succeeded"), ("metrics.success_total", ">=", 1)),
-        "side_effects": ("structured_log.task_id_entrypoint_stage_result_status", "evidence_refs.non_empty"),
+        "side_effects": (
+            "structured_log.task_id",
+            "structured_log.entrypoint",
+            "structured_log.stage",
+            "structured_log.result.status",
+            "evidence_refs.non_empty",
+        ),
     },
     "flm-business-failure-observable": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
         "entrypoints": ("core",),
         "fields": (("error.category", "in", ("invalid_input", "unsupported", "platform")), ("metrics.failure_total", ">=", 1)),
-        "side_effects": ("structured_log.task_id_entrypoint_stage_error_category",),
+        "side_effects": (
+            "structured_log.task_id",
+            "structured_log.entrypoint",
+            "structured_log.stage",
+            "structured_log.error.category",
+        ),
     },
     "flm-contract-failure-fail-closed": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -160,7 +171,12 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
             ("error.details.control_code", "==", "execution_timeout"),
             ("metrics.timeout_total", ">=", 1),
         ),
-        "side_effects": ("structured_log.timeout_classification",),
+        "side_effects": (
+            "structured_log.task_id",
+            "structured_log.stage",
+            "structured_log.error.category",
+            "structured_log.error.details.control_code",
+        ),
     },
     "flm-retry-budget-closed-observable": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -170,7 +186,11 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
             ("retry.attempts", "==", 0),
             ("metrics.retry_attempt_total", "==", 0),
         ),
-        "side_effects": ("structured_log.retry_budget_closed",),
+        "side_effects": (
+            "structured_log.retry_budget_closed",
+            "structured_log.final_failure_classification",
+            "structured_log.error.details.retryable=true",
+        ),
     },
     "flm-store-unavailable-fail-closed": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -180,7 +200,7 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
             ("error.category", "==", "runtime_contract"),
             ("gate.verdict", "==", "fail"),
         ),
-        "side_effects": ("structured_log.store_unavailable", "no_shadow_status_or_result"),
+        "side_effects": ("structured_log.store_unavailable.reason", "no_shadow_status_or_result"),
     },
     "flm-http-invalid-input-observable": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -193,7 +213,14 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
             ("error.category", "==", "invalid_input"),
             ("metrics.failure_total", ">=", 1),
         ),
-        "side_effects": ("structured_log.http_pre_admission_failure", "TaskRecord.not_created"),
+        "side_effects": (
+            "structured_log.request_ref",
+            "structured_log.entrypoint=http",
+            "structured_log.stage",
+            "structured_log.result.status",
+            "structured_log.error.category",
+            "TaskRecord.not_created",
+        ),
     },
     "flm-cli-invalid-input-observable": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -206,7 +233,14 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
             ("error.category", "==", "invalid_input"),
             ("metrics.failure_total", ">=", 1),
         ),
-        "side_effects": ("structured_log.cli_pre_admission_failure", "TaskRecord.not_created"),
+        "side_effects": (
+            "structured_log.request_ref",
+            "structured_log.entrypoint=cli",
+            "structured_log.stage",
+            "structured_log.result.status",
+            "structured_log.error.category",
+            "TaskRecord.not_created",
+        ),
     },
     "flm-same-path-violation-observable": {
         "dimension": DIMENSION_FAILURE_LOG_METRICS,
@@ -655,6 +689,19 @@ def _validate_case_actual_result(
                 expected_comparison_value = _get_path(fact_source, expected_value)
             else:
                 expected_comparison_value = expected_value
+            if actual_value is None or expected_comparison_value is None:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_missing",
+                        "actual_result is missing a required field assertion path",
+                        details={
+                            "path": path,
+                            "expected_path": expected_value if isinstance(expected_value, str) and "." in expected_value else "",
+                        },
+                    )
+                )
+                continue
             if actual_value != expected_comparison_value:
                 failures.append(
                     _case_failure(
@@ -670,7 +717,16 @@ def _validate_case_actual_result(
                     )
                 )
         elif operator == "!=":
-            if actual_value == expected_value:
+            if actual_value is None:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_missing",
+                        "actual_result is missing a required field assertion path",
+                        details={"path": path, "operator": operator},
+                    )
+                )
+            elif actual_value == expected_value:
                 failures.append(
                     _case_failure(
                         case_id,

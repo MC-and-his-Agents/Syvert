@@ -148,6 +148,37 @@ class OperabilityGateTests(unittest.TestCase):
         result_case = next(case for case in result["cases"] if case["case_id"] == "trc-timeout-platform-control-code")
         self.assertEqual(result_case["verdict"], FAIL_VERDICT)
 
+    def test_missing_non_empty_field_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-pre-accept-concurrency-reject")
+        target["actual_result"].pop("request_ref")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_missing", self.failure_codes(result))
+
+    def test_missing_path_to_path_values_fail_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "same-path-terminal-result-read")
+        target["actual_result"]["cli"]["result"].pop("task_id")
+        target["actual_result"]["http"]["result"].pop("task_id")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_missing", self.failure_codes(result))
+
+    def test_missing_envelope_ref_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "http-submit-status-result-shared-truth")
+        target["actual_result"]["result"].pop("envelope_ref")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_missing", self.failure_codes(result))
+
     def test_malformed_greater_than_expected_value_fails_closed(self) -> None:
         cases = self.valid_cases()
         target = next(case for case in cases if case["case_id"] == "flm-success-observable")
