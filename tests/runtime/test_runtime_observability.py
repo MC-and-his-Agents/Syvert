@@ -44,6 +44,29 @@ class RetryablePlatformFailureAdapter(PlatformFailureAdapter):
         )
 
 
+class RetryableThenSuccessAdapter(SuccessfulAdapter):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def execute(self, request):
+        self.calls += 1
+        if self.calls == 1:
+            raise PlatformAdapterError(
+                code="transient_platform",
+                message="try again later",
+                details={"retryable": True},
+            )
+        return super().execute(request)
+
+
+class AcceptedFailingStore:
+    def write(self, record):
+        raise OSError("boom")
+
+    def mark_invalid(self, task_id: str, *, stage: str, reason: str) -> None:
+        self.invalid_marker = {"task_id": task_id, "stage": stage, "reason": reason}
+
+
 class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_failed_envelope_projects_failure_signal_log_and_metric(self) -> None:
         envelope = execute_task(
@@ -61,6 +84,8 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(signal["failure_phase"], "adapter_execution")
         self.assertEqual(signal["task_record_ref"], "task_record:task-observability-failed")
         self.assertEqual(signal["runtime_result_refs"], envelope["runtime_result_refs"])
+        self.assertTrue(signal["resource_trace_refs"])
+        self.assertEqual(signal["resource_trace_refs"], envelope["error"]["details"]["resource_trace_refs"])
 
         log_event = envelope["runtime_structured_log_events"][0]
         self.assertEqual(log_event["event_type"], "task_failed")
@@ -131,6 +156,8 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "concurrency_limit_exceeded")
         self.assertEqual(envelope["runtime_failure_signal"]["task_record_ref"], "none")
         self.assertEqual(envelope["runtime_failure_signal"]["failure_phase"], "concurrency_rejected")
+        self.assertEqual(envelope["runtime_failure_signal"]["runtime_result_refs"], envelope["runtime_result_refs"])
+        self.assertEqual(envelope["runtime_result_refs"][0]["event_type"], "admission_concurrency_rejected")
         self.assertEqual(
             envelope["runtime_structured_log_events"][0]["event_type"],
             "admission_concurrency_rejected",
@@ -139,6 +166,63 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
             envelope["runtime_execution_metric_samples"][0]["metric_name"],
             "admission_concurrency_rejected_total",
         )
+
+    def test_pre_accepted_invalid_input_observability_uses_none_task_record_ref(self) -> None:
+        envelope = execute_task(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="unsupported_capability",
+                input=TaskInput(url="https://example.com/posts/pre-accepted-invalid"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-observability-pre-accepted-invalid",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["runtime_failure_signal"]["task_record_ref"], "none")
+        self.assertEqual(envelope["error"]["details"]["stage"], "pre_admission")
+
+    def test_retry_scheduled_log_and_metric_are_preserved(self) -> None:
+        adapter = RetryableThenSuccessAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/retry-scheduled"),
+            execution_control_policy=ExecutionControlPolicy(
+                timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+                retry=ExecutionRetryPolicy(max_attempts=2, backoff_ms=0),
+                concurrency=ExecutionConcurrencyPolicy(scope="global", max_in_flight=1, on_limit="reject"),
+            ),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-observability-retry-scheduled",
+        )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(adapter.calls, 2)
+        self.assertIn(
+            "retry_scheduled",
+            {event["event_type"] for event in envelope["runtime_structured_log_events"]},
+        )
+        self.assertIn(
+            "retry_scheduled_total",
+            {metric["metric_name"] for metric in envelope["runtime_execution_metric_samples"]},
+        )
+
+    def test_persistence_failures_project_persistence_phase(self) -> None:
+        result = execute_task_with_record(
+            make_request(),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-observability-persistence",
+            task_record_store=AcceptedFailingStore(),
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "task_record_persistence_failed")
+        self.assertEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "persistence")
 
     def test_task_record_persists_observability_carriers(self) -> None:
         with tempfile.TemporaryDirectory() as store_dir:

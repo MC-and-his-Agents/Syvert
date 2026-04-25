@@ -36,13 +36,12 @@
 - 当前主干基线为 `3c57ec6ce6437b0e810645b104fd85d6bf1235ba`，已包含 `FR-0016` closeout。
 - 已在 runtime helper 层为 failed envelope 投影最小 failure signal、structured log event 与 metric sample。
 - 已扩展 `TaskRecord` JSON-safe durable fields：`runtime_failure_signals`、`runtime_structured_log_events`、`runtime_execution_metric_samples`。
-- 当前实现保持 success envelope 不新增 observability 字段。
+- guardian 初审要求补齐 pre-accepted failure、admission concurrency control ref、retry scheduling、persistence phase 与 resource trace refs 五类 FR-0017 关联 truth；当前修复已落到同一 Core path。
 
 ## 下一步动作
 
-- 跑完整本地验证矩阵。
-- 创建 PR，绑定 `#227` / `CHORE-0151-fr-0017-failure-logs-metrics-runtime`。
-- 通过 CI、guardian、merge gate 后 squash merge。
+- 推送 guardian review-sync 修复提交。
+- 重跑 CI、guardian、merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -61,18 +60,30 @@
 - `python3 -m py_compile syvert/runtime.py syvert/task_record.py tests/runtime/test_runtime_observability.py`
   - 结果：通过。
 - `python3 -m unittest tests.runtime.test_runtime_observability -v`
-  - 结果：通过，`Ran 5 tests`，`OK`。
+  - 初始结果：通过，`Ran 5 tests`，`OK`。
+  - guardian review-sync 后结果：通过，`Ran 8 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability`
-  - 结果：通过，`Ran 161 tests`，`OK`。
+  - 初始结果：通过，`Ran 161 tests`，`OK`。
+  - guardian review-sync 后结果：通过，`Ran 164 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
 
+## guardian review-sync
+
+- PR `#249` 初次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - pre-accepted failure 统一投影 `task_record_ref=none` 与 `stage=pre_admission`。
+  - admission concurrency rejection 的 `ExecutionControlEvent` 同步进入 `runtime_result_refs`。
+  - retry predicate 命中且预算允许时生成 `retry_scheduled` structured log 与 `retry_scheduled_total` metric，不新增 FR-0016 control event。
+  - persistence / completion 写入失败投影 `failure_phase=persistence`。
+  - 已 acquire 资源后的 failed envelope 注入 FR-0011 `resource_trace_refs`，并同步到 failure signal / structured log。
+
 ## 未决风险
 
 - 当前 metrics / logs 是 JSON-safe local carrier，不是持久化指标后端。
-- 当前 structured log event 使用最小事件集合；更完整的 retry lifecycle、duration metrics 或 observability-write failure 注入测试可在后续 gate / closeout 中扩展。
+- 当前 structured log event 使用最小事件集合；更完整的 duration metrics 或 observability-write failure 注入测试可在后续 gate / closeout 中扩展。
 - `TaskRecord` 新字段保持 additive；旧记录缺字段时按空数组解析。
 
 ## 回滚方式

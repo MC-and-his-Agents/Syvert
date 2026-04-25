@@ -340,7 +340,9 @@ class CliHttpSamePathTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result_response.body, query_payload["result"]["envelope"])
         self.assertEqual(result_response.body["error"]["category"], "platform")
         self.assertEqual(result_response.body["error"]["code"], "platform_broken")
-        self.assertEqual(result_response.body["error"]["details"], {"reason": "same-path", "retryable": False})
+        self.assertEqual(result_response.body["error"]["details"]["reason"], "same-path")
+        self.assertFalse(result_response.body["error"]["details"]["retryable"])
+        self.assertTrue(result_response.body["error"]["details"]["resource_trace_refs"])
 
     def test_same_path_pre_admission_invalid_input_does_not_create_task_record(self) -> None:
         url = "https://example.com/posts/invalid-capability"
