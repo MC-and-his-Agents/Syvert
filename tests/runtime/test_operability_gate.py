@@ -91,7 +91,7 @@ class OperabilityGateTests(unittest.TestCase):
         result = self.pass_result(metrics_snapshot=metrics)
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
-        self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
+        self.assertIn("metrics_snapshot_value_insufficient", self.failure_codes(result))
 
     def test_policy_snapshot_drift_fails_closed(self) -> None:
         policy = deepcopy(POLICY_SNAPSHOT)
@@ -101,6 +101,16 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("policy_snapshot_mismatch", self.failure_codes(result))
+
+    def test_case_local_policy_drift_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
+        target["actual_result"]["policy"]["retry"]["max_attempts"] = 999
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
 
     def test_mandatory_case_expected_field_drift_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -220,8 +230,7 @@ class OperabilityGateTests(unittest.TestCase):
         result = self.pass_result(metrics_snapshot=metrics)
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
-        self.assertGreater(result["summary"]["fail_case_total"], 0)
-        self.assertIn("http-submit-status-result-shared-truth", result["summary"]["failed_case_ids"])
+        self.assertIn("metrics_snapshot_value_insufficient", self.failure_codes(result))
 
     def test_dimension_or_capability_drift_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -284,6 +293,31 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_execution_revision_binding_rejects_substring_overlap(self) -> None:
+        cases = self.valid_cases()
+        for case in cases:
+            case["actual_result_ref"] = f"operability:otherhead:{case['case_id']}"
+            case["evidence_refs"] = [f"operability:otherhead:{case['case_id']}"]
+
+        result = self.pass_result(
+            execution_revision="head",
+            baseline_gate_ref="FR-0007:version_gate:v0.6.0:baseline:otherhead",
+            cases=cases,
+            evidence_refs=["FR-0007:version_gate:v0.6.0:baseline:otherhead"],
+        )
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_external_actual_result_ref_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["actual_result_ref"] = "https://example.invalid/not-reviewable"
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_actual_result_ref", self.failure_codes(result))
 
     def test_unapproved_extra_dimension_fails_closed(self) -> None:
         cases = self.valid_cases()

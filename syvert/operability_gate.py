@@ -379,8 +379,15 @@ def orchestrate_operability_gate(
 
     normalized_policy = _normalize_policy_snapshot(policy_snapshot, failures)
     normalized_metrics = _normalize_metrics_snapshot(metrics_snapshot, failures)
+    _validate_metrics_snapshot_semantics(normalized_metrics, failures)
     normalized_evidence_refs = _normalize_evidence_refs(evidence_refs, failures)
-    normalized_cases = _normalize_cases(cases, failures, metrics_snapshot=normalized_metrics, policy_snapshot=normalized_policy)
+    normalized_cases = _normalize_cases(
+        cases,
+        failures,
+        metrics_snapshot=normalized_metrics,
+        policy_snapshot=normalized_policy,
+        execution_revision=execution_revision,
+    )
     _validate_mandatory_case_coverage(normalized_cases, failures)
 
     for case in normalized_cases:
@@ -467,6 +474,7 @@ def _normalize_cases(
     *,
     metrics_snapshot: Mapping[str, Any],
     policy_snapshot: Mapping[str, Any],
+    execution_revision: str,
 ) -> list[dict[str, Any]]:
     if isinstance(raw_cases, Mapping) or isinstance(raw_cases, (str, bytes)):
         failures.append(_failure("operability_gate", "invalid_cases", "operability cases must be a sequence of mappings"))
@@ -553,6 +561,24 @@ def _normalize_cases(
         actual_result_ref = _non_empty_string(raw_case.get("actual_result_ref"))
         if not actual_result_ref:
             failures.append(_case_failure(case_id, "missing_actual_result_ref", "operability case requires actual_result_ref"))
+        elif not _is_allowed_evidence_ref(actual_result_ref):
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "invalid_actual_result_ref",
+                    "actual_result_ref must use a local, reviewable FR-0019 evidence ref format",
+                    details={"actual_result_ref": actual_result_ref},
+                )
+            )
+        elif _evidence_ref_revision(actual_result_ref) != execution_revision:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "actual_result_ref_revision_mismatch",
+                    "actual_result_ref must be bound to the execution_revision",
+                    details={"actual_result_ref": actual_result_ref, "execution_revision": execution_revision},
+                )
+            )
         if "evidence_refs" not in raw_case:
             failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires evidence_refs"))
             evidence_refs = []
@@ -702,7 +728,7 @@ def _validate_case_actual_result(
     policy_snapshot: Mapping[str, Any],
     failures: list[dict[str, Any]],
 ) -> None:
-    fact_source = _merge_mappings(actual_result, {"metrics": metrics_snapshot, "policy": policy_snapshot})
+    fact_source = actual_result
     for field in fields:
         path = str(field.get("path") or "")
         operator = str(field.get("operator") or "")
@@ -920,6 +946,39 @@ def _normalize_metrics_snapshot(raw_metrics: Mapping[str, Any], failures: list[d
     return normalized
 
 
+def _validate_metrics_snapshot_semantics(metrics: Mapping[str, int], failures: list[dict[str, Any]]) -> None:
+    minimums = {
+        "submit_total": 1,
+        "success_total": 1,
+        "failure_total": 1,
+        "timeout_total": 1,
+        "concurrency_case_total": 1,
+        "same_path_case_total": 1,
+        "same_path_case_failure_total": 1,
+    }
+    for field, minimum in minimums.items():
+        if metrics.get(field, 0) < minimum:
+            failures.append(
+                _failure(
+                    "operability_gate",
+                    "metrics_snapshot_value_insufficient",
+                    "metrics_snapshot does not prove the mandatory FR-0019 case coverage",
+                    details={"field": field, "minimum": minimum, "actual": metrics.get(field, 0)},
+                )
+            )
+    exact_values = {"retry_attempt_total": 0, "concurrency_case_failure_total": 0}
+    for field, expected in exact_values.items():
+        if metrics.get(field) != expected:
+            failures.append(
+                _failure(
+                    "operability_gate",
+                    "metrics_snapshot_value_mismatch",
+                    "metrics_snapshot value does not match the FR-0019 gate expectation",
+                    details={"field": field, "expected": expected, "actual": metrics.get(field)},
+                )
+            )
+
+
 def _validate_revision_evidence_binding(
     execution_revision: str,
     evidence_refs: Sequence[str],
@@ -928,13 +987,14 @@ def _validate_revision_evidence_binding(
     revision = _non_empty_string(execution_revision)
     if not revision:
         return
-    if not any(revision in evidence_ref for evidence_ref in evidence_refs):
+    mismatched_refs = [evidence_ref for evidence_ref in evidence_refs if _evidence_ref_revision(evidence_ref) != revision]
+    if mismatched_refs:
         failures.append(
             _failure(
                 "operability_gate",
                 "execution_revision_evidence_mismatch",
-                "execution_revision must be traceable from gate or case evidence refs",
-                details={"execution_revision": revision},
+                "execution_revision must match every gate and case evidence ref",
+                details={"execution_revision": revision, "mismatched_evidence_refs": mismatched_refs},
             )
         )
 
@@ -1061,6 +1121,16 @@ def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
             "local:",
         )
     )
+
+
+def _evidence_ref_revision(evidence_ref: str) -> str | None:
+    if evidence_ref.startswith("FR-0007:version_gate:v0.6.0:baseline:"):
+        revision = evidence_ref.removeprefix("FR-0007:version_gate:v0.6.0:baseline:")
+        return revision or None
+    parts = evidence_ref.split(":")
+    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local"}:
+        return parts[1] or None
+    return None
 
 
 def _non_empty_string(value: Any) -> str:
