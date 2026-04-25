@@ -1861,7 +1861,7 @@
   "gate_id": "v0.6.0-operability-gate",
   "matrix_version": "v0.6.0-operability-matrix-v1",
   "metrics_snapshot": {
-    "concurrency_case_failure_total": 0,
+    "concurrency_case_failure_total": 1,
     "concurrency_case_total": 3,
     "failure_total": 8,
     "retry_attempt_total": 0,

@@ -365,6 +365,15 @@ def orchestrate_operability_gate(
                 details={"actual_baseline_gate_ref": baseline_gate_ref},
             )
         )
+    elif _evidence_ref_revision(baseline_gate_ref) != execution_revision:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_ref_revision_mismatch",
+                "baseline_gate_ref must be bound to the execution_revision",
+                details={"baseline_gate_ref": baseline_gate_ref, "execution_revision": execution_revision},
+            )
+        )
     normalized_baseline_gate_result = _normalize_baseline_gate_result(
         baseline_gate_result,
         baseline_gate_ref=baseline_gate_ref,
@@ -1133,13 +1142,17 @@ def _get_assertion_path(
     path: str,
 ) -> Any:
     if path == "policy":
-        return policy_snapshot
+        return actual_result.get("policy") if actual_result.get("policy") == policy_snapshot else None
     if path.startswith("policy."):
-        return _get_path(policy_snapshot, path.removeprefix("policy."))
+        actual_value = _get_path(actual_result, path)
+        snapshot_value = _get_path(policy_snapshot, path.removeprefix("policy."))
+        return actual_value if actual_value == snapshot_value else None
     if path == "metrics":
-        return metrics_snapshot
+        return actual_result.get("metrics") if actual_result.get("metrics") == metrics_snapshot else None
     if path.startswith("metrics."):
-        return _get_path(metrics_snapshot, path.removeprefix("metrics."))
+        actual_value = _get_path(actual_result, path)
+        snapshot_value = _get_path(metrics_snapshot, path.removeprefix("metrics."))
+        return actual_value if actual_value == snapshot_value else None
     return _get_path(actual_result, path)
 
 
@@ -1230,6 +1243,7 @@ def _validate_metrics_snapshot_semantics(metrics: Mapping[str, int], failures: l
         "failure_total": 1,
         "timeout_total": 1,
         "concurrency_case_total": 1,
+        "concurrency_case_failure_total": 1,
         "same_path_case_total": 1,
         "same_path_case_failure_total": 1,
     }
@@ -1386,13 +1400,13 @@ def _evidence_ref_revision(evidence_ref: str) -> str | None:
     if evidence_ref.startswith("FR-0007:version_gate:v0.6.0:baseline:"):
         revision = evidence_ref.removeprefix("FR-0007:version_gate:v0.6.0:baseline:")
         return revision or None
+    parts = evidence_ref.split(":")
+    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local", "ci", "gate", "log", "metrics"}:
+        return parts[1] or None
     if f":{RELEASE}:" in evidence_ref and evidence_ref.endswith(":baseline"):
         parts = evidence_ref.split(":")
         if len(parts) >= 4:
             return parts[-2] or None
-    parts = evidence_ref.split(":")
-    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local", "ci", "gate", "log", "metrics"}:
-        return parts[1] or None
     return None
 
 

@@ -70,7 +70,7 @@ def build_gate_input_from_source_evidence(
         ]
         case["actual_result"] = evidence_case["actual_result"]
         case["upstream_refs"] = [f"tests:{revision}:{module}" for module in evidence_case["upstream_modules"]]
-    baseline_gate_result = build_baseline_gate_result(revision)
+    baseline_gate_result = build_baseline_gate_result(revision) if run_upstream else default_baseline_gate_result(revision)
     return {
         "execution_revision": revision,
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
@@ -85,6 +85,35 @@ def build_gate_input_from_source_evidence(
 
 
 def build_baseline_gate_result(revision: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, "-m", "unittest", "tests.runtime.test_version_gate"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    passed = completed.returncode == 0
+    return {
+        "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
+        "execution_revision": revision,
+        "release": "v0.6.0",
+        "verdict": "pass" if passed else "fail",
+        "safe_to_release": passed,
+        "evidence_refs": [
+            f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
+            f"tests:{revision}:tests.runtime.test_version_gate",
+        ],
+        "source_reports": {
+            "version_gate_unittest": {
+                "command": "python3 -m unittest tests.runtime.test_version_gate",
+                "verdict": "pass" if passed else "fail",
+                "output_tail": completed.stdout[-4000:],
+            }
+        },
+    }
+
+
+def default_baseline_gate_result(revision: str) -> dict[str, Any]:
     return {
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
         "execution_revision": revision,

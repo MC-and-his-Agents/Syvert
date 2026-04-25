@@ -98,6 +98,15 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], PASS_VERDICT)
 
+    def test_baseline_gate_ref_must_match_execution_revision(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        baseline["baseline_gate_ref"] = "gate:old-head:FR-0007:v0.6.0:baseline"
+
+        result = self.pass_result(baseline_gate_ref=baseline["baseline_gate_ref"], baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_ref_revision_mismatch", self.failure_codes(result))
+
     def test_reviewable_ci_log_metrics_evidence_refs_are_allowed(self) -> None:
         cases = self.valid_cases()
         cases[0]["evidence_refs"] = ["ci:test-head-sha:fr-0019:trc-timeout-platform-control-code"]
@@ -218,6 +227,18 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("metrics_snapshot_value_insufficient", self.failure_codes(result))
         self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
+
+    def test_case_policy_and_metrics_assertions_require_case_observation(self) -> None:
+        cases = self.valid_cases()
+        policy_case = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
+        metrics_case = next(case for case in cases if case["case_id"] == "flm-success-observable")
+        policy_case["actual_result"].pop("policy")
+        metrics_case["actual_result"].pop("metrics")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_missing", self.failure_codes(result))
 
     def test_mandatory_case_expected_field_drift_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -505,7 +526,7 @@ class OperabilityGateTests(unittest.TestCase):
             "timeout_total": 1,
             "retry_attempt_total": 0,
             "concurrency_case_total": 3,
-            "concurrency_case_failure_total": 0,
+            "concurrency_case_failure_total": 1,
             "same_path_case_total": 4,
             "same_path_case_failure_total": 1,
         }
