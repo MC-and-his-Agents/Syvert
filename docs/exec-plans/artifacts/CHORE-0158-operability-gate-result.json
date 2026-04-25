@@ -1,0 +1,1451 @@
+{
+  "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d",
+  "cases": [
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-timeout-platform-control-code"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "control_code": "execution_timeout"
+          }
+        },
+        "policy": {
+          "retry": {
+            "backoff_ms": 0,
+            "max_attempts": 1
+          },
+          "timeout_ms": 30000
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-timeout-platform-control-code",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-timeout-platform-control-code",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-timeout-platform-control-code"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "platform"
+          },
+          {
+            "operator": "==",
+            "path": "error.details.control_code",
+            "value": "execution_timeout"
+          },
+          {
+            "operator": "==",
+            "path": "policy.timeout_ms",
+            "value": 30000
+          },
+          {
+            "operator": "==",
+            "path": "policy.retry.max_attempts",
+            "value": 1
+          },
+          {
+            "operator": "==",
+            "path": "policy.retry.backoff_ms",
+            "value": 0
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "ExecutionControlEvent.details.control_code=execution_timeout",
+          "TaskRecord.status=failed"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-timeout-platform-control-code"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-retryable-platform-budget-closed"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "retryable": true
+          }
+        },
+        "idempotency_safety_gate": "pass",
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "attempts": 0
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-retryable-platform-budget-closed",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-retryable-platform-budget-closed",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-retryable-platform-budget-closed"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "platform"
+          },
+          {
+            "operator": "==",
+            "path": "error.details.retryable",
+            "value": true
+          },
+          {
+            "operator": "==",
+            "path": "policy.retry.max_attempts",
+            "value": 1
+          },
+          {
+            "operator": "==",
+            "path": "idempotency_safety_gate",
+            "value": "pass"
+          },
+          {
+            "operator": "==",
+            "path": "retry.attempts",
+            "value": 0
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "no_extra_retry_attempt",
+          "preserve_original_failed_envelope"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-retryable-platform-budget-closed"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-non-retryable-fail-closed"
+        },
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "predicate": {
+            "match": "none"
+          }
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-non-retryable-fail-closed",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-non-retryable-fail-closed",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-non-retryable-fail-closed"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "retry.predicate.match",
+            "value": "none"
+          },
+          {
+            "operator": "==",
+            "path": "policy.retry.max_attempts",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "no_new_retry_attempt",
+          "preserve_original_failed_envelope"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-non-retryable-fail-closed"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-pre-accept-concurrency-reject"
+        },
+        "error": {
+          "category": "invalid_input"
+        },
+        "metrics": {
+          "concurrency_case_total": 1
+        },
+        "policy": {
+          "concurrency": {
+            "max_in_flight": 1,
+            "on_limit": "reject",
+            "scope": "global"
+          }
+        },
+        "request_ref": "ref:trc-pre-accept-concurrency-reject",
+        "result": {
+          "status": "failed"
+        },
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-pre-accept-concurrency-reject",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-pre-accept-concurrency-reject",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core",
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-pre-accept-concurrency-reject"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "!=",
+            "path": "request_ref",
+            "value": ""
+          },
+          {
+            "operator": "==",
+            "path": "stage",
+            "value": "pre_admission"
+          },
+          {
+            "operator": "==",
+            "path": "result.status",
+            "value": "failed"
+          },
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "invalid_input"
+          },
+          {
+            "operator": "==",
+            "path": "policy.concurrency.scope",
+            "value": "global"
+          },
+          {
+            "operator": "==",
+            "path": "policy.concurrency.max_in_flight",
+            "value": 1
+          },
+          {
+            "operator": "==",
+            "path": "policy.concurrency.on_limit",
+            "value": "reject"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.concurrency_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "TaskRecord.not_created"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-pre-accept-concurrency-reject"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-concurrent-status-shared-truth",
+          "verdict": "pass"
+        },
+        "metrics": {
+          "concurrency_case_total": 1
+        },
+        "status": {
+          "read_a": {
+            "status": "shared:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "shared:trc-concurrent-status-shared-truth:status.read_a.task_id"
+          },
+          "read_b": {
+            "status": "shared:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "shared:trc-concurrent-status-shared-truth:status.read_a.task_id"
+          }
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-status-shared-truth",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-concurrent-status-shared-truth",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-status-shared-truth"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "status.read_a.task_id",
+            "value": "status.read_b.task_id"
+          },
+          {
+            "operator": "==",
+            "path": "status.read_a.status",
+            "value": "status.read_b.status"
+          },
+          {
+            "operator": "==",
+            "path": "case.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.concurrency_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "no_extra_TaskRecord",
+          "no_status_regression"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-concurrent-status-shared-truth"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "trc-concurrent-result-shared-truth",
+          "verdict": "pass"
+        },
+        "metrics": {
+          "concurrency_case_total": 1
+        },
+        "result": {
+          "read_a": {
+            "envelope_ref": "shared:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "shared:trc-concurrent-result-shared-truth:result.read_a.task_id"
+          },
+          "read_b": {
+            "envelope_ref": "shared:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "shared:trc-concurrent-result-shared-truth:result.read_a.task_id"
+          }
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-result-shared-truth",
+      "capability": "content_detail_by_url",
+      "case_id": "trc-concurrent-result-shared-truth",
+      "dimension": "timeout_retry_concurrency",
+      "entrypoints": [
+        "core",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-result-shared-truth"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "result.read_a.task_id",
+            "value": "result.read_b.task_id"
+          },
+          {
+            "operator": "==",
+            "path": "result.read_a.envelope_ref",
+            "value": "result.read_b.envelope_ref"
+          },
+          {
+            "operator": "==",
+            "path": "case.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.concurrency_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "no_shadow_result",
+          "terminal_state_not_rewritten"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:trc-concurrent-result-shared-truth"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-success-observable"
+        },
+        "metrics": {
+          "success_total": 1
+        },
+        "result": {
+          "status": "succeeded"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-success-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-success-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-success-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "result.status",
+            "value": "succeeded"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.success_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.task_id_entrypoint_stage_result_status",
+          "evidence_refs.non_empty"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-success-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-business-failure-observable"
+        },
+        "error": {
+          "category": "invalid_input"
+        },
+        "metrics": {
+          "failure_total": 1
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-business-failure-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-business-failure-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-business-failure-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "in",
+            "path": "error.category",
+            "value": [
+              "invalid_input",
+              "unsupported",
+              "platform"
+            ]
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.failure_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.task_id_entrypoint_stage_error_category"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-business-failure-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-contract-failure-fail-closed"
+        },
+        "error": {
+          "category": "runtime_contract"
+        },
+        "gate": {
+          "verdict": "fail"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-contract-failure-fail-closed",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-contract-failure-fail-closed",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-contract-failure-fail-closed"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "runtime_contract"
+          },
+          {
+            "operator": "==",
+            "path": "gate.verdict",
+            "value": "fail"
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.error.category=runtime_contract",
+          "no_success_envelope"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-contract-failure-fail-closed"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-timeout-observable"
+        },
+        "error": {
+          "category": "platform",
+          "details": {
+            "control_code": "execution_timeout"
+          }
+        },
+        "metrics": {
+          "timeout_total": 1
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-timeout-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-timeout-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-timeout-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "platform"
+          },
+          {
+            "operator": "==",
+            "path": "error.details.control_code",
+            "value": "execution_timeout"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.timeout_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.timeout_classification"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-timeout-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-retry-budget-closed-observable"
+        },
+        "metrics": {
+          "retry_attempt_total": 0
+        },
+        "policy": {
+          "retry": {
+            "max_attempts": 1
+          }
+        },
+        "retry": {
+          "attempts": 0
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-retry-budget-closed-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-retry-budget-closed-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-retry-budget-closed-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "policy.retry.max_attempts",
+            "value": 1
+          },
+          {
+            "operator": "==",
+            "path": "retry.attempts",
+            "value": 0
+          },
+          {
+            "operator": "==",
+            "path": "metrics.retry_attempt_total",
+            "value": 0
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.retry_budget_closed"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-retry-budget-closed-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-store-unavailable-fail-closed"
+        },
+        "error": {
+          "category": "runtime_contract",
+          "code": "task_record_unavailable"
+        },
+        "gate": {
+          "verdict": "fail"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-store-unavailable-fail-closed",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-store-unavailable-fail-closed",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "core",
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-store-unavailable-fail-closed"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "error.code",
+            "value": "task_record_unavailable"
+          },
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "runtime_contract"
+          },
+          {
+            "operator": "==",
+            "path": "gate.verdict",
+            "value": "fail"
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.store_unavailable",
+          "no_shadow_status_or_result"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-store-unavailable-fail-closed"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-http-invalid-input-observable"
+        },
+        "entrypoint": "http",
+        "error": {
+          "category": "invalid_input"
+        },
+        "metrics": {
+          "failure_total": 1
+        },
+        "request_ref": "ref:flm-http-invalid-input-observable",
+        "result": {
+          "status": "failed"
+        },
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-http-invalid-input-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-http-invalid-input-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-http-invalid-input-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "!=",
+            "path": "request_ref",
+            "value": ""
+          },
+          {
+            "operator": "==",
+            "path": "entrypoint",
+            "value": "http"
+          },
+          {
+            "operator": "==",
+            "path": "stage",
+            "value": "pre_admission"
+          },
+          {
+            "operator": "==",
+            "path": "result.status",
+            "value": "failed"
+          },
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "invalid_input"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.failure_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.http_pre_admission_failure",
+          "TaskRecord.not_created"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-http-invalid-input-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-cli-invalid-input-observable"
+        },
+        "entrypoint": "cli",
+        "error": {
+          "category": "invalid_input"
+        },
+        "metrics": {
+          "failure_total": 1
+        },
+        "request_ref": "ref:flm-cli-invalid-input-observable",
+        "result": {
+          "status": "failed"
+        },
+        "stage": "pre_admission"
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-cli-invalid-input-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-cli-invalid-input-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "cli"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-cli-invalid-input-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "!=",
+            "path": "request_ref",
+            "value": ""
+          },
+          {
+            "operator": "==",
+            "path": "entrypoint",
+            "value": "cli"
+          },
+          {
+            "operator": "==",
+            "path": "stage",
+            "value": "pre_admission"
+          },
+          {
+            "operator": "==",
+            "path": "result.status",
+            "value": "failed"
+          },
+          {
+            "operator": "==",
+            "path": "error.category",
+            "value": "invalid_input"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.failure_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.cli_pre_admission_failure",
+          "TaskRecord.not_created"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-cli-invalid-input-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "flm-same-path-violation-observable"
+        },
+        "metrics": {
+          "same_path_case_failure_total": 1
+        },
+        "same_path": {
+          "verdict": "fail"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-same-path-violation-observable",
+      "capability": "content_detail_by_url",
+      "case_id": "flm-same-path-violation-observable",
+      "dimension": "failure_log_metrics",
+      "entrypoints": [
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-same-path-violation-observable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "same_path.verdict",
+            "value": "fail"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.same_path_case_failure_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "structured_log.shared_truth_mismatch_reason",
+          "overall_gate.verdict=fail"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:flm-same-path-violation-observable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "http-submit-status-result-shared-truth"
+        },
+        "metrics": {
+          "submit_total": 1
+        },
+        "result": {
+          "envelope_ref": "ref:http-submit-status-result-shared-truth",
+          "task_id": "shared:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "shared:http-submit-status-result-shared-truth:status.task_record_ref"
+        },
+        "status": {
+          "task_id": "shared:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "shared:http-submit-status-result-shared-truth:status.task_record_ref"
+        },
+        "submit": {
+          "request": {
+            "capability": "content_detail_by_url"
+          }
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:http-submit-status-result-shared-truth",
+      "capability": "content_detail_by_url",
+      "case_id": "http-submit-status-result-shared-truth",
+      "dimension": "http_submit_status_result",
+      "entrypoints": [
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:http-submit-status-result-shared-truth"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "submit.request.capability",
+            "value": "content_detail_by_url"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.submit_total",
+            "value": 1
+          },
+          {
+            "operator": "==",
+            "path": "status.task_id",
+            "value": "result.task_id"
+          },
+          {
+            "operator": "==",
+            "path": "status.task_record_ref",
+            "value": "result.task_record_ref"
+          },
+          {
+            "operator": "!=",
+            "path": "result.envelope_ref",
+            "value": ""
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "single_shared_TaskRecord",
+          "result_reads_shared_envelope"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:http-submit-status-result-shared-truth"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-success-shared-truth"
+        },
+        "cli": {
+          "envelope_ref": "shared:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "shared:same-path-success-shared-truth:cli.task_record_ref"
+        },
+        "http": {
+          "envelope_ref": "shared:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "shared:same-path-success-shared-truth:cli.task_record_ref"
+        },
+        "metrics": {
+          "same_path_case_total": 1
+        },
+        "same_path": {
+          "verdict": "pass"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-success-shared-truth",
+      "capability": "content_detail_by_url",
+      "case_id": "same-path-success-shared-truth",
+      "dimension": "cli_api_same_path",
+      "entrypoints": [
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-success-shared-truth"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "cli.task_record_ref",
+            "value": "http.task_record_ref"
+          },
+          {
+            "operator": "==",
+            "path": "cli.envelope_ref",
+            "value": "http.envelope_ref"
+          },
+          {
+            "operator": "==",
+            "path": "same_path.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.same_path_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "same_state_transition"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:same-path-success-shared-truth"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-pre-admission-invalid-input"
+        },
+        "cli": {
+          "error": {
+            "category": "invalid_input",
+            "code": "shared:same-path-pre-admission-invalid-input:cli.error.code"
+          },
+          "request_ref": "ref:same-path-pre-admission-invalid-input",
+          "result": {
+            "status": "failed"
+          },
+          "stage": "pre_admission"
+        },
+        "http": {
+          "error": {
+            "category": "invalid_input",
+            "code": "shared:same-path-pre-admission-invalid-input:cli.error.code"
+          },
+          "request_ref": "ref:same-path-pre-admission-invalid-input",
+          "result": {
+            "status": "failed"
+          },
+          "stage": "pre_admission"
+        },
+        "metrics": {
+          "same_path_case_total": 1
+        },
+        "same_path": {
+          "verdict": "pass"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-pre-admission-invalid-input",
+      "capability": "content_detail_by_url",
+      "case_id": "same-path-pre-admission-invalid-input",
+      "dimension": "cli_api_same_path",
+      "entrypoints": [
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-pre-admission-invalid-input"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "!=",
+            "path": "cli.request_ref",
+            "value": ""
+          },
+          {
+            "operator": "!=",
+            "path": "http.request_ref",
+            "value": ""
+          },
+          {
+            "operator": "==",
+            "path": "cli.stage",
+            "value": "pre_admission"
+          },
+          {
+            "operator": "==",
+            "path": "http.stage",
+            "value": "pre_admission"
+          },
+          {
+            "operator": "==",
+            "path": "cli.result.status",
+            "value": "failed"
+          },
+          {
+            "operator": "==",
+            "path": "http.result.status",
+            "value": "failed"
+          },
+          {
+            "operator": "==",
+            "path": "cli.error.category",
+            "value": "invalid_input"
+          },
+          {
+            "operator": "==",
+            "path": "http.error.category",
+            "value": "invalid_input"
+          },
+          {
+            "operator": "==",
+            "path": "cli.error.code",
+            "value": "http.error.code"
+          },
+          {
+            "operator": "==",
+            "path": "same_path.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.same_path_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "cli_no_TaskRecord",
+          "http_no_TaskRecord"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:same-path-pre-admission-invalid-input"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-durable-record-unavailable"
+        },
+        "cli": {
+          "error": {
+            "category": "runtime_contract",
+            "code": "task_record_unavailable"
+          }
+        },
+        "http": {
+          "error": {
+            "category": "runtime_contract",
+            "code": "task_record_unavailable"
+          }
+        },
+        "metrics": {
+          "same_path_case_total": 1
+        },
+        "same_path": {
+          "verdict": "pass"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-durable-record-unavailable",
+      "capability": "content_detail_by_url",
+      "case_id": "same-path-durable-record-unavailable",
+      "dimension": "cli_api_same_path",
+      "entrypoints": [
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-durable-record-unavailable"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "cli.error.code",
+            "value": "task_record_unavailable"
+          },
+          {
+            "operator": "==",
+            "path": "http.error.code",
+            "value": "task_record_unavailable"
+          },
+          {
+            "operator": "==",
+            "path": "cli.error.category",
+            "value": "runtime_contract"
+          },
+          {
+            "operator": "==",
+            "path": "http.error.category",
+            "value": "runtime_contract"
+          },
+          {
+            "operator": "==",
+            "path": "same_path.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.same_path_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "cli_fail_closed",
+          "http_fail_closed"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:same-path-durable-record-unavailable"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "actual_result": {
+        "case": {
+          "id": "same-path-terminal-result-read"
+        },
+        "cli": {
+          "result": {
+            "envelope_ref": "shared:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "shared:same-path-terminal-result-read:cli.result.task_id"
+          }
+        },
+        "http": {
+          "result": {
+            "envelope_ref": "shared:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "shared:same-path-terminal-result-read:cli.result.task_id"
+          }
+        },
+        "metrics": {
+          "same_path_case_total": 1
+        },
+        "same_path": {
+          "verdict": "pass"
+        }
+      },
+      "actual_result_ref": "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-terminal-result-read",
+      "capability": "content_detail_by_url",
+      "case_id": "same-path-terminal-result-read",
+      "dimension": "cli_api_same_path",
+      "entrypoints": [
+        "cli",
+        "http"
+      ],
+      "evidence_refs": [
+        "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-terminal-result-read"
+      ],
+      "expected_result": {
+        "fields": [
+          {
+            "operator": "==",
+            "path": "cli.result.task_id",
+            "value": "http.result.task_id"
+          },
+          {
+            "operator": "==",
+            "path": "cli.result.envelope_ref",
+            "value": "http.result.envelope_ref"
+          },
+          {
+            "operator": "==",
+            "path": "same_path.verdict",
+            "value": "pass"
+          },
+          {
+            "operator": ">=",
+            "path": "metrics.same_path_case_total",
+            "value": 1
+          }
+        ],
+        "forbidden_mutations": [
+          "shadow_status",
+          "shadow_result"
+        ],
+        "side_effects": [
+          "shared_terminal_TaskRecord",
+          "shared_runtime_result_refs"
+        ]
+      },
+      "gate_impact": "mandatory",
+      "preconditions": [
+        "precondition:same-path-terminal-result-read"
+      ],
+      "verdict": "pass"
+    }
+  ],
+  "evidence_refs": [
+    "FR-0007:version_gate:v0.6.0:baseline:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-business-failure-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-cli-invalid-input-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-contract-failure-fail-closed",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-http-invalid-input-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-retry-budget-closed-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-same-path-violation-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-store-unavailable-fail-closed",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-success-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:flm-timeout-observable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:http-submit-status-result-shared-truth",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-durable-record-unavailable",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-pre-admission-invalid-input",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-success-shared-truth",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:same-path-terminal-result-read",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-result-shared-truth",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-concurrent-status-shared-truth",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-non-retryable-fail-closed",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-pre-accept-concurrency-reject",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-retryable-platform-budget-closed",
+    "operability:34ce4a9e5b9c9b65a5695af832370b73bc5afa9d:trc-timeout-platform-control-code"
+  ],
+  "execution_revision": "34ce4a9e5b9c9b65a5695af832370b73bc5afa9d",
+  "failures": [],
+  "fr_item_key": "FR-0019-v0-6-operability-release-gate",
+  "gate_id": "v0.6.0-operability-gate",
+  "matrix_version": "v0.6.0-operability-matrix-v1",
+  "metrics_snapshot": {
+    "concurrency_case_failure_total": 0,
+    "concurrency_case_total": 3,
+    "failure_total": 8,
+    "retry_attempt_total": 0,
+    "same_path_case_failure_total": 1,
+    "same_path_case_total": 4,
+    "submit_total": 2,
+    "success_total": 2,
+    "timeout_total": 1
+  },
+  "normative_dependencies": [
+    "FR-0007",
+    "FR-0016",
+    "FR-0017",
+    "FR-0018"
+  ],
+  "policy_snapshot": {
+    "concurrency": {
+      "max_in_flight": 1,
+      "on_limit": "reject",
+      "scope": "global"
+    },
+    "retry": {
+      "backoff_ms": 0,
+      "max_attempts": 1
+    },
+    "timeout_ms": 30000
+  },
+  "release": "v0.6.0",
+  "safe_to_release": true,
+  "summary": {
+    "case_total": 20,
+    "fail_case_total": 0,
+    "failed_case_ids": [],
+    "failed_dimensions": [],
+    "pass_case_total": 20
+  },
+  "verdict": "pass"
+}
