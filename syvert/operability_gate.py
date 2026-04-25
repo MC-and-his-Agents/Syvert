@@ -310,14 +310,25 @@ def orchestrate_operability_gate(
         failures.append(_failure("operability_gate", "release_mismatch", "operability gate release must be v0.6.0"))
     if fr_item_key != FR_ITEM_KEY:
         failures.append(_failure("operability_gate", "fr_item_key_mismatch", "operability gate FR item key mismatch"))
-    if not _non_empty_string(gate_id):
-        failures.append(_failure("operability_gate", "missing_gate_id", "operability gate requires a stable gate_id"))
-    if not _non_empty_string(matrix_version):
-        failures.append(_failure("operability_gate", "missing_matrix_version", "operability gate requires a matrix_version"))
+    if gate_id != GATE_ID:
+        failures.append(_failure("operability_gate", "gate_id_mismatch", "operability gate_id must match the frozen FR-0019 gate id"))
+    if matrix_version != MATRIX_VERSION:
+        failures.append(
+            _failure("operability_gate", "matrix_version_mismatch", "operability matrix_version must match the frozen FR-0019 matrix")
+        )
     if not _non_empty_string(execution_revision):
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
+    elif "FR-0007" not in baseline_gate_ref:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "invalid_baseline_gate_ref",
+                "baseline_gate_ref must be traceable to the FR-0007 baseline gate",
+                details={"baseline_gate_ref": baseline_gate_ref},
+            )
+        )
 
     normalized_dependencies = _normalize_string_list(normative_dependencies, "normative_dependencies", failures)
     missing_dependencies = sorted(set(NORMATIVE_DEPENDENCIES) - set(normalized_dependencies))
@@ -334,7 +345,7 @@ def orchestrate_operability_gate(
     normalized_policy = _normalize_policy_snapshot(policy_snapshot, failures)
     normalized_metrics = _normalize_metrics_snapshot(metrics_snapshot, failures)
     normalized_evidence_refs = _normalize_evidence_refs(evidence_refs, failures)
-    normalized_cases = _normalize_cases(cases, failures)
+    normalized_cases = _normalize_cases(cases, failures, metrics_snapshot=normalized_metrics, policy_snapshot=normalized_policy)
     _validate_mandatory_case_coverage(normalized_cases, failures)
 
     for case in normalized_cases:
@@ -400,13 +411,20 @@ def _case_from_definition(case_id: str, definition: Mapping[str, Any], *, verdic
             "forbidden_mutations": ["shadow_status", "shadow_result"],
         },
         "actual_result_ref": f"operability:{case_id}",
+        "actual_result": _actual_result_from_definition(case_id, definition),
         "gate_impact": "mandatory",
         "evidence_refs": [f"operability:{case_id}"],
         "verdict": verdict,
     }
 
 
-def _normalize_cases(raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[str, Any]], failures: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _normalize_cases(
+    raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[str, Any]],
+    failures: list[dict[str, Any]],
+    *,
+    metrics_snapshot: Mapping[str, Any],
+    policy_snapshot: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     if isinstance(raw_cases, Mapping) or isinstance(raw_cases, (str, bytes)):
         failures.append(_failure("operability_gate", "invalid_cases", "operability cases must be a sequence of mappings"))
         return []
@@ -488,6 +506,18 @@ def _normalize_cases(raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[s
         else:
             evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
+        actual_result = raw_case.get("actual_result")
+        if not isinstance(actual_result, Mapping):
+            failures.append(_case_failure(case_id, "invalid_actual_result", "operability case requires actual_result mapping"))
+            actual_result = {}
+        _validate_case_actual_result(
+            case_id,
+            expected_result.get("fields", []),
+            actual_result,
+            metrics_snapshot=metrics_snapshot,
+            policy_snapshot=policy_snapshot,
+            failures=failures,
+        )
         normalized.append(
             {
                 "case_id": case_id,
@@ -497,6 +527,7 @@ def _normalize_cases(raw_cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[s
                 "preconditions": _normalize_string_list(raw_case.get("preconditions"), "preconditions", failures, failure_source=case_id),
                 "expected_result": expected_result,
                 "actual_result_ref": actual_result_ref,
+                "actual_result": _json_safe(actual_result),
                 "gate_impact": gate_impact,
                 "evidence_refs": evidence_refs,
                 "verdict": verdict,
@@ -567,6 +598,91 @@ def _normalize_expected_result(
                 )
             )
     return {"fields": fields, "side_effects": side_effects, "forbidden_mutations": forbidden_mutations}
+
+
+def _validate_case_actual_result(
+    case_id: str,
+    fields: Sequence[Mapping[str, Any]],
+    actual_result: Mapping[str, Any],
+    *,
+    metrics_snapshot: Mapping[str, Any],
+    policy_snapshot: Mapping[str, Any],
+    failures: list[dict[str, Any]],
+) -> None:
+    fact_source = _merge_mappings(actual_result, {"metrics": metrics_snapshot, "policy": policy_snapshot})
+    for field in fields:
+        path = str(field.get("path") or "")
+        operator = str(field.get("operator") or "")
+        expected_value = field.get("value")
+        actual_value = _get_path(fact_source, path)
+        if operator == "==":
+            if isinstance(expected_value, str) and "." in expected_value:
+                expected_comparison_value = _get_path(fact_source, expected_value)
+            else:
+                expected_comparison_value = expected_value
+            if actual_value != expected_comparison_value:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_mismatch",
+                        "actual_result does not satisfy expected_result field assertion",
+                        details={
+                            "path": path,
+                            "operator": operator,
+                            "expected": _json_safe(expected_comparison_value),
+                            "actual": _json_safe(actual_value),
+                        },
+                    )
+                )
+        elif operator == "!=":
+            if actual_value == expected_value:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_mismatch",
+                        "actual_result does not satisfy expected_result field assertion",
+                        details={"path": path, "operator": operator, "forbidden": _json_safe(expected_value)},
+                    )
+                )
+        elif operator == ">=":
+            if isinstance(actual_value, bool) or not isinstance(actual_value, (int, float)) or actual_value < expected_value:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_mismatch",
+                        "actual_result does not satisfy expected_result field assertion",
+                        details={
+                            "path": path,
+                            "operator": operator,
+                            "expected": _json_safe(expected_value),
+                            "actual": _json_safe(actual_value),
+                        },
+                    )
+                )
+        elif operator == "in":
+            if actual_value not in expected_value:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "actual_result_field_mismatch",
+                        "actual_result does not satisfy expected_result field assertion",
+                        details={
+                            "path": path,
+                            "operator": operator,
+                            "allowed": _json_safe(expected_value),
+                            "actual": _json_safe(actual_value),
+                        },
+                    )
+                )
+        else:
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "unsupported_expected_result_operator",
+                    "expected_result field operator is unsupported",
+                    details={"path": path, "operator": operator},
+                )
+            )
 
 
 def _validate_mandatory_case_coverage(normalized_cases: Sequence[Mapping[str, Any]], failures: list[dict[str, Any]]) -> None:
@@ -647,6 +763,23 @@ def _normalize_metrics_snapshot(raw_metrics: Mapping[str, Any], failures: list[d
         else:
             normalized[field] = raw_value
     return normalized
+
+
+def _actual_result_from_definition(case_id: str, definition: Mapping[str, Any]) -> dict[str, Any]:
+    actual_result: dict[str, Any] = {"case": {"id": case_id}}
+    for path, operator, expected_value in definition["fields"]:
+        if isinstance(expected_value, str) and "." in expected_value and operator == "==":
+            shared_value = f"shared:{case_id}:{path}"
+            _set_path(actual_result, path, shared_value)
+            _set_path(actual_result, expected_value, shared_value)
+        elif operator == "!=":
+            _set_path(actual_result, path, f"ref:{case_id}")
+        elif operator == "in":
+            allowed_values = list(expected_value)
+            _set_path(actual_result, path, allowed_values[0] if allowed_values else "")
+        else:
+            _set_path(actual_result, path, deepcopy(expected_value))
+    return actual_result
 
 
 def _validate_revision_evidence_binding(
@@ -745,6 +878,30 @@ def _get_path(mapping: Mapping[str, Any], path: str) -> Any:
             return None
         value = value[segment]
     return value
+
+
+def _set_path(mapping: dict[str, Any], path: str, value: Any) -> None:
+    current = mapping
+    segments = path.split(".")
+    for segment in segments[:-1]:
+        child = current.get(segment)
+        if not isinstance(child, dict):
+            child = {}
+            current[segment] = child
+        current = child
+    current[segments[-1]] = value
+
+
+def _merge_mappings(primary: Mapping[str, Any], overlay: Mapping[str, Any]) -> dict[str, Any]:
+    merged = _json_safe(primary)
+    if not isinstance(merged, dict):
+        merged = {}
+    for key, value in overlay.items():
+        if isinstance(merged.get(key), dict) and isinstance(value, Mapping):
+            merged[key] = _merge_mappings(merged[key], value)
+        else:
+            merged[key] = _json_safe(value)
+    return merged
 
 
 def _canonical_json(value: Any) -> str:

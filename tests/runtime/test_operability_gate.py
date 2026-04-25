@@ -22,7 +22,7 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertTrue(result["safe_to_release"])
         self.assertEqual(result["release"], "v0.6.0")
         self.assertEqual(result["fr_item_key"], "FR-0019-v0-6-operability-release-gate")
-        self.assertEqual(result["baseline_gate_ref"], "version_gate:v0.6.0:baseline")
+        self.assertEqual(result["baseline_gate_ref"], "FR-0007:version_gate:v0.6.0:baseline")
         self.assertEqual(set(result["normative_dependencies"]), {"FR-0007", "FR-0016", "FR-0017", "FR-0018"})
         self.assertEqual(result["policy_snapshot"], POLICY_SNAPSHOT)
         self.assertEqual({case["case_id"] for case in result["cases"]}, set(mandatory_operability_case_ids()))
@@ -37,6 +37,19 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertFalse(result["safe_to_release"])
         self.assertIn("missing_baseline_gate_ref", self.failure_codes(result))
+
+    def test_invalid_baseline_gate_ref_fails_closed(self) -> None:
+        result = self.pass_result(baseline_gate_ref="not-fr-0007-at-all:test-head-sha")
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+
+    def test_gate_id_and_matrix_version_are_frozen(self) -> None:
+        result = self.pass_result(gate_id="totally-different-gate", matrix_version="scratch-matrix")
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("gate_id_mismatch", self.failure_codes(result))
+        self.assertIn("matrix_version_mismatch", self.failure_codes(result))
 
     def test_missing_mandatory_case_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -60,6 +73,14 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("invalid_metrics_snapshot_field", self.failure_codes(result))
         self.assertEqual(result["metrics_snapshot"]["timeout_total"], 0)
 
+    def test_semantically_wrong_metrics_fail_closed(self) -> None:
+        metrics = dict.fromkeys(self.valid_metrics(), 0)
+
+        result = self.pass_result(metrics_snapshot=metrics)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
+
     def test_policy_snapshot_drift_fails_closed(self) -> None:
         policy = deepcopy(POLICY_SNAPSHOT)
         policy["concurrency"]["max_in_flight"] = 2
@@ -80,6 +101,16 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("mandatory_case_expected_fields_missing", self.failure_codes(result))
+
+    def test_actual_result_must_satisfy_mandatory_assertions(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
+        target["actual_result"]["error"]["category"] = "runtime_contract"
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
 
     def test_dimension_or_capability_drift_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -152,10 +183,10 @@ class OperabilityGateTests(unittest.TestCase):
     def pass_result(self, **overrides: object) -> dict[str, object]:
         payload: dict[str, object] = {
             "execution_revision": "test-head-sha",
-            "baseline_gate_ref": "version_gate:v0.6.0:baseline",
+            "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline",
             "cases": self.valid_cases(),
             "metrics_snapshot": self.valid_metrics(),
-            "evidence_refs": ["version_gate:v0.6.0:baseline:test-head-sha"],
+            "evidence_refs": ["FR-0007:version_gate:v0.6.0:baseline:test-head-sha"],
         }
         payload.update(overrides)
         return orchestrate_operability_gate(**payload)
@@ -177,7 +208,7 @@ class OperabilityGateTests(unittest.TestCase):
             "concurrency_case_total": 3,
             "concurrency_case_failure_total": 0,
             "same_path_case_total": 4,
-            "same_path_case_failure_total": 0,
+            "same_path_case_failure_total": 1,
         }
 
     def failure_codes(self, result: dict[str, object]) -> set[str]:
