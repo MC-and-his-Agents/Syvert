@@ -1,18 +1,4 @@
 {
-  "baseline_gate_result": {
-    "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:5b9211258dc2e00c9306c4133dc68eb245ab270c",
-    "evidence_refs": [
-      "FR-0007:version_gate:v0.6.0:baseline:5b9211258dc2e00c9306c4133dc68eb245ab270c",
-      "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_version_gate"
-    ],
-    "execution_revision": "5b9211258dc2e00c9306c4133dc68eb245ab270c",
-    "release": "v0.6.0",
-    "safe_to_release": true,
-    "source_reports": {
-      "FR-0007": "version_gate baseline checks passed on local regression evidence"
-    },
-    "verdict": "pass"
-  },
   "cases": [
     {
       "actual_result": {
@@ -42,17 +28,12 @@
           "TaskRecord.status=failed"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-timeout-platform-control-code",
       "case_id": "trc-timeout-platform-control-code",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-timeout-platform-control-code",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-timeout-platform-control-code"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -85,17 +66,12 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-retryable-platform-budget-closed",
       "case_id": "trc-retryable-platform-budget-closed",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-retryable-platform-budget-closed",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-retryable-platform-budget-closed"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -123,17 +99,12 @@
           "preserve_original_failed_envelope"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-non-retryable-fail-closed",
       "case_id": "trc-non-retryable-fail-closed",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-non-retryable-fail-closed",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-non-retryable-fail-closed"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -168,17 +139,12 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-pre-accept-concurrency-reject",
       "case_id": "trc-pre-accept-concurrency-reject",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-pre-accept-concurrency-reject",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-pre-accept-concurrency-reject"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -210,17 +176,12 @@
           }
         }
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth",
       "case_id": "trc-concurrent-status-shared-truth",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -252,17 +213,12 @@
           "terminal_state_not_rewritten"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth",
       "case_id": "trc-concurrent-result-shared-truth",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -289,17 +245,12 @@
           "evidence_refs.non_empty"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-success-observable",
       "case_id": "flm-success-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-success-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-success-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -325,17 +276,12 @@
           "structured_log.error.category"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-business-failure-observable",
       "case_id": "flm-business-failure-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-business-failure-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-business-failure-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -359,17 +305,12 @@
           "no_success_envelope"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-contract-failure-fail-closed",
       "case_id": "flm-contract-failure-fail-closed",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-contract-failure-fail-closed",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-contract-failure-fail-closed"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -398,17 +339,12 @@
           "structured_log.error.details.control_code"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-timeout-observable",
       "case_id": "flm-timeout-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-timeout-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-timeout-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -438,17 +374,12 @@
           "structured_log.error.details.retryable=true"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-retry-budget-closed-observable",
       "case_id": "flm-retry-budget-closed-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-retry-budget-closed-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-retry-budget-closed-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -473,17 +404,12 @@
           "no_shadow_status_or_result"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-store-unavailable-fail-closed",
       "case_id": "flm-store-unavailable-fail-closed",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-store-unavailable-fail-closed",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-store-unavailable-fail-closed"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -517,17 +443,12 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-http-invalid-input-observable",
       "case_id": "flm-http-invalid-input-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-http-invalid-input-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-http-invalid-input-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -561,17 +482,12 @@
         ],
         "stage": "pre_admission"
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-cli-invalid-input-observable",
       "case_id": "flm-cli-invalid-input-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-cli-invalid-input-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-cli-invalid-input-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -595,17 +511,12 @@
           "overall_gate.verdict=fail"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-same-path-violation-observable",
       "case_id": "flm-same-path-violation-observable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-same-path-violation-observable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-same-path-violation-observable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -640,17 +551,12 @@
           }
         }
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth",
       "case_id": "http-submit-status-result-shared-truth",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -681,17 +587,12 @@
           "same_state_transition"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth",
       "case_id": "same-path-success-shared-truth",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -737,17 +638,12 @@
           "http_no_TaskRecord"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input",
       "case_id": "same-path-pre-admission-invalid-input",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -783,17 +679,12 @@
           "http_fail_closed"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-durable-record-unavailable",
       "case_id": "same-path-durable-record-unavailable",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-durable-record-unavailable",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-durable-record-unavailable"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     },
     {
@@ -829,21 +720,15 @@
           "shared_runtime_result_refs"
         ]
       },
-      "actual_result_ref": "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read",
       "case_id": "same-path-terminal-result-read",
-      "evidence_refs": [
-        "operability:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read",
-        "test_evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read"
-      ],
-      "upstream_refs": [
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_execution_control",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_runtime_observability",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_http_api",
-        "tests:5b9211258dc2e00c9306c4133dc68eb245ab270c:tests.runtime.test_cli_http_same_path"
+      "upstream_modules": [
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path"
       ]
     }
   ],
-  "execution_revision": "5b9211258dc2e00c9306c4133dc68eb245ab270c",
   "metrics_snapshot": {
     "concurrency_case_failure_total": 0,
     "concurrency_case_total": 3,

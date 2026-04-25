@@ -775,6 +775,9 @@ def _normalize_cases(
             evidence_refs = []
         else:
             evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
+        upstream_refs = _normalize_evidence_refs(raw_case.get("upstream_refs"), failures, source=case_id)
+        if not upstream_refs:
+            failures.append(_case_failure(case_id, "missing_upstream_refs", "operability case requires concrete upstream evidence refs"))
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
         actual_result = raw_case.get("actual_result")
         if not isinstance(actual_result, Mapping):
@@ -802,6 +805,7 @@ def _normalize_cases(
                 "actual_result": _json_safe(actual_result),
                 "gate_impact": gate_impact,
                 "evidence_refs": evidence_refs,
+                "upstream_refs": upstream_refs,
                 "verdict": verdict,
             }
         )
