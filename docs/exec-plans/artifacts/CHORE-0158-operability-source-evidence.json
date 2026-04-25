@@ -162,7 +162,7 @@
             "scope": "global"
           }
         },
-        "request_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-pre-accept-concurrency-reject:non_empty_ref",
+        "request_ref": "evidence:{revision}:trc-pre-accept-concurrency-reject:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -204,12 +204,12 @@
         ],
         "status": {
           "read_a": {
-            "status": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth:status.read_a.status",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth:status.read_a.task_id"
+            "status": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.task_id"
           },
           "read_b": {
-            "status": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth:status.read_a.status",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-status-shared-truth:status.read_a.task_id"
+            "status": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.status",
+            "task_id": "evidence:{revision}:trc-concurrent-status-shared-truth:status.read_a.task_id"
           }
         }
       },
@@ -242,12 +242,12 @@
         },
         "result": {
           "read_a": {
-            "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth:result.read_a.task_id"
+            "envelope_ref": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.task_id"
           },
           "read_b": {
-            "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:trc-concurrent-result-shared-truth:result.read_a.task_id"
+            "envelope_ref": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.envelope_ref",
+            "task_id": "evidence:{revision}:trc-concurrent-result-shared-truth:result.read_a.task_id"
           }
         },
         "side_effects": [
@@ -506,7 +506,7 @@
         "metrics": {
           "failure_total": 8
         },
-        "request_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-http-invalid-input-observable:non_empty_ref",
+        "request_ref": "evidence:{revision}:flm-http-invalid-input-observable:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -550,7 +550,7 @@
         "metrics": {
           "failure_total": 8
         },
-        "request_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:flm-cli-invalid-input-observable:non_empty_ref",
+        "request_ref": "evidence:{revision}:flm-cli-invalid-input-observable:non_empty_ref",
         "result": {
           "status": "failed"
         },
@@ -625,17 +625,17 @@
           "submit_total": 2
         },
         "result": {
-          "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth:non_empty_ref",
-          "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth:status.task_id",
-          "task_record_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth:status.task_record_ref"
+          "envelope_ref": "evidence:{revision}:http-submit-status-result-shared-truth:non_empty_ref",
+          "task_id": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_record_ref"
         },
         "side_effects": [
           "single_shared_TaskRecord",
           "result_reads_shared_envelope"
         ],
         "status": {
-          "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth:status.task_id",
-          "task_record_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:http-submit-status-result-shared-truth:status.task_record_ref"
+          "task_id": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_id",
+          "task_record_ref": "evidence:{revision}:http-submit-status-result-shared-truth:status.task_record_ref"
         },
         "submit": {
           "request": {
@@ -662,8 +662,8 @@
           "id": "same-path-success-shared-truth"
         },
         "cli": {
-          "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth:cli.envelope_ref",
-          "task_record_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth:cli.task_record_ref"
+          "envelope_ref": "evidence:{revision}:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:{revision}:same-path-success-shared-truth:cli.task_record_ref"
         },
         "evidence_source": "tests/runtime/same-path-success-shared-truth",
         "forbidden_mutations_absent": [
@@ -671,8 +671,8 @@
           "shadow_result"
         ],
         "http": {
-          "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth:cli.envelope_ref",
-          "task_record_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-success-shared-truth:cli.task_record_ref"
+          "envelope_ref": "evidence:{revision}:same-path-success-shared-truth:cli.envelope_ref",
+          "task_record_ref": "evidence:{revision}:same-path-success-shared-truth:cli.task_record_ref"
         },
         "metrics": {
           "same_path_case_total": 4
@@ -705,9 +705,9 @@
         "cli": {
           "error": {
             "category": "invalid_input",
-            "code": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input:cli.error.code"
+            "code": "evidence:{revision}:same-path-pre-admission-invalid-input:cli.error.code"
           },
-          "request_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input:non_empty_ref",
+          "request_ref": "evidence:{revision}:same-path-pre-admission-invalid-input:non_empty_ref",
           "result": {
             "status": "failed"
           },
@@ -721,9 +721,9 @@
         "http": {
           "error": {
             "category": "invalid_input",
-            "code": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input:cli.error.code"
+            "code": "evidence:{revision}:same-path-pre-admission-invalid-input:cli.error.code"
           },
-          "request_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-pre-admission-invalid-input:non_empty_ref",
+          "request_ref": "evidence:{revision}:same-path-pre-admission-invalid-input:non_empty_ref",
           "result": {
             "status": "failed"
           },
@@ -806,8 +806,8 @@
         },
         "cli": {
           "result": {
-            "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read:cli.result.envelope_ref",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read:cli.result.task_id"
+            "envelope_ref": "evidence:{revision}:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:{revision}:same-path-terminal-result-read:cli.result.task_id"
           }
         },
         "evidence_source": "tests/runtime/same-path-terminal-result-read",
@@ -817,8 +817,8 @@
         ],
         "http": {
           "result": {
-            "envelope_ref": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read:cli.result.envelope_ref",
-            "task_id": "evidence:5b9211258dc2e00c9306c4133dc68eb245ab270c:same-path-terminal-result-read:cli.result.task_id"
+            "envelope_ref": "evidence:{revision}:same-path-terminal-result-read:cli.result.envelope_ref",
+            "task_id": "evidence:{revision}:same-path-terminal-result-read:cli.result.task_id"
           }
         },
         "metrics": {

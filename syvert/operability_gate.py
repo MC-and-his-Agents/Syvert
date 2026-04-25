@@ -785,6 +785,8 @@ def _normalize_cases(
             evidence_refs = []
         else:
             evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
+            if not evidence_refs:
+                failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires non-empty evidence_refs"))
         upstream_refs = _normalize_evidence_refs(raw_case.get("upstream_refs"), failures, source=case_id)
         if not upstream_refs:
             failures.append(_case_failure(case_id, "missing_upstream_refs", "operability case requires concrete upstream evidence refs"))
@@ -814,6 +816,7 @@ def _normalize_cases(
             policy_snapshot=policy_snapshot,
             failures=failures,
         )
+        _validate_actual_result_revision_binding(case_id, actual_result, execution_revision, failures)
         normalized.append(
             {
                 "case_id": case_id,
@@ -1083,6 +1086,43 @@ def _validate_case_actual_result(
         )
 
 
+def _validate_actual_result_revision_binding(
+    case_id: str,
+    actual_result: Mapping[str, Any],
+    execution_revision: str,
+    failures: list[dict[str, Any]],
+) -> None:
+    revision = _non_empty_string(execution_revision)
+    if not revision:
+        return
+    mismatched_values: list[str] = []
+    for value in _iter_strings(actual_result):
+        if value.startswith("evidence:"):
+            observed_revision = _evidence_ref_revision(value)
+            if observed_revision and observed_revision != revision:
+                mismatched_values.append(value)
+    if mismatched_values:
+        failures.append(
+            _case_failure(
+                case_id,
+                "actual_result_revision_mismatch",
+                "actual_result evidence-bearing values must be bound to execution_revision",
+                details={"execution_revision": revision, "mismatched_values": mismatched_values},
+            )
+        )
+
+
+def _iter_strings(value: Any) -> Iterable[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _iter_strings(item)
+    elif isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        for item in value:
+            yield from _iter_strings(item)
+
+
 def _validate_case_snapshot_consistency(
     case_id: str,
     actual_result: Mapping[str, Any],
@@ -1189,6 +1229,8 @@ def _validate_mandatory_case_coverage(normalized_cases: Sequence[Mapping[str, An
 
 
 def _normalize_policy_snapshot(raw_policy: Mapping[str, Any] | None, failures: list[dict[str, Any]]) -> dict[str, Any]:
+    if raw_policy is None:
+        failures.append(_failure("operability_gate", "missing_policy_snapshot", "policy_snapshot is required"))
     policy = deepcopy(POLICY_SNAPSHOT if raw_policy is None else raw_policy)
     expected_paths = {
         "timeout_ms": 30000,
@@ -1378,6 +1420,9 @@ def _failed_case_ids(cases: Sequence[Mapping[str, Any]], failures: Sequence[Mapp
         case_id = details.get("case_id")
         if isinstance(case_id, str) and case_id:
             failed_ids.add(case_id)
+        missing_case_ids = details.get("missing_case_ids")
+        if isinstance(missing_case_ids, Iterable) and not isinstance(missing_case_ids, (Mapping, str, bytes)):
+            failed_ids.update(case_id for case_id in missing_case_ids if isinstance(case_id, str) and case_id)
     return failed_ids
 
 
@@ -1410,7 +1455,7 @@ def _evidence_ref_revision(evidence_ref: str) -> str | None:
         revision = evidence_ref.removeprefix("FR-0007:version_gate:v0.6.0:baseline:")
         return revision or None
     parts = evidence_ref.split(":")
-    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local", "ci", "gate", "log", "metrics"}:
+    if len(parts) >= 3 and parts[0] in {"evidence", "operability", "test_evidence", "tests", "local", "ci", "gate", "log", "metrics"}:
         return parts[1] or None
     if f":{RELEASE}:" in evidence_ref and evidence_ref.endswith(":baseline"):
         parts = evidence_ref.split(":")

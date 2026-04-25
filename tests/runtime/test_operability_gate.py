@@ -148,6 +148,13 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("missing_mandatory_cases", self.failure_codes(result))
         missing_failure = next(item for item in result["failures"] if item["code"] == "missing_mandatory_cases")
         self.assertEqual(missing_failure["details"]["missing_case_ids"], ["same-path-terminal-result-read"])
+        self.assertIn("same-path-terminal-result-read", result["summary"]["failed_case_ids"])
+
+    def test_missing_policy_snapshot_fails_closed(self) -> None:
+        result = self.pass_result(policy_snapshot=None)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_policy_snapshot", self.failure_codes(result))
 
     def test_invalid_case_entries_are_reflected_in_summary(self) -> None:
         result = self.pass_result(cases=[{}])
@@ -414,6 +421,24 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("missing_case_evidence_refs", self.failure_codes(result))
+
+    def test_case_null_evidence_refs_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["evidence_refs"] = None
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_case_evidence_refs", self.failure_codes(result))
+
+    def test_actual_result_revision_bearing_values_must_match_execution_revision(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["actual_result"]["request_ref"] = "evidence:old-head:trc-timeout-platform-control-code:request_ref"
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_revision_mismatch", self.failure_codes(result))
 
     def test_case_scoped_metadata_failures_update_case_verdict(self) -> None:
         cases = self.valid_cases()
