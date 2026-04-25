@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import queue
 import re
+import threading
+import time
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 from uuid import uuid4
 
@@ -48,9 +51,20 @@ DEFAULT_FAILURE_RELEASE_REASON = "adapter_failed_without_disposition_hint"
 DEFAULT_INVALID_HINT_RELEASE_REASON = "invalid_resource_disposition_hint"
 MATCH_STATUS_MATCHED = "matched"
 MATCH_STATUS_UNMATCHED = "unmatched"
+EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED = "admission_concurrency_rejected"
+EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED = "retry_concurrency_rejected"
+EXECUTION_CONTROL_EVENT_RETRY_EXHAUSTED = "retry_exhausted"
+EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED = "concurrency_limit_exceeded"
+EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT = "execution_timeout"
+EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID = "execution_control_state_invalid"
+EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
+EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
 _ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL})
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
+_EXECUTION_CONCURRENCY_LOCK = threading.Lock()
+_EXECUTION_CONCURRENCY_IN_FLIGHT: dict[tuple[str, ...], int] = {}
+_EXECUTION_CONCURRENCY_ADMISSION_GUARDS: dict[tuple[str, ...], threading.Lock] = {}
 
 if TYPE_CHECKING:
     from syvert.resource_lifecycle import ResourceBundle
@@ -190,6 +204,25 @@ def default_task_id_factory() -> str:
 class TaskExecutionResult:
     envelope: dict[str, Any]
     task_record: TaskRecord | None
+
+
+@dataclass(frozen=True)
+class ExecutionConcurrencySlot:
+    scope_key: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExecutionConcurrencyAdmissionGuard:
+    scope_key: tuple[str, ...]
+    lock: threading.Lock
+
+
+@dataclass(frozen=True)
+class AdapterAttemptResult:
+    envelope: dict[str, Any]
+    attempt_outcome_ref: dict[str, Any] | None
+    execution_control_event: dict[str, Any] | None = None
+    core_timeout_outcome: bool = False
 
 
 @dataclass(frozen=True)
@@ -442,9 +475,77 @@ def execute_task_internal(
     if projection_error is not None:
         return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_error), None)
 
+    execution_control_policy = normalized_request.execution_control_policy
+    if execution_control_policy is None:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("execution_control_state_invalid", "Core 未能物化默认执行控制策略"),
+            ),
+            None,
+        )
+    admission_guard = acquire_execution_concurrency_admission_guard(
+        execution_control_policy.concurrency,
+        adapter_key=adapter_key,
+        capability=capability,
+    )
+    if not is_execution_concurrency_slot_available(
+        execution_control_policy.concurrency,
+        adapter_key=adapter_key,
+        capability=capability,
+    ):
+        release_execution_concurrency_admission_guard(admission_guard)
+        event = build_execution_control_event(
+            task_id,
+            adapter_key,
+            capability,
+            event_type=EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED,
+            attempt_count=0,
+            control_code=EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+            task_record_ref="none",
+            policy=execution_control_policy,
+        )
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                invalid_input_error(
+                    EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                    "执行控制并发限制拒绝本次任务提交",
+                    details={
+                        "scope": execution_control_policy.concurrency.scope,
+                        "max_in_flight": execution_control_policy.concurrency.max_in_flight,
+                        "on_limit": execution_control_policy.concurrency.on_limit,
+                        "task_record_ref": "none",
+                        "execution_control_event": event,
+                    },
+                ),
+            ),
+            None,
+        )
+
+    def release_admission_guard_or_failure(stage: str) -> TaskExecutionResult | None:
+        release_error = release_execution_concurrency_admission_guard(admission_guard)
+        if release_error is None:
+            return None
+        release_details = dict(release_error.get("details", {}))
+        release_details["stage"] = stage
+        release_error = dict(release_error)
+        release_error["details"] = release_details
+        return TaskExecutionResult(
+            failure_envelope(task_id, adapter_key, capability, release_error),
+            None,
+        )
+
     try:
         record = create_task_record(task_id, build_task_request_snapshot(normalized_request))
     except TaskRecordContractError as error:
+        release_failure = release_admission_guard_or_failure("create_task_record")
+        if release_failure is not None:
+            return release_failure
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -463,6 +564,9 @@ def execute_task_internal(
         task_record_store=store,
     )
     if persistence_error is not None:
+        release_failure = release_admission_guard_or_failure("persist_accepted")
+        if release_failure is not None:
+            return release_failure
         return persistence_error
     if persisted_record is not None:
         record = persisted_record
@@ -470,6 +574,9 @@ def execute_task_internal(
     try:
         record = start_task_record(record)
     except TaskRecordContractError as error:
+        release_failure = release_admission_guard_or_failure("start_task_record")
+        if release_failure is not None:
+            return release_failure
         return TaskExecutionResult(
             failure_envelope(
                 task_id,
@@ -488,12 +595,26 @@ def execute_task_internal(
         task_record_store=store,
     )
     if persistence_error is not None:
+        release_failure = release_admission_guard_or_failure("persist_running")
+        if release_failure is not None:
+            return release_failure
         return persistence_error
     if persisted_record is not None:
         record = persisted_record
 
     match_result = match_resource_capabilities(matcher_input)
     if match_result.match_status == MATCH_STATUS_UNMATCHED:
+        release_failure = release_admission_guard_or_failure("resource_capability_match")
+        if release_failure is not None:
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                release_failure.envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
         return finalize_task_execution_result(
             task_id,
             adapter_key,
@@ -518,151 +639,17 @@ def execute_task_internal(
             task_record_store=store,
         )
 
-    requested_slots = resolve_requested_resource_slots(normalized_request)
-    managed_resource_store = None
-    managed_trace_store = None
-    resource_bundle = None
-    if requested_slots is not None:
-        managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
-        managed_trace_store = resource_trace_store or default_runtime_resource_trace_store(managed_resource_store)
-        acquire_result = acquire_runtime_resource_bundle(
-            task_id=task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            requested_slots=requested_slots,
-            resource_lifecycle_store=managed_resource_store,
-            resource_trace_store=managed_trace_store,
-        )
-        if isinstance(acquire_result, Mapping):
-            return finalize_task_execution_result(
-                task_id,
-                adapter_key,
-                capability,
-                record,
-                dict(acquire_result),
-                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-                task_record_store=store,
-            )
-        resource_bundle = acquire_result
-        live_resource_lease, live_resources_by_id, live_lease_error = resolve_host_resource_lease(
-            task_id=task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            resource_lifecycle_store=managed_resource_store,
-        )
-        if live_lease_error is not None:
-            cleanup_envelope = settle_managed_resource_bundle(
-                lease_id=resource_bundle.lease_id,
-                task_id=task_id,
-                resource_lifecycle_store=managed_resource_store,
-                resource_trace_store=managed_trace_store,
-                default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
-                hint=None,
-            )
-            envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, live_lease_error)
-            return finalize_task_execution_result(
-                task_id,
-                adapter_key,
-                capability,
-                record,
-                envelope,
-                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-                task_record_store=store,
-            )
-
-        bundle_error = validate_host_resource_bundle(
-            resource_bundle,
-            task_id=task_id,
-            adapter_key=adapter_key,
-            capability=capability,
-            requested_slots=requested_slots,
-            live_resource_lease=live_resource_lease,
-            live_resources_by_id=live_resources_by_id,
-        )
-        if bundle_error is not None:
-            cleanup_envelope = settle_managed_resource_bundle(
-                lease_id=live_resource_lease.lease_id,
-                task_id=task_id,
-                resource_lifecycle_store=managed_resource_store,
-                resource_trace_store=managed_trace_store,
-                default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
-                hint=None,
-            )
-            envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, bundle_error)
-            return finalize_task_execution_result(
-                task_id,
-                adapter_key,
-                capability,
-                record,
-                envelope,
-                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
-                task_record_store=store,
-            )
-
-    adapter_context = AdapterExecutionContext(
-        request=adapter_request,
-        resource_bundle=resource_bundle,
-        execution_control_policy=normalized_request.execution_control_policy,
+    envelope = execute_controlled_adapter_attempts(
+        task_id=task_id,
+        adapter_key=adapter_key,
+        capability=capability,
+        adapter_request=adapter_request,
+        adapter=adapter_declaration.adapter,
+        policy=execution_control_policy,
+        initial_admission_guard=admission_guard,
+        resource_lifecycle_store=resource_lifecycle_store,
+        resource_trace_store=resource_trace_store,
     )
-    disposition_hint: ResourceDispositionHint | None = None
-    default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
-    try:
-        payload = adapter_declaration.adapter.execute(adapter_context)
-        payload_error = validate_success_payload(payload)
-        if payload_error is not None:
-            envelope = failure_envelope(task_id, adapter_key, capability, payload_error)
-            default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
-        else:
-            disposition_hint, hint_error = extract_internal_resource_disposition_hint(
-                payload.get("resource_disposition_hint"),
-                expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
-            )
-            if hint_error is not None:
-                envelope = failure_envelope(task_id, adapter_key, capability, hint_error)
-                default_release_reason = DEFAULT_INVALID_HINT_RELEASE_REASON
-            else:
-                envelope = {
-                    "task_id": task_id,
-                    "adapter_key": adapter_key,
-                    "capability": capability,
-                    "status": "success",
-                    "raw": payload["raw"],
-                    "normalized": payload["normalized"],
-                }
-    except PlatformAdapterError as error:
-        disposition_hint, hint_error = extract_internal_resource_disposition_hint(
-            error.resource_disposition_hint,
-            expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
-        )
-        if hint_error is not None:
-            envelope = failure_envelope(task_id, adapter_key, capability, hint_error)
-            default_release_reason = DEFAULT_INVALID_HINT_RELEASE_REASON
-        else:
-            envelope = failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error))
-            default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
-    except Exception as error:
-        envelope = failure_envelope(
-            task_id,
-            adapter_key,
-            capability,
-            runtime_contract_error(
-                "adapter_execution_error",
-                str(error) or error.__class__.__name__,
-            ),
-        )
-        default_release_reason = DEFAULT_FAILURE_RELEASE_REASON
-
-    if resource_bundle is not None and managed_resource_store is not None:
-        cleanup_envelope = settle_managed_resource_bundle(
-            lease_id=live_resource_lease.lease_id,
-            task_id=task_id,
-            resource_lifecycle_store=managed_resource_store,
-            resource_trace_store=managed_trace_store,
-            default_reason=default_release_reason,
-            hint=disposition_hint,
-        )
-        if cleanup_envelope is not None:
-            envelope = cleanup_envelope
 
     return finalize_task_execution_result(
         task_id,
@@ -673,6 +660,781 @@ def execute_task_internal(
         preserve_envelope_on_record_error=preserve_envelope_on_record_error,
         task_record_store=store,
     )
+
+
+def execute_controlled_adapter_attempts(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    adapter_request: AdapterTaskRequest,
+    adapter: Any,
+    policy: ExecutionControlPolicy,
+    initial_admission_guard: ExecutionConcurrencyAdmissionGuard,
+    resource_lifecycle_store: "LocalResourceLifecycleStore | None",
+    resource_trace_store: "LocalResourceTraceStore | None",
+) -> dict[str, Any]:
+    attempt_index = 1
+    admission_guard: ExecutionConcurrencyAdmissionGuard | None = initial_admission_guard
+    last_failed_envelope: dict[str, Any] | None = None
+    runtime_result_refs: list[dict[str, Any]] = []
+    execution_control_events: list[dict[str, Any]] = []
+
+    while True:
+        attempt = execute_single_controlled_adapter_attempt(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            adapter_request=adapter_request,
+            adapter=adapter,
+            policy=policy,
+            attempt_index=attempt_index,
+            admission_guard=admission_guard,
+            resource_lifecycle_store=resource_lifecycle_store,
+            resource_trace_store=resource_trace_store,
+        )
+        admission_guard = None
+        envelope = attempt.envelope
+        if attempt.attempt_outcome_ref is not None:
+            runtime_result_refs.append(attempt.attempt_outcome_ref)
+        if attempt.execution_control_event is not None:
+            execution_control_events.append(attempt.execution_control_event)
+            runtime_result_refs.append(attempt.execution_control_event)
+            if last_failed_envelope is not None:
+                envelope = with_failed_envelope_control_details(
+                    last_failed_envelope,
+                    event=attempt.execution_control_event,
+                    details={
+                        "retry_concurrency_rejected": True,
+                        "attempt_count": attempt_index - 1,
+                        "scope": policy.concurrency.scope,
+                        "max_in_flight": policy.concurrency.max_in_flight,
+                    },
+                )
+            return with_runtime_observability(envelope, runtime_result_refs, execution_control_events)
+        envelope = with_runtime_observability(envelope, runtime_result_refs, execution_control_events)
+        if envelope.get("status") == "success":
+            return envelope
+
+        last_failed_envelope = envelope
+        retryable = is_retryable_attempt_outcome(
+            envelope,
+            capability=capability,
+            core_timeout_outcome=attempt.core_timeout_outcome,
+        )
+        if not retryable:
+            return envelope
+        if attempt_index >= policy.retry.max_attempts:
+            event = build_execution_control_event(
+                task_id,
+                adapter_key,
+                capability,
+                event_type=EXECUTION_CONTROL_EVENT_RETRY_EXHAUSTED,
+                attempt_count=attempt_index,
+                control_code=EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED,
+                task_record_ref=f"task_record:{task_id}",
+                policy=policy,
+            )
+            execution_control_events.append(event)
+            runtime_result_refs.append(event)
+            exhausted_envelope = with_failed_envelope_control_details(
+                last_failed_envelope,
+                event=event,
+                details={
+                    "retry_exhausted": True,
+                    "attempt_count": attempt_index,
+                    "max_attempts": policy.retry.max_attempts,
+                    "last_attempt_outcome_ref": attempt.attempt_outcome_ref,
+                },
+            )
+            return with_runtime_observability(exhausted_envelope, runtime_result_refs, execution_control_events)
+        if policy.retry.backoff_ms:
+            time.sleep(policy.retry.backoff_ms / 1000)
+        admission_guard = acquire_execution_concurrency_admission_guard(
+            policy.concurrency,
+            adapter_key=adapter_key,
+            capability=capability,
+        )
+        if not is_execution_concurrency_slot_available(
+            policy.concurrency,
+            adapter_key=adapter_key,
+            capability=capability,
+        ):
+            release_execution_concurrency_admission_guard(admission_guard)
+            admission_guard = None
+            event = build_execution_control_event(
+                task_id,
+                adapter_key,
+                capability,
+                event_type=EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED,
+                attempt_count=attempt_index,
+                control_code=EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                task_record_ref=f"task_record:{task_id}",
+                policy=policy,
+            )
+            execution_control_events.append(event)
+            runtime_result_refs.append(event)
+            rejected_envelope = with_failed_envelope_control_details(
+                last_failed_envelope,
+                event=event,
+                details={
+                    "retry_concurrency_rejected": True,
+                    "attempt_count": attempt_index,
+                    "scope": policy.concurrency.scope,
+                    "max_in_flight": policy.concurrency.max_in_flight,
+                },
+            )
+            return with_runtime_observability(rejected_envelope, runtime_result_refs, execution_control_events)
+        attempt_index += 1
+
+
+def execute_single_controlled_adapter_attempt(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    adapter_request: AdapterTaskRequest,
+    adapter: Any,
+    policy: ExecutionControlPolicy,
+    attempt_index: int,
+    admission_guard: ExecutionConcurrencyAdmissionGuard,
+    resource_lifecycle_store: "LocalResourceLifecycleStore | None",
+    resource_trace_store: "LocalResourceTraceStore | None",
+) -> AdapterAttemptResult:
+    requested_slots = resolve_requested_resource_slots(
+        CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=adapter_key,
+                capability=capability,
+                target_type=adapter_request.target_type,
+                target_value=adapter_request.target_value,
+            ),
+            policy=CollectionPolicy(collection_mode=adapter_request.collection_mode),
+            execution_control_policy=policy,
+        )
+    )
+    managed_resource_store = None
+    managed_trace_store = None
+    resource_bundle = None
+    live_resource_lease = None
+    disposition_hint: ResourceDispositionHint | None = None
+    default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
+    started_at = datetime.now(timezone.utc)
+    slot: ExecutionConcurrencySlot | None = None
+    admission_guard_released = False
+    slot_released = False
+
+    def release_attempt_admission_guard() -> dict[str, Any] | None:
+        nonlocal admission_guard_released
+        if admission_guard_released:
+            return None
+        admission_guard_released = True
+        return release_execution_concurrency_admission_guard(admission_guard)
+
+    def finish_attempt(envelope: dict[str, Any], *, core_timeout_outcome: bool = False) -> AdapterAttemptResult:
+        nonlocal slot_released
+        guard_release_error = release_attempt_admission_guard()
+        if guard_release_error is not None:
+            envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
+            core_timeout_outcome = False
+        if slot is not None and not slot_released:
+            release_error = release_execution_concurrency_slot(slot)
+            slot_released = True
+            if release_error is not None:
+                envelope = failure_envelope(task_id, adapter_key, capability, release_error)
+                core_timeout_outcome = False
+        ended_at = datetime.now(timezone.utc)
+        return AdapterAttemptResult(
+            envelope,
+            build_attempt_outcome_ref(
+                task_id,
+                adapter_key,
+                capability,
+                attempt_index,
+                envelope,
+                started_at=started_at,
+                ended_at=ended_at,
+                core_timeout_outcome=core_timeout_outcome,
+            ),
+            core_timeout_outcome=core_timeout_outcome,
+        )
+
+    try:
+        if requested_slots is not None:
+            managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
+            managed_trace_store = resource_trace_store or default_runtime_resource_trace_store(managed_resource_store)
+            acquire_result = acquire_runtime_resource_bundle(
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                requested_slots=requested_slots,
+                resource_lifecycle_store=managed_resource_store,
+                resource_trace_store=managed_trace_store,
+            )
+            if isinstance(acquire_result, Mapping):
+                envelope = dict(acquire_result)
+                return finish_attempt(envelope)
+            resource_bundle = acquire_result
+            live_resource_lease, live_resources_by_id, live_lease_error = resolve_host_resource_lease(
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                resource_lifecycle_store=managed_resource_store,
+            )
+            if live_lease_error is not None:
+                cleanup_envelope = settle_managed_resource_bundle(
+                    lease_id=resource_bundle.lease_id,
+                    task_id=task_id,
+                    resource_lifecycle_store=managed_resource_store,
+                    resource_trace_store=managed_trace_store,
+                    default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
+                    hint=None,
+                )
+                envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, live_lease_error)
+                return finish_attempt(envelope)
+
+            bundle_error = validate_host_resource_bundle(
+                resource_bundle,
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                requested_slots=requested_slots,
+                live_resource_lease=live_resource_lease,
+                live_resources_by_id=live_resources_by_id,
+            )
+            if bundle_error is not None:
+                cleanup_envelope = settle_managed_resource_bundle(
+                    lease_id=live_resource_lease.lease_id,
+                    task_id=task_id,
+                    resource_lifecycle_store=managed_resource_store,
+                    resource_trace_store=managed_trace_store,
+                    default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
+                    hint=None,
+                )
+                envelope = cleanup_envelope or failure_envelope(task_id, adapter_key, capability, bundle_error)
+                return finish_attempt(envelope)
+
+        adapter_context = AdapterExecutionContext(
+            request=adapter_request,
+            resource_bundle=resource_bundle,
+            execution_control_policy=policy,
+        )
+        slot = acquire_execution_concurrency_slot(
+            policy.concurrency,
+            adapter_key=adapter_key,
+            capability=capability,
+        )
+        if slot is None:
+            event = None
+            if attempt_index > 1:
+                event = build_execution_control_event(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    event_type=EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED,
+                    attempt_count=attempt_index - 1,
+                    control_code=EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                    task_record_ref=f"task_record:{task_id}",
+                    policy=policy,
+                )
+            cleanup_envelope = None
+            if resource_bundle is not None and managed_resource_store is not None and live_resource_lease is not None:
+                cleanup_envelope = settle_managed_resource_bundle(
+                    lease_id=live_resource_lease.lease_id,
+                    task_id=task_id,
+                    resource_lifecycle_store=managed_resource_store,
+                    resource_trace_store=managed_trace_store,
+                    default_reason=DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON,
+                    hint=None,
+                )
+            envelope = cleanup_envelope or failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error(
+                    EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+                    "execution concurrency slot became unavailable after guarded admission",
+                    details={
+                        "control_code": EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                        "scope": policy.concurrency.scope,
+                        "max_in_flight": policy.concurrency.max_in_flight,
+                    },
+                ),
+            )
+            guard_release_error = release_attempt_admission_guard()
+            if guard_release_error is not None:
+                envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
+            return AdapterAttemptResult(envelope, None)
+        guard_release_error = release_attempt_admission_guard()
+        if guard_release_error is not None:
+            release_error = release_execution_concurrency_slot(slot)
+            slot_released = True
+            envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
+            if release_error is not None:
+                envelope = failure_envelope(task_id, adapter_key, capability, release_error)
+            return finish_attempt(envelope)
+        (
+            envelope,
+            disposition_hint,
+            default_release_reason,
+            slot_release_deferred,
+            core_timeout_outcome,
+        ) = run_adapter_attempt_with_timeout(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            adapter=adapter,
+            adapter_context=adapter_context,
+            timeout_ms=policy.timeout.timeout_ms,
+            resource_bundle=resource_bundle,
+            slot=slot,
+        )
+        if slot_release_deferred:
+            slot_released = True
+
+        if resource_bundle is not None and managed_resource_store is not None and live_resource_lease is not None:
+            cleanup_envelope = settle_managed_resource_bundle(
+                lease_id=live_resource_lease.lease_id,
+                task_id=task_id,
+                resource_lifecycle_store=managed_resource_store,
+                resource_trace_store=managed_trace_store,
+                default_reason=default_release_reason,
+                hint=disposition_hint,
+            )
+            if cleanup_envelope is not None:
+                envelope = cleanup_envelope
+                core_timeout_outcome = False
+        if slot_release_deferred:
+            return AdapterAttemptResult(envelope, None)
+        return finish_attempt(envelope, core_timeout_outcome=core_timeout_outcome)
+    finally:
+        if not admission_guard_released:
+            release_attempt_admission_guard()
+        if slot is not None and not slot_released:
+            release_execution_concurrency_slot(slot)
+
+
+def run_adapter_attempt_with_timeout(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    adapter: Any,
+    adapter_context: AdapterExecutionContext,
+    timeout_ms: int,
+    resource_bundle: Any,
+    slot: ExecutionConcurrencySlot | None,
+) -> tuple[dict[str, Any], ResourceDispositionHint | None, str, bool, bool]:
+    result_queue: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+
+    def invoke_adapter() -> None:
+        try:
+            result_queue.put(("payload", adapter.execute(adapter_context)))
+        except BaseException as error:
+            result_queue.put(("error", error))
+
+    thread = threading.Thread(target=invoke_adapter, daemon=True)
+    thread.start()
+    try:
+        kind, value = result_queue.get(timeout=timeout_ms / 1000)
+    except queue.Empty:
+        thread.join(timeout=EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS)
+        if thread.is_alive():
+            slot_release_deferred = False
+            if slot is not None:
+                def release_slot_after_adapter_exit() -> None:
+                    thread.join()
+                    release_execution_concurrency_slot(slot)
+
+                threading.Thread(target=release_slot_after_adapter_exit, daemon=True).start()
+                slot_release_deferred = True
+            envelope = failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                {
+                    "category": "runtime_contract",
+                    "code": EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+                    "message": "adapter execution timeout closeout could not be proven within bounded quarantine",
+                    "details": {
+                        "control_code": EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT,
+                        "timeout_ms": timeout_ms,
+                        "closeout_grace_seconds": EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS,
+                        "retryable": False,
+                        "resource_quarantine": "INVALID",
+                    },
+                },
+            )
+            disposition_hint = (
+                ResourceDispositionHint(
+                    lease_id=resource_bundle.lease_id,
+                    target_status_after_release="INVALID",
+                    reason="execution_timeout_closeout_unproven",
+                )
+                if resource_bundle is not None
+                else None
+            )
+            return envelope, disposition_hint, "execution_timeout_closeout_unproven", slot_release_deferred, False
+        envelope = failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            {
+                "category": "platform",
+                "code": EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT,
+                "message": "adapter execution attempt exceeded execution_control_policy timeout",
+                "details": {
+                    "control_code": EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT,
+                    "timeout_ms": timeout_ms,
+                    "retryable": True,
+                },
+            },
+        )
+        late_disposition_hint: ResourceDispositionHint | None = None
+        try:
+            late_kind, late_value = result_queue.get_nowait()
+        except queue.Empty:
+            late_kind = ""
+            late_value = None
+        if late_kind == "payload" and isinstance(late_value, Mapping):
+            late_disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+                late_value.get("resource_disposition_hint"),
+                expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
+            )
+            if hint_error is not None:
+                return (
+                    timeout_closeout_invalid_hint_envelope(task_id, adapter_key, capability, timeout_ms, hint_error),
+                    timeout_closeout_invalid_resource_hint(resource_bundle),
+                    "timeout_closeout_invalid_resource_disposition_hint",
+                    False,
+                    False,
+                )
+        elif late_kind == "error" and isinstance(late_value, PlatformAdapterError):
+            late_disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+                late_value.resource_disposition_hint,
+                expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
+            )
+            if hint_error is not None:
+                return (
+                    timeout_closeout_invalid_hint_envelope(task_id, adapter_key, capability, timeout_ms, hint_error),
+                    timeout_closeout_invalid_resource_hint(resource_bundle),
+                    "timeout_closeout_invalid_resource_disposition_hint",
+                    False,
+                    False,
+                )
+        return envelope, late_disposition_hint, DEFAULT_FAILURE_RELEASE_REASON, False, True
+
+    disposition_hint: ResourceDispositionHint | None = None
+    default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
+    if kind == "payload":
+        payload = value
+        payload_error = validate_success_payload(payload)
+        if payload_error is not None:
+            return failure_envelope(task_id, adapter_key, capability, payload_error), None, DEFAULT_FAILURE_RELEASE_REASON, False, False
+        disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+            payload.get("resource_disposition_hint"),
+            expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
+        )
+        if hint_error is not None:
+            return failure_envelope(task_id, adapter_key, capability, hint_error), None, DEFAULT_INVALID_HINT_RELEASE_REASON, False, False
+        return (
+            {
+                "task_id": task_id,
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "status": "success",
+                "raw": payload["raw"],
+                "normalized": payload["normalized"],
+            },
+            disposition_hint,
+            default_release_reason,
+            False,
+            False,
+        )
+
+    error = value
+    if isinstance(error, PlatformAdapterError):
+        disposition_hint, hint_error = extract_internal_resource_disposition_hint(
+            error.resource_disposition_hint,
+            expected_lease_id=resource_bundle.lease_id if resource_bundle is not None else None,
+        )
+        if hint_error is not None:
+            return failure_envelope(task_id, adapter_key, capability, hint_error), None, DEFAULT_INVALID_HINT_RELEASE_REASON, False, False
+        return (
+            failure_envelope(task_id, adapter_key, capability, classify_adapter_error(error)),
+            disposition_hint,
+            DEFAULT_FAILURE_RELEASE_REASON,
+            False,
+            False,
+        )
+    return (
+        failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "adapter_execution_error",
+                str(error) or error.__class__.__name__,
+            ),
+        ),
+        None,
+        DEFAULT_FAILURE_RELEASE_REASON,
+        False,
+        False,
+    )
+
+
+def timeout_closeout_invalid_hint_envelope(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    timeout_ms: int,
+    hint_error: Mapping[str, Any],
+) -> dict[str, Any]:
+    return failure_envelope(
+        task_id,
+        adapter_key,
+        capability,
+        runtime_contract_error(
+            EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+            "timeout closeout late resource disposition hint is invalid",
+            details={
+                "control_code": EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT,
+                "timeout_ms": timeout_ms,
+                "closeout_error": dict(hint_error),
+                "resource_quarantine": "INVALID",
+                "retryable": False,
+            },
+        ),
+    )
+
+
+def timeout_closeout_invalid_resource_hint(resource_bundle: Any) -> ResourceDispositionHint | None:
+    if resource_bundle is None:
+        return None
+    return ResourceDispositionHint(
+        lease_id=resource_bundle.lease_id,
+        target_status_after_release="INVALID",
+        reason="timeout_closeout_invalid_resource_disposition_hint",
+    )
+
+
+def acquire_execution_concurrency_admission_guard(
+    policy: ExecutionConcurrencyPolicy,
+    *,
+    adapter_key: str,
+    capability: str,
+) -> ExecutionConcurrencyAdmissionGuard:
+    scope_key = execution_concurrency_scope_key(policy, adapter_key=adapter_key, capability=capability)
+    with _EXECUTION_CONCURRENCY_LOCK:
+        guard_lock = _EXECUTION_CONCURRENCY_ADMISSION_GUARDS.get(scope_key)
+        if guard_lock is None:
+            guard_lock = threading.Lock()
+            _EXECUTION_CONCURRENCY_ADMISSION_GUARDS[scope_key] = guard_lock
+    guard_lock.acquire()
+    return ExecutionConcurrencyAdmissionGuard(scope_key=scope_key, lock=guard_lock)
+
+
+def release_execution_concurrency_admission_guard(
+    guard: ExecutionConcurrencyAdmissionGuard | None,
+) -> dict[str, Any] | None:
+    if guard is None:
+        return None
+    try:
+        guard.lock.release()
+    except RuntimeError:
+        return runtime_contract_error(
+            EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+            "execution concurrency admission guard release underflow",
+            details={
+                "control_code": EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+                "scope_key": list(guard.scope_key),
+            },
+        )
+    return None
+
+
+def acquire_execution_concurrency_slot(
+    policy: ExecutionConcurrencyPolicy,
+    *,
+    adapter_key: str,
+    capability: str,
+) -> ExecutionConcurrencySlot | None:
+    scope_key = execution_concurrency_scope_key(policy, adapter_key=adapter_key, capability=capability)
+    with _EXECUTION_CONCURRENCY_LOCK:
+        in_flight = _EXECUTION_CONCURRENCY_IN_FLIGHT.get(scope_key, 0)
+        if in_flight >= policy.max_in_flight:
+            return None
+        _EXECUTION_CONCURRENCY_IN_FLIGHT[scope_key] = in_flight + 1
+    return ExecutionConcurrencySlot(scope_key=scope_key)
+
+
+def is_execution_concurrency_slot_available(
+    policy: ExecutionConcurrencyPolicy,
+    *,
+    adapter_key: str,
+    capability: str,
+) -> bool:
+    scope_key = execution_concurrency_scope_key(policy, adapter_key=adapter_key, capability=capability)
+    with _EXECUTION_CONCURRENCY_LOCK:
+        return _EXECUTION_CONCURRENCY_IN_FLIGHT.get(scope_key, 0) < policy.max_in_flight
+
+
+def release_execution_concurrency_slot(slot: ExecutionConcurrencySlot | None) -> dict[str, Any] | None:
+    if slot is None:
+        return None
+    with _EXECUTION_CONCURRENCY_LOCK:
+        in_flight = _EXECUTION_CONCURRENCY_IN_FLIGHT.get(slot.scope_key, 0)
+        if in_flight <= 0:
+            return runtime_contract_error(
+                EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+                "execution concurrency slot release underflow",
+                details={
+                    "control_code": EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID,
+                    "scope_key": list(slot.scope_key),
+                    "in_flight": in_flight,
+                },
+            )
+        if in_flight == 1:
+            _EXECUTION_CONCURRENCY_IN_FLIGHT.pop(slot.scope_key, None)
+        else:
+            _EXECUTION_CONCURRENCY_IN_FLIGHT[slot.scope_key] = in_flight - 1
+    return None
+
+
+def execution_concurrency_scope_key(
+    policy: ExecutionConcurrencyPolicy,
+    *,
+    adapter_key: str,
+    capability: str,
+) -> tuple[str, ...]:
+    if policy.scope == "global":
+        return ("global",)
+    if policy.scope == "adapter":
+        return ("adapter", adapter_key)
+    return ("adapter_capability", adapter_key, capability)
+
+
+def is_retryable_attempt_outcome(
+    envelope: Mapping[str, Any],
+    *,
+    capability: str,
+    core_timeout_outcome: bool,
+) -> bool:
+    if capability != CONTENT_DETAIL_BY_URL or envelope.get("status") != "failed":
+        return False
+    error = envelope.get("error")
+    if not isinstance(error, Mapping):
+        return False
+    details = error.get("details")
+    if not isinstance(details, Mapping):
+        details = {}
+    if core_timeout_outcome:
+        return True
+    return error.get("category") == "platform" and details.get("retryable") is True
+
+
+def build_attempt_outcome_ref(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    attempt_index: int,
+    envelope: Mapping[str, Any],
+    *,
+    started_at: datetime,
+    ended_at: datetime,
+    core_timeout_outcome: bool,
+) -> dict[str, Any]:
+    status = envelope.get("status")
+    if status == "success":
+        outcome = "succeeded"
+        control_code = ""
+    else:
+        error = envelope.get("error") if isinstance(envelope.get("error"), Mapping) else {}
+        details = error.get("details") if isinstance(error.get("details"), Mapping) else {}
+        control_code = str(details.get("control_code") or "") if core_timeout_outcome else ""
+        outcome = "timeout" if core_timeout_outcome else "failed"
+    terminal_envelope = dict(envelope)
+    terminal_envelope.pop("runtime_result_refs", None)
+    terminal_envelope.pop("execution_control_events", None)
+    ref = {
+        "ref_type": "ExecutionAttemptOutcome",
+        "ref_id": f"{task_id}:attempt:{attempt_index}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "attempt_index": attempt_index,
+        "started_at": started_at.isoformat(timespec="microseconds").replace("+00:00", "Z"),
+        "ended_at": ended_at.isoformat(timespec="microseconds").replace("+00:00", "Z"),
+        "outcome": outcome,
+        "terminal_envelope": terminal_envelope,
+    }
+    if control_code:
+        ref["control_code"] = control_code
+    return ref
+
+
+def build_execution_control_event(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    *,
+    event_type: str,
+    attempt_count: int,
+    control_code: str,
+    task_record_ref: str,
+    policy: ExecutionControlPolicy,
+) -> dict[str, Any]:
+    return {
+        "ref_type": "ExecutionControlEvent",
+        "ref_id": f"{task_id}:{event_type}:{attempt_count}",
+        "task_id": task_id,
+        "event_type": event_type,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "attempt_count": attempt_count,
+        "control_code": control_code,
+        "task_record_ref": task_record_ref,
+        "policy": {
+            "timeout": {"timeout_ms": policy.timeout.timeout_ms},
+            "retry": {"max_attempts": policy.retry.max_attempts, "backoff_ms": policy.retry.backoff_ms},
+            "concurrency": {
+                "scope": policy.concurrency.scope,
+                "max_in_flight": policy.concurrency.max_in_flight,
+                "on_limit": policy.concurrency.on_limit,
+            },
+        },
+        "occurred_at": datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+    }
+
+
+def with_runtime_observability(
+    envelope: Mapping[str, Any],
+    runtime_result_refs: list[dict[str, Any]],
+    execution_control_events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    enriched = dict(envelope)
+    if runtime_result_refs and (enriched.get("status") == "failed" or len(runtime_result_refs) > 1 or execution_control_events):
+        enriched["runtime_result_refs"] = list(runtime_result_refs)
+    if execution_control_events:
+        enriched["execution_control_events"] = list(execution_control_events)
+    return enriched
+
+
+def with_failed_envelope_control_details(
+    envelope: Mapping[str, Any],
+    *,
+    event: Mapping[str, Any],
+    details: Mapping[str, Any],
+) -> dict[str, Any]:
+    enriched = dict(envelope)
+    error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
+    current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    current_details.update(details)
+    current_details["execution_control_event"] = dict(event)
+    error["details"] = current_details
+    enriched["error"] = error
+    return enriched
 
 
 def finalize_task_execution_result(
