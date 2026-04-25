@@ -817,6 +817,7 @@ def execute_controlled_adapter_attempts(
                 structured_log_events,
                 metric_samples,
             )
+        retry_result_refs = [attempt.attempt_outcome_ref] if attempt.attempt_outcome_ref is not None else []
         retry_log_event, retry_metric_sample = build_retry_scheduled_observability(
             task_id=task_id,
             adapter_key=adapter_key,
@@ -832,7 +833,7 @@ def execute_controlled_adapter_attempts(
                 if isinstance(envelope.get("runtime_failure_signal", {}).get("resource_trace_refs"), list)
                 else []
             ),
-            runtime_result_refs=runtime_result_refs,
+            runtime_result_refs=retry_result_refs,
             policy=policy,
         )
         structured_log_events.append(retry_log_event)

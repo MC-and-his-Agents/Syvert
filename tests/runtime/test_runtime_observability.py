@@ -519,6 +519,21 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
             {event["failure_signal_id"] for event in payload["runtime_structured_log_events"] if event["event_type"] == "retry_scheduled"},
             set(signal_ids),
         )
+        retry_scheduled_events = [
+            event
+            for event in payload["runtime_structured_log_events"]
+            if event["event_type"] == "retry_scheduled"
+        ]
+        self.assertEqual(len(retry_scheduled_events), 2)
+        for event, direct_attempt_index in zip(retry_scheduled_events, (1, 2), strict=True):
+            self.assertEqual(
+                [ref.get("attempt_index") for ref in event["runtime_result_refs"]],
+                [direct_attempt_index],
+            )
+            self.assertEqual(
+                [ref.get("ref_type") for ref in event["runtime_result_refs"]],
+                ["ExecutionAttemptOutcome"],
+            )
 
 
 if __name__ == "__main__":

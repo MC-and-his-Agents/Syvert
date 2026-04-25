@@ -14,6 +14,7 @@ from syvert.task_record import (
     create_task_record,
     finish_task_record,
     start_task_record,
+    task_record_from_dict,
     task_record_to_dict,
 )
 from syvert.task_record_store import LocalTaskRecordStore, TaskRecordStoreError
@@ -701,6 +702,31 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             conflicting["error"]["code"] = "changed"
             with self.assertRaises((TaskRecordStoreError, TaskRecordContractError)):
                 store.write(finish_task_record(running, conflicting, occurred_at="2026-04-17T12:00:02Z"))
+
+    def test_store_rejects_terminal_rewrite_that_drops_existing_observability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-observability-subset"),
+                ),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-observability-subset",
+                task_record_store=store,
+            )
+            payload = task_record_to_dict(outcome.task_record)
+            payload["runtime_failure_signals"] = []
+            payload["runtime_structured_log_events"] = []
+            payload["runtime_execution_metric_samples"] = []
+            subset_terminal = task_record_from_dict(payload)
+
+            self.assertTrue(outcome.task_record.runtime_structured_log_events)
+            self.assertTrue(outcome.task_record.runtime_execution_metric_samples)
+            with self.assertRaises(TaskRecordStoreError):
+                store.write(subset_terminal)
+            self.assertEqual(store.load("task-store-observability-subset"), outcome.task_record)
 
     def test_store_allows_idempotent_rewrite_after_loading_legacy_terminal_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

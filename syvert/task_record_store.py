@@ -224,6 +224,24 @@ def merge_incoming_terminal_observability(candidate: TaskRecord, incoming: TaskR
         id_field="metric_id",
         field="runtime_execution_metric_samples",
     )
+    ensure_observability_superset(
+        candidate.runtime_failure_signals,
+        incoming.runtime_failure_signals,
+        id_field="signal_id",
+        field="runtime_failure_signals",
+    )
+    ensure_observability_superset(
+        candidate.runtime_structured_log_events,
+        incoming.runtime_structured_log_events,
+        id_field="event_id",
+        field="runtime_structured_log_events",
+    )
+    ensure_observability_superset(
+        candidate.runtime_execution_metric_samples,
+        incoming.runtime_execution_metric_samples,
+        id_field="metric_id",
+        field="runtime_execution_metric_samples",
+    )
     return replace(
         candidate,
         runtime_failure_signals=incoming.runtime_failure_signals,
@@ -262,3 +280,22 @@ def ensure_observability_no_conflict(
         entry_id = str(entry[id_field])
         if entry_id in by_id and by_id[entry_id] != entry:
             raise TaskRecordConflictError(f"本地持久化记录的 {field} 存在同 ID 冲突")
+
+
+def ensure_observability_superset(
+    candidate_entries: tuple[object, ...],
+    incoming_entries: tuple[object, ...],
+    *,
+    id_field: str,
+    field: str,
+) -> None:
+    incoming_by_id: dict[str, object] = {}
+    for entry in incoming_entries:
+        if isinstance(entry, Mapping) and isinstance(entry.get(id_field), str):
+            incoming_by_id[str(entry[id_field])] = entry
+    for entry in candidate_entries:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get(id_field), str):
+            raise TaskRecordConflictError(f"本地持久化记录的 {field} 不满足共享模型")
+        entry_id = str(entry[id_field])
+        if incoming_by_id.get(entry_id) != entry:
+            raise TaskRecordConflictError(f"本地持久化记录的 {field} 不得被较小观测子集覆盖")
