@@ -41,7 +41,7 @@
 
 ## 下一步动作
 
-- 当前 closeout PR：待创建。
+- 当前 closeout PR：`#251 https://github.com/MC-and-his-Agents/Syvert/pull/251`
 - 本 PR 为 docs-only closeout，PR class 必须保持 `docs`。
 - 通过 CI、reviewer、guardian 与 merge gate。
 - 合入后 fast-forward main。
@@ -100,10 +100,14 @@
   - 结果：通过，`governance-gate 通过。`
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，`PR class: docs`，`变更类别: docs`，`PR scope 校验通过。`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 232 --item-key CHORE-0156-fr-0018-parent-closeout --item-type CHORE --release v0.6.0 --sprint 2026-S19 --title 'docs(closeout): 收口 FR-0018 父事项' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：通过，创建 PR `#251`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/commits/2f6878d094000ba5b19725af82f33de5ac610956/check-runs`
+  - 结果：PR `#251` head `2f6878d094000ba5b19725af82f33de5ac610956` 的 required checks 全部通过
 
 ## 待完成
 
-- 创建并合入本 closeout PR。
+- 通过 PR `#251` guardian / merge gate 并合入。
 - 合入后将 `#232` 正文更新为已完成并关闭，Project 切到 `Done`。
 - 回写并关闭父 FR `#221`，说明 formal spec、HTTP runtime 与 same-path evidence 已合入主干。
 - fast-forward main，退役 `issue-232-chore-fr-0018` 分支与 worktree。
@@ -121,5 +125,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`394d48a7be861de742aae439c38e18625cc44193`。
-- 当前可恢复 checkpoint：本 closeout PR 当前 head 承载本 exec-plan 首个版本化恢复工件与 `FR-0018` inactive requirement container closeout 索引；合入前以 PR head 与 merge gate 输出为准。
+- 当前可恢复 checkpoint：`2f6878d094000ba5b19725af82f33de5ac610956`，包含本 exec-plan 首个版本化恢复工件与 `FR-0018` inactive requirement container closeout 索引。
 - 后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
