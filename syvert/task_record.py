@@ -63,6 +63,9 @@ class TaskRecord:
     task_record_ref: str | None = None
     runtime_result_refs: tuple[Any, ...] = field(default_factory=tuple)
     execution_control_events: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_failure_signals: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_structured_log_events: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_execution_metric_samples: tuple[Any, ...] = field(default_factory=tuple)
 
 
 def now_rfc3339_utc() -> str:
@@ -164,6 +167,9 @@ def start_task_record(record: TaskRecord, *, occurred_at: str | None = None) -> 
         task_record_ref=record.task_record_ref,
         runtime_result_refs=record.runtime_result_refs,
         execution_control_events=record.execution_control_events,
+        runtime_failure_signals=record.runtime_failure_signals,
+        runtime_structured_log_events=record.runtime_structured_log_events,
+        runtime_execution_metric_samples=record.runtime_execution_metric_samples,
     )
     validate_task_record(updated)
     return updated
@@ -227,6 +233,17 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
             "execution_control_events",
             record.execution_control_events,
         ),
+        runtime_failure_signals=_runtime_failure_signals(normalized_envelope, record.runtime_failure_signals),
+        runtime_structured_log_events=_observability_entries(
+            normalized_envelope,
+            "runtime_structured_log_events",
+            record.runtime_structured_log_events,
+        ),
+        runtime_execution_metric_samples=_observability_entries(
+            normalized_envelope,
+            "runtime_execution_metric_samples",
+            record.runtime_execution_metric_samples,
+        ),
     )
     validate_task_record(updated)
     return updated
@@ -252,6 +269,9 @@ def task_record_to_dict(record: TaskRecord) -> dict[str, Any]:
         "task_record_ref": record.task_record_ref,
         "runtime_result_refs": list(record.runtime_result_refs),
         "execution_control_events": list(record.execution_control_events),
+        "runtime_failure_signals": list(record.runtime_failure_signals),
+        "runtime_structured_log_events": list(record.runtime_structured_log_events),
+        "runtime_execution_metric_samples": list(record.runtime_execution_metric_samples),
         "logs": [
             {
                 "sequence": entry.sequence,
@@ -326,6 +346,9 @@ def task_record_from_dict(payload: Mapping[str, Any]) -> TaskRecord:
         ),
         runtime_result_refs=_observability_entries(payload, "runtime_result_refs", ()),
         execution_control_events=_observability_entries(payload, "execution_control_events", ()),
+        runtime_failure_signals=_observability_entries(payload, "runtime_failure_signals", ()),
+        runtime_structured_log_events=_observability_entries(payload, "runtime_structured_log_events", ()),
+        runtime_execution_metric_samples=_observability_entries(payload, "runtime_execution_metric_samples", ()),
     )
     if len(record.logs) != len(logs_payload):
         raise TaskRecordContractError("TaskRecord.logs 项必须全部为对象")
@@ -348,6 +371,29 @@ def validate_task_record(record: TaskRecord) -> None:
         != record.execution_control_events
     ):
         raise TaskRecordContractError("TaskRecord.execution_control_events 必须预先满足 JSON-safe 约束")
+    if (
+        _observability_entries({"runtime_failure_signals": record.runtime_failure_signals}, "runtime_failure_signals", ())
+        != record.runtime_failure_signals
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_failure_signals 必须预先满足 JSON-safe 约束")
+    if (
+        _observability_entries(
+            {"runtime_structured_log_events": record.runtime_structured_log_events},
+            "runtime_structured_log_events",
+            (),
+        )
+        != record.runtime_structured_log_events
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_structured_log_events 必须预先满足 JSON-safe 约束")
+    if (
+        _observability_entries(
+            {"runtime_execution_metric_samples": record.runtime_execution_metric_samples},
+            "runtime_execution_metric_samples",
+            (),
+        )
+        != record.runtime_execution_metric_samples
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_execution_metric_samples 必须预先满足 JSON-safe 约束")
     validate_request_snapshot(record.request)
     if record.status not in TASK_RECORD_STATUSES:
         raise TaskRecordContractError("TaskRecord.status 不在允许值范围内")
@@ -492,6 +538,15 @@ def _observability_entries(source: Mapping[str, Any], field_name: str, default: 
     return tuple(normalized)
 
 
+def _runtime_failure_signals(envelope: Mapping[str, Any], default: tuple[Any, ...]) -> tuple[Any, ...]:
+    if "runtime_failure_signal" in envelope:
+        normalized = normalize_json_value(envelope["runtime_failure_signal"], field="runtime_failure_signal")
+        if not isinstance(normalized, Mapping):
+            raise TaskRecordContractError("runtime_failure_signal 必须是对象")
+        return (dict(normalized),)
+    return _observability_entries(envelope, "runtime_failure_signals", default)
+
+
 def coerce_int(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TaskRecordContractError(f"{field} 必须为整数")
@@ -550,6 +605,22 @@ def validate_terminal_envelope_observability_contract(record: TaskRecord, envelo
         if envelope_execution_control_events != record.execution_control_events:
             raise TaskRecordContractError(
                 "TaskTerminalResult.envelope.execution_control_events 与 TaskRecord.execution_control_events 不一致"
+            )
+    if "runtime_failure_signal" in envelope or "runtime_failure_signals" in envelope:
+        envelope_failure_signals = _runtime_failure_signals(envelope, ())
+        if envelope_failure_signals != record.runtime_failure_signals:
+            raise TaskRecordContractError("TaskTerminalResult.envelope.runtime_failure_signal 与 TaskRecord.runtime_failure_signals 不一致")
+    if "runtime_structured_log_events" in envelope:
+        envelope_log_events = _observability_entries(envelope, "runtime_structured_log_events", ())
+        if envelope_log_events != record.runtime_structured_log_events:
+            raise TaskRecordContractError(
+                "TaskTerminalResult.envelope.runtime_structured_log_events 与 TaskRecord.runtime_structured_log_events 不一致"
+            )
+    if "runtime_execution_metric_samples" in envelope:
+        envelope_metric_samples = _observability_entries(envelope, "runtime_execution_metric_samples", ())
+        if envelope_metric_samples != record.runtime_execution_metric_samples:
+            raise TaskRecordContractError(
+                "TaskTerminalResult.envelope.runtime_execution_metric_samples 与 TaskRecord.runtime_execution_metric_samples 不一致"
             )
 
 

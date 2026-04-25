@@ -1418,7 +1418,139 @@ def with_runtime_observability(
         enriched["runtime_result_refs"] = list(runtime_result_refs)
     if execution_control_events:
         enriched["execution_control_events"] = list(execution_control_events)
+    if enriched.get("status") == "failed":
+        enriched = with_failure_observability(enriched)
     return enriched
+
+
+def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    if envelope.get("status") != "failed" or not isinstance(envelope.get("error"), Mapping):
+        return dict(envelope)
+
+    enriched = dict(envelope)
+    error = dict(enriched["error"])
+    details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    task_id = str(enriched.get("task_id") or "")
+    adapter_key = str(enriched.get("adapter_key") or "")
+    capability = str(enriched.get("capability") or "")
+    error_category = str(error.get("category") or "")
+    error_code = str(error.get("code") or "")
+    occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    task_record_ref = details.get("task_record_ref")
+    if not isinstance(task_record_ref, str) or not task_record_ref:
+        task_record_ref = "none" if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED else f"task_record:{task_id}"
+    runtime_result_refs = list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
+    resource_trace_refs = list(details.get("resource_trace_refs") if isinstance(details.get("resource_trace_refs"), list) else [])
+    failure_phase = infer_failure_phase(error_category=error_category, error_code=error_code, details=details)
+    event_type = infer_failure_log_event_type(error_code=error_code, details=details, task_record_ref=task_record_ref)
+    metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
+    signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}"
+    envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}"
+    failure_signal = {
+        "signal_id": signal_id,
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "status": "failed",
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "envelope_ref": envelope_ref,
+        "task_record_ref": task_record_ref,
+        "resource_trace_refs": resource_trace_refs,
+        "runtime_result_refs": runtime_result_refs,
+        "occurred_at": occurred_at,
+    }
+    log_event = {
+        "event_id": f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": event_type,
+        "level": "error",
+        "attempt_index": infer_attempt_index(runtime_result_refs),
+        "failure_signal_id": signal_id,
+        "resource_trace_refs": resource_trace_refs,
+        "runtime_result_refs": runtime_result_refs,
+        "message": f"task failed: {error_category}/{error_code}",
+        "occurred_at": occurred_at,
+    }
+    metric_sample = {
+        "metric_id": f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}",
+        "task_id": task_id,
+        "metric_name": metric_name,
+        "metric_value": 1,
+        "unit": "count",
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "attempt_index": log_event["attempt_index"],
+        "occurred_at": occurred_at,
+    }
+    enriched["runtime_failure_signal"] = failure_signal
+    enriched["runtime_structured_log_events"] = [log_event]
+    enriched["runtime_execution_metric_samples"] = [metric_sample]
+    return enriched
+
+
+def infer_failure_phase(*, error_category: str, error_code: str, details: Mapping[str, Any]) -> str:
+    event = details.get("execution_control_event")
+    if isinstance(event, Mapping):
+        event_type = event.get("event_type")
+        if event_type in {EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED, EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED}:
+            return "concurrency_rejected"
+        if event_type == EXECUTION_CONTROL_EVENT_RETRY_EXHAUSTED:
+            return "retry_exhausted"
+    if details.get("retry_exhausted") is True:
+        return "retry_exhausted"
+    if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED:
+        return "concurrency_rejected"
+    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
+        return "timeout"
+    if error_code in {"resource_unavailable", "invalid_resource_requirement"}:
+        return "resource_acquire"
+    if error_category == "invalid_input":
+        return "admission"
+    if error_category == "runtime_contract":
+        return "pre_execution"
+    return "adapter_execution"
+
+
+def infer_failure_log_event_type(*, error_code: str, details: Mapping[str, Any], task_record_ref: str) -> str:
+    event = details.get("execution_control_event")
+    if isinstance(event, Mapping):
+        event_type = event.get("event_type")
+        if event_type in {
+            EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED,
+            EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED,
+        }:
+            return str(event_type)
+    if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED and task_record_ref == "none":
+        return EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED
+    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
+        return "timeout_triggered"
+    return "task_failed"
+
+
+def infer_failure_metric_name(*, event_type: str, failure_phase: str) -> str:
+    if event_type == EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED:
+        return "admission_concurrency_rejected_total"
+    if event_type == EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED:
+        return "retry_concurrency_rejected_total"
+    if failure_phase == "timeout":
+        return "timeout_total"
+    return "task_failed_total"
+
+
+def infer_attempt_index(runtime_result_refs: list[Any]) -> int:
+    for entry in reversed(runtime_result_refs):
+        if isinstance(entry, Mapping):
+            attempt_index = entry.get("attempt_index")
+            if isinstance(attempt_index, int) and attempt_index >= 0:
+                return attempt_index
+    return 0
 
 
 def with_failed_envelope_control_details(
@@ -2291,7 +2423,7 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
     details = error.get("details", {})
     if not isinstance(details, Mapping):
         details = {}
-    return {
+    envelope = {
         "task_id": task_id,
         "adapter_key": adapter_key,
         "capability": capability,
@@ -2303,6 +2435,7 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
             "details": dict(details),
         },
     }
+    return with_failure_observability(envelope)
 
 
 def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
