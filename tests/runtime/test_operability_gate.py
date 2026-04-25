@@ -149,6 +149,7 @@ class OperabilityGateTests(unittest.TestCase):
         missing_failure = next(item for item in result["failures"] if item["code"] == "missing_mandatory_cases")
         self.assertEqual(missing_failure["details"]["missing_case_ids"], ["same-path-terminal-result-read"])
         self.assertIn("same-path-terminal-result-read", result["summary"]["failed_case_ids"])
+        self.assertIn("cli_api_same_path", result["summary"]["failed_dimensions"])
 
     def test_missing_policy_snapshot_fails_closed(self) -> None:
         result = self.pass_result(policy_snapshot=None)
@@ -493,6 +494,26 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("upstream_refs_revision_mismatch", self.failure_codes(result))
         self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_case_evidence_refs_must_be_scoped_to_case_id(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["actual_result_ref"] = "gate:test-head-sha:FR-0007:v0.6.0:baseline"
+        cases[0]["evidence_refs"] = ["operability:test-head-sha:other-operability-case"]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_ref_scope_mismatch", self.failure_codes(result))
+        self.assertIn("case_evidence_ref_scope_mismatch", self.failure_codes(result))
+
+    def test_case_upstream_refs_must_point_to_approved_modules(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["upstream_refs"] = ["tests:test-head-sha:tests.runtime.test_operability_gate"]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_upstream_refs", self.failure_codes(result))
 
     def test_renderer_rejects_non_head_execution_revision(self) -> None:
         with self.assertRaises(SystemExit):

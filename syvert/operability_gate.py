@@ -30,6 +30,15 @@ ALLOWED_DIMENSIONS = frozenset(
 APPROVED_CAPABILITY = "content_detail_by_url"
 ALLOWED_ENTRYPOINTS = frozenset({"core", "cli", "http"})
 NORMATIVE_DEPENDENCIES = ("FR-0007", "FR-0016", "FR-0017", "FR-0018")
+APPROVED_UPSTREAM_MODULES = frozenset(
+    {
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path",
+        "tests.runtime.test_version_gate",
+    }
+)
 
 POLICY_SNAPSHOT = {
     "timeout_ms": 30000,
@@ -433,13 +442,7 @@ def orchestrate_operability_gate(
             case["verdict"] = FAIL_VERDICT
     normalized_case_ids = {str(case["case_id"]) for case in normalized_cases}
     invalid_failed_case_ids = failed_case_ids - normalized_case_ids
-    failed_dimensions = sorted(
-        {
-            str(case["dimension"])
-            for case in normalized_cases
-            if str(case["case_id"]) in failed_case_ids
-        }
-    )
+    failed_dimensions = _failed_dimensions(normalized_cases, failures, failed_case_ids)
     summary = {
         "case_total": len(normalized_cases) + len(invalid_failed_case_ids),
         "pass_case_total": max(len(normalized_cases) - len(failed_case_ids & normalized_case_ids), 0),
@@ -780,6 +783,15 @@ def _normalize_cases(
                     details={"actual_result_ref": actual_result_ref, "execution_revision": execution_revision},
                 )
             )
+        elif not _is_case_scoped_evidence_ref(actual_result_ref, case_id):
+            failures.append(
+                _case_failure(
+                    case_id,
+                    "actual_result_ref_scope_mismatch",
+                    "actual_result_ref must be scoped to the current operability case",
+                    details={"actual_result_ref": actual_result_ref},
+                )
+            )
         if "evidence_refs" not in raw_case:
             failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires evidence_refs"))
             evidence_refs = []
@@ -787,6 +799,16 @@ def _normalize_cases(
             evidence_refs = _normalize_evidence_refs(raw_case.get("evidence_refs"), failures, source=case_id)
             if not evidence_refs:
                 failures.append(_case_failure(case_id, "missing_case_evidence_refs", "operability case requires non-empty evidence_refs"))
+            mismatched_evidence_refs = [ref for ref in evidence_refs if not _is_case_scoped_evidence_ref(ref, case_id)]
+            if mismatched_evidence_refs:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "case_evidence_ref_scope_mismatch",
+                        "case evidence_refs must be scoped to the current operability case",
+                        details={"mismatched_evidence_refs": mismatched_evidence_refs},
+                    )
+                )
         upstream_refs = _normalize_evidence_refs(raw_case.get("upstream_refs"), failures, source=case_id)
         if not upstream_refs:
             failures.append(_case_failure(case_id, "missing_upstream_refs", "operability case requires concrete upstream evidence refs"))
@@ -799,6 +821,16 @@ def _normalize_cases(
                         "upstream_refs_revision_mismatch",
                         "upstream_refs must be bound to the execution_revision",
                         details={"execution_revision": execution_revision, "mismatched_upstream_refs": mismatched_upstream_refs},
+                    )
+                )
+            invalid_upstream_refs = [ref for ref in upstream_refs if not _is_approved_upstream_ref(ref)]
+            if invalid_upstream_refs:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "invalid_upstream_refs",
+                        "upstream_refs must point to approved upstream evidence modules",
+                        details={"invalid_upstream_refs": invalid_upstream_refs},
                     )
                 )
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
@@ -1425,6 +1457,30 @@ def _failed_case_ids(cases: Sequence[Mapping[str, Any]], failures: Sequence[Mapp
     return failed_ids
 
 
+def _failed_dimensions(
+    cases: Sequence[Mapping[str, Any]],
+    failures: Sequence[Mapping[str, Any]],
+    failed_case_ids: set[str],
+) -> list[str]:
+    failed_dimensions = {
+        str(case["dimension"])
+        for case in cases
+        if str(case["case_id"]) in failed_case_ids and _non_empty_string(case.get("dimension"))
+    }
+    for case_id in failed_case_ids:
+        definition = _MANDATORY_CASES.get(case_id)
+        if definition:
+            failed_dimensions.add(str(definition["dimension"]))
+    for failure in failures:
+        details = failure.get("details")
+        if not isinstance(details, Mapping):
+            continue
+        missing_dimensions = details.get("missing_dimensions")
+        if isinstance(missing_dimensions, Iterable) and not isinstance(missing_dimensions, (Mapping, str, bytes)):
+            failed_dimensions.update(str(dimension) for dimension in missing_dimensions if _non_empty_string(dimension))
+    return sorted(failed_dimensions)
+
+
 def _dedupe_sorted(values: Iterable[str]) -> list[str]:
     return sorted(set(values))
 
@@ -1439,6 +1495,18 @@ def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
     if not _non_empty_string(evidence_ref) or evidence_ref.startswith(("http://", "https://")):
         return False
     return evidence_ref.startswith(("FR-", "operability:", "test_evidence:", "tests:", "local:", "ci:", "gate:", "log:", "metrics:"))
+
+
+def _is_case_scoped_evidence_ref(evidence_ref: str, case_id: str) -> bool:
+    parts = evidence_ref.split(":")
+    return len(parts) >= 3 and not parts[0].startswith("FR-") and case_id in parts[2:]
+
+
+def _is_approved_upstream_ref(evidence_ref: str) -> bool:
+    parts = evidence_ref.split(":")
+    if len(parts) != 3 or parts[0] not in {"tests", "log"}:
+        return False
+    return parts[2] in APPROVED_UPSTREAM_MODULES
 
 
 def _is_fr0007_baseline_ref(evidence_ref: str) -> bool:
