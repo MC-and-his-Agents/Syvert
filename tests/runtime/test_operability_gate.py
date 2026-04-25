@@ -44,6 +44,12 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
 
+    def test_baseline_gate_ref_rejects_substring_forgery(self) -> None:
+        result = self.pass_result(baseline_gate_ref="garbage-prefix-FR-0007-garbage:test-head-sha")
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+
     def test_gate_id_and_matrix_version_are_frozen(self) -> None:
         result = self.pass_result(gate_id="totally-different-gate", matrix_version="scratch-matrix")
 
@@ -111,6 +117,41 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
+        self.assertEqual(result["summary"]["fail_case_total"], 1)
+        self.assertEqual(result["summary"]["failed_case_ids"], ["trc-timeout-platform-control-code"])
+
+    def test_malformed_greater_than_expected_value_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "flm-success-observable")
+        for field in target["expected_result"]["fields"]:
+            if field["operator"] == ">=":
+                field["value"] = "not-a-number"
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_expected_result_field_value", self.failure_codes(result))
+
+    def test_malformed_in_expected_value_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "flm-business-failure-observable")
+        for field in target["expected_result"]["fields"]:
+            if field["operator"] == "in":
+                field["value"] = 123
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_expected_result_field_value", self.failure_codes(result))
+
+    def test_zero_metrics_are_reflected_in_failed_case_summary(self) -> None:
+        metrics = dict.fromkeys(self.valid_metrics(), 0)
+
+        result = self.pass_result(metrics_snapshot=metrics)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertGreater(result["summary"]["fail_case_total"], 0)
+        self.assertIn("http-submit-status-result-shared-truth", result["summary"]["failed_case_ids"])
 
     def test_dimension_or_capability_drift_fails_closed(self) -> None:
         cases = self.valid_cases()

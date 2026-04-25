@@ -320,7 +320,7 @@ def orchestrate_operability_gate(
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
-    elif "FR-0007" not in baseline_gate_ref:
+    elif not baseline_gate_ref.startswith("FR-0007:version_gate:"):
         failures.append(
             _failure(
                 "operability_gate",
@@ -366,13 +366,19 @@ def orchestrate_operability_gate(
         failures.append(_failure("operability_gate", "missing_evidence_refs", "operability gate requires evidence refs"))
         normalized_evidence_refs = ["operability_gate:failure:missing_evidence_refs"]
 
-    case_failures = [case["case_id"] for case in normalized_cases if case["verdict"] != PASS_VERDICT]
-    failed_dimensions = sorted({case["dimension"] for case in normalized_cases if case["verdict"] != PASS_VERDICT})
+    failed_case_ids = _failed_case_ids(normalized_cases, failures)
+    failed_dimensions = sorted(
+        {
+            str(case["dimension"])
+            for case in normalized_cases
+            if str(case["case_id"]) in failed_case_ids
+        }
+    )
     summary = {
         "case_total": len(normalized_cases),
-        "pass_case_total": sum(1 for case in normalized_cases if case["verdict"] == PASS_VERDICT),
-        "fail_case_total": sum(1 for case in normalized_cases if case["verdict"] == FAIL_VERDICT),
-        "failed_case_ids": case_failures,
+        "pass_case_total": max(len(normalized_cases) - len(failed_case_ids), 0),
+        "fail_case_total": len(failed_case_ids),
+        "failed_case_ids": sorted(failed_case_ids),
         "failed_dimensions": failed_dimensions,
     }
     verdict = PASS_VERDICT if not failures else FAIL_VERDICT
@@ -559,7 +565,30 @@ def _normalize_expected_result(
             if not path or not operator or "value" not in raw_field:
                 failures.append(_case_failure(case_id, "invalid_expected_result_field", "expected_result field requires path, operator and value", details={"index": index}))
                 continue
-            fields.append({"path": path, "operator": operator, "value": _json_safe(raw_field.get("value"))})
+            raw_value = raw_field.get("value")
+            if operator == ">=" and (isinstance(raw_value, bool) or not isinstance(raw_value, (int, float))):
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "invalid_expected_result_field_value",
+                        "expected_result >= assertions require a numeric value",
+                        details={"index": index, "path": path},
+                    )
+                )
+                continue
+            if operator == "in" and (
+                not isinstance(raw_value, Iterable) or isinstance(raw_value, (Mapping, str, bytes))
+            ):
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "invalid_expected_result_field_value",
+                        "expected_result in assertions require a non-string iterable value",
+                        details={"index": index, "path": path},
+                    )
+                )
+                continue
+            fields.append({"path": path, "operator": operator, "value": _json_safe(raw_value)})
     if not any(field["operator"] in {"==", "!=", "in"} for field in fields):
         failures.append(_case_failure(case_id, "missing_exact_expected_field", "expected_result.fields requires at least one exact field assertion"))
 
@@ -645,7 +674,16 @@ def _validate_case_actual_result(
                     )
                 )
         elif operator == ">=":
-            if isinstance(actual_value, bool) or not isinstance(actual_value, (int, float)) or actual_value < expected_value:
+            if isinstance(expected_value, bool) or not isinstance(expected_value, (int, float)):
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "invalid_expected_result_field_value",
+                        "expected_result >= assertions require a numeric value",
+                        details={"path": path, "actual_expected_value": _json_safe(expected_value)},
+                    )
+                )
+            elif isinstance(actual_value, bool) or not isinstance(actual_value, (int, float)) or actual_value < expected_value:
                 failures.append(
                     _case_failure(
                         case_id,
@@ -660,7 +698,16 @@ def _validate_case_actual_result(
                     )
                 )
         elif operator == "in":
-            if actual_value not in expected_value:
+            if not isinstance(expected_value, Iterable) or isinstance(expected_value, (Mapping, str, bytes)):
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "invalid_expected_result_field_value",
+                        "expected_result in assertions require a non-string iterable value",
+                        details={"path": path, "actual_expected_value": _json_safe(expected_value)},
+                    )
+                )
+            elif actual_value not in expected_value:
                 failures.append(
                     _case_failure(
                         case_id,
@@ -861,6 +908,19 @@ def _dedupe_failures(failures: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         seen.add(key)
         normalized.append(dict(failure))
     return normalized
+
+
+def _failed_case_ids(cases: Sequence[Mapping[str, Any]], failures: Sequence[Mapping[str, Any]]) -> set[str]:
+    failed_ids = {str(case["case_id"]) for case in cases if case.get("verdict") != PASS_VERDICT}
+    known_case_ids = {str(case["case_id"]) for case in cases}
+    for failure in failures:
+        details = failure.get("details")
+        if not isinstance(details, Mapping):
+            continue
+        case_id = details.get("case_id")
+        if isinstance(case_id, str) and case_id in known_case_ids:
+            failed_ids.add(case_id)
+    return failed_ids
 
 
 def _dedupe_sorted(values: Iterable[str]) -> list[str]:
