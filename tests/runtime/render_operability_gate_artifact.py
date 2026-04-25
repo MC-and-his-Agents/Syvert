@@ -16,6 +16,15 @@ from syvert.operability_gate import build_mandatory_operability_cases, orchestra
 
 DEFAULT_OUTPUT = Path("docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json")
 SOURCE_EVIDENCE = Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json")
+APPROVED_UPSTREAM_MODULES = frozenset(
+    {
+        "tests.runtime.test_execution_control",
+        "tests.runtime.test_runtime_observability",
+        "tests.runtime.test_http_api",
+        "tests.runtime.test_cli_http_same_path",
+        "tests.runtime.test_version_gate",
+    }
+)
 
 
 def main() -> int:
@@ -57,6 +66,7 @@ def build_gate_input_from_source_evidence(
     if run_upstream:
         assert_revision_is_current_head(revision)
     upstream_results = run_upstream_verifications(revision) if run_upstream else default_upstream_results(revision)
+    executed_modules = set(APPROVED_UPSTREAM_MODULES)
     source = materialize_revision(json.loads(source_path.read_text(encoding="utf-8")), revision=revision)
     failures = validate_source_evidence(source)
     if failures:
@@ -78,7 +88,11 @@ def build_gate_input_from_source_evidence(
         ]
         case["actual_result"] = evidence_case.get("actual_result", {})
         upstream_modules = evidence_case.get("upstream_modules")
-        if not isinstance(upstream_modules, list) or not all(isinstance(module, str) and module for module in upstream_modules):
+        if (
+            not isinstance(upstream_modules, list)
+            or not all(isinstance(module, str) and module for module in upstream_modules)
+            or not set(upstream_modules) <= executed_modules
+        ):
             return fail_closed_gate_input(
                 revision=revision,
                 failures=[{"code": "invalid_source_evidence_upstream_modules", "field": case_id}],
@@ -115,11 +129,15 @@ def validate_source_evidence(source: dict[str, Any]) -> list[dict[str, str]]:
             if not isinstance(case_id, str) or not case_id:
                 failures.append({"code": "missing_source_evidence_case_id", "field": f"cases[{index}].case_id"})
                 continue
+            if case_id in observed_case_ids:
+                failures.append({"code": "duplicate_source_evidence_case_id", "field": case_id})
             observed_case_ids.add(case_id)
             if "actual_result" not in case:
                 failures.append({"code": "missing_source_evidence_actual_result", "field": case_id})
             if "upstream_modules" not in case:
                 failures.append({"code": "missing_source_evidence_upstream_modules", "field": case_id})
+            elif not isinstance(case["upstream_modules"], list) or not set(case["upstream_modules"]) <= APPROVED_UPSTREAM_MODULES:
+                failures.append({"code": "unapproved_source_evidence_upstream_module", "field": case_id})
         for mandatory_case in build_mandatory_operability_cases():
             case_id = str(mandatory_case["case_id"])
             if case_id not in observed_case_ids:
@@ -147,25 +165,11 @@ def fail_closed_gate_input(*, revision: str, failures: list[dict[str, str]]) -> 
 
 
 def default_upstream_results(revision: str) -> dict[str, Any]:
-    return {
-        "evidence_refs": [
-            f"tests:{revision}:tests.runtime.test_execution_control",
-            f"tests:{revision}:tests.runtime.test_runtime_observability",
-            f"tests:{revision}:tests.runtime.test_http_api",
-            f"tests:{revision}:tests.runtime.test_cli_http_same_path",
-            f"tests:{revision}:tests.runtime.test_version_gate",
-        ]
-    }
+    return {"evidence_refs": [f"tests:{revision}:{module}" for module in sorted(APPROVED_UPSTREAM_MODULES)]}
 
 
 def run_upstream_verifications(revision: str) -> dict[str, Any]:
-    modules = [
-        "tests.runtime.test_execution_control",
-        "tests.runtime.test_runtime_observability",
-        "tests.runtime.test_http_api",
-        "tests.runtime.test_cli_http_same_path",
-        "tests.runtime.test_version_gate",
-    ]
+    modules = sorted(APPROVED_UPSTREAM_MODULES)
     subprocess.run([sys.executable, "-m", "unittest", *modules], check=True)
     return {"evidence_refs": [f"tests:{revision}:{module}" for module in modules]}
 

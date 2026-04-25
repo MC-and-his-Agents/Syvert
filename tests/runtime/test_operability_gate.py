@@ -503,6 +503,32 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("missing_mandatory_cases", self.failure_codes(result))
 
+    def test_renderer_duplicate_case_id_fails_closed(self) -> None:
+        valid_source = json.loads(Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json").read_text())
+        valid_source["cases"].append(deepcopy(valid_source["cases"][0]))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps(valid_source), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
+    def test_renderer_unapproved_upstream_module_fails_closed(self) -> None:
+        valid_source = json.loads(Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json").read_text())
+        valid_source["cases"][0]["upstream_modules"] = ["tests.runtime.test_not_executed"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "source.json"
+            source_path.write_text(json.dumps(valid_source), encoding="utf-8")
+
+            gate_input = build_gate_input_from_source_evidence(revision="test-head-sha", source_path=source_path)
+            result = orchestrate_operability_gate(**gate_input)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_mandatory_cases", self.failure_codes(result))
+
     def test_external_actual_result_ref_fails_closed(self) -> None:
         cases = self.valid_cases()
         cases[0]["actual_result_ref"] = "https://example.invalid/not-reviewable"
