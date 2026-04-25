@@ -90,4 +90,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：待首个实现提交生成；当前 working tree 已包含 gate runner、mandatory matrix validator、专项测试与验证证据。
+- 当前可恢复 checkpoint：`526d391ccbb388d0b6d53ca9be279eb0a0f3c300`，包含 gate runner、mandatory matrix validator、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
