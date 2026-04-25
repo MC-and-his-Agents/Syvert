@@ -303,14 +303,14 @@ def execute_task_internal(
     adapter_key, capability = extract_request_context(request)
     task_id, task_id_error = resolve_task_id(task_id_factory)
     if task_id_error is not None:
-        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, task_id_error), None)
+        return TaskExecutionResult(pre_accepted_failure_envelope(task_id, adapter_key, capability, task_id_error), None)
 
     normalized_request, contract_error = normalize_request(request)
     if contract_error is not None:
-        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, contract_error), None)
+        return TaskExecutionResult(pre_accepted_failure_envelope(task_id, adapter_key, capability, contract_error), None)
     if normalized_request is None:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -323,10 +323,13 @@ def execute_task_internal(
     capability = normalized_request.target.capability
     capability_family, capability_family_error = resolve_capability_family(capability)
     if capability_family_error is not None:
-        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, capability_family_error), None)
+        return TaskExecutionResult(
+            pre_accepted_failure_envelope(task_id, adapter_key, capability, capability_family_error),
+            None,
+        )
     if capability_family is None:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -337,7 +340,10 @@ def execute_task_internal(
 
     projection_axis_error = validate_projection_axes_for_current_runtime(normalized_request)
     if projection_axis_error is not None:
-        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_axis_error), None)
+        return TaskExecutionResult(
+            pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_axis_error),
+            None,
+        )
 
     try:
         registry = AdapterRegistry.from_mapping(adapters)
@@ -349,7 +355,7 @@ def execute_task_internal(
         )
         if requested_resource_requirement_error is not None:
             return TaskExecutionResult(
-                failure_envelope(
+                pre_accepted_failure_envelope(
                     task_id,
                     adapter_key,
                     capability,
@@ -358,7 +364,7 @@ def execute_task_internal(
                 None,
             )
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -374,7 +380,7 @@ def execute_task_internal(
     adapter_declaration = registry.lookup(adapter_key)
     if adapter_declaration is None:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -386,7 +392,7 @@ def execute_task_internal(
     supported_capabilities = adapter_declaration.supported_capabilities
     if capability_family not in supported_capabilities:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -405,7 +411,7 @@ def execute_task_internal(
     supported_targets = adapter_declaration.supported_targets
     if normalized_request.target.target_type not in supported_targets:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -421,7 +427,7 @@ def execute_task_internal(
     supported_collection_modes = adapter_declaration.supported_collection_modes
     if normalized_request.policy.collection_mode not in supported_collection_modes:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -437,7 +443,7 @@ def execute_task_internal(
     resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
     if resource_requirement_declaration is None:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -462,7 +468,7 @@ def execute_task_internal(
         )
     except ResourceCapabilityMatcherContractError as error:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -473,16 +479,23 @@ def execute_task_internal(
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
     if projection_error is not None:
-        return TaskExecutionResult(failure_envelope(task_id, adapter_key, capability, projection_error), None)
+        return TaskExecutionResult(
+            pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_error),
+            None,
+        )
 
     execution_control_policy = normalized_request.execution_control_policy
     if execution_control_policy is None:
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
-                runtime_contract_error("execution_control_state_invalid", "Core 未能物化默认执行控制策略"),
+                runtime_contract_error(
+                    "execution_control_state_invalid",
+                    "Core 未能物化默认执行控制策略",
+                    details={"stage": "pre_execution", "control_context": "default_execution_control_policy"},
+                ),
             ),
             None,
         )
@@ -507,23 +520,24 @@ def execute_task_internal(
             task_record_ref="none",
             policy=execution_control_policy,
         )
-        return TaskExecutionResult(
-            failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                invalid_input_error(
-                    EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
-                    "执行控制并发限制拒绝本次任务提交",
-                    details={
-                        "scope": execution_control_policy.concurrency.scope,
-                        "max_in_flight": execution_control_policy.concurrency.max_in_flight,
-                        "on_limit": execution_control_policy.concurrency.on_limit,
-                        "task_record_ref": "none",
-                        "execution_control_event": event,
-                    },
-                ),
+        envelope = pre_accepted_failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            invalid_input_error(
+                EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                "执行控制并发限制拒绝本次任务提交",
+                details={
+                    "scope": execution_control_policy.concurrency.scope,
+                    "max_in_flight": execution_control_policy.concurrency.max_in_flight,
+                    "on_limit": execution_control_policy.concurrency.on_limit,
+                    "task_record_ref": "none",
+                    "execution_control_event": event,
+                },
             ),
+        )
+        return TaskExecutionResult(
+            with_runtime_observability(envelope, [event], [event]),
             None,
         )
 
@@ -533,10 +547,14 @@ def execute_task_internal(
             return None
         release_details = dict(release_error.get("details", {}))
         release_details["stage"] = stage
+        release_details.setdefault(
+            "task_record_ref",
+            "none" if stage in {"create_task_record", "persist_accepted"} else f"task_record:{task_id}",
+        )
         release_error = dict(release_error)
         release_error["details"] = release_details
         return TaskExecutionResult(
-            failure_envelope(task_id, adapter_key, capability, release_error),
+            with_failure_observability(failure_envelope(task_id, adapter_key, capability, release_error)),
             None,
         )
 
@@ -547,7 +565,7 @@ def execute_task_internal(
         if release_failure is not None:
             return release_failure
         return TaskExecutionResult(
-            failure_envelope(
+            pre_accepted_failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -576,15 +594,28 @@ def execute_task_internal(
     except TaskRecordContractError as error:
         release_failure = release_admission_guard_or_failure("start_task_record")
         if release_failure is not None:
-            return release_failure
-        return TaskExecutionResult(
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                release_failure.envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
+        return finalize_task_execution_result(
+            task_id,
+            adapter_key,
+            capability,
+            record,
             failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
                 runtime_contract_error("invalid_task_record", str(error)),
             ),
-            None,
+            preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+            task_record_store=store,
         )
     persisted_record, persistence_error = persist_task_record(
         task_id,
@@ -597,7 +628,15 @@ def execute_task_internal(
     if persistence_error is not None:
         release_failure = release_admission_guard_or_failure("persist_running")
         if release_failure is not None:
-            return release_failure
+            return finalize_task_execution_result(
+                task_id,
+                adapter_key,
+                capability,
+                record,
+                release_failure.envelope,
+                preserve_envelope_on_record_error=preserve_envelope_on_record_error,
+                task_record_store=store,
+            )
         return persistence_error
     if persisted_record is not None:
         record = persisted_record
@@ -679,6 +718,9 @@ def execute_controlled_adapter_attempts(
     last_failed_envelope: dict[str, Any] | None = None
     runtime_result_refs: list[dict[str, Any]] = []
     execution_control_events: list[dict[str, Any]] = []
+    failure_signals: list[dict[str, Any]] = []
+    structured_log_events: list[dict[str, Any]] = []
+    metric_samples: list[dict[str, Any]] = []
 
     while True:
         attempt = execute_single_controlled_adapter_attempt(
@@ -697,10 +739,13 @@ def execute_controlled_adapter_attempts(
         envelope = attempt.envelope
         if attempt.attempt_outcome_ref is not None:
             runtime_result_refs.append(attempt.attempt_outcome_ref)
+            attempt_log_events, attempt_metric_samples = build_attempt_lifecycle_observability(attempt.attempt_outcome_ref)
+            structured_log_events.extend(attempt_log_events)
+            metric_samples.extend(attempt_metric_samples)
         if attempt.execution_control_event is not None:
             execution_control_events.append(attempt.execution_control_event)
             runtime_result_refs.append(attempt.execution_control_event)
-            if last_failed_envelope is not None:
+            if last_failed_envelope is not None and is_synthetic_retry_concurrency_rejection(envelope):
                 envelope = with_failed_envelope_control_details(
                     last_failed_envelope,
                     event=attempt.execution_control_event,
@@ -711,12 +756,29 @@ def execute_controlled_adapter_attempts(
                         "max_in_flight": policy.concurrency.max_in_flight,
                     },
                 )
-            return with_runtime_observability(envelope, runtime_result_refs, execution_control_events)
-        envelope = with_runtime_observability(envelope, runtime_result_refs, execution_control_events)
+            return with_runtime_observability(
+                envelope,
+                runtime_result_refs,
+                execution_control_events,
+                failure_signals,
+                structured_log_events,
+                metric_samples,
+            )
+        envelope = with_runtime_observability(
+            envelope,
+            runtime_result_refs,
+            execution_control_events,
+            failure_signals,
+            structured_log_events,
+            metric_samples,
+        )
         if envelope.get("status") == "success":
             return envelope
 
         last_failed_envelope = envelope
+        failure_signal = envelope.get("runtime_failure_signal")
+        if isinstance(failure_signal, Mapping):
+            failure_signals.append(dict(failure_signal))
         retryable = is_retryable_attempt_outcome(
             envelope,
             capability=capability,
@@ -747,7 +809,35 @@ def execute_controlled_adapter_attempts(
                     "last_attempt_outcome_ref": attempt.attempt_outcome_ref,
                 },
             )
-            return with_runtime_observability(exhausted_envelope, runtime_result_refs, execution_control_events)
+            return with_runtime_observability(
+                exhausted_envelope,
+                runtime_result_refs,
+                execution_control_events,
+                failure_signals,
+                structured_log_events,
+                metric_samples,
+            )
+        retry_result_refs = [attempt.attempt_outcome_ref] if attempt.attempt_outcome_ref is not None else []
+        retry_log_event, retry_metric_sample = build_retry_scheduled_observability(
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            attempt_index=attempt_index,
+            next_attempt_index=attempt_index + 1,
+            failure_signal_id=str(envelope.get("runtime_failure_signal", {}).get("signal_id", "")),
+            error_category=str(envelope.get("runtime_failure_signal", {}).get("error_category", "")),
+            error_code=str(envelope.get("runtime_failure_signal", {}).get("error_code", "")),
+            failure_phase=str(envelope.get("runtime_failure_signal", {}).get("failure_phase", "")),
+            resource_trace_refs=list(
+                envelope.get("runtime_failure_signal", {}).get("resource_trace_refs", [])
+                if isinstance(envelope.get("runtime_failure_signal", {}).get("resource_trace_refs"), list)
+                else []
+            ),
+            runtime_result_refs=retry_result_refs,
+            policy=policy,
+        )
+        structured_log_events.append(retry_log_event)
+        metric_samples.append(retry_metric_sample)
         if policy.retry.backoff_ms:
             time.sleep(policy.retry.backoff_ms / 1000)
         admission_guard = acquire_execution_concurrency_admission_guard(
@@ -784,7 +874,14 @@ def execute_controlled_adapter_attempts(
                     "max_in_flight": policy.concurrency.max_in_flight,
                 },
             )
-            return with_runtime_observability(rejected_envelope, runtime_result_refs, execution_control_events)
+            return with_runtime_observability(
+                rejected_envelope,
+                runtime_result_refs,
+                execution_control_events,
+                failure_signals,
+                structured_log_events,
+                metric_samples,
+            )
         attempt_index += 1
 
 
@@ -833,6 +930,9 @@ def execute_single_controlled_adapter_attempt(
 
     def finish_attempt(envelope: dict[str, Any], *, core_timeout_outcome: bool = False) -> AdapterAttemptResult:
         nonlocal slot_released
+        trace_refs = resource_trace_refs_for_bundle(resource_bundle)
+        if trace_refs:
+            envelope = with_failed_envelope_resource_trace_refs(envelope, trace_refs)
         guard_release_error = release_attempt_admission_guard()
         if guard_release_error is not None:
             envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
@@ -956,6 +1056,8 @@ def execute_single_controlled_adapter_attempt(
                     "execution concurrency slot became unavailable after guarded admission",
                     details={
                         "control_code": EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                        "stage": "pre_execution",
+                        "control_context": "guarded_admission",
                         "scope": policy.concurrency.scope,
                         "max_in_flight": policy.concurrency.max_in_flight,
                     },
@@ -964,7 +1066,8 @@ def execute_single_controlled_adapter_attempt(
             guard_release_error = release_attempt_admission_guard()
             if guard_release_error is not None:
                 envelope = failure_envelope(task_id, adapter_key, capability, guard_release_error)
-            return AdapterAttemptResult(envelope, None)
+                event = None
+            return AdapterAttemptResult(envelope, None, execution_control_event=event)
         guard_release_error = release_attempt_admission_guard()
         if guard_release_error is not None:
             release_error = release_execution_concurrency_slot(slot)
@@ -1357,6 +1460,12 @@ def build_attempt_outcome_ref(
     terminal_envelope = dict(envelope)
     terminal_envelope.pop("runtime_result_refs", None)
     terminal_envelope.pop("execution_control_events", None)
+    terminal_envelope.pop("runtime_failure_signal", None)
+    terminal_envelope.pop("runtime_structured_log_events", None)
+    terminal_envelope.pop("runtime_execution_metric_samples", None)
+    terminal_envelope.pop("_runtime_failure_signals", None)
+    terminal_envelope.pop("_runtime_structured_log_events", None)
+    terminal_envelope.pop("_runtime_execution_metric_samples", None)
     ref = {
         "ref_type": "ExecutionAttemptOutcome",
         "ref_id": f"{task_id}:attempt:{attempt_index}",
@@ -1412,13 +1521,502 @@ def with_runtime_observability(
     envelope: Mapping[str, Any],
     runtime_result_refs: list[dict[str, Any]],
     execution_control_events: list[dict[str, Any]],
+    failure_signals: list[dict[str, Any]] | None = None,
+    structured_log_events: list[dict[str, Any]] | None = None,
+    metric_samples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     enriched = dict(envelope)
+    if enriched.get("status") == "success":
+        if runtime_result_refs and (len(runtime_result_refs) > 1 or execution_control_events):
+            enriched["runtime_result_refs"] = list(runtime_result_refs)
+        if failure_signals:
+            enriched["_runtime_failure_signals"] = list(failure_signals)
+        if structured_log_events:
+            enriched["_runtime_structured_log_events"] = list(structured_log_events)
+        if metric_samples:
+            enriched["_runtime_execution_metric_samples"] = list(metric_samples)
+        return enriched
     if runtime_result_refs and (enriched.get("status") == "failed" or len(runtime_result_refs) > 1 or execution_control_events):
         enriched["runtime_result_refs"] = list(runtime_result_refs)
     if execution_control_events:
         enriched["execution_control_events"] = list(execution_control_events)
+    if failure_signals:
+        enriched["_runtime_failure_signals"] = list(failure_signals)
+    if structured_log_events:
+        enriched["runtime_structured_log_events"] = list(structured_log_events)
+    if metric_samples:
+        enriched["runtime_execution_metric_samples"] = list(metric_samples)
+    if enriched.get("status") == "failed" and runtime_result_refs:
+        current_error = enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {}
+        current_details = current_error.get("details") if isinstance(current_error.get("details"), Mapping) else {}
+        current_task_record_ref = current_details.get("task_record_ref")
+        if current_task_record_ref != "none":
+            enriched = with_failed_envelope_task_record_ref(enriched, f"task_record:{enriched.get('task_id')}")
+    if enriched.get("status") == "failed":
+        enriched = with_failure_observability(enriched)
     return enriched
+
+
+def public_task_execution_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    public_envelope = dict(envelope)
+    public_envelope.pop("_runtime_failure_signals", None)
+    public_envelope.pop("_runtime_structured_log_events", None)
+    public_envelope.pop("_runtime_execution_metric_samples", None)
+    return public_envelope
+
+
+def pre_accepted_failure_envelope(
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    error: Mapping[str, Any],
+) -> dict[str, Any]:
+    enriched_error = dict(error)
+    current_details = dict(enriched_error.get("details") if isinstance(enriched_error.get("details"), Mapping) else {})
+    current_details["task_record_ref"] = "none"
+    current_details.setdefault("stage", "pre_admission")
+    enriched_error["details"] = current_details
+    return with_failure_observability(failure_envelope(
+        task_id,
+        adapter_key,
+        capability,
+        enriched_error,
+    ))
+
+
+def with_failed_envelope_resource_trace_refs(envelope: Mapping[str, Any], refs: list[dict[str, Any]]) -> dict[str, Any]:
+    if envelope.get("status") != "failed" or not refs:
+        return dict(envelope)
+    enriched = dict(envelope)
+    error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
+    current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    current_details.setdefault("resource_trace_refs", refs)
+    error["details"] = current_details
+    enriched["error"] = error
+    return enriched
+
+
+def with_failed_envelope_task_record_ref(envelope: Mapping[str, Any], task_record_ref: str) -> dict[str, Any]:
+    if envelope.get("status") != "failed":
+        return dict(envelope)
+    enriched = dict(envelope)
+    error = dict(enriched.get("error") if isinstance(enriched.get("error"), Mapping) else {})
+    current_details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    current_details["task_record_ref"] = task_record_ref
+    error["details"] = current_details
+    enriched["error"] = error
+    return enriched
+
+
+def resource_trace_refs_for_bundle(resource_bundle: Any) -> list[dict[str, Any]]:
+    if resource_bundle is None:
+        return []
+    lease_id = getattr(resource_bundle, "lease_id", "")
+    bundle_id = getattr(resource_bundle, "bundle_id", "")
+    refs: list[dict[str, Any]] = []
+    for slot_name in ("account", "proxy"):
+        resource = getattr(resource_bundle, slot_name, None)
+        resource_id = getattr(resource, "resource_id", "")
+        resource_type = getattr(resource, "resource_type", slot_name)
+        if not lease_id or not bundle_id or not resource_id:
+            continue
+        refs.append(
+            {
+                "event_id": f"acquired:{lease_id}:{resource_id}",
+                "ref_type": "ResourceTraceEvent",
+                "lease_id": lease_id,
+                "bundle_id": bundle_id,
+                "resource_id": resource_id,
+                "resource_type": resource_type,
+            }
+        )
+    return refs
+
+
+def build_retry_scheduled_observability(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    attempt_index: int,
+    next_attempt_index: int,
+    failure_signal_id: str,
+    error_category: str,
+    error_code: str,
+    failure_phase: str,
+    resource_trace_refs: list[dict[str, Any]],
+    runtime_result_refs: list[dict[str, Any]],
+    policy: ExecutionControlPolicy,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    log_event = {
+        "event_id": f"runtime_log:{task_id}:retry_scheduled:{attempt_index}:{next_attempt_index}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": "retry_scheduled",
+        "level": "info",
+        "attempt_index": attempt_index,
+        "failure_signal_id": failure_signal_id,
+        "resource_trace_refs": list(resource_trace_refs),
+        "runtime_result_refs": list(runtime_result_refs),
+        "message": f"retry scheduled after attempt {attempt_index}",
+        "occurred_at": occurred_at,
+    }
+    metric_sample = {
+        "metric_id": f"runtime_metric:{task_id}:retry_scheduled_total:{attempt_index}:{next_attempt_index}",
+        "task_id": task_id,
+        "metric_name": "retry_scheduled_total",
+        "metric_value": 1,
+        "unit": "count",
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "attempt_index": attempt_index,
+        "policy": {
+            "retry": {"max_attempts": policy.retry.max_attempts, "backoff_ms": policy.retry.backoff_ms},
+        },
+        "occurred_at": occurred_at,
+    }
+    return log_event, metric_sample
+
+
+def build_attempt_lifecycle_observability(
+    attempt_outcome_ref: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    task_id = str(attempt_outcome_ref.get("task_id") or "")
+    adapter_key = str(attempt_outcome_ref.get("adapter_key") or "")
+    capability = str(attempt_outcome_ref.get("capability") or "")
+    attempt_index = attempt_outcome_ref.get("attempt_index")
+    if isinstance(attempt_index, bool) or not isinstance(attempt_index, int) or attempt_index < 0:
+        attempt_index = 0
+    started_at = str(attempt_outcome_ref.get("started_at") or "")
+    ended_at = str(attempt_outcome_ref.get("ended_at") or started_at)
+    outcome = str(attempt_outcome_ref.get("outcome") or "")
+    duration_ms = 0
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        ended = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+        duration_ms = max(0, int((ended - started).total_seconds() * 1000))
+    except ValueError:
+        duration_ms = 0
+    runtime_refs = [dict(attempt_outcome_ref)]
+    log_events = [
+        {
+            "event_id": f"runtime_log:{task_id}:attempt_started:{attempt_index}",
+            "task_id": task_id,
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "event_type": "attempt_started",
+            "level": "info",
+            "attempt_index": attempt_index,
+            "failure_signal_id": "",
+            "resource_trace_refs": [],
+            "runtime_result_refs": runtime_refs,
+            "message": f"attempt {attempt_index} started",
+            "occurred_at": started_at,
+        },
+        {
+            "event_id": f"runtime_log:{task_id}:attempt_finished:{attempt_index}",
+            "task_id": task_id,
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "event_type": "attempt_finished",
+            "level": "error" if outcome in {"failed", "timeout"} else "info",
+            "attempt_index": attempt_index,
+            "failure_signal_id": "",
+            "resource_trace_refs": [],
+            "runtime_result_refs": runtime_refs,
+            "message": f"attempt {attempt_index} finished: {outcome or 'unknown'}",
+            "occurred_at": ended_at,
+        },
+    ]
+    metric_samples = [
+        {
+            "metric_id": f"runtime_metric:{task_id}:attempt_started_total:{attempt_index}",
+            "task_id": task_id,
+            "metric_name": "attempt_started_total",
+            "metric_value": 1,
+            "unit": "count",
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "error_category": "",
+            "error_code": "",
+            "failure_phase": "",
+            "attempt_index": attempt_index,
+            "occurred_at": started_at,
+        },
+        {
+            "metric_id": f"runtime_metric:{task_id}:execution_duration_ms:{attempt_index}",
+            "task_id": task_id,
+            "metric_name": "execution_duration_ms",
+            "metric_value": duration_ms,
+            "unit": "ms",
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "error_category": "",
+            "error_code": "",
+            "failure_phase": "",
+            "attempt_index": attempt_index,
+            "occurred_at": ended_at,
+        },
+    ]
+    return log_events, metric_samples
+
+
+def with_observability_write_failed(
+    envelope: Mapping[str, Any],
+    *,
+    stage: str,
+    reason: str,
+    details: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    enriched = dict(envelope)
+    task_id = str(enriched.get("task_id") or "")
+    adapter_key = str(enriched.get("adapter_key") or "")
+    capability = str(enriched.get("capability") or "")
+    failure_signal = enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
+    resource_trace_refs = list(
+        failure_signal.get("resource_trace_refs") if isinstance(failure_signal.get("resource_trace_refs"), list) else []
+    )
+    occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    event = {
+        "event_id": f"runtime_log:{task_id}:observability_write_failed:{stage}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": "observability_write_failed",
+        "level": "error",
+        "attempt_index": infer_attempt_index(
+            list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
+        ),
+        "failure_signal_id": str(failure_signal.get("signal_id") or ""),
+        "resource_trace_refs": resource_trace_refs,
+        "runtime_result_refs": list(
+            enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else []
+        ),
+        "message": f"observability write failed during {stage}: {reason}",
+        "details": dict(details or {}),
+        "occurred_at": occurred_at,
+    }
+    existing_events = list(
+        enriched.get("runtime_structured_log_events")
+        if isinstance(enriched.get("runtime_structured_log_events"), list)
+        else []
+    )
+    enriched["runtime_structured_log_events"] = [*existing_events, event]
+    return enriched
+
+
+def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    if envelope.get("status") != "failed" or not isinstance(envelope.get("error"), Mapping):
+        return dict(envelope)
+
+    enriched = dict(envelope)
+    error = dict(enriched["error"])
+    details = dict(error.get("details") if isinstance(error.get("details"), Mapping) else {})
+    task_id = str(enriched.get("task_id") or "")
+    adapter_key = str(enriched.get("adapter_key") or "")
+    capability = str(enriched.get("capability") or "")
+    error_category = str(error.get("category") or "")
+    error_code = str(error.get("code") or "")
+    task_record_ref = details.get("task_record_ref")
+    if not isinstance(task_record_ref, str) or not task_record_ref:
+        task_record_ref = "none"
+    runtime_result_refs = list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
+    resource_trace_refs = list(details.get("resource_trace_refs") if isinstance(details.get("resource_trace_refs"), list) else [])
+    failure_phase = infer_failure_phase(error_category=error_category, error_code=error_code, details=details)
+    event_type = infer_failure_log_event_type(
+        error_category=error_category,
+        error_code=error_code,
+        details=details,
+        task_record_ref=task_record_ref,
+    )
+    metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
+    attempt_index = infer_attempt_index(runtime_result_refs)
+    signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}:{attempt_index}"
+    envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}:{attempt_index}"
+    existing_failure_signal = (
+        enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
+    )
+    existing_log_events = list(
+        enriched.get("runtime_structured_log_events")
+        if isinstance(enriched.get("runtime_structured_log_events"), list)
+        else []
+    )
+    existing_metric_samples = list(
+        enriched.get("runtime_execution_metric_samples")
+        if isinstance(enriched.get("runtime_execution_metric_samples"), list)
+        else []
+    )
+    signal_occurred_at = stable_observability_occurred_at(
+        existing_failure_signal,
+        id_field="signal_id",
+        entry_id=signal_id,
+    )
+    log_id = f"runtime_log:{task_id}:task_failed:{error_category}:{error_code}:{attempt_index}"
+    metric_id = f"runtime_metric:{task_id}:{metric_name}:{error_category}:{error_code}:{attempt_index}"
+    log_occurred_at = stable_observability_occurred_at(
+        next((event for event in existing_log_events if isinstance(event, Mapping) and event.get("event_id") == log_id), {}),
+        id_field="event_id",
+        entry_id=log_id,
+    )
+    metric_occurred_at = stable_observability_occurred_at(
+        next((metric for metric in existing_metric_samples if isinstance(metric, Mapping) and metric.get("metric_id") == metric_id), {}),
+        id_field="metric_id",
+        entry_id=metric_id,
+    )
+    failure_signal = {
+        "signal_id": signal_id,
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "status": "failed",
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "envelope_ref": envelope_ref,
+        "task_record_ref": task_record_ref,
+        "resource_trace_refs": resource_trace_refs,
+        "runtime_result_refs": runtime_result_refs,
+        "occurred_at": signal_occurred_at,
+    }
+    log_event = {
+        "event_id": log_id,
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": event_type,
+        "level": "error",
+        "attempt_index": attempt_index,
+        "failure_signal_id": signal_id,
+        "resource_trace_refs": resource_trace_refs,
+        "runtime_result_refs": runtime_result_refs,
+        "message": f"task failed: {error_category}/{error_code}",
+        "occurred_at": log_occurred_at,
+    }
+    metric_sample = {
+        "metric_id": metric_id,
+        "task_id": task_id,
+        "metric_name": metric_name,
+        "metric_value": 1,
+        "unit": "count",
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "attempt_index": attempt_index,
+        "occurred_at": metric_occurred_at,
+    }
+    enriched["runtime_failure_signal"] = failure_signal
+    retained_log_events = [
+        event
+        for event in existing_log_events
+        if isinstance(event, Mapping)
+        and event.get("event_type")
+        in {"attempt_started", "attempt_finished", "retry_scheduled", "observability_write_failed"}
+    ]
+    retained_metric_samples = [
+        metric
+        for metric in existing_metric_samples
+        if isinstance(metric, Mapping)
+        and metric.get("metric_name") in {"attempt_started_total", "execution_duration_ms", "retry_scheduled_total"}
+    ]
+    enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
+    enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
+    return enriched
+
+
+def stable_observability_occurred_at(entry: Mapping[str, Any], *, id_field: str, entry_id: str) -> str:
+    if entry.get(id_field) == entry_id and isinstance(entry.get("occurred_at"), str) and entry["occurred_at"]:
+        return str(entry["occurred_at"])
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def infer_failure_phase(*, error_category: str, error_code: str, details: Mapping[str, Any]) -> str:
+    event = details.get("execution_control_event")
+    if isinstance(event, Mapping):
+        event_type = event.get("event_type")
+        if event_type in {EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED, EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED}:
+            return "concurrency_rejected"
+        if event_type == EXECUTION_CONTROL_EVENT_RETRY_EXHAUSTED:
+            return "retry_exhausted"
+    if details.get("retry_exhausted") is True:
+        return "retry_exhausted"
+    if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED:
+        return "concurrency_rejected"
+    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID:
+        if details.get("control_context") == "guarded_admission" or (
+            details.get("control_code") == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED
+        ):
+            return "concurrency_rejected"
+        if details.get("stage") == "pre_execution" or details.get("control_context") == "default_execution_control_policy":
+            return "pre_execution"
+    if details.get("stage") == "pre_admission":
+        return "admission"
+    if details.get("stage") == "pre_execution":
+        return "pre_execution"
+    if is_normal_execution_timeout_failure(error_category=error_category, error_code=error_code, details=details):
+        return "timeout"
+    if error_code in {"resource_unavailable", "invalid_resource_requirement"}:
+        return "resource_acquire"
+    if error_code in {"envelope_not_json_serializable", "task_record_conflict", "task_record_persistence_failed"}:
+        return "persistence"
+    if details.get("stage") in {"accepted", "running", "completion", "persist_accepted", "persist_running"}:
+        return "persistence"
+    if error_code in {"adapter_not_found", "capability_not_supported", "target_type_not_supported", "collection_mode_not_supported"}:
+        return "admission"
+    if error_code in {"invalid_adapter_success_payload", "adapter_execution_error"}:
+        return "adapter_execution"
+    if error_category == "runtime_contract":
+        return "adapter_execution"
+    return "adapter_execution"
+
+
+def is_normal_execution_timeout_failure(*, error_category: str, error_code: str, details: Mapping[str, Any]) -> bool:
+    return (
+        error_category == "platform"
+        and error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT
+        and details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT
+    )
+
+
+def infer_failure_log_event_type(*, error_category: str, error_code: str, details: Mapping[str, Any], task_record_ref: str) -> str:
+    event = details.get("execution_control_event")
+    if isinstance(event, Mapping):
+        event_type = event.get("event_type")
+        if event_type in {
+            EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED,
+            EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED,
+        }:
+            return str(event_type)
+    if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED and task_record_ref == "none":
+        return EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED
+    if is_normal_execution_timeout_failure(error_category=error_category, error_code=error_code, details=details):
+        return "timeout_triggered"
+    return "task_failed"
+
+
+def infer_failure_metric_name(*, event_type: str, failure_phase: str) -> str:
+    if event_type == EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED:
+        return "admission_concurrency_rejected_total"
+    if event_type == EXECUTION_CONTROL_EVENT_RETRY_CONCURRENCY_REJECTED:
+        return "retry_concurrency_rejected_total"
+    if failure_phase == "timeout":
+        return "timeout_total"
+    return "task_failed_total"
+
+
+def infer_attempt_index(runtime_result_refs: list[Any]) -> int:
+    for entry in reversed(runtime_result_refs):
+        if isinstance(entry, Mapping):
+            attempt_index = entry.get("attempt_index")
+            if isinstance(attempt_index, int) and attempt_index >= 0:
+                return attempt_index
+    return 0
 
 
 def with_failed_envelope_control_details(
@@ -1437,6 +2035,17 @@ def with_failed_envelope_control_details(
     return enriched
 
 
+def is_synthetic_retry_concurrency_rejection(envelope: Mapping[str, Any]) -> bool:
+    error = envelope.get("error") if isinstance(envelope.get("error"), Mapping) else {}
+    details = error.get("details") if isinstance(error.get("details"), Mapping) else {}
+    return (
+        error.get("category") == "runtime_contract"
+        and error.get("code") == EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID
+        and details.get("control_context") == "guarded_admission"
+        and details.get("control_code") == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED
+    )
+
+
 def finalize_task_execution_result(
     task_id: str,
     adapter_key: str,
@@ -1447,6 +2056,13 @@ def finalize_task_execution_result(
     preserve_envelope_on_record_error: bool,
     task_record_store: TaskRecordStore | None,
 ) -> TaskExecutionResult:
+    envelope = (
+        with_failure_observability(
+            with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
+        )
+        if envelope.get("status") == "failed"
+        else dict(envelope)
+    )
     try:
         terminal_record = finish_task_record(record, envelope)
     except TaskRecordContractError as error:
@@ -1458,17 +2074,28 @@ def finalize_task_execution_result(
         except Exception as invalidation_error:
             invalidation_details["invalidation_reason"] = str(invalidation_error)
         if preserve_envelope_on_record_error and task_record_store is None:
-            return TaskExecutionResult(dict(envelope), None)
+            return TaskExecutionResult(public_task_execution_envelope(envelope), None)
+        if envelope.get("status") == "failed":
+            return TaskExecutionResult(
+                with_observability_write_failed(envelope, stage="completion", reason=str(error), details=invalidation_details),
+                None,
+            )
+        failed_envelope = failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "envelope_not_json_serializable",
+                "共享终态结果无法收口为 JSON-safe TaskRecord",
+                details={"reason": str(error), **invalidation_details},
+            ),
+        )
         return TaskExecutionResult(
-            failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                runtime_contract_error(
-                    "envelope_not_json_serializable",
-                    "共享终态结果无法收口为 JSON-safe TaskRecord",
-                    details={"reason": str(error), **invalidation_details},
-                ),
+            with_failure_observability(
+                with_failed_envelope_task_record_ref(
+                    failed_envelope,
+                    record.task_record_ref or f"task_record:{task_id}",
+                )
             ),
             None,
         )
@@ -1481,8 +2108,19 @@ def finalize_task_execution_result(
         task_record_store=task_record_store,
     )
     if persistence_error is not None:
+        if envelope.get("status") == "failed":
+            reason = persistence_error.envelope.get("error", {}).get("details", {}).get("reason", "")
+            return TaskExecutionResult(
+                with_observability_write_failed(
+                    envelope,
+                    stage="completion",
+                    reason=str(reason),
+                    details=dict(persistence_error.envelope.get("error", {}).get("details", {})),
+                ),
+                None,
+            )
         return persistence_error
-    return TaskExecutionResult(dict(envelope), persisted_record or terminal_record)
+    return TaskExecutionResult(public_task_execution_envelope(envelope), persisted_record or terminal_record)
 
 
 def persist_task_record(
@@ -1499,17 +2137,20 @@ def persist_task_record(
     try:
         return task_record_store.write(record), None
     except TaskRecordConflictError as error:
-        return None, TaskExecutionResult(
-            failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                runtime_contract_error(
-                    "task_record_conflict",
-                    "共享任务记录写入与既有 durable truth 冲突",
-                    details={"stage": stage, "reason": str(error)},
-                ),
+        envelope = failure_envelope(
+            task_id,
+            adapter_key,
+            capability,
+            runtime_contract_error(
+                "task_record_conflict",
+                "共享任务记录写入与既有 durable truth 冲突",
+                details={"stage": stage, "reason": str(error)},
             ),
+        )
+        if stage in {"running", "completion"}:
+            envelope = with_failed_envelope_task_record_ref(envelope, record.task_record_ref or f"task_record:{task_id}")
+        return None, TaskExecutionResult(
+            with_failure_observability(envelope),
             None,
         )
     except (TaskRecordContractError, TaskRecordStoreError, OSError) as error:
@@ -1519,6 +2160,7 @@ def persist_task_record(
             capability,
             stage=stage,
             task_record_store=task_record_store,
+            task_record_ref=record.task_record_ref or f"task_record:{task_id}" if stage in {"running", "completion"} else None,
             error=error,
         )
     except Exception as error:
@@ -1528,6 +2170,7 @@ def persist_task_record(
             capability,
             stage=stage,
             task_record_store=task_record_store,
+            task_record_ref=record.task_record_ref or f"task_record:{task_id}" if stage in {"running", "completion"} else None,
             error=error,
         )
 
@@ -1539,6 +2182,7 @@ def _fail_closed_task_record_persistence(
     *,
     stage: str,
     task_record_store: TaskRecordStore,
+    task_record_ref: str | None,
     error: Exception,
 ) -> tuple[TaskRecord | None, TaskExecutionResult | None]:
     invalidation_details: dict[str, Any] = {}
@@ -1548,17 +2192,20 @@ def _fail_closed_task_record_persistence(
         invalidation_details["invalidation_reason"] = str(invalidation_error)
     except Exception as invalidation_error:
         invalidation_details["invalidation_reason"] = str(invalidation_error)
+    details = {"stage": stage, "reason": str(error), **invalidation_details}
+    if task_record_ref:
+        details["task_record_ref"] = task_record_ref
     return None, TaskExecutionResult(
-        failure_envelope(
+        with_failure_observability(failure_envelope(
             task_id,
             adapter_key,
             capability,
             runtime_contract_error(
                 "task_record_persistence_failed",
                 "共享任务记录无法可靠写入本地稳定存储",
-                details={"stage": stage, "reason": str(error), **invalidation_details},
+                details=details,
             ),
-        ),
+        )),
         None,
     )
 

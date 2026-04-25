@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import unittest
 from unittest import mock
@@ -215,6 +216,174 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
+
+    def test_rejects_conflicting_observability_replay_id(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability-conflict"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-record-observability-conflict",
+        )
+        payload = task_record_to_dict(outcome.task_record)
+        duplicate_event = dict(payload["runtime_structured_log_events"][0])
+        duplicate_event["message"] = "conflicting replay"
+        payload["runtime_structured_log_events"].append(duplicate_event)
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_invalid_runtime_observability_enum_values(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability-enum"),
+            ),
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
+            task_id_factory=lambda: "task-record-observability-enum",
+        )
+        payload = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+
+        invalid_signal = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+        invalid_signal["runtime_failure_signals"][0]["failure_phase"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal)
+
+        invalid_event = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+        invalid_event["runtime_structured_log_events"][0]["event_type"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_event)
+
+        invalid_metric = payload
+        invalid_metric["runtime_execution_metric_samples"][0]["metric_name"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_metric)
+
+    def test_rejects_failed_observability_without_required_signal_or_error_metadata(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability-required-fields"),
+            ),
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
+            task_id_factory=lambda: "task-record-observability-required-fields",
+        )
+        payload = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+
+        missing_signal_id = json.loads(json.dumps(payload))
+        missing_signal_id["runtime_failure_signals"][0]["signal_id"] = ""
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(missing_signal_id)
+
+        missing_signal_ref = json.loads(json.dumps(payload))
+        failed_event = next(
+            event
+            for event in missing_signal_ref["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        failed_event["failure_signal_id"] = ""
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(missing_signal_ref)
+
+        for event_type in ("retry_scheduled", "observability_write_failed"):
+            with self.subTest(event_type=event_type):
+                missing_event_signal_ref = json.loads(json.dumps(payload))
+                failed_event = next(
+                    event
+                    for event in missing_event_signal_ref["runtime_structured_log_events"]
+                    if event["event_type"] == "task_failed"
+                )
+                extra_event = dict(failed_event)
+                extra_event["event_id"] = f"runtime_log_event:required-fields:{event_type}"
+                extra_event["event_type"] = event_type
+                extra_event["failure_signal_id"] = ""
+                missing_event_signal_ref["runtime_structured_log_events"].append(extra_event)
+                with self.assertRaises(TaskRecordContractError):
+                    task_record_from_dict(missing_event_signal_ref)
+
+        missing_error_metadata = json.loads(json.dumps(payload))
+        failed_metric = next(
+            metric
+            for metric in missing_error_metadata["runtime_execution_metric_samples"]
+            if metric["metric_name"] == "task_failed_total"
+        )
+        failed_metric["error_category"] = ""
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(missing_error_metadata)
+
+        missing_failure_phase = json.loads(json.dumps(payload))
+        failed_metric = next(
+            metric
+            for metric in missing_failure_phase["runtime_execution_metric_samples"]
+            if metric["metric_name"] == "task_failed_total"
+        )
+        failed_metric["failure_phase"] = ""
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(missing_failure_phase)
+
+        missing_error_code = json.loads(json.dumps(payload))
+        failed_metric = next(
+            metric
+            for metric in missing_error_code["runtime_execution_metric_samples"]
+            if metric["metric_name"] == "task_failed_total"
+        )
+        failed_metric["error_code"] = ""
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(missing_error_code)
+
+        for metric_name in (
+            "timeout_total",
+            "admission_concurrency_rejected_total",
+            "retry_concurrency_rejected_total",
+        ):
+            with self.subTest(metric_name=metric_name):
+                missing_metric_metadata = json.loads(json.dumps(payload))
+                failed_metric = next(
+                    metric
+                    for metric in missing_metric_metadata["runtime_execution_metric_samples"]
+                    if metric["metric_name"] == "task_failed_total"
+                )
+                extra_metric = dict(failed_metric)
+                extra_metric["metric_id"] = f"runtime_metric_sample:required-fields:{metric_name}"
+                extra_metric["metric_name"] = metric_name
+                extra_metric["error_category"] = ""
+                missing_metric_metadata["runtime_execution_metric_samples"].append(extra_metric)
+                with self.assertRaises(TaskRecordContractError):
+                    task_record_from_dict(missing_metric_metadata)
+
+        invalid_signal_resource_refs = json.loads(json.dumps(payload))
+        invalid_signal_resource_refs["runtime_failure_signals"][0]["resource_trace_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal_resource_refs)
+
+        invalid_signal_runtime_refs = json.loads(json.dumps(payload))
+        invalid_signal_runtime_refs["runtime_failure_signals"][0]["runtime_result_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal_runtime_refs)
+
+        invalid_log_resource_refs = json.loads(json.dumps(payload))
+        failed_event = next(
+            event
+            for event in invalid_log_resource_refs["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        failed_event["resource_trace_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_log_resource_refs)
+
+        invalid_log_runtime_refs = json.loads(json.dumps(payload))
+        failed_event = next(
+            event
+            for event in invalid_log_runtime_refs["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        failed_event["runtime_result_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_log_runtime_refs)
 
     def test_migrates_missing_and_rejects_mismatched_task_record_ref(self) -> None:
         outcome = execute_task_with_record(
@@ -517,6 +686,20 @@ class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(outcome.envelope["status"], "failed")
         self.assertEqual(outcome.envelope["error"]["code"], "envelope_not_json_serializable")
+        self.assertEqual(outcome.envelope["runtime_failure_signal"]["failure_phase"], "persistence")
+        self.assertEqual(outcome.envelope["runtime_failure_signal"]["task_record_ref"], "task_record:task-record-7")
+        task_failed_log = next(
+            event
+            for event in outcome.envelope["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        self.assertEqual(task_failed_log["failure_signal_id"], outcome.envelope["runtime_failure_signal"]["signal_id"])
+        task_failed_metric = next(
+            metric
+            for metric in outcome.envelope["runtime_execution_metric_samples"]
+            if metric["metric_name"] == "task_failed_total"
+        )
+        self.assertEqual(task_failed_metric["error_code"], "envelope_not_json_serializable")
         self.assertIsNone(outcome.task_record)
 
     def test_execute_task_preserves_public_envelope_when_task_record_fails_to_close(self) -> None:

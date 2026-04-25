@@ -18,6 +18,53 @@ SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
 ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
+RUNTIME_FAILURE_PHASES = frozenset(
+    {
+        "admission",
+        "pre_execution",
+        "resource_acquire",
+        "adapter_execution",
+        "timeout",
+        "retry_exhausted",
+        "concurrency_rejected",
+        "persistence",
+        "observability",
+    }
+)
+RUNTIME_STRUCTURED_LOG_EVENT_TYPES = frozenset(
+    {
+        "task_accepted",
+        "task_running",
+        "attempt_started",
+        "attempt_finished",
+        "retry_scheduled",
+        "timeout_triggered",
+        "admission_concurrency_rejected",
+        "retry_concurrency_rejected",
+        "task_failed",
+        "task_succeeded",
+        "observability_write_failed",
+    }
+)
+RUNTIME_STRUCTURED_LOG_LEVELS = frozenset({"info", "warning", "error"})
+RUNTIME_EXECUTION_METRIC_NAMES = frozenset(
+    {
+        "task_started_total",
+        "task_succeeded_total",
+        "task_failed_total",
+        "attempt_started_total",
+        "retry_scheduled_total",
+        "timeout_total",
+        "admission_concurrency_rejected_total",
+        "retry_concurrency_rejected_total",
+        "execution_duration_ms",
+    }
+)
+RUNTIME_RESULT_REF_TYPES = frozenset({"ExecutionAttemptOutcome", "ExecutionControlEvent"})
+EXECUTION_ATTEMPT_OUTCOMES = frozenset({"succeeded", "failed", "timeout"})
+EXECUTION_CONTROL_EVENT_TYPES = frozenset(
+    {"admission_concurrency_rejected", "retry_concurrency_rejected", "retry_exhausted"}
+)
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
 
@@ -63,6 +110,9 @@ class TaskRecord:
     task_record_ref: str | None = None
     runtime_result_refs: tuple[Any, ...] = field(default_factory=tuple)
     execution_control_events: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_failure_signals: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_structured_log_events: tuple[Any, ...] = field(default_factory=tuple)
+    runtime_execution_metric_samples: tuple[Any, ...] = field(default_factory=tuple)
 
 
 def now_rfc3339_utc() -> str:
@@ -71,6 +121,66 @@ def now_rfc3339_utc() -> str:
 
 def task_record_ref_for(task_id: str) -> str:
     return f"task_record:{task_id}"
+
+
+def _runtime_structured_log_event(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    event_type: str,
+    level: str,
+    occurred_at: str,
+    message: str,
+    attempt_index: int = 0,
+    failure_signal_id: str = "",
+    resource_trace_refs: tuple[Any, ...] | list[Any] | None = None,
+    runtime_result_refs: tuple[Any, ...] | list[Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "event_id": f"runtime_log:{task_id}:{event_type}:{attempt_index}",
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "event_type": event_type,
+        "level": level,
+        "attempt_index": attempt_index,
+        "failure_signal_id": failure_signal_id,
+        "resource_trace_refs": list(resource_trace_refs or []),
+        "runtime_result_refs": list(runtime_result_refs or []),
+        "message": message,
+        "occurred_at": occurred_at,
+    }
+
+
+def _runtime_execution_metric_sample(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    metric_name: str,
+    metric_value: int | float,
+    unit: str,
+    occurred_at: str,
+    attempt_index: int = 0,
+    error_category: str = "",
+    error_code: str = "",
+    failure_phase: str = "",
+) -> dict[str, Any]:
+    return {
+        "metric_id": f"runtime_metric:{task_id}:{metric_name}:{attempt_index}",
+        "task_id": task_id,
+        "metric_name": metric_name,
+        "metric_value": metric_value,
+        "unit": unit,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "error_category": error_category,
+        "error_code": error_code,
+        "failure_phase": failure_phase,
+        "attempt_index": attempt_index,
+        "occurred_at": occurred_at,
+    }
 
 
 def build_task_request_snapshot(request: Any) -> TaskRequestSnapshot:
@@ -129,6 +239,28 @@ def create_task_record(
             ),
         ),
         task_record_ref=task_record_ref_for(task_id),
+        runtime_structured_log_events=(
+            _runtime_structured_log_event(
+                task_id=task_id,
+                adapter_key=request.adapter_key,
+                capability=request.capability,
+                event_type="task_accepted",
+                level="info",
+                occurred_at=timestamp,
+                message="task accepted",
+            ),
+        ),
+        runtime_execution_metric_samples=(
+            _runtime_execution_metric_sample(
+                task_id=task_id,
+                adapter_key=request.adapter_key,
+                capability=request.capability,
+                metric_name="task_started_total",
+                metric_value=1,
+                unit="count",
+                occurred_at=timestamp,
+            ),
+        ),
     )
     validate_task_record(record)
     return record
@@ -164,6 +296,20 @@ def start_task_record(record: TaskRecord, *, occurred_at: str | None = None) -> 
         task_record_ref=record.task_record_ref,
         runtime_result_refs=record.runtime_result_refs,
         execution_control_events=record.execution_control_events,
+        runtime_failure_signals=record.runtime_failure_signals,
+        runtime_structured_log_events=record.runtime_structured_log_events
+        + (
+            _runtime_structured_log_event(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                event_type="task_running",
+                level="info",
+                occurred_at=timestamp,
+                message="task running",
+            ),
+        ),
+        runtime_execution_metric_samples=record.runtime_execution_metric_samples,
     )
     validate_task_record(updated)
     return updated
@@ -175,6 +321,14 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
     normalized_envelope = normalize_json_value(envelope, field="result.envelope")
     if not isinstance(normalized_envelope, dict):
         raise TaskRecordContractError("TaskTerminalResult.envelope 必须是对象")
+    private_failure_signals = normalized_envelope.pop("_runtime_failure_signals", None)
+    private_structured_log_events = normalized_envelope.pop("_runtime_structured_log_events", None)
+    private_metric_samples = normalized_envelope.pop("_runtime_execution_metric_samples", None)
+    if terminal_status == "succeeded":
+        normalized_envelope.pop("runtime_failure_signal", None)
+        normalized_envelope.pop("runtime_failure_signals", None)
+        normalized_envelope.pop("runtime_structured_log_events", None)
+        normalized_envelope.pop("runtime_execution_metric_samples", None)
     task_record_ref = _observability_task_record_ref(normalized_envelope, record)
     if task_record_ref is not None and "task_record_ref" not in normalized_envelope:
         normalized_envelope["task_record_ref"] = task_record_ref
@@ -199,6 +353,63 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
         code = error.get("code")
         if isinstance(code, str) and code:
             log_code = code
+
+    runtime_failure_signals = (
+        record.runtime_failure_signals
+        + _observability_entries({"runtime_failure_signals": private_failure_signals}, "runtime_failure_signals", ())
+        + _runtime_failure_signals(normalized_envelope, ())
+        if private_failure_signals is not None
+        else _runtime_failure_signals(normalized_envelope, record.runtime_failure_signals)
+    )
+    runtime_structured_log_events = record.runtime_structured_log_events + _observability_entries(
+        {"runtime_structured_log_events": private_structured_log_events}
+        if private_structured_log_events is not None
+        else normalized_envelope,
+        "runtime_structured_log_events",
+        (),
+    )
+    runtime_execution_metric_samples = record.runtime_execution_metric_samples + _observability_entries(
+        {"runtime_execution_metric_samples": private_metric_samples}
+        if private_metric_samples is not None
+        else normalized_envelope,
+        "runtime_execution_metric_samples",
+        (),
+    )
+    if terminal_status == "succeeded":
+        runtime_structured_log_events = runtime_structured_log_events + (
+            _runtime_structured_log_event(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                event_type="task_succeeded",
+                level="info",
+                occurred_at=timestamp,
+                message="task succeeded",
+            ),
+        )
+        runtime_execution_metric_samples = runtime_execution_metric_samples + (
+            _runtime_execution_metric_sample(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                metric_name="task_succeeded_total",
+                metric_value=1,
+                unit="count",
+                occurred_at=timestamp,
+            ),
+            _runtime_execution_metric_sample(
+                task_id=record.task_id,
+                adapter_key=record.request.adapter_key,
+                capability=record.request.capability,
+                metric_name="execution_duration_ms",
+                metric_value=max(
+                    0,
+                    int((parse_timestamp(timestamp, field="terminal_at") - parse_timestamp(record.created_at, field="created_at")).total_seconds() * 1000),
+                ),
+                unit="ms",
+                occurred_at=timestamp,
+            ),
+        )
 
     updated = TaskRecord(
         schema_version=record.schema_version,
@@ -227,6 +438,9 @@ def finish_task_record(record: TaskRecord, envelope: Mapping[str, Any], *, occur
             "execution_control_events",
             record.execution_control_events,
         ),
+        runtime_failure_signals=runtime_failure_signals,
+        runtime_structured_log_events=runtime_structured_log_events,
+        runtime_execution_metric_samples=runtime_execution_metric_samples,
     )
     validate_task_record(updated)
     return updated
@@ -252,6 +466,9 @@ def task_record_to_dict(record: TaskRecord) -> dict[str, Any]:
         "task_record_ref": record.task_record_ref,
         "runtime_result_refs": list(record.runtime_result_refs),
         "execution_control_events": list(record.execution_control_events),
+        "runtime_failure_signals": list(record.runtime_failure_signals),
+        "runtime_structured_log_events": list(record.runtime_structured_log_events),
+        "runtime_execution_metric_samples": list(record.runtime_execution_metric_samples),
         "logs": [
             {
                 "sequence": entry.sequence,
@@ -326,6 +543,9 @@ def task_record_from_dict(payload: Mapping[str, Any]) -> TaskRecord:
         ),
         runtime_result_refs=_observability_entries(payload, "runtime_result_refs", ()),
         execution_control_events=_observability_entries(payload, "execution_control_events", ()),
+        runtime_failure_signals=_observability_entries(payload, "runtime_failure_signals", ()),
+        runtime_structured_log_events=_observability_entries(payload, "runtime_structured_log_events", ()),
+        runtime_execution_metric_samples=_observability_entries(payload, "runtime_execution_metric_samples", ()),
     )
     if len(record.logs) != len(logs_payload):
         raise TaskRecordContractError("TaskRecord.logs 项必须全部为对象")
@@ -348,6 +568,43 @@ def validate_task_record(record: TaskRecord) -> None:
         != record.execution_control_events
     ):
         raise TaskRecordContractError("TaskRecord.execution_control_events 必须预先满足 JSON-safe 约束")
+    if (
+        _observability_entries({"runtime_failure_signals": record.runtime_failure_signals}, "runtime_failure_signals", ())
+        != record.runtime_failure_signals
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_failure_signals 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(record.runtime_failure_signals, id_field="signal_id", field="runtime_failure_signals")
+    validate_runtime_failure_signals(record)
+    if (
+        _observability_entries(
+            {"runtime_structured_log_events": record.runtime_structured_log_events},
+            "runtime_structured_log_events",
+            (),
+        )
+        != record.runtime_structured_log_events
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_structured_log_events 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(
+        record.runtime_structured_log_events,
+        id_field="event_id",
+        field="runtime_structured_log_events",
+    )
+    validate_runtime_structured_log_events(record)
+    if (
+        _observability_entries(
+            {"runtime_execution_metric_samples": record.runtime_execution_metric_samples},
+            "runtime_execution_metric_samples",
+            (),
+        )
+        != record.runtime_execution_metric_samples
+    ):
+        raise TaskRecordContractError("TaskRecord.runtime_execution_metric_samples 必须预先满足 JSON-safe 约束")
+    validate_observability_replay_ids(
+        record.runtime_execution_metric_samples,
+        id_field="metric_id",
+        field="runtime_execution_metric_samples",
+    )
+    validate_runtime_execution_metric_samples(record)
     validate_request_snapshot(record.request)
     if record.status not in TASK_RECORD_STATUSES:
         raise TaskRecordContractError("TaskRecord.status 不在允许值范围内")
@@ -492,6 +749,198 @@ def _observability_entries(source: Mapping[str, Any], field_name: str, default: 
     return tuple(normalized)
 
 
+def validate_observability_replay_ids(entries: tuple[Any, ...], *, id_field: str, field: str) -> None:
+    seen: dict[str, Any] = {}
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise TaskRecordContractError(f"TaskRecord.{field} 项必须是对象")
+        entry_id = require_string(entry.get(id_field), field=f"{field}.{id_field}")
+        if entry_id in seen and seen[entry_id] != entry:
+            raise TaskRecordContractError(f"TaskRecord.{field} 同一 {id_field} 不得对应不同 payload")
+        seen[entry_id] = entry
+
+
+def validate_runtime_failure_signals(record: TaskRecord) -> None:
+    for signal in record.runtime_failure_signals:
+        if not isinstance(signal, Mapping):
+            raise TaskRecordContractError("RuntimeFailureSignal 必须是对象")
+        task_id = require_string(signal.get("task_id"), field="RuntimeFailureSignal.task_id")
+        adapter_key = require_string(signal.get("adapter_key"), field="RuntimeFailureSignal.adapter_key")
+        capability = require_string(signal.get("capability"), field="RuntimeFailureSignal.capability")
+        if task_id != record.task_id or adapter_key != record.request.adapter_key or capability != record.request.capability:
+            raise TaskRecordContractError("RuntimeFailureSignal 必须绑定同一 TaskRecord 请求上下文")
+        if signal.get("status") != "failed":
+            raise TaskRecordContractError("RuntimeFailureSignal.status 必须为 failed")
+        category = require_string(signal.get("error_category"), field="RuntimeFailureSignal.error_category")
+        if category not in ALLOWED_ERROR_CATEGORIES:
+            raise TaskRecordContractError("RuntimeFailureSignal.error_category 不在允许值范围内")
+        require_string(signal.get("error_code"), field="RuntimeFailureSignal.error_code")
+        phase = require_string(signal.get("failure_phase"), field="RuntimeFailureSignal.failure_phase")
+        if phase not in RUNTIME_FAILURE_PHASES:
+            raise TaskRecordContractError("RuntimeFailureSignal.failure_phase 不在允许值范围内")
+        require_string(signal.get("envelope_ref"), field="RuntimeFailureSignal.envelope_ref")
+        task_record_ref = require_string(signal.get("task_record_ref"), field="RuntimeFailureSignal.task_record_ref")
+        if task_record_ref != "none" and task_record_ref != record.task_record_ref:
+            raise TaskRecordContractError("RuntimeFailureSignal.task_record_ref 与 TaskRecord 不一致")
+        validate_resource_trace_refs(signal, field="RuntimeFailureSignal.resource_trace_refs")
+        validate_runtime_result_refs(record, signal, field="RuntimeFailureSignal.runtime_result_refs")
+        validate_timestamp(require_string(signal.get("occurred_at"), field="RuntimeFailureSignal.occurred_at"), field="RuntimeFailureSignal.occurred_at")
+
+
+def validate_runtime_structured_log_events(record: TaskRecord) -> None:
+    signal_ids = {signal.get("signal_id") for signal in record.runtime_failure_signals if isinstance(signal, Mapping)}
+    for event in record.runtime_structured_log_events:
+        if not isinstance(event, Mapping):
+            raise TaskRecordContractError("RuntimeStructuredLogEvent 必须是对象")
+        task_id = require_string(event.get("task_id"), field="RuntimeStructuredLogEvent.task_id")
+        adapter_key = require_string(event.get("adapter_key"), field="RuntimeStructuredLogEvent.adapter_key")
+        capability = require_string(event.get("capability"), field="RuntimeStructuredLogEvent.capability")
+        if task_id != record.task_id or adapter_key != record.request.adapter_key or capability != record.request.capability:
+            raise TaskRecordContractError("RuntimeStructuredLogEvent 必须绑定同一 TaskRecord 请求上下文")
+        event_type = require_string(event.get("event_type"), field="RuntimeStructuredLogEvent.event_type")
+        if event_type not in RUNTIME_STRUCTURED_LOG_EVENT_TYPES:
+            raise TaskRecordContractError("RuntimeStructuredLogEvent.event_type 不在允许值范围内")
+        level = require_string(event.get("level"), field="RuntimeStructuredLogEvent.level")
+        if level not in RUNTIME_STRUCTURED_LOG_LEVELS:
+            raise TaskRecordContractError("RuntimeStructuredLogEvent.level 不在允许值范围内")
+        attempt_index = coerce_int(event.get("attempt_index"), field="RuntimeStructuredLogEvent.attempt_index")
+        if attempt_index < 0:
+            raise TaskRecordContractError("RuntimeStructuredLogEvent.attempt_index 必须为非负整数")
+        failure_signal_id = event.get("failure_signal_id", "")
+        if failure_signal_id is not None and not isinstance(failure_signal_id, str):
+            raise TaskRecordContractError("RuntimeStructuredLogEvent.failure_signal_id 必须是字符串")
+        if event_type in {
+            "admission_concurrency_rejected",
+            "retry_concurrency_rejected",
+            "task_failed",
+            "timeout_triggered",
+            "retry_scheduled",
+            "observability_write_failed",
+        }:
+            if not failure_signal_id or failure_signal_id not in signal_ids:
+                raise TaskRecordContractError("失败相关 RuntimeStructuredLogEvent 必须引用对应 RuntimeFailureSignal")
+        validate_resource_trace_refs(event, field="RuntimeStructuredLogEvent.resource_trace_refs")
+        validate_runtime_result_refs(record, event, field="RuntimeStructuredLogEvent.runtime_result_refs")
+        require_string(event.get("message"), field="RuntimeStructuredLogEvent.message")
+        validate_timestamp(require_string(event.get("occurred_at"), field="RuntimeStructuredLogEvent.occurred_at"), field="RuntimeStructuredLogEvent.occurred_at")
+
+
+def validate_resource_trace_refs(source: Mapping[str, Any], *, field: str) -> None:
+    field_name = field.rsplit(".", 1)[-1]
+    for ref in _observability_entries(source, field_name, ()):
+        if not isinstance(ref, Mapping):
+            raise TaskRecordContractError(f"{field} 项必须是对象")
+        ref_type = require_string(ref.get("ref_type"), field=f"{field}.ref_type")
+        if ref_type != "ResourceTraceEvent":
+            raise TaskRecordContractError(f"{field}.ref_type 必须为 ResourceTraceEvent")
+        require_string(ref.get("event_id"), field=f"{field}.event_id")
+        require_string(ref.get("lease_id"), field=f"{field}.lease_id")
+        require_string(ref.get("bundle_id"), field=f"{field}.bundle_id")
+        require_string(ref.get("resource_id"), field=f"{field}.resource_id")
+        require_string(ref.get("resource_type"), field=f"{field}.resource_type")
+
+
+def validate_runtime_result_refs(record: TaskRecord, source: Mapping[str, Any], *, field: str) -> None:
+    field_name = field.rsplit(".", 1)[-1]
+    for ref in _observability_entries(source, field_name, ()):
+        if not isinstance(ref, Mapping):
+            raise TaskRecordContractError(f"{field} 项必须是对象")
+        ref_type = require_string(ref.get("ref_type"), field=f"{field}.ref_type")
+        if ref_type not in RUNTIME_RESULT_REF_TYPES:
+            raise TaskRecordContractError(f"{field}.ref_type 不在允许值范围内")
+        task_id = require_string(ref.get("task_id"), field=f"{field}.task_id")
+        adapter_key = require_string(ref.get("adapter_key"), field=f"{field}.adapter_key")
+        capability = require_string(ref.get("capability"), field=f"{field}.capability")
+        if task_id != record.task_id or adapter_key != record.request.adapter_key or capability != record.request.capability:
+            raise TaskRecordContractError(f"{field} 必须绑定同一 TaskRecord 请求上下文")
+        require_string(ref.get("ref_id"), field=f"{field}.ref_id")
+        if ref_type == "ExecutionAttemptOutcome":
+            attempt_index = coerce_int(ref.get("attempt_index"), field=f"{field}.attempt_index")
+            if attempt_index < 0:
+                raise TaskRecordContractError(f"{field}.attempt_index 必须为非负整数")
+            validate_timestamp(require_string(ref.get("started_at"), field=f"{field}.started_at"), field=f"{field}.started_at")
+            validate_timestamp(require_string(ref.get("ended_at"), field=f"{field}.ended_at"), field=f"{field}.ended_at")
+            outcome = require_string(ref.get("outcome"), field=f"{field}.outcome")
+            if outcome not in EXECUTION_ATTEMPT_OUTCOMES:
+                raise TaskRecordContractError(f"{field}.outcome 不在允许值范围内")
+            if not isinstance(ref.get("terminal_envelope"), Mapping):
+                raise TaskRecordContractError(f"{field}.terminal_envelope 必须是对象")
+            control_code = ref.get("control_code", "")
+            if not isinstance(control_code, str):
+                raise TaskRecordContractError(f"{field}.control_code 必须是字符串")
+            continue
+        event_type = require_string(ref.get("event_type"), field=f"{field}.event_type")
+        if event_type not in EXECUTION_CONTROL_EVENT_TYPES:
+            raise TaskRecordContractError(f"{field}.event_type 不在允许值范围内")
+        attempt_count = coerce_int(ref.get("attempt_count"), field=f"{field}.attempt_count")
+        if attempt_count < 0:
+            raise TaskRecordContractError(f"{field}.attempt_count 必须为非负整数")
+        require_string(ref.get("control_code"), field=f"{field}.control_code")
+        task_record_ref = require_string(ref.get("task_record_ref"), field=f"{field}.task_record_ref")
+        if task_record_ref != "none" and task_record_ref != record.task_record_ref:
+            raise TaskRecordContractError(f"{field}.task_record_ref 与 TaskRecord 不一致")
+        if not isinstance(ref.get("policy"), Mapping):
+            raise TaskRecordContractError(f"{field}.policy 必须是对象")
+        validate_timestamp(require_string(ref.get("occurred_at"), field=f"{field}.occurred_at"), field=f"{field}.occurred_at")
+
+
+def validate_runtime_execution_metric_samples(record: TaskRecord) -> None:
+    for metric in record.runtime_execution_metric_samples:
+        if not isinstance(metric, Mapping):
+            raise TaskRecordContractError("RuntimeExecutionMetricSample 必须是对象")
+        task_id = require_string(metric.get("task_id"), field="RuntimeExecutionMetricSample.task_id")
+        adapter_key = require_string(metric.get("adapter_key"), field="RuntimeExecutionMetricSample.adapter_key")
+        capability = require_string(metric.get("capability"), field="RuntimeExecutionMetricSample.capability")
+        if task_id != record.task_id or adapter_key != record.request.adapter_key or capability != record.request.capability:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample 必须绑定同一 TaskRecord 请求上下文")
+        metric_name = require_string(metric.get("metric_name"), field="RuntimeExecutionMetricSample.metric_name")
+        if metric_name not in RUNTIME_EXECUTION_METRIC_NAMES:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.metric_name 不在允许值范围内")
+        value = metric.get("metric_value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or math.isnan(value) or value < 0:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.metric_value 必须为非负数")
+        unit = require_string(metric.get("unit"), field="RuntimeExecutionMetricSample.unit")
+        if metric_name == "execution_duration_ms":
+            if unit != "ms":
+                raise TaskRecordContractError("RuntimeExecutionMetricSample execution_duration_ms unit 必须为 ms")
+        elif unit != "count" or not isinstance(value, int):
+            raise TaskRecordContractError("RuntimeExecutionMetricSample 计数指标必须使用 count 整数")
+        category = metric.get("error_category")
+        if not isinstance(category, str):
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.error_category 必须是字符串")
+        if category and category not in ALLOWED_ERROR_CATEGORIES:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.error_category 不在允许值范围内")
+        error_code = metric.get("error_code")
+        if not isinstance(error_code, str):
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.error_code 必须是字符串")
+        phase = metric.get("failure_phase")
+        if not isinstance(phase, str):
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.failure_phase 必须是字符串")
+        if phase and phase not in RUNTIME_FAILURE_PHASES:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.failure_phase 不在允许值范围内")
+        if metric_name in {
+            "task_failed_total",
+            "timeout_total",
+            "admission_concurrency_rejected_total",
+            "retry_concurrency_rejected_total",
+        }:
+            if not category or not error_code or not phase:
+                raise TaskRecordContractError("失败相关 RuntimeExecutionMetricSample 必须携带错误元数据")
+        attempt_index = coerce_int(metric.get("attempt_index"), field="RuntimeExecutionMetricSample.attempt_index")
+        if attempt_index < 0:
+            raise TaskRecordContractError("RuntimeExecutionMetricSample.attempt_index 必须为非负整数")
+        validate_timestamp(require_string(metric.get("occurred_at"), field="RuntimeExecutionMetricSample.occurred_at"), field="RuntimeExecutionMetricSample.occurred_at")
+
+
+def _runtime_failure_signals(envelope: Mapping[str, Any], default: tuple[Any, ...]) -> tuple[Any, ...]:
+    if "runtime_failure_signal" in envelope:
+        normalized = normalize_json_value(envelope["runtime_failure_signal"], field="runtime_failure_signal")
+        if not isinstance(normalized, Mapping):
+            raise TaskRecordContractError("runtime_failure_signal 必须是对象")
+        return (dict(normalized),)
+    return _observability_entries(envelope, "runtime_failure_signals", default)
+
+
 def coerce_int(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TaskRecordContractError(f"{field} 必须为整数")
@@ -551,6 +1000,31 @@ def validate_terminal_envelope_observability_contract(record: TaskRecord, envelo
             raise TaskRecordContractError(
                 "TaskTerminalResult.envelope.execution_control_events 与 TaskRecord.execution_control_events 不一致"
             )
+    if "runtime_failure_signal" in envelope or "runtime_failure_signals" in envelope:
+        envelope_failure_signals = _runtime_failure_signals(envelope, ())
+        if not _observability_entries_are_subset(envelope_failure_signals, record.runtime_failure_signals):
+            raise TaskRecordContractError("TaskTerminalResult.envelope.runtime_failure_signal 与 TaskRecord.runtime_failure_signals 不一致")
+    if "runtime_structured_log_events" in envelope:
+        envelope_log_events = _observability_entries(envelope, "runtime_structured_log_events", ())
+        if not _observability_entries_are_subset(envelope_log_events, record.runtime_structured_log_events):
+            raise TaskRecordContractError(
+                "TaskTerminalResult.envelope.runtime_structured_log_events 与 TaskRecord.runtime_structured_log_events 不一致"
+            )
+    if "runtime_execution_metric_samples" in envelope:
+        envelope_metric_samples = _observability_entries(envelope, "runtime_execution_metric_samples", ())
+        if not _observability_entries_are_subset(envelope_metric_samples, record.runtime_execution_metric_samples):
+            raise TaskRecordContractError(
+                "TaskTerminalResult.envelope.runtime_execution_metric_samples 与 TaskRecord.runtime_execution_metric_samples 不一致"
+            )
+
+
+def _observability_entries_are_subset(entries: tuple[Any, ...], superset: tuple[Any, ...]) -> bool:
+    remaining = list(superset)
+    for entry in entries:
+        if entry not in remaining:
+            return False
+        remaining.remove(entry)
+    return True
 
 
 def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:

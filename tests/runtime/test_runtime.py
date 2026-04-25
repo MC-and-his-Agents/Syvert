@@ -1115,6 +1115,14 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertIsNotNone(outcome.task_record)
         self.assertEqual(outcome.task_record.status, "failed")
         self.assertEqual(outcome.task_record.result.envelope["error"]["code"], "resource_unavailable")
+        self.assertEqual(
+            outcome.envelope["runtime_failure_signal"]["task_record_ref"],
+            "task_record:task-unmatched-runtime-capabilities",
+        )
+        self.assertEqual(
+            outcome.task_record.result.envelope["runtime_failure_signal"]["task_record_ref"],
+            "task_record:task-unmatched-runtime-capabilities",
+        )
 
     def test_execute_task_rejects_unsupported_capability(self) -> None:
         request = TaskRequest(
@@ -1217,7 +1225,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["category"], "platform")
         self.assertEqual(envelope["error"]["code"], "platform_broken")
-        self.assertEqual(envelope["error"]["details"], {})
+        self.assertEqual(set(envelope["error"]["details"]), {"resource_trace_refs", "task_record_ref"})
+        self.assertTrue(envelope["error"]["details"]["resource_trace_refs"])
 
     def test_execute_task_wraps_platform_error(self) -> None:
         request = TaskRequest(

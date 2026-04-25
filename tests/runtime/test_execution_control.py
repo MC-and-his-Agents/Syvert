@@ -315,6 +315,15 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(result.envelope["error"]["code"], "execution_control_state_invalid")
         self.assertEqual(result.envelope["error"]["details"]["resource_quarantine"], "INVALID")
+        self.assertNotEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "timeout")
+        self.assertNotIn(
+            "timeout_triggered",
+            {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+        )
+        self.assertNotIn(
+            "timeout_total",
+            {metric["metric_name"] for metric in result.envelope["runtime_execution_metric_samples"]},
+        )
         snapshot = default_resource_lifecycle_store().load_snapshot()
         self.assertEqual({lease.target_status_after_release for lease in snapshot.leases}, {"INVALID"})
         self.assertEqual(
@@ -386,6 +395,15 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
             self.assertEqual(result.envelope["error"]["details"]["control_code"], "execution_timeout")
             self.assertEqual(result.envelope["error"]["details"]["retryable"], False)
             self.assertEqual(result.envelope["error"]["details"]["resource_quarantine"], "INVALID")
+            self.assertNotEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "timeout")
+            self.assertNotIn(
+                "timeout_triggered",
+                {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+            )
+            self.assertNotIn(
+                "timeout_total",
+                {metric["metric_name"] for metric in result.envelope["runtime_execution_metric_samples"]},
+            )
             self.assertNotIn("runtime_result_refs", result.envelope)
             self.assertEqual(result.task_record.status, "failed")
 
@@ -697,9 +715,62 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         self.assertIsNotNone(result.task_record)
         self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "platform")
+        self.assertEqual(result.envelope["error"]["code"], "transient_platform")
+        self.assertEqual(result.envelope["execution_control_events"][0]["event_type"], "retry_concurrency_rejected")
+        self.assertEqual(
+            result.envelope["error"]["details"]["execution_control_event"],
+            result.envelope["execution_control_events"][0],
+        )
+        self.assertEqual(result.envelope["runtime_result_refs"][1], result.envelope["execution_control_events"][0])
+        self.assertEqual(result.task_record.status, "failed")
+
+    def test_retry_slot_rejection_preserves_current_cleanup_failure(self) -> None:
+        real_acquire = runtime_module.acquire_execution_concurrency_slot
+        real_settle = runtime_module.settle_managed_resource_bundle
+        acquire_calls = 0
+        settle_calls = 0
+
+        def acquire_once_then_invalid(policy, *, adapter_key, capability):
+            nonlocal acquire_calls
+            acquire_calls += 1
+            if acquire_calls == 1:
+                return real_acquire(policy, adapter_key=adapter_key, capability=capability)
+            return None
+
+        def fail_second_settle(*args, **kwargs):
+            nonlocal settle_calls
+            settle_calls += 1
+            if settle_calls == 2:
+                return runtime_module.failure_envelope(
+                    "task-retry-slot-cleanup-failed",
+                    TEST_ADAPTER_KEY,
+                    TEST_CAPABILITY,
+                    runtime_module.runtime_contract_error(
+                        "resource_cleanup_failed",
+                        "resource cleanup failed during retry slot rejection",
+                        details={"stage": "resource_cleanup", "retryable": False},
+                    ),
+                )
+            return real_settle(*args, **kwargs)
+
+        with (
+            mock.patch("syvert.runtime.acquire_execution_concurrency_slot", side_effect=acquire_once_then_invalid),
+            mock.patch("syvert.runtime.settle_managed_resource_bundle", side_effect=fail_second_settle),
+        ):
+            result = execute_task_with_record(
+                make_request(make_policy(max_attempts=2)),
+                adapters={TEST_ADAPTER_KEY: RetryableFailureAdapter()},
+                task_id_factory=lambda: "task-retry-slot-cleanup-failed",
+                task_record_store=self.store,
+            )
+
+        self.assertIsNotNone(result.task_record)
+        self.assertEqual(result.envelope["status"], "failed")
         self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(result.envelope["error"]["code"], "execution_control_state_invalid")
-        self.assertNotIn("execution_control_events", result.envelope)
+        self.assertEqual(result.envelope["error"]["code"], "resource_cleanup_failed")
+        self.assertEqual(result.envelope["execution_control_events"][0]["event_type"], "retry_concurrency_rejected")
+        self.assertEqual(result.envelope["runtime_result_refs"][1], result.envelope["execution_control_events"][0])
         self.assertEqual(result.task_record.status, "failed")
 
     def test_concurrency_scope_keys_are_enforced_independently(self) -> None:

@@ -97,6 +97,7 @@ def normalize_record_payload(payload: dict[str, object]) -> dict[str, object]:
         for index, entry in enumerate(logs, start=1):
             if isinstance(entry, dict) and isinstance(entry.get("occurred_at"), str):
                 entry["occurred_at"] = f"normalized-log-{index}-occurred-at"
+    normalize_observability_identity(normalized)
     return normalized
 
 
@@ -107,6 +108,33 @@ def normalize_envelope_identity(envelope: object) -> None:
         envelope["task_id"] = "normalized-task-id"
     if isinstance(envelope.get("task_record_ref"), str):
         envelope["task_record_ref"] = "normalized-task-record-ref"
+
+
+def normalize_observability_identity(payload: object) -> None:
+    if isinstance(payload, dict):
+        for key, value in list(payload.items()):
+            if key == "task_id" and isinstance(value, str):
+                payload[key] = "normalized-task-id"
+            elif key == "task_record_ref" and isinstance(value, str):
+                payload[key] = "normalized-task-record-ref"
+            elif key in {"event_id", "metric_id", "signal_id", "ref_id", "failure_signal_id"} and isinstance(value, str):
+                payload[key] = normalize_generated_ref(value)
+            elif key in {"occurred_at", "started_at", "ended_at"} and isinstance(value, str):
+                payload[key] = "normalized-observability-occurred-at"
+            elif key == "metric_value" and payload.get("metric_name") == "execution_duration_ms":
+                payload[key] = "normalized-execution-duration-ms"
+            else:
+                normalize_observability_identity(value)
+    elif isinstance(payload, list):
+        for entry in payload:
+            normalize_observability_identity(entry)
+
+
+def normalize_generated_ref(value: str) -> str:
+    return value.replace("task-cli-same-success", "normalized-task-id").replace(
+        "task-http-same-success",
+        "normalized-task-id",
+    )
 
 
 def make_request_snapshot(url: str = "https://example.com/posts/same-path") -> TaskRequestSnapshot:
@@ -340,7 +368,9 @@ class CliHttpSamePathTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result_response.body, query_payload["result"]["envelope"])
         self.assertEqual(result_response.body["error"]["category"], "platform")
         self.assertEqual(result_response.body["error"]["code"], "platform_broken")
-        self.assertEqual(result_response.body["error"]["details"], {"reason": "same-path", "retryable": False})
+        self.assertEqual(result_response.body["error"]["details"]["reason"], "same-path")
+        self.assertFalse(result_response.body["error"]["details"]["retryable"])
+        self.assertTrue(result_response.body["error"]["details"]["resource_trace_refs"])
 
     def test_same_path_pre_admission_invalid_input_does_not_create_task_record(self) -> None:
         url = "https://example.com/posts/invalid-capability"

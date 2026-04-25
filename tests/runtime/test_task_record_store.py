@@ -14,6 +14,7 @@ from syvert.task_record import (
     create_task_record,
     finish_task_record,
     start_task_record,
+    task_record_from_dict,
     task_record_to_dict,
 )
 from syvert.task_record_store import LocalTaskRecordStore, TaskRecordStoreError
@@ -351,6 +352,7 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(outcome.envelope["error"]["code"], "task_record_persistence_failed")
         self.assertEqual(outcome.envelope["error"]["details"]["stage"], "running")
+        self.assertEqual(outcome.envelope["runtime_failure_signal"]["task_record_ref"], "task_record:task-store-3b")
         self.assertEqual(adapter.calls, 0)
         self.assertIsNone(outcome.task_record)
 
@@ -701,6 +703,61 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
             conflicting["error"]["code"] = "changed"
             with self.assertRaises((TaskRecordStoreError, TaskRecordContractError)):
                 store.write(finish_task_record(running, conflicting, occurred_at="2026-04-17T12:00:02Z"))
+
+    def test_store_rejects_terminal_rewrite_that_drops_existing_observability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-observability-subset"),
+                ),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-observability-subset",
+                task_record_store=store,
+            )
+            payload = task_record_to_dict(outcome.task_record)
+            payload["runtime_failure_signals"] = []
+            payload["runtime_structured_log_events"] = []
+            payload["runtime_execution_metric_samples"] = []
+            subset_terminal = task_record_from_dict(payload)
+
+            self.assertTrue(outcome.task_record.runtime_structured_log_events)
+            self.assertTrue(outcome.task_record.runtime_execution_metric_samples)
+            with self.assertRaises(TaskRecordStoreError):
+                store.write(subset_terminal)
+            self.assertEqual(store.load("task-store-observability-subset"), outcome.task_record)
+
+    def test_store_allows_terminal_rewrite_that_adds_observability_superset(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-observability-superset"),
+                ),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-observability-superset",
+                task_record_store=store,
+            )
+            payload = task_record_to_dict(outcome.task_record)
+            legacy_payload = json.loads(json.dumps(payload))
+            legacy_payload["runtime_failure_signals"] = []
+            legacy_payload["runtime_structured_log_events"] = []
+            legacy_payload["runtime_execution_metric_samples"] = []
+            store.root.mkdir(parents=True, exist_ok=True)
+            store.record_path("task-store-observability-superset").write_text(
+                json.dumps(legacy_payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            loaded_legacy = store.load("task-store-observability-superset")
+            self.assertEqual(loaded_legacy.runtime_structured_log_events, ())
+            self.assertTrue(outcome.task_record.runtime_structured_log_events)
+            self.assertEqual(store.write(outcome.task_record), outcome.task_record)
+            self.assertEqual(store.load("task-store-observability-superset"), outcome.task_record)
 
     def test_store_allows_idempotent_rewrite_after_loading_legacy_terminal_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
