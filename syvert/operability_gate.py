@@ -320,7 +320,7 @@ def orchestrate_operability_gate(
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
-    elif not baseline_gate_ref.startswith("FR-0007:version_gate:"):
+    elif not baseline_gate_ref.startswith(f"FR-0007:version_gate:{RELEASE}:"):
         failures.append(
             _failure(
                 "operability_gate",
@@ -867,20 +867,26 @@ def _normalize_string_list(
     failure_source: str = "operability_gate",
     allow_empty: bool = False,
 ) -> list[str]:
+    def add_failure(code: str, message: str) -> None:
+        if failure_source == "operability_gate":
+            failures.append(_failure(failure_source, code, message))
+        else:
+            failures.append(_case_failure(failure_source, code, message))
+
     if not isinstance(raw_value, Iterable) or isinstance(raw_value, (Mapping, str, bytes)):
-        failures.append(_failure(failure_source, f"invalid_{field_name}", f"{field_name} must be a string sequence"))
+        add_failure(f"invalid_{field_name}", f"{field_name} must be a string sequence")
         return []
     normalized: list[str] = []
     for item in raw_value:
         text = _non_empty_string(item)
         if not text:
-            failures.append(_failure(failure_source, f"invalid_{field_name}", f"{field_name} entries must be non-empty strings"))
+            add_failure(f"invalid_{field_name}", f"{field_name} entries must be non-empty strings")
             continue
         normalized.append(text)
     if not allow_empty and not normalized:
-        failures.append(_failure(failure_source, f"missing_{field_name}", f"{field_name} must be non-empty"))
+        add_failure(f"missing_{field_name}", f"{field_name} must be non-empty")
     if len(set(normalized)) != len(normalized):
-        failures.append(_failure(failure_source, f"duplicate_{field_name}", f"{field_name} must not contain duplicates"))
+        add_failure(f"duplicate_{field_name}", f"{field_name} must not contain duplicates")
         normalized = _dedupe_sorted(normalized)
     return normalized
 

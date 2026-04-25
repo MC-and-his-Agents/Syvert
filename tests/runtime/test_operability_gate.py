@@ -50,6 +50,12 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
 
+    def test_baseline_gate_ref_rejects_wrong_release(self) -> None:
+        result = self.pass_result(baseline_gate_ref="FR-0007:version_gate:v0.5.0:baseline:test-head-sha")
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+
     def test_gate_id_and_matrix_version_are_frozen(self) -> None:
         result = self.pass_result(gate_id="totally-different-gate", matrix_version="scratch-matrix")
 
@@ -217,6 +223,19 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("missing_case_evidence_refs", self.failure_codes(result))
+
+    def test_case_scoped_metadata_failures_update_case_verdict(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["entrypoints"] = ["core", ""]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("invalid_entrypoints", self.failure_codes(result))
+        self.assertEqual(result["summary"]["fail_case_total"], 1)
+        self.assertEqual(result["summary"]["failed_case_ids"], [cases[0]["case_id"]])
+        result_case = next(case for case in result["cases"] if case["case_id"] == cases[0]["case_id"])
+        self.assertEqual(result_case["verdict"], FAIL_VERDICT)
 
     def test_execution_revision_must_be_bound_to_evidence_refs(self) -> None:
         result = self.pass_result(execution_revision="other-head")
