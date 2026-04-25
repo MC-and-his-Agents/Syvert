@@ -22,6 +22,7 @@
 - 本次纳入：
   - `syvert/operability_gate.py`
   - `tests/runtime/test_operability_gate.py`
+  - `docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json`
   - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
   - `tests/runtime/render_operability_gate_artifact.py`
   - `docs/exec-plans/CHORE-0158-fr-0019-v0-6-release-gate-runtime.md`
@@ -68,7 +69,7 @@
 - `python3 -m py_compile syvert/operability_gate.py tests/runtime/render_operability_gate_artifact.py`
   - 结果：修复 artifact 重放入口后通过。
 - `python3 -m unittest tests.runtime.test_operability_gate`
-  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`；修复 guardian 三轮阻断后再次通过，`Ran 21 tests`，`OK`；修复 guardian 四轮阻断后再次通过，`Ran 23 tests`，`OK`；修复 guardian 五轮阻断后再次通过，`Ran 25 tests`，`OK`；修复 guardian 六轮阻断后再次通过，`Ran 28 tests`，`OK`；修复 guardian 七轮阻断后再次通过，`Ran 31 tests`，`OK`；修复 guardian 八轮阻断后再次通过，`Ran 34 tests`，`OK`；补齐 exact baseline / invalid-case summary / reviewable preconditions / artifact reproduction entrypoint 后再次通过，`Ran 37 tests`，`OK`；修复 guardian 九轮 snapshot 断言来源阻断后再次通过，`Ran 40 tests`，`OK`。
+  - 结果：首轮通过，`Ran 10 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 13 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 17 tests`，`OK`；修复 guardian 三轮阻断后再次通过，`Ran 21 tests`，`OK`；修复 guardian 四轮阻断后再次通过，`Ran 23 tests`，`OK`；修复 guardian 五轮阻断后再次通过，`Ran 25 tests`，`OK`；修复 guardian 六轮阻断后再次通过，`Ran 28 tests`，`OK`；修复 guardian 七轮阻断后再次通过，`Ran 31 tests`，`OK`；修复 guardian 八轮阻断后再次通过，`Ran 34 tests`，`OK`；补齐 exact baseline / invalid-case summary / reviewable preconditions / artifact reproduction entrypoint 后再次通过，`Ran 37 tests`，`OK`；修复 guardian 九轮 snapshot 断言来源阻断后再次通过，`Ran 40 tests`，`OK`；改为消费 source evidence artifact 与 resolved `baseline_gate_result` 后再次通过，`Ran 43 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_task_record_store tests.runtime.test_version_gate tests.runtime.test_operability_gate`
   - 结果：首轮通过，`Ran 251 tests`，`OK`；修复 guardian 一轮阻断后再次通过，`Ran 254 tests`，`OK`；修复 guardian 二轮阻断后再次通过，`Ran 258 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
@@ -95,10 +96,14 @@
   - 结果：`REQUEST_CHANGES`；指出 `baseline_gate_ref` 必须精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>`、invalid/missing case 不能从 summary 消失、generated matrix case 不能使用占位 preconditions、artifact 需要本地重放入口。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-9484a36.json`
   - 结果：`REQUEST_CHANGES`；指出 case-level `actual_result.policy` / `actual_result.metrics` 不能自证 snapshot 断言，`policy.*` / `metrics.*` 必须绑定顶层 normalized `policy_snapshot` / `metrics_snapshot`。
-- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision 5b9211258dc2e00c9306c4133dc68eb245ab270c`
-  - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=5b9211258dc2e00c9306c4133dc68eb245ab270c`。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 252 --post-review --json-output /tmp/syvert-guardian-252-2956afc.json`
+  - 结果：`REQUEST_CHANGES`；指出 artifact renderer 不能由 frozen expected_result 与 hard-coded metrics 自造 pass 结果，`baseline_gate_ref` 也不能只校验字符串形状，必须消费 resolved FR-0007 baseline pass evidence。
+- `docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json`
+  - 结果：已新增 source evidence artifact，作为 renderer 输入，包含 resolved `baseline_gate_result`、metrics snapshot、case-level actual_result / local evidence refs / upstream test refs；renderer 只负责加载和 revision 重写，不再从 `expected_result` 自造 actual_result。
+- `python3 -m tests.runtime.render_operability_gate_artifact --execution-revision 4773dc010de4c987f8d2c57b725800b01803ee88`
+  - 结果：通过，输出 `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json` 与 `verdict=pass cases=20 execution_revision=4773dc010de4c987f8d2c57b725800b01803ee88`。
 - `docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json`
-  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=5b9211258dc2e00c9306c4133dc68eb245ab270c`，覆盖 20 个 mandatory cases，并包含 case-level local evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions、顶层 snapshot 绑定断言与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
+  - 结果：已生成 reviewable `OperabilityGateResult` artifact；`verdict=pass`，`execution_revision=4773dc010de4c987f8d2c57b725800b01803ee88`，覆盖 20 个 mandatory cases，并包含 resolved `baseline_gate_result`、case-level local evidence refs、actual_result、canonical `failure_log_metrics` side_effects、forbidden_mutations_absent、reviewable preconditions、顶层 snapshot 绑定断言与精确绑定 `FR-0007:version_gate:v0.6.0:baseline:<execution_revision>` 的 baseline ref。
 
 ## 待完成
 
@@ -118,4 +123,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`。
-- 当前可恢复 checkpoint：`5b9211258dc2e00c9306c4133dc68eb245ab270c`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、顶层 normalized `policy_snapshot` / `metrics_snapshot` 断言来源绑定、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
+- 当前可恢复 checkpoint：`4773dc010de4c987f8d2c57b725800b01803ee88`，包含 gate runner、mandatory matrix validator、revision/evidence 绑定校验、case-level evidence fail-closed、allowed dimension / entrypoints 校验、baseline ref / release / execution_revision 精确绑定校验、resolved FR-0007 `baseline_gate_result` pass evidence 校验、case-scoped metadata failure attribution、invalid case summary reconciliation、reviewable case preconditions、artifact 本地重放入口、source evidence artifact consumption、local evidence ref format / actual_result_ref 校验、token-level revision matching、case-local metrics / policy evidence 校验、顶层 normalized `policy_snapshot` / `metrics_snapshot` 断言来源绑定、gate/matrix identity freeze、actual_result 断言求值、missing field fail-closed、canonical `failure_log_metrics` side-effect evidence、side effects / forbidden mutations 机判校验、mandatory forbidden mutations freeze、case verdict validator 回写、summary failure reconciliation、malformed expected value fail-closed、专项测试与验证证据；后续若只更新 review / merge gate / closeout metadata，不推进新的 runtime 语义 checkpoint。
