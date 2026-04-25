@@ -11,7 +11,7 @@ from syvert.operability_gate import (
     mandatory_operability_case_ids,
     orchestrate_operability_gate,
 )
-from tests.runtime.render_operability_gate_artifact import build_gate_input_from_source_evidence
+from tests.runtime.render_operability_gate_artifact import assert_revision_is_current_head, build_gate_input_from_source_evidence
 
 
 class OperabilityGateTests(unittest.TestCase):
@@ -396,6 +396,20 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_case_upstream_refs_must_match_execution_revision(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["upstream_refs"] = ["tests:other-rev:tests.runtime.test_execution_control"]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("upstream_refs_revision_mismatch", self.failure_codes(result))
+        self.assertIn("execution_revision_evidence_mismatch", self.failure_codes(result))
+
+    def test_renderer_rejects_non_head_execution_revision(self) -> None:
+        with self.assertRaises(SystemExit):
+            assert_revision_is_current_head("not-current-head")
 
     def test_external_actual_result_ref_fails_closed(self) -> None:
         cases = self.valid_cases()

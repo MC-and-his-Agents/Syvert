@@ -401,6 +401,7 @@ def orchestrate_operability_gate(
 
     for case in normalized_cases:
         normalized_evidence_refs.extend(case["evidence_refs"])
+        normalized_evidence_refs.extend(case["upstream_refs"])
         if case["verdict"] == FAIL_VERDICT and case["gate_impact"] == "mandatory":
             failures.append(
                 _failure(
@@ -778,6 +779,17 @@ def _normalize_cases(
         upstream_refs = _normalize_evidence_refs(raw_case.get("upstream_refs"), failures, source=case_id)
         if not upstream_refs:
             failures.append(_case_failure(case_id, "missing_upstream_refs", "operability case requires concrete upstream evidence refs"))
+        else:
+            mismatched_upstream_refs = [ref for ref in upstream_refs if _evidence_ref_revision(ref) != execution_revision]
+            if mismatched_upstream_refs:
+                failures.append(
+                    _case_failure(
+                        case_id,
+                        "upstream_refs_revision_mismatch",
+                        "upstream_refs must be bound to the execution_revision",
+                        details={"execution_revision": execution_revision, "mismatched_upstream_refs": mismatched_upstream_refs},
+                    )
+                )
         expected_result = _normalize_expected_result(case_id, raw_case.get("expected_result"), definition, failures)
         actual_result = raw_case.get("actual_result")
         if not isinstance(actual_result, Mapping):
