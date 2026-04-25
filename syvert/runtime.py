@@ -745,7 +745,7 @@ def execute_controlled_adapter_attempts(
         if attempt.execution_control_event is not None:
             execution_control_events.append(attempt.execution_control_event)
             runtime_result_refs.append(attempt.execution_control_event)
-            if last_failed_envelope is not None:
+            if last_failed_envelope is not None and is_synthetic_retry_concurrency_rejection(envelope):
                 envelope = with_failed_envelope_control_details(
                     last_failed_envelope,
                     event=attempt.execution_control_event,
@@ -2033,6 +2033,17 @@ def with_failed_envelope_control_details(
     error["details"] = current_details
     enriched["error"] = error
     return enriched
+
+
+def is_synthetic_retry_concurrency_rejection(envelope: Mapping[str, Any]) -> bool:
+    error = envelope.get("error") if isinstance(envelope.get("error"), Mapping) else {}
+    details = error.get("details") if isinstance(error.get("details"), Mapping) else {}
+    return (
+        error.get("category") == "runtime_contract"
+        and error.get("code") == EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID
+        and details.get("control_context") == "guarded_admission"
+        and details.get("control_code") == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED
+    )
 
 
 def finalize_task_execution_result(

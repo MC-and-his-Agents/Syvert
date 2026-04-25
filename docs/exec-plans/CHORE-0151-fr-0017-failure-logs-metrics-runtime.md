@@ -46,10 +46,11 @@
 - 已按 guardian 第十轮审查补齐 terminal-to-terminal observability superset 升级路径，并校验 durable observability refs 的 `ResourceTraceEvent` / `ExecutionAttemptOutcome` / `ExecutionControlEvent` 形状。
 - 已按 guardian 第十一轮审查补齐 post-accepted persistence failure 的 durable `task_record_ref` 绑定，以及 retry reacquire TOCTOU 分支的 `retry_concurrency_rejected` event 回传。
 - 已按 guardian 第十二轮审查收敛 failure phase 推断：post-accepted adapter-attempt `invalid_input` 不再伪装成 admission，timeout closeout/control-state `runtime_contract` 不再计入正常 timeout observability。
+- 已按 guardian 第十三轮审查修复 retry-concurrency rejection 外层归并：当前 attempt 若已有 cleanup/runtime-contract failure，不再被上一 attempt 的业务失败覆盖。
 
 ## 下一步动作
 
-- 推送第十二轮 guardian review-sync 修复提交。
+- 推送第十三轮 guardian review-sync 修复提交。
 - 等待 CI 重新全绿后重跑 guardian 与 merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
@@ -94,6 +95,7 @@
   - guardian 第十轮 review-sync 后结果：通过，`Ran 197 tests`，`OK`。
   - guardian 第十一轮 review-sync 后结果：通过，`Ran 197 tests`，`OK`。
   - guardian 第十二轮 review-sync 后结果：通过，`Ran 198 tests`，`OK`。
+  - guardian 第十三轮 review-sync 后结果：通过，`Ran 199 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
@@ -106,6 +108,7 @@
   - guardian 第十轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第十一轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第十二轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
+  - guardian 第十三轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
   - guardian 第四轮 review-sync 后结果：通过。
@@ -118,6 +121,7 @@
   - guardian 第十轮 review-sync 后结果：通过。
   - guardian 第十一轮 review-sync 后结果：通过。
   - guardian 第十二轮 review-sync 后结果：通过。
+  - guardian 第十三轮 review-sync 后结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - guardian 第四轮 review-sync 后结果：通过。
   - 本地 reviewer 复核修复后结果：通过。
@@ -129,6 +133,7 @@
   - guardian 第十轮 review-sync 后结果：通过。
   - guardian 第十一轮 review-sync 后结果：通过。
   - guardian 第十二轮 review-sync 后结果：通过。
+  - guardian 第十三轮 review-sync 后结果：通过。
 
 ## guardian review-sync
 
@@ -195,6 +200,10 @@
 - 已处理阻断项：
   - `infer_failure_phase` 不再用 `error.category=invalid_input/unsupported` 兜底成 admission；已 accepted/running 的 adapter-attempt 失败默认保持 `adapter_execution`，pre-admission 仍由显式 `details.stage=pre_admission` 表达。
   - timeout observability 只对正常 `platform/execution_timeout` 且 `details.control_code=execution_timeout` 投影 `timeout` / `timeout_triggered` / `timeout_total`；timeout closeout/control-state 的 `runtime_contract/execution_control_state_invalid` 保持普通 task failure 观测。
+- PR `#249` 第十三次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - `execute_controlled_adapter_attempts` 只在当前 envelope 是合成的 guarded-admission retry concurrency wrapper 时，才用上一 attempt 的 failed envelope 追加 control details。
+  - 当第二次 retry reacquire slot 丢失且资源 cleanup 返回真实 runtime-contract failure 时，最终 envelope 保留当前 cleanup failure，同时仍携带 `retry_concurrency_rejected` control event / refs。
 
 ## 未决风险
 
@@ -219,4 +228,5 @@
 - guardian 第九轮 review-sync 可恢复 checkpoint：`a0e0d2ccd9c4e91cd844d7bf89ca70075328172f`。
 - guardian 第十轮 review-sync 可恢复 checkpoint：`6ffeb01aedad08f9c9fb12a2f89a77fd379275c4`。
 - guardian 第十一轮 review-sync 可恢复 checkpoint：`5b2f207da7390776b3bdd094b7995461642dc20d`。
-- guardian 第十二轮 review-sync 待提交；本轮不推进 formal spec 语义。
+- guardian 第十二轮 review-sync 可恢复 checkpoint：`d48ef1c0595ae49e15b807d5854b46aa202d0619`。
+- guardian 第十三轮 review-sync 待提交；本轮不推进 formal spec 语义。
