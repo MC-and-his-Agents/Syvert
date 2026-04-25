@@ -283,6 +283,8 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
         "dimension": DIMENSION_CLI_API_SAME_PATH,
         "entrypoints": ("cli", "http"),
         "fields": (
+            ("cli.envelope_ref", "!=", ""),
+            ("http.envelope_ref", "!=", ""),
             ("cli.task_record_ref", "==", "http.task_record_ref"),
             ("cli.envelope_ref", "==", "http.envelope_ref"),
             ("same_path.verdict", "==", "pass"),
@@ -325,6 +327,10 @@ _MANDATORY_CASES: dict[str, dict[str, Any]] = {
         "dimension": DIMENSION_CLI_API_SAME_PATH,
         "entrypoints": ("cli", "http"),
         "fields": (
+            ("cli.result.task_id", "!=", ""),
+            ("http.result.task_id", "!=", ""),
+            ("cli.result.envelope_ref", "!=", ""),
+            ("http.result.envelope_ref", "!=", ""),
             ("cli.result.task_id", "==", "http.result.task_id"),
             ("cli.result.envelope_ref", "==", "http.result.envelope_ref"),
             ("same_path.verdict", "==", "pass"),

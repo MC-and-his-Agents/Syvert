@@ -87,8 +87,10 @@ def build_gate_input_from_source_evidence(
     actual_cases = {str(case["case_id"]): case for case in source["cases"]}
     runtime_cases = runtime_evidence["cases"]
     cases = build_mandatory_operability_cases()
+    consumed_case_ids = set()
     for case in cases:
         case_id = str(case["case_id"])
+        consumed_case_ids.add(case_id)
         evidence_case = actual_cases.get(case_id)
         runtime_case = runtime_cases.get(case_id, {})
         if not isinstance(evidence_case, dict):
@@ -110,6 +112,19 @@ def build_gate_input_from_source_evidence(
                 failures=[{"code": "invalid_source_evidence_upstream_modules", "field": case_id}],
             )
         case["upstream_refs"] = [f"tests:{revision}:{module}" for module in upstream_modules]
+    for case_id, evidence_case in actual_cases.items():
+        if case_id in consumed_case_ids:
+            continue
+        runtime_case = runtime_cases.get(case_id, {})
+        extension_case = dict(evidence_case)
+        extension_case["actual_result_ref"] = f"local:{revision}:{RUNTIME_EVIDENCE_OUTPUT}:{case_id}:actual_result"
+        extension_case["evidence_refs"] = [f"local:{revision}:{RUNTIME_EVIDENCE_OUTPUT}:{case_id}:source_case"]
+        extension_case["actual_result"] = runtime_case.get("actual_result", {})
+        upstream_modules = evidence_case.get("upstream_modules")
+        if not isinstance(upstream_modules, list):
+            upstream_modules = []
+        extension_case["upstream_refs"] = [f"tests:{revision}:{module}" for module in upstream_modules]
+        cases.append(extension_case)
     return {
         "execution_revision": revision,
         "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
@@ -165,14 +180,16 @@ def validate_source_evidence(source: Any) -> list[dict[str, str]]:
             if case_id in observed_case_ids:
                 failures.append({"code": "duplicate_source_evidence_case_id", "field": case_id})
             observed_case_ids.add(case_id)
-            if case_id not in mandatory_case_ids:
-                failures.append({"code": "unexpected_source_evidence_case", "field": case_id})
             if "actual_result" not in case:
                 failures.append({"code": "missing_source_evidence_actual_result", "field": case_id})
             if "actual_result_ref" not in case:
                 failures.append({"code": "missing_source_evidence_actual_result_ref", "field": case_id})
+            elif not isinstance(case["actual_result_ref"], str) or not case["actual_result_ref"]:
+                failures.append({"code": "empty_source_evidence_actual_result_ref", "field": case_id})
             if "evidence_refs" not in case:
                 failures.append({"code": "missing_source_evidence_refs", "field": case_id})
+            elif not isinstance(case["evidence_refs"], list) or not case["evidence_refs"]:
+                failures.append({"code": "empty_source_evidence_refs", "field": case_id})
             if "upstream_modules" not in case:
                 failures.append({"code": "missing_source_evidence_upstream_modules", "field": case_id})
             elif not isinstance(case["upstream_modules"], list) or not set(case["upstream_modules"]) <= APPROVED_UPSTREAM_MODULES:
