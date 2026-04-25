@@ -491,7 +491,11 @@ def execute_task_internal(
                 task_id,
                 adapter_key,
                 capability,
-                runtime_contract_error("execution_control_state_invalid", "Core 未能物化默认执行控制策略"),
+                runtime_contract_error(
+                    "execution_control_state_invalid",
+                    "Core 未能物化默认执行控制策略",
+                    details={"stage": "pre_execution", "control_context": "default_execution_control_policy"},
+                ),
             ),
             None,
         )
@@ -1019,6 +1023,8 @@ def execute_single_controlled_adapter_attempt(
                     "execution concurrency slot became unavailable after guarded admission",
                     details={
                         "control_code": EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED,
+                        "stage": "pre_execution",
+                        "control_context": "guarded_admission",
                         "scope": policy.concurrency.scope,
                         "max_in_flight": policy.concurrency.max_in_flight,
                     },
@@ -1420,6 +1426,11 @@ def build_attempt_outcome_ref(
     terminal_envelope = dict(envelope)
     terminal_envelope.pop("runtime_result_refs", None)
     terminal_envelope.pop("execution_control_events", None)
+    terminal_envelope.pop("runtime_failure_signal", None)
+    terminal_envelope.pop("runtime_structured_log_events", None)
+    terminal_envelope.pop("runtime_execution_metric_samples", None)
+    terminal_envelope.pop("_runtime_structured_log_events", None)
+    terminal_envelope.pop("_runtime_execution_metric_samples", None)
     ref = {
         "ref_type": "ExecutionAttemptOutcome",
         "ref_id": f"{task_id}:attempt:{attempt_index}",
@@ -1515,20 +1526,17 @@ def pre_accepted_failure_envelope(
     capability: str,
     error: Mapping[str, Any],
 ) -> dict[str, Any]:
+    enriched_error = dict(error)
+    current_details = dict(enriched_error.get("details") if isinstance(enriched_error.get("details"), Mapping) else {})
+    current_details["task_record_ref"] = "none"
+    current_details.setdefault("stage", "pre_admission")
+    enriched_error["details"] = current_details
     return failure_envelope(
         task_id,
         adapter_key,
         capability,
-        with_error_details(error, {"task_record_ref": "none", "stage": "pre_admission"}),
+        enriched_error,
     )
-
-
-def with_error_details(error: Mapping[str, Any], details: Mapping[str, Any]) -> dict[str, Any]:
-    enriched = dict(error)
-    current_details = dict(enriched.get("details") if isinstance(enriched.get("details"), Mapping) else {})
-    current_details.update(details)
-    enriched["details"] = current_details
-    return enriched
 
 
 def with_failed_envelope_resource_trace_refs(envelope: Mapping[str, Any], refs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1641,6 +1649,10 @@ def with_observability_write_failed(
     task_id = str(enriched.get("task_id") or "")
     adapter_key = str(enriched.get("adapter_key") or "")
     capability = str(enriched.get("capability") or "")
+    failure_signal = enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
+    resource_trace_refs = list(
+        failure_signal.get("resource_trace_refs") if isinstance(failure_signal.get("resource_trace_refs"), list) else []
+    )
     occurred_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     event = {
         "event_id": f"runtime_log:{task_id}:observability_write_failed:{stage}",
@@ -1652,8 +1664,8 @@ def with_observability_write_failed(
         "attempt_index": infer_attempt_index(
             list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
         ),
-        "failure_signal_id": "",
-        "resource_trace_refs": [],
+        "failure_signal_id": str(failure_signal.get("signal_id") or ""),
+        "resource_trace_refs": resource_trace_refs,
         "runtime_result_refs": list(
             enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else []
         ),
@@ -1661,32 +1673,12 @@ def with_observability_write_failed(
         "details": dict(details or {}),
         "occurred_at": occurred_at,
     }
-    metric = {
-        "metric_id": f"runtime_metric:{task_id}:observability_write_failed_total:{stage}",
-        "task_id": task_id,
-        "metric_name": "observability_write_failed_total",
-        "metric_value": 1,
-        "unit": "count",
-        "adapter_key": adapter_key,
-        "capability": capability,
-        "error_category": "runtime_contract",
-        "error_code": "observability_write_failed",
-        "failure_phase": "persistence",
-        "attempt_index": event["attempt_index"],
-        "occurred_at": occurred_at,
-    }
     existing_events = list(
         enriched.get("runtime_structured_log_events")
         if isinstance(enriched.get("runtime_structured_log_events"), list)
         else []
     )
-    existing_metrics = list(
-        enriched.get("runtime_execution_metric_samples")
-        if isinstance(enriched.get("runtime_execution_metric_samples"), list)
-        else []
-    )
     enriched["runtime_structured_log_events"] = [*existing_events, event]
-    enriched["runtime_execution_metric_samples"] = [*existing_metrics, metric]
     return enriched
 
 
@@ -1775,8 +1767,7 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     retained_metric_samples = [
         metric
         for metric in existing_metric_samples
-        if isinstance(metric, Mapping)
-        and metric.get("metric_name") in {"retry_scheduled_total", "observability_write_failed_total"}
+        if isinstance(metric, Mapping) and metric.get("metric_name") == "retry_scheduled_total"
     ]
     enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
     enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
@@ -1795,8 +1786,17 @@ def infer_failure_phase(*, error_category: str, error_code: str, details: Mappin
         return "retry_exhausted"
     if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED:
         return "concurrency_rejected"
+    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID:
+        if details.get("control_context") == "guarded_admission" or (
+            details.get("control_code") == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED
+        ):
+            return "concurrency_rejected"
+        if details.get("stage") == "pre_execution" or details.get("control_context") == "default_execution_control_policy":
+            return "pre_execution"
     if details.get("stage") == "pre_admission":
         return "admission"
+    if details.get("stage") == "pre_execution":
+        return "pre_execution"
     if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
         return "timeout"
     if error_code in {"resource_unavailable", "invalid_resource_requirement"}:

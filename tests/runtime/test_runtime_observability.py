@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 from syvert.runtime import (
     ExecutionConcurrencyPolicy,
@@ -97,6 +98,10 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(metric["metric_value"], 1)
         self.assertEqual(metric["error_category"], signal["error_category"])
         self.assertEqual(metric["error_code"], signal["error_code"])
+        attempt_envelope = envelope["runtime_result_refs"][0]["terminal_envelope"]
+        self.assertNotIn("runtime_failure_signal", attempt_envelope)
+        self.assertNotIn("runtime_structured_log_events", attempt_envelope)
+        self.assertNotIn("runtime_execution_metric_samples", attempt_envelope)
 
     def test_success_envelope_does_not_change_success_payload_shape(self) -> None:
         envelope = execute_task(
@@ -221,6 +226,40 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         ]
         self.assertEqual(len(non_retry_events), 1)
         self.assertEqual(len(non_retry_metrics), 1)
+        for runtime_ref in envelope["runtime_result_refs"]:
+            if runtime_ref.get("ref_type") == "ExecutionAttemptOutcome":
+                self.assertNotIn("runtime_failure_signal", runtime_ref["terminal_envelope"])
+                self.assertNotIn("runtime_structured_log_events", runtime_ref["terminal_envelope"])
+                self.assertNotIn("runtime_execution_metric_samples", runtime_ref["terminal_envelope"])
+
+    def test_execution_control_default_policy_failure_projects_pre_execution_phase(self) -> None:
+        with mock.patch("syvert.runtime.default_execution_control_policy", return_value=None):
+            envelope = execute_task(
+                make_request(),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-observability-default-policy-invalid",
+            )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["code"], "execution_control_state_invalid")
+        self.assertEqual(envelope["error"]["details"]["stage"], "pre_execution")
+        self.assertEqual(envelope["runtime_failure_signal"]["task_record_ref"], "none")
+        self.assertEqual(envelope["runtime_failure_signal"]["failure_phase"], "pre_execution")
+
+    def test_guarded_admission_slot_disappearance_projects_concurrency_phase(self) -> None:
+        with tempfile.TemporaryDirectory() as store_dir:
+            with mock.patch("syvert.runtime.acquire_execution_concurrency_slot", return_value=None):
+                result = execute_task_with_record(
+                    make_request(),
+                    adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                    task_id_factory=lambda: "task-observability-guarded-slot-missing",
+                    task_record_store=LocalTaskRecordStore(Path(store_dir)),
+                )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "execution_control_state_invalid")
+        self.assertEqual(result.envelope["error"]["details"]["control_context"], "guarded_admission")
+        self.assertEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "concurrency_rejected")
 
     def test_retry_success_keeps_success_envelope_surface(self) -> None:
         adapter = RetryableThenSuccessAdapter()
@@ -321,6 +360,17 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIn(
             "observability_write_failed",
             {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+        )
+        write_failure_events = [
+            event
+            for event in result.envelope["runtime_structured_log_events"]
+            if event["event_type"] == "observability_write_failed"
+        ]
+        self.assertEqual(write_failure_events[0]["failure_signal_id"], result.envelope["runtime_failure_signal"]["signal_id"])
+        self.assertEqual(write_failure_events[0]["resource_trace_refs"], result.envelope["runtime_failure_signal"]["resource_trace_refs"])
+        self.assertNotIn(
+            "observability_write_failed_total",
+            {metric["metric_name"] for metric in result.envelope["runtime_execution_metric_samples"]},
         )
 
     def test_task_record_persists_observability_carriers(self) -> None:
