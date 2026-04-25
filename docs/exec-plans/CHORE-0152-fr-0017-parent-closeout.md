@@ -40,7 +40,9 @@
 
 ## 下一步动作
 
-- 打开本 closeout PR 并通过 CI、reviewer、guardian 与 merge gate。
+- 当前 closeout PR：`#250 https://github.com/MC-and-his-Agents/Syvert/pull/250`
+- 本 PR 为 docs-only closeout，PR class 必须保持 `docs`。
+- 通过 CI、reviewer、guardian 与 merge gate。
 - 合入后 fast-forward main。
 - 更新 `#228` 正文为已完成并关闭，Project 状态切到 `Done`。
 - 在 `#220` 发布 closeout 评论，引用 `#226/#227/#228` 与 PR `#239/#249`，随后关闭父 FR 并切 Project 到 `Done`。
@@ -78,10 +80,14 @@
   - 结果：`state=closed`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/220`
   - 结果：`state=open`，等待本 closeout PR 合入后关闭
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 220 --json projectItems --jq '.projectItems'`
+  - 结果：Project `Syvert 主交付看板` status 为 `Todo`，等待本 closeout PR 合入后切到 `Done`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 228 --json projectItems --jq '.projectItems'`
+  - 结果：Project `Syvert 主交付看板` status 为 `In Progress`
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
-  - 待本 closeout 文档落地后运行。
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
-  - 待本 closeout 文档落地后运行。
+  - 结果：通过，`governance-gate 通过。`
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，`PR class: docs`，`变更类别: docs`，`PR scope 校验通过。`
 
 ## 待完成
 
@@ -103,4 +109,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`d0ae78b6c96789f0c16b541bac14694dd1ad9df4`。
-- 本 exec-plan 是 `#228` 的首个版本化恢复工件；恢复点由本 closeout PR 的 live head 与 guardian / merge gate 绑定。
+- 当前可恢复 checkpoint：`410971a147897e5fbc8f5fdc2d5df1d1559db9e7`，包含本 exec-plan 首个版本化恢复工件与 `FR-0017` inactive requirement container closeout 索引。
+- 后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
