@@ -8,10 +8,10 @@ from syvert.operability_gate import (
     FAIL_VERDICT,
     PASS_VERDICT,
     POLICY_SNAPSHOT,
-    build_mandatory_operability_cases,
     mandatory_operability_case_ids,
     orchestrate_operability_gate,
 )
+from tests.runtime.render_operability_gate_artifact import build_gate_input_from_source_evidence
 
 
 class OperabilityGateTests(unittest.TestCase):
@@ -43,6 +43,31 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+
+    def test_missing_baseline_gate_result_fails_closed(self) -> None:
+        result = self.pass_result(baseline_gate_result=None)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("missing_baseline_gate_result", self.failure_codes(result))
+
+    def test_non_pass_baseline_gate_result_fails_closed(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        baseline["verdict"] = "fail"
+        baseline["safe_to_release"] = False
+
+        result = self.pass_result(baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_not_passed", self.failure_codes(result))
+
+    def test_baseline_gate_result_ref_must_match_requested_ref(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        baseline["baseline_gate_ref"] = "FR-0007:version_gate:v0.6.0:baseline:other-head"
+
+        result = self.pass_result(baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_ref_mismatch", self.failure_codes(result))
 
     def test_baseline_gate_ref_rejects_substring_forgery(self) -> None:
         result = self.pass_result(baseline_gate_ref="garbage-prefix-FR-0007-garbage:test-head-sha")
@@ -428,67 +453,15 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("missing_normative_dependencies", self.failure_codes(result))
 
     def pass_result(self, **overrides: object) -> dict[str, object]:
-        payload: dict[str, object] = {
-            "execution_revision": "test-head-sha",
-            "baseline_gate_ref": "FR-0007:version_gate:v0.6.0:baseline:test-head-sha",
-            "cases": self.valid_cases(),
-            "metrics_snapshot": self.valid_metrics(),
-            "evidence_refs": ["FR-0007:version_gate:v0.6.0:baseline:test-head-sha"],
-        }
+        payload: dict[str, object] = build_gate_input_from_source_evidence(revision="test-head-sha")
         payload.update(overrides)
         return orchestrate_operability_gate(**payload)
 
     def valid_cases(self) -> list[dict[str, object]]:
-        cases = build_mandatory_operability_cases()
-        for case in cases:
-            case["actual_result_ref"] = f"operability:test-head-sha:{case['case_id']}"
-            case["evidence_refs"] = [f"operability:test-head-sha:{case['case_id']}"]
-            case["actual_result"] = self.actual_result_for_case(case)
-        return cases
+        return build_gate_input_from_source_evidence(revision="test-head-sha")["cases"]
 
-    def actual_result_for_case(self, case: dict[str, object]) -> dict[str, object]:
-        expected_result = case["expected_result"]
-        actual_result: dict[str, object] = {"case": {"id": case["case_id"]}}
-        for field in expected_result["fields"]:
-            path = field["path"]
-            operator = field["operator"]
-            value = field["value"]
-            if path.startswith("policy."):
-                self.set_path(actual_result, path, deepcopy(self.get_path(POLICY_SNAPSHOT, path.removeprefix("policy."))))
-            elif path.startswith("metrics."):
-                self.set_path(actual_result, path, self.valid_metrics()[path.removeprefix("metrics.")])
-            elif isinstance(value, str) and "." in value and operator == "==":
-                shared_value = f"tests.runtime.test_operability_gate:{case['case_id']}:{path}"
-                self.set_path(actual_result, path, shared_value)
-                self.set_path(actual_result, value, shared_value)
-            elif operator == "!=":
-                self.set_path(actual_result, path, f"tests.runtime.test_operability_gate:{case['case_id']}:ref")
-            elif operator == "in":
-                self.set_path(actual_result, path, list(value)[0])
-            else:
-                self.set_path(actual_result, path, deepcopy(value))
-        actual_result["side_effects"] = list(expected_result["side_effects"])
-        actual_result["forbidden_mutations_absent"] = list(expected_result["forbidden_mutations"])
-        return actual_result
-
-    def set_path(self, mapping: dict[str, object], path: str, value: object) -> None:
-        current = mapping
-        segments = path.split(".")
-        for segment in segments[:-1]:
-            child = current.get(segment)
-            if not isinstance(child, dict):
-                child = {}
-                current[segment] = child
-            current = child
-        current[segments[-1]] = value
-
-    def get_path(self, mapping: dict[str, object], path: str) -> object:
-        current: object = mapping
-        for segment in path.split("."):
-            if not isinstance(current, dict):
-                return None
-            current = current.get(segment)
-        return current
+    def valid_baseline_gate_result(self) -> dict[str, object]:
+        return build_gate_input_from_source_evidence(revision="test-head-sha")["baseline_gate_result"]
 
     def valid_metrics(self) -> dict[str, int]:
         return {

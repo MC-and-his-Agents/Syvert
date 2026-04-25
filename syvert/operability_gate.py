@@ -329,6 +329,7 @@ def orchestrate_operability_gate(
     *,
     execution_revision: str,
     baseline_gate_ref: str,
+    baseline_gate_result: Mapping[str, Any] | None = None,
     cases: Sequence[Mapping[str, Any]] | Iterable[Mapping[str, Any]],
     metrics_snapshot: Mapping[str, Any],
     release: str = RELEASE,
@@ -365,6 +366,12 @@ def orchestrate_operability_gate(
                 details={"expected_baseline_gate_ref": expected_baseline_gate_ref, "actual_baseline_gate_ref": baseline_gate_ref},
             )
         )
+    normalized_baseline_gate_result = _normalize_baseline_gate_result(
+        baseline_gate_result,
+        baseline_gate_ref=baseline_gate_ref,
+        execution_revision=execution_revision,
+        failures=failures,
+    )
 
     normalized_dependencies = _normalize_string_list(normative_dependencies, "normative_dependencies", failures)
     missing_dependencies = sorted(set(NORMATIVE_DEPENDENCIES) - set(normalized_dependencies))
@@ -382,6 +389,7 @@ def orchestrate_operability_gate(
     normalized_metrics = _normalize_metrics_snapshot(metrics_snapshot, failures)
     _validate_metrics_snapshot_semantics(normalized_metrics, failures)
     normalized_evidence_refs = _normalize_evidence_refs(evidence_refs, failures)
+    normalized_evidence_refs.extend(normalized_baseline_gate_result["evidence_refs"])
     normalized_cases = _normalize_cases(
         cases,
         failures,
@@ -436,6 +444,7 @@ def orchestrate_operability_gate(
         "gate_id": gate_id,
         "execution_revision": execution_revision,
         "baseline_gate_ref": baseline_gate_ref,
+        "baseline_gate_result": normalized_baseline_gate_result,
         "matrix_version": matrix_version,
         "normative_dependencies": list(normalized_dependencies),
         "policy_snapshot": normalized_policy,
@@ -469,6 +478,88 @@ def _case_from_definition(case_id: str, definition: Mapping[str, Any], *, verdic
         "evidence_refs": [],
         "verdict": verdict,
     }
+
+
+def _normalize_baseline_gate_result(
+    raw_result: Mapping[str, Any] | None,
+    *,
+    baseline_gate_ref: str,
+    execution_revision: str,
+    failures: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not isinstance(raw_result, Mapping):
+        failures.append(
+            _failure(
+                "operability_gate",
+                "missing_baseline_gate_result",
+                "operability gate requires a resolved FR-0007 baseline gate result",
+            )
+        )
+        return {
+            "baseline_gate_ref": baseline_gate_ref,
+            "verdict": FAIL_VERDICT,
+            "safe_to_release": False,
+            "evidence_refs": [],
+        }
+    normalized_ref = _non_empty_string(raw_result.get("baseline_gate_ref")) or _non_empty_string(raw_result.get("ref"))
+    normalized_revision = _non_empty_string(raw_result.get("execution_revision"))
+    normalized_release = _non_empty_string(raw_result.get("release")) or _non_empty_string(raw_result.get("version"))
+    normalized_verdict = _non_empty_string(raw_result.get("verdict"))
+    safe_to_release = raw_result.get("safe_to_release") is True
+    evidence_refs = _normalize_evidence_refs(raw_result.get("evidence_refs"), failures)
+    result = {
+        "baseline_gate_ref": normalized_ref,
+        "execution_revision": normalized_revision,
+        "release": normalized_release,
+        "verdict": normalized_verdict,
+        "safe_to_release": safe_to_release,
+        "evidence_refs": evidence_refs,
+    }
+    if normalized_ref != baseline_gate_ref:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_ref_mismatch",
+                "resolved FR-0007 baseline gate result must match baseline_gate_ref",
+                details={"expected_baseline_gate_ref": baseline_gate_ref, "actual_baseline_gate_ref": normalized_ref},
+            )
+        )
+    if normalized_revision != execution_revision:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_revision_mismatch",
+                "resolved FR-0007 baseline gate result must match execution_revision",
+                details={"expected_execution_revision": execution_revision, "actual_execution_revision": normalized_revision},
+            )
+        )
+    if normalized_release != RELEASE:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_release_mismatch",
+                "resolved FR-0007 baseline gate result must target the v0.6.0 release",
+                details={"expected_release": RELEASE, "actual_release": normalized_release},
+            )
+        )
+    if normalized_verdict != PASS_VERDICT or not safe_to_release:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_not_passed",
+                "resolved FR-0007 baseline gate result must be pass and safe_to_release",
+                details={"verdict": normalized_verdict, "safe_to_release": safe_to_release},
+            )
+        )
+    if not evidence_refs:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_evidence_missing",
+                "resolved FR-0007 baseline gate result requires evidence refs",
+            )
+        )
+    return result
 
 
 def _preconditions_for_case(case_id: str, definition: Mapping[str, Any]) -> list[str]:

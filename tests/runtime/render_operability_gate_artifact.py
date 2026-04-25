@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from copy import deepcopy
 import json
 from pathlib import Path
 import subprocess
@@ -12,21 +11,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from syvert.operability_gate import POLICY_SNAPSHOT, build_mandatory_operability_cases, orchestrate_operability_gate
+from syvert.operability_gate import build_mandatory_operability_cases, orchestrate_operability_gate
 
 
 DEFAULT_OUTPUT = Path("docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json")
-METRICS_SNAPSHOT = {
-    "submit_total": 2,
-    "success_total": 2,
-    "failure_total": 8,
-    "timeout_total": 1,
-    "retry_attempt_total": 0,
-    "concurrency_case_total": 3,
-    "concurrency_case_failure_total": 0,
-    "same_path_case_total": 4,
-    "same_path_case_failure_total": 1,
-}
+SOURCE_EVIDENCE = Path("docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json")
 
 
 def main() -> int:
@@ -36,23 +25,8 @@ def main() -> int:
     args = parser.parse_args()
 
     revision = args.execution_revision.strip() or current_head()
-    cases = build_mandatory_operability_cases()
-    for case in cases:
-        case_id = str(case["case_id"])
-        case["actual_result_ref"] = f"operability:{revision}:{case_id}"
-        case["evidence_refs"] = [
-            f"operability:{revision}:{case_id}",
-            f"test_evidence:{revision}:{case_id}",
-        ]
-        case["actual_result"] = actual_result_for_case(case, revision)
-
-    result = orchestrate_operability_gate(
-        execution_revision=revision,
-        baseline_gate_ref=f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
-        cases=cases,
-        metrics_snapshot=METRICS_SNAPSHOT,
-        evidence_refs=[f"FR-0007:version_gate:v0.6.0:baseline:{revision}"],
-    )
+    gate_input = build_gate_input_from_source_evidence(revision=revision)
+    result = orchestrate_operability_gate(**gate_input)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -73,54 +47,37 @@ def current_head() -> str:
     return completed.stdout.strip()
 
 
-def actual_result_for_case(case: dict[str, Any], revision: str) -> dict[str, Any]:
-    case_id = str(case["case_id"])
-    actual_result: dict[str, Any] = {
-        "case": {"id": case_id},
-        "evidence_source": f"tests/runtime/{case_id}",
+def build_gate_input_from_source_evidence(*, revision: str, source_path: Path = SOURCE_EVIDENCE) -> dict[str, Any]:
+    source = json.loads(source_path.read_text(encoding="utf-8"))
+    source_revision = str(source["execution_revision"])
+    rewritten_source = rewrite_revision(source, old=source_revision, new=revision)
+    actual_cases = {str(case["case_id"]): case for case in rewritten_source["cases"]}
+    cases = build_mandatory_operability_cases()
+    for case in cases:
+        case_id = str(case["case_id"])
+        evidence_case = actual_cases[case_id]
+        case["actual_result_ref"] = evidence_case["actual_result_ref"]
+        case["evidence_refs"] = evidence_case["evidence_refs"]
+        case["actual_result"] = evidence_case["actual_result"]
+        case["upstream_refs"] = evidence_case["upstream_refs"]
+    return {
+        "execution_revision": revision,
+        "baseline_gate_ref": f"FR-0007:version_gate:v0.6.0:baseline:{revision}",
+        "baseline_gate_result": rewritten_source["baseline_gate_result"],
+        "cases": cases,
+        "metrics_snapshot": rewritten_source["metrics_snapshot"],
+        "evidence_refs": [f"FR-0007:version_gate:v0.6.0:baseline:{revision}"],
     }
-    for field in case["expected_result"]["fields"]:
-        path = str(field["path"])
-        operator = str(field["operator"])
-        value = field["value"]
-        if path.startswith("policy."):
-            set_path(actual_result, path, deepcopy(get_path(POLICY_SNAPSHOT, path.removeprefix("policy."))))
-        elif path.startswith("metrics."):
-            set_path(actual_result, path, METRICS_SNAPSHOT[path.removeprefix("metrics.")])
-        elif isinstance(value, str) and "." in value and operator == "==":
-            shared_value = f"evidence:{revision}:{case_id}:{path}"
-            set_path(actual_result, path, shared_value)
-            set_path(actual_result, value, shared_value)
-        elif operator == "!=":
-            set_path(actual_result, path, f"evidence:{revision}:{case_id}:non_empty_ref")
-        elif operator == "in":
-            set_path(actual_result, path, list(value)[0])
-        else:
-            set_path(actual_result, path, deepcopy(value))
-    actual_result["side_effects"] = list(case["expected_result"]["side_effects"])
-    actual_result["forbidden_mutations_absent"] = list(case["expected_result"]["forbidden_mutations"])
-    return actual_result
 
 
-def set_path(mapping: dict[str, Any], path: str, value: Any) -> None:
-    current = mapping
-    segments = path.split(".")
-    for segment in segments[:-1]:
-        child = current.get(segment)
-        if not isinstance(child, dict):
-            child = {}
-            current[segment] = child
-        current = child
-    current[segments[-1]] = value
-
-
-def get_path(mapping: dict[str, Any], path: str) -> Any:
-    current: Any = mapping
-    for segment in path.split("."):
-        if not isinstance(current, dict):
-            return None
-        current = current.get(segment)
-    return current
+def rewrite_revision(value: Any, *, old: str, new: str) -> Any:
+    if isinstance(value, str):
+        return value.replace(old, new)
+    if isinstance(value, list):
+        return [rewrite_revision(item, old=old, new=new) for item in value]
+    if isinstance(value, dict):
+        return {str(key): rewrite_revision(item, old=old, new=new) for key, item in value.items()}
+    return value
 
 
 if __name__ == "__main__":
