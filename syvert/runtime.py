@@ -1475,6 +1475,10 @@ def with_runtime_observability(
     metric_samples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     enriched = dict(envelope)
+    if enriched.get("status") == "success":
+        if runtime_result_refs and (len(runtime_result_refs) > 1 or execution_control_events):
+            enriched["runtime_result_refs"] = list(runtime_result_refs)
+        return enriched
     if runtime_result_refs and (enriched.get("status") == "failed" or len(runtime_result_refs) > 1 or execution_control_events):
         enriched["runtime_result_refs"] = list(runtime_result_refs)
     if execution_control_events:
@@ -1674,8 +1678,18 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(enriched.get("runtime_execution_metric_samples"), list)
         else []
     )
-    enriched["runtime_structured_log_events"] = [*existing_log_events, log_event]
-    enriched["runtime_execution_metric_samples"] = [*existing_metric_samples, metric_sample]
+    retained_log_events = [
+        event
+        for event in existing_log_events
+        if isinstance(event, Mapping) and event.get("event_type") == "retry_scheduled"
+    ]
+    retained_metric_samples = [
+        metric
+        for metric in existing_metric_samples
+        if isinstance(metric, Mapping) and metric.get("metric_name") == "retry_scheduled_total"
+    ]
+    enriched["runtime_structured_log_events"] = [*retained_log_events, log_event]
+    enriched["runtime_execution_metric_samples"] = [*retained_metric_samples, metric_sample]
     return enriched
 
 

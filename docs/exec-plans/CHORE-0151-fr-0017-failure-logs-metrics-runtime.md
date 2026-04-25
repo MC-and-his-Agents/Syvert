@@ -62,9 +62,11 @@
 - `python3 -m unittest tests.runtime.test_runtime_observability -v`
   - 初始结果：通过，`Ran 5 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 8 tests`，`OK`。
+  - guardian 第二轮 review-sync 后结果：通过，`Ran 9 tests`，`OK`。
 - `python3 -m unittest tests.runtime.test_task_record_store tests.runtime.test_runtime tests.runtime.test_http_api tests.runtime.test_cli_http_same_path tests.runtime.test_execution_control tests.runtime.test_runtime_observability`
   - 初始结果：通过，`Ran 161 tests`，`OK`。
   - guardian review-sync 后结果：通过，`Ran 164 tests`，`OK`。
+  - guardian 第二轮 review-sync 后结果：通过，`Ran 165 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
@@ -79,6 +81,10 @@
   - retry predicate 命中且预算允许时生成 `retry_scheduled` structured log 与 `retry_scheduled_total` metric，不新增 FR-0016 control event。
   - persistence / completion 写入失败投影 `failure_phase=persistence`。
   - 已 acquire 资源后的 failed envelope 注入 FR-0011 `resource_trace_refs`，并同步到 failure signal / structured log。
+- PR `#249` 第二次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - failed envelope 再投影时只保留 `retry_scheduled` lifecycle carrier，并重建唯一一组 failure signal/log/metric，避免同一失败出现重复且不一致的 observability truth。
+  - retry 成功路径只保留既有 `runtime_result_refs` 执行控制证据，不把 `runtime_failure_signal`、`runtime_structured_log_events` 或 `runtime_execution_metric_samples` 写入 success envelope。
 
 ## 未决风险
 

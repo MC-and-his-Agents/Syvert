@@ -182,8 +182,7 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["runtime_failure_signal"]["task_record_ref"], "none")
         self.assertEqual(envelope["error"]["details"]["stage"], "pre_admission")
 
-    def test_retry_scheduled_log_and_metric_are_preserved(self) -> None:
-        adapter = RetryableThenSuccessAdapter()
+    def test_retry_scheduled_log_and_metric_are_preserved_on_terminal_failure(self) -> None:
         request = TaskRequest(
             adapter_key=TEST_ADAPTER_KEY,
             capability="content_detail_by_url",
@@ -197,12 +196,11 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         envelope = execute_task(
             request,
-            adapters={TEST_ADAPTER_KEY: adapter},
+            adapters={TEST_ADAPTER_KEY: RetryablePlatformFailureAdapter()},
             task_id_factory=lambda: "task-observability-retry-scheduled",
         )
 
-        self.assertEqual(envelope["status"], "success")
-        self.assertEqual(adapter.calls, 2)
+        self.assertEqual(envelope["status"], "failed")
         self.assertIn(
             "retry_scheduled",
             {event["event_type"] for event in envelope["runtime_structured_log_events"]},
@@ -211,6 +209,44 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
             "retry_scheduled_total",
             {metric["metric_name"] for metric in envelope["runtime_execution_metric_samples"]},
         )
+        non_retry_events = [
+            event
+            for event in envelope["runtime_structured_log_events"]
+            if event["event_type"] != "retry_scheduled"
+        ]
+        non_retry_metrics = [
+            metric
+            for metric in envelope["runtime_execution_metric_samples"]
+            if metric["metric_name"] != "retry_scheduled_total"
+        ]
+        self.assertEqual(len(non_retry_events), 1)
+        self.assertEqual(len(non_retry_metrics), 1)
+
+    def test_retry_success_keeps_success_envelope_surface(self) -> None:
+        adapter = RetryableThenSuccessAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_detail_by_url",
+            input=TaskInput(url="https://example.com/posts/retry-success"),
+            execution_control_policy=ExecutionControlPolicy(
+                timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
+                retry=ExecutionRetryPolicy(max_attempts=2, backoff_ms=0),
+                concurrency=ExecutionConcurrencyPolicy(scope="global", max_in_flight=1, on_limit="reject"),
+            ),
+        )
+
+        envelope = execute_task(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-observability-retry-success",
+        )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(adapter.calls, 2)
+        self.assertEqual([ref["attempt_index"] for ref in envelope["runtime_result_refs"]], [1, 2])
+        self.assertNotIn("runtime_failure_signal", envelope)
+        self.assertNotIn("runtime_structured_log_events", envelope)
+        self.assertNotIn("runtime_execution_metric_samples", envelope)
 
     def test_persistence_failures_project_persistence_phase(self) -> None:
         result = execute_task_with_record(
