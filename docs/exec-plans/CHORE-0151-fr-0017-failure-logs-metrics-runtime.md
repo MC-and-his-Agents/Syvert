@@ -43,10 +43,11 @@
 - 已按 guardian 第七轮审查收敛 FR-0017 注入边界、`envelope_ref` occurrence identity，以及 durable observability carrier 枚举校验。
 - 已按 guardian 第八轮审查补齐 record lifecycle fail-closed 分支的 FR-0017 carrier，并收紧 failed log / metric 必填引用和错误元数据校验。
 - 已按 guardian 第九轮审查收窄 `retry_scheduled.runtime_result_refs` 至直接前因，并修正 terminal observability reconciliation 的 append-only superset 约束。
+- 已按 guardian 第十轮审查补齐 terminal-to-terminal observability superset 升级路径，并校验 durable observability refs 的 `ResourceTraceEvent` / `ExecutionAttemptOutcome` / `ExecutionControlEvent` 形状。
 
 ## 下一步动作
 
-- 推送第九轮 guardian review-sync 修复提交。
+- 推送第十轮 guardian review-sync 修复提交。
 - 等待 CI 重新全绿后重跑 guardian 与 merge gate。
 - 合入后同步 `#227` issue / Project 状态，并进入 `#228` parent closeout。
 
@@ -88,6 +89,7 @@
   - guardian 第七轮 review-sync 后结果：通过，`Ran 193 tests`，`OK`。
   - guardian 第八轮 review-sync 后结果：通过，`Ran 195 tests`，`OK`。
   - guardian 第九轮 review-sync 后结果：通过，`Ran 196 tests`，`OK`。
+  - guardian 第十轮 review-sync 后结果：通过，`Ran 197 tests`，`OK`。
 - `python3 -m unittest discover -s tests`
   - 结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第四轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
@@ -97,6 +99,7 @@
   - guardian 第七轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第八轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
   - guardian 第九轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
+  - guardian 第十轮 review-sync 后结果：通过，`Ran 376 tests`，`OK`。
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过。
   - guardian 第四轮 review-sync 后结果：通过。
@@ -106,6 +109,7 @@
   - guardian 第七轮 review-sync 后结果：通过。
   - guardian 第八轮 review-sync 后结果：通过。
   - guardian 第九轮 review-sync 后结果：通过。
+  - guardian 第十轮 review-sync 后结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - guardian 第四轮 review-sync 后结果：通过。
   - 本地 reviewer 复核修复后结果：通过。
@@ -114,6 +118,7 @@
   - guardian 第七轮 review-sync 后结果：通过。
   - guardian 第八轮 review-sync 后结果：通过。
   - guardian 第九轮 review-sync 后结果：通过。
+  - guardian 第十轮 review-sync 后结果：通过。
 
 ## guardian review-sync
 
@@ -168,6 +173,10 @@
 - 已处理阻断项：
   - `retry_scheduled` structured log 的 `runtime_result_refs` 从累计 execution history 收窄为触发本次 retry 的直接 `ExecutionAttemptOutcome`，避免第二次及后续 retry 混入更早 attempt / control refs。
   - `LocalTaskRecordStore` terminal reconciliation 在同 ID 无冲突之外，进一步要求 incoming terminal observability 是 candidate durable observability 的 superset；较小子集不再能覆盖既有 lifecycle / metric truth。
+- PR `#249` 第十次 guardian 结论：`REQUEST_CHANGES`。
+- 已处理阻断项：
+  - `LocalTaskRecordStore` 已对 existing terminal -> incoming terminal 的合法 observability superset 回写走同一 merge 逻辑，允许 legacy terminal record 无损升级新增顶层 carrier。
+  - `TaskRecord` durable validation 已校验 `RuntimeFailureSignal` / `RuntimeStructuredLogEvent` 中 `resource_trace_refs` 的 `ResourceTraceEvent` 形状，以及 `runtime_result_refs` 的 `ExecutionAttemptOutcome` / `ExecutionControlEvent` 形状、上下文绑定与时间字段。
 
 ## 未决风险
 
@@ -189,4 +198,5 @@
 - guardian 第四轮 review-sync 可恢复 checkpoint：`9ba4cf56f7837d24307227ec1db12101cba6fe66`。
 - guardian 第七轮 review-sync 可恢复 checkpoint：`8eb978c55a91143cb0c9fb975fe93bd8528b55c7`。
 - guardian 第八轮 review-sync 可恢复 checkpoint：`7339885287f2bb55b858fba96e5ad61302c04842`。
-- guardian 第九轮 review-sync 待提交；本轮不推进 formal spec 语义。
+- guardian 第九轮 review-sync 可恢复 checkpoint：`a0e0d2ccd9c4e91cd844d7bf89ca70075328172f`。
+- guardian 第十轮 review-sync 待提交；本轮不推进 formal spec 语义。

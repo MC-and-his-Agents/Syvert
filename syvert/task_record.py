@@ -60,6 +60,11 @@ RUNTIME_EXECUTION_METRIC_NAMES = frozenset(
         "execution_duration_ms",
     }
 )
+RUNTIME_RESULT_REF_TYPES = frozenset({"ExecutionAttemptOutcome", "ExecutionControlEvent"})
+EXECUTION_ATTEMPT_OUTCOMES = frozenset({"succeeded", "failed", "timeout"})
+EXECUTION_CONTROL_EVENT_TYPES = frozenset(
+    {"admission_concurrency_rejected", "retry_concurrency_rejected", "retry_exhausted"}
+)
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
 
@@ -777,8 +782,8 @@ def validate_runtime_failure_signals(record: TaskRecord) -> None:
         task_record_ref = require_string(signal.get("task_record_ref"), field="RuntimeFailureSignal.task_record_ref")
         if task_record_ref != "none" and task_record_ref != record.task_record_ref:
             raise TaskRecordContractError("RuntimeFailureSignal.task_record_ref 与 TaskRecord 不一致")
-        _observability_entries(signal, "resource_trace_refs", ())
-        _observability_entries(signal, "runtime_result_refs", ())
+        validate_resource_trace_refs(signal, field="RuntimeFailureSignal.resource_trace_refs")
+        validate_runtime_result_refs(record, signal, field="RuntimeFailureSignal.runtime_result_refs")
         validate_timestamp(require_string(signal.get("occurred_at"), field="RuntimeFailureSignal.occurred_at"), field="RuntimeFailureSignal.occurred_at")
 
 
@@ -814,10 +819,69 @@ def validate_runtime_structured_log_events(record: TaskRecord) -> None:
         }:
             if not failure_signal_id or failure_signal_id not in signal_ids:
                 raise TaskRecordContractError("失败相关 RuntimeStructuredLogEvent 必须引用对应 RuntimeFailureSignal")
-        _observability_entries(event, "resource_trace_refs", ())
-        _observability_entries(event, "runtime_result_refs", ())
+        validate_resource_trace_refs(event, field="RuntimeStructuredLogEvent.resource_trace_refs")
+        validate_runtime_result_refs(record, event, field="RuntimeStructuredLogEvent.runtime_result_refs")
         require_string(event.get("message"), field="RuntimeStructuredLogEvent.message")
         validate_timestamp(require_string(event.get("occurred_at"), field="RuntimeStructuredLogEvent.occurred_at"), field="RuntimeStructuredLogEvent.occurred_at")
+
+
+def validate_resource_trace_refs(source: Mapping[str, Any], *, field: str) -> None:
+    field_name = field.rsplit(".", 1)[-1]
+    for ref in _observability_entries(source, field_name, ()):
+        if not isinstance(ref, Mapping):
+            raise TaskRecordContractError(f"{field} 项必须是对象")
+        ref_type = require_string(ref.get("ref_type"), field=f"{field}.ref_type")
+        if ref_type != "ResourceTraceEvent":
+            raise TaskRecordContractError(f"{field}.ref_type 必须为 ResourceTraceEvent")
+        require_string(ref.get("event_id"), field=f"{field}.event_id")
+        require_string(ref.get("lease_id"), field=f"{field}.lease_id")
+        require_string(ref.get("bundle_id"), field=f"{field}.bundle_id")
+        require_string(ref.get("resource_id"), field=f"{field}.resource_id")
+        require_string(ref.get("resource_type"), field=f"{field}.resource_type")
+
+
+def validate_runtime_result_refs(record: TaskRecord, source: Mapping[str, Any], *, field: str) -> None:
+    field_name = field.rsplit(".", 1)[-1]
+    for ref in _observability_entries(source, field_name, ()):
+        if not isinstance(ref, Mapping):
+            raise TaskRecordContractError(f"{field} 项必须是对象")
+        ref_type = require_string(ref.get("ref_type"), field=f"{field}.ref_type")
+        if ref_type not in RUNTIME_RESULT_REF_TYPES:
+            raise TaskRecordContractError(f"{field}.ref_type 不在允许值范围内")
+        task_id = require_string(ref.get("task_id"), field=f"{field}.task_id")
+        adapter_key = require_string(ref.get("adapter_key"), field=f"{field}.adapter_key")
+        capability = require_string(ref.get("capability"), field=f"{field}.capability")
+        if task_id != record.task_id or adapter_key != record.request.adapter_key or capability != record.request.capability:
+            raise TaskRecordContractError(f"{field} 必须绑定同一 TaskRecord 请求上下文")
+        require_string(ref.get("ref_id"), field=f"{field}.ref_id")
+        if ref_type == "ExecutionAttemptOutcome":
+            attempt_index = coerce_int(ref.get("attempt_index"), field=f"{field}.attempt_index")
+            if attempt_index < 0:
+                raise TaskRecordContractError(f"{field}.attempt_index 必须为非负整数")
+            validate_timestamp(require_string(ref.get("started_at"), field=f"{field}.started_at"), field=f"{field}.started_at")
+            validate_timestamp(require_string(ref.get("ended_at"), field=f"{field}.ended_at"), field=f"{field}.ended_at")
+            outcome = require_string(ref.get("outcome"), field=f"{field}.outcome")
+            if outcome not in EXECUTION_ATTEMPT_OUTCOMES:
+                raise TaskRecordContractError(f"{field}.outcome 不在允许值范围内")
+            if not isinstance(ref.get("terminal_envelope"), Mapping):
+                raise TaskRecordContractError(f"{field}.terminal_envelope 必须是对象")
+            control_code = ref.get("control_code", "")
+            if not isinstance(control_code, str):
+                raise TaskRecordContractError(f"{field}.control_code 必须是字符串")
+            continue
+        event_type = require_string(ref.get("event_type"), field=f"{field}.event_type")
+        if event_type not in EXECUTION_CONTROL_EVENT_TYPES:
+            raise TaskRecordContractError(f"{field}.event_type 不在允许值范围内")
+        attempt_count = coerce_int(ref.get("attempt_count"), field=f"{field}.attempt_count")
+        if attempt_count < 0:
+            raise TaskRecordContractError(f"{field}.attempt_count 必须为非负整数")
+        require_string(ref.get("control_code"), field=f"{field}.control_code")
+        task_record_ref = require_string(ref.get("task_record_ref"), field=f"{field}.task_record_ref")
+        if task_record_ref != "none" and task_record_ref != record.task_record_ref:
+            raise TaskRecordContractError(f"{field}.task_record_ref 与 TaskRecord 不一致")
+        if not isinstance(ref.get("policy"), Mapping):
+            raise TaskRecordContractError(f"{field}.policy 必须是对象")
+        validate_timestamp(require_string(ref.get("occurred_at"), field=f"{field}.occurred_at"), field=f"{field}.occurred_at")
 
 
 def validate_runtime_execution_metric_samples(record: TaskRecord) -> None:

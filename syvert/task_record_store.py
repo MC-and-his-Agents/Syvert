@@ -192,7 +192,13 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
         elif existing.status in {"succeeded", "failed"} and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
-            candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
+            candidate = finish_task_record(
+                existing,
+                terminal_envelope_with_observability(incoming),
+                occurred_at=incoming.terminal_at,
+            )
+            if candidate != incoming:
+                candidate = merge_incoming_terminal_observability(candidate, incoming)
         else:
             raise TaskRecordConflictError("本地持久化记录的生命周期推进不合法")
     except TaskRecordContractError as error:

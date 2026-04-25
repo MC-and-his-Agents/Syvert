@@ -728,6 +728,36 @@ class TaskRecordStoreTests(ResourceStoreEnvMixin, unittest.TestCase):
                 store.write(subset_terminal)
             self.assertEqual(store.load("task-store-observability-subset"), outcome.task_record)
 
+    def test_store_allows_terminal_rewrite_that_adds_observability_superset(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = LocalTaskRecordStore(Path(temp_dir))
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/post/store-observability-superset"),
+                ),
+                adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+                task_id_factory=lambda: "task-store-observability-superset",
+                task_record_store=store,
+            )
+            payload = task_record_to_dict(outcome.task_record)
+            legacy_payload = json.loads(json.dumps(payload))
+            legacy_payload["runtime_failure_signals"] = []
+            legacy_payload["runtime_structured_log_events"] = []
+            legacy_payload["runtime_execution_metric_samples"] = []
+            store.root.mkdir(parents=True, exist_ok=True)
+            store.record_path("task-store-observability-superset").write_text(
+                json.dumps(legacy_payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            loaded_legacy = store.load("task-store-observability-superset")
+            self.assertEqual(loaded_legacy.runtime_structured_log_events, ())
+            self.assertTrue(outcome.task_record.runtime_structured_log_events)
+            self.assertEqual(store.write(outcome.task_record), outcome.task_record)
+            self.assertEqual(store.load("task-store-observability-superset"), outcome.task_record)
+
     def test_store_allows_idempotent_rewrite_after_loading_legacy_terminal_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = LocalTaskRecordStore(Path(temp_dir))

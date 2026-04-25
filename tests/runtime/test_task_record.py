@@ -355,6 +355,36 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 with self.assertRaises(TaskRecordContractError):
                     task_record_from_dict(missing_metric_metadata)
 
+        invalid_signal_resource_refs = json.loads(json.dumps(payload))
+        invalid_signal_resource_refs["runtime_failure_signals"][0]["resource_trace_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal_resource_refs)
+
+        invalid_signal_runtime_refs = json.loads(json.dumps(payload))
+        invalid_signal_runtime_refs["runtime_failure_signals"][0]["runtime_result_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal_runtime_refs)
+
+        invalid_log_resource_refs = json.loads(json.dumps(payload))
+        failed_event = next(
+            event
+            for event in invalid_log_resource_refs["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        failed_event["resource_trace_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_log_resource_refs)
+
+        invalid_log_runtime_refs = json.loads(json.dumps(payload))
+        failed_event = next(
+            event
+            for event in invalid_log_runtime_refs["runtime_structured_log_events"]
+            if event["event_type"] == "task_failed"
+        )
+        failed_event["runtime_result_refs"] = [{"bogus": "value"}]
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_log_runtime_refs)
+
     def test_migrates_missing_and_rejects_mismatched_task_record_ref(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
