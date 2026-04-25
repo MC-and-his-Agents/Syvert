@@ -182,7 +182,11 @@ def reconcile_persisted_record(existing: TaskRecord | None, incoming: TaskRecord
         elif existing.status == "running" and incoming.status in {"succeeded", "failed"}:
             if incoming.result is None or incoming.terminal_at is None:
                 raise TaskRecordConflictError("终态任务记录缺少结果或终态时间")
-            candidate = finish_task_record(existing, incoming.result.envelope, occurred_at=incoming.terminal_at)
+            candidate = finish_task_record(
+                existing,
+                terminal_envelope_with_observability(incoming),
+                occurred_at=incoming.terminal_at,
+            )
             if candidate != incoming:
                 candidate = merge_incoming_terminal_observability(candidate, incoming)
         elif existing.status in {"succeeded", "failed"} and incoming.status in {"succeeded", "failed"}:
@@ -226,6 +230,19 @@ def merge_incoming_terminal_observability(candidate: TaskRecord, incoming: TaskR
         runtime_structured_log_events=incoming.runtime_structured_log_events,
         runtime_execution_metric_samples=incoming.runtime_execution_metric_samples,
     )
+
+
+def terminal_envelope_with_observability(record: TaskRecord) -> dict:
+    if record.result is None:
+        raise TaskRecordConflictError("终态任务记录缺少结果")
+    envelope = dict(record.result.envelope)
+    if record.runtime_failure_signals:
+        envelope.setdefault("_runtime_failure_signals", list(record.runtime_failure_signals))
+    if record.runtime_structured_log_events:
+        envelope.setdefault("_runtime_structured_log_events", list(record.runtime_structured_log_events))
+    if record.runtime_execution_metric_samples:
+        envelope.setdefault("_runtime_execution_metric_samples", list(record.runtime_execution_metric_samples))
+    return envelope
 
 
 def ensure_observability_no_conflict(

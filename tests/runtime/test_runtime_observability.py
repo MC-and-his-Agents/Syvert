@@ -16,7 +16,9 @@ from syvert.runtime import (
     acquire_execution_concurrency_slot,
     execute_task,
     execute_task_with_record,
+    failure_envelope,
     release_execution_concurrency_slot,
+    runtime_contract_error,
 )
 from syvert.task_record import task_record_to_dict
 from syvert.task_record_store import LocalTaskRecordStore
@@ -84,6 +86,14 @@ class AcceptedFailingStore:
 
 
 class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
+    def test_generic_failure_envelope_does_not_inject_runtime_observability(self) -> None:
+        envelope = failure_envelope("", "", "", runtime_contract_error("generic_failure", "generic"))
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertNotIn("runtime_failure_signal", envelope)
+        self.assertNotIn("runtime_structured_log_events", envelope)
+        self.assertNotIn("runtime_execution_metric_samples", envelope)
+
     def test_failed_envelope_projects_failure_signal_log_and_metric(self) -> None:
         envelope = execute_task(
             make_request(),
@@ -459,8 +469,10 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(adapter.calls, 3)
         signal_ids = [signal["signal_id"] for signal in payload["runtime_failure_signals"]]
+        envelope_refs = [signal["envelope_ref"] for signal in payload["runtime_failure_signals"]]
         self.assertEqual(len(signal_ids), 2)
         self.assertEqual(len(set(signal_ids)), 2)
+        self.assertEqual(len(set(envelope_refs)), 2)
         self.assertEqual(
             {event["failure_signal_id"] for event in payload["runtime_structured_log_events"] if event["event_type"] == "retry_scheduled"},
             set(signal_ids),

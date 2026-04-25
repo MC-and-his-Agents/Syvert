@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import unittest
 from unittest import mock
@@ -233,6 +234,33 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
+
+    def test_rejects_invalid_runtime_observability_enum_values(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/post/observability-enum"),
+            ),
+            adapters={TEST_ADAPTER_KEY: PlatformFailureAdapter()},
+            task_id_factory=lambda: "task-record-observability-enum",
+        )
+        payload = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+
+        invalid_signal = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+        invalid_signal["runtime_failure_signals"][0]["failure_phase"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_signal)
+
+        invalid_event = json.loads(json.dumps(task_record_to_dict(outcome.task_record)))
+        invalid_event["runtime_structured_log_events"][0]["event_type"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_event)
+
+        invalid_metric = payload
+        invalid_metric["runtime_execution_metric_samples"][0]["metric_name"] = "not_approved"
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(invalid_metric)
 
     def test_migrates_missing_and_rejects_mismatched_task_record_ref(self) -> None:
         outcome = execute_task_with_record(

@@ -1517,6 +1517,8 @@ def with_runtime_observability(
         enriched["runtime_result_refs"] = list(runtime_result_refs)
     if execution_control_events:
         enriched["execution_control_events"] = list(execution_control_events)
+    if failure_signals:
+        enriched["_runtime_failure_signals"] = list(failure_signals)
     if structured_log_events:
         enriched["runtime_structured_log_events"] = list(structured_log_events)
     if metric_samples:
@@ -1551,12 +1553,12 @@ def pre_accepted_failure_envelope(
     current_details["task_record_ref"] = "none"
     current_details.setdefault("stage", "pre_admission")
     enriched_error["details"] = current_details
-    return failure_envelope(
+    return with_failure_observability(failure_envelope(
         task_id,
         adapter_key,
         capability,
         enriched_error,
-    )
+    ))
 
 
 def with_failed_envelope_resource_trace_refs(envelope: Mapping[str, Any], refs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1807,7 +1809,7 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
     attempt_index = infer_attempt_index(runtime_result_refs)
     signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}:{attempt_index}"
-    envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}"
+    envelope_ref = f"failed_envelope:{task_id}:{error_category}:{error_code}:{attempt_index}"
     existing_failure_signal = (
         enriched.get("runtime_failure_signal") if isinstance(enriched.get("runtime_failure_signal"), Mapping) else {}
     )
@@ -2087,7 +2089,7 @@ def persist_task_record(
         return task_record_store.write(record), None
     except TaskRecordConflictError as error:
         return None, TaskExecutionResult(
-            failure_envelope(
+            with_failure_observability(failure_envelope(
                 task_id,
                 adapter_key,
                 capability,
@@ -2096,7 +2098,7 @@ def persist_task_record(
                     "共享任务记录写入与既有 durable truth 冲突",
                     details={"stage": stage, "reason": str(error)},
                 ),
-            ),
+            )),
             None,
         )
     except (TaskRecordContractError, TaskRecordStoreError, OSError) as error:
@@ -2136,7 +2138,7 @@ def _fail_closed_task_record_persistence(
     except Exception as invalidation_error:
         invalidation_details["invalidation_reason"] = str(invalidation_error)
     return None, TaskExecutionResult(
-        failure_envelope(
+        with_failure_observability(failure_envelope(
             task_id,
             adapter_key,
             capability,
@@ -2145,7 +2147,7 @@ def _fail_closed_task_record_persistence(
                 "共享任务记录无法可靠写入本地稳定存储",
                 details={"stage": stage, "reason": str(error), **invalidation_details},
             ),
-        ),
+        )),
         None,
     )
 
@@ -2878,7 +2880,7 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
     details = error.get("details", {})
     if not isinstance(details, Mapping):
         details = {}
-    envelope = {
+    return {
         "task_id": task_id,
         "adapter_key": adapter_key,
         "capability": capability,
@@ -2890,7 +2892,6 @@ def failure_envelope(task_id: str, adapter_key: str, capability: str, error: Map
             "details": dict(details),
         },
     }
-    return with_failure_observability(envelope)
 
 
 def runtime_contract_error(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
