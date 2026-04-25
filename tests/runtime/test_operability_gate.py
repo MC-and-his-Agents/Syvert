@@ -62,6 +62,16 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("baseline_gate_not_passed", self.failure_codes(result))
 
+    def test_forged_baseline_gate_evidence_ref_fails_closed(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        baseline["evidence_refs"] = ["local:test-head-sha:forged-baseline-proof"]
+
+        result = self.pass_result(baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("baseline_gate_evidence_unbound", self.failure_codes(result))
+        self.assertIn("baseline_gate_evidence_unbacked", self.failure_codes(result))
+
     def test_baseline_gate_result_ref_must_match_requested_ref(self) -> None:
         baseline = self.valid_baseline_gate_result()
         baseline["baseline_gate_ref"] = "FR-0007:version_gate:v0.6.0:baseline:other-head"
@@ -95,6 +105,7 @@ class OperabilityGateTests(unittest.TestCase):
     def test_reviewable_non_private_baseline_ref_is_allowed_when_resolved_result_matches(self) -> None:
         baseline = self.valid_baseline_gate_result()
         baseline["baseline_gate_ref"] = "gate:test-head-sha:FR-0007:v0.6.0:baseline"
+        baseline["evidence_refs"] = [baseline["baseline_gate_ref"], "tests:test-head-sha:tests.runtime.test_version_gate"]
 
         result = self.pass_result(baseline_gate_ref=baseline["baseline_gate_ref"], baseline_gate_result=baseline)
 
@@ -501,6 +512,19 @@ class OperabilityGateTests(unittest.TestCase):
         cases = self.valid_cases()
         cases[0]["actual_result_ref"] = "gate:test-head-sha:FR-0007:v0.6.0:baseline"
         cases[0]["evidence_refs"] = ["operability:test-head-sha:other-operability-case"]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_ref_scope_mismatch", self.failure_codes(result))
+        self.assertIn("case_evidence_ref_scope_mismatch", self.failure_codes(result))
+
+    def test_case_local_evidence_refs_must_point_to_real_slots(self) -> None:
+        cases = self.valid_cases()
+        case_id = str(cases[0]["case_id"])
+        artifact = "docs/exec-plans/artifacts/CHORE-0158-operability-source-evidence.json"
+        cases[0]["actual_result_ref"] = f"local:test-head-sha:{artifact}:{case_id}:totally-fake-slot"
+        cases[0]["evidence_refs"] = [f"local:test-head-sha:{artifact}:{case_id}:totally-fake-proof"]
 
         result = self.pass_result(cases=cases)
 

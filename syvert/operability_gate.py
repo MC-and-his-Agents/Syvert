@@ -578,7 +578,42 @@ def _normalize_baseline_gate_result(
                 "resolved FR-0007 baseline gate result requires evidence refs",
             )
         )
+    else:
+        _validate_baseline_gate_evidence_refs(
+            evidence_refs,
+            baseline_gate_ref=baseline_gate_ref,
+            execution_revision=execution_revision,
+            failures=failures,
+        )
     return result
+
+
+def _validate_baseline_gate_evidence_refs(
+    evidence_refs: Sequence[str],
+    *,
+    baseline_gate_ref: str,
+    execution_revision: str,
+    failures: list[dict[str, Any]],
+) -> None:
+    version_gate_ref = f"tests:{execution_revision}:tests.runtime.test_version_gate"
+    if baseline_gate_ref not in evidence_refs:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_evidence_unbound",
+                "resolved FR-0007 baseline evidence must include the exact baseline_gate_ref",
+                details={"baseline_gate_ref": baseline_gate_ref, "evidence_refs": list(evidence_refs)},
+            )
+        )
+    if version_gate_ref not in evidence_refs:
+        failures.append(
+            _failure(
+                "operability_gate",
+                "baseline_gate_evidence_unbacked",
+                "resolved FR-0007 baseline evidence must include the approved version gate test evidence",
+                details={"required_evidence_ref": version_gate_ref, "evidence_refs": list(evidence_refs)},
+            )
+        )
 
 
 def _preconditions_for_case(case_id: str, definition: Mapping[str, Any]) -> list[str]:
@@ -1509,21 +1544,26 @@ def _is_case_scoped_evidence_ref(evidence_ref: str, case_id: str) -> bool:
 
 
 def _is_backed_case_actual_result_ref(evidence_ref: str, case_id: str) -> bool:
-    return _is_backed_local_case_ref(evidence_ref, case_id)
+    return _is_backed_local_case_ref(evidence_ref, case_id, allowed_slots={"actual_result"})
 
 
 def _is_backed_case_evidence_ref(evidence_ref: str, case_id: str) -> bool:
-    return _is_backed_local_case_ref(evidence_ref, case_id) or _is_backed_upstream_case_ref(evidence_ref, case_id)
+    return _is_backed_local_case_ref(evidence_ref, case_id, allowed_slots={"source_case"}) or _is_backed_upstream_case_ref(
+        evidence_ref,
+        case_id,
+    )
 
 
-def _is_backed_local_case_ref(evidence_ref: str, case_id: str) -> bool:
+def _is_backed_local_case_ref(evidence_ref: str, case_id: str, *, allowed_slots: set[str]) -> bool:
     if not _is_case_scoped_evidence_ref(evidence_ref, case_id):
         return False
     parts = evidence_ref.split(":")
-    if len(parts) < 4 or parts[0] != "local":
+    if len(parts) != 5 or parts[0] != "local":
         return False
     artifact_path = parts[2]
-    return artifact_path in APPROVED_LOCAL_EVIDENCE_ARTIFACTS and Path(artifact_path).is_file()
+    if artifact_path not in APPROVED_LOCAL_EVIDENCE_ARTIFACTS or not Path(artifact_path).is_file():
+        return False
+    return parts[3] == case_id and parts[4] in allowed_slots
 
 
 def _is_backed_upstream_case_ref(evidence_ref: str, case_id: str) -> bool:
