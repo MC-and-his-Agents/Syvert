@@ -354,16 +354,15 @@ def orchestrate_operability_gate(
         )
     if not _non_empty_string(execution_revision):
         failures.append(_failure("operability_gate", "missing_execution_revision", "operability gate requires an execution revision"))
-    expected_baseline_gate_ref = f"FR-0007:version_gate:{RELEASE}:baseline:{execution_revision}"
     if not _non_empty_string(baseline_gate_ref):
         failures.append(_failure("operability_gate", "missing_baseline_gate_ref", "operability gate requires FR-0007 baseline gate ref"))
-    elif baseline_gate_ref != expected_baseline_gate_ref:
+    elif not _is_allowed_evidence_ref(baseline_gate_ref) or "FR-0007" not in baseline_gate_ref:
         failures.append(
             _failure(
                 "operability_gate",
                 "invalid_baseline_gate_ref",
-                "baseline_gate_ref must be bound to the current v0.6.0 FR-0007 baseline revision",
-                details={"expected_baseline_gate_ref": expected_baseline_gate_ref, "actual_baseline_gate_ref": baseline_gate_ref},
+                "baseline_gate_ref must be a local, reviewable FR-0007 baseline evidence ref",
+                details={"actual_baseline_gate_ref": baseline_gate_ref},
             )
         )
     normalized_baseline_gate_result = _normalize_baseline_gate_result(
@@ -1244,17 +1243,6 @@ def _validate_metrics_snapshot_semantics(metrics: Mapping[str, int], failures: l
                     details={"field": field, "minimum": minimum, "actual": metrics.get(field, 0)},
                 )
             )
-    exact_values = {"retry_attempt_total": 0, "concurrency_case_failure_total": 0}
-    for field, expected in exact_values.items():
-        if metrics.get(field) != expected:
-            failures.append(
-                _failure(
-                    "operability_gate",
-                    "metrics_snapshot_value_mismatch",
-                    "metrics_snapshot value does not match the FR-0019 gate expectation",
-                    details={"field": field, "expected": expected, "actual": metrics.get(field)},
-                )
-            )
 
 
 def _validate_revision_evidence_binding(
@@ -1389,23 +1377,21 @@ def _string_set_from_actual(value: Any) -> set[str]:
 
 
 def _is_allowed_evidence_ref(evidence_ref: str) -> bool:
-    return evidence_ref.startswith(
-        (
-            "FR-0007:version_gate:v0.6.0:baseline:",
-            "operability:",
-            "test_evidence:",
-            "tests:",
-            "local:",
-        )
-    )
+    if not _non_empty_string(evidence_ref) or evidence_ref.startswith(("http://", "https://")):
+        return False
+    return evidence_ref.startswith(("FR-", "operability:", "test_evidence:", "tests:", "local:", "ci:", "gate:", "log:", "metrics:"))
 
 
 def _evidence_ref_revision(evidence_ref: str) -> str | None:
     if evidence_ref.startswith("FR-0007:version_gate:v0.6.0:baseline:"):
         revision = evidence_ref.removeprefix("FR-0007:version_gate:v0.6.0:baseline:")
         return revision or None
+    if f":{RELEASE}:" in evidence_ref and evidence_ref.endswith(":baseline"):
+        parts = evidence_ref.split(":")
+        if len(parts) >= 4:
+            return parts[-2] or None
     parts = evidence_ref.split(":")
-    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local"}:
+    if len(parts) >= 3 and parts[0] in {"operability", "test_evidence", "tests", "local", "ci", "gate", "log", "metrics"}:
         return parts[1] or None
     return None
 

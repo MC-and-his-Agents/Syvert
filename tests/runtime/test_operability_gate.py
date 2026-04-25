@@ -79,7 +79,7 @@ class OperabilityGateTests(unittest.TestCase):
         result = self.pass_result(baseline_gate_ref="FR-0007:version_gate:v0.5.0:baseline:test-head-sha")
 
         self.assertEqual(result["verdict"], FAIL_VERDICT)
-        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(result))
+        self.assertIn("baseline_gate_ref_mismatch", self.failure_codes(result))
 
     def test_baseline_gate_ref_rejects_wrong_tail_segment_or_revision(self) -> None:
         wrong_tail = self.pass_result(baseline_gate_ref="FR-0007:version_gate:v0.6.0:other:test-head-sha")
@@ -87,8 +87,28 @@ class OperabilityGateTests(unittest.TestCase):
 
         self.assertEqual(wrong_tail["verdict"], FAIL_VERDICT)
         self.assertEqual(wrong_revision["verdict"], FAIL_VERDICT)
-        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(wrong_tail))
-        self.assertIn("invalid_baseline_gate_ref", self.failure_codes(wrong_revision))
+        self.assertIn("baseline_gate_ref_mismatch", self.failure_codes(wrong_tail))
+        self.assertIn("baseline_gate_ref_mismatch", self.failure_codes(wrong_revision))
+
+    def test_reviewable_non_private_baseline_ref_is_allowed_when_resolved_result_matches(self) -> None:
+        baseline = self.valid_baseline_gate_result()
+        baseline["baseline_gate_ref"] = "gate:test-head-sha:FR-0007:v0.6.0:baseline"
+
+        result = self.pass_result(baseline_gate_ref=baseline["baseline_gate_ref"], baseline_gate_result=baseline)
+
+        self.assertEqual(result["verdict"], PASS_VERDICT)
+
+    def test_reviewable_ci_log_metrics_evidence_refs_are_allowed(self) -> None:
+        cases = self.valid_cases()
+        cases[0]["evidence_refs"] = ["ci:test-head-sha:fr-0019:trc-timeout-platform-control-code"]
+        cases[0]["upstream_refs"] = ["log:test-head-sha:tests.runtime.test_execution_control"]
+
+        result = self.pass_result(
+            cases=cases,
+            evidence_refs=["metrics:test-head-sha:fr-0019:summary"],
+        )
+
+        self.assertEqual(result["verdict"], PASS_VERDICT)
 
     def test_gate_id_and_matrix_version_are_frozen(self) -> None:
         result = self.pass_result(gate_id="totally-different-gate", matrix_version="scratch-matrix")
