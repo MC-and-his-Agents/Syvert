@@ -367,6 +367,9 @@ def orchestrate_operability_gate(
         normalized_evidence_refs = ["operability_gate:failure:missing_evidence_refs"]
 
     failed_case_ids = _failed_case_ids(normalized_cases, failures)
+    for case in normalized_cases:
+        if case["case_id"] in failed_case_ids:
+            case["verdict"] = FAIL_VERDICT
     failed_dimensions = sorted(
         {
             str(case["dimension"])
@@ -416,10 +419,9 @@ def _case_from_definition(case_id: str, definition: Mapping[str, Any], *, verdic
             "side_effects": list(definition["side_effects"]),
             "forbidden_mutations": ["shadow_status", "shadow_result"],
         },
-        "actual_result_ref": f"operability:{case_id}",
-        "actual_result": _actual_result_from_definition(case_id, definition),
+        "actual_result_ref": "",
         "gate_impact": "mandatory",
-        "evidence_refs": [f"operability:{case_id}"],
+        "evidence_refs": [],
         "verdict": verdict,
     }
 
@@ -519,6 +521,8 @@ def _normalize_cases(
         _validate_case_actual_result(
             case_id,
             expected_result.get("fields", []),
+            expected_result.get("side_effects", []),
+            expected_result.get("forbidden_mutations", []),
             actual_result,
             metrics_snapshot=metrics_snapshot,
             policy_snapshot=policy_snapshot,
@@ -632,6 +636,8 @@ def _normalize_expected_result(
 def _validate_case_actual_result(
     case_id: str,
     fields: Sequence[Mapping[str, Any]],
+    expected_side_effects: Sequence[str],
+    expected_forbidden_mutations: Sequence[str],
     actual_result: Mapping[str, Any],
     *,
     metrics_snapshot: Mapping[str, Any],
@@ -730,6 +736,28 @@ def _validate_case_actual_result(
                     details={"path": path, "operator": operator},
                 )
             )
+    actual_side_effects = _string_set_from_actual(actual_result.get("side_effects"))
+    missing_side_effects = sorted(set(expected_side_effects) - actual_side_effects)
+    if missing_side_effects:
+        failures.append(
+            _case_failure(
+                case_id,
+                "actual_result_side_effects_missing",
+                "actual_result does not prove expected side effects",
+                details={"missing_side_effects": missing_side_effects},
+            )
+        )
+    actual_absent_mutations = _string_set_from_actual(actual_result.get("forbidden_mutations_absent"))
+    missing_forbidden_mutation_proofs = sorted(set(expected_forbidden_mutations) - actual_absent_mutations)
+    if missing_forbidden_mutation_proofs:
+        failures.append(
+            _case_failure(
+                case_id,
+                "actual_result_forbidden_mutation_proof_missing",
+                "actual_result does not prove forbidden mutations stayed absent",
+                details={"missing_forbidden_mutations": missing_forbidden_mutation_proofs},
+            )
+        )
 
 
 def _validate_mandatory_case_coverage(normalized_cases: Sequence[Mapping[str, Any]], failures: list[dict[str, Any]]) -> None:
@@ -810,23 +838,6 @@ def _normalize_metrics_snapshot(raw_metrics: Mapping[str, Any], failures: list[d
         else:
             normalized[field] = raw_value
     return normalized
-
-
-def _actual_result_from_definition(case_id: str, definition: Mapping[str, Any]) -> dict[str, Any]:
-    actual_result: dict[str, Any] = {"case": {"id": case_id}}
-    for path, operator, expected_value in definition["fields"]:
-        if isinstance(expected_value, str) and "." in expected_value and operator == "==":
-            shared_value = f"shared:{case_id}:{path}"
-            _set_path(actual_result, path, shared_value)
-            _set_path(actual_result, expected_value, shared_value)
-        elif operator == "!=":
-            _set_path(actual_result, path, f"ref:{case_id}")
-        elif operator == "in":
-            allowed_values = list(expected_value)
-            _set_path(actual_result, path, allowed_values[0] if allowed_values else "")
-        else:
-            _set_path(actual_result, path, deepcopy(expected_value))
-    return actual_result
 
 
 def _validate_revision_evidence_binding(
@@ -925,6 +936,12 @@ def _failed_case_ids(cases: Sequence[Mapping[str, Any]], failures: Sequence[Mapp
 
 def _dedupe_sorted(values: Iterable[str]) -> list[str]:
     return sorted(set(values))
+
+
+def _string_set_from_actual(value: Any) -> set[str]:
+    if not isinstance(value, Iterable) or isinstance(value, (Mapping, str, bytes)):
+        return set()
+    return {item for item in value if isinstance(item, str) and item}
 
 
 def _non_empty_string(value: Any) -> str:

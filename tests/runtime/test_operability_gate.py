@@ -108,7 +108,27 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertEqual(result["verdict"], FAIL_VERDICT)
         self.assertIn("mandatory_case_expected_fields_missing", self.failure_codes(result))
 
-    def test_actual_result_must_satisfy_mandatory_assertions(self) -> None:
+    def test_missing_side_effects_fail_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
+        target["actual_result"].pop("side_effects")
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_side_effects_missing", self.failure_codes(result))
+
+    def test_missing_forbidden_mutation_proof_fails_closed(self) -> None:
+        cases = self.valid_cases()
+        target = next(case for case in cases if case["case_id"] == "trc-concurrent-result-shared-truth")
+        target["actual_result"]["forbidden_mutations_absent"] = ["shadow_status"]
+
+        result = self.pass_result(cases=cases)
+
+        self.assertEqual(result["verdict"], FAIL_VERDICT)
+        self.assertIn("actual_result_forbidden_mutation_proof_missing", self.failure_codes(result))
+
+    def test_case_verdict_is_derived_from_validator_failures(self) -> None:
         cases = self.valid_cases()
         target = next(case for case in cases if case["case_id"] == "trc-timeout-platform-control-code")
         target["actual_result"]["error"]["category"] = "runtime_contract"
@@ -119,6 +139,8 @@ class OperabilityGateTests(unittest.TestCase):
         self.assertIn("actual_result_field_mismatch", self.failure_codes(result))
         self.assertEqual(result["summary"]["fail_case_total"], 1)
         self.assertEqual(result["summary"]["failed_case_ids"], ["trc-timeout-platform-control-code"])
+        result_case = next(case for case in result["cases"] if case["case_id"] == "trc-timeout-platform-control-code")
+        self.assertEqual(result_case["verdict"], FAIL_VERDICT)
 
     def test_malformed_greater_than_expected_value_fails_closed(self) -> None:
         cases = self.valid_cases()
@@ -237,7 +259,40 @@ class OperabilityGateTests(unittest.TestCase):
         for case in cases:
             case["actual_result_ref"] = f"operability:test-head-sha:{case['case_id']}"
             case["evidence_refs"] = [f"operability:test-head-sha:{case['case_id']}"]
+            case["actual_result"] = self.actual_result_for_case(case)
         return cases
+
+    def actual_result_for_case(self, case: dict[str, object]) -> dict[str, object]:
+        expected_result = case["expected_result"]
+        actual_result: dict[str, object] = {"case": {"id": case["case_id"]}}
+        for field in expected_result["fields"]:
+            path = field["path"]
+            operator = field["operator"]
+            value = field["value"]
+            if isinstance(value, str) and "." in value and operator == "==":
+                shared_value = f"tests.runtime.test_operability_gate:{case['case_id']}:{path}"
+                self.set_path(actual_result, path, shared_value)
+                self.set_path(actual_result, value, shared_value)
+            elif operator == "!=":
+                self.set_path(actual_result, path, f"tests.runtime.test_operability_gate:{case['case_id']}:ref")
+            elif operator == "in":
+                self.set_path(actual_result, path, list(value)[0])
+            else:
+                self.set_path(actual_result, path, deepcopy(value))
+        actual_result["side_effects"] = list(expected_result["side_effects"])
+        actual_result["forbidden_mutations_absent"] = list(expected_result["forbidden_mutations"])
+        return actual_result
+
+    def set_path(self, mapping: dict[str, object], path: str, value: object) -> None:
+        current = mapping
+        segments = path.split(".")
+        for segment in segments[:-1]:
+            child = current.get(segment)
+            if not isinstance(child, dict):
+                child = {}
+                current[segment] = child
+            current = child
+        current[segments[-1]] = value
 
     def valid_metrics(self) -> dict[str, int]:
         return {
