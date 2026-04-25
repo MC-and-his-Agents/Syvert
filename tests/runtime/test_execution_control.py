@@ -315,6 +315,15 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(result.envelope["error"]["code"], "execution_control_state_invalid")
         self.assertEqual(result.envelope["error"]["details"]["resource_quarantine"], "INVALID")
+        self.assertNotEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "timeout")
+        self.assertNotIn(
+            "timeout_triggered",
+            {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+        )
+        self.assertNotIn(
+            "timeout_total",
+            {metric["metric_name"] for metric in result.envelope["runtime_execution_metric_samples"]},
+        )
         snapshot = default_resource_lifecycle_store().load_snapshot()
         self.assertEqual({lease.target_status_after_release for lease in snapshot.leases}, {"INVALID"})
         self.assertEqual(
@@ -386,6 +395,15 @@ class ExecutionControlRuntimeTests(ResourceStoreEnvMixin, unittest.TestCase):
             self.assertEqual(result.envelope["error"]["details"]["control_code"], "execution_timeout")
             self.assertEqual(result.envelope["error"]["details"]["retryable"], False)
             self.assertEqual(result.envelope["error"]["details"]["resource_quarantine"], "INVALID")
+            self.assertNotEqual(result.envelope["runtime_failure_signal"]["failure_phase"], "timeout")
+            self.assertNotIn(
+                "timeout_triggered",
+                {event["event_type"] for event in result.envelope["runtime_structured_log_events"]},
+            )
+            self.assertNotIn(
+                "timeout_total",
+                {metric["metric_name"] for metric in result.envelope["runtime_execution_metric_samples"]},
+            )
             self.assertNotIn("runtime_result_refs", result.envelope)
             self.assertEqual(result.task_record.status, "failed")
 

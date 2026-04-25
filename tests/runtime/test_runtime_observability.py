@@ -47,6 +47,16 @@ class RetryablePlatformFailureAdapter(PlatformFailureAdapter):
         )
 
 
+class InvalidInputAttemptFailureAdapter(SuccessfulAdapter):
+    def execute(self, request):
+        raise PlatformAdapterError(
+            code="adapter_precheck_failed",
+            message="adapter rejected request during execution",
+            category="invalid_input",
+            details={"reason": "adapter_precheck"},
+        )
+
+
 class RetryableThenSuccessAdapter(SuccessfulAdapter):
     def __init__(self) -> None:
         self.calls = 0
@@ -196,6 +206,20 @@ class RuntimeObservabilityTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "transient_platform")
         self.assertEqual(envelope["runtime_failure_signal"]["error_category"], "platform")
         self.assertEqual(envelope["runtime_failure_signal"]["error_code"], "transient_platform")
+
+    def test_adapter_attempt_invalid_input_projects_adapter_execution_phase(self) -> None:
+        envelope = execute_task(
+            make_request(),
+            adapters={TEST_ADAPTER_KEY: InvalidInputAttemptFailureAdapter()},
+            task_id_factory=lambda: "task-observability-attempt-invalid-input",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["runtime_failure_signal"]["failure_phase"], "adapter_execution")
+        error_event_types = {event["event_type"] for event in envelope["runtime_structured_log_events"] if event["level"] == "error"}
+        self.assertIn("task_failed", error_event_types)
+        self.assertNotIn("admission_concurrency_rejected", error_event_types)
 
     def test_admission_concurrency_rejection_observability_uses_none_task_record_ref(self) -> None:
         policy = ExecutionControlPolicy(

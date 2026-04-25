@@ -1828,7 +1828,12 @@ def with_failure_observability(envelope: Mapping[str, Any]) -> dict[str, Any]:
     runtime_result_refs = list(enriched.get("runtime_result_refs") if isinstance(enriched.get("runtime_result_refs"), list) else [])
     resource_trace_refs = list(details.get("resource_trace_refs") if isinstance(details.get("resource_trace_refs"), list) else [])
     failure_phase = infer_failure_phase(error_category=error_category, error_code=error_code, details=details)
-    event_type = infer_failure_log_event_type(error_code=error_code, details=details, task_record_ref=task_record_ref)
+    event_type = infer_failure_log_event_type(
+        error_category=error_category,
+        error_code=error_code,
+        details=details,
+        task_record_ref=task_record_ref,
+    )
     metric_name = infer_failure_metric_name(event_type=event_type, failure_phase=failure_phase)
     attempt_index = infer_attempt_index(runtime_result_refs)
     signal_id = f"runtime_failure_signal:{task_id}:{error_category}:{error_code}:{failure_phase}:{attempt_index}"
@@ -1954,7 +1959,7 @@ def infer_failure_phase(*, error_category: str, error_code: str, details: Mappin
         return "admission"
     if details.get("stage") == "pre_execution":
         return "pre_execution"
-    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
+    if is_normal_execution_timeout_failure(error_category=error_category, error_code=error_code, details=details):
         return "timeout"
     if error_code in {"resource_unavailable", "invalid_resource_requirement"}:
         return "resource_acquire"
@@ -1966,16 +1971,20 @@ def infer_failure_phase(*, error_category: str, error_code: str, details: Mappin
         return "admission"
     if error_code in {"invalid_adapter_success_payload", "adapter_execution_error"}:
         return "adapter_execution"
-    if error_category == "invalid_input":
-        return "admission"
-    if error_category == "unsupported":
-        return "admission"
     if error_category == "runtime_contract":
         return "adapter_execution"
     return "adapter_execution"
 
 
-def infer_failure_log_event_type(*, error_code: str, details: Mapping[str, Any], task_record_ref: str) -> str:
+def is_normal_execution_timeout_failure(*, error_category: str, error_code: str, details: Mapping[str, Any]) -> bool:
+    return (
+        error_category == "platform"
+        and error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT
+        and details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT
+    )
+
+
+def infer_failure_log_event_type(*, error_category: str, error_code: str, details: Mapping[str, Any], task_record_ref: str) -> str:
     event = details.get("execution_control_event")
     if isinstance(event, Mapping):
         event_type = event.get("event_type")
@@ -1986,7 +1995,7 @@ def infer_failure_log_event_type(*, error_code: str, details: Mapping[str, Any],
             return str(event_type)
     if error_code == EXECUTION_CONTROL_CODE_CONCURRENCY_LIMIT_EXCEEDED and task_record_ref == "none":
         return EXECUTION_CONTROL_EVENT_ADMISSION_CONCURRENCY_REJECTED
-    if error_code == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT or details.get("control_code") == EXECUTION_CONTROL_CODE_EXECUTION_TIMEOUT:
+    if is_normal_execution_timeout_failure(error_category=error_category, error_code=error_code, details=details):
         return "timeout_triggered"
     return "task_failed"
 
