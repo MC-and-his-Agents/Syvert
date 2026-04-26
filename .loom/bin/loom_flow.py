@@ -2500,7 +2500,7 @@ def review_engine_schema_path() -> Path:
         runtime_root = bootstrap_runtime_root(__file__)
         if runtime_root is None:
             raise
-        schema_path = runtime_root.parent / "runtime/assets/review/loom-review-result-schema.json"
+        schema_path = runtime_root.parent / "runtime/review/loom-review-result-schema.json"
         schema_path.parent.mkdir(parents=True, exist_ok=True)
         schema_path.write_text(
             json.dumps(

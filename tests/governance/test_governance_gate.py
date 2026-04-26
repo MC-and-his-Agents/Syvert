@@ -211,6 +211,7 @@ def write_minimal_loom_carrier(root: Path) -> None:
                             "mapping_rule_locator": "docs/process/delivery-funnel.md",
                             "type": "integer",
                             "required": True,
+                            "enforcement": "blocking",
                         }
                     ]
                     + [
@@ -221,6 +222,7 @@ def write_minimal_loom_carrier(root: Path) -> None:
                             "mapping_rule_locator": "WORKFLOW.md",
                             "type": "string",
                             "required": True,
+                            "enforcement": "blocking",
                         }
                         for field in ("item_key", "item_type", "release", "sprint")
                     ],
@@ -944,6 +946,24 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
 
             self.assertTrue(any("context_schema field `issue` mapping_rule_locator 必须是 docs/process/delivery-funnel.md" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_required_context_semantic_downgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            for field in payload["context_schema"]["fields"]:
+                if field["id"] == "issue":
+                    field["type"] = "string"
+                    field["required"] = False
+                    field["enforcement"] = "advisory"
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("context_schema field `issue` type 必须是 integer" in error for error in errors))
+            self.assertTrue(any("context_schema field `issue` required 必须是 True" in error for error in errors))
+            self.assertTrue(any("context_schema field `issue` enforcement 必须是 blocking" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_metadata_enforcement_downgrade(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

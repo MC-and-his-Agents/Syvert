@@ -108,11 +108,41 @@ REQUIRED_METADATA_CONTRACT_LOCATORS = {
     },
 }
 REQUIRED_CONTEXT_SCHEMA_LOCATORS = {
-    "issue": ("WORKFLOW.md", "docs/process/delivery-funnel.md"),
-    "item_key": ("WORKFLOW.md", "WORKFLOW.md"),
-    "item_type": ("WORKFLOW.md", "WORKFLOW.md"),
-    "release": ("WORKFLOW.md", "WORKFLOW.md"),
-    "sprint": ("WORKFLOW.md", "WORKFLOW.md"),
+    "issue": {
+        "authority_locator": "WORKFLOW.md",
+        "mapping_rule_locator": "docs/process/delivery-funnel.md",
+        "type": "integer",
+        "required": True,
+        "enforcement": "blocking",
+    },
+    "item_key": {
+        "authority_locator": "WORKFLOW.md",
+        "mapping_rule_locator": "WORKFLOW.md",
+        "type": "string",
+        "required": True,
+        "enforcement": "blocking",
+    },
+    "item_type": {
+        "authority_locator": "WORKFLOW.md",
+        "mapping_rule_locator": "WORKFLOW.md",
+        "type": "string",
+        "required": True,
+        "enforcement": "blocking",
+    },
+    "release": {
+        "authority_locator": "WORKFLOW.md",
+        "mapping_rule_locator": "WORKFLOW.md",
+        "type": "string",
+        "required": True,
+        "enforcement": "blocking",
+    },
+    "sprint": {
+        "authority_locator": "WORKFLOW.md",
+        "mapping_rule_locator": "WORKFLOW.md",
+        "type": "string",
+        "required": True,
+        "enforcement": "blocking",
+    },
 }
 
 
@@ -342,11 +372,13 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
             for field in context_schema.get("fields", [])
             if isinstance(field, dict) and isinstance(field.get("id"), str)
         }
-        for required_id, (expected_authority, expected_mapping) in REQUIRED_CONTEXT_SCHEMA_LOCATORS.items():
+        for required_id, expected_contract in REQUIRED_CONTEXT_SCHEMA_LOCATORS.items():
             field = context_fields.get(required_id)
             if not isinstance(field, dict):
                 errors.append(f"Loom repo interface context_schema 缺少 required field `{required_id}`")
                 continue
+            expected_authority = expected_contract["authority_locator"]
+            expected_mapping = expected_contract["mapping_rule_locator"]
             if field.get("authority_locator") != expected_authority:
                 errors.append(
                     f"Loom repo interface context_schema field `{required_id}` authority_locator 必须是 {expected_authority}"
@@ -355,6 +387,12 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
                 errors.append(
                     f"Loom repo interface context_schema field `{required_id}` mapping_rule_locator 必须是 {expected_mapping}"
                 )
+            for contract_key in ("type", "required", "enforcement"):
+                expected_value = expected_contract[contract_key]
+                if field.get(contract_key) != expected_value:
+                    errors.append(
+                        f"Loom repo interface context_schema field `{required_id}` {contract_key} 必须是 {expected_value}"
+                    )
         for index, field in enumerate(context_schema.get("fields", [])):
             if not isinstance(field, dict):
                 continue

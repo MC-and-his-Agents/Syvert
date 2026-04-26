@@ -17,6 +17,13 @@
 - sprint: `{{SPRINT}}`
 - Closing: {{CLOSING}}
 
+## Review Artifacts
+
+- Active exec-plan:
+- Governing spec / bootstrap contract:
+- Review artifact:
+- Validation evidence:
+
 ## 风险
 
 - 风险级别：`{{RISK_LEVEL}}`
