@@ -7,7 +7,8 @@
 - item_type：`GOV`
 - release：`governance-baseline`
 - sprint：`loom-official-adoption`
-- 关联 spec：`.loom/specs/INIT-0001/spec.md`
+- 关联 spec：无（治理 bootstrap / Loom adoption 事项）
+- Loom carrier spec：`.loom/specs/INIT-0001/spec.md`
 - 关联 decision：`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`
 - 关联 PR：#259
 - active 收口事项：`GOV-0038-loom-official-adoption`
