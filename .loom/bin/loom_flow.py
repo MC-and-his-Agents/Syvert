@@ -4335,9 +4335,13 @@ query($owner:String!, $name:String!, $number:Int!) {
     return issue, []
 
 
-def contains_merged_commit(root: Path, merge_commit_sha: str) -> bool:
-    run_git(root, ["fetch", "origin", "main"])
-    contains = run_git(root, ["merge-base", "--is-ancestor", merge_commit_sha, "origin/main"])
+def contains_merged_commit(root: Path, merge_commit_sha: str, target_branch: str) -> bool:
+    if not target_branch.strip():
+        return False
+    remote_ref = f"refs/remotes/origin/{target_branch}"
+    fetch_refspec = f"refs/heads/{target_branch}:{remote_ref}"
+    run_git(root, ["fetch", "origin", fetch_refspec])
+    contains = run_git(root, ["merge-base", "--is-ancestor", merge_commit_sha, remote_ref])
     return contains is not None and contains.returncode == 0
 
 
@@ -4451,19 +4455,27 @@ def reconciliation_audit_payload(
 
     pr_payload: dict[str, Any] | None = None
     merge_commit_sha: str | None = None
-    merge_commit_in_main = False
+    merge_commit_in_target_branch = False
+    merge_target_branch: str | None = None
     if pr_number is not None:
         pr_payload, pr_errors = github_pr_payload(target_root, owner, repo_name, pr_number)
         if pr_errors:
             missing_inputs.extend(f"pr: {message}" for message in pr_errors)
         elif pr_payload is not None:
+            raw_target_branch = pr_payload.get("baseRefName") or branch_name
+            if isinstance(raw_target_branch, str) and raw_target_branch:
+                merge_target_branch = raw_target_branch
             merge_commit = pr_payload.get("mergeCommit")
             if isinstance(merge_commit, dict):
                 oid = merge_commit.get("oid")
-                if isinstance(oid, str) and oid:
+                if isinstance(oid, str) and oid and merge_target_branch:
                     merge_commit_sha = oid
-                    merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha)
-            if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_main):
+                    merge_commit_in_target_branch = contains_merged_commit(
+                        target_root,
+                        merge_commit_sha,
+                        merge_target_branch,
+                    )
+            if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_target_branch):
                 findings.append(
                     make_reconciliation_finding(
                         kind="merge_signal_drift",
@@ -4471,8 +4483,9 @@ def reconciliation_audit_payload(
                         subject=f"PR #{pr_number} merge signal",
                         evidence={
                             "pr_state": pr_payload.get("state"),
+                            "target_branch": merge_target_branch,
                             "merge_commit": merge_commit_sha,
-                            "merge_commit_in_main": merge_commit_in_main,
+                            "merge_commit_in_target_branch": merge_commit_in_target_branch,
                         },
                         recommended_action="repair or re-read the merge commit basis before closeout.",
                         category="drift",
@@ -4482,7 +4495,12 @@ def reconciliation_audit_payload(
 
     merged_issue_open = False
     if issue_payload is not None and pr_payload is not None:
-        if issue_payload.get("state") == "OPEN" and pr_payload.get("state") == "MERGED" and merge_commit_sha and merge_commit_in_main:
+        if (
+            issue_payload.get("state") == "OPEN"
+            and pr_payload.get("state") == "MERGED"
+            and merge_commit_sha
+            and merge_commit_in_target_branch
+        ):
             merged_issue_open = True
             findings.append(
                 make_reconciliation_finding(
@@ -4493,8 +4511,9 @@ def reconciliation_audit_payload(
                         "issue_state": issue_payload.get("state"),
                         "pr_number": pr_number,
                         "pr_state": pr_payload.get("state"),
+                        "target_branch": merge_target_branch,
                         "merge_commit": merge_commit_sha,
-                        "merge_commit_in_main": merge_commit_in_main,
+                        "merge_commit_in_target_branch": merge_commit_in_target_branch,
                     },
                     recommended_action="close the merged issue or run reconciliation sync after reviewing the evidence.",
                 )
@@ -5187,6 +5206,8 @@ def closeout_payload(
         if pr_errors:
             missing_inputs.extend(f"pr: {message}" for message in pr_errors)
         elif pr_payload is not None:
+            raw_target_branch = pr_payload.get("baseRefName") or branch_name
+            merge_target_branch = raw_target_branch if isinstance(raw_target_branch, str) and raw_target_branch else None
             merge_commit = pr_payload.get("mergeCommit")
             if isinstance(merge_commit, dict):
                 oid = merge_commit.get("oid")
@@ -5195,10 +5216,10 @@ def closeout_payload(
             if pr_payload.get("state") != "MERGED":
                 missing_inputs.append("pr is not merged")
             if merge_commit_sha:
-                run_git(target_root, ["fetch", "origin", "main"])
-                contains = run_git(target_root, ["merge-base", "--is-ancestor", merge_commit_sha, "origin/main"])
-                if contains is None or contains.returncode != 0:
-                    missing_inputs.append("origin/main does not contain the merged PR commit")
+                if not merge_target_branch:
+                    missing_inputs.append("merged PR target branch is unavailable")
+                elif not contains_merged_commit(target_root, merge_commit_sha, merge_target_branch):
+                    missing_inputs.append(f"target branch `{merge_target_branch}` does not contain the merged PR commit")
 
     project_payload: dict[str, Any] | None = None
     if project_number is not None:
