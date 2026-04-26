@@ -27,7 +27,8 @@
   - `tests/**` 测试实现
   - `FR-0019` formal spec 语义变更
   - upstream actual_result extraction layer 或外部 evidence pipeline
-  - release / sprint 最终发布索引；该动作留给 `#236`
+  - release / sprint 最终发布索引落盘；该动作留给 `#236`
+  - `#235` 只保证 `FR-0019` parent closeout truth 可被 `#236` 引用，不直接创建或更新 `docs/releases/**`、`docs/sprints/**`
 
 ## 当前停点
 
@@ -52,6 +53,7 @@
 ## 当前 checkpoint 推进的 release 目标
 
 - 为 `v0.6.0` 完成 `FR-0019` 父事项收口，使 `#236` release / sprint closeout 可以直接引用 operability gate formal spec、runtime、source evidence artifact、renderer 与 GitHub closeout truth。
+- 本事项关闭条件按当前 v0.6.0 收口计划收窄为：`FR-0019` spec、实现、验证证据、GitHub 状态与主干事实一致；release / sprint 索引最终一致性由 `#236` 承担。
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
@@ -122,5 +124,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`71983563b48d2712248754fc3f56ead0c135fd5f`。
-- 当前可恢复 checkpoint：`fdcd227b3d895596a62d073d42046e59c50ec1d2`，包含本 exec-plan 首个版本化恢复工件与 `FR-0019` inactive requirement container closeout 索引。
+- 当前可恢复 checkpoint：`fdcd227c82bc440c7374395148e9a288483958f6`，包含本 exec-plan 首个版本化恢复工件与 `FR-0019` inactive requirement container closeout 索引。
 - 后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
