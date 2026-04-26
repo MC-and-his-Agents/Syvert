@@ -5,7 +5,7 @@
   "kind": "general_review",
   "summary": "Syvert Loom official adoption carrier is ready for controlled merge after active-item-aware static gate, trackable vendored bootstrap, fresh spec review, and interop alignment.",
   "reviewer": "syvert-guardian",
-  "reviewed_head": "5a832decaaed398841fd8b01c207b11e7c0bfbab",
+  "reviewed_head": "a83af7108262b1932d89d7840639914cf3cad998",
   "reviewed_validation_summary": "Trackable vendored carrier, active-item-aware static gate, fresh spec review, self-contained review schema, fetch-failure-safe target-branch closeout, required status/progress fields, bounded loom_check runtime gate, bootstrap contract binding, coherent INIT-0001 truth, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
   "fallback_to": null,
   "blocking_issues": [],
