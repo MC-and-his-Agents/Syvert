@@ -167,6 +167,7 @@ def write_minimal_loom_carrier(root: Path) -> None:
     (root / ".loom/shadow/shadow-parity.json").write_text(
         json.dumps(
             {
+                "schema_version": "loom-shadow-parity-evidence/v1",
                 "result": "pass",
                 "surfaces": list(surfaces),
                 "loom_sources": loom_sources,
@@ -457,6 +458,30 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("reviewed_validation_summary" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_review_schema_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/reviews/INIT-0001.json").read_text(encoding="utf-8"))
+            payload["schema_version"] = "loom-review/v2"
+            (root / ".loom/reviews/INIT-0001.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/reviews/INIT-0001.json"])
+
+            self.assertTrue(any("schema_version 必须是 loom-review/v1" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_spec_review_schema_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/reviews/INIT-0001.spec.json").read_text(encoding="utf-8"))
+            payload["schema_version"] = "loom-review/v2"
+            (root / ".loom/reviews/INIT-0001.spec.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/reviews/INIT-0001.spec.json"])
+
+            self.assertTrue(any("schema_version 必须是 loom-review/v1" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_missing_status_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -530,6 +555,18 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/shadow-parity.json"])
 
             self.assertTrue(any("surfaces 必须与 repo interop shadow_surfaces 完全一致" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_shadow_artifact_schema_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/shadow/shadow-parity.json").read_text(encoding="utf-8"))
+            payload["schema_version"] = "loom-shadow-parity-evidence/v2"
+            (root / ".loom/shadow/shadow-parity.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/shadow-parity.json"])
+
+            self.assertTrue(any("schema_version 必须是 loom-shadow-parity-evidence/v1" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_shadow_source_locator_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

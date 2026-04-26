@@ -151,6 +151,8 @@ def validate_review_payload(path: Path, *, expected_kind: str, item_id: str) -> 
     for field in ("schema_version", "item_id", "decision", "kind", "summary", "reviewer", "reviewed_head", "reviewed_validation_summary"):
         if not str(payload.get(field, "")).strip():
             errors.append(f"Loom review artifact `{path}` 缺少 `{field}`")
+    if payload.get("schema_version") != "loom-review/v1":
+        errors.append(f"Loom review artifact `{path}` schema_version 必须是 loom-review/v1")
     if payload.get("item_id") != item_id:
         errors.append(f"Loom review artifact `{path}` item_id 必须是 {item_id}")
     if payload.get("kind") != expected_kind:
@@ -251,6 +253,8 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         shadow_payload = {}
     if shadow_payload.get("result") != "pass":
         errors.append("Loom shadow parity artifact result 必须为 pass")
+    if shadow_payload.get("schema_version") != "loom-shadow-parity-evidence/v1":
+        errors.append("Loom shadow parity artifact schema_version 必须是 loom-shadow-parity-evidence/v1")
     if not isinstance(shadow_payload.get("surfaces"), list) or not shadow_payload.get("surfaces"):
         errors.append("Loom shadow parity artifact 必须列出 surfaces")
 
