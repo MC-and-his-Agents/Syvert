@@ -109,6 +109,30 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
 
+    def test_runtime_state_rejects_install_layout_path_escape(self) -> None:
+        runtime_state = load_loom_module("runtime_state")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "install-layout.json").write_text('{"required_paths":["../outside"]}', encoding="utf-8")
+            payload, errors, _ = runtime_state._validate_install_layout(root)
+
+        self.assertEqual(payload["status"], "block")
+        self.assertTrue(any("inside the installed skills root" in error for error in errors))
+
+    def test_runtime_state_rejects_registry_path_escape(self) -> None:
+        runtime_state = load_loom_module("runtime_state")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "registry.json").write_text(
+                '{"install_layout":"install-layout.json","upgrade_contract":"upgrade-contract.json","entries":[{"id":"x","executable":"/tmp/x","manifest":"../manifest"}]}',
+                encoding="utf-8",
+            )
+            (root / "upgrade-contract.json").write_text('{"upgrade_policy":{"refresh_required":["layout_manifest"]}}', encoding="utf-8")
+            payload, errors, _ = runtime_state._validate_registry_contract(root)
+
+        self.assertEqual(payload["status"], "block")
+        self.assertTrue(any("inside the installed skills root" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

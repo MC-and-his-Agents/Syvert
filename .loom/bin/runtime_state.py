@@ -65,6 +65,21 @@ def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     return payload, None
 
 
+def _resolve_skills_relative_path(skills_root: Path, relative: str, label: str, errors: list[str]) -> Path | None:
+    candidate = Path(relative)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        errors.append(f"{label} must be a relative path inside the installed skills root: `{relative}`")
+        return None
+    resolved_root = skills_root.resolve()
+    resolved = (skills_root / candidate).resolve()
+    try:
+        resolved.relative_to(resolved_root)
+    except ValueError:
+        errors.append(f"{label} escapes the installed skills root: `{relative}`")
+        return None
+    return resolved
+
+
 def _check(status: str, summary: str, *, evidence: object | None = None) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "status": status,
@@ -135,7 +150,8 @@ def _validate_install_layout(skills_root: Path) -> tuple[dict[str, Any], list[st
             if not isinstance(relative, str) or not relative:
                 errors.append("`install-layout.json` required paths must be non-empty strings")
                 continue
-            if not (skills_root / relative).exists():
+            resolved = _resolve_skills_relative_path(skills_root, relative, "install layout required path", errors)
+            if resolved is not None and not resolved.exists():
                 missing.append(relative)
         if missing:
             errors.append("install layout is missing required paths: " + ", ".join(sorted(missing)))
@@ -177,12 +193,26 @@ def _validate_registry_contract(skills_root: Path) -> tuple[dict[str, Any], list
                 continue
             if not isinstance(executable, str) or not executable:
                 errors.append(f"registry entry `{skill_id}` must declare a non-empty `executable`")
-            elif not (skills_root / executable).exists():
-                errors.append(f"registry entry `{skill_id}` points to missing executable `{executable}`")
+            else:
+                resolved_executable = _resolve_skills_relative_path(
+                    skills_root,
+                    executable,
+                    f"registry entry `{skill_id}` executable",
+                    errors,
+                )
+                if resolved_executable is not None and not resolved_executable.exists():
+                    errors.append(f"registry entry `{skill_id}` points to missing executable `{executable}`")
             if not isinstance(manifest, str) or not manifest:
                 errors.append(f"registry entry `{skill_id}` must declare a non-empty `manifest`")
-            elif not (skills_root / manifest).exists():
-                errors.append(f"registry entry `{skill_id}` points to missing manifest `{manifest}`")
+            else:
+                resolved_manifest = _resolve_skills_relative_path(
+                    skills_root,
+                    manifest,
+                    f"registry entry `{skill_id}` manifest",
+                    errors,
+                )
+                if resolved_manifest is not None and not resolved_manifest.exists():
+                    errors.append(f"registry entry `{skill_id}` points to missing manifest `{manifest}`")
 
     upgrade_path = skills_root / "upgrade-contract.json"
     upgrade_contract, upgrade_error = _load_json(upgrade_path)
