@@ -32,22 +32,23 @@
 
 ## 当前停点
 
-- `FR-0016` parent closeout 已由 PR `#248` 合入，merge commit `3c57ec6ce6437b0e810645b104fd85d6bf1235ba`，Issue `#219` 已关闭。
-- `FR-0017` parent closeout 已由 PR `#250` 合入，merge commit `394d48a7be861de742aae439c38e18625cc44193`，Issue `#220` 已关闭。
-- `FR-0018` parent closeout 已由 PR `#251` 合入，merge commit `7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`，Issue `#221` 已关闭。
-- `FR-0019` parent closeout 已由 PR `#253` 合入，merge commit `2413ecc3d8d1811270d45420b91a0ae98af064be`，Issue `#222` 已关闭。
-- Git tag `v0.6.0` 当前不存在。
-- GitHub Release `v0.6.0` 当前不存在。
-- Phase `#218` 仍为 `open`。
+- `FR-0016` parent closeout 已由 PR `#248` 合入，merge commit `3c57ec6ce6437b0e810645b104fd85d6bf1235ba`，FR Issue `#219` 与 closeout Work Item `#225` 均已关闭。
+- `FR-0017` parent closeout 已由 PR `#250` 合入，merge commit `394d48a7be861de742aae439c38e18625cc44193`，FR Issue `#220` 与 closeout Work Item `#228` 均已关闭。
+- `FR-0018` parent closeout 已由 PR `#251` 合入，merge commit `7a1439052f85f26ae34e7770dd7de3b4c73f7fb3`，FR Issue `#221` 与 closeout Work Item `#232` 均已关闭。
+- `FR-0019` parent closeout 已由 PR `#253` 合入，merge commit `2413ecc3d8d1811270d45420b91a0ae98af064be`，FR Issue `#222` 与 closeout Work Item `#235` 均已关闭。
+- 阶段 A docs carrier 已由 PR `#254` 合入主干，merge commit `123cd6dc0c6037050011fde87bace33ca0412098`。
+- Git tag `v0.6.0` 已创建并推送，锚点为 `123cd6dc0c6037050011fde87bace33ca0412098`。
+- GitHub Release `v0.6.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.6.0`。
+- Phase `#218` 与 Work Item `#236` 仍为 `open`，等待阶段 B metadata-only follow-up 合入后关闭。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-236-v0-6-0`
-- 当前主干基线：`2413ecc3d8d1811270d45420b91a0ae98af064be`
+- 当前主干基线：`123cd6dc0c6037050011fde87bace33ca0412098`
 
 ## 下一步动作
 
-- 阶段 A：创建 docs PR，建立 release / sprint / decision / exec-plan carrier。
-- 阶段 A 合入后 fast-forward main，并在阶段 A merge commit 上创建并推送 `v0.6.0` tag。
-- 创建 GitHub Release `v0.6.0`。
-- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。
+- 阶段 A：创建 docs PR，建立 release / sprint / decision / exec-plan carrier。已完成，PR `#254`。
+- 阶段 A 合入后 fast-forward main，并在阶段 A merge commit 上创建并推送 `v0.6.0` tag。已完成。
+- 创建 GitHub Release `v0.6.0`。已完成。
+- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。当前进行中。
 - 阶段 B 合入后关闭 `#218/#236` 并退役 worktree / branch。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -57,12 +58,14 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`2026-S19` 的 phase / release closeout Work Item，承接 `FR-0016..FR-0019` parent closeout 后的最终发布动作。
-- 位置：本事项是 `v0.6.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 B 建立发布锚点并回写 published truth。
+- 位置：本事项是 `v0.6.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 A 合入后的发布动作建立 tag / GitHub Release，阶段 B 回写 published truth 并完成 GitHub closeout。
 - 阻塞：
   - 阶段 A PR 合入前不得创建 `v0.6.0` tag 或 GitHub Release。
-  - 阶段 B 合入并完成 tag / Release / Phase closeout 前，不得声明 `v0.6.0` 完成。
+  - 阶段 B metadata-only follow-up 合入并完成 Phase / Work Item closeout 前，不得声明 `v0.6.0` 完成。
 
 ## 已验证项
+
+### 发布前基线验证
 
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/219`
   - 结果：`state=closed`
@@ -72,10 +75,29 @@
   - 结果：`state=closed`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/222`
   - 结果：`state=closed`
-- `env -u GH_TOKEN -u GITHUB_TOKEN gh release view v0.6.0`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/225`
+  - 结果：`state=closed`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/228`
+  - 结果：`state=closed`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/232`
+  - 结果：`state=closed`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/235`
+  - 结果：`state=closed`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh release view v0.6.0`（阶段 A PR 合入前）
   - 结果：当前不存在 GitHub Release `v0.6.0`
-- `git tag --list 'v0.6.0'`
+- `git tag --list 'v0.6.0'`（阶段 A PR 合入前）
   - 结果：当前未找到 `v0.6.0`
+
+### 发布锚点建立验证
+
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/pulls/254`
+  - 结果：`merged=true`，`merged_at=2026-04-26T05:27:46Z`，`merge_commit_sha=123cd6dc0c6037050011fde87bace33ca0412098`
+- `git tag -a v0.6.0 -m 'v0.6.0' 123cd6dc0c6037050011fde87bace33ca0412098`
+  - 结果：已创建 annotated tag `v0.6.0`
+- `git push origin v0.6.0`
+  - 结果：已推送 tag `v0.6.0`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/releases`
+  - 结果：已创建 GitHub Release `v0.6.0`，URL 为 `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.6.0`
 
 ## closeout 证据
 
@@ -86,15 +108,11 @@
 
 ## 剩余 closeout 动作
 
-- 合入阶段 A docs carrier PR
-- 创建并推送 `v0.6.0` tag
-- 创建 GitHub Release `v0.6.0`
 - 合入阶段 B published-truth follow-up PR
 - 回写并关闭 `#218/#236`
 
 ## 未决风险
 
-- 若阶段 A 合入后没有立即建立 tag / GitHub Release，仓内 release/sprint 索引仍会滞后于正式发布态。
 - 若只建立 tag 而不回写 published truth 与 GitHub issue closeout metadata，`v0.6.0` 会出现“发布锚点已存在，但仓内/issue 真相仍停在前一跳”的分叉。
 
 ## 回滚方式
@@ -104,5 +122,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `2413ecc3d8d1811270d45420b91a0ae98af064be`
-- 说明：该 checkpoint 对应 `FR-0016..FR-0019` parent closeout 全部合入主干、`v0.6.0` 具备正式发布前主干基线。阶段 A carrier、tag / GitHub Release 与阶段 B metadata-only 回写属于该 checkpoint 之后的发布收口动作。
+- `123cd6dc0c6037050011fde87bace33ca0412098`
+- 说明：该 checkpoint 对应阶段 A release carrier 已合入主干，且 `v0.6.0` tag / GitHub Release 已锚定该提交。阶段 B metadata-only 回写负责把仓内 release/sprint 索引与已发布事实对齐。
