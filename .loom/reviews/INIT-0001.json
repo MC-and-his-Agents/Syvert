@@ -3,10 +3,10 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Syvert Loom official adoption carrier is ready for controlled merge after restoring Syvert bootstrap contract binding and keeping Loom carrier spec as carrier-local evidence.",
+  "summary": "Syvert Loom official adoption carrier is ready for controlled merge after default-branch-aware closeout and complete .loom/bin carrier requirements.",
   "reviewer": "syvert-guardian",
-  "reviewed_head": "5bc68c653fe3a3f5732d38cd99ffdfee517b2877",
-  "reviewed_validation_summary": "Static carrier structural gate, bounded loom_check runtime gate, bootstrap contract binding, coherent INIT-0001 truth, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
+  "reviewed_head": "798739fbd5511814945bdac03ba62aa14b653b51",
+  "reviewed_validation_summary": "Default-branch-aware closeout, complete carrier structural gate, bounded loom_check runtime gate, bootstrap contract binding, coherent INIT-0001 truth, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
