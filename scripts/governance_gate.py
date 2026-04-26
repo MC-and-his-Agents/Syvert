@@ -68,19 +68,37 @@ REQUIRED_LOOM_CARRIER_FILES = (
 REQUIRED_LOOM_SHADOW_SURFACES = {"admission", "review", "merge_ready", "closeout"}
 REQUIRED_COMPANION_REQUIREMENTS = {
     "review": {
-        "syvert-review-rubric": "code_review.md",
+        "syvert-review-rubric": {
+            "locator": "code_review.md",
+            "enforcement": "blocking",
+        },
     },
     "merge_ready": {
-        "syvert-guardian-merge-gate": "code_review.md",
+        "syvert-guardian-merge-gate": {
+            "locator": "code_review.md",
+            "enforcement": "blocking",
+        },
     },
     "closeout": {
-        "syvert-delivery-closeout": "docs/process/delivery-funnel.md",
+        "syvert-delivery-closeout": {
+            "locator": "docs/process/delivery-funnel.md",
+            "enforcement": "advisory",
+        },
     },
 }
 REQUIRED_SPECIALIZED_GATES = {
-    "workflow-guard": "scripts/workflow_guard.py",
-    "governance-gate": "scripts/governance_gate.py",
-    "pr-guardian": "scripts/pr_guardian.py",
+    "workflow-guard": {
+        "locator": "scripts/workflow_guard.py",
+        "gate_type": "admission",
+    },
+    "governance-gate": {
+        "locator": "scripts/governance_gate.py",
+        "gate_type": "build",
+    },
+    "pr-guardian": {
+        "locator": "scripts/pr_guardian.py",
+        "gate_type": "merge_ready",
+    },
 }
 REQUIRED_METADATA_CONTRACT_LOCATORS = {
     "integration_check": {
@@ -215,14 +233,20 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
                 for requirement in requirements
                 if isinstance(requirement, dict) and isinstance(requirement.get("id"), str)
             }
-            for required_id, expected_locator in required_entries.items():
+            for required_id, expected_contract in required_entries.items():
                 requirement = by_id.get(required_id)
                 if not isinstance(requirement, dict):
                     errors.append(f"Loom repo interface `{required_surface}` 缺少 required requirement `{required_id}`")
                     continue
+                expected_locator = expected_contract["locator"]
                 if requirement.get("locator") != expected_locator:
                     errors.append(
                         f"Loom repo interface `{required_surface}` requirement `{required_id}` locator 必须是 {expected_locator}"
+                    )
+                expected_enforcement = expected_contract["enforcement"]
+                if requirement.get("enforcement") != expected_enforcement:
+                    errors.append(
+                        f"Loom repo interface `{required_surface}` requirement `{required_id}` enforcement 必须是 {expected_enforcement}"
                     )
         for surface, requirements in repo_specific_requirements.items():
             if not isinstance(requirements, list):
@@ -249,13 +273,17 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
             for gate in specialized_gates
             if isinstance(gate, dict) and isinstance(gate.get("id"), str)
         }
-        for required_id, expected_locator in REQUIRED_SPECIALIZED_GATES.items():
+        for required_id, expected_contract in REQUIRED_SPECIALIZED_GATES.items():
             gate = gates_by_id.get(required_id)
             if not isinstance(gate, dict):
                 errors.append(f"Loom repo interface specialized_gates 缺少 required gate `{required_id}`")
                 continue
+            expected_locator = expected_contract["locator"]
             if gate.get("locator") != expected_locator:
                 errors.append(f"Loom repo interface specialized gate `{required_id}` locator 必须是 {expected_locator}")
+            expected_gate_type = expected_contract["gate_type"]
+            if gate.get("gate_type") != expected_gate_type:
+                errors.append(f"Loom repo interface specialized gate `{required_id}` gate_type 必须是 {expected_gate_type}")
         for index, gate in enumerate(specialized_gates):
             if not isinstance(gate, dict):
                 errors.append(f"Loom repo interface specialized_gates[{index}] 必须是对象")
