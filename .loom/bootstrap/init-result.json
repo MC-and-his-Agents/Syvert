@@ -200,9 +200,9 @@
   "initial_work_items": [
     {
       "id": "INIT-0001",
-      "goal": "Bootstrap the first executable Loom path for this repository",
-      "scope": "Establish rule entry, first work item, progress carrier, spec/plan, and verification entry",
-      "execution_path": "bootstrap/root",
+      "goal": "Formally adopt Loom as Syvert's upstream governance runtime while preserving Syvert-owned residue.",
+      "scope": "Install and validate the vendored `.loom` carrier, companion contracts, shadow parity, review/status/spec surfaces, and Syvert gate coverage for PR #259 / Work Item #258.",
+      "execution_path": "governance/loom-official-adoption",
       "workspace_entry": ".",
       "recovery_entry": ".loom/progress/INIT-0001.md",
       "review_entry": ".loom/reviews/INIT-0001.json",
@@ -220,14 +220,27 @@
         ".loom/bin/loom_flow.py",
         ".loom/bin/loom_status.py",
         ".loom/bin/runtime_paths.py",
+        ".loom/bin/runtime_state.py",
         ".loom/bin/loom_check.py",
+        ".loom/companion/manifest.json",
+        ".loom/companion/repo-interface.json",
+        ".loom/companion/interop.json",
+        ".loom/shadow/shadow-parity.json",
         ".loom/specs/INIT-0001/spec.md",
         ".loom/specs/INIT-0001/plan.md",
-        ".loom/specs/INIT-0001/implementation-contract.md"
+        ".loom/specs/INIT-0001/implementation-contract.md",
+        "AGENTS.md",
+        "WORKFLOW.md",
+        "docs/process/delivery-funnel.md",
+        "docs/AGENTS.md",
+        "docs/decisions/ADR-GOV-0038-loom-official-adoption.md",
+        "scripts/governance_gate.py",
+        "tests/governance/test_governance_gate.py",
+        "tests/governance/test_loom_carrier_runtime.py"
       ],
-      "closing_condition": "The generated entry, work item, recovery entry, and templates are readable and verified",
-      "post_build_continuation": "Promote the first real downstream issue after the bootstrap artifacts are accepted",
-      "owner_for_checkpoint_lite": "repository owner or current bootstrap operator"
+      "closing_condition": "Loom carrier verification, runtime parity, blocking shadow parity, merge checkpoint, Syvert governance gates, guardian review, controlled merge, and issue closeout all agree on the same adoption truth.",
+      "post_build_continuation": "Complete guardian review, controlled merge, and Work Item / FR / Phase closeout.",
+      "owner_for_checkpoint_lite": "Syvert governance maintainer"
     }
   ],
   "validation_and_closing": {

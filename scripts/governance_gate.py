@@ -10,6 +10,7 @@ if __package__ in {None, ""}:
 import argparse
 import json
 import py_compile
+import tempfile
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch, run
 from scripts.context_guard import infer_current_issue, validate_context_rules, validate_repository as validate_context_repository
@@ -93,11 +94,17 @@ def validate_loom_carrier_repository(repo_root: Path, changed_paths: list[str]) 
 
         bin_root = loom_root / "bin"
         if bin_root.exists():
-            for py_path in sorted(bin_root.glob("*.py")):
-                try:
-                    py_compile.compile(str(py_path), doraise=True)
-                except py_compile.PyCompileError as exc:
-                    errors.append(f"Loom carrier Python 语法无效: {py_path}: {exc.msg}")
+            with tempfile.TemporaryDirectory(prefix="syvert-loom-pycompile-") as temp_dir:
+                temp_root = Path(temp_dir)
+                for index, py_path in enumerate(sorted(bin_root.glob("*.py"))):
+                    try:
+                        py_compile.compile(
+                            str(py_path),
+                            cfile=str(temp_root / f"{index}-{py_path.name}c"),
+                            doraise=True,
+                        )
+                    except py_compile.PyCompileError as exc:
+                        errors.append(f"Loom carrier Python 语法无效: {py_path}: {exc.msg}")
 
     loom_check = repo_root / ".loom/bin/loom_check.py"
     if loom_check.exists():

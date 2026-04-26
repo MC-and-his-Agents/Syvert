@@ -737,6 +737,100 @@ def attach_only_artifact_paths(target_root: Path, install_pr_template: bool) -> 
     return artifacts
 
 
+BUILTIN_SCAFFOLD_ASSETS = {
+    "templates/scaffold/spec.md": """# Spec
+
+## Goal
+
+- Define the target outcome for this Loom work item.
+
+## Scope
+
+- In scope:
+- Out of scope:
+
+## Key Scenarios
+
+### Scenario 1
+
+Given
+- a clear starting state
+
+When
+- the actor performs the target action
+
+Then
+- the expected observable outcome happens
+
+## Exceptions And Boundaries
+
+- Failure modes:
+- Operational boundaries:
+- Rollback or fallback expectations:
+
+## Acceptance Criteria
+
+- [ ] Target outcome is observable
+- [ ] Validation evidence is identified
+""",
+    "templates/scaffold/plan.md": """# Plan
+
+## Implementation Goal
+
+- Describe what will be delivered and what is deferred.
+
+## Phases
+
+- Phase 1:
+
+## Validation
+
+- Automated checks:
+- Manual checks:
+
+## Ready For Implementation
+
+- [ ] Scope and non-goals are clear
+- [ ] Validation path is defined
+""",
+    "templates/scaffold/implementation-contract.md": """# Implementation Contract
+
+## Work Item
+
+- Item:
+- Execution Entry:
+
+## Approved Spec
+
+- Spec Path:
+- Spec Review Entry:
+
+## Validation Plan
+
+- Automated Checks:
+- Manual Verification:
+""",
+    "github/PULL_REQUEST_TEMPLATE.md": """## Summary
+
+## Validation
+
+## Risks And Follow-ups
+
+## Related Work
+""",
+}
+
+
+def copy_or_write_shared_asset(relative_path: str, destination: Path, *, force: bool) -> bool:
+    try:
+        return copy_file(shared_asset(__file__, relative_path), destination, force=force)
+    except RuntimeError:
+        fallback = BUILTIN_SCAFFOLD_ASSETS.get(relative_path)
+        if fallback is None:
+            raise
+        return write_text(destination, fallback, force=force)
+
+
 def initial_work_items(scenario: str, target_root: Path, adoption_path: str, install_pr_template: bool) -> list[dict[str, object]]:
     if uses_attach_only_path(adoption_path):
         return [
@@ -1440,21 +1534,18 @@ def scaffold_target(
             written += 1
             touched.append(str(destination.relative_to(target_root)))
     if not attach_only:
-        for source, destination in (
-            (shared_asset(__file__, "templates/scaffold/spec.md"), target_root / ".loom/specs/INIT-0001/spec.md"),
-            (shared_asset(__file__, "templates/scaffold/plan.md"), target_root / ".loom/specs/INIT-0001/plan.md"),
-            (
-                shared_asset(__file__, "templates/scaffold/implementation-contract.md"),
-                target_root / ".loom/specs/INIT-0001/implementation-contract.md",
-            ),
+        for relative_asset, destination in (
+            ("templates/scaffold/spec.md", target_root / ".loom/specs/INIT-0001/spec.md"),
+            ("templates/scaffold/plan.md", target_root / ".loom/specs/INIT-0001/plan.md"),
+            ("templates/scaffold/implementation-contract.md", target_root / ".loom/specs/INIT-0001/implementation-contract.md"),
         ):
-            if copy_file(source, destination, force=force):
+            if copy_or_write_shared_asset(relative_asset, destination, force=force):
                 written += 1
                 touched.append(str(destination.relative_to(target_root)))
 
     pr_template_target = target_root / ".github/PULL_REQUEST_TEMPLATE.md"
     if install_pr_template or not pr_template_target.exists():
-        if copy_file(shared_asset(__file__, "github/PULL_REQUEST_TEMPLATE.md"), pr_template_target, force=force):
+        if copy_or_write_shared_asset("github/PULL_REQUEST_TEMPLATE.md", pr_template_target, force=force):
             written += 1
             touched.append(str(pr_template_target.relative_to(target_root)))
 
