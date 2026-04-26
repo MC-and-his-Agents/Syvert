@@ -21,6 +21,7 @@ def load_loom_module(name: str):
     sys.path.insert(0, str(LOOM_BIN))
     try:
         module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
         spec.loader.exec_module(module)
         return module
     finally:
@@ -251,6 +252,25 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
             self.assertIsNone(value)
             self.assertIn("source_files must exactly match source_sha256 keys", error)
+
+    def test_loom_check_merge_checkpoint_uses_active_item(self) -> None:
+        loom_check = load_loom_module("loom_check")
+        commands: list[list[str]] = []
+
+        def fake_run_carrier_check(root: Path, command: list[str]):
+            commands.append(command)
+            return True, ""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / ".loom/status").mkdir(parents=True)
+            (root / ".loom/status/current.md").write_text("- Item ID: WORK-0002\n", encoding="utf-8")
+            with patch.object(loom_check, "run_carrier_check", side_effect=fake_run_carrier_check):
+                self.assertEqual(loom_check.bootstrapped_target_failures(root), [])
+
+        merge_commands = [command for command in commands if command[2:4] == ["checkpoint", "merge"]]
+        self.assertEqual(len(merge_commands), 1)
+        self.assertEqual(merge_commands[0][-2:], ["--item", "WORK-0002"])
 
 
 if __name__ == "__main__":

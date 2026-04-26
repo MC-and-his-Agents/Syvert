@@ -5796,7 +5796,21 @@ def run_carrier_check(root: Path, command: list[str]) -> tuple[bool, str]:
     return completed.returncode == 0, output
 
 
+def active_item_id(root: Path) -> str:
+    status_path = root / ".loom/status/current.md"
+    try:
+        for line in status_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("- Item ID:"):
+                item_id = line.split(":", 1)[1].strip()
+                if item_id:
+                    return item_id
+    except OSError:
+        pass
+    return "INIT-0001"
+
+
 def bootstrapped_target_failures(root: Path) -> list[Failure]:
+    item_id = active_item_id(root)
     checks = [
         (
             "loom-init-verify",
@@ -5816,7 +5830,7 @@ def bootstrapped_target_failures(root: Path) -> list[Failure]:
         ),
         (
             "merge-checkpoint",
-            [sys.executable, ".loom/bin/loom_flow.py", "checkpoint", "merge", "--target", ".", "--item", "INIT-0001"],
+            [sys.executable, ".loom/bin/loom_flow.py", "checkpoint", "merge", "--target", ".", "--item", item_id],
         ),
     ]
     failures: list[Failure] = []
