@@ -35,11 +35,13 @@
 - `#234` operability gate runtime 已由 PR `#252` squash merge，merge commit `71983563b48d2712248754fc3f56ead0c135fd5f`。
 - `#233` 与 `#234` GitHub issue 均已关闭。
 - `#222` 仍为 `open`，等待本父事项 closeout 回写后关闭。
+- 当前 closeout PR：`#253 https://github.com/MC-and-his-Agents/Syvert/pull/253`
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-235-chore-fr-0019`
 - 当前主干基线：`71983563b48d2712248754fc3f56ead0c135fd5f`
 
 ## 下一步动作
 
+- 当前 closeout PR：`#253 https://github.com/MC-and-his-Agents/Syvert/pull/253`
 - 本 PR 为 docs-only closeout，PR class 必须保持 `docs`。
 - 通过 CI、reviewer、guardian 与 merge gate。
 - 合入后 fast-forward main。
@@ -97,10 +99,12 @@
   - 结果：通过，`PR class: docs`，`变更类别: docs`，`PR scope 校验通过。`
 - `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
   - 结果：通过，`governance-gate 通过。`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/open_pr.py --class docs --issue 235 --item-key CHORE-0159-fr-0019-parent-closeout --item-type CHORE --release v0.6.0 --sprint 2026-S19 --title 'docs(closeout): 收口 FR-0019 父事项' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：通过，创建 PR `#253`
 
 ## 待完成
 
-- 创建并合入本 closeout PR。
+- 通过 PR `#253` guardian / merge gate 并合入。
 - 合入后将 `#235` 正文更新为已完成并关闭，Project 切到 `Done`。
 - 回写并关闭父 FR `#222`，说明 formal spec 与 operability gate runtime / evidence 已合入主干。
 - fast-forward main，退役 `issue-235-chore-fr-0019` 分支与 worktree。
