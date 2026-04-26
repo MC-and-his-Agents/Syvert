@@ -9,7 +9,7 @@
 - sprint：`2026-S19`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0037-v0-6-0-phase-and-release-closeout.md`
-- 状态：`active`
+- 状态：`closed`
 
 ## 目标
 
@@ -39,7 +39,8 @@
 - 阶段 A docs carrier 已由 PR `#254` 合入主干，merge commit `123cd6dc0c6037050011fde87bace33ca0412098`。
 - Git tag `v0.6.0` 已创建并推送，锚点为 `123cd6dc0c6037050011fde87bace33ca0412098`。
 - GitHub Release `v0.6.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.6.0`。
-- Phase `#218` 与 Work Item `#236` 仍为 `open`，等待阶段 B metadata-only follow-up 合入后关闭。
+- 阶段 B published-truth follow-up 由 PR `#255` 回写；合入后 Work Item `#236` 由 closing keyword 关闭。
+- Phase `#218` 的 GitHub issue closeout 是 PR `#255` 合入后的仓外 REST 同步动作。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-236-v0-6-0`
 - 当前主干基线：`123cd6dc0c6037050011fde87bace33ca0412098`
 
@@ -48,8 +49,8 @@
 - 阶段 A：创建 docs PR，建立 release / sprint / decision / exec-plan carrier。已完成，PR `#254`。
 - 阶段 A 合入后 fast-forward main，并在阶段 A merge commit 上创建并推送 `v0.6.0` tag。已完成。
 - 创建 GitHub Release `v0.6.0`。已完成。
-- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。当前进行中。
-- 阶段 B 合入后关闭 `#218/#236` 并退役 worktree / branch。
+- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。由 PR `#255` 完成。
+- PR `#255` 合入后关闭 `#218/#236` 并退役 worktree / branch。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -58,10 +59,10 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`2026-S19` 的 phase / release closeout Work Item，承接 `FR-0016..FR-0019` parent closeout 后的最终发布动作。
-- 位置：本事项是 `v0.6.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 A 合入后的发布动作建立 tag / GitHub Release，阶段 B 回写 published truth 并完成 GitHub closeout。
+- 位置：本事项是 `v0.6.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 A 合入后的发布动作建立 tag / GitHub Release，阶段 B 由 PR `#255` 回写 published truth，并在合入后完成 GitHub closeout。
 - 阻塞：
   - 阶段 A PR 合入前不得创建 `v0.6.0` tag 或 GitHub Release。
-  - 阶段 B metadata-only follow-up 合入并完成 Phase / Work Item closeout 前，不得声明 `v0.6.0` 完成。
+  - PR `#255` 合入并完成 Phase / Work Item closeout 前，不得声明 `v0.6.0` 完成。
 
 ## 已验证项
 
@@ -106,10 +107,11 @@
 - `FR-0018`：formal spec / HTTP runtime / same-path evidence / parent closeout 已完成，见 `docs/exec-plans/FR-0018-http-task-api-same-core-path.md`
 - `FR-0019`：formal spec / gate runtime / source evidence / renderer / parent closeout 已完成，见 `docs/exec-plans/FR-0019-v0-6-operability-release-gate.md`
 
-## 剩余 closeout 动作
+## 仓外 closeout 同步
 
-- 合入阶段 B published-truth follow-up PR
-- 回写并关闭 `#218/#236`
+- PR `#255` 合入后通过 closing keyword 关闭 `#236`。
+- PR `#255` 合入后通过 GitHub REST 关闭 Phase `#218` 并留言记录 `v0.6.0` tag / GitHub Release URL。
+- PR `#255` 合入后 fast-forward main，并退役 `issue-236-v0-6-0-published-truth` branch / worktree。
 
 ## 未决风险
 
