@@ -1,17 +1,14 @@
 {
   "schema_version": "loom-review/v1",
   "item_id": "INIT-0001",
-  "decision": "fallback",
+  "decision": "allow",
   "kind": "spec_review",
-  "summary": "Formal spec review has not been completed yet.",
-  "reviewer": "not yet assigned",
-  "reviewed_head": "bootstrap-placeholder",
-  "reviewed_validation_summary": "Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.",
-  "fallback_to": "admission",
-  "blocking_issues": [
-    "Spec gate remains open until the formal spec path receives its own review record."
-  ],
-  "follow_ups": [
-    "Record a spec_review decision before implementation review or merge-ready consumes the formal spec path."
-  ]
+  "summary": "Formal spec review allows the Loom carrier adoption boundary: Syvert consumes Loom as upstream runtime while retaining Syvert-owned guardian, integration contract, and release/sprint residue.",
+  "reviewer": "syvert-guardian",
+  "reviewed_head": "8277a525e21dc5f9cbe4a61cbd7270dec8178583",
+  "reviewed_validation_summary": "Formal spec boundary reviewed for Loom official adoption.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [],
+  "findings": []
 }

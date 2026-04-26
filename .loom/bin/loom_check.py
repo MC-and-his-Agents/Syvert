@@ -5768,11 +5768,80 @@ def print_report(root: Path, failures: list[Failure]) -> None:
     print(f"failures: {len(failures)} across {len(grouped)} categories")
 
 
+def is_bootstrapped_target_carrier(root: Path) -> bool:
+    return (
+        (root / ".loom/bootstrap/manifest.json").exists()
+        and (root / ".loom/bin/loom_init.py").exists()
+        and (root / ".loom/bin/loom_flow.py").exists()
+        and not (root / "skills/registry.json").exists()
+    )
+
+
+def run_carrier_check(root: Path, command: list[str]) -> tuple[bool, str]:
+    completed = subprocess.run(
+        command,
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    output = "\n".join(part for part in (completed.stdout.strip(), completed.stderr.strip()) if part)
+    return completed.returncode == 0, output
+
+
+def bootstrapped_target_failures(root: Path) -> list[Failure]:
+    checks = [
+        (
+            "loom-init-verify",
+            [sys.executable, ".loom/bin/loom_init.py", "verify", "--target", "."],
+        ),
+        (
+            "governance-profile-status",
+            [sys.executable, ".loom/bin/loom_flow.py", "governance-profile", "status", "--target", "."],
+        ),
+        (
+            "runtime-parity",
+            [sys.executable, ".loom/bin/loom_flow.py", "runtime-parity", "validate", "--target", "."],
+        ),
+        (
+            "shadow-parity-blocking",
+            [sys.executable, ".loom/bin/loom_flow.py", "shadow-parity", "--target", ".", "--blocking"],
+        ),
+        (
+            "merge-checkpoint",
+            [sys.executable, ".loom/bin/loom_flow.py", "checkpoint", "merge", "--target", ".", "--item", "INIT-0001"],
+        ),
+    ]
+    failures: list[Failure] = []
+    for category, command in checks:
+        ok, output = run_carrier_check(root, command)
+        if not ok:
+            failures.append(Failure(category, output or f"`{' '.join(command)}` failed"))
+    return failures
+
+
+def print_bootstrapped_target_report(root: Path, failures: list[Failure]) -> None:
+    if not failures:
+        print(f"loom_check: OK ({root})")
+        print("checked bootstrapped target carrier surfaces")
+        return
+    print(f"loom_check: FAILED ({root})")
+    for failure in failures:
+        print(f"- {failure.category}")
+        for line in failure.detail.splitlines():
+            print(f"  {line}")
+    print(f"failures: {len(failures)} across {len(failures)} categories")
+
+
 def main(argv: list[str]) -> int:
     root = repo_root_from_argv(argv)
     if not root.exists():
         print(f"loom_check: repo root does not exist: {root}", file=sys.stderr)
         return 2
+    if is_bootstrapped_target_carrier(root):
+        failures = bootstrapped_target_failures(root)
+        print_bootstrapped_target_report(root, failures)
+        return 1 if failures else 0
     failures = collect_failures(root)
     print_report(root, failures)
     return 1 if failures else 0

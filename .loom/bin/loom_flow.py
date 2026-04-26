@@ -380,6 +380,13 @@ def repo_specific_default_fallback(surface: str) -> str:
     }[surface]
 
 
+def target_runtime_entry(target_root: Path) -> tuple[str, str]:
+    """Return a copyable Loom flow entrypoint for the target repository."""
+    if (target_root / ".loom/bin/loom_flow.py").exists():
+        return ".loom/bin/loom_flow.py", "."
+    return "tools/loom_flow.py", str(target_root)
+
+
 def repo_specific_requirements_payload(
     repo_interface: object,
     *,
@@ -2498,13 +2505,14 @@ def manual_review_payload(
     kind: str,
     review_record_path: str,
 ) -> dict[str, Any]:
+    flow_entry, target_arg = target_runtime_entry(context["target_root"])
     command = [
         "python3",
-        "tools/loom_flow.py",
+        flow_entry,
         "review",
         "record",
         "--target",
-        str(context["target_root"]),
+        target_arg,
         "--item",
         context["item_id"],
         "--decision",
@@ -3805,6 +3813,7 @@ def governance_profile_upgrade_payload(
 
 
 def maturity_upgrade_path(governance_surface: dict[str, Any], target_root: Path) -> dict[str, Any]:
+    flow_entry, target_arg = target_runtime_entry(target_root)
     control_plane = governance_surface.get("governance_control_plane")
     maturity = control_plane.get("maturity") if isinstance(control_plane, dict) else None
     if not isinstance(maturity, dict):
@@ -3837,13 +3846,13 @@ def maturity_upgrade_path(governance_surface: dict[str, Any], target_root: Path)
         "missing_details": missing_details,
         "fallback_to": None if next_level is None else "adoption",
         "upgrade_entry": (
-            f"python3 tools/loom_flow.py governance-profile upgrade --target {target_root} --to {next_level} --dry-run"
+            f"python3 {flow_entry} governance-profile upgrade --target {target_arg} --to {next_level} --dry-run"
             if isinstance(next_level, str)
             else None
         ),
         "validation_entries": [
-            f"python3 tools/loom_flow.py governance-profile status --target {target_root}",
-            f"python3 tools/loom_flow.py governance-profile upgrade-plan --target {target_root}",
+            f"python3 {flow_entry} governance-profile status --target {target_arg}",
+            f"python3 {flow_entry} governance-profile upgrade-plan --target {target_arg}",
         ],
     }
 

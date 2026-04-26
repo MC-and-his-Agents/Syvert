@@ -7,7 +7,7 @@
     "contract_version": "1.3.0"
   },
   "run": {
-    "target": "/Users/mc/dev/syvert-official-loom",
+    "target": ".",
     "scenario": "复杂既有仓库",
     "scenario_key": "complex-existing",
     "integration_mode": "companion",
@@ -246,47 +246,45 @@
   },
   "runtime_state": {
     "result": "pass",
-    "summary": "runtime carrier `repo-local-wrapper` is executing as `repo-local-demo` with a consistent bundled runtime.",
+    "summary": "runtime carrier `bootstrapped-target-runtime` is executing as `installed-runtime` with a consistent bundled runtime.",
     "missing_inputs": [],
     "fallback_to": null,
-    "scene": "repo-local-demo",
-    "carrier": "repo-local-wrapper",
+    "scene": "installed-runtime",
+    "carrier": "bootstrapped-target-runtime",
     "entry_family": "loom-init",
-    "install_root": "/Users/mc/dev/Loom/skills",
-    "runtime_root": "/Users/mc/dev/Loom/skills/shared/scripts",
-    "registry_path": "/Users/mc/dev/Loom/skills/registry.json",
-    "layout_or_manifest_path": "/Users/mc/dev/Loom/skills/install-layout.json",
-    "source_repo_root": "/Users/mc/dev/Loom",
-    "target_root": "/Users/mc/dev/syvert-official-loom",
+    "install_root": null,
+    "runtime_root": ".loom/bin",
+    "registry_path": null,
+    "layout_or_manifest_path": ".loom/bootstrap/manifest.json",
+    "source_repo_root": null,
+    "target_root": ".",
     "checks": {
       "scene_marker": {
         "status": "pass",
-        "summary": "scene marker `repo-local-demo` is consistent with carrier `repo-local-wrapper`."
+        "summary": "scene defaults to `installed-runtime` for carrier `bootstrapped-target-runtime`."
       },
       "carrier_layout": {
         "status": "pass",
-        "summary": "carrier layout exposes an installed skills root and shared runtime tree.",
+        "summary": "bootstrap manifest and .loom/bin runtime files are aligned.",
         "evidence": {
-          "install_root": "/Users/mc/dev/Loom/skills"
+          "path": ".loom/bootstrap/manifest.json"
         }
       },
       "registry_contract": {
-        "status": "pass",
-        "summary": "registry, upgrade contract, and skill entrypoints are consistent.",
-        "evidence": {
-          "path": "/Users/mc/dev/Loom/skills/registry.json"
-        }
+        "status": "not_applicable",
+        "summary": "bootstrapped target runtime does not consume `skills/registry.json`; it uses `.loom/bootstrap/manifest.json`.",
+        "evidence": null
       },
       "shared_runtime": {
         "status": "pass",
-        "summary": "shared runtime scripts are present and executable roots can be resolved.",
+        "summary": "bootstrap manifest and .loom/bin runtime files are aligned.",
         "evidence": {
-          "path": "/Users/mc/dev/Loom/skills/shared/scripts"
+          "path": ".loom/bin"
         }
       },
       "referenced_resources": {
-        "status": "pass",
-        "summary": "shared references and assets required by the installed runtime are present."
+        "status": "not_applicable",
+        "summary": "bootstrapped target runtime validates copied runtime artifacts via the bootstrap manifest instead of shared references."
       }
     }
   },
@@ -432,7 +430,7 @@
           },
           "worktree": {
             "status": "present",
-            "locator": "/Users/mc/dev/syvert-official-loom",
+            "locator": ".",
             "authority": "git"
           },
           "implementation_pr": {
@@ -703,8 +701,8 @@
     "fallback_to": null,
     "upgrade_entry": null,
     "validation_entries": [
-      "python3 tools/loom_flow.py governance-profile status --target /Users/mc/dev/syvert-official-loom",
-      "python3 tools/loom_flow.py governance-profile upgrade-plan --target /Users/mc/dev/syvert-official-loom"
+      "python3 .loom/bin/loom_flow.py governance-profile status --target .",
+      "python3 .loom/bin/loom_flow.py governance-profile upgrade-plan --target ."
     ]
   }
 }

@@ -1145,7 +1145,8 @@ def render_loom_readme(result: dict[str, object]) -> str:
         "- Runtime-state entry: `.loom/bin/loom_init.py runtime-state --target .`\n"
         "- Daily execution CLI: `.loom/bin/loom_flow.py`\n"
         "- Unified status CLI: `.loom/bin/loom_status.py --target .`\n"
-        "- Gate CLI: `.loom/bin/loom_check.py`\n"
+        "- Carrier verification: `.loom/bin/loom_init.py verify --target .`\n"
+        "- Repo-native gates remain owned by this repository.\n"
     )
 
 
