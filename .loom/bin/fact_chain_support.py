@@ -191,6 +191,16 @@ def resolve_target_relative_path(root: Path, raw_value: object, label: str) -> t
     return resolved, None
 
 
+def validate_item_id(value: object, label: str) -> list[str]:
+    if not isinstance(value, str) or not value.strip():
+        return [f"{label} must be a non-empty string"]
+    if value in {".", ".."} or ".." in value or "/" in value or "\\" in value:
+        return [f"{label} must not contain path traversal or separators: {value}"]
+    if value != value.strip():
+        return [f"{label} must not include leading or trailing whitespace"]
+    return []
+
+
 def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str]]:
     relative_path = _relative(path, root)
     sections = markdown_sections(path)
@@ -203,6 +213,7 @@ def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str
     for forbidden_key in FORBIDDEN_DYNAMIC_KEYS:
         if forbidden_key in static_facts:
             errors.append(f"{relative_path}: `{forbidden_key}` must not be authored in `Static Facts`")
+    errors.extend(validate_item_id(static_facts.get("item_id"), f"{relative_path}: Item ID"))
 
     return data, errors
 
@@ -215,6 +226,7 @@ def parse_recovery_entry(path: Path, root: Path) -> tuple[dict[str, str], list[s
     for forbidden_key in FORBIDDEN_STATIC_KEYS:
         if forbidden_key in dynamic_facts:
             errors.append(f"{relative_path}: `{forbidden_key}` must not be authored in `Dynamic Facts`")
+    errors.extend(validate_item_id(dynamic_facts.get("item_id"), f"{relative_path}: Item ID"))
 
     return dynamic_facts, errors
 
@@ -349,6 +361,7 @@ def inspect_fact_chain(
     ):
         if not isinstance(value, str) or not value:
             errors.append(f"init-result.fact_chain.entry_points.{label} must be a non-empty string")
+    errors.extend(validate_item_id(current_item_id, "init-result.fact_chain.entry_points.current_item_id"))
 
     if errors:
         return {}, errors
@@ -436,6 +449,7 @@ def inspect_fact_chain(
         "fact_chain": {
             "mode": str(mode),
             "read_entry": str(read_entry),
+            "init_result": output_relative,
             "entry_points": {
                 "current_item_id": str(current_item_id),
                 "work_item": str(work_item_ref),

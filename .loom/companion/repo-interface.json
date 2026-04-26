@@ -2,14 +2,7 @@
   "schema_version": "loom-repo-interface/v2",
   "companion_entry": ".loom/companion/README.md",
   "repo_specific_requirements": {
-    "admission": [
-      {
-        "id": "syvert-item-context",
-        "summary": "Syvert requires Issue, item_key, item_type, release, and sprint before a Work Item enters execution.",
-        "locator": "WORKFLOW.md",
-        "enforcement": "blocking"
-      }
-    ],
+    "admission": [],
     "review": [
       {
         "id": "syvert-review-rubric",

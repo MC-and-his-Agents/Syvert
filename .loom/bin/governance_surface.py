@@ -29,7 +29,7 @@ PLANNED_LOCATORS = {
     "plan_path": ".loom/specs/INIT-0001/plan.md",
 }
 
-REPO_INTERFACE_SURFACES = ("review", "merge_ready", "closeout")
+REPO_INTERFACE_SURFACES = ("admission", "review", "merge_ready", "closeout")
 REPO_INTERFACE_AVAILABILITY = {"absent", "companion_docs_only", "incomplete", "present"}
 REPO_INTERFACE_MANIFEST_SCHEMA = "loom-repo-companion-manifest/v1"
 REPO_INTERFACE_V1_SCHEMA = "loom-repo-interface/v1"

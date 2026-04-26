@@ -1237,6 +1237,7 @@ def render_work_item(result: dict[str, object]) -> str:
 
 def render_progress(result: dict[str, object]) -> str:
     checkpoint = "admission checkpoint" if result["run"]["scenario_key"] != "complex-existing" else "build checkpoint"
+    output_locator = str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json"))
     return (
         f"# {WORK_ITEM_ID} Progress\n\n"
         "## Dynamic Facts\n\n"
@@ -1246,7 +1247,7 @@ def render_progress(result: dict[str, object]) -> str:
         "- Next Step: Accept the generated Loom entry and promote the first real repository work item.\n"
         "- Blockers: None recorded.\n"
         "- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.\n"
-        "- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
+        f"- Recovery Boundary: Bootstrap result at `{output_locator}`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
         "- Current Lane: bootstrap verification only\n"
     )
 
@@ -1309,6 +1310,7 @@ def default_runtime_evidence(result: dict[str, object]) -> dict[str, str]:
 def render_status(result: dict[str, object]) -> str:
     item = result["initial_work_items"][0]
     fact_chain = result["fact_chain"]
+    output_locator = str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json"))
     checkpoint = "admission checkpoint" if result["run"]["scenario_key"] != "complex-existing" else "build checkpoint"
     runtime_evidence = default_runtime_evidence(result)
     return (
@@ -1328,7 +1330,7 @@ def render_status(result: dict[str, object]) -> str:
         "- Next Step: Accept the generated Loom entry and promote the first real repository work item.\n"
         "- Blockers: None recorded.\n"
         "- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.\n"
-        "- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
+        f"- Recovery Boundary: Bootstrap result at `{output_locator}`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
         "- Current Lane: bootstrap verification only\n\n"
         "## Governance Status\n\n"
         "- Item Key: INIT-0001\n"
@@ -1355,7 +1357,7 @@ def render_status(result: dict[str, object]) -> str:
         "## Sources\n\n"
         f"- Static Truth: {fact_chain['entry_points']['work_item']}\n"
         f"- Dynamic Truth: {fact_chain['entry_points']['recovery_entry']}\n"
-        "- Locator Truth: .loom/bootstrap/init-result.json\n"
+        f"- Locator Truth: {output_locator}\n"
         f"- Fact Chain CLI: {fact_chain['read_entry']}\n"
     )
 
@@ -1373,7 +1375,7 @@ def manifest_payload(result: dict[str, object]) -> dict[str, object]:
         "tool_version": TOOL_VERSION,
         "root_entry": "loom-init",
         "contract_version": CONTRACT_VERSION,
-        "output": ".loom/bootstrap/init-result.json",
+        "output": str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json")),
         "artifacts": result["initial_artifacts"],
     }
 
@@ -1796,6 +1798,7 @@ def bootstrap(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         print(f"loom-init: {exc}", file=sys.stderr)
         return 2
+    result["bootstrap_output"] = str(output_path.relative_to(target_root))
 
     if args.write:
         try:

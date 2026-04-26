@@ -372,6 +372,7 @@ def runtime_state_block_payload(
 
 def repo_specific_default_fallback(surface: str) -> str:
     return {
+        "admission": "admission",
         "spec_review": "build",
         "review": "build",
         "merge_ready": "merge",
@@ -1060,6 +1061,7 @@ def replace_markdown_section(path: Path, section_name: str, new_lines: list[str]
 def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, dict[str, Any]]) -> str:
     facts = report["facts"]
     status_path = report["fact_chain"]["entry_points"]["status_surface"]
+    init_result = report["fact_chain"].get("init_result", ".loom/bootstrap/init-result.json")
     return (
         "# Current Status\n\n"
         "## Derived Fact Chain View\n\n"
@@ -1088,7 +1090,7 @@ def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, di
         "## Sources\n\n"
         f"- Static Truth: {report['fact_chain']['entry_points']['work_item']}\n"
         f"- Dynamic Truth: {report['fact_chain']['entry_points']['recovery_entry']}\n"
-        "- Locator Truth: .loom/bootstrap/init-result.json\n"
+        f"- Locator Truth: {init_result}\n"
         f"- Fact Chain CLI: {report['fact_chain']['read_entry']}\n"
     )
 
@@ -1126,11 +1128,12 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     if errors:
         return {}, errors
     pseudo_report = {
-        "fact_chain": {
-            "read_entry": str(fact_chain.get("read_entry", "python3 .loom/bin/loom_init.py fact-chain --target .")),
-            "entry_points": {
-                "work_item": work_item_ref,
-                "recovery_entry": recovery_ref,
+            "fact_chain": {
+                "read_entry": str(fact_chain.get("read_entry", "python3 .loom/bin/loom_init.py fact-chain --target .")),
+                "init_result": normalized_output,
+                "entry_points": {
+                    "work_item": work_item_ref,
+                    "recovery_entry": recovery_ref,
                 "status_surface": status_ref,
             },
         },
@@ -2383,6 +2386,9 @@ def load_context(target_root: Path, output_relative: str, expected_item: str | N
         return {}, errors
 
     item_id = report["fact_chain"]["entry_points"]["current_item_id"]
+    item_errors = validate_work_item_id(str(item_id))
+    if item_errors:
+        return {}, item_errors
     if expected_item and expected_item != item_id:
         return {}, [f"current item mismatch: expected `{expected_item}`, got `{item_id}`"]
 
@@ -2745,6 +2751,7 @@ def inspect_fact_chain_legacy(target_root: Path, output_relative: str) -> tuple[
         "fact_chain": {
             "mode": str(mode),
             "read_entry": str(read_entry),
+            "init_result": output_relative,
             "entry_points": {
                 "current_item_id": str(current_item_id),
                 "work_item": str(work_item_ref),

@@ -75,6 +75,10 @@
   - 结果：阻断；findings file 必须保持在 target root 内。
 - `python3 .loom/bin/loom_flow.py work-item create --target . --item SAFE-WS-ESCAPE --goal x --scope x --execution-path x --workspace-entry ../ --validation-entry x --closing-condition x`
   - 结果：阻断，且未创建 `.loom/work-items/SAFE-WS-ESCAPE.md`；workspace entry 必须在写入 carrier 前完成边界校验。
+- 临时篡改 `.loom/bootstrap/init-result.json` 的 `fact_chain.entry_points.current_item_id` 为 `../escape` 后运行 review flow。
+  - 结果：阻断；既有 fact-chain 中的 item id 也必须通过路径安全校验。
+- 使用 `--output .loom/bootstrap/custom-init-result.json` bootstrap 后运行 fact-chain。
+  - 结果：通过；status surface 的 `Locator Truth` 与实际 output path 保持一致。
 - `python3.11 -m py_compile scripts/*.py scripts/policy/*.py`
   - 结果：通过。
 - `python3.11 scripts/docs_guard.py --mode ci`
@@ -98,5 +102,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `5a949c972f86eaa2d1bd78245d7c7f5fbead4109`
+- `5a949c9dfc1a076faf58b706064d4383ff98ceb6`
 - 说明：该 SHA 只是本轮 worktree 从 `origin/main` 创建时的只读基线，用于说明迁移起点；正式可恢复状态以本 PR 分支上的提交、`.loom/` carrier、ADR-GOV-0038 和本 exec-plan 为准，不把基线 SHA 伪装为当前执行 checkpoint。
