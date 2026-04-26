@@ -46,6 +46,12 @@ def write_minimal_loom_carrier(root: Path) -> None:
             path.write_text(json.dumps({}), encoding="utf-8")
         else:
             path.write_text("ok\n", encoding="utf-8")
+    (root / ".loom/work-items").mkdir(parents=True, exist_ok=True)
+    (root / ".loom/progress").mkdir(parents=True, exist_ok=True)
+    (root / ".loom/status").mkdir(parents=True, exist_ok=True)
+    (root / ".loom/reviews").mkdir(parents=True, exist_ok=True)
+    (root / ".loom/shadow").mkdir(parents=True, exist_ok=True)
+    (root / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
     (root / ".loom/work-items/INIT-0001.md").write_text(
         "\n".join(
             [
@@ -109,6 +115,8 @@ def write_minimal_loom_carrier(root: Path) -> None:
         json.dumps({"result": "pass", "surfaces": ["admission"]}),
         encoding="utf-8",
     )
+    for name in ("spec.md", "plan.md", "implementation-contract.md"):
+        (root / ".loom/specs/INIT-0001" / name).write_text("ok\n", encoding="utf-8")
 
 
 class GovernanceGateTests(unittest.TestCase):
