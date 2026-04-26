@@ -69,6 +69,12 @@
   - 结果：阻断；fact-chain carrier 必须保持在 target root 内。
 - 临时篡改 `.loom/companion/manifest.json` 的 locator 为 `../loom-escape.md` 后运行 `build_governance_surface()`。
   - 结果：repo companion interface 变为 `incomplete`，对应 locator 不再返回 `present`；companion locator 必须保持在 target root 内。
+- `python3 .loom/bin/loom_flow.py review read --target . --review-file ../outside.json`
+  - 结果：阻断；review artifact 必须保持在 target root 内。
+- `python3 .loom/bin/loom_flow.py review record --target . --decision fallback --kind general_review --summary x --reviewer x --fallback-to build --findings-file ../outside.json`
+  - 结果：阻断；findings file 必须保持在 target root 内。
+- `python3 .loom/bin/loom_flow.py work-item create --target . --item SAFE-WS-ESCAPE --goal x --scope x --execution-path x --workspace-entry ../ --validation-entry x --closing-condition x`
+  - 结果：阻断，且未创建 `.loom/work-items/SAFE-WS-ESCAPE.md`；workspace entry 必须在写入 carrier 前完成边界校验。
 - `python3.11 -m py_compile scripts/*.py scripts/policy/*.py`
   - 结果：通过。
 - `python3.11 scripts/docs_guard.py --mode ci`

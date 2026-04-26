@@ -55,4 +55,18 @@ Canonical integration contract source: `scripts/policy/integration_contract.json
 - Loom companion: `.loom/companion/README.md`
 - Loom runtime: `.loom/bin/loom_flow.py`
 
-<!-- Loom compatibility headings for `loom_init verify`: ## Summary / ## Validation / ## Risks And Follow-ups / ## Related Work -->
+## Summary
+
+- Loom-compatible summary: see `## 摘要`.
+
+## Validation
+
+- Loom-compatible validation: see `## 验证`.
+
+## Risks And Follow-ups
+
+- Loom-compatible risks and follow-ups: see `## 风险`.
+
+## Related Work
+
+- Loom-compatible related work: see `## 关联事项`.

@@ -1621,11 +1621,9 @@ def target_relative_label(target_root: Path, path: Path) -> str:
 
 
 def load_findings_file(target_root: Path, findings_file: str) -> tuple[list[dict[str, Any]] | None, list[str]]:
-    findings_path = Path(findings_file).expanduser()
-    if not findings_path.is_absolute():
-        findings_path = (target_root / findings_path).resolve()
-
-    label = target_relative_label(target_root, findings_path)
+    findings_path, label, path_errors = resolve_target_relative_path(target_root, findings_file, "findings file")
+    if path_errors or findings_path is None or label is None:
+        return None, path_errors
     try:
         payload = json.loads(findings_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1646,7 +1644,10 @@ def load_review_record(
     review_file: str | None = None,
 ) -> tuple[dict[str, Any] | None, str, list[str]]:
     relative = review_file or default_review_path(item_id)
-    review_path = target_root / relative
+    review_path, normalized_relative, path_errors = resolve_target_relative_path(target_root, relative, "review artifact")
+    if path_errors or review_path is None or normalized_relative is None:
+        return None, str(relative), path_errors
+    relative = normalized_relative
     if not review_path.exists():
         return None, relative, []
     try:
@@ -1971,6 +1972,23 @@ def run_default_review_engine(
     findings_path = runtime_root / "normalized-findings.json"
     metadata_path = runtime_root / "engine-metadata.json"
     scratch_dir = context["target_root"] / ".loom/runtime/tmp" / "review-engine" / context["item_id"]
+    try:
+        schema_path = review_engine_schema_path()
+    except RuntimeError as exc:
+        return {
+            "result": "block",
+            "summary": "default review engine cannot run because the vendored runtime is missing installed review assets.",
+            "missing_inputs": [f"review engine schema: {exc}"],
+            "fallback_to": "build",
+            "engine": {
+                "engine": DEFAULT_REVIEW_ENGINE,
+                "adapter": DEFAULT_REVIEW_ADAPTER,
+                "result": "block",
+                "failure_reason": "runtime_asset_missing",
+                "reviewed_head": reviewed_head,
+                "evidence": None,
+            },
+        }
     prompt_text = build_default_review_prompt(
         context=context,
         build_payload=build_payload,
@@ -2026,7 +2044,7 @@ def run_default_review_engine(
                 "-s",
                 "workspace-write",
                 "--output-schema",
-                str(review_engine_schema_path()),
+                str(schema_path),
                 "-o",
                 str(result_path),
                 "-",
@@ -6167,6 +6185,18 @@ def handle_work_item(args: argparse.Namespace) -> int:
                     "fallback_to": "admission",
                 }
             )
+        _, workspace_errors = resolve_workspace_path(target_root, args.workspace_entry)
+        if workspace_errors:
+            return emit(
+                {
+                    "command": "work-item",
+                    "operation": "create",
+                    "result": "block",
+                    "summary": "work-item create refused an unsafe or unreadable workspace entry before writing carriers.",
+                    "missing_inputs": workspace_errors,
+                    "fallback_to": "admission",
+                }
+            )
         if work_item_path.exists():
             return emit(
                 {
@@ -6300,6 +6330,18 @@ def handle_work_item(args: argparse.Namespace) -> int:
             "closing_condition": args.closing_condition or str(parsed_work_item["closing_condition"]),
             "associated_artifacts": list(parsed_work_item["associated_artifacts"]),
         }
+        _, workspace_errors = resolve_workspace_path(target_root, str(work_item_payload["workspace_entry"]))
+        if workspace_errors:
+            return emit(
+                {
+                    "command": "work-item",
+                    "operation": "update",
+                    "result": "block",
+                    "summary": "work-item update refused an unsafe or unreadable workspace entry before writing carriers.",
+                    "missing_inputs": workspace_errors,
+                    "fallback_to": "admission",
+                }
+            )
         for artifact in args.add_artifact:
             if artifact not in work_item_payload["associated_artifacts"]:
                 work_item_payload["associated_artifacts"].append(artifact)
