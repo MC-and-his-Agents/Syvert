@@ -54,6 +54,14 @@
 
 - 为 `v0.6.0` 完成“从 FR parent 全部收口到正式发布”的最后一段链路，使 release/sprint 索引、发布锚点与 GitHub closeout 进入一致完成态。
 
+## 当前事项在 sprint 中的角色 / 阻塞
+
+- 角色：`2026-S19` 的 phase / release closeout Work Item，承接 `FR-0016..FR-0019` parent closeout 后的最终发布动作。
+- 位置：本事项是 `v0.6.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 B 建立发布锚点并回写 published truth。
+- 阻塞：
+  - 阶段 A PR 合入前不得创建 `v0.6.0` tag 或 GitHub Release。
+  - 阶段 B 合入并完成 tag / Release / Phase closeout 前，不得声明 `v0.6.0` 完成。
+
 ## 已验证项
 
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/219`
