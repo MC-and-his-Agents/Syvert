@@ -26,7 +26,7 @@
 
 - Automated Checks:
   - py_compile for `.loom/bin` and Syvert scripts.
-  - docs/workflow/governance/spec guards.
+  - docs guard, workflow guard, governance gate, and spec guard.
   - governance unittest discovery.
   - repo-local `loom_check`.
 - Manual Verification:

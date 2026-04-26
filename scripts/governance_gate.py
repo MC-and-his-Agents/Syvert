@@ -9,6 +9,7 @@ if __package__ in {None, ""}:
 
 import argparse
 import json
+import os
 import py_compile
 import tempfile
 
@@ -111,6 +112,7 @@ def validate_loom_carrier_repository(repo_root: Path, changed_paths: list[str]) 
         completed = run(
             [sys.executable, ".loom/bin/loom_check.py", "."],
             cwd=repo_root,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             check=False,
         )
         if completed.returncode != 0:
