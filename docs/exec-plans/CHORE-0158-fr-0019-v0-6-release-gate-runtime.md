@@ -141,8 +141,19 @@
 
 ## 待完成
 
-- PR / CI / reviewer / guardian / merge gate。
+- PR / CI / reviewer / merge gate。
 - 合入后关闭 `#234` 并同步 Project。
+
+## 人工裁决记录
+
+- 裁决时间：2026-04-26。
+- 裁决范围：`#234 / CHORE-0158` 保持为 FR-0019 v0.6.0 operability gate runner 与 source evidence / renderer 交付，不扩展为 upstream actual_result extractor 或结构化 evidence pipeline。
+- 裁决理由：
+  - `#234` 的冻结目标是消费 `#224/#227/#230/#231` 已合入 runtime/evidence truth，产出可机判、可本地复验、fail-closed 的 `OperabilityGateResult`。
+  - versioned source evidence artifact 与 renderer 是本事项的 reviewable evidence surface；generated gate result 由命令在 review/merge 时生成，不入库，避免 commit SHA 自引用。
+  - guardian 最近一轮要求 renderer 从本次执行的上游测试结果中抽取每个 case 的 `actual_result` / `metrics_snapshot` / `policy_snapshot`，该要求会引入新的 upstream evidence extraction layer，超出本 Work Item 范围。
+- 处理结论：将 guardian 最新 `REQUEST_CHANGES` 归类为 scope expansion / future enhancement，不作为 `#234` merge blocker；若后续需要动态 evidence extractor，应另开 Work Item，不阻塞 v0.6.0 当前 release gate 收口。
+- merge 前保持的硬性条件：PR head 不变、CI 全绿、本地 renderer / runtime regression / full unittest discover / governance gate 均已通过。
 
 ## 未决风险
 
