@@ -25,7 +25,7 @@ from fact_chain_support import (
     parse_work_item,
 )
 from governance_surface import build_governance_surface
-from runtime_paths import shared_asset, shared_script
+from runtime_paths import bootstrap_runtime_root, shared_asset, shared_script
 from runtime_state import detect_runtime_state
 
 PR_TEMPLATE_SECTIONS = (
@@ -2470,7 +2470,32 @@ def review_focus_paths(context: dict[str, Any]) -> list[str]:
 
 
 def review_engine_schema_path() -> Path:
-    return shared_asset(__file__, "review/loom-review-result-schema.json")
+    try:
+        return shared_asset(__file__, "review/loom-review-result-schema.json")
+    except RuntimeError:
+        runtime_root = bootstrap_runtime_root(__file__)
+        if runtime_root is None:
+            raise
+        schema_path = runtime_root.parent / "runtime/assets/review/loom-review-result-schema.json"
+        schema_path.parent.mkdir(parents=True, exist_ok=True)
+        schema_path.write_text(
+            json.dumps(
+                {
+                    "type": "object",
+                    "required": ["decision", "summary", "findings"],
+                    "properties": {
+                        "decision": {"enum": sorted(REVIEW_DECISIONS)},
+                        "summary": {"type": "string", "minLength": 1},
+                        "findings": {"type": "array"},
+                    },
+                    "additionalProperties": True,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return schema_path
 
 
 def normalize_engine_review_result(payload: Any, *, relative: str) -> tuple[dict[str, Any] | None, list[str]]:
@@ -5136,8 +5161,8 @@ def closeout_payload(
     if not skip_gate:
         if (target_root / "scripts/docs_guard.py").exists() and (target_root / "scripts/workflow_guard.py").exists():
             gate_commands = [
-                ["python3.11", "scripts/docs_guard.py", "--mode", "ci"],
-                ["python3.11", "scripts/workflow_guard.py", "--mode", "ci"],
+                [sys.executable, "scripts/docs_guard.py", "--mode", "ci"],
+                [sys.executable, "scripts/workflow_guard.py", "--mode", "ci"],
             ]
             gate["commands"] = [" ".join(command) for command in gate_commands]
             gate_stdout: list[str] = []

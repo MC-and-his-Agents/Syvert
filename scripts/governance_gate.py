@@ -130,10 +130,14 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         if not work_item.get(field):
             errors.append(f"Loom work item 缺少 `{field}`")
     for field in ("Item ID", "Goal", "Scope", "Execution Path", "Current Checkpoint", "Latest Validation Summary"):
-        if work_item.get(field) and status.get(field) and work_item[field] != status[field]:
+        if not status.get(field):
+            errors.append(f"Loom status 缺少 `{field}`")
+        elif work_item.get(field) and work_item[field] != status[field]:
             errors.append(f"Loom status 与 work item 的 `{field}` 不一致")
     for field in ("Item ID", "Current Checkpoint", "Latest Validation Summary"):
-        if progress.get(field) and status.get(field) and progress[field] != status[field]:
+        if not progress.get(field):
+            errors.append(f"Loom progress 缺少 `{field}`")
+        elif status.get(field) and progress[field] != status[field]:
             errors.append(f"Loom progress 与 status 的 `{field}` 不一致")
 
     errors.extend(validate_review_payload(review_path, expected_kind="general_review"))

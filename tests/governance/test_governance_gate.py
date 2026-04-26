@@ -391,6 +391,16 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("reviewed_validation_summary" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_missing_status_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / ".loom/status/current.md").write_text("- Item ID: INIT-0001\n", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Loom status 缺少 `Latest Validation Summary`" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
