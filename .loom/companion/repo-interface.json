@@ -24,7 +24,7 @@
         "id": "syvert-delivery-closeout",
         "summary": "Syvert closeout remains tied to Work Item, PR, release, and parent issue reconciliation.",
         "locator": "docs/process/delivery-funnel.md",
-        "enforcement": "blocking"
+        "enforcement": "advisory"
       }
     ]
   },

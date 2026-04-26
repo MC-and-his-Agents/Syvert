@@ -9,7 +9,7 @@
 - sprint：`loom-official-adoption`
 - 关联 spec：无（治理 bootstrap / Loom adoption 事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`
-- 关联 PR：待创建
+- 关联 PR：#259
 - active 收口事项：`GOV-0038-loom-official-adoption`
 - 状态：`active`
 
@@ -34,11 +34,8 @@
 
 ## 下一步动作
 
-- 重跑 Syvert governance gate 与 Loom-on-Syvert 验证。
-- 提交并推送 `issue-258-loom-official-adoption` 分支。
-- 创建 PR `feat: 正式引入 Loom governance runtime`。
-- 等待 CI 与 guardian，随后通过受控 merge 合入 main。
-- 合入后关闭 Work Item `#258`、FR `#257` 与 Phase `#256`。
+- CI 与 guardian 已在 PR #259 上循环校验；当前下一步是等待最新 guardian 通过后执行受控 merge。
+- 合入后关闭 Work Item `#258`、FR `#257` 与 Phase `#256`，并同步 main。
 
 ## 当前 checkpoint 推进的 release 目标
 

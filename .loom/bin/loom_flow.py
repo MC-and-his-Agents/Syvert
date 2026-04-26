@@ -5104,17 +5104,37 @@ def closeout_payload(
     )
     gate: dict[str, Any] = {"skipped": skip_gate}
     if not skip_gate:
-        repo_gate = target_root / ".loom/bin/loom_check.py"
-        if repo_gate.exists():
-            gate_command = ["python3", ".loom/bin/loom_check.py", "."]
+        if (target_root / "scripts/docs_guard.py").exists() and (target_root / "scripts/workflow_guard.py").exists():
+            gate_commands = [
+                ["python3.11", "scripts/docs_guard.py", "--mode", "ci"],
+                ["python3.11", "scripts/workflow_guard.py", "--mode", "ci"],
+            ]
+            gate["commands"] = [" ".join(command) for command in gate_commands]
+            gate_stdout: list[str] = []
+            gate_exit_code = 0
+            for command in gate_commands:
+                gate_result = run_process(command, target_root)
+                gate_stdout.append(gate_result.stdout.strip())
+                if gate_result.returncode != 0:
+                    gate_exit_code = gate_result.returncode
+                    break
+            gate["command"] = " && ".join(gate["commands"])
+            gate["exit_code"] = gate_exit_code
+            gate["stdout"] = "\n".join(entry for entry in gate_stdout if entry)
+            if gate_exit_code != 0:
+                missing_inputs.append("repo_closeout_gate")
         else:
-            gate_command = ["python3", str(shared_script(__file__, "loom_check.py")), str(target_root)]
-        gate_result = run_process(gate_command, target_root)
-        gate["command"] = " ".join(gate_command)
-        gate["exit_code"] = gate_result.returncode
-        gate["stdout"] = gate_result.stdout.strip()
-        if gate_result.returncode != 0:
-            missing_inputs.append("loom_check")
+            repo_gate = target_root / ".loom/bin/loom_check.py"
+            if repo_gate.exists():
+                gate_command = ["python3", ".loom/bin/loom_check.py", "."]
+            else:
+                gate_command = ["python3", str(shared_script(__file__, "loom_check.py")), str(target_root)]
+            gate_result = run_process(gate_command, target_root)
+            gate["command"] = " ".join(gate_command)
+            gate["exit_code"] = gate_result.returncode
+            gate["stdout"] = gate_result.stdout.strip()
+            if gate_result.returncode != 0:
+                missing_inputs.append("loom_check")
 
     reconciliation_payload: dict[str, Any] | None = None
     closeout_fallback: str | None = None
