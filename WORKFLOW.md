@@ -14,6 +14,13 @@ codex:
 
 # Syvert Repo Workflow Contract
 
+## Loom consumption boundary
+
+- Syvert 正式消费 Loom 作为通用治理 runtime；`.loom/bootstrap/`、`.loom/bin/` 与 `.loom/companion/` 是本仓库的 Loom carrier。
+- Loom 承接通用 Work Item admission、gate chain、status control plane、maturity upgrade、GitHub binding、closeout / reconciliation 与 shadow parity boundary。
+- 本文件只保留 Syvert repo-specific contract：事项上下文字段、release / sprint 语义、guardian、integration contract、worktree 约定与 Syvert runtime 相关门禁。
+- 若本文件与 Loom 通用治理语义重复，优先把重复部分理解为 Syvert 对 Loom 能力的本仓库约束或 locator，不另建平行通用治理模型。
+
 ## 任务输入来源
 
 - 任务来源固定为当前仓库的 GitHub Issues / Projects。

@@ -1,0 +1,53 @@
+{
+  "schema_version": "loom-repo-interop/v1",
+  "host_adapters": [
+    {
+      "id": "syvert-guardian",
+      "summary": "Syvert guardian result remains a retained host/repo-native action consumed by Loom as read-only evidence.",
+      "surfaces": ["review", "merge_ready"],
+      "locator": "scripts/pr_guardian.py"
+    }
+  ],
+  "repo_native_carriers": [
+    {
+      "id": "syvert-workflow",
+      "summary": "Syvert workflow and process docs remain repo-native governance carriers.",
+      "surfaces": ["admission", "review", "merge_ready", "closeout"],
+      "locator": "WORKFLOW.md"
+    },
+    {
+      "id": "syvert-exec-plans",
+      "summary": "Syvert exec-plans remain repo-native recovery and closeout carriers.",
+      "surfaces": ["admission", "closeout"],
+      "locator": "docs/exec-plans"
+    },
+    {
+      "id": "syvert-integration-contract",
+      "summary": "Syvert integration contract remains repo-owned and is consumed by review, guardian, and merge gates.",
+      "surfaces": ["review", "merge_ready", "closeout"],
+      "locator": "scripts/policy/integration_contract.json"
+    }
+  ],
+  "shadow_surfaces": {
+    "admission": {
+      "summary": "Compare Loom Work Item admission with Syvert Work Item entry discipline.",
+      "loom_locator": ".loom/shadow/admission-loom.txt",
+      "repo_locator": ".loom/shadow/admission-repo.txt"
+    },
+    "review": {
+      "summary": "Compare Loom review gate with Syvert review rubric and guardian split.",
+      "loom_locator": ".loom/shadow/review-loom.txt",
+      "repo_locator": ".loom/shadow/review-repo.txt"
+    },
+    "merge_ready": {
+      "summary": "Compare Loom merge-ready gate with Syvert guardian safe_to_merge discipline.",
+      "loom_locator": ".loom/shadow/merge-ready-loom.txt",
+      "repo_locator": ".loom/shadow/merge-ready-repo.txt"
+    },
+    "closeout": {
+      "summary": "Compare Loom closeout/reconciliation with Syvert Work Item and parent closeout practice.",
+      "loom_locator": ".loom/shadow/closeout-loom.txt",
+      "repo_locator": ".loom/shadow/closeout-repo.txt"
+    }
+  }
+}

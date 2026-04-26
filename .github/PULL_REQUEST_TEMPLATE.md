@@ -49,3 +49,10 @@ Canonical integration contract source: `scripts/policy/integration_contract.json
 ## 回滚
 
 - 回滚方式：{{ROLLBACK}}
+
+## Loom Runtime Locator
+
+- Loom companion: `.loom/companion/README.md`
+- Loom runtime: `.loom/bin/loom_flow.py`
+
+<!-- Loom compatibility headings for `loom_init verify`: ## Summary / ## Validation / ## Risks And Follow-ups / ## Related Work -->
