@@ -15,7 +15,7 @@
 - Current Stop: Syvert Loom official adoption PR #259 is ready for controlled merge after carrier consistency fixes.
 - Next Step: Run final guardian review, complete controlled merge, verify main truth, and close Work Item #258 / FR #257 / Phase #256.
 - Blockers: None
-- Latest Validation Summary: Carrier gate, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.
+- Latest Validation Summary: Carrier structural gate, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.
 - Recovery Boundary: Formal adoption is tracked by Phase #256, FR #257, Work Item #258, and PR #259.
 - Current Lane: official Syvert adoption
 

@@ -3,10 +3,10 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Syvert Loom official adoption carrier is ready for controlled merge; Syvert-owned guardian, integration contract, and release/sprint residue remain authoritative.",
+  "summary": "Syvert Loom official adoption carrier is ready for controlled merge after parser, branch-path, structural gate, and formal spec hardening.",
   "reviewer": "syvert-guardian",
-  "reviewed_head": "127978cf855f7da32389e53720ded8d7077e57e2",
-  "reviewed_validation_summary": "Carrier gate, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
+  "reviewed_head": "dc477068e2c6a98fd966a64d698b7d1082513957",
+  "reviewed_validation_summary": "Carrier structural gate, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
