@@ -796,7 +796,7 @@ def detect_github_repo(root: Path) -> tuple[str | None, str | None]:
     remote = git_remote_origin(root)
     if not remote:
         return None, None
-    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/.]+)(?:\.git)?$", remote)
+    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", remote)
     if not match:
         return None, None
     return match.group("owner"), match.group("repo")

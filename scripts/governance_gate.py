@@ -8,8 +8,10 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import json
+import py_compile
 
-from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
+from scripts.common import REPO_ROOT, git_changed_files, git_current_branch, run
 from scripts.context_guard import infer_current_issue, validate_context_rules, validate_repository as validate_context_repository
 from scripts.item_context import matching_exec_plan_for_issue
 from scripts.open_pr import validate_pr_preflight
@@ -42,6 +44,23 @@ REQUIRED_GOVERNANCE_FILES = (
     Path("scripts/sync_repo_settings.py"),
 )
 
+REQUIRED_LOOM_CARRIER_FILES = (
+    Path(".loom/README.md"),
+    Path(".loom/bootstrap/manifest.json"),
+    Path(".loom/bootstrap/init-result.json"),
+    Path(".loom/bin/loom_init.py"),
+    Path(".loom/bin/loom_flow.py"),
+    Path(".loom/bin/loom_check.py"),
+    Path(".loom/companion/manifest.json"),
+    Path(".loom/companion/repo-interface.json"),
+    Path(".loom/companion/interop.json"),
+    Path(".loom/reviews/INIT-0001.json"),
+    Path(".loom/reviews/INIT-0001.spec.json"),
+    Path(".loom/specs/INIT-0001/spec.md"),
+    Path(".loom/status/current.md"),
+    Path(".loom/progress/INIT-0001.md"),
+)
+
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="校验治理基线变更是否保持纯度。")
@@ -52,6 +71,46 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--head-sha")
     return parser.parse_args(argv)
+
+
+def validate_loom_carrier_repository(repo_root: Path, changed_paths: list[str]) -> list[str]:
+    if not any(path == ".loom" or path.startswith(".loom/") for path in changed_paths):
+        return []
+
+    errors: list[str] = []
+    for relative_path in REQUIRED_LOOM_CARRIER_FILES:
+        if not (repo_root / relative_path).exists():
+            errors.append(f"缺少 Loom carrier 必需工件: {repo_root / relative_path}")
+
+    loom_root = repo_root / ".loom"
+    if loom_root.exists():
+        for json_path in sorted(loom_root.rglob("*.json")):
+            try:
+                with json_path.open("r", encoding="utf-8") as handle:
+                    json.load(handle)
+            except (OSError, json.JSONDecodeError) as exc:
+                errors.append(f"Loom carrier JSON 无效: {json_path}: {exc}")
+
+        bin_root = loom_root / "bin"
+        if bin_root.exists():
+            for py_path in sorted(bin_root.glob("*.py")):
+                try:
+                    py_compile.compile(str(py_path), doraise=True)
+                except py_compile.PyCompileError as exc:
+                    errors.append(f"Loom carrier Python 语法无效: {py_path}: {exc.msg}")
+
+    loom_check = repo_root / ".loom/bin/loom_check.py"
+    if loom_check.exists():
+        completed = run(
+            [sys.executable, ".loom/bin/loom_check.py", "."],
+            cwd=repo_root,
+            check=False,
+        )
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip() or "loom_check failed"
+            errors.append(f"Loom carrier 结构校验失败: {detail}")
+
+    return errors
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     errors: list[str] = []
     errors.extend(validate_workflow_repository(repo_root))
     errors.extend(validate_context_repository(repo_root))
+    errors.extend(validate_loom_carrier_repository(repo_root, changed))
     current_issue = infer_current_issue(args.head_ref)
     if current_issue is None and args.head_sha is None:
         current_issue = infer_current_issue(git_current_branch(repo=repo_root))

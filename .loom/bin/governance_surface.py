@@ -8,6 +8,7 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from runtime_paths import installed_skill_script
 
@@ -305,7 +306,7 @@ def detect_github_repo(root: Path) -> tuple[str | None, str | None]:
     remote = git_remote_origin(root)
     if not remote:
         return None, None
-    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/.]+)(?:\.git)?$", remote)
+    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", remote)
     if not match:
         return None, None
     return match.group("owner"), match.group("repo")
@@ -995,7 +996,10 @@ def detect_github_control_plane(root: Path) -> tuple[dict[str, Any], list[str]]:
         missing_inputs.append("github control plane: default branch is unavailable")
         return surface, missing_inputs
 
-    branch_payload, branch_errors = gh_json(root, ["api", f"repos/{owner}/{repo}/branches/{surface['default_branch']}"])
+    branch_payload, branch_errors = gh_json(
+        root,
+        ["api", f"repos/{owner}/{repo}/branches/{quote(surface['default_branch'], safe='')}"],
+    )
     if branch_errors or branch_payload is None:
         missing_inputs.extend(f"github control plane: {message}" for message in branch_errors)
         return surface, missing_inputs

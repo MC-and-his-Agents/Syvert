@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from unittest.mock import patch
 
@@ -280,6 +283,46 @@ class GovernanceGateTests(unittest.TestCase):
         ]
         self.assertEqual(governance_gate.infer_pr_class(changed), "governance")
         self.assertEqual(governance_gate.build_report("governance", changed)["violations"], [])
+
+    def test_loom_carrier_guard_rejects_invalid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if path.suffix == ".json":
+                    path.write_text("{}", encoding="utf-8")
+                elif path.suffix == ".py":
+                    path.write_text("print('ok')\n", encoding="utf-8")
+                else:
+                    path.write_text("ok\n", encoding="utf-8")
+            (root / ".loom/bootstrap/init-result.json").write_text("{invalid", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/init-result.json"])
+
+            self.assertTrue(any("Loom carrier JSON 无效" in error for error in errors))
+
+    @patch("scripts.governance_gate.run")
+    def test_loom_carrier_guard_runs_repo_local_loom_check(self, run_mock) -> None:
+        run_mock.return_value.returncode = 0
+        run_mock.return_value.stdout = ""
+        run_mock.return_value.stderr = ""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if path.suffix == ".json":
+                    path.write_text(json.dumps({}), encoding="utf-8")
+                elif path.suffix == ".py":
+                    path.write_text("print('ok')\n", encoding="utf-8")
+                else:
+                    path.write_text("ok\n", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bin/loom_flow.py"])
+
+            self.assertEqual(errors, [])
+            run_mock.assert_called_once()
 
 
 if __name__ == "__main__":
