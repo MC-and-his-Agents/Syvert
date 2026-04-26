@@ -549,15 +549,21 @@ def sha256_file(path: Path) -> str:
 
 
 def validate_shadow_source_hashes(payload: dict[str, Any], *, target_root: Path, evidence_path: Path) -> list[str]:
+    source_files = payload.get("source_files")
     source_hashes = payload.get("source_sha256")
-    if source_hashes is None:
-        return []
+    if not isinstance(source_files, list) or not source_files or not all(isinstance(entry, str) and entry for entry in source_files):
+        return [f"shadow parity evidence `{evidence_path}` has invalid source_files"]
     if not isinstance(source_hashes, dict) or not source_hashes:
         return [f"shadow parity evidence `{evidence_path}` has invalid source_sha256"]
+    source_file_set = set(source_files)
+    source_hash_set = set(source_hashes)
+    if source_file_set != source_hash_set:
+        return [f"shadow parity evidence `{evidence_path}` source_files must exactly match source_sha256 keys"]
 
     errors: list[str] = []
     root = target_root.resolve()
-    for relative_path, expected_hash in source_hashes.items():
+    for relative_path in source_files:
+        expected_hash = source_hashes.get(relative_path)
         if not isinstance(relative_path, str) or not isinstance(expected_hash, str) or not expected_hash.strip():
             errors.append(f"shadow parity evidence `{evidence_path}` has invalid source hash entry")
             continue

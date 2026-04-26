@@ -160,11 +160,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def markdown_fields(path: Path) -> dict[str, str]:
     fields: dict[str, str] = {}
+    metadata_started = False
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.startswith("- ") or ":" not in line:
+            if metadata_started and line.strip():
+                break
             continue
+        metadata_started = True
         key, value = line[2:].split(":", 1)
-        fields[key.strip()] = value.strip()
+        normalized_key = key.strip()
+        if normalized_key not in fields:
+            fields[normalized_key] = value.strip()
     return fields
 
 

@@ -689,7 +689,11 @@ class GovernanceGateTests(unittest.TestCase):
             root = Path(temp_dir)
             write_minimal_loom_carrier(root)
             status = (root / ".loom/status/current.md").read_text(encoding="utf-8")
-            status += "- Review Entry: .loom/reviews/OTHER.json\n"
+            status = status.replace(
+                "- Review Entry: .loom/reviews/INIT-0001.json",
+                "- Review Entry: .loom/reviews/OTHER.json",
+                1,
+            )
             (root / ".loom/status/current.md").write_text(status, encoding="utf-8")
 
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
@@ -713,6 +717,20 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
 
             self.assertTrue(any("Review Entry" in error and "必须是" in error for error in errors))
+
+    def test_loom_carrier_guard_ignores_late_metadata_spoofing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            status_path = root / ".loom/status/current.md"
+            status_text = status_path.read_text(encoding="utf-8")
+            status_text = status_text.replace("- Goal: Adopt Loom", "- Goal: Spoofed Goal", 1)
+            status_text += "\n## Later Notes\n\n- Goal: Adopt Loom\n"
+            status_path.write_text(status_text, encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Loom status 与 work item 的 `Goal` 不一致" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_missing_shadow_surface_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

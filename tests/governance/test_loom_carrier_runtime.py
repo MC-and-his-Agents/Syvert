@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import importlib.util
 import sys
 import tempfile
@@ -198,6 +199,58 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
             with self.assertRaises(RuntimeError):
                 loom_init.assert_write_path_inside_target(root, root / ".loom/README.md")
+
+    def test_shadow_source_hashes_require_source_files(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            evidence_path = root / ".loom/shadow/review-repo.json"
+            evidence_path.parent.mkdir(parents=True)
+            (root / "WORKFLOW.md").write_text("ok\n", encoding="utf-8")
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-shadow-surface-evidence/v1",
+                        "surface": "review",
+                        "side": "repo",
+                        "parity_value": "ok",
+                        "source_sha256": {"WORKFLOW.md": loom_flow.sha256_file(root / "WORKFLOW.md")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            value, error = loom_flow.normalized_shadow_value(evidence_path, target_root=root)
+
+            self.assertIsNone(value)
+            self.assertIn("invalid source_files", error)
+
+    def test_shadow_source_hashes_require_exact_source_set(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            evidence_path = root / ".loom/shadow/review-repo.json"
+            evidence_path.parent.mkdir(parents=True)
+            (root / "WORKFLOW.md").write_text("ok\n", encoding="utf-8")
+            (root / "code_review.md").write_text("review\n", encoding="utf-8")
+            evidence_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-shadow-surface-evidence/v1",
+                        "surface": "review",
+                        "side": "repo",
+                        "parity_value": "ok",
+                        "source_files": ["WORKFLOW.md", "code_review.md"],
+                        "source_sha256": {"WORKFLOW.md": loom_flow.sha256_file(root / "WORKFLOW.md")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            value, error = loom_flow.normalized_shadow_value(evidence_path, target_root=root)
+
+            self.assertIsNone(value)
+            self.assertIn("source_files must exactly match source_sha256 keys", error)
 
 
 if __name__ == "__main__":
