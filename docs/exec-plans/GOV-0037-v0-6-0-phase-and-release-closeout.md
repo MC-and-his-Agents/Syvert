@@ -9,7 +9,7 @@
 - sprint：`2026-S19`
 - 关联 spec：无（发布/治理收口事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0037-v0-6-0-phase-and-release-closeout.md`
-- 状态：`closed`
+- 状态：`active`
 
 ## 目标
 
@@ -39,8 +39,8 @@
 - 阶段 A docs carrier 已由 PR `#254` 合入主干，merge commit `123cd6dc0c6037050011fde87bace33ca0412098`。
 - Git tag `v0.6.0` 已创建并推送，锚点为 `123cd6dc0c6037050011fde87bace33ca0412098`。
 - GitHub Release `v0.6.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.6.0`。
-- 阶段 B published-truth follow-up 由 PR `#255` 回写；合入后 Work Item `#236` 由 closing keyword 关闭。
-- Phase `#218` 的 GitHub issue closeout 是 PR `#255` 合入后的仓外 REST 同步动作。
+- 阶段 B published-truth follow-up 正由 PR `#255` 回写；该 exec-plan 作为 live execution tracker 保留合入前状态。
+- Phase `#218` 与 Work Item `#236` 当前仍为 `open`，等待 PR `#255` 合入后完成 GitHub closeout。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-236-v0-6-0`
 - 当前主干基线：`123cd6dc0c6037050011fde87bace33ca0412098`
 
@@ -49,7 +49,7 @@
 - 阶段 A：创建 docs PR，建立 release / sprint / decision / exec-plan carrier。已完成，PR `#254`。
 - 阶段 A 合入后 fast-forward main，并在阶段 A merge commit 上创建并推送 `v0.6.0` tag。已完成。
 - 创建 GitHub Release `v0.6.0`。已完成。
-- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。由 PR `#255` 完成。
+- 阶段 B：回写 published truth，合入 metadata-only/docs follow-up。当前进行中，PR `#255`。
 - PR `#255` 合入后关闭 `#218/#236` 并退役 worktree / branch。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -107,8 +107,9 @@
 - `FR-0018`：formal spec / HTTP runtime / same-path evidence / parent closeout 已完成，见 `docs/exec-plans/FR-0018-http-task-api-same-core-path.md`
 - `FR-0019`：formal spec / gate runtime / source evidence / renderer / parent closeout 已完成，见 `docs/exec-plans/FR-0019-v0-6-operability-release-gate.md`
 
-## 仓外 closeout 同步
+## 剩余 closeout 动作
 
+- 合入阶段 B published-truth follow-up PR `#255`。
 - PR `#255` 合入后通过 closing keyword 关闭 `#236`。
 - PR `#255` 合入后通过 GitHub REST 关闭 Phase `#218` 并留言记录 `v0.6.0` tag / GitHub Release URL。
 - PR `#255` 合入后 fast-forward main，并退役 `issue-236-v0-6-0-published-truth` branch / worktree。
@@ -124,5 +125,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `123cd6dc0c6037050011fde87bace33ca0412098`
-- 说明：该 checkpoint 对应阶段 A release carrier 已合入主干，且 `v0.6.0` tag / GitHub Release 已锚定该提交。阶段 B metadata-only 回写负责把仓内 release/sprint 索引与已发布事实对齐。
+- `2413ecc3d8d1811270d45420b91a0ae98af064be`
+- 说明：该 checkpoint 对应 `FR-0016..FR-0019` parent closeout 全部合入主干、`v0.6.0` 具备正式发布前主干基线。阶段 A carrier、tag / GitHub Release 与阶段 B metadata-only 回写属于该 checkpoint 之后的发布收口动作，不作为新的 runtime/spec checkpoint。
