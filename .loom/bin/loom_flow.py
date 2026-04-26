@@ -2636,8 +2636,6 @@ def build_default_review_prompt(
 
 def load_fact_chain_report(target_root: Path, output_relative: str) -> tuple[dict[str, Any], list[str]]:
     report, errors = inspect_fact_chain(target_root, output_relative)
-    if errors and all("Runtime Evidence" in message for message in errors):
-        report, errors = inspect_fact_chain_legacy(target_root, output_relative)
     if errors:
         return {}, errors
     if not report:
@@ -5544,15 +5542,33 @@ def handle_reconciliation(args: argparse.Namespace) -> int:
 
     comment_body = args.comment
     if args.comment_file:
-        comment_body, comment_errors = read_text_file(args.comment_file)
-        if comment_errors:
+        comment_path, comment_relative, comment_path_errors = resolve_target_relative_path(
+            target_root,
+            args.comment_file,
+            "reconciliation comment file",
+        )
+        if comment_path_errors:
             return emit(
                 {
                     "command": "reconciliation",
                     "operation": args.operation,
                     "result": "block",
                     "summary": "reconciliation sync could not read the requested comment file.",
-                    "missing_inputs": comment_errors,
+                    "missing_inputs": comment_path_errors,
+                    "fallback_to": "manual-reconciliation",
+                    "runtime_state": runtime_state,
+                }
+            )
+        try:
+            comment_body = comment_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return emit(
+                {
+                    "command": "reconciliation",
+                    "operation": args.operation,
+                    "result": "block",
+                    "summary": "reconciliation sync could not read the requested comment file.",
+                    "missing_inputs": [f"reconciliation comment file `{comment_relative}` could not be read: {exc}"],
                     "fallback_to": "manual-reconciliation",
                     "runtime_state": runtime_state,
                 }

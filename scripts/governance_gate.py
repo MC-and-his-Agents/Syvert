@@ -138,7 +138,19 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     for field in ("Item ID", "Goal", "Scope", "Execution Path", "Workspace Entry", "Recovery Entry", "Review Entry", "Validation Entry", "Closing Condition"):
         if not work_item.get(field):
             errors.append(f"Loom work item 缺少 `{field}`")
-    for field in ("Item ID", "Goal", "Scope", "Execution Path", "Current Checkpoint", "Latest Validation Summary"):
+    for field in (
+        "Item ID",
+        "Goal",
+        "Scope",
+        "Execution Path",
+        "Workspace Entry",
+        "Recovery Entry",
+        "Review Entry",
+        "Validation Entry",
+        "Closing Condition",
+        "Current Checkpoint",
+        "Latest Validation Summary",
+    ):
         if not status.get(field):
             errors.append(f"Loom status 缺少 `{field}`")
         elif work_item.get(field) and work_item[field] != status[field]:

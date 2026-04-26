@@ -75,6 +75,11 @@ def write_minimal_loom_carrier(root: Path) -> None:
             "- Goal: Adopt Loom",
             "- Scope: Validate carrier",
             "- Execution Path: governance/loom",
+            "- Workspace Entry: .",
+            "- Recovery Entry: .loom/progress/INIT-0001.md",
+            "- Review Entry: .loom/reviews/INIT-0001.json",
+            "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+            "- Closing Condition: carrier is valid",
             "- Current Checkpoint: merge checkpoint",
             f"- Latest Validation Summary: {summary}",
             "",
@@ -408,6 +413,18 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
 
             self.assertTrue(any("Loom status 缺少 `Latest Validation Summary`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_locator_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            status = (root / ".loom/status/current.md").read_text(encoding="utf-8")
+            status += "- Review Entry: .loom/reviews/OTHER.json\n"
+            (root / ".loom/status/current.md").write_text(status, encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Review Entry" in error and "不一致" in error for error in errors))
 
 
 if __name__ == "__main__":
