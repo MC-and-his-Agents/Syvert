@@ -192,6 +192,66 @@
       "source": "skills/shared/assets/templates/scaffold/implementation-contract.md"
     },
     {
+      "path": ".loom/companion/manifest.json",
+      "kind": "repo-companion-manifest",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/companion/repo-interface.json",
+      "kind": "repo-interface",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/companion/interop.json",
+      "kind": "repo-interop",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/admission-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/admission-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/review-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/review-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/merge-ready-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/merge-ready-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/closeout-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/closeout-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/shadow-parity.json",
+      "kind": "shadow-parity-summary",
+      "source": "generated"
+    },
+    {
       "path": ".github/PULL_REQUEST_TEMPLATE.md",
       "kind": "pr-template",
       "source": "skills/shared/assets/github/PULL_REQUEST_TEMPLATE.md"
@@ -208,6 +268,8 @@
       "review_entry": ".loom/reviews/INIT-0001.json",
       "validation_entry": "python3 .loom/bin/loom_init.py verify --target .",
       "artifacts": [
+        ".loom/bootstrap/manifest.json",
+        ".loom/README.md",
         ".loom/bootstrap/init-result.json",
         ".loom/work-items/INIT-0001.md",
         ".loom/progress/INIT-0001.md",
@@ -226,6 +288,14 @@
         ".loom/companion/repo-interface.json",
         ".loom/companion/interop.json",
         ".loom/shadow/shadow-parity.json",
+        ".loom/shadow/closeout-repo.json",
+        ".loom/shadow/closeout-loom.json",
+        ".loom/shadow/merge-ready-repo.json",
+        ".loom/shadow/merge-ready-loom.json",
+        ".loom/shadow/review-repo.json",
+        ".loom/shadow/review-loom.json",
+        ".loom/shadow/admission-repo.json",
+        ".loom/shadow/admission-loom.json",
         ".loom/specs/INIT-0001/spec.md",
         ".loom/specs/INIT-0001/plan.md",
         ".loom/specs/INIT-0001/implementation-contract.md",

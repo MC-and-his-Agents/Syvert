@@ -234,6 +234,11 @@ def load_registry_skill_ids() -> tuple[tuple[str, ...] | None, str | None]:
     except RuntimeError as exc:
         return None, str(exc)
     if not active_registry.exists():
+        bootstrap_manifest = Path(__file__).resolve().parent.parent / "bootstrap" / "manifest.json"
+        if bootstrap_manifest.exists():
+            # Bootstrapped target runtimes vendor only .loom/bin; route with the
+            # built-in matrix instead of requiring a full installed skills tree.
+            return tuple(sorted({"loom-init", *SKILL_SIGNAL_RULES})), None
         return None, f"{active_registry} is missing"
     try:
         registry = read_json(active_registry)

@@ -54,6 +54,12 @@ def write_minimal_loom_carrier(root: Path) -> None:
     (root / ".loom/shadow").mkdir(parents=True, exist_ok=True)
     (root / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
     (root / "WORKFLOW.md").write_text("# Workflow\n\nSyvert repo-native governance surface.\n", encoding="utf-8")
+    (root / "code_review.md").write_text("# Code Review\n", encoding="utf-8")
+    (root / "scripts/policy").mkdir(parents=True, exist_ok=True)
+    (root / "scripts/workflow_guard.py").write_text("print('workflow')\n", encoding="utf-8")
+    (root / "scripts/governance_gate.py").write_text("print('governance')\n", encoding="utf-8")
+    (root / "scripts/pr_guardian.py").write_text("print('guardian')\n", encoding="utf-8")
+    (root / "scripts/policy/integration_contract.json").write_text("{}", encoding="utf-8")
     (root / ".loom/work-items/INIT-0001.md").write_text(
         "\n".join(
             [
@@ -120,6 +126,76 @@ def write_minimal_loom_carrier(root: Path) -> None:
         )
     for name in ("spec.md", "plan.md", "implementation-contract.md"):
         (root / ".loom/specs/INIT-0001" / name).write_text("ok\n", encoding="utf-8")
+    (root / ".loom/companion/README.md").write_text("# Companion\n", encoding="utf-8")
+    (root / ".loom/companion/manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "loom-repo-companion-manifest/v1",
+                "companion_entry": ".loom/companion/README.md",
+                "repo_interface": ".loom/companion/repo-interface.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / ".loom/companion/repo-interface.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "loom-repo-interface/v2",
+                "companion_entry": ".loom/companion/README.md",
+                "repo_specific_requirements": {
+                    "admission": [],
+                    "review": [
+                        {
+                            "id": "review-rubric",
+                            "summary": "review",
+                            "locator": "code_review.md",
+                            "enforcement": "blocking",
+                        }
+                    ],
+                    "merge_ready": [],
+                    "closeout": [],
+                },
+                "specialized_gates": [
+                    {
+                        "id": "workflow-guard",
+                        "summary": "workflow",
+                        "locator": "scripts/workflow_guard.py",
+                        "gate_type": "admission",
+                    },
+                    {
+                        "id": "governance-gate",
+                        "summary": "governance",
+                        "locator": "scripts/governance_gate.py",
+                        "gate_type": "build",
+                    },
+                ],
+                "metadata_contract": {
+                    "fields": [
+                        {
+                            "id": "integration_check",
+                            "summary": "integration",
+                            "applicability_locator": "WORKFLOW.md",
+                            "authority_locator": "scripts/policy/integration_contract.json",
+                            "enforcement": "blocking",
+                        }
+                    ]
+                },
+                "context_schema": {
+                    "fields": [
+                        {
+                            "id": "issue",
+                            "summary": "issue",
+                            "authority_locator": "WORKFLOW.md",
+                            "mapping_rule_locator": "WORKFLOW.md",
+                            "type": "integer",
+                            "required": True,
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     interop_payload = {
         "schema_version": "loom-repo-interop/v1",
         "host_adapters": [],
@@ -176,6 +252,77 @@ def write_minimal_loom_carrier(root: Path) -> None:
         ),
         encoding="utf-8",
     )
+    carrier_paths = sorted(
+        {
+            str(path)
+            for path in governance_gate.REQUIRED_LOOM_CARRIER_FILES
+        }
+        | set(loom_sources)
+        | set(repo_sources)
+    )
+    work_item_path = root / ".loom/work-items/INIT-0001.md"
+    work_item_path.write_text(
+        work_item_path.read_text(encoding="utf-8")
+        + "\n## Associated Artifacts\n\n"
+        + "\n".join(f"- `{path}`" for path in carrier_paths)
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / ".loom/bootstrap/manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "loom-bootstrap-manifest/v1",
+                "artifacts": [
+                    {"path": path, "kind": "carrier", "source": "test"}
+                    for path in carrier_paths
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / ".loom/bootstrap/init-result.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "loom-init-output/v1",
+                "fact_chain": {
+                    "mode": "work-item + recovery-entry + derived status-surface",
+                    "read_entry": "python3 .loom/bin/loom_init.py fact-chain --target .",
+                    "entry_points": {
+                        "current_item_id": "INIT-0001",
+                        "work_item": ".loom/work-items/INIT-0001.md",
+                        "recovery_entry": ".loom/progress/INIT-0001.md",
+                        "status_surface": ".loom/status/current.md",
+                    },
+                },
+                "initial_artifacts": [
+                    {"path": path, "kind": "carrier", "source": "test"}
+                    for path in carrier_paths
+                ],
+                "initial_work_items": [
+                    {
+                        "id": "INIT-0001",
+                        "goal": "Adopt Loom",
+                        "scope": "Validate carrier",
+                        "execution_path": "governance/loom",
+                        "workspace_entry": ".",
+                        "recovery_entry": ".loom/progress/INIT-0001.md",
+                        "review_entry": ".loom/reviews/INIT-0001.json",
+                        "validation_entry": "python3 .loom/bin/loom_init.py verify --target .",
+                        "closing_condition": "carrier is valid",
+                        "artifacts": carrier_paths,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    for evidence_path in root.glob(".loom/shadow/*-*.json"):
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        payload["source_sha256"] = {
+            source: governance_gate.sha256_file(root / source)
+            for source in payload.get("source_files", [])
+        }
+        evidence_path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 class GovernanceGateTests(unittest.TestCase):
@@ -589,6 +736,46 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/admission-repo.json"])
 
             self.assertTrue(any("source hash 已漂移" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_bootstrap_inventory_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/bootstrap/manifest.json").read_text(encoding="utf-8"))
+            payload["artifacts"] = [
+                artifact
+                for artifact in payload["artifacts"]
+                if artifact["path"] != ".loom/companion/interop.json"
+            ]
+            (root / ".loom/bootstrap/manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/manifest.json"])
+
+            self.assertTrue(any("bootstrap manifest artifacts 缺少 `.loom/companion/interop.json`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_init_fact_chain_locator_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/bootstrap/init-result.json").read_text(encoding="utf-8"))
+            payload["fact_chain"]["entry_points"]["work_item"] = "../outside.md"
+            (root / ".loom/bootstrap/init-result.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/init-result.json"])
+
+            self.assertTrue(any("fact_chain.entry_points.work_item 必须是 .loom/work-items/INIT-0001.md" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_companion_locator_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/manifest.json").read_text(encoding="utf-8"))
+            payload["repo_interface"] = "../outside.json"
+            (root / ".loom/companion/manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/manifest.json"])
+
+            self.assertTrue(any("companion manifest `repo_interface` 必须是 .loom/companion/repo-interface.json" in error for error in errors))
 
 
 if __name__ == "__main__":

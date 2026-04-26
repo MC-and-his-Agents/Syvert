@@ -95,6 +95,145 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def repo_relative_path(repo_root: Path, raw_locator: object, *, label: str) -> tuple[str | None, str | None]:
+    if not isinstance(raw_locator, str) or not raw_locator.strip():
+        return None, f"{label} 必须是非空相对路径"
+    path = Path(raw_locator)
+    if path.is_absolute():
+        return None, f"{label} 必须是仓库内相对路径"
+    resolved = (repo_root / path).resolve()
+    try:
+        resolved.relative_to(repo_root.resolve())
+    except ValueError:
+        return None, f"{label} 不得指向仓库外: {raw_locator}"
+    if not resolved.exists():
+        return raw_locator, f"{label} 指向缺失文件: {raw_locator}"
+    return raw_locator, None
+
+
+def artifact_paths(payload: object, field: str) -> set[str]:
+    if not isinstance(payload, dict):
+        return set()
+    raw_artifacts = payload.get(field)
+    if not isinstance(raw_artifacts, list):
+        return set()
+    return {
+        artifact["path"]
+        for artifact in raw_artifacts
+        if isinstance(artifact, dict) and isinstance(artifact.get("path"), str) and artifact.get("path")
+    }
+
+
+def markdown_artifact_refs(path: Path) -> set[str]:
+    refs: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- `") and stripped.endswith("`"):
+            refs.add(stripped[3:-1])
+    return refs
+
+
+def validate_companion_locator_truth(repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    manifest_path = repo_root / ".loom/companion/manifest.json"
+    repo_interface_path = repo_root / ".loom/companion/repo-interface.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"Loom companion manifest 无法读取: {manifest_path}: {exc}"]
+    try:
+        repo_interface = json.loads(repo_interface_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"Loom repo interface 无法读取: {repo_interface_path}: {exc}"]
+
+    if manifest.get("schema_version") != "loom-repo-companion-manifest/v1":
+        errors.append("Loom companion manifest schema_version 必须是 loom-repo-companion-manifest/v1")
+    for field, expected in (
+        ("companion_entry", ".loom/companion/README.md"),
+        ("repo_interface", ".loom/companion/repo-interface.json"),
+    ):
+        actual, error = repo_relative_path(repo_root, manifest.get(field), label=f"companion manifest `{field}`")
+        if actual != expected:
+            errors.append(f"Loom companion manifest `{field}` 必须是 {expected}")
+        if error:
+            errors.append(error)
+
+    if repo_interface.get("schema_version") not in {"loom-repo-interface/v1", "loom-repo-interface/v2"}:
+        errors.append("Loom repo interface schema_version 必须是 loom-repo-interface/v1 或 loom-repo-interface/v2")
+    _, error = repo_relative_path(
+        repo_root,
+        repo_interface.get("companion_entry"),
+        label="repo interface `companion_entry`",
+    )
+    if error:
+        errors.append(error)
+
+    repo_specific_requirements = repo_interface.get("repo_specific_requirements")
+    if not isinstance(repo_specific_requirements, dict):
+        errors.append("Loom repo interface 必须声明 repo_specific_requirements")
+    else:
+        for surface, requirements in repo_specific_requirements.items():
+            if not isinstance(requirements, list):
+                errors.append(f"Loom repo interface surface `{surface}` 必须是列表")
+                continue
+            for index, requirement in enumerate(requirements):
+                if not isinstance(requirement, dict):
+                    errors.append(f"Loom repo interface surface `{surface}` requirement[{index}] 必须是对象")
+                    continue
+                _, locator_error = repo_relative_path(
+                    repo_root,
+                    requirement.get("locator"),
+                    label=f"repo interface `{surface}` requirement[{index}].locator",
+                )
+                if locator_error:
+                    errors.append(locator_error)
+
+    specialized_gates = repo_interface.get("specialized_gates")
+    if not isinstance(specialized_gates, list):
+        errors.append("Loom repo interface 必须声明 specialized_gates 列表")
+    else:
+        for index, gate in enumerate(specialized_gates):
+            if not isinstance(gate, dict):
+                errors.append(f"Loom repo interface specialized_gates[{index}] 必须是对象")
+                continue
+            _, locator_error = repo_relative_path(
+                repo_root,
+                gate.get("locator"),
+                label=f"repo interface specialized_gates[{index}].locator",
+            )
+            if locator_error:
+                errors.append(locator_error)
+
+    metadata_contract = repo_interface.get("metadata_contract")
+    if isinstance(metadata_contract, dict):
+        for index, field in enumerate(metadata_contract.get("fields", [])):
+            if not isinstance(field, dict):
+                continue
+            for locator_key in ("applicability_locator", "authority_locator"):
+                _, locator_error = repo_relative_path(
+                    repo_root,
+                    field.get(locator_key),
+                    label=f"repo interface metadata_contract.fields[{index}].{locator_key}",
+                )
+                if locator_error:
+                    errors.append(locator_error)
+
+    context_schema = repo_interface.get("context_schema")
+    if isinstance(context_schema, dict):
+        for index, field in enumerate(context_schema.get("fields", [])):
+            if not isinstance(field, dict):
+                continue
+            for locator_key in ("authority_locator", "mapping_rule_locator"):
+                _, locator_error = repo_relative_path(
+                    repo_root,
+                    field.get(locator_key),
+                    label=f"repo interface context_schema.fields[{index}].{locator_key}",
+                )
+                if locator_error:
+                    errors.append(locator_error)
+    return errors
+
+
 def validate_shadow_surface_evidence(repo_root: Path, evidence_path: Path, *, expected_surface: str, expected_side: str) -> list[str]:
     errors: list[str] = []
     try:
@@ -165,6 +304,8 @@ def validate_review_payload(path: Path, *, expected_kind: str, item_id: str) -> 
 def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     errors: list[str] = []
     status_path = repo_root / ".loom/status/current.md"
+    bootstrap_manifest_path = repo_root / ".loom/bootstrap/manifest.json"
+    init_result_path = repo_root / ".loom/bootstrap/init-result.json"
     shadow_path = repo_root / ".loom/shadow/shadow-parity.json"
     interop_path = repo_root / ".loom/companion/interop.json"
 
@@ -200,6 +341,19 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
 
     work_item = markdown_fields(work_item_path)
     progress = markdown_fields(progress_path)
+    try:
+        bootstrap_manifest = json.loads(bootstrap_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        bootstrap_manifest = {}
+    try:
+        init_result = json.loads(init_result_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        init_result = {}
+    if bootstrap_manifest.get("schema_version") != "loom-bootstrap-manifest/v1":
+        errors.append("Loom bootstrap manifest schema_version 必须是 loom-bootstrap-manifest/v1")
+    if init_result.get("schema_version") != "loom-init-output/v1":
+        errors.append("Loom init-result schema_version 必须是 loom-init-output/v1")
+
     for field in ("Item ID", "Goal", "Scope", "Execution Path", "Workspace Entry", "Recovery Entry", "Review Entry", "Validation Entry", "Closing Condition"):
         if not work_item.get(field):
             errors.append(f"Loom work item 缺少 `{field}`")
@@ -246,6 +400,76 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         spec_review_payload = {}
     if spec_review_payload.get("reviewed_validation_summary") != progress.get("Latest Validation Summary"):
         errors.append("Loom spec review 的 reviewed_validation_summary 必须匹配 progress/status 最新验证摘要")
+
+    required_bootstrap_paths = {str(path) for path in REQUIRED_LOOM_CARRIER_FILES}
+    required_bootstrap_paths.update(
+        path.as_posix()
+        for path in sorted((repo_root / ".loom/shadow").glob("*.json"))
+        if path.name != "shadow-parity.json"
+        for path in [path.relative_to(repo_root)]
+    )
+    manifest_artifacts = artifact_paths(bootstrap_manifest, "artifacts")
+    init_artifacts = artifact_paths(init_result, "initial_artifacts")
+    for required_path in sorted(required_bootstrap_paths):
+        if required_path not in manifest_artifacts:
+            errors.append(f"Loom bootstrap manifest artifacts 缺少 `{required_path}`")
+        if required_path not in init_artifacts:
+            errors.append(f"Loom init-result initial_artifacts 缺少 `{required_path}`")
+    for artifact_path in sorted(manifest_artifacts | init_artifacts):
+        _, artifact_error = repo_relative_path(repo_root, artifact_path, label=f"Loom bootstrap artifact `{artifact_path}`")
+        if artifact_error:
+            errors.append(artifact_error)
+
+    fact_chain = init_result.get("fact_chain")
+    if not isinstance(fact_chain, dict):
+        errors.append("Loom init-result 必须声明 fact_chain")
+    else:
+        entry_points = fact_chain.get("entry_points")
+        if not isinstance(entry_points, dict):
+            errors.append("Loom init-result fact_chain.entry_points 必须是对象")
+        else:
+            expected_entry_points = {
+                "current_item_id": item_id,
+                "work_item": f".loom/work-items/{item_id}.md",
+                "recovery_entry": f".loom/progress/{item_id}.md",
+                "status_surface": ".loom/status/current.md",
+            }
+            for field, expected in expected_entry_points.items():
+                if entry_points.get(field) != expected:
+                    errors.append(f"Loom init-result fact_chain.entry_points.{field} 必须是 {expected}")
+
+    initial_work_items = init_result.get("initial_work_items")
+    matching_initial_work_item = None
+    if isinstance(initial_work_items, list):
+        for candidate in initial_work_items:
+            if isinstance(candidate, dict) and candidate.get("id") == item_id:
+                matching_initial_work_item = candidate
+                break
+    if matching_initial_work_item is None:
+        errors.append(f"Loom init-result initial_work_items 缺少 `{item_id}`")
+        initial_work_item_artifacts: set[str] = set()
+    else:
+        for field, expected in (
+            ("recovery_entry", f".loom/progress/{item_id}.md"),
+            ("review_entry", f".loom/reviews/{item_id}.json"),
+            ("validation_entry", "python3 .loom/bin/loom_init.py verify --target ."),
+            ("workspace_entry", "."),
+        ):
+            if matching_initial_work_item.get(field) != expected:
+                errors.append(f"Loom init-result work item `{item_id}` 的 {field} 必须是 {expected}")
+        initial_work_item_artifacts = {
+            artifact
+            for artifact in matching_initial_work_item.get("artifacts", [])
+            if isinstance(artifact, str) and artifact
+        }
+    work_item_artifacts = markdown_artifact_refs(work_item_path)
+    for required_path in sorted(required_bootstrap_paths):
+        if required_path not in initial_work_item_artifacts:
+            errors.append(f"Loom init-result work item artifacts 缺少 `{required_path}`")
+        if required_path not in work_item_artifacts:
+            errors.append(f"Loom work item Associated Artifacts 缺少 `{required_path}`")
+
+    errors.extend(validate_companion_locator_truth(repo_root))
 
     try:
         shadow_payload = json.loads(shadow_path.read_text(encoding="utf-8"))
