@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "review",
+  "side": "repo",
+  "parity_value": "syvert-loom-review-v1",
+  "source_files": [
+    "scripts/pr_guardian.py",
+    "scripts/policy/integration_contract.json",
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md"
+  ],
+  "source_sha256": {
+    "scripts/pr_guardian.py": "d12e7a508ad91c12d91a4538529d5db12d03d74a14d8831a4b1c4a4bd92340bd",
+    "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "670da47f22b24c68f88365ba2ec054379a50b1641693ab6facc57e86e88f2742"
+  }
+}

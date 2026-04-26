@@ -8,6 +8,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
+import hashlib
 import json
 import py_compile
 import tempfile
@@ -86,6 +87,61 @@ def markdown_fields(path: Path) -> dict[str, str]:
     return fields
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_shadow_surface_evidence(repo_root: Path, evidence_path: Path, *, expected_surface: str, expected_side: str) -> list[str]:
+    errors: list[str] = []
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"Loom shadow parity evidence 无法读取: {evidence_path}: {exc}"]
+
+    if payload.get("schema_version") != "loom-shadow-surface-evidence/v1":
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` schema_version 非法")
+    if payload.get("surface") != expected_surface:
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` surface 必须是 {expected_surface}")
+    if payload.get("side") != expected_side:
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` side 必须是 {expected_side}")
+    if not str(payload.get("parity_value", "")).strip():
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` 缺少 parity_value")
+
+    source_files = payload.get("source_files")
+    source_hashes = payload.get("source_sha256")
+    if not isinstance(source_files, list) or not source_files:
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` 必须列出 source_files")
+    if not isinstance(source_hashes, dict) or not source_hashes:
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` 必须列出 source_sha256")
+        return errors
+
+    root = repo_root.resolve()
+    listed_sources = {entry for entry in source_files if isinstance(entry, str)} if isinstance(source_files, list) else set()
+    if listed_sources != set(source_hashes):
+        errors.append(f"Loom shadow parity evidence `{evidence_path}` 的 source_files 与 source_sha256 必须一致")
+    for relative_path, expected_hash in source_hashes.items():
+        if not isinstance(relative_path, str) or not isinstance(expected_hash, str) or not expected_hash.strip():
+            errors.append(f"Loom shadow parity evidence `{evidence_path}` 包含非法 source hash entry")
+            continue
+        source_path = (root / relative_path).resolve()
+        try:
+            source_path.relative_to(root)
+        except ValueError:
+            errors.append(f"Loom shadow parity evidence `{evidence_path}` 引用了仓库外 source: {relative_path}")
+            continue
+        if not source_path.is_file():
+            errors.append(f"Loom shadow parity evidence `{evidence_path}` 引用了缺失 source: {relative_path}")
+            continue
+        actual_hash = sha256_file(source_path)
+        if actual_hash != expected_hash:
+            errors.append(f"Loom shadow parity evidence `{evidence_path}` source hash 已漂移: {relative_path}")
+    return errors
+
+
 def validate_review_payload(path: Path, *, expected_kind: str, item_id: str) -> list[str]:
     errors: list[str] = []
     try:
@@ -108,6 +164,7 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     errors: list[str] = []
     status_path = repo_root / ".loom/status/current.md"
     shadow_path = repo_root / ".loom/shadow/shadow-parity.json"
+    interop_path = repo_root / ".loom/companion/interop.json"
 
     if not status_path.exists():
         return errors
@@ -196,6 +253,74 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         errors.append("Loom shadow parity artifact result 必须为 pass")
     if not isinstance(shadow_payload.get("surfaces"), list) or not shadow_payload.get("surfaces"):
         errors.append("Loom shadow parity artifact 必须列出 surfaces")
+
+    try:
+        interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        interop_payload = {}
+    shadow_surfaces = interop_payload.get("shadow_surfaces")
+    if not isinstance(shadow_surfaces, dict) or not shadow_surfaces:
+        errors.append("Loom repo interop contract 必须声明 shadow_surfaces")
+    else:
+        declared_surface_set = set(shadow_surfaces)
+        artifact_surface_set = set(shadow_payload.get("surfaces", [])) if isinstance(shadow_payload.get("surfaces"), list) else set()
+        if artifact_surface_set != declared_surface_set:
+            errors.append("Loom shadow parity artifact surfaces 必须与 repo interop shadow_surfaces 完全一致")
+
+        artifact_sources = set()
+        for source_field in ("loom_sources", "repo_sources"):
+            sources = shadow_payload.get(source_field)
+            if not isinstance(sources, list) or not sources:
+                errors.append(f"Loom shadow parity artifact 必须列出 {source_field}")
+                continue
+            artifact_sources.update(entry for entry in sources if isinstance(entry, str))
+
+        for surface, declared_surface in sorted(shadow_surfaces.items()):
+            if not isinstance(declared_surface, dict):
+                errors.append(f"Loom shadow surface `{surface}` 必须是对象")
+                continue
+            surface_values: dict[str, str] = {}
+            for side, locator_key in (("loom", "loom_locator"), ("repo", "repo_locator")):
+                locator = declared_surface.get(locator_key)
+                if not isinstance(locator, str) or not locator.strip():
+                    errors.append(f"Loom shadow surface `{surface}` 缺少 {locator_key}")
+                    continue
+                if not locator.startswith(".loom/shadow/") or not locator.endswith(".json") or locator.endswith("shadow-parity.json"):
+                    errors.append(f"Loom shadow surface `{surface}` 的 {locator_key} 必须指向结构化 shadow evidence JSON")
+                    continue
+                if locator not in artifact_sources:
+                    errors.append(f"Loom shadow surface `{surface}` 的 {locator_key} 必须被 shadow-parity artifact 引用")
+                evidence_path = repo_root / locator
+                if not evidence_path.exists():
+                    errors.append(f"Loom shadow surface `{surface}` 缺少 evidence: {locator}")
+                    continue
+                errors.extend(
+                    validate_shadow_surface_evidence(
+                        repo_root,
+                        evidence_path,
+                        expected_surface=surface,
+                        expected_side=side,
+                    )
+                )
+                try:
+                    evidence_payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                parity_value = evidence_payload.get("parity_value")
+                if isinstance(parity_value, str):
+                    surface_values[side] = parity_value
+            if surface_values.get("loom") != surface_values.get("repo"):
+                errors.append(f"Loom shadow surface `{surface}` 的 loom/repo parity_value 必须一致")
+
+        declared_locators = {
+            declared_surface[locator_key]
+            for declared_surface in shadow_surfaces.values()
+            if isinstance(declared_surface, dict)
+            for locator_key in ("loom_locator", "repo_locator")
+            if isinstance(declared_surface.get(locator_key), str)
+        }
+        if artifact_sources != declared_locators:
+            errors.append("Loom shadow parity artifact sources 必须与 repo interop locators 完全一致")
 
     return errors
 

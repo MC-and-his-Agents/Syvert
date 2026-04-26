@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -539,7 +540,45 @@ def load_repo_interop_contract(repo_interop: object, *, target_root: Path) -> tu
     return payload, []
 
 
-def normalized_shadow_value(path: Path) -> tuple[str | None, str | None]:
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_shadow_source_hashes(payload: dict[str, Any], *, target_root: Path, evidence_path: Path) -> list[str]:
+    source_hashes = payload.get("source_sha256")
+    if source_hashes is None:
+        return []
+    if not isinstance(source_hashes, dict) or not source_hashes:
+        return [f"shadow parity evidence `{evidence_path}` has invalid source_sha256"]
+
+    errors: list[str] = []
+    root = target_root.resolve()
+    for relative_path, expected_hash in source_hashes.items():
+        if not isinstance(relative_path, str) or not isinstance(expected_hash, str) or not expected_hash.strip():
+            errors.append(f"shadow parity evidence `{evidence_path}` has invalid source hash entry")
+            continue
+        source_path = (root / relative_path).resolve()
+        try:
+            source_path.relative_to(root)
+        except ValueError:
+            errors.append(f"shadow parity evidence `{evidence_path}` references source outside repo: {relative_path}")
+            continue
+        if not source_path.is_file():
+            errors.append(f"shadow parity evidence `{evidence_path}` references missing source: {relative_path}")
+            continue
+        actual_hash = sha256_file(source_path)
+        if actual_hash != expected_hash:
+            errors.append(
+                f"shadow parity evidence `{evidence_path}` source hash drift: {relative_path}"
+            )
+    return errors
+
+
+def normalized_shadow_value(path: Path, *, target_root: Path | None = None) -> tuple[str | None, str | None]:
     try:
         if path.is_dir():
             return None, f"shadow parity locator points to a directory: {path}"
@@ -555,6 +594,10 @@ def normalized_shadow_value(path: Path) -> tuple[str | None, str | None]:
         payload = None
 
     if isinstance(payload, dict):
+        root = target_root or path.resolve().parents[2]
+        source_errors = validate_shadow_source_hashes(payload, target_root=root, evidence_path=path)
+        if source_errors:
+            return None, "; ".join(source_errors)
         for key in ("parity_value", "result", "decision", "status", "verdict", "value"):
             value = payload.get(key)
             if isinstance(value, (str, int, float, bool)) and str(value).strip():
@@ -640,8 +683,8 @@ def shadow_parity_report(
     loom_path = target_root / str(loom_locator)
     repo_path = target_root / str(repo_locator)
 
-    loom_value, loom_error = normalized_shadow_value(loom_path)
-    repo_value, repo_error = normalized_shadow_value(repo_path)
+    loom_value, loom_error = normalized_shadow_value(loom_path, target_root=target_root)
+    repo_value, repo_error = normalized_shadow_value(repo_path, target_root=target_root)
 
     missing_inputs: list[str] = []
     if loom_error:

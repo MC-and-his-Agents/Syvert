@@ -6,20 +6,20 @@
   "surfaces": [
     "admission",
     "review",
-    "merge-ready",
+    "merge_ready",
     "closeout"
   ],
   "loom_sources": [
-    ".loom/shadow/admission-loom.txt",
-    ".loom/shadow/review-loom.txt",
-    ".loom/shadow/merge-ready-loom.txt",
-    ".loom/shadow/closeout-loom.txt"
+    ".loom/shadow/admission-loom.json",
+    ".loom/shadow/review-loom.json",
+    ".loom/shadow/merge-ready-loom.json",
+    ".loom/shadow/closeout-loom.json"
   ],
   "repo_sources": [
-    ".loom/shadow/admission-repo.txt",
-    ".loom/shadow/review-repo.txt",
-    ".loom/shadow/merge-ready-repo.txt",
-    ".loom/shadow/closeout-repo.txt"
+    ".loom/shadow/admission-repo.json",
+    ".loom/shadow/review-repo.json",
+    ".loom/shadow/merge-ready-repo.json",
+    ".loom/shadow/closeout-repo.json"
   ],
   "validation_entries": [
     "python3 .loom/bin/loom_flow.py shadow-parity --target .",

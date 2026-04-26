@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "admission",
+  "side": "repo",
+  "parity_value": "syvert-loom-admission-v1",
+  "source_files": [
+    "WORKFLOW.md",
+    "docs/process/delivery-funnel.md",
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md"
+  ],
+  "source_sha256": {
+    "WORKFLOW.md": "fbe5787e913d2844cdb30c1e79bcc759568ab34bdb68feaf2602d40ca62fbb4c",
+    "docs/process/delivery-funnel.md": "398f9242f00bfdd2be5c418f854de3527d262e2440cc13d6cabbed4ad03ad8e3",
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "670da47f22b24c68f88365ba2ec054379a50b1641693ab6facc57e86e88f2742"
+  }
+}

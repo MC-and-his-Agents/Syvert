@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "review",
+  "side": "loom",
+  "parity_value": "syvert-loom-review-v1",
+  "source_files": [
+    ".loom/reviews/INIT-0001.json",
+    ".loom/reviews/INIT-0001.spec.json",
+    ".loom/companion/interop.json"
+  ],
+  "source_sha256": {
+    ".loom/reviews/INIT-0001.json": "ecf1f4767b4d44ef5a18369f1b393802e1b0b4d7d4f8c5a1ee00d2f600fb213f",
+    ".loom/reviews/INIT-0001.spec.json": "2d52e805660c11054a9394559aab97203470c1632c78a4d45bdcd7f0706a0c79",
+    ".loom/companion/interop.json": "2d70e1f48967fcfbf84da1a6c63a5f19bdc107bb52708f179d1ecebf2bd3824e"
+  }
+}

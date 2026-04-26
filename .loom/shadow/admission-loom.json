@@ -1,0 +1,14 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "admission",
+  "side": "loom",
+  "parity_value": "syvert-loom-admission-v1",
+  "source_files": [
+    ".loom/work-items/INIT-0001.md",
+    ".loom/companion/repo-interface.json"
+  ],
+  "source_sha256": {
+    ".loom/work-items/INIT-0001.md": "04a48b5999e0cb75b454e6023c973e4f07fb07eaf9739cde520c0b9742696c30",
+    ".loom/companion/repo-interface.json": "e14f200429b06253540035da3745db85bd26b11fb2a4c7324768e1b747e72578"
+  }
+}

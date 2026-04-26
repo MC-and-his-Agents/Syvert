@@ -37,6 +37,7 @@ SPEC_SCOPE_REPORT = {
 
 def write_minimal_loom_carrier(root: Path) -> None:
     summary = "carrier validation passed"
+    surfaces = ("admission", "review", "merge_ready", "closeout")
     for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +53,7 @@ def write_minimal_loom_carrier(root: Path) -> None:
     (root / ".loom/reviews").mkdir(parents=True, exist_ok=True)
     (root / ".loom/shadow").mkdir(parents=True, exist_ok=True)
     (root / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
+    (root / "WORKFLOW.md").write_text("# Workflow\n\nSyvert repo-native governance surface.\n", encoding="utf-8")
     (root / ".loom/work-items/INIT-0001.md").write_text(
         "\n".join(
             [
@@ -116,12 +118,63 @@ def write_minimal_loom_carrier(root: Path) -> None:
             ),
             encoding="utf-8",
         )
-    (root / ".loom/shadow/shadow-parity.json").write_text(
-        json.dumps({"result": "pass", "surfaces": ["admission"]}),
-        encoding="utf-8",
-    )
     for name in ("spec.md", "plan.md", "implementation-contract.md"):
         (root / ".loom/specs/INIT-0001" / name).write_text("ok\n", encoding="utf-8")
+    interop_payload = {
+        "schema_version": "loom-repo-interop/v1",
+        "host_adapters": [],
+        "repo_native_carriers": [],
+        "shadow_surfaces": {
+            surface: {
+                "summary": f"{surface} parity",
+                "loom_locator": f".loom/shadow/{surface.replace('_', '-')}-loom.json",
+                "repo_locator": f".loom/shadow/{surface.replace('_', '-')}-repo.json",
+            }
+            for surface in surfaces
+        },
+    }
+    (root / ".loom/companion/interop.json").write_text(json.dumps(interop_payload), encoding="utf-8")
+    loom_sources: list[str] = []
+    repo_sources: list[str] = []
+    for surface in surfaces:
+        parity_value = f"{surface}-parity"
+        for side, sources in (
+            ("loom", [".loom/work-items/INIT-0001.md"]),
+            ("repo", ["WORKFLOW.md"]),
+        ):
+            locator = f".loom/shadow/{surface.replace('_', '-')}-{side}.json"
+            source_hashes = {
+                source: governance_gate.sha256_file(root / source)
+                for source in sources
+            }
+            (root / locator).write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-shadow-surface-evidence/v1",
+                        "surface": surface,
+                        "side": side,
+                        "parity_value": parity_value,
+                        "source_files": sources,
+                        "source_sha256": source_hashes,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            if side == "loom":
+                loom_sources.append(locator)
+            else:
+                repo_sources.append(locator)
+    (root / ".loom/shadow/shadow-parity.json").write_text(
+        json.dumps(
+            {
+                "result": "pass",
+                "surfaces": list(surfaces),
+                "loom_sources": loom_sources,
+                "repo_sources": repo_sources,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class GovernanceGateTests(unittest.TestCase):
@@ -443,6 +496,62 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
 
             self.assertTrue(any("Review Entry" in error and "必须是" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_shadow_surface_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / ".loom/shadow/admission-repo.json").unlink()
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/shadow-parity.json"])
+
+            self.assertTrue(any("缺少 evidence" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_shadow_parity_value_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/shadow/review-repo.json").read_text(encoding="utf-8"))
+            payload["parity_value"] = "stale-review-parity"
+            (root / ".loom/shadow/review-repo.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/review-repo.json"])
+
+            self.assertTrue(any("parity_value 必须一致" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_shadow_artifact_surface_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/shadow/shadow-parity.json").read_text(encoding="utf-8"))
+            payload["surfaces"] = ["admission"]
+            (root / ".loom/shadow/shadow-parity.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/shadow-parity.json"])
+
+            self.assertTrue(any("surfaces 必须与 repo interop shadow_surfaces 完全一致" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_shadow_source_locator_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/shadow/shadow-parity.json").read_text(encoding="utf-8"))
+            payload["repo_sources"] = payload["repo_sources"][:-1]
+            (root / ".loom/shadow/shadow-parity.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/shadow-parity.json"])
+
+            self.assertTrue(any("sources 必须与 repo interop locators 完全一致" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_shadow_source_hash_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / "WORKFLOW.md").write_text("# Workflow\n\nDrifted repo surface.\n", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/admission-repo.json"])
+
+            self.assertTrue(any("source hash 已漂移" in error for error in errors))
 
 
 if __name__ == "__main__":

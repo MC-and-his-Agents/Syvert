@@ -1,0 +1,14 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "merge_ready",
+  "side": "loom",
+  "parity_value": "syvert-loom-merge-ready-v1",
+  "source_files": [
+    ".loom/status/current.md",
+    ".loom/specs/INIT-0001/implementation-contract.md"
+  ],
+  "source_sha256": {
+    ".loom/status/current.md": "c8e10d67b17c1bc586dbd906c05b0b0457cbc44159d6e65deead807e7474203c",
+    ".loom/specs/INIT-0001/implementation-contract.md": "93d005370bed72bab741db66348714fef58a341a422c10225b152cb5386ea551"
+  }
+}

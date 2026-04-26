@@ -1,0 +1,14 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "closeout",
+  "side": "loom",
+  "parity_value": "syvert-loom-closeout-v1",
+  "source_files": [
+    ".loom/bin/loom_flow.py",
+    ".loom/progress/INIT-0001.md"
+  ],
+  "source_sha256": {
+    ".loom/bin/loom_flow.py": "14c5fd56dc406d23f7077c1f9c4298f1d898c11dcb82ba57fddca537ccde6327",
+    ".loom/progress/INIT-0001.md": "3154e01e9d78bc1ce0ca0d7a7f2d44ca85bc4eb0c2771d690623e4f9dfd612ad"
+  }
+}
