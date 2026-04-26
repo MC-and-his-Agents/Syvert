@@ -63,6 +63,12 @@
   - 结果：`pass`。
 - `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom --blocking`
   - 结果：`pass`。
+- `python3 .loom/bin/loom_init.py bootstrap --target . --output ../loom-escape.json --verify`
+  - 结果：阻断；`--output` 必须保持在 target root 内。
+- 临时篡改 `.loom/bootstrap/init-result.json` 的 `fact_chain.entry_points.work_item` 为 `../loom-escape.md` 后运行 fact-chain 读取。
+  - 结果：阻断；fact-chain carrier 必须保持在 target root 内。
+- 临时篡改 `.loom/companion/manifest.json` 的 locator 为 `../loom-escape.md` 后运行 `build_governance_surface()`。
+  - 结果：repo companion interface 变为 `incomplete`，对应 locator 不再返回 `present`；companion locator 必须保持在 target root 内。
 - `python3.11 -m py_compile scripts/*.py scripts/policy/*.py`
   - 结果：通过。
 - `python3.11 scripts/docs_guard.py --mode ci`
@@ -87,4 +93,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `5a949c972f86eaa2d1bd78245d7c7f5fbead4109`
-- 说明：该 SHA 是本轮 worktree 从 `origin/main` 创建时的基线；本 exec-plan 记录正式 adoption 迁移的首个可恢复 checkpoint。
+- 说明：该 SHA 只是本轮 worktree 从 `origin/main` 创建时的只读基线，用于说明迁移起点；正式可恢复状态以本 PR 分支上的提交、`.loom/` carrier、ADR-GOV-0038 和本 exec-plan 为准，不把基线 SHA 伪装为当前执行 checkpoint。

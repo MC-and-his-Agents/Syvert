@@ -191,7 +191,12 @@ def resolve_output_path(target_root: Path, raw_output: str) -> Path:
     output_path = Path(raw_output)
     if output_path.is_absolute():
         raise RuntimeError("--output must be relative to the target root")
-    return target_root / output_path
+    resolved = (target_root / output_path).resolve()
+    try:
+        resolved.relative_to(target_root.resolve())
+    except ValueError as exc:
+        raise RuntimeError("--output must stay inside the target root") from exc
+    return resolved
 
 
 def runtime_state_payload(target_root: Path) -> dict[str, object]:

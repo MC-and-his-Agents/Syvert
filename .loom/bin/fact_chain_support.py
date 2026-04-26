@@ -177,6 +177,20 @@ def _relative(path: Path, root: Path) -> str:
     return str(path.relative_to(root))
 
 
+def resolve_target_relative_path(root: Path, raw_value: object, label: str) -> tuple[Path | None, str | None]:
+    if not isinstance(raw_value, str) or not raw_value:
+        return None, f"{label} must be a non-empty string"
+    raw_path = Path(raw_value)
+    if raw_path.is_absolute():
+        return None, f"{label} must be relative to target root"
+    resolved = (root / raw_path).resolve()
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError:
+        return None, f"{label} escapes target root: {raw_value}"
+    return resolved, None
+
+
 def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str]]:
     relative_path = _relative(path, root)
     sections = markdown_sections(path)
@@ -292,7 +306,9 @@ def inspect_fact_chain(
     output_relative: str = ".loom/bootstrap/init-result.json",
 ) -> tuple[dict[str, object], list[str]]:
     errors: list[str] = []
-    output_path = target_root / output_relative
+    output_path, output_error = resolve_target_relative_path(target_root, output_relative, "init-result")
+    if output_error or output_path is None:
+        return {}, [output_error or "invalid init-result path"]
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
 
@@ -337,9 +353,12 @@ def inspect_fact_chain(
     if errors:
         return {}, errors
 
-    work_item_path = target_root / str(work_item_ref)
-    recovery_path = target_root / str(recovery_ref)
-    status_path = target_root / str(status_ref)
+    work_item_path, work_item_path_error = resolve_target_relative_path(target_root, work_item_ref, "work_item")
+    recovery_path, recovery_path_error = resolve_target_relative_path(target_root, recovery_ref, "recovery_entry")
+    status_path, status_path_error = resolve_target_relative_path(target_root, status_ref, "status_surface")
+    errors.extend(error for error in (work_item_path_error, recovery_path_error, status_path_error) if error)
+    if errors or work_item_path is None or recovery_path is None or status_path is None:
+        return {}, errors
     for label, path in (
         ("work_item", work_item_path),
         ("recovery_entry", recovery_path),
