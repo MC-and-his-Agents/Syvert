@@ -1,17 +1,16 @@
 {
   "schema_version": "loom-review/v1",
   "item_id": "INIT-0001",
-  "decision": "fallback",
+  "decision": "allow",
   "kind": "general_review",
-  "summary": "Bootstrap has not entered formal review yet.",
-  "reviewer": "not yet assigned",
-  "reviewed_head": "bootstrap-placeholder",
-  "reviewed_validation_summary": "Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.",
-  "fallback_to": "admission",
-  "blocking_issues": [
-    "Formal review starts only after downstream work replaces the bootstrap placeholder item."
-  ],
+  "summary": "Syvert Loom official adoption carrier is ready for controlled merge; Syvert-owned guardian, integration contract, and release/sprint residue remain authoritative.",
+  "reviewer": "syvert-guardian",
+  "reviewed_head": "127978cf855f7da32389e53720ded8d7077e57e2",
+  "reviewed_validation_summary": "Carrier gate, Syvert docs/workflow gates, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
+  "fallback_to": null,
+  "blocking_issues": [],
   "follow_ups": [
-    "Record the first real semantic review before asking merge checkpoint to consume reviewer judgment."
-  ]
+    "Close Work Item #258, FR #257, and Phase #256 after controlled merge and main-truth verification."
+  ],
+  "findings": []
 }
