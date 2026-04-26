@@ -69,6 +69,15 @@
   "context_schema": {
     "fields": [
       {
+        "id": "issue",
+        "summary": "GitHub Work Item issue number required before Syvert execution.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "integer",
+        "required": true,
+        "mapping_rule_locator": "docs/process/delivery-funnel.md"
+      },
+      {
         "id": "item_key",
         "summary": "Syvert Work Item context key.",
         "authority_locator": "WORKFLOW.md",
@@ -90,18 +99,18 @@
         "id": "release",
         "summary": "Syvert release context remains repo-owned.",
         "authority_locator": "WORKFLOW.md",
-        "enforcement": "advisory",
+        "enforcement": "blocking",
         "type": "string",
-        "required": false,
+        "required": true,
         "mapping_rule_locator": "WORKFLOW.md"
       },
       {
         "id": "sprint",
         "summary": "Syvert sprint context remains repo-owned.",
         "authority_locator": "WORKFLOW.md",
-        "enforcement": "advisory",
+        "enforcement": "blocking",
         "type": "string",
-        "required": false,
+        "required": true,
         "mapping_rule_locator": "WORKFLOW.md"
       }
     ]

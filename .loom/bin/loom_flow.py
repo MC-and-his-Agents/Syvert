@@ -808,6 +808,43 @@ def write_json_file(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    try:
+        temp_path.write_text(text, encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def atomic_write_json(path: Path, payload: Any) -> None:
+    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def resolve_target_relative_path(target_root: Path, value: str, label: str) -> tuple[Path | None, str | None, list[str]]:
+    if not isinstance(value, str) or not value.strip():
+        return None, None, [f"{label} must be a non-empty path relative to target root"]
+    raw = Path(value)
+    if raw.is_absolute():
+        return None, None, [f"{label} must be relative to target root: {value}"]
+    resolved = (target_root / raw).resolve()
+    try:
+        relative = resolved.relative_to(target_root.resolve())
+    except ValueError:
+        return None, None, [f"{label} escapes target root: {value}"]
+    return resolved, str(relative), []
+
+
+def validate_work_item_id(value: str) -> list[str]:
+    if not isinstance(value, str) or not value.strip():
+        return ["work item id must be a non-empty string"]
+    if value in {".", ".."} or ".." in value or "/" in value or "\\" in value:
+        return [f"work item id must not contain path traversal or separators: {value}"]
+    return []
+
+
 def cleanup_scratch_tree(target_root: Path, scratch_dir: Path) -> None:
     shutil.rmtree(scratch_dir, ignore_errors=True)
     for candidate in (scratch_dir.parent, scratch_dir.parent.parent):
@@ -996,13 +1033,16 @@ def current_cwd_relative(target_root: Path) -> str | None:
 
 
 def update_markdown_bullet(path: Path, label: str, value: str) -> None:
+    atomic_write_text(path, update_markdown_bullet_text(path.read_text(encoding="utf-8"), label, value, str(path)))
+
+
+def update_markdown_bullet_text(text: str, label: str, value: str, path_label: str) -> str:
     pattern = re.compile(rf"(?m)^- {re.escape(label)}:\s*.*$")
     replacement = f"- {label}: {value}"
-    text = path.read_text(encoding="utf-8")
     updated, count = pattern.subn(replacement, text, count=1)
     if count != 1:
-        raise RuntimeError(f"unable to update `{label}` in {path}")
-    path.write_text(updated, encoding="utf-8")
+        raise RuntimeError(f"unable to update `{label}` in {path_label}")
+    return updated
 
 
 def replace_markdown_section(path: Path, section_name: str, new_lines: list[str]) -> None:
@@ -1054,7 +1094,9 @@ def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, di
 
 
 def sync_status_surface(target_root: Path, output_relative: str, runtime_evidence: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
-    output_path = target_root / output_relative
+    output_path, normalized_output, path_errors = resolve_target_relative_path(target_root, output_relative, "init-result")
+    if path_errors or output_path is None or normalized_output is None:
+        return {}, path_errors
     try:
         init_result = load_json_file(output_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -1070,9 +1112,12 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     work_item_ref = str(entry_points.get("work_item", ""))
     recovery_ref = str(entry_points.get("recovery_entry", ""))
     status_ref = str(entry_points.get("status_surface", ""))
-    work_item_path = target_root / work_item_ref
-    recovery_path = target_root / recovery_ref
-    status_path = target_root / status_ref
+    work_item_path, _, work_item_path_errors = resolve_target_relative_path(target_root, work_item_ref, "work item")
+    recovery_path, _, recovery_path_errors = resolve_target_relative_path(target_root, recovery_ref, "recovery entry")
+    status_path, normalized_status, status_path_errors = resolve_target_relative_path(target_root, status_ref, "status surface")
+    path_errors = [*work_item_path_errors, *recovery_path_errors, *status_path_errors]
+    if path_errors or work_item_path is None or recovery_path is None or status_path is None or normalized_status is None:
+        return {}, path_errors
     if not work_item_path.exists() or not recovery_path.exists():
         return {}, ["fact-chain carrier is missing during status sync"]
     work_item, work_item_errors = parse_work_item(work_item_path, target_root)
@@ -1108,9 +1153,15 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
             "current_lane": {"value": recovery_entry["current_lane"]},
         },
     }
-    status_path.write_text(render_status_surface(pseudo_report, runtime_evidence), encoding="utf-8")
-    refreshed, refresh_errors = load_fact_chain_report(target_root, output_relative)
+    status_text = render_status_surface(pseudo_report, runtime_evidence)
+    original_status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else None
+    atomic_write_text(status_path, status_text)
+    refreshed, refresh_errors = load_fact_chain_report(target_root, normalized_output)
     if refresh_errors:
+        if original_status_text is None:
+            status_path.unlink(missing_ok=True)
+        else:
+            atomic_write_text(status_path, original_status_text)
         return {}, refresh_errors
     return refreshed, []
 
@@ -5907,7 +5958,19 @@ def handle_review(args: argparse.Namespace) -> int:
 
 def handle_recovery(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    context, errors = load_context(target_root, args.output, args.item)
+    _, output_relative, output_errors = resolve_target_relative_path(target_root, args.output, "init-result")
+    if output_errors or output_relative is None:
+        return emit(
+            {
+                "command": "recovery",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "recovery command refused an unsafe init-result path.",
+                "missing_inputs": output_errors,
+                "fallback_to": "admission",
+            }
+        )
+    context, errors = load_context(target_root, output_relative, args.item)
     if errors:
         return emit(
             {
@@ -5956,19 +6019,28 @@ def handle_recovery(args: argparse.Namespace) -> int:
             }
         )
 
+    original_recovery_text = context["recovery_path"].read_text(encoding="utf-8")
+    candidate_recovery_text = original_recovery_text
     for field_name, value in provided.items():
         if field_name == "current_checkpoint":
             value = normalize_checkpoint(value) if value.strip().lower() == "retired" else value
-        update_markdown_bullet(context["recovery_path"], RECOVERY_FIELD_LABELS[field_name], value)
+        candidate_recovery_text = update_markdown_bullet_text(
+            candidate_recovery_text,
+            RECOVERY_FIELD_LABELS[field_name],
+            value,
+            str(context["recovery_path"]),
+        )
 
-    refreshed, refresh_errors = sync_status_surface(target_root, args.output, runtime_evidence)
+    atomic_write_text(context["recovery_path"], candidate_recovery_text)
+    refreshed, refresh_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
     if refresh_errors:
+        atomic_write_text(context["recovery_path"], original_recovery_text)
         return emit(
             {
                 "command": "recovery",
                 "operation": "writeback",
                 "result": "block",
-                "summary": "recovery writeback updated the recovery entry, but fact-chain verification failed during status sync.",
+                "summary": "recovery writeback refused to retain carrier changes because fact-chain verification failed during status sync.",
                 "missing_inputs": refresh_errors,
                 "fallback_to": "admission",
             }
@@ -5999,7 +6071,9 @@ def update_active_entry_points(
     recovery_entry: str,
     status_surface: str,
 ) -> None:
-    output_path = target_root / output_relative
+    output_path, _, errors = resolve_target_relative_path(target_root, output_relative, "init-result")
+    if errors or output_path is None:
+        raise RuntimeError("; ".join(errors))
     payload = load_json_file(output_path)
     fact_chain = payload.get("fact_chain")
     if not isinstance(fact_chain, dict):
@@ -6011,12 +6085,24 @@ def update_active_entry_points(
     entry_points["work_item"] = work_item
     entry_points["recovery_entry"] = recovery_entry
     entry_points["status_surface"] = status_surface
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(output_path, payload)
 
 
 def handle_work_item(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    output_path = target_root / args.output
+    item_errors = validate_work_item_id(args.item)
+    output_path, output_relative, output_errors = resolve_target_relative_path(target_root, args.output, "init-result")
+    if item_errors or output_errors or output_path is None or output_relative is None:
+        return emit(
+            {
+                "command": "work-item",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "work-item command refused unsafe identifiers or paths.",
+                "missing_inputs": [*item_errors, *output_errors],
+                "fallback_to": "admission",
+            }
+        )
     if not output_path.exists():
         return emit(
             {
@@ -6024,17 +6110,40 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 "operation": args.operation,
                 "result": "block",
                 "summary": "work-item command requires an existing init-result fact-chain locator.",
-                "missing_inputs": [f"missing init-result: {args.output}"],
+                "missing_inputs": [f"missing init-result: {output_relative}"],
                 "fallback_to": "admission",
             }
         )
 
     work_item_relative = f".loom/work-items/{args.item}.md"
-    work_item_path = target_root / work_item_relative
+    work_item_path, work_item_relative, work_item_path_errors = resolve_target_relative_path(target_root, work_item_relative, "work item")
     recovery_relative = args.recovery_entry or f".loom/progress/{args.item}.md"
-    recovery_path = target_root / recovery_relative
+    recovery_path, recovery_relative, recovery_path_errors = resolve_target_relative_path(target_root, recovery_relative, "recovery entry")
     review_relative = default_review_path(args.item)
-    status_relative = ".loom/status/current.md"
+    review_path, review_relative, review_path_errors = resolve_target_relative_path(target_root, review_relative, "review entry")
+    status_path, status_relative, status_path_errors = resolve_target_relative_path(target_root, ".loom/status/current.md", "status surface")
+    artifact_errors: list[str] = []
+    for artifact in [*args.artifact, *args.add_artifact, *args.remove_artifact]:
+        _, _, errors = resolve_target_relative_path(target_root, artifact, "associated artifact")
+        artifact_errors.extend(errors)
+    path_errors = [
+        *work_item_path_errors,
+        *recovery_path_errors,
+        *review_path_errors,
+        *status_path_errors,
+        *artifact_errors,
+    ]
+    if path_errors or work_item_path is None or recovery_path is None or review_path is None or status_path is None:
+        return emit(
+            {
+                "command": "work-item",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "work-item command refused paths that escape the target root.",
+                "missing_inputs": path_errors,
+                "fallback_to": "admission",
+            }
+        )
     runtime_evidence: dict[str, dict[str, Any]] | None = None
 
     if args.operation == "create":
@@ -6091,11 +6200,10 @@ def handle_work_item(args: argparse.Namespace) -> int:
             "closing_condition": args.closing_condition,
             "associated_artifacts": deduped_artifacts,
         }
-        work_item_path.parent.mkdir(parents=True, exist_ok=True)
-        work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
-        review_path = target_root / review_relative
+        atomic_write_text(work_item_path, render_work_item(work_item_payload))
         review_path.parent.mkdir(parents=True, exist_ok=True)
-        review_path.write_text(
+        atomic_write_text(
+            review_path,
             json.dumps(
                 {
                     "schema_version": "loom-review/v1",
@@ -6136,12 +6244,12 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 indent=2,
             )
             + "\n",
-            encoding="utf-8",
         )
 
         if args.init_recovery:
             recovery_path.parent.mkdir(parents=True, exist_ok=True)
-            recovery_path.write_text(
+            atomic_write_text(
+                recovery_path,
                 render_recovery_entry(
                     args.item,
                     {
@@ -6154,7 +6262,6 @@ def handle_work_item(args: argparse.Namespace) -> int:
                         "current_lane": "not yet assigned",
                     },
                 ),
-                encoding="utf-8",
             )
 
     else:
@@ -6201,8 +6308,19 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 entry for entry in work_item_payload["associated_artifacts"] if entry != artifact
             ]
         recovery_relative = work_item_payload["recovery_entry"]
-        recovery_path = target_root / recovery_relative
-        work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
+        recovery_path, recovery_relative, recovery_path_errors = resolve_target_relative_path(target_root, recovery_relative, "recovery entry")
+        if recovery_path_errors or recovery_path is None:
+            return emit(
+                {
+                    "command": "work-item",
+                    "operation": "update",
+                    "result": "block",
+                    "summary": "work-item update refused an unsafe recovery entry path.",
+                    "missing_inputs": recovery_path_errors,
+                    "fallback_to": "admission",
+                }
+            )
+        atomic_write_text(work_item_path, render_work_item(work_item_payload))
 
     if args.activate:
         if not recovery_path.exists():
@@ -6230,13 +6348,13 @@ def handle_work_item(args: argparse.Namespace) -> int:
             )
         update_active_entry_points(
             target_root,
-            args.output,
+            output_relative,
             item_id=args.item,
             work_item=work_item_relative,
             recovery_entry=recovery_relative,
             status_surface=status_relative,
         )
-        _, sync_errors = sync_status_surface(target_root, args.output, runtime_evidence)
+        _, sync_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
         if sync_errors:
             return emit(
                 {
@@ -6265,7 +6383,7 @@ def handle_work_item(args: argparse.Namespace) -> int:
                         "fallback_to": "admission",
                     }
                 )
-            _, sync_errors = sync_status_surface(target_root, args.output, runtime_evidence)
+            _, sync_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
             if sync_errors:
                 return emit(
                     {

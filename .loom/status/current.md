@@ -12,30 +12,12 @@
 - Validation Entry: python3 .loom/bin/loom_init.py verify --target .
 - Closing Condition: The generated entry, work item, recovery entry, and templates are readable and verified
 - Current Checkpoint: build checkpoint
-- Current Stop: Bootstrap artifacts have been generated and are awaiting downstream review.
-- Next Step: Accept the generated Loom entry and promote the first real repository work item.
-- Blockers: None recorded.
-- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.
-- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.
-- Current Lane: bootstrap verification only
-
-## Governance Status
-
-- Item Key: INIT-0001
-- Item Type: work_item
-- Phase: not_declared
-- FR: not_declared
-- Release: not_declared
-- Sprint: not_declared
-- Head SHA: bootstrap-placeholder
-- Status: planning
-- Spec Entry: .loom/specs/INIT-0001/spec.md
-- Plan Entry: .loom/specs/INIT-0001/plan.md
-- Implementation Contract Entry: .loom/specs/INIT-0001/implementation-contract.md
-- Spec Review Entry: .loom/reviews/INIT-0001.spec.json
-- Spec Review Status: pending
-- Review Head Status: bootstrap-placeholder
-- Merge Gate Status: pending
+- Current Stop: Syvert Loom official adoption PR #259 is under guardian review after CI passed.
+- Next Step: Resolve guardian findings, refresh validation, and complete controlled merge for Work Item #258.
+- Blockers: Guardian requested companion/runtime carrier fixes before merge.
+- Latest Validation Summary: CI passed for PR #259; Loom verify, governance-profile status, runtime-parity, shadow-parity, and blocking shadow-parity passed after carrier hardening.
+- Recovery Boundary: Formal adoption is tracked by Phase #256, FR #257, Work Item #258, and PR #259.
+- Current Lane: official Syvert adoption
 
 ## Runtime Evidence
 
