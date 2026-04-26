@@ -191,11 +191,13 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
 
     if repo_interface.get("schema_version") not in {"loom-repo-interface/v1", "loom-repo-interface/v2"}:
         errors.append("Loom repo interface schema_version 必须是 loom-repo-interface/v1 或 loom-repo-interface/v2")
-    _, error = repo_relative_path(
+    actual_companion_entry, error = repo_relative_path(
         repo_root,
         repo_interface.get("companion_entry"),
         label="repo interface `companion_entry`",
     )
+    if actual_companion_entry != ".loom/companion/README.md":
+        errors.append("Loom repo interface `companion_entry` 必须是 .loom/companion/README.md")
     if error:
         errors.append(error)
 
@@ -497,6 +499,17 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         errors.append("Loom spec review 的 reviewed_validation_summary 必须匹配 progress/status 最新验证摘要")
 
     required_bootstrap_paths = {str(path) for path in REQUIRED_LOOM_CARRIER_FILES}
+    required_bootstrap_paths.update(
+        {
+            f".loom/work-items/{item_id}.md",
+            f".loom/progress/{item_id}.md",
+            f".loom/reviews/{item_id}.json",
+            f".loom/reviews/{item_id}.spec.json",
+            f".loom/specs/{item_id}/spec.md",
+            f".loom/specs/{item_id}/plan.md",
+            f".loom/specs/{item_id}/implementation-contract.md",
+        }
+    )
     required_bootstrap_paths.update(
         path.as_posix()
         for path in sorted((repo_root / ".loom/shadow").glob("*.json"))

@@ -45,7 +45,7 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`loom-official-adoption` 的唯一实现 Work Item，承接 Phase D release judgment 后的 Syvert 正式迁移。
-- 阻塞：`tests/runtime` 全量发现当前存在既有 baseline 失败；本轮以 governance gate、CI 必跑门禁与 Loom-on-Syvert 验证作为合并依据，并在 PR 中记录该 residual。
+- 阻塞：`tests/runtime` 全量发现当前存在既有 baseline 失败；Work Item #258 与 FR #257 已明确接受该项为本治理迁移 out-of-scope，并由 #260 跟进修复。本轮以 governance gate、CI 必跑门禁与 Loom-on-Syvert 验证作为合并依据。
 
 ## 已验证项
 
@@ -90,6 +90,7 @@
 - `python3.11 -m unittest discover -s tests/governance -p 'test_*.py'`
   - 结果：通过。
 - `python3.11 -m unittest discover -s tests/runtime -p 'test_*.py'`
+  - 结果：5 failures / 1 error；该项属于 Syvert runtime business baseline residual，已在 #258/#257 中作为 accepted waiver 记录，并由 #260 跟进，不阻断 PR #259 的 Loom governance adoption closeout。
   - 结果：失败，5 failures / 1 error；失败集中于 Douyin browser bridge、CLI durable truth、platform leakage fixture，与本轮 `.loom` / governance docs 改动无直接路径重叠。
 
 ## 未决风险

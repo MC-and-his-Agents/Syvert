@@ -290,6 +290,15 @@ def write_minimal_loom_carrier(root: Path) -> None:
             str(path)
             for path in governance_gate.REQUIRED_LOOM_CARRIER_FILES
         }
+        | {
+            ".loom/work-items/INIT-0001.md",
+            ".loom/progress/INIT-0001.md",
+            ".loom/reviews/INIT-0001.json",
+            ".loom/reviews/INIT-0001.spec.json",
+            ".loom/specs/INIT-0001/spec.md",
+            ".loom/specs/INIT-0001/plan.md",
+            ".loom/specs/INIT-0001/implementation-contract.md",
+        }
         | set(loom_sources)
         | set(repo_sources)
     )
@@ -803,6 +812,22 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("bootstrap manifest artifacts 缺少 `.loom/companion/interop.json`" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_missing_active_item_inventory_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/bootstrap/init-result.json").read_text(encoding="utf-8"))
+            payload["initial_artifacts"] = [
+                artifact
+                for artifact in payload["initial_artifacts"]
+                if artifact["path"] != ".loom/specs/INIT-0001/spec.md"
+            ]
+            (root / ".loom/bootstrap/init-result.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/init-result.json"])
+
+            self.assertTrue(any("init-result initial_artifacts 缺少 `.loom/specs/INIT-0001/spec.md`" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_init_fact_chain_locator_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -826,6 +851,18 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/manifest.json"])
 
             self.assertTrue(any("companion manifest `repo_interface` 必须是 .loom/companion/repo-interface.json" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_repo_interface_companion_entry_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload["companion_entry"] = "WORKFLOW.md"
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("repo interface `companion_entry` 必须是 .loom/companion/README.md" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_missing_required_specialized_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
