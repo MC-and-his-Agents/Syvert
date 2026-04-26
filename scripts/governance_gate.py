@@ -118,6 +118,12 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     review_path = repo_root / f".loom/reviews/{item_id}.json"
     spec_review_path = repo_root / f".loom/reviews/{item_id}.spec.json"
     spec_dir = repo_root / f".loom/specs/{item_id}"
+    canonical_fields = {
+        "Workspace Entry": ".",
+        "Recovery Entry": f".loom/progress/{item_id}.md",
+        "Review Entry": f".loom/reviews/{item_id}.json",
+        "Validation Entry": "python3 .loom/bin/loom_init.py verify --target .",
+    }
     for path in (
         work_item_path,
         progress_path,
@@ -138,6 +144,9 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     for field in ("Item ID", "Goal", "Scope", "Execution Path", "Workspace Entry", "Recovery Entry", "Review Entry", "Validation Entry", "Closing Condition"):
         if not work_item.get(field):
             errors.append(f"Loom work item 缺少 `{field}`")
+    for field, expected in canonical_fields.items():
+        if work_item.get(field) and work_item[field] != expected:
+            errors.append(f"Loom work item 的 `{field}` 必须是 `{expected}`")
     for field in (
         "Item ID",
         "Goal",
@@ -155,6 +164,9 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
             errors.append(f"Loom status 缺少 `{field}`")
         elif work_item.get(field) and work_item[field] != status[field]:
             errors.append(f"Loom status 与 work item 的 `{field}` 不一致")
+    for field, expected in canonical_fields.items():
+        if status.get(field) and status[field] != expected:
+            errors.append(f"Loom status 的 `{field}` 必须是 `{expected}`")
     for field in ("Item ID", "Current Checkpoint", "Latest Validation Summary"):
         if not progress.get(field):
             errors.append(f"Loom progress 缺少 `{field}`")

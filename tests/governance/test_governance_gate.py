@@ -426,6 +426,24 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("Review Entry" in error and "不一致" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_synchronized_wrong_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            for relative in (".loom/work-items/INIT-0001.md", ".loom/status/current.md"):
+                path = root / relative
+                path.write_text(
+                    path.read_text(encoding="utf-8").replace(
+                        "- Review Entry: .loom/reviews/INIT-0001.json",
+                        "- Review Entry: .loom/reviews/OTHER.json",
+                    ),
+                    encoding="utf-8",
+                )
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Review Entry" in error and "必须是" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
