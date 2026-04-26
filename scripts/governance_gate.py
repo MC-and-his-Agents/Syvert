@@ -58,6 +58,7 @@ REQUIRED_LOOM_CARRIER_FILES = (
     Path(".loom/bin/loom_check.py"),
     Path(".loom/bin/runtime_paths.py"),
     Path(".loom/bin/runtime_state.py"),
+    Path(".loom/companion/README.md"),
     Path(".loom/companion/manifest.json"),
     Path(".loom/companion/repo-interface.json"),
     Path(".loom/companion/interop.json"),
@@ -524,6 +525,10 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         init_result = json.loads(init_result_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         init_result = {}
+    try:
+        interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        interop_payload = {}
     if bootstrap_manifest.get("schema_version") != "loom-bootstrap-manifest/v1":
         errors.append("Loom bootstrap manifest schema_version 必须是 loom-bootstrap-manifest/v1")
     if init_result.get("schema_version") != "loom-init-output/v1":
@@ -587,6 +592,16 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         f".loom/specs/{item_id}/implementation-contract.md",
     }
     required_bootstrap_paths = {str(path) for path in REQUIRED_LOOM_CARRIER_FILES}
+    shadow_surfaces = interop_payload.get("shadow_surfaces")
+    declared_shadow_locators = set()
+    if isinstance(shadow_surfaces, dict):
+        declared_shadow_locators = {
+            declared_surface[locator_key]
+            for declared_surface in shadow_surfaces.values()
+            if isinstance(declared_surface, dict)
+            for locator_key in ("loom_locator", "repo_locator")
+            if isinstance(declared_surface.get(locator_key), str)
+        }
     required_bootstrap_paths.update(
         {
             f".loom/work-items/{bootstrap_item_id}.md",
@@ -598,12 +613,14 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
             f".loom/specs/{bootstrap_item_id}/implementation-contract.md",
         }
     )
-    required_bootstrap_paths.update(
-        path.as_posix()
+    required_bootstrap_paths.update(declared_shadow_locators)
+    actual_shadow_locators = {
+        path.relative_to(repo_root).as_posix()
         for path in sorted((repo_root / ".loom/shadow").glob("*.json"))
-        if path.name != "shadow-parity.json"
-        for path in [path.relative_to(repo_root)]
-    )
+    }
+    allowed_shadow_locators = declared_shadow_locators | {".loom/shadow/shadow-parity.json"}
+    for extra_shadow_locator in sorted(actual_shadow_locators - allowed_shadow_locators):
+        errors.append(f"Loom shadow evidence 未在 repo interop 中声明: {extra_shadow_locator}")
     manifest_artifacts = artifact_paths(bootstrap_manifest, "artifacts")
     init_artifacts = artifact_paths(init_result, "initial_artifacts")
     for required_path in sorted(required_bootstrap_paths):
@@ -625,9 +642,9 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
             errors.append("Loom init-result fact_chain.entry_points 必须是对象")
         else:
             expected_entry_points = {
-                "current_item_id": item_id,
-                "work_item": f".loom/work-items/{item_id}.md",
-                "recovery_entry": f".loom/progress/{item_id}.md",
+                "current_item_id": bootstrap_item_id,
+                "work_item": f".loom/work-items/{bootstrap_item_id}.md",
+                "recovery_entry": f".loom/progress/{bootstrap_item_id}.md",
                 "status_surface": ".loom/status/current.md",
             }
             for field, expected in expected_entry_points.items():
@@ -679,10 +696,6 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     if not isinstance(shadow_payload.get("surfaces"), list) or not shadow_payload.get("surfaces"):
         errors.append("Loom shadow parity artifact 必须列出 surfaces")
 
-    try:
-        interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        interop_payload = {}
     shadow_surfaces = interop_payload.get("shadow_surfaces")
     if not isinstance(shadow_surfaces, dict) or not shadow_surfaces:
         errors.append("Loom repo interop contract 必须声明 shadow_surfaces")

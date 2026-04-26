@@ -843,6 +843,137 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("fact_chain.entry_points.work_item 必须是 .loom/work-items/INIT-0001.md" in error for error in errors))
 
+    def test_loom_carrier_guard_keeps_bootstrap_fact_chain_on_initial_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            item_id = "WORK-0002"
+            summary = "ok"
+            active_paths = {
+                f".loom/work-items/{item_id}.md",
+                f".loom/progress/{item_id}.md",
+                f".loom/reviews/{item_id}.json",
+                f".loom/reviews/{item_id}.spec.json",
+                f".loom/specs/{item_id}/spec.md",
+                f".loom/specs/{item_id}/plan.md",
+                f".loom/specs/{item_id}/implementation-contract.md",
+            }
+            (root / f".loom/specs/{item_id}").mkdir(parents=True, exist_ok=True)
+            for name in ("spec.md", "plan.md", "implementation-contract.md"):
+                (root / f".loom/specs/{item_id}" / name).write_text("ok\n", encoding="utf-8")
+            (root / f".loom/work-items/{item_id}.md").write_text(
+                "\n".join(
+                    [
+                        f"- Item ID: {item_id}",
+                        "- Goal: Adopt Loom",
+                        "- Scope: Validate carrier",
+                        "- Execution Path: governance/loom",
+                        "- Workspace Entry: .",
+                        f"- Recovery Entry: .loom/progress/{item_id}.md",
+                        f"- Review Entry: .loom/reviews/{item_id}.json",
+                        "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                        "- Closing Condition: carrier is valid",
+                        "",
+                        "## Associated Artifacts",
+                        "",
+                        *[f"- `{path}`" for path in sorted(active_paths)],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / ".loom/status/current.md").write_text(
+                "\n".join(
+                    [
+                        f"- Item ID: {item_id}",
+                        "- Goal: Adopt Loom",
+                        "- Scope: Validate carrier",
+                        "- Execution Path: governance/loom",
+                        "- Workspace Entry: .",
+                        f"- Recovery Entry: .loom/progress/{item_id}.md",
+                        f"- Review Entry: .loom/reviews/{item_id}.json",
+                        "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                        "- Closing Condition: carrier is valid",
+                        "- Current Checkpoint: merge checkpoint",
+                        f"- Latest Validation Summary: {summary}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / f".loom/progress/{item_id}.md").write_text(
+                "\n".join(
+                    [
+                        f"- Item ID: {item_id}",
+                        "- Current Checkpoint: merge checkpoint",
+                        f"- Latest Validation Summary: {summary}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            for relative, kind in (
+                (f".loom/reviews/{item_id}.json", "general_review"),
+                (f".loom/reviews/{item_id}.spec.json", "spec_review"),
+            ):
+                (root / relative).write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "loom-review/v1",
+                            "item_id": item_id,
+                            "decision": "allow",
+                            "kind": kind,
+                            "summary": "ok",
+                            "reviewer": "test",
+                            "reviewed_head": "abc",
+                            "reviewed_validation_summary": summary,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertFalse(any("fact_chain.entry_points" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_undeclared_shadow_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / ".loom/shadow/rogue.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-shadow-surface-evidence/v1",
+                        "surface": "review",
+                        "side": "repo",
+                        "parity_value": "rogue",
+                        "source_files": ["WORKFLOW.md"],
+                        "source_sha256": {"WORKFLOW.md": governance_gate.sha256_file(root / "WORKFLOW.md")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/shadow/rogue.json"])
+
+            self.assertTrue(any("shadow evidence 未在 repo interop 中声明: .loom/shadow/rogue.json" in error for error in errors))
+
+    def test_loom_carrier_guard_requires_companion_readme_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/bootstrap/manifest.json").read_text(encoding="utf-8"))
+            payload["artifacts"] = [
+                artifact
+                for artifact in payload["artifacts"]
+                if artifact["path"] != ".loom/companion/README.md"
+            ]
+            (root / ".loom/bootstrap/manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/manifest.json"])
+
+            self.assertTrue(any("bootstrap manifest artifacts 缺少 `.loom/companion/README.md`" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_companion_locator_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -255,6 +255,11 @@
       "path": ".github/PULL_REQUEST_TEMPLATE.md",
       "kind": "pr-template",
       "source": "skills/shared/assets/github/PULL_REQUEST_TEMPLATE.md"
+    },
+    {
+      "path": ".loom/companion/README.md",
+      "kind": "companion-entry",
+      "source": "official-adoption"
     }
   ],
   "initial_work_items": [
@@ -306,7 +311,8 @@
         "docs/decisions/ADR-GOV-0038-loom-official-adoption.md",
         "scripts/governance_gate.py",
         "tests/governance/test_governance_gate.py",
-        "tests/governance/test_loom_carrier_runtime.py"
+        "tests/governance/test_loom_carrier_runtime.py",
+        ".loom/companion/README.md"
       ],
       "closing_condition": "Loom carrier verification, runtime parity, blocking shadow parity, merge checkpoint, Syvert governance gates, guardian review, controlled merge, and issue closeout all agree on the same adoption truth.",
       "post_build_continuation": "Complete guardian review, controlled merge, and Work Item / FR / Phase closeout.",
