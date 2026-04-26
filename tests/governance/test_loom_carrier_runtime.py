@@ -90,6 +90,25 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             ["merge-base", "--is-ancestor", "abc123", "refs/remotes/origin/release/main"],
         )
 
+    def test_contains_merged_commit_blocks_when_fetch_fails(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        calls: list[list[str]] = []
+
+        def fake_run_git(root: Path, args: list[str]):
+            calls.append(args)
+
+            class Result:
+                returncode = 1
+
+            return Result()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            with patch.object(loom_flow, "run_git", side_effect=fake_run_git):
+                self.assertFalse(loom_flow.contains_merged_commit(root, "abc123", "release/main"))
+
+        self.assertEqual(len(calls), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

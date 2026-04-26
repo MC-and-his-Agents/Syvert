@@ -35,6 +35,82 @@ SPEC_SCOPE_REPORT = {
 }
 
 
+def write_minimal_loom_carrier(root: Path) -> None:
+    summary = "carrier validation passed"
+    for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.suffix == ".py":
+            path.write_text("print('ok')\n", encoding="utf-8")
+        elif path.suffix == ".json":
+            path.write_text(json.dumps({}), encoding="utf-8")
+        else:
+            path.write_text("ok\n", encoding="utf-8")
+    (root / ".loom/work-items/INIT-0001.md").write_text(
+        "\n".join(
+            [
+                "- Item ID: INIT-0001",
+                "- Goal: Adopt Loom",
+                "- Scope: Validate carrier",
+                "- Execution Path: governance/loom",
+                "- Workspace Entry: .",
+                "- Recovery Entry: .loom/progress/INIT-0001.md",
+                "- Review Entry: .loom/reviews/INIT-0001.json",
+                "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                "- Closing Condition: carrier is valid",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    status_text = "\n".join(
+        [
+            "- Item ID: INIT-0001",
+            "- Goal: Adopt Loom",
+            "- Scope: Validate carrier",
+            "- Execution Path: governance/loom",
+            "- Current Checkpoint: merge checkpoint",
+            f"- Latest Validation Summary: {summary}",
+            "",
+        ]
+    )
+    (root / ".loom/status/current.md").write_text(status_text, encoding="utf-8")
+    (root / ".loom/progress/INIT-0001.md").write_text(
+        "\n".join(
+            [
+                "- Item ID: INIT-0001",
+                "- Current Checkpoint: merge checkpoint",
+                f"- Latest Validation Summary: {summary}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    for relative, kind in (
+        (".loom/reviews/INIT-0001.json", "general_review"),
+        (".loom/reviews/INIT-0001.spec.json", "spec_review"),
+    ):
+        (root / relative).write_text(
+            json.dumps(
+                {
+                    "schema_version": "loom-review/v1",
+                    "item_id": "INIT-0001",
+                    "decision": "allow",
+                    "kind": kind,
+                    "summary": "ok",
+                    "reviewer": "test",
+                    "reviewed_head": "abc",
+                    "reviewed_validation_summary": summary,
+                }
+            ),
+            encoding="utf-8",
+        )
+    (root / ".loom/shadow/shadow-parity.json").write_text(
+        json.dumps({"result": "pass", "surfaces": ["admission"]}),
+        encoding="utf-8",
+    )
+
+
 class GovernanceGateTests(unittest.TestCase):
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={})
     @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
@@ -287,15 +363,7 @@ class GovernanceGateTests(unittest.TestCase):
     def test_loom_carrier_guard_rejects_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                if path.suffix == ".json":
-                    path.write_text("{}", encoding="utf-8")
-                elif path.suffix == ".py":
-                    path.write_text("print('ok')\n", encoding="utf-8")
-                else:
-                    path.write_text("ok\n", encoding="utf-8")
+            write_minimal_loom_carrier(root)
             (root / ".loom/bootstrap/init-result.json").write_text("{invalid", encoding="utf-8")
 
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/init-result.json"])
@@ -305,19 +373,23 @@ class GovernanceGateTests(unittest.TestCase):
     def test_loom_carrier_guard_is_static_and_accepts_valid_structure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                if path.suffix == ".json":
-                    path.write_text(json.dumps({}), encoding="utf-8")
-                elif path.suffix == ".py":
-                    path.write_text("print('ok')\n", encoding="utf-8")
-                else:
-                    path.write_text("ok\n", encoding="utf-8")
+            write_minimal_loom_carrier(root)
 
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bin/loom_flow.py"])
 
             self.assertEqual(errors, [])
+
+    def test_loom_carrier_guard_rejects_review_status_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/reviews/INIT-0001.json").read_text(encoding="utf-8"))
+            payload["reviewed_validation_summary"] = "stale"
+            (root / ".loom/reviews/INIT-0001.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/reviews/INIT-0001.json"])
+
+            self.assertTrue(any("reviewed_validation_summary" in error for error in errors))
 
 
 if __name__ == "__main__":

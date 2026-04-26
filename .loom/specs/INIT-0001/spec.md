@@ -44,8 +44,8 @@ When
 - PR 修改 `.loom/bin/*.py`、`.loom/**/*.json`、review/status/spec carrier 或 companion locator。
 
 Then
-- `scripts/governance_gate.py --mode ci` 必须校验 `.loom` 必需文件、JSON 语法、Python 语法和 repo-local `loom_check`。
-- 结构不一致或 carrier gate fallback/block 时，governance gate 阻断 PR。
+- `scripts/governance_gate.py --mode ci` 必须校验 `.loom` 必需文件、JSON 语法、Python 语法、work item/status/progress/review/spec/shadow 的最小静态一致性。
+- runtime parity、shadow parity 与 merge checkpoint 由 bounded repo-local `loom_check` 在运行门禁阶段验证，不嵌入早期 governance gate。
 
 ### Scenario 3
 

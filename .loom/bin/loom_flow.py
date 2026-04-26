@@ -4340,7 +4340,9 @@ def contains_merged_commit(root: Path, merge_commit_sha: str, target_branch: str
         return False
     remote_ref = f"refs/remotes/origin/{target_branch}"
     fetch_refspec = f"refs/heads/{target_branch}:{remote_ref}"
-    run_git(root, ["fetch", "origin", fetch_refspec])
+    fetch = run_git(root, ["fetch", "origin", fetch_refspec])
+    if fetch is None or fetch.returncode != 0:
+        return False
     contains = run_git(root, ["merge-base", "--is-ancestor", merge_commit_sha, remote_ref])
     return contains is not None and contains.returncode == 0
 
