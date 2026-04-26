@@ -55,6 +55,8 @@ def write_minimal_loom_carrier(root: Path) -> None:
     (root / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
     (root / "WORKFLOW.md").write_text("# Workflow\n\nSyvert repo-native governance surface.\n", encoding="utf-8")
     (root / "code_review.md").write_text("# Code Review\n", encoding="utf-8")
+    (root / "docs/process").mkdir(parents=True, exist_ok=True)
+    (root / "docs/process/delivery-funnel.md").write_text("# Delivery Funnel\n", encoding="utf-8")
     (root / "scripts/policy").mkdir(parents=True, exist_ok=True)
     (root / "scripts/workflow_guard.py").write_text("print('workflow')\n", encoding="utf-8")
     (root / "scripts/governance_gate.py").write_text("print('governance')\n", encoding="utf-8")
@@ -146,14 +148,28 @@ def write_minimal_loom_carrier(root: Path) -> None:
                     "admission": [],
                     "review": [
                         {
-                            "id": "review-rubric",
+                            "id": "syvert-review-rubric",
                             "summary": "review",
                             "locator": "code_review.md",
                             "enforcement": "blocking",
                         }
                     ],
-                    "merge_ready": [],
-                    "closeout": [],
+                    "merge_ready": [
+                        {
+                            "id": "syvert-guardian-merge-gate",
+                            "summary": "merge",
+                            "locator": "code_review.md",
+                            "enforcement": "blocking",
+                        }
+                    ],
+                    "closeout": [
+                        {
+                            "id": "syvert-delivery-closeout",
+                            "summary": "closeout",
+                            "locator": "docs/process/delivery-funnel.md",
+                            "enforcement": "advisory",
+                        }
+                    ],
                 },
                 "specialized_gates": [
                     {
@@ -167,6 +183,12 @@ def write_minimal_loom_carrier(root: Path) -> None:
                         "summary": "governance",
                         "locator": "scripts/governance_gate.py",
                         "gate_type": "build",
+                    },
+                    {
+                        "id": "pr-guardian",
+                        "summary": "guardian",
+                        "locator": "scripts/pr_guardian.py",
+                        "gate_type": "merge_ready",
                     },
                 ],
                 "metadata_contract": {
@@ -186,11 +208,22 @@ def write_minimal_loom_carrier(root: Path) -> None:
                             "id": "issue",
                             "summary": "issue",
                             "authority_locator": "WORKFLOW.md",
-                            "mapping_rule_locator": "WORKFLOW.md",
+                            "mapping_rule_locator": "docs/process/delivery-funnel.md",
                             "type": "integer",
                             "required": True,
                         }
                     ]
+                    + [
+                        {
+                            "id": field,
+                            "summary": field,
+                            "authority_locator": "WORKFLOW.md",
+                            "mapping_rule_locator": "WORKFLOW.md",
+                            "type": "string",
+                            "required": True,
+                        }
+                        for field in ("item_key", "item_type", "release", "sprint")
+                    ],
                 },
             }
         ),
@@ -703,6 +736,23 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("surfaces 必须与 repo interop shadow_surfaces 完全一致" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_synchronized_shadow_surface_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            interop = json.loads((root / ".loom/companion/interop.json").read_text(encoding="utf-8"))
+            interop["shadow_surfaces"].pop("review")
+            (root / ".loom/companion/interop.json").write_text(json.dumps(interop), encoding="utf-8")
+            shadow = json.loads((root / ".loom/shadow/shadow-parity.json").read_text(encoding="utf-8"))
+            shadow["surfaces"].remove("review")
+            shadow["loom_sources"] = [source for source in shadow["loom_sources"] if "review-" not in source]
+            shadow["repo_sources"] = [source for source in shadow["repo_sources"] if "review-" not in source]
+            (root / ".loom/shadow/shadow-parity.json").write_text(json.dumps(shadow), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/interop.json"])
+
+            self.assertTrue(any("shadow_surfaces 必须固定为 admission/review/merge_ready/closeout" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_shadow_artifact_schema_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -776,6 +826,34 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/manifest.json"])
 
             self.assertTrue(any("companion manifest `repo_interface` 必须是 .loom/companion/repo-interface.json" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_required_specialized_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload["specialized_gates"] = [
+                gate for gate in payload["specialized_gates"] if gate["id"] != "pr-guardian"
+            ]
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("specialized_gates 缺少 required gate `pr-guardian`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_required_context_locator_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            for field in payload["context_schema"]["fields"]:
+                if field["id"] == "issue":
+                    field["mapping_rule_locator"] = "WORKFLOW.md"
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("context_schema field `issue` mapping_rule_locator 必须是 docs/process/delivery-funnel.md" in error for error in errors))
 
 
 if __name__ == "__main__":

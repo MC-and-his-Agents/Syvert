@@ -49,17 +49,19 @@
 
 ## 已验证项
 
-- `python3 /Users/mc/dev/Loom/tools/loom_init.py bootstrap --target /Users/mc/dev/syvert-official-loom --write --force --verify --install-pr-template`
-  - 结果：通过；后续恢复 Syvert-owned PR template，仅保留 Loom locator。
-- `python3 /Users/mc/dev/Loom/tools/loom_init.py verify --target /Users/mc/dev/syvert-official-loom`
+- `python3 .loom/bin/loom_check.py .`
+  - 结果：通过；repo-local Loom gate 覆盖 vendored runtime、runtime parity、shadow parity 与 merge checkpoint。
+- `python3 .loom/bin/loom_init.py verify --target .`
   - 结果：通过。
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py governance-profile status --target /Users/mc/dev/syvert-official-loom`
+- `python3 .loom/bin/loom_init.py route --target . --task 'inspect adoption carrier'`
+  - 结果：通过；vendored `.loom/bin` layout 不依赖外部 skills registry。
+- `python3 .loom/bin/loom_flow.py governance-profile status --target .`
   - 结果：`pass`，maturity=`strong`。
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py runtime-parity validate --target /Users/mc/dev/syvert-official-loom`
+- `python3 .loom/bin/loom_flow.py runtime-parity validate --target .`
   - 结果：`pass`。
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target .`
   - 结果：`pass`。
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom --blocking`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
   - 结果：`pass`。
 - `python3 .loom/bin/loom_flow.py checkpoint merge --target . --item INIT-0001`
   - 结果：`pass`；review head binding 为 `carrier-only`，spec review head binding 为 `implementation-drift-only` 且 `spec_changed_paths=[]`。

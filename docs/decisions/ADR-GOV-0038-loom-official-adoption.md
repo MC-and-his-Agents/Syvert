@@ -44,9 +44,9 @@ Syvert 文档不删除既有治理栈，而是把通用治理语义降级为 Loo
 
 ## Validation
 
-- `python3 /Users/mc/dev/Loom/tools/loom_init.py verify --target /Users/mc/dev/syvert-official-loom`
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py governance-profile status --target /Users/mc/dev/syvert-official-loom`
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py runtime-parity validate --target /Users/mc/dev/syvert-official-loom`
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom`
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom --blocking`
-- `python3 /Users/mc/dev/Loom/tools/loom_flow.py flow resume --target /Users/mc/dev/syvert-official-loom --item INIT-0001`
+- `python3 .loom/bin/loom_init.py verify --target .`
+- `python3 .loom/bin/loom_flow.py governance-profile status --target .`
+- `python3 .loom/bin/loom_flow.py runtime-parity validate --target .`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target .`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
+- `python3 .loom/bin/loom_flow.py flow resume --target . --item INIT-0001`

@@ -65,6 +65,37 @@ REQUIRED_LOOM_CARRIER_FILES = (
     Path(".loom/shadow/shadow-parity.json"),
 )
 
+REQUIRED_LOOM_SHADOW_SURFACES = {"admission", "review", "merge_ready", "closeout"}
+REQUIRED_COMPANION_REQUIREMENTS = {
+    "review": {
+        "syvert-review-rubric": "code_review.md",
+    },
+    "merge_ready": {
+        "syvert-guardian-merge-gate": "code_review.md",
+    },
+    "closeout": {
+        "syvert-delivery-closeout": "docs/process/delivery-funnel.md",
+    },
+}
+REQUIRED_SPECIALIZED_GATES = {
+    "workflow-guard": "scripts/workflow_guard.py",
+    "governance-gate": "scripts/governance_gate.py",
+    "pr-guardian": "scripts/pr_guardian.py",
+}
+REQUIRED_METADATA_CONTRACT_LOCATORS = {
+    "integration_check": {
+        "applicability_locator": "WORKFLOW.md",
+        "authority_locator": "scripts/policy/integration_contract.json",
+    },
+}
+REQUIRED_CONTEXT_SCHEMA_LOCATORS = {
+    "issue": ("WORKFLOW.md", "docs/process/delivery-funnel.md"),
+    "item_key": ("WORKFLOW.md", "WORKFLOW.md"),
+    "item_type": ("WORKFLOW.md", "WORKFLOW.md"),
+    "release": ("WORKFLOW.md", "WORKFLOW.md"),
+    "sprint": ("WORKFLOW.md", "WORKFLOW.md"),
+}
+
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="校验治理基线变更是否保持纯度。")
@@ -172,6 +203,25 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
     if not isinstance(repo_specific_requirements, dict):
         errors.append("Loom repo interface 必须声明 repo_specific_requirements")
     else:
+        for required_surface, required_entries in REQUIRED_COMPANION_REQUIREMENTS.items():
+            requirements = repo_specific_requirements.get(required_surface)
+            if not isinstance(requirements, list):
+                errors.append(f"Loom repo interface 必须声明 `{required_surface}` repo-specific requirements")
+                continue
+            by_id = {
+                requirement.get("id"): requirement
+                for requirement in requirements
+                if isinstance(requirement, dict) and isinstance(requirement.get("id"), str)
+            }
+            for required_id, expected_locator in required_entries.items():
+                requirement = by_id.get(required_id)
+                if not isinstance(requirement, dict):
+                    errors.append(f"Loom repo interface `{required_surface}` 缺少 required requirement `{required_id}`")
+                    continue
+                if requirement.get("locator") != expected_locator:
+                    errors.append(
+                        f"Loom repo interface `{required_surface}` requirement `{required_id}` locator 必须是 {expected_locator}"
+                    )
         for surface, requirements in repo_specific_requirements.items():
             if not isinstance(requirements, list):
                 errors.append(f"Loom repo interface surface `{surface}` 必须是列表")
@@ -192,6 +242,18 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
     if not isinstance(specialized_gates, list):
         errors.append("Loom repo interface 必须声明 specialized_gates 列表")
     else:
+        gates_by_id = {
+            gate.get("id"): gate
+            for gate in specialized_gates
+            if isinstance(gate, dict) and isinstance(gate.get("id"), str)
+        }
+        for required_id, expected_locator in REQUIRED_SPECIALIZED_GATES.items():
+            gate = gates_by_id.get(required_id)
+            if not isinstance(gate, dict):
+                errors.append(f"Loom repo interface specialized_gates 缺少 required gate `{required_id}`")
+                continue
+            if gate.get("locator") != expected_locator:
+                errors.append(f"Loom repo interface specialized gate `{required_id}` locator 必须是 {expected_locator}")
         for index, gate in enumerate(specialized_gates):
             if not isinstance(gate, dict):
                 errors.append(f"Loom repo interface specialized_gates[{index}] 必须是对象")
@@ -206,6 +268,21 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
 
     metadata_contract = repo_interface.get("metadata_contract")
     if isinstance(metadata_contract, dict):
+        metadata_fields = {
+            field.get("id"): field
+            for field in metadata_contract.get("fields", [])
+            if isinstance(field, dict) and isinstance(field.get("id"), str)
+        }
+        for required_id, expected_locators in REQUIRED_METADATA_CONTRACT_LOCATORS.items():
+            field = metadata_fields.get(required_id)
+            if not isinstance(field, dict):
+                errors.append(f"Loom repo interface metadata_contract 缺少 required field `{required_id}`")
+                continue
+            for locator_key, expected_locator in expected_locators.items():
+                if field.get(locator_key) != expected_locator:
+                    errors.append(
+                        f"Loom repo interface metadata_contract field `{required_id}` {locator_key} 必须是 {expected_locator}"
+                    )
         for index, field in enumerate(metadata_contract.get("fields", [])):
             if not isinstance(field, dict):
                 continue
@@ -220,6 +297,24 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
 
     context_schema = repo_interface.get("context_schema")
     if isinstance(context_schema, dict):
+        context_fields = {
+            field.get("id"): field
+            for field in context_schema.get("fields", [])
+            if isinstance(field, dict) and isinstance(field.get("id"), str)
+        }
+        for required_id, (expected_authority, expected_mapping) in REQUIRED_CONTEXT_SCHEMA_LOCATORS.items():
+            field = context_fields.get(required_id)
+            if not isinstance(field, dict):
+                errors.append(f"Loom repo interface context_schema 缺少 required field `{required_id}`")
+                continue
+            if field.get("authority_locator") != expected_authority:
+                errors.append(
+                    f"Loom repo interface context_schema field `{required_id}` authority_locator 必须是 {expected_authority}"
+                )
+            if field.get("mapping_rule_locator") != expected_mapping:
+                errors.append(
+                    f"Loom repo interface context_schema field `{required_id}` mapping_rule_locator 必须是 {expected_mapping}"
+                )
         for index, field in enumerate(context_schema.get("fields", [])):
             if not isinstance(field, dict):
                 continue
@@ -491,6 +586,8 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         errors.append("Loom repo interop contract 必须声明 shadow_surfaces")
     else:
         declared_surface_set = set(shadow_surfaces)
+        if declared_surface_set != REQUIRED_LOOM_SHADOW_SURFACES:
+            errors.append("Loom repo interop shadow_surfaces 必须固定为 admission/review/merge_ready/closeout")
         artifact_surface_set = set(shadow_payload.get("surfaces", [])) if isinstance(shadow_payload.get("surfaces"), list) else set()
         if artifact_surface_set != declared_surface_set:
             errors.append("Loom shadow parity artifact surfaces 必须与 repo interop shadow_surfaces 完全一致")

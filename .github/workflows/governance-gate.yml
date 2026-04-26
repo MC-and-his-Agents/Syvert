@@ -33,6 +33,7 @@ jobs:
           set -euo pipefail
           python3 scripts/workflow_guard.py --mode ci
           python3 scripts/governance_gate.py             --mode ci             --base-sha "$PR_BASE_SHA"             --head-sha "$PR_HEAD_SHA"             --head-ref "$PR_HEAD_REF"
+          python3 .loom/bin/loom_check.py .
 
       - name: Run governance tests
         run: |
