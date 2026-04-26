@@ -42,6 +42,7 @@
 - 阶段 B published-truth follow-up 正由 PR `#255` 回写；该 exec-plan 作为 live execution tracker 保留合入前状态。
 - Phase `#218` 与 Work Item `#236` 当前仍为 `open`，等待 PR `#255` 合入后完成 GitHub closeout。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-236-v0-6-0`
+- 当前承载分支：`issue-236-v0-6-0-published-truth`
 - 当前主干基线：`123cd6dc0c6037050011fde87bace33ca0412098`
 
 ## 下一步动作
