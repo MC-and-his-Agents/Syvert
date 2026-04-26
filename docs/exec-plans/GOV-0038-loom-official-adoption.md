@@ -7,7 +7,7 @@
 - item_type：`GOV`
 - release：`governance-baseline`
 - sprint：`loom-official-adoption`
-- 关联 spec：无（治理 bootstrap / Loom adoption 事项）
+- 关联 spec：`.loom/specs/INIT-0001/spec.md`
 - 关联 decision：`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`
 - 关联 PR：#259
 - active 收口事项：`GOV-0038-loom-official-adoption`
@@ -60,6 +60,8 @@
   - 结果：`pass`。
 - `python3 /Users/mc/dev/Loom/tools/loom_flow.py shadow-parity --target /Users/mc/dev/syvert-official-loom --blocking`
   - 结果：`pass`。
+- `python3 .loom/bin/loom_flow.py checkpoint merge --target . --item INIT-0001`
+  - 结果：`pass`；review head binding 为 `carrier-only`，spec review head binding 为 `implementation-drift-only` 且 `spec_changed_paths=[]`。
 - `python3 .loom/bin/loom_init.py bootstrap --target . --output ../loom-escape.json --verify`
   - 结果：阻断；`--output` 必须保持在 target root 内。
 - 临时篡改 `.loom/bootstrap/init-result.json` 的 `fact_chain.entry_points.work_item` 为 `../loom-escape.md` 后运行 fact-chain 读取。

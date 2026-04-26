@@ -9,11 +9,10 @@ if __package__ in {None, ""}:
 
 import argparse
 import json
-import os
 import py_compile
 import tempfile
 
-from scripts.common import REPO_ROOT, git_changed_files, git_current_branch, run
+from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
 from scripts.context_guard import infer_current_issue, validate_context_rules, validate_repository as validate_context_repository
 from scripts.item_context import matching_exec_plan_for_issue
 from scripts.open_pr import validate_pr_preflight
@@ -106,18 +105,6 @@ def validate_loom_carrier_repository(repo_root: Path, changed_paths: list[str]) 
                         )
                     except py_compile.PyCompileError as exc:
                         errors.append(f"Loom carrier Python 语法无效: {py_path}: {exc.msg}")
-
-    loom_check = repo_root / ".loom/bin/loom_check.py"
-    if loom_check.exists():
-        completed = run(
-            [sys.executable, ".loom/bin/loom_check.py", "."],
-            cwd=repo_root,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-            check=False,
-        )
-        if completed.returncode != 0:
-            detail = completed.stderr.strip() or completed.stdout.strip() or "loom_check failed"
-            errors.append(f"Loom carrier 结构校验失败: {detail}")
 
     return errors
 

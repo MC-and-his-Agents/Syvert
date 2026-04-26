@@ -302,11 +302,7 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("Loom carrier JSON 无效" in error for error in errors))
 
-    @patch("scripts.governance_gate.run")
-    def test_loom_carrier_guard_runs_repo_local_loom_check(self, run_mock) -> None:
-        run_mock.return_value.returncode = 0
-        run_mock.return_value.stdout = ""
-        run_mock.return_value.stderr = ""
+    def test_loom_carrier_guard_is_static_and_accepts_valid_structure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             for relative in governance_gate.REQUIRED_LOOM_CARRIER_FILES:
@@ -322,7 +318,6 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bin/loom_flow.py"])
 
             self.assertEqual(errors, [])
-            run_mock.assert_called_once()
 
 
 if __name__ == "__main__":

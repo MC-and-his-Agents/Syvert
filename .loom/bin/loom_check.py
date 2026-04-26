@@ -5778,13 +5778,20 @@ def is_bootstrapped_target_carrier(root: Path) -> bool:
 
 
 def run_carrier_check(root: Path, command: list[str]) -> tuple[bool, str]:
-    completed = subprocess.run(
-        command,
-        cwd=root,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        output = "\n".join(part for part in (stdout.strip(), stderr.strip()) if part)
+        return False, output or f"`{' '.join(command)}` timed out after 120 seconds"
     output = "\n".join(part for part in (completed.stdout.strip(), completed.stderr.strip()) if part)
     return completed.returncode == 0, output
 
