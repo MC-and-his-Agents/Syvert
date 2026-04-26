@@ -22,7 +22,7 @@
 
 ## 范围
 
-- 本次纳入：`.loom/` runtime / companion carrier、`AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`.github/PULL_REQUEST_TEMPLATE.md` 的 Loom locator、`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`。
+- 本次纳入：`.loom/` runtime / companion carrier、`AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`.github/PULL_REQUEST_TEMPLATE.md` 的 Loom locator、`.github/workflows/governance-gate.yml` 的 repo-local Loom gate wiring、`scripts/governance_gate.py` / `scripts/policy/policy.json` 的 `.loom` governance policy、`tests/governance/**` 回归测试、`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`。
 - 本次不纳入：删除 Syvert guardian、替换 integration contract、修改 adapter/runtime 行为、把 release/sprint/item_key 升级为 Loom core schema。
 
 ## 当前停点

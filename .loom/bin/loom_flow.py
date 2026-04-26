@@ -1267,35 +1267,16 @@ def formal_spec_path(context: dict[str, Any]) -> str | None:
     preferred = f".loom/specs/{context['item_id']}/spec.md"
     if (context["target_root"] / preferred).exists():
         return preferred
-
-    for artifact in context.get("associated_artifacts", []):
-        if isinstance(artifact, str) and artifact.endswith("/spec.md") and (context["target_root"] / artifact).exists():
-            return artifact
-
-    fallback = context["target_root"] / ".loom/specs/INIT-0001/spec.md"
-    if fallback.exists():
-        return ".loom/specs/INIT-0001/spec.md"
     return None
 
 
 def spec_suite_paths(context: dict[str, Any]) -> dict[str, str]:
     item_id = context["item_id"]
-    candidates = [
-        {
-            "spec": f".loom/specs/{item_id}/spec.md",
-            "plan": f".loom/specs/{item_id}/plan.md",
-            "implementation_contract": f".loom/specs/{item_id}/implementation-contract.md",
-        },
-        {
-            "spec": ".loom/specs/INIT-0001/spec.md",
-            "plan": ".loom/specs/INIT-0001/plan.md",
-            "implementation_contract": ".loom/specs/INIT-0001/implementation-contract.md",
-        },
-    ]
-    for suite in candidates:
-        if (context["target_root"] / suite["spec"]).exists():
-            return suite
-    return candidates[0]
+    return {
+        "spec": f".loom/specs/{item_id}/spec.md",
+        "plan": f".loom/specs/{item_id}/plan.md",
+        "implementation_contract": f".loom/specs/{item_id}/implementation-contract.md",
+    }
 
 
 def review_head_binding(

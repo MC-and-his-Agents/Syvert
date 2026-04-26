@@ -609,6 +609,7 @@ class GovernanceGateTests(unittest.TestCase):
 
     def test_loom_carrier_paths_are_governance_scope(self) -> None:
         changed = [
+            ".loom",
             ".loom/bin/loom_flow.py",
             ".loom/companion/repo-interface.json",
             ".loom/bootstrap/init-result.json",
@@ -863,6 +864,32 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
 
             self.assertTrue(any("repo interface `companion_entry` 必须是 .loom/companion/README.md" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_repo_interface_schema_downgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload["schema_version"] = "loom-repo-interface/v1"
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("repo interface schema_version 必须是 loom-repo-interface/v2" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_repo_interface_v2_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload.pop("metadata_contract")
+            payload.pop("context_schema")
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("repo interface v2 必须声明 metadata_contract" in error for error in errors))
+            self.assertTrue(any("repo interface v2 必须声明 context_schema" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_missing_required_specialized_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

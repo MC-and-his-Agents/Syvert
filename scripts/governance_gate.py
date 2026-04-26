@@ -207,8 +207,8 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
         if error:
             errors.append(error)
 
-    if repo_interface.get("schema_version") not in {"loom-repo-interface/v1", "loom-repo-interface/v2"}:
-        errors.append("Loom repo interface schema_version 必须是 loom-repo-interface/v1 或 loom-repo-interface/v2")
+    if repo_interface.get("schema_version") != "loom-repo-interface/v2":
+        errors.append("Loom repo interface schema_version 必须是 loom-repo-interface/v2")
     actual_companion_entry, error = repo_relative_path(
         repo_root,
         repo_interface.get("companion_entry"),
@@ -324,6 +324,8 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
                 )
                 if locator_error:
                     errors.append(locator_error)
+    else:
+        errors.append("Loom repo interface v2 必须声明 metadata_contract")
 
     context_schema = repo_interface.get("context_schema")
     if isinstance(context_schema, dict):
@@ -356,6 +358,8 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
                 )
                 if locator_error:
                     errors.append(locator_error)
+    else:
+        errors.append("Loom repo interface v2 必须声明 context_schema")
     return errors
 
 

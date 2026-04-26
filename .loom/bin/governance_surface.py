@@ -898,18 +898,41 @@ def first_match(directory: Path, suffix: str, root: Path) -> str:
     return ""
 
 
-def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: bool) -> dict[str, dict[str, str]]:
-    item_dir = root / ".loom/work-items"
-    recovery_dir = root / ".loom/progress"
-    review_dir = root / ".loom/reviews"
+def markdown_fields(path: Path) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return fields
+    for line in lines:
+        if not line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line[2:].split(":", 1)
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def active_item_id(root: Path) -> str:
     status_path = root / ".loom/status/current.md"
-    spec_path = root / ".loom/specs/INIT-0001/spec.md"
-    plan_path = root / ".loom/specs/INIT-0001/plan.md"
+    item_id = markdown_fields(status_path).get("Item ID")
+    if isinstance(item_id, str) and item_id.strip():
+        return item_id.strip()
+    return "INIT-0001"
+
+
+def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: bool) -> dict[str, dict[str, str]]:
+    item_id = active_item_id(root)
+    work_item_path = root / f".loom/work-items/{item_id}.md"
+    recovery_path = root / f".loom/progress/{item_id}.md"
+    review_path = root / f".loom/reviews/{item_id}.json"
+    status_path = root / ".loom/status/current.md"
+    spec_path = root / f".loom/specs/{item_id}/spec.md"
+    plan_path = root / f".loom/specs/{item_id}/plan.md"
 
     present_locators = {
-        "work_item": first_match(item_dir, ".md", root) if item_dir.exists() else "",
-        "recovery": first_match(recovery_dir, ".md", root) if recovery_dir.exists() else "",
-        "review": first_match(review_dir, ".json", root) if review_dir.exists() else "",
+        "work_item": relative_locator(work_item_path, root) if work_item_path.exists() else "",
+        "recovery": relative_locator(recovery_path, root) if recovery_path.exists() else "",
+        "review": relative_locator(review_path, root) if review_path.exists() else "",
         "status_surface": relative_locator(status_path, root) if status_path.exists() else "",
         "spec_path": relative_locator(spec_path, root) if spec_path.exists() else "",
         "plan_path": relative_locator(plan_path, root) if plan_path.exists() else "",
@@ -928,10 +951,11 @@ def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: b
 
 
 def detect_execution_entry(root: Path, loom_state: str, *, bootstrap_mode: bool) -> str:
+    item_id = active_item_id(root)
     if bootstrap_mode:
-        return "python3 .loom/bin/loom_flow.py flow resume --target . --item INIT-0001"
+        return f"python3 .loom/bin/loom_flow.py flow resume --target . --item {item_id}"
     if loom_state == "active":
-        return f"{command_prefix(root, 'loom_flow.py')} flow resume --target . --item INIT-0001"
+        return f"{command_prefix(root, 'loom_flow.py')} flow resume --target . --item {item_id}"
     if loom_state == "partial":
         return f"{command_prefix(root, 'loom_init.py')} route --target <repo> --task \"请接手当前事项并恢复上下文后继续推进\""
     return "unknown"
@@ -948,13 +972,14 @@ def detect_validation_entry(loom_state: str, *, bootstrap_mode: bool) -> str:
 
 
 def detect_review_merge_surface(root: Path, loom_state: str, *, bootstrap_mode: bool) -> dict[str, str]:
+    item_id = active_item_id(root)
     pr_template = ".github/PULL_REQUEST_TEMPLATE.md" if file_exists(root, ".github/PULL_REQUEST_TEMPLATE.md") else "unknown"
     validation_surface = ".loom/status/current.md" if file_exists(root, ".loom/status/current.md") else "unknown"
     if bootstrap_mode and validation_surface == "unknown":
         validation_surface = ".loom/status/current.md"
 
     if bootstrap_mode:
-        merge_surface = "python3 .loom/bin/loom_flow.py checkpoint merge --target . --item INIT-0001"
+        merge_surface = f"python3 .loom/bin/loom_flow.py checkpoint merge --target . --item {item_id}"
     elif loom_state == "active":
         merge_surface = f"{command_prefix(root, 'loom_flow.py')} checkpoint merge --target . [--item <id>]"
     else:

@@ -133,6 +133,60 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["status"], "block")
         self.assertTrue(any("inside the installed skills root" in error for error in errors))
 
+    def test_spec_gate_does_not_fall_back_to_init_item_spec(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / ".loom/specs/INIT-0001").mkdir(parents=True)
+            (root / ".loom/specs/INIT-0001/spec.md").write_text("bootstrap spec\n", encoding="utf-8")
+            context = {
+                "item_id": "WORK-0002",
+                "target_root": root,
+                "associated_artifacts": [".loom/specs/INIT-0001/spec.md"],
+            }
+
+            self.assertIsNone(loom_flow.formal_spec_path(context))
+            self.assertEqual(
+                loom_flow.spec_suite_paths(context),
+                {
+                    "spec": ".loom/specs/WORK-0002/spec.md",
+                    "plan": ".loom/specs/WORK-0002/plan.md",
+                    "implementation_contract": ".loom/specs/WORK-0002/implementation-contract.md",
+                },
+            )
+
+    def test_governance_surface_uses_active_item_from_status(self) -> None:
+        governance_surface = load_loom_module("governance_surface")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for relative in (
+                ".loom/work-items/WORK-0002.md",
+                ".loom/progress/WORK-0002.md",
+                ".loom/reviews/WORK-0002.json",
+                ".loom/specs/WORK-0002/spec.md",
+                ".loom/specs/WORK-0002/plan.md",
+                ".loom/work-items/INIT-0001.md",
+                ".loom/specs/INIT-0001/spec.md",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("ok\n", encoding="utf-8")
+            (root / ".loom/status").mkdir(parents=True, exist_ok=True)
+            (root / ".loom/status/current.md").write_text("- Item ID: WORK-0002\n", encoding="utf-8")
+
+            summary = governance_surface.detect_carrier_summary(
+                root,
+                repository_mode="complex-existing",
+                planning_mode=False,
+            )
+            execution_entry = governance_surface.detect_execution_entry(root, "active", bootstrap_mode=True)
+            merge_surface = governance_surface.detect_review_merge_surface(root, "active", bootstrap_mode=True)
+
+            self.assertEqual(summary["work_item"]["locator"], ".loom/work-items/WORK-0002.md")
+            self.assertEqual(summary["spec_path"]["locator"], ".loom/specs/WORK-0002/spec.md")
+            self.assertIn("--item WORK-0002", execution_entry)
+            self.assertIn("--item WORK-0002", merge_surface["merge_surface"])
+
 
 if __name__ == "__main__":
     unittest.main()
