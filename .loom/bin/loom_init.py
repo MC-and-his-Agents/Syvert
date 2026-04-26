@@ -220,19 +220,8 @@ def write_json(path: Path, payload: object, force: bool) -> bool:
 
 
 def ensure_gitignore_has_loom(target_root: Path) -> bool:
-    gitignore = target_root / ".gitignore"
-    desired_line = ".loom/"
-    if gitignore.exists():
-        current = gitignore.read_text(encoding="utf-8")
-        lines = current.splitlines()
-        if desired_line in lines:
-            return False
-        new_content = current if current.endswith("\n") or not current else current + "\n"
-        new_content += desired_line + "\n"
-    else:
-        new_content = desired_line + "\n"
-    gitignore.write_text(new_content, encoding="utf-8")
-    return True
+    # Vendored Loom carriers are intended to be reviewed and committed as repo truth.
+    return False
 
 
 def file_exists(root: Path, relative_path: str) -> bool:

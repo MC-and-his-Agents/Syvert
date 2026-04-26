@@ -60,14 +60,7 @@ REQUIRED_LOOM_CARRIER_FILES = (
     Path(".loom/companion/manifest.json"),
     Path(".loom/companion/repo-interface.json"),
     Path(".loom/companion/interop.json"),
-    Path(".loom/work-items/INIT-0001.md"),
-    Path(".loom/progress/INIT-0001.md"),
     Path(".loom/status/current.md"),
-    Path(".loom/reviews/INIT-0001.json"),
-    Path(".loom/reviews/INIT-0001.spec.json"),
-    Path(".loom/specs/INIT-0001/spec.md"),
-    Path(".loom/specs/INIT-0001/plan.md"),
-    Path(".loom/specs/INIT-0001/implementation-contract.md"),
     Path(".loom/shadow/shadow-parity.json"),
 )
 
@@ -93,7 +86,7 @@ def markdown_fields(path: Path) -> dict[str, str]:
     return fields
 
 
-def validate_review_payload(path: Path, *, expected_kind: str) -> list[str]:
+def validate_review_payload(path: Path, *, expected_kind: str, item_id: str) -> list[str]:
     errors: list[str] = []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -102,8 +95,8 @@ def validate_review_payload(path: Path, *, expected_kind: str) -> list[str]:
     for field in ("schema_version", "item_id", "decision", "kind", "summary", "reviewer", "reviewed_head", "reviewed_validation_summary"):
         if not str(payload.get(field, "")).strip():
             errors.append(f"Loom review artifact `{path}` 缺少 `{field}`")
-    if payload.get("item_id") != "INIT-0001":
-        errors.append(f"Loom review artifact `{path}` item_id 必须是 INIT-0001")
+    if payload.get("item_id") != item_id:
+        errors.append(f"Loom review artifact `{path}` item_id 必须是 {item_id}")
     if payload.get("kind") != expected_kind:
         errors.append(f"Loom review artifact `{path}` kind 必须是 {expected_kind}")
     if payload.get("decision") not in {"allow", "block", "fallback"}:
@@ -113,19 +106,35 @@ def validate_review_payload(path: Path, *, expected_kind: str) -> list[str]:
 
 def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     errors: list[str] = []
-    work_item_path = repo_root / ".loom/work-items/INIT-0001.md"
-    progress_path = repo_root / ".loom/progress/INIT-0001.md"
     status_path = repo_root / ".loom/status/current.md"
-    review_path = repo_root / ".loom/reviews/INIT-0001.json"
-    spec_review_path = repo_root / ".loom/reviews/INIT-0001.spec.json"
     shadow_path = repo_root / ".loom/shadow/shadow-parity.json"
 
-    if not all(path.exists() for path in (work_item_path, progress_path, status_path, review_path, spec_review_path, shadow_path)):
+    if not status_path.exists():
+        return errors
+    status = markdown_fields(status_path)
+    item_id = status.get("Item ID") or "INIT-0001"
+    work_item_path = repo_root / f".loom/work-items/{item_id}.md"
+    progress_path = repo_root / f".loom/progress/{item_id}.md"
+    review_path = repo_root / f".loom/reviews/{item_id}.json"
+    spec_review_path = repo_root / f".loom/reviews/{item_id}.spec.json"
+    spec_dir = repo_root / f".loom/specs/{item_id}"
+    for path in (
+        work_item_path,
+        progress_path,
+        review_path,
+        spec_review_path,
+        spec_dir / "spec.md",
+        spec_dir / "plan.md",
+        spec_dir / "implementation-contract.md",
+        shadow_path,
+    ):
+        if not path.exists():
+            errors.append(f"缺少当前 Loom item carrier: {path}")
+    if errors:
         return errors
 
     work_item = markdown_fields(work_item_path)
     progress = markdown_fields(progress_path)
-    status = markdown_fields(status_path)
     for field in ("Item ID", "Goal", "Scope", "Execution Path", "Workspace Entry", "Recovery Entry", "Review Entry", "Validation Entry", "Closing Condition"):
         if not work_item.get(field):
             errors.append(f"Loom work item 缺少 `{field}`")
@@ -140,14 +149,20 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         elif status.get(field) and progress[field] != status[field]:
             errors.append(f"Loom progress 与 status 的 `{field}` 不一致")
 
-    errors.extend(validate_review_payload(review_path, expected_kind="general_review"))
-    errors.extend(validate_review_payload(spec_review_path, expected_kind="spec_review"))
+    errors.extend(validate_review_payload(review_path, expected_kind="general_review", item_id=item_id))
+    errors.extend(validate_review_payload(spec_review_path, expected_kind="spec_review", item_id=item_id))
     try:
         review_payload = json.loads(review_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         review_payload = {}
     if review_payload.get("reviewed_validation_summary") != progress.get("Latest Validation Summary"):
         errors.append("Loom review 的 reviewed_validation_summary 必须匹配 progress/status 最新验证摘要")
+    try:
+        spec_review_payload = json.loads(spec_review_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        spec_review_payload = {}
+    if spec_review_payload.get("reviewed_validation_summary") != progress.get("Latest Validation Summary"):
+        errors.append("Loom spec review 的 reviewed_validation_summary 必须匹配 progress/status 最新验证摘要")
 
     try:
         shadow_payload = json.loads(shadow_path.read_text(encoding="utf-8"))

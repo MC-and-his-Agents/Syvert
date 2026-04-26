@@ -100,7 +100,21 @@
 
 - 使用独立 revert PR 撤销 `.loom/` carrier、ADR-GOV-0038、PR template locator 与本轮文档边界增量；Syvert legacy governance、guardian、integration contract 与 runtime 实现未被删除，可直接恢复迁移前状态。
 
-## 最近一次 checkpoint 对应的 head SHA
+## 起始基线 SHA
 
 - `5a949c9dfc1a076faf58b706064d4383ff98ceb6`
-- 说明：该 SHA 只是本轮 worktree 从 `origin/main` 创建时的只读基线，用于说明迁移起点；正式可恢复状态以本 PR 分支上的提交、`.loom/` carrier、ADR-GOV-0038 和本 exec-plan 为准，不把基线 SHA 伪装为当前执行 checkpoint。
+- 说明：该 SHA 是本轮 worktree 从 `origin/main` 创建时的只读基线，只用于说明迁移起点，不是当前 checkpoint。
+
+## 当前 checkpoint 真相
+
+- Work Item：`.loom/work-items/INIT-0001.md`
+- Progress：`.loom/progress/INIT-0001.md`
+- Status：`.loom/status/current.md`
+- Review：`.loom/reviews/INIT-0001.json`
+- Spec review：`.loom/reviews/INIT-0001.spec.json`
+- Merge checkpoint：`python3 .loom/bin/loom_flow.py checkpoint merge --target . --item INIT-0001`，结果 `pass`。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- 当前 checkpoint 真相由 `.loom/reviews/INIT-0001.json` 的 `reviewed_head`、`.loom/progress/INIT-0001.md` 与 `.loom/status/current.md` 共同记录。
+- 当前文本不把起始基线 SHA 伪装为 checkpoint；执行恢复时以 Loom carrier 为准。

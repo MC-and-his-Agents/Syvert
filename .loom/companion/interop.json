@@ -4,7 +4,10 @@
     {
       "id": "syvert-guardian",
       "summary": "Syvert guardian result remains a retained host/repo-native action consumed by Loom as read-only evidence.",
-      "surfaces": ["review", "merge_ready"],
+      "surfaces": [
+        "review",
+        "merge_ready"
+      ],
       "locator": "scripts/pr_guardian.py"
     }
   ],
@@ -12,19 +15,33 @@
     {
       "id": "syvert-workflow",
       "summary": "Syvert workflow and process docs remain repo-native governance carriers.",
-      "surfaces": ["admission", "review", "merge_ready", "closeout"],
+      "surfaces": [
+        "admission",
+        "review",
+        "merge_ready",
+        "closeout"
+      ],
       "locator": "WORKFLOW.md"
     },
     {
       "id": "syvert-exec-plans",
-      "summary": "Syvert exec-plans remain repo-native recovery and closeout carriers.",
-      "surfaces": ["admission", "closeout"],
+      "summary": "Syvert exec-plans remain repo-native recovery, review, merge-ready, and closeout carriers.",
+      "surfaces": [
+        "admission",
+        "review",
+        "merge_ready",
+        "closeout"
+      ],
       "locator": "docs/exec-plans"
     },
     {
       "id": "syvert-integration-contract",
       "summary": "Syvert integration contract remains repo-owned and is consumed by review, guardian, and merge gates.",
-      "surfaces": ["review", "merge_ready", "closeout"],
+      "surfaces": [
+        "review",
+        "merge_ready",
+        "closeout"
+      ],
       "locator": "scripts/policy/integration_contract.json"
     }
   ],
