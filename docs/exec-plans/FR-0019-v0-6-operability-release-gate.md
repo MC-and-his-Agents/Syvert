@@ -31,4 +31,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `71983563b48d2712248754fc3f56ead0c135fd5f`
+- `10a767c0cd473651348f868ba88dcb5210fe11ad`
+- review-sync 说明：`#235` 只做 parent closeout / inactive index metadata follow-up，不推进新的 requirement semantic checkpoint；`71983563b48d2712248754fc3f56ead0c135fd5f` 仅作为 `#234/#252` runtime implementation 合入后的主干事实引用。

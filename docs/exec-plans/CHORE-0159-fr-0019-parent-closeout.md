@@ -83,6 +83,20 @@
   - 结果：`state=closed`
 - `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/222`
   - 结果：`state=open`，等待本 closeout PR 合入后关闭
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh api repos/MC-and-his-Agents/Syvert/issues/235`
+  - 结果：`state=open`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 222 --json projectItems --jq '.projectItems'`
+  - 结果：Project `Syvert 主交付看板` status 为 `Todo`，等待本 closeout PR 合入后切到 `Done`
+- `env -u GH_TOKEN -u GITHUB_TOKEN gh issue view 235 --json projectItems --jq '.projectItems'`
+  - 结果：Project `Syvert 主交付看板` status 为 `In Progress`
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过，`docs-guard 通过。`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，`workflow-guard 通过。`
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，`PR class: docs`，`变更类别: docs`，`PR scope 校验通过。`
+- `python3 scripts/governance_gate.py --mode local --base-ref origin/main`
+  - 结果：通过，`governance-gate 通过。`
 
 ## 待完成
 
@@ -104,4 +118,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`71983563b48d2712248754fc3f56ead0c135fd5f`。
-- 当前可恢复 checkpoint：本文件首个版本化恢复工件；后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
+- 当前可恢复 checkpoint：`fdcd227b3d895596a62d073d42046e59c50ec1d2`，包含本 exec-plan 首个版本化恢复工件与 `FR-0019` inactive requirement container closeout 索引。
+- 后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
