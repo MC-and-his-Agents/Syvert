@@ -272,6 +272,15 @@ class GovernanceGateTests(unittest.TestCase):
         self.assertEqual(governance_gate.infer_pr_class(changed), "spec")
         self.assertEqual(governance_gate.build_report("spec", changed)["violations"], [])
 
+    def test_loom_carrier_paths_are_governance_scope(self) -> None:
+        changed = [
+            ".loom/bin/loom_flow.py",
+            ".loom/companion/repo-interface.json",
+            ".loom/bootstrap/init-result.json",
+        ]
+        self.assertEqual(governance_gate.infer_pr_class(changed), "governance")
+        self.assertEqual(governance_gate.build_report("governance", changed)["violations"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

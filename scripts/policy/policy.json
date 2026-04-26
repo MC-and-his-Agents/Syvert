@@ -46,6 +46,7 @@
         "docs/process/**",
         "docs/specs/README.md",
         "docs/specs/_template/**",
+        ".loom/**",
         ".github/**",
         ".githooks/**",
         "scripts/**",
