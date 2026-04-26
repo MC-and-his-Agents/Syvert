@@ -187,6 +187,18 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             self.assertIn("--item WORK-0002", execution_entry)
             self.assertIn("--item WORK-0002", merge_surface["merge_surface"])
 
+    def test_bootstrap_write_rejects_symlinked_carrier_escape(self) -> None:
+        loom_init = load_loom_module("loom_init")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            outside = Path(temp_dir) / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (root / ".loom").symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(RuntimeError):
+                loom_init.assert_write_path_inside_target(root, root / ".loom/README.md")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -945,6 +945,47 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("context_schema field `issue` mapping_rule_locator 必须是 docs/process/delivery-funnel.md" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_metadata_enforcement_downgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload["metadata_contract"]["fields"][0]["enforcement"] = "advisory"
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("metadata_contract field `integration_check` enforcement 必须是 blocking" in error for error in errors))
+
+    def test_loom_carrier_guard_keeps_bootstrap_inventory_bound_to_init_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            # Simulate a later active item without requiring the immutable
+            # bootstrap manifest to be rewritten away from INIT-0001.
+            (root / ".loom/work-items/WORK-0002.md").write_text(
+                (root / ".loom/work-items/INIT-0001.md").read_text(encoding="utf-8").replace("INIT-0001", "WORK-0002"),
+                encoding="utf-8",
+            )
+            (root / ".loom/progress/WORK-0002.md").write_text(
+                "- Item ID: WORK-0002\n- Current Checkpoint: merge checkpoint\n- Latest Validation Summary: carrier validation passed\n",
+                encoding="utf-8",
+            )
+            for name in ("json", "spec.json"):
+                payload = json.loads((root / f".loom/reviews/INIT-0001.{name}" if name != "json" else root / ".loom/reviews/INIT-0001.json").read_text(encoding="utf-8"))
+                payload["item_id"] = "WORK-0002"
+                destination = root / (".loom/reviews/WORK-0002.json" if name == "json" else ".loom/reviews/WORK-0002.spec.json")
+                destination.write_text(json.dumps(payload), encoding="utf-8")
+            (root / ".loom/specs/WORK-0002").mkdir(parents=True, exist_ok=True)
+            for name in ("spec.md", "plan.md", "implementation-contract.md"):
+                (root / ".loom/specs/WORK-0002" / name).write_text("ok\n", encoding="utf-8")
+            status = (root / ".loom/status/current.md").read_text(encoding="utf-8").replace("INIT-0001", "WORK-0002")
+            (root / ".loom/status/current.md").write_text(status, encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertFalse(any("bootstrap manifest artifacts 缺少 `.loom/work-items/WORK-0002.md`" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

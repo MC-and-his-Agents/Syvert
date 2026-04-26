@@ -219,6 +219,15 @@ def write_json(path: Path, payload: object, force: bool) -> bool:
     return write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n", force=force)
 
 
+def assert_write_path_inside_target(target_root: Path, path: Path) -> None:
+    root = target_root.resolve()
+    resolved = path.resolve(strict=False)
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError(f"refusing to write outside target root: {path}") from exc
+
+
 def ensure_gitignore_has_loom(target_root: Path) -> bool:
     # Vendored Loom carriers are intended to be reviewed and committed as repo truth.
     return False
@@ -1509,6 +1518,7 @@ def scaffold_target(
         )
 
     for path, payload, kind in writes:
+        assert_write_path_inside_target(target_root, path)
         changed = write_json(path, payload, force=force) if kind == "json" else write_text(path, payload, force=force)
         if changed:
             written += 1
@@ -1524,6 +1534,7 @@ def scaffold_target(
         (Path(__file__).with_name("runtime_state.py"), target_root / ".loom/bin/runtime_state.py"),
         (Path(__file__).with_name("loom_check.py"), target_root / ".loom/bin/loom_check.py"),
     ):
+        assert_write_path_inside_target(target_root, destination)
         if copy_file(source, destination, force=force):
             written += 1
             touched.append(str(destination.relative_to(target_root)))
@@ -1533,18 +1544,21 @@ def scaffold_target(
             ("templates/scaffold/plan.md", target_root / ".loom/specs/INIT-0001/plan.md"),
             ("templates/scaffold/implementation-contract.md", target_root / ".loom/specs/INIT-0001/implementation-contract.md"),
         ):
+            assert_write_path_inside_target(target_root, destination)
             if copy_or_write_shared_asset(relative_asset, destination, force=force):
                 written += 1
                 touched.append(str(destination.relative_to(target_root)))
 
     pr_template_target = target_root / ".github/PULL_REQUEST_TEMPLATE.md"
     if install_pr_template or not pr_template_target.exists():
+        assert_write_path_inside_target(target_root, pr_template_target)
         if copy_or_write_shared_asset("github/PULL_REQUEST_TEMPLATE.md", pr_template_target, force=force):
             written += 1
             touched.append(str(pr_template_target.relative_to(target_root)))
 
     root_agents = target_root / "AGENTS.md"
     if not attach_only and not root_agents.exists():
+        assert_write_path_inside_target(target_root, root_agents)
         if write_text(root_agents, render_root_agents(), force=force):
             written += 1
             touched.append(str(root_agents.relative_to(target_root)))

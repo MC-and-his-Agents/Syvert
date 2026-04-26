@@ -6512,6 +6512,7 @@ def handle_work_item(args: argparse.Namespace) -> int:
                     "fallback_to": "admission",
                 }
             )
+        original_init_result = output_path.read_text(encoding="utf-8")
         update_active_entry_points(
             target_root,
             output_relative,
@@ -6522,12 +6523,13 @@ def handle_work_item(args: argparse.Namespace) -> int:
         )
         _, sync_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
         if sync_errors:
+            atomic_write_text(output_path, original_init_result)
             return emit(
                 {
                     "command": "work-item",
                     "operation": args.operation,
                     "result": "block",
-                    "summary": "work-item activation updated the locator truth, but fact-chain sync failed.",
+                    "summary": "work-item activation could not sync the fact chain; locator truth was rolled back.",
                     "missing_inputs": sync_errors,
                     "fallback_to": "admission",
                 }

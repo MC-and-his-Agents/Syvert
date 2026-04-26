@@ -104,6 +104,7 @@ REQUIRED_METADATA_CONTRACT_LOCATORS = {
     "integration_check": {
         "applicability_locator": "WORKFLOW.md",
         "authority_locator": "scripts/policy/integration_contract.json",
+        "enforcement": "blocking",
     },
 }
 REQUIRED_CONTEXT_SCHEMA_LOCATORS = {
@@ -309,10 +310,17 @@ def validate_companion_locator_truth(repo_root: Path) -> list[str]:
                 errors.append(f"Loom repo interface metadata_contract 缺少 required field `{required_id}`")
                 continue
             for locator_key, expected_locator in expected_locators.items():
+                if locator_key == "enforcement":
+                    continue
                 if field.get(locator_key) != expected_locator:
                     errors.append(
                         f"Loom repo interface metadata_contract field `{required_id}` {locator_key} 必须是 {expected_locator}"
                     )
+            expected_enforcement = expected_locators["enforcement"]
+            if field.get("enforcement") != expected_enforcement:
+                errors.append(
+                    f"Loom repo interface metadata_contract field `{required_id}` enforcement 必须是 {expected_enforcement}"
+                )
         for index, field in enumerate(metadata_contract.get("fields", [])):
             if not isinstance(field, dict):
                 continue
@@ -530,16 +538,26 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     if spec_review_payload.get("reviewed_validation_summary") != progress.get("Latest Validation Summary"):
         errors.append("Loom spec review 的 reviewed_validation_summary 必须匹配 progress/status 最新验证摘要")
 
+    bootstrap_item_id = "INIT-0001"
+    required_active_paths = {
+        f".loom/work-items/{item_id}.md",
+        f".loom/progress/{item_id}.md",
+        f".loom/reviews/{item_id}.json",
+        f".loom/reviews/{item_id}.spec.json",
+        f".loom/specs/{item_id}/spec.md",
+        f".loom/specs/{item_id}/plan.md",
+        f".loom/specs/{item_id}/implementation-contract.md",
+    }
     required_bootstrap_paths = {str(path) for path in REQUIRED_LOOM_CARRIER_FILES}
     required_bootstrap_paths.update(
         {
-            f".loom/work-items/{item_id}.md",
-            f".loom/progress/{item_id}.md",
-            f".loom/reviews/{item_id}.json",
-            f".loom/reviews/{item_id}.spec.json",
-            f".loom/specs/{item_id}/spec.md",
-            f".loom/specs/{item_id}/plan.md",
-            f".loom/specs/{item_id}/implementation-contract.md",
+            f".loom/work-items/{bootstrap_item_id}.md",
+            f".loom/progress/{bootstrap_item_id}.md",
+            f".loom/reviews/{bootstrap_item_id}.json",
+            f".loom/reviews/{bootstrap_item_id}.spec.json",
+            f".loom/specs/{bootstrap_item_id}/spec.md",
+            f".loom/specs/{bootstrap_item_id}/plan.md",
+            f".loom/specs/{bootstrap_item_id}/implementation-contract.md",
         }
     )
     required_bootstrap_paths.update(
@@ -582,21 +600,21 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     matching_initial_work_item = None
     if isinstance(initial_work_items, list):
         for candidate in initial_work_items:
-            if isinstance(candidate, dict) and candidate.get("id") == item_id:
+            if isinstance(candidate, dict) and candidate.get("id") == bootstrap_item_id:
                 matching_initial_work_item = candidate
                 break
     if matching_initial_work_item is None:
-        errors.append(f"Loom init-result initial_work_items 缺少 `{item_id}`")
+        errors.append(f"Loom init-result initial_work_items 缺少 `{bootstrap_item_id}`")
         initial_work_item_artifacts: set[str] = set()
     else:
         for field, expected in (
-            ("recovery_entry", f".loom/progress/{item_id}.md"),
-            ("review_entry", f".loom/reviews/{item_id}.json"),
+            ("recovery_entry", f".loom/progress/{bootstrap_item_id}.md"),
+            ("review_entry", f".loom/reviews/{bootstrap_item_id}.json"),
             ("validation_entry", "python3 .loom/bin/loom_init.py verify --target ."),
             ("workspace_entry", "."),
         ):
             if matching_initial_work_item.get(field) != expected:
-                errors.append(f"Loom init-result work item `{item_id}` 的 {field} 必须是 {expected}")
+                errors.append(f"Loom init-result work item `{bootstrap_item_id}` 的 {field} 必须是 {expected}")
         initial_work_item_artifacts = {
             artifact
             for artifact in matching_initial_work_item.get("artifacts", [])
@@ -606,6 +624,7 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     for required_path in sorted(required_bootstrap_paths):
         if required_path not in initial_work_item_artifacts:
             errors.append(f"Loom init-result work item artifacts 缺少 `{required_path}`")
+    for required_path in sorted(required_active_paths):
         if required_path not in work_item_artifacts:
             errors.append(f"Loom work item Associated Artifacts 缺少 `{required_path}`")
 
