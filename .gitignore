@@ -11,3 +11,6 @@ dist/
 build/
 
 .agents/
+
+# Generated locally by tests/runtime/render_operability_gate_artifact.py.
+docs/exec-plans/artifacts/CHORE-0158-operability-gate-result.json
