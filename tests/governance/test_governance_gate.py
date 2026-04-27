@@ -939,6 +939,26 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertEqual(errors, [])
 
+    def test_loom_carrier_guard_runs_when_interop_contract_is_unreadable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / ".loom/companion/interop.json").write_text("{", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, ["scripts/pr_guardian.py"])
+
+            self.assertTrue(any("Loom carrier JSON 无效" in error and "interop.json" in error for error in errors))
+
+    def test_loom_carrier_guard_runs_when_repo_interface_contract_is_unreadable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / ".loom/companion/repo-interface.json").write_text("{", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, ["scripts/pr_guardian.py"])
+
+            self.assertTrue(any("Loom carrier JSON 无效" in error and "repo-interface.json" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_shadow_parity_value_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

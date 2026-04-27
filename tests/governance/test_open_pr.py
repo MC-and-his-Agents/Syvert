@@ -16,6 +16,7 @@ from scripts.open_pr import (
     extract_issue_canonical_integration_fields,
     extract_issue_summary_sections,
     has_formal_spec_core_file_changes,
+    has_formal_spec_suite_changes,
     parse_args,
     validate_current_worktree_binding,
     validate_integration_args,
@@ -1252,6 +1253,11 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/spec.md"]))
         self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/implementation-contract.md"]))
 
+    def test_has_formal_spec_suite_changes_accepts_non_core_spec_artifacts(self) -> None:
+        self.assertTrue(has_formal_spec_suite_changes(["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"]))
+        self.assertTrue(has_formal_spec_suite_changes([".loom/specs/INIT-0001/references/risk.md"]))
+        self.assertFalse(has_formal_spec_core_file_changes(["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"]))
+
     def test_validate_pr_preflight_rejects_governance_pr_that_touches_loom_spec_without_formal_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
@@ -1280,6 +1286,35 @@ class OpenPrPreflightTests(unittest.TestCase):
                 "v0.1.0",
                 "2026-S13",
                 [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
+
+    def test_validate_pr_preflight_rejects_governance_pr_that_touches_non_core_spec_with_bootstrap_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text("# decision\n", encoding="utf-8")
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+            )
+            (repo / "docs/specs/FR-0001-governance-stack-v1/contracts").mkdir(parents=True)
+            (repo / "docs/specs/FR-0001-governance-stack-v1/contracts/README.md").write_text("# contract\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"],
                 repo_root=repo,
             )
 

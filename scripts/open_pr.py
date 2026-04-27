@@ -113,6 +113,18 @@ def has_formal_spec_core_file_changes(changed_files: list[str], *, repo_root: Pa
     return bool(changed_files) and all(is_deleted_legacy_todo_change(path, repo_root=repo_root) for path in changed_files)
 
 
+def has_formal_spec_suite_changes(changed_files: list[str], *, repo_root: Path | None = None) -> bool:
+    for path in changed_files:
+        parts = Path(path).parts
+        if len(parts) >= 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-"):
+            return True
+        if len(parts) >= 4 and parts[0] == ".loom" and parts[1] == "specs":
+            return True
+    if repo_root is None:
+        return False
+    return bool(changed_files) and all(is_deleted_legacy_todo_change(path, repo_root=repo_root) for path in changed_files)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="创建受控 PR。")
     parser.add_argument("--class", dest="pr_class", required=True, choices=get_policy()["pr_classes"])
@@ -450,6 +462,7 @@ def validate_pr_preflight(
 ) -> list[str]:
     errors: list[str] = []
     touches_formal_spec = has_formal_spec_core_file_changes(changed_files, repo_root=repo_root)
+    touches_formal_spec_suite = has_formal_spec_suite_changes(changed_files, repo_root=repo_root)
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
     if validate_worktree_binding_check:
@@ -495,7 +508,7 @@ def validate_pr_preflight(
     ):
         errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
-    if pr_class == "governance" and touches_formal_spec and not has_bound_formal_spec_input(
+    if pr_class == "governance" and touches_formal_spec_suite and not has_bound_formal_spec_input(
         repo_root,
         item_key,
         item_type,

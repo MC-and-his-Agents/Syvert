@@ -922,18 +922,29 @@ def collect_repo_interface_locators(payload: object) -> set[str]:
     return locators
 
 
+def load_json_contract(path: Path) -> tuple[object, str | None]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return {}, f"missing contract: {path}"
+    except (OSError, json.JSONDecodeError) as exc:
+        return {}, f"invalid contract: {path}: {exc}"
+
+
 def loom_carrier_semantic_validation_applies(repo_root: Path, changed_paths: list[str]) -> bool:
     if any(path == ".loom" or path.startswith(".loom/") for path in changed_paths):
         return True
 
+    if not (repo_root / ".loom").exists():
+        return False
+
     watched_locators: set[str] = set()
     interop_path = repo_root / ".loom/companion/interop.json"
-    try:
-        interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        interop_payload = {}
+    interop_payload, interop_error = load_json_contract(interop_path)
+    if interop_error:
+        return True
 
-    repo_native_carriers = interop_payload.get("repo_native_carriers")
+    repo_native_carriers = interop_payload.get("repo_native_carriers") if isinstance(interop_payload, dict) else None
     if isinstance(repo_native_carriers, list):
         for carrier in repo_native_carriers:
             if not isinstance(carrier, dict):
@@ -943,10 +954,9 @@ def loom_carrier_semantic_validation_applies(repo_root: Path, changed_paths: lis
                 watched_locators.add(locator.strip())
 
     repo_interface_path = repo_root / ".loom/companion/repo-interface.json"
-    try:
-        repo_interface_payload = json.loads(repo_interface_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        repo_interface_payload = {}
+    repo_interface_payload, repo_interface_error = load_json_contract(repo_interface_path)
+    if repo_interface_error:
+        return True
     watched_locators.update(collect_repo_interface_locators(repo_interface_payload))
 
     shadow_root = repo_root / ".loom/shadow"
