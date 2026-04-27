@@ -3,27 +3,14 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Syvert governance gate now validates repo-interface locator drift, active item validation entries are no longer bootstrap-hardcoded, and review shadow evidence includes the general review artifact.",
+  "summary": "Loom carrier runtime refreshed to Loom main 1818818; Syvert-owned guardian, integration, release/sprint residue remains unchanged.",
   "reviewer": "codex",
-  "reviewed_head": "56fa60ebdaa0dfd4194d0d9fc0a1ebd081fb3358",
+  "reviewed_head": "6022916cbf76b5ef3568247be1552e2d7134274d",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
-  "findings": [
-    {
-      "id": "compat-follow-up-1",
-      "summary": "Push PR #259, wait for CI, rerun guardian, then controlled merge.",
-      "severity": "warn",
-      "rebuttal": null,
-      "disposition": {
-        "status": "deferred",
-        "summary": "Projected from compatibility `follow_ups`."
-      }
-    }
-  ],
+  "findings": [],
   "blocking_issues": [],
-  "follow_ups": [
-    "Push PR #259, wait for CI, rerun guardian, then controlled merge."
-  ],
+  "follow_ups": [],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
     "recovery_entry": ".loom/progress/INIT-0001.md",
