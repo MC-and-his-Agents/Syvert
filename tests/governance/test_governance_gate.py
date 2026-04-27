@@ -57,7 +57,10 @@ def write_minimal_loom_carrier(root: Path) -> None:
     (root / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
     (root / "WORKFLOW.md").write_text("# Workflow\n\nSyvert repo-native governance surface.\n", encoding="utf-8")
     (root / "code_review.md").write_text("# Code Review\n", encoding="utf-8")
+    (root / "spec_review.md").write_text("# Spec Review\n", encoding="utf-8")
     (root / "docs/process").mkdir(parents=True, exist_ok=True)
+    (root / "docs/exec-plans").mkdir(parents=True, exist_ok=True)
+    (root / "docs/exec-plans/INIT-0001.md").write_text("# Exec Plan\n", encoding="utf-8")
     (root / "docs/process/delivery-funnel.md").write_text("# Delivery Funnel\n", encoding="utf-8")
     (root / "scripts/policy").mkdir(parents=True, exist_ok=True)
     (root / "scripts/workflow_guard.py").write_text("print('workflow')\n", encoding="utf-8")
@@ -162,6 +165,12 @@ def write_minimal_loom_carrier(root: Path) -> None:
                     "admission": [],
                     "review": [
                         {
+                            "id": "syvert-spec-review-rubric",
+                            "summary": "spec review",
+                            "locator": "spec_review.md",
+                            "enforcement": "blocking",
+                        },
+                        {
                             "id": "syvert-review-rubric",
                             "summary": "review",
                             "locator": "code_review.md",
@@ -247,8 +256,34 @@ def write_minimal_loom_carrier(root: Path) -> None:
     )
     interop_payload = {
         "schema_version": "loom-repo-interop/v1",
-        "host_adapters": [],
-        "repo_native_carriers": [],
+        "host_adapters": [
+            {
+                "id": "syvert-guardian",
+                "summary": "guardian",
+                "surfaces": ["review", "merge_ready"],
+                "locator": "scripts/pr_guardian.py",
+            }
+        ],
+        "repo_native_carriers": [
+            {
+                "id": "syvert-workflow",
+                "summary": "workflow",
+                "surfaces": ["admission", "review", "merge_ready", "closeout"],
+                "locator": "WORKFLOW.md",
+            },
+            {
+                "id": "syvert-exec-plans",
+                "summary": "exec plans",
+                "surfaces": ["admission", "review", "merge_ready", "closeout"],
+                "locator": "docs/exec-plans",
+            },
+            {
+                "id": "syvert-integration-contract",
+                "summary": "integration",
+                "surfaces": ["review", "merge_ready", "closeout"],
+                "locator": "scripts/policy/integration_contract.json",
+            },
+        ],
         "shadow_surfaces": {
             surface: {
                 "summary": f"{surface} parity",
@@ -1223,12 +1258,56 @@ class GovernanceGateTests(unittest.TestCase):
             root = Path(temp_dir)
             write_minimal_loom_carrier(root)
             payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
-            payload["repo_specific_requirements"]["review"][0]["enforcement"] = "advisory"
+            for requirement in payload["repo_specific_requirements"]["review"]:
+                if requirement["id"] == "syvert-review-rubric":
+                    requirement["enforcement"] = "advisory"
             (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
 
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
 
             self.assertTrue(any("requirement `syvert-review-rubric` enforcement 必须是 blocking" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_spec_review_requirement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+            payload["repo_specific_requirements"]["review"] = [
+                requirement
+                for requirement in payload["repo_specific_requirements"]["review"]
+                if requirement["id"] != "syvert-spec-review-rubric"
+            ]
+            (root / ".loom/companion/repo-interface.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/repo-interface.json"])
+
+            self.assertTrue(any("requirement `syvert-spec-review-rubric`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_required_interop_host_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/interop.json").read_text(encoding="utf-8"))
+            payload["host_adapters"] = []
+            (root / ".loom/companion/interop.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/interop.json"])
+
+            self.assertTrue(any("host_adapters` 缺少 required host adapter `syvert-guardian`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_required_interop_carrier_locator_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            payload = json.loads((root / ".loom/companion/interop.json").read_text(encoding="utf-8"))
+            for carrier in payload["repo_native_carriers"]:
+                if carrier["id"] == "syvert-integration-contract":
+                    carrier["locator"] = "WORKFLOW.md"
+            (root / ".loom/companion/interop.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/companion/interop.json"])
+
+            self.assertTrue(any("repo_native_carriers` `syvert-integration-contract` locator 必须是 scripts/policy/integration_contract.json" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_required_gate_type_reclassification(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

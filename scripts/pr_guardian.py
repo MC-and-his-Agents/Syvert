@@ -461,13 +461,7 @@ def parse_github_timestamp(value: object) -> datetime | None:
 
 
 def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
-    body = str(meta.get("body") or "")
-    if any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS):
-        return True
-    created_at = parse_github_timestamp(meta.get("createdAt"))
-    if created_at is None:
-        return True
-    return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
+    return True
 
 
 def review_artifact_gate_applies(meta: dict) -> bool:

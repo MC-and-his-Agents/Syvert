@@ -608,7 +608,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
 
-    def test_review_artifact_errors_allows_legacy_pr_without_section(self) -> None:
+    def test_review_artifact_errors_rejects_legacy_pr_without_section(self) -> None:
         errors = review_artifact_errors(
             {
                 "createdAt": "2026-04-26T23:59:59Z",
@@ -626,7 +626,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(errors, [])
+        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
 
     def test_review_artifact_errors_requires_section_for_new_template_marker(self) -> None:
         errors = review_artifact_errors(
@@ -2388,6 +2388,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
     ) -> None:
         temp_dir = Path("/tmp/guardian-temp")
         worktree_dir = Path("/tmp/guardian-temp/worktree")
+        (worktree_dir / "docs/exec-plans").mkdir(parents=True, exist_ok=True)
+        (worktree_dir / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
+        (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text("plan", encoding="utf-8")
+        (worktree_dir / ".loom/specs/INIT-0001/spec.md").write_text("spec", encoding="utf-8")
+        (worktree_dir / "code_review.md").write_text("review", encoding="utf-8")
         pr_meta_mock.return_value = {
             "number": 24,
             "title": "治理: 精简 guardian review context",
@@ -2396,7 +2401,16 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
             "createdAt": "2026-04-26T23:59:59Z",
-            "body": "",
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
+                    "- Governing spec / bootstrap contract: .loom/specs/INIT-0001/spec.md",
+                    "- Review artifact: code_review.md",
+                    "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
+                ]
+            ),
         }
         prepare_worktree_mock.return_value = (temp_dir, worktree_dir)
         run_codex_review_mock.return_value = {

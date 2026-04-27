@@ -74,6 +74,10 @@ REQUIRED_LOOM_BOOTSTRAP_ARTIFACTS = (
 REQUIRED_LOOM_SHADOW_SURFACES = {"admission", "review", "merge_ready", "closeout"}
 REQUIRED_COMPANION_REQUIREMENTS = {
     "review": {
+        "syvert-spec-review-rubric": {
+            "locator": "spec_review.md",
+            "enforcement": "blocking",
+        },
         "syvert-review-rubric": {
             "locator": "code_review.md",
             "enforcement": "blocking",
@@ -148,6 +152,26 @@ REQUIRED_CONTEXT_SCHEMA_LOCATORS = {
         "type": "string",
         "required": True,
         "enforcement": "blocking",
+    },
+}
+REQUIRED_INTEROP_HOST_ADAPTERS = {
+    "syvert-guardian": {
+        "locator": "scripts/pr_guardian.py",
+        "surfaces": {"review", "merge_ready"},
+    },
+}
+REQUIRED_INTEROP_REPO_NATIVE_CARRIERS = {
+    "syvert-workflow": {
+        "locator": "WORKFLOW.md",
+        "surfaces": {"admission", "review", "merge_ready", "closeout"},
+    },
+    "syvert-exec-plans": {
+        "locator": "docs/exec-plans",
+        "surfaces": {"admission", "review", "merge_ready", "closeout"},
+    },
+    "syvert-integration-contract": {
+        "locator": "scripts/policy/integration_contract.json",
+        "surfaces": {"review", "merge_ready", "closeout"},
     },
 }
 
@@ -228,6 +252,60 @@ def artifact_paths(payload: object, field: str) -> set[str]:
         for artifact in raw_artifacts
         if isinstance(artifact, dict) and isinstance(artifact.get("path"), str) and artifact.get("path")
     }
+
+
+def validate_interop_inventory(
+    repo_root: Path,
+    payload: dict,
+    *,
+    field: str,
+    required_entries: dict[str, dict[str, object]],
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    raw_entries = payload.get(field)
+    if not isinstance(raw_entries, list):
+        return [f"Loom repo interop 必须声明 `{field}` 列表"]
+    by_id = {
+        entry.get("id"): entry
+        for entry in raw_entries
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+    }
+    for required_id, expected in required_entries.items():
+        entry = by_id.get(required_id)
+        if not isinstance(entry, dict):
+            errors.append(f"Loom repo interop `{field}` 缺少 required {label} `{required_id}`")
+            continue
+        expected_locator = expected["locator"]
+        if entry.get("locator") != expected_locator:
+            errors.append(f"Loom repo interop `{field}` `{required_id}` locator 必须是 {expected_locator}")
+        _, locator_error = repo_relative_path(
+            repo_root,
+            entry.get("locator"),
+            label=f"repo interop `{field}` `{required_id}` locator",
+        )
+        if locator_error:
+            errors.append(locator_error)
+        expected_surfaces = expected["surfaces"]
+        actual_surfaces = entry.get("surfaces")
+        if not isinstance(actual_surfaces, list) or set(actual_surfaces) != expected_surfaces:
+            expected_text = ", ".join(sorted(expected_surfaces))
+            errors.append(f"Loom repo interop `{field}` `{required_id}` surfaces 必须是 {expected_text}")
+    for index, entry in enumerate(raw_entries):
+        if not isinstance(entry, dict):
+            errors.append(f"Loom repo interop `{field}`[{index}] 必须是对象")
+            continue
+        _, locator_error = repo_relative_path(
+            repo_root,
+            entry.get("locator"),
+            label=f"repo interop `{field}`[{index}].locator",
+        )
+        if locator_error:
+            errors.append(locator_error)
+        surfaces = entry.get("surfaces")
+        if not isinstance(surfaces, list) or not surfaces or not all(isinstance(surface, str) and surface for surface in surfaces):
+            errors.append(f"Loom repo interop `{field}`[{index}].surfaces 必须是非空字符串列表")
+    return errors
 
 
 def markdown_artifact_refs(path: Path, *, section_name: str = "Associated Artifacts") -> set[str]:
@@ -564,6 +642,26 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         interop_payload = {}
+    if interop_payload.get("schema_version") != "loom-repo-interop/v1":
+        errors.append("Loom repo interop schema_version 必须是 loom-repo-interop/v1")
+    errors.extend(
+        validate_interop_inventory(
+            repo_root,
+            interop_payload,
+            field="host_adapters",
+            required_entries=REQUIRED_INTEROP_HOST_ADAPTERS,
+            label="host adapter",
+        )
+    )
+    errors.extend(
+        validate_interop_inventory(
+            repo_root,
+            interop_payload,
+            field="repo_native_carriers",
+            required_entries=REQUIRED_INTEROP_REPO_NATIVE_CARRIERS,
+            label="repo-native carrier",
+        )
+    )
     if bootstrap_manifest.get("schema_version") != "loom-bootstrap-manifest/v1":
         errors.append("Loom bootstrap manifest schema_version 必须是 loom-bootstrap-manifest/v1")
     if init_result.get("schema_version") != "loom-init-output/v1":
