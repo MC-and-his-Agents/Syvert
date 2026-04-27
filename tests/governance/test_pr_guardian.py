@@ -785,10 +785,12 @@ class CodexReviewExecutionTests(unittest.TestCase):
             exec_plan_path = repo_root / "docs/exec-plans/GOV-0024-guardian-review-context.md"
             spec_dir = repo_root / "docs/specs/FR-0024"
             extra_spec_dir = repo_root / "docs/specs/FR-0025-extra"
+            extra_spec_dir_zh = repo_root / "docs/specs/FR-0026-extra"
             decision_path = repo_root / "docs/decisions/ADR-0024-review-context.md"
             exec_plan_path.parent.mkdir(parents=True)
             spec_dir.mkdir(parents=True)
             extra_spec_dir.mkdir(parents=True)
+            extra_spec_dir_zh.mkdir(parents=True)
             decision_path.parent.mkdir(parents=True)
             exec_plan_path.write_text(
                 "\n".join(
@@ -803,7 +805,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "- release：`v0.1.0`",
                         "- sprint：`2026-S14`",
                         "- 关联 spec：`docs/specs/FR-0024/`",
-                        "- 额外关联 specs：docs/specs/FR-0025-extra/",
+                        "- 额外关联 specs：docs/specs/FR-0025-extra/，docs/specs/FR-0026-extra/",
                         "- 关联 decision：`docs/decisions/ADR-0024-review-context.md`",
                         "- active 收口事项：`GOV-0024-guardian-review-context`",
                     ]
@@ -812,6 +814,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             )
             (spec_dir / "spec.md").write_text("spec", encoding="utf-8")
             (extra_spec_dir / "spec.md").write_text("extra spec", encoding="utf-8")
+            (extra_spec_dir_zh / "spec.md").write_text("extra spec zh", encoding="utf-8")
             decision_path.write_text("decision", encoding="utf-8")
             (repo_root / "code_review.md").write_text("review", encoding="utf-8")
             meta = {
@@ -828,7 +831,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "## Review Artifacts",
                         "",
                         "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
-                        "- Governing spec / bootstrap contract: docs/specs/FR-0024, docs/specs/FR-0025-extra, docs/decisions/ADR-0024-review-context.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0024, docs/specs/FR-0025-extra, docs/specs/FR-0026-extra, docs/decisions/ADR-0024-review-context.md",
                         "- Review artifact: code_review.md",
                         "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
                     ]
@@ -944,6 +947,57 @@ class CodexReviewExecutionTests(unittest.TestCase):
             (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
             errors = review_artifact_errors(meta, repo_root=repo_root)
             self.assertTrue(any("`Review artifact` 必须指向具体 artifact locator" in error for error in errors))
+
+    def test_review_artifact_errors_accepts_generated_validation_placeholder_when_validation_section_has_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text(
+                "\n".join(
+                    [
+                        "# GOV-0015",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- Issue：`#15`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`",
+                        "- active 收口事项：`GOV-0015-item-context-gate`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #15",
+                        "- item_key: `GOV-0015-item-context-gate`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: 见 `## 验证`，由受控流程补充已执行验证命令或验证 artifact。",
+                        "",
+                        "## 验证",
+                        "",
+                        "- `python3.11 -m unittest tests.governance.test_pr_guardian`",
+                    ]
+                )
+            }
+
+            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
 
     def test_review_artifact_errors_rejects_unresolved_controlled_flow_placeholders(self) -> None:
         meta = {

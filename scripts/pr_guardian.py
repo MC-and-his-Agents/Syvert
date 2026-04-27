@@ -497,11 +497,12 @@ def validation_section_has_executed_evidence(section: str) -> bool:
 
 def validation_evidence_errors(value: str, *, sections: dict[str, str], repo_root: Path) -> list[str]:
     normalized = value.strip().strip("`").strip()
+    section_has_executed_evidence = validation_section_has_executed_evidence(sections.get("validation", ""))
     if any(marker in normalized for marker in REVIEW_ARTIFACT_PLACEHOLDER_MARKERS):
-        if not validation_section_has_executed_evidence(sections.get("validation", "")):
+        if not section_has_executed_evidence:
             return ["`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact，不能只使用模板占位说明。"]
     candidates = review_artifact_locator_candidates(value)
-    concrete = False
+    concrete = "验证" in normalized and section_has_executed_evidence
     errors: list[str] = []
     for candidate in candidates:
         if candidate in {"## 验证", "验证"}:
@@ -877,7 +878,7 @@ def extract_related_links_from_exec_plan(exec_plan_path: Path) -> list[str]:
             if not match:
                 continue
             raw_value = match.group(1).strip()
-            values = raw_value.split(",") if split_values else [raw_value]
+            values = re.split(r"[,，]", raw_value) if split_values else [raw_value]
             for value in values:
                 value = value.strip().strip("`").strip()
                 if not value or value.startswith("无"):
