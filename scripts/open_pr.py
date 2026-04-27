@@ -60,7 +60,7 @@ from scripts.integration_contract import (
 )
 from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
-from scripts.spec_guard import validate_suite
+from scripts.spec_guard import validate_formal_spec_suite, validate_suite
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
@@ -180,12 +180,12 @@ def has_bound_formal_spec_input(
                 and allows_legacy_metadata_free_formal_spec_decision(exec_plan, decision_errors)
             ):
                 return False
-        if validate_suite(spec_dir):
+        if validate_formal_spec_suite(spec_dir):
             return False
         for extra_spec_dir in additional_spec_dirs:
             if extra_spec_dir == spec_dir.relative_to(repo_root.resolve()):
                 continue
-            if validate_suite(repo_root / extra_spec_dir):
+            if validate_formal_spec_suite(repo_root / extra_spec_dir):
                 return False
         return True
 

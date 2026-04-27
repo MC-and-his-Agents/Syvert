@@ -158,16 +158,17 @@ class SpecGuardTests(unittest.TestCase):
             errors = validate_changed_paths(repo, ["docs/specs/FR-0001-example/TODO.md"])
         self.assertTrue(any("退出正式治理流" in error for error in errors))
 
-    def test_loom_spec_changes_trigger_existing_spec_suite_validation(self) -> None:
+    def test_loom_spec_changes_use_loom_suite_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             spec_dir = repo / ".loom" / "specs" / "INIT-0001"
             spec_dir.mkdir(parents=True)
-            (spec_dir / "spec.md").write_text(GOOD_SPEC, encoding="utf-8")
+            (spec_dir / "spec.md").write_text(GOOD_LOOM_SPEC, encoding="utf-8")
+            (spec_dir / "plan.md").write_text(GOOD_LOOM_PLAN, encoding="utf-8")
 
             errors = validate_changed_paths(repo, [".loom/specs/INIT-0001/spec.md"])
 
-        self.assertTrue(any("缺少 `plan.md`" in error for error in errors))
+        self.assertTrue(any("缺少 `implementation-contract.md`" in error for error in errors))
 
     def test_valid_loom_spec_suite_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -10,7 +10,7 @@
   ],
   "source_sha256": {
     "WORKFLOW.md": "fbe5787e913d2844cdb30c1e79bcc759568ab34bdb68feaf2602d40ca62fbb4c",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "3c3c5d5d5ef3b0d2df4b0e5c31f8b7432874c8b13cd13fbc430ddcfea21ba655",
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "51fde291b9dd7ba92853a0f91e63415f21b7cc06ea12c32ee8ad794c633b93da",
     "docs/process/delivery-funnel.md": "398f9242f00bfdd2be5c418f854de3527d262e2440cc13d6cabbed4ad03ad8e3"
   },
   "source_semantics": "Closeout parity requires merged delivery state, reconciled status or progress truth, and parent closeout evidence after execution completes.",
