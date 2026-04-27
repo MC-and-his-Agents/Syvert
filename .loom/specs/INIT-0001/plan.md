@@ -24,7 +24,7 @@
 
 - Objective: Harden merge-readiness of the carrier itself.
 - Deliverable: `.loom/**` structural gate coverage, formal spec/review/status consistency, GitHub parser hardening, and self-contained vendored bootstrap fallback.
-- Exit condition: governance gate, spec guard, repo-local `loom_check`, guardian review, and CI pass.
+- Exit condition: governance gate, spec guard, 消费侧 Loom validation chain, guardian review, and CI pass.
 
 ## Constraints
 
@@ -51,10 +51,10 @@
   - Guardian review on PR #259 with `--post-review`.
   - Controlled merge through Syvert merge entrypoint.
 - Runtime evidence:
-  - `python3 .loom/bin/loom_check.py .`
   - `python3 .loom/bin/loom_init.py verify --target .`
   - `python3 .loom/bin/loom_flow.py governance-profile status --target .`
   - `python3 .loom/bin/loom_flow.py runtime-parity validate --target .`
+  - `python3 .loom/bin/loom_flow.py shadow-parity --target .`
   - `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
   - `python3 .loom/bin/loom_flow.py flow resume --target . --item INIT-0001`
 

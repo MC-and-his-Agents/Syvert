@@ -66,6 +66,11 @@ REQUIRED_LOOM_CARRIER_FILES = (
     Path(".loom/shadow/shadow-parity.json"),
 )
 
+REQUIRED_LOOM_BOOTSTRAP_ARTIFACTS = (
+    ".loom/bootstrap/intake.snapshot.json",
+    ".loom/bootstrap/capability-map.md",
+)
+
 REQUIRED_LOOM_SHADOW_SURFACES = {"admission", "review", "merge_ready", "closeout"}
 REQUIRED_COMPANION_REQUIREMENTS = {
     "review": {
@@ -598,6 +603,7 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         f".loom/specs/{item_id}/implementation-contract.md",
     }
     required_bootstrap_paths = {str(path) for path in REQUIRED_LOOM_CARRIER_FILES}
+    required_bootstrap_paths.update(REQUIRED_LOOM_BOOTSTRAP_ARTIFACTS)
     shadow_surfaces = interop_payload.get("shadow_surfaces")
     declared_shadow_locators = set()
     if isinstance(shadow_surfaces, dict):

@@ -12,7 +12,7 @@
   - 提交 `.loom/bootstrap/*`、`.loom/bin/*`、`.loom/companion/*`、`.loom/shadow/*`、`.loom/work-items/*`、`.loom/progress/*`、`.loom/status/*`、`.loom/reviews/*` 与 `.loom/specs/*` carrier。
   - 更新 Syvert `AGENTS.md`、`WORKFLOW.md`、`docs/process/delivery-funnel.md`、`docs/AGENTS.md`，声明 Loom consumption boundary。
   - 新增 ADR-GOV-0038，记录正式引入依据、保留 residue 与后续 de-vendor 风险。
-  - 让 Syvert governance gate 对 `.loom/**` 做最小结构校验：Python 语法、JSON 语法、必需 locator、review/status/spec 一致性与 repo-local Loom check。
+  - 让 Syvert governance gate 对 `.loom/**` 做最小结构校验：Python 语法、JSON 语法、必需 locator、review/status/spec 一致性与消费侧 Loom validation chain。
   - 修复 vendored `.loom/bin` 中影响正式使用的 GitHub remote / branch REST 读取边界。
 - Out of scope:
   - 不删除 Syvert `AGENTS.md`、`WORKFLOW.md`、guardian、release/sprint 或 integration contract。
@@ -29,7 +29,7 @@ Given
 - Loom carrier 以 vendored `.loom/bin` 和 `.loom/companion` 形式进入仓库。
 
 When
-- 维护者运行 `python3 .loom/bin/loom_init.py verify --target .`、`python3 .loom/bin/loom_flow.py governance-profile status --target .`、`runtime-parity validate` 与 `shadow-parity --blocking`。
+- 维护者运行 `python3 .loom/bin/loom_init.py verify --target .`、`python3 .loom/bin/loom_flow.py governance-profile status --target .`、`python3 .loom/bin/loom_flow.py runtime-parity validate --target .`、`python3 .loom/bin/loom_flow.py shadow-parity --target .` 与 `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`。
 
 Then
 - Loom runtime 返回 pass，并把 Syvert 识别为 strong governance profile。
@@ -45,7 +45,7 @@ When
 
 Then
 - `scripts/governance_gate.py --mode ci` 必须校验 `.loom` 必需文件、JSON 语法、Python 语法、work item/status/progress/review/spec/shadow 的最小静态一致性。
-- runtime parity、shadow parity 与 merge checkpoint 由 bounded repo-local `loom_check` 在运行门禁阶段验证，不嵌入早期 governance gate。
+- runtime parity、shadow parity 与 merge checkpoint 由消费侧验证链 `loom_init verify -> governance-profile status -> runtime-parity validate -> shadow-parity -> shadow-parity --blocking` 与 merge-ready/checkpoint 命令共同验证，不再把源仓 `loom_check` 作为正式 adoption gate。
 
 ### Scenario 3
 
@@ -65,7 +65,7 @@ Then
 - Failure modes:
   - `.loom/bin` Python 语法错误必须由 Syvert governance gate 阻断。
   - `.loom/**/*.json` 无法解析必须由 Syvert governance gate 阻断。
-  - `.loom` merge checkpoint fallback/block 必须由 repo-local `loom_check` 阻断。
+  - `.loom` merge checkpoint fallback/block 必须由消费侧验证链与 `flow merge-ready` / `checkpoint merge` 阻断。
   - GitHub control-plane 读取失败时，Loom 返回 host-signal/binding failure，不自动降级为已通过。
 - Operational boundaries:
   - Syvert guardian 仍是 repo-native merge gate。

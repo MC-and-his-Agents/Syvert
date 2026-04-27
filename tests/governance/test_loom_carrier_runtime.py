@@ -256,10 +256,72 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             root = Path(temp_dir) / "repo"
             root.mkdir()
 
-            self.assertEqual(
-                loom_init.resolve_output_path(root, "../outside.json"),
-                root / "../outside.json",
+            with self.assertRaises(RuntimeError):
+                loom_init.resolve_output_path(root, "../outside.json")
+
+    def test_bootstrap_cli_rejects_output_path_escape(self) -> None:
+        loom_init = load_loom_module("loom_init")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_root = Path(temp_dir) / "repo"
+            outside_path = Path(temp_dir) / "outside.json"
+            target_root.mkdir()
+
+            exit_code = loom_init.main(
+                [
+                    "bootstrap",
+                    "--target",
+                    str(target_root),
+                    "--output",
+                    "../outside.json",
+                    "--write",
+                ]
             )
+
+            self.assertEqual(exit_code, 2)
+            self.assertFalse(outside_path.exists())
+
+    def test_governance_surface_rejects_companion_locator_escape(self) -> None:
+        governance_surface = load_loom_module("governance_surface")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            outside = Path(temp_dir) / "outside.json"
+            (root / ".loom/companion").mkdir(parents=True)
+            outside.write_text("{}", encoding="utf-8")
+            (root / ".loom/companion/manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-repo-companion-manifest/v1",
+                        "companion_entry": ".loom/companion/README.md",
+                        "repo_interface": "../outside.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / ".loom/companion/README.md").write_text("# Companion\n", encoding="utf-8")
+
+            payload, errors = governance_surface.detect_repo_interface(root)
+
+            self.assertEqual(payload["availability"], "incomplete")
+            self.assertTrue(any("must stay within the repository root" in error for error in errors))
+
+    def test_governance_surface_rejects_shadow_locator_escape(self) -> None:
+        governance_surface = load_loom_module("governance_surface")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            outside = Path(temp_dir) / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+
+            errors = governance_surface.validate_shadow_surface(
+                root=root,
+                surface="review",
+                entry={
+                    "summary": "review parity",
+                    "loom_locator": ".loom/shadow/review-loom.json",
+                    "repo_locator": "../outside.json",
+                },
+            )
+
+            self.assertTrue(any("must stay within the repository root" in error for error in errors))
 
     def test_shadow_source_hashes_require_source_files(self) -> None:
         loom_flow = load_loom_module("loom_flow")

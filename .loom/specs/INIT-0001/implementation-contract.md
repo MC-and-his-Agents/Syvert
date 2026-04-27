@@ -28,7 +28,10 @@
   - py_compile for `.loom/bin` and Syvert scripts.
   - docs guard, workflow guard, governance gate, and spec guard.
   - governance unittest discovery.
-  - repo-local `loom_check`.
+  - `python3 .loom/bin/loom_init.py verify --target .`
+  - `python3 .loom/bin/loom_flow.py governance-profile status --target .`
+  - `python3 .loom/bin/loom_flow.py runtime-parity validate --target .`
+  - `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
 - Manual Verification:
   - Guardian review.
   - Controlled merge and post-merge main-truth closeout.

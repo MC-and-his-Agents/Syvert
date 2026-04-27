@@ -47,6 +47,8 @@ def write_minimal_loom_carrier(root: Path) -> None:
             path.write_text(json.dumps({}), encoding="utf-8")
         else:
             path.write_text("ok\n", encoding="utf-8")
+    (root / ".loom/bootstrap/intake.snapshot.json").write_text("{}", encoding="utf-8")
+    (root / ".loom/bootstrap/capability-map.md").write_text("# Capability Map\n", encoding="utf-8")
     (root / ".loom/work-items").mkdir(parents=True, exist_ok=True)
     (root / ".loom/progress").mkdir(parents=True, exist_ok=True)
     (root / ".loom/status").mkdir(parents=True, exist_ok=True)
@@ -292,6 +294,7 @@ def write_minimal_loom_carrier(root: Path) -> None:
             str(path)
             for path in governance_gate.REQUIRED_LOOM_CARRIER_FILES
         }
+        | set(governance_gate.REQUIRED_LOOM_BOOTSTRAP_ARTIFACTS)
         | {
             ".loom/work-items/INIT-0001.md",
             ".loom/progress/INIT-0001.md",
@@ -370,6 +373,31 @@ def write_minimal_loom_carrier(root: Path) -> None:
 
 
 class GovernanceGateTests(unittest.TestCase):
+    def test_loom_official_adoption_docs_keep_consumption_side_validation_chain(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        files = [
+            repo_root / ".loom/specs/INIT-0001/spec.md",
+            repo_root / ".loom/specs/INIT-0001/plan.md",
+            repo_root / ".loom/specs/INIT-0001/implementation-contract.md",
+            repo_root / "docs/exec-plans/GOV-0038-loom-official-adoption.md",
+        ]
+        required_terms = (
+            "python3 .loom/bin/loom_init.py verify --target .",
+            "python3 .loom/bin/loom_flow.py governance-profile status --target .",
+            "python3 .loom/bin/loom_flow.py runtime-parity validate --target .",
+            "python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking",
+        )
+        forbidden_term = "python3 .loom/bin/loom_check.py ."
+
+        for path in files:
+            text = path.read_text(encoding="utf-8")
+            for term in required_terms:
+                self.assertIn(term, text, f"{path} 缺少权威验证入口 `{term}`")
+            if path.name == "GOV-0038-loom-official-adoption.md":
+                self.assertIn("不再错误调用 `python3 .loom/bin/loom_check.py .`", text)
+            else:
+                self.assertNotIn(forbidden_term, text, f"{path} 不得再把 `loom_check.py .` 写成正式 adoption gate")
+
     @patch("scripts.governance_gate.matching_exec_plan_for_issue", return_value={})
     @patch("scripts.governance_gate.build_report", return_value=GOVERNANCE_SCOPE_REPORT)
     @patch("scripts.governance_gate.validate_context_rules", return_value=[])
@@ -832,6 +860,36 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/manifest.json"])
 
             self.assertTrue(any("bootstrap manifest artifacts 缺少 `.loom/companion/interop.json`" in error for error in errors))
+
+    def test_loom_carrier_guard_rejects_missing_canonical_bootstrap_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            capability_map = ".loom/bootstrap/capability-map.md"
+            (root / capability_map).unlink()
+            manifest = json.loads((root / ".loom/bootstrap/manifest.json").read_text(encoding="utf-8"))
+            manifest["artifacts"] = [
+                artifact
+                for artifact in manifest["artifacts"]
+                if artifact["path"] != capability_map
+            ]
+            (root / ".loom/bootstrap/manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            init_result = json.loads((root / ".loom/bootstrap/init-result.json").read_text(encoding="utf-8"))
+            init_result["initial_artifacts"] = [
+                artifact
+                for artifact in init_result["initial_artifacts"]
+                if artifact["path"] != capability_map
+            ]
+            init_result["initial_work_items"][0]["artifacts"] = [
+                artifact
+                for artifact in init_result["initial_work_items"][0]["artifacts"]
+                if artifact != capability_map
+            ]
+            (root / ".loom/bootstrap/init-result.json").write_text(json.dumps(init_result), encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/bootstrap/manifest.json"])
+
+            self.assertTrue(any(f"bootstrap manifest artifacts 缺少 `{capability_map}`" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_missing_active_item_inventory_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
