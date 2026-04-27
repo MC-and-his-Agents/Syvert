@@ -98,21 +98,6 @@ def load_json_file(path: Path) -> dict[str, object]:
     return payload
 
 
-def resolve_target_relative_path(target_root: Path, locator: str, *, label: str) -> tuple[Path | None, str | None]:
-    raw = str(locator or "").strip()
-    if not raw:
-        return None, f"{label} must be a non-empty path relative to the target root"
-    candidate = Path(raw)
-    if candidate.is_absolute():
-        return None, f"{label} must be relative to the target root: {raw}"
-    resolved = (target_root / candidate).resolve()
-    try:
-        resolved.relative_to(target_root.resolve())
-    except ValueError:
-        return None, f"{label} must stay within the target root: {raw}"
-    return resolved, None
-
-
 def _clean_value(raw: str) -> str:
     value = raw.strip()
     if value.startswith("`") and value.endswith("`") and len(value) >= 2:
@@ -198,7 +183,59 @@ def parse_list_section(sections: dict[str, list[str]], section_name: str, relati
 
 
 def _relative(path: Path, root: Path) -> str:
-    return str(path.relative_to(root))
+    return str(path.resolve().relative_to(root.resolve()))
+
+
+def resolve_repo_relative_path(target_root: Path, relative: str, *, label: str) -> tuple[Path | None, list[str]]:
+    """Resolve a repository locator while rejecting absolute paths and path escapes."""
+    if not isinstance(relative, str) or not relative.strip():
+        return None, [f"{label} must be a non-empty repo-relative path"]
+    locator = relative.strip()
+    candidate_raw = Path(locator)
+    if candidate_raw.is_absolute():
+        return None, [f"{label} must be repo-relative, got absolute path: {locator}"]
+    if ".." in candidate_raw.parts:
+        return None, [f"{label} must stay within the target root and inside the target repository: {locator}"]
+    candidate = (target_root / candidate_raw).resolve()
+    try:
+        candidate.relative_to(target_root.resolve())
+    except ValueError:
+        return None, [f"{label} must stay within the target root and inside the target repository: {locator}"]
+    return candidate, []
+
+
+def path_boundary_missing_details(*, label: str, locator: object, errors: list[str]) -> list[dict[str, object]]:
+    """Return stable machine-readable details for repo locator boundary failures."""
+    locator_text = "" if locator is None else str(locator)
+    details: list[dict[str, object]] = []
+    for message in errors:
+        if "non-empty" in message:
+            kind = "empty_locator"
+        elif "absolute path" in message or "repo-relative" in message:
+            kind = "absolute_locator"
+        else:
+            kind = "repo_locator_escape"
+
+        scopes: list[str] = []
+        if "target root" in message:
+            scopes.append("target_root")
+        if "repository" in message or "repo-relative" in message:
+            scopes.append("repository_root")
+        if not scopes:
+            scopes.append("repository_root")
+
+        for scope in scopes:
+            details.append(
+                {
+                    "category": "path_boundary",
+                    "kind": kind,
+                    "scope": scope,
+                    "label": label,
+                    "locator": locator_text,
+                    "message": message,
+                }
+            )
+    return details
 
 
 def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str]]:
@@ -316,9 +353,9 @@ def inspect_fact_chain(
     output_relative: str = ".loom/bootstrap/init-result.json",
 ) -> tuple[dict[str, object], list[str]]:
     errors: list[str] = []
-    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
-    if output_error:
-        return {}, [output_error]
+    output_path, output_errors = resolve_repo_relative_path(target_root, output_relative, label="init-result locator")
+    if output_errors:
+        return {}, output_errors
     assert output_path is not None
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
@@ -364,30 +401,39 @@ def inspect_fact_chain(
     if errors:
         return {}, errors
 
-    resolved_paths: dict[str, Path] = {}
-    for label, locator in (
-        ("work_item", str(work_item_ref)),
-        ("recovery_entry", str(recovery_ref)),
-        ("status_surface", str(status_ref)),
-    ):
-        path, path_error = resolve_target_relative_path(target_root, locator, label=f"fact-chain carrier `{label}`")
-        if path_error:
-            errors.append(path_error)
-            continue
-        assert path is not None
-        resolved_paths[label] = path
+    work_item_path, work_item_path_errors = resolve_repo_relative_path(
+        target_root,
+        str(work_item_ref),
+        label="init-result.fact_chain.entry_points.work_item",
+    )
+    recovery_path, recovery_path_errors = resolve_repo_relative_path(
+        target_root,
+        str(recovery_ref),
+        label="init-result.fact_chain.entry_points.recovery_entry",
+    )
+    status_path, status_path_errors = resolve_repo_relative_path(
+        target_root,
+        str(status_ref),
+        label="init-result.fact_chain.entry_points.status_surface",
+    )
+    errors.extend(work_item_path_errors)
+    errors.extend(recovery_path_errors)
+    errors.extend(status_path_errors)
     if errors:
         return {}, errors
-
-    for label, path in resolved_paths.items():
+    assert work_item_path is not None
+    assert recovery_path is not None
+    assert status_path is not None
+    for label, path in (
+        ("work_item", work_item_path),
+        ("recovery_entry", recovery_path),
+        ("status_surface", status_path),
+    ):
         if not path.exists():
             errors.append(f"declared fact-chain carrier is missing on disk: {label} -> {_relative(path, target_root)}")
     if errors:
         return {}, errors
 
-    work_item_path = resolved_paths["work_item"]
-    recovery_path = resolved_paths["recovery_entry"]
-    status_path = resolved_paths["status_surface"]
     work_item, work_item_errors = parse_work_item(work_item_path, target_root)
     recovery_entry, recovery_errors = parse_recovery_entry(recovery_path, target_root)
     status_surface, runtime_evidence, status_sources, status_errors = parse_status_surface(status_path, target_root)

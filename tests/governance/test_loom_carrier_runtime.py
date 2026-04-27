@@ -645,7 +645,19 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             )
 
             self.assertEqual(report["result"], "unreadable")
-            self.assertTrue(any("must stay inside the repository" in item for item in report["missing_inputs"]))
+            missing_details = report.get("missing_details")
+            self.assertIsInstance(missing_details, list)
+            self.assertTrue(
+                any(
+                    isinstance(detail, dict)
+                    and detail.get("category") == "path_boundary"
+                    and detail.get("kind") == "repo_locator_escape"
+                    and detail.get("scope") == "repository_root"
+                    and detail.get("label") == "shadow surface `review` repo_locator"
+                    and detail.get("locator") == "../outside-repo.json"
+                    for detail in missing_details
+                )
+            )
 
     def test_loom_check_requires_adversarial_adoption_evidence(self) -> None:
         loom_check = load_loom_module("loom_check")

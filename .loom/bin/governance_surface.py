@@ -30,7 +30,7 @@ PLANNED_LOCATORS = {
     "plan_path": ".loom/specs/INIT-0001/plan.md",
 }
 
-REPO_INTERFACE_SURFACES = ("admission", "review", "merge_ready", "closeout")
+REPO_INTERFACE_SURFACES = ("review", "merge_ready", "closeout")
 REPO_INTERFACE_AVAILABILITY = {"absent", "companion_docs_only", "incomplete", "present"}
 REPO_INTERFACE_MANIFEST_SCHEMA = "loom-repo-companion-manifest/v1"
 REPO_INTERFACE_V1_SCHEMA = "loom-repo-interface/v1"
@@ -469,23 +469,32 @@ def relative_locator_from_value(root: Path, raw_locator: object) -> str | None:
         return None
     locator_path = Path(locator)
     if locator_path.is_absolute():
-        try:
-            return str(locator_path.relative_to(root))
-        except ValueError:
-            return str(locator_path)
+        return None
+    if ".." in locator_path.parts:
+        return None
     return str(locator_path)
 
 
-def resolve_locator(root: Path, raw_locator: object) -> tuple[str | None, Path | None, str | None]:
+def locator_boundary_error(raw_locator: object, *, label: str) -> str:
+    if not isinstance(raw_locator, str) or not raw_locator.strip():
+        return f"{label} must be a non-empty string"
+    locator = raw_locator.strip()
+    locator_path = Path(locator)
+    if locator_path.is_absolute() or ".." in locator_path.parts:
+        return f"{label} must stay within the repository root and must stay inside the repository: {locator}"
+    return f"{label} must stay within the repository root and must stay inside the repository: {locator}"
+
+
+def resolve_locator(root: Path, raw_locator: object) -> tuple[str | None, Path | None]:
     locator = relative_locator_from_value(root, raw_locator)
     if locator is None:
-        return None, None, "locator must be a non-empty string"
+        return None, None
     target = (root / locator).resolve()
     try:
         target.relative_to(root.resolve())
     except ValueError:
-        return locator, None, f"locator `{locator}` must stay within the repository root"
-    return locator, target, None
+        return None, None
+    return locator, target
 
 
 def locator_status_entry(
@@ -494,10 +503,9 @@ def locator_status_entry(
     raw_locator: object,
     source: str,
 ) -> tuple[dict[str, str], str | None]:
-    locator, target, locator_error = resolve_locator(root, raw_locator)
-    if locator_error:
-        locator_label = locator if locator is not None else "unknown"
-        return carrier_entry("missing", locator_label, source), f"{source} {locator_error}"
+    locator, target = resolve_locator(root, raw_locator)
+    if locator is None or target is None:
+        return carrier_entry("missing", "unknown", source), locator_boundary_error(raw_locator, label=source)
     if not target.exists():
         return carrier_entry("missing", locator, source), f"{source} points to missing path `{locator}`"
     return carrier_entry("present", locator, source), None
@@ -521,9 +529,9 @@ def validate_repo_specific_requirement(
     enforcement = entry.get("enforcement")
     if enforcement not in REPO_INTERFACE_ENFORCEMENT:
         missing_inputs.append(f"{prefix} enforcement must be `blocking` or `advisory`")
-    locator, target, locator_error = resolve_locator(root, entry.get("locator"))
-    if locator_error:
-        missing_inputs.append(f"{prefix} {locator_error}")
+    locator, target = resolve_locator(root, entry.get("locator"))
+    if locator is None or target is None:
+        missing_inputs.append(locator_boundary_error(entry.get("locator"), label=f"{prefix} locator"))
     elif not target.exists():
         missing_inputs.append(f"{prefix} locator points to missing path `{locator}`")
     return missing_inputs
@@ -543,9 +551,9 @@ def validate_specialized_gate(
         value = entry.get(field)
         if not isinstance(value, str) or not value.strip():
             missing_inputs.append(f"{prefix} missing `{field}`")
-    locator, target, locator_error = resolve_locator(root, entry.get("locator"))
-    if locator_error:
-        missing_inputs.append(f"{prefix} {locator_error}")
+    locator, target = resolve_locator(root, entry.get("locator"))
+    if locator is None or target is None:
+        missing_inputs.append(locator_boundary_error(entry.get("locator"), label=f"{prefix} locator"))
     elif not target.exists():
         missing_inputs.append(f"{prefix} locator points to missing path `{locator}`")
     gate_type = entry.get("gate_type")
@@ -583,9 +591,9 @@ def validate_metadata_contract(
         if enforcement not in REPO_INTERFACE_ENFORCEMENT:
             missing_inputs.append(f"{field_prefix} enforcement must be `blocking` or `advisory`")
         for locator_field in ("applicability_locator", "authority_locator"):
-            locator, target, locator_error = resolve_locator(root, field.get(locator_field))
-            if locator_error:
-                missing_inputs.append(f"{field_prefix} `{locator_field}` {locator_error}")
+            locator, target = resolve_locator(root, field.get(locator_field))
+            if locator is None or target is None:
+                missing_inputs.append(locator_boundary_error(field.get(locator_field), label=f"{field_prefix} `{locator_field}`"))
             elif not target.exists():
                 missing_inputs.append(f"{field_prefix} `{locator_field}` points to missing path `{locator}`")
     return missing_inputs
@@ -617,9 +625,9 @@ def validate_context_schema(
             missing_inputs.append(f"{field_prefix} type must be one of `string`, `integer`, `number`, `boolean`")
         if not isinstance(field.get("required"), bool):
             missing_inputs.append(f"{field_prefix} `required` must be a boolean")
-        locator, target, locator_error = resolve_locator(root, field.get("mapping_rule_locator"))
-        if locator_error:
-            missing_inputs.append(f"{field_prefix} `mapping_rule_locator` {locator_error}")
+        locator, target = resolve_locator(root, field.get("mapping_rule_locator"))
+        if locator is None or target is None:
+            missing_inputs.append(locator_boundary_error(field.get("mapping_rule_locator"), label=f"{field_prefix} `mapping_rule_locator`"))
         elif not target.exists():
             missing_inputs.append(f"{field_prefix} `mapping_rule_locator` points to missing path `{locator}`")
     return missing_inputs
@@ -649,9 +657,9 @@ def validate_repo_interop_collection_entry(
                 missing_inputs.append(
                     f"{prefix}.surfaces[{surface_index}] must be one of `admission`, `pre_review`, `review`, `build`, `merge_ready`, `closeout`"
                 )
-    locator, target, locator_error = resolve_locator(root, entry.get("locator"))
-    if locator_error:
-        missing_inputs.append(f"{prefix} {locator_error}")
+    locator, target = resolve_locator(root, entry.get("locator"))
+    if locator is None or target is None:
+        missing_inputs.append(locator_boundary_error(entry.get("locator"), label=f"{prefix} locator"))
     elif not target.exists():
         missing_inputs.append(f"{prefix} locator points to missing path `{locator}`")
     return missing_inputs
@@ -671,9 +679,9 @@ def validate_shadow_surface(
     if not isinstance(summary, str) or not summary.strip():
         missing_inputs.append(f"{prefix} missing `summary`")
     for locator_field in ("loom_locator", "repo_locator"):
-        locator, target, locator_error = resolve_locator(root, entry.get(locator_field))
-        if locator_error:
-            missing_inputs.append(f"{prefix} `{locator_field}` {locator_error}")
+        locator, target = resolve_locator(root, entry.get(locator_field))
+        if locator is None or target is None:
+            missing_inputs.append(locator_boundary_error(entry.get(locator_field), label=f"{prefix} `{locator_field}`"))
         elif not target.exists():
             missing_inputs.append(f"{prefix} `{locator_field}` points to missing path `{locator}`")
     return missing_inputs
@@ -746,7 +754,7 @@ def detect_repo_interface(root: Path) -> tuple[dict[str, Any], list[str]]:
     if manifest_repo_interface_error:
         missing_inputs.append(manifest_repo_interface_error)
 
-    repo_interface_locator, repo_interface_target, _ = resolve_locator(root, manifest.get("repo_interface"))
+    repo_interface_locator, repo_interface_target = resolve_locator(root, manifest.get("repo_interface"))
     if repo_interface_surface["repo_specific_requirements"]["status"] != "present":
         if repo_interface_path.exists() and manifest_repo_interface_error:
             missing_inputs.append("repo companion manifest must point `repo_interface` to `.loom/companion/repo-interface.json`")
@@ -1092,10 +1100,8 @@ def detect_github_control_plane(root: Path) -> tuple[dict[str, Any], list[str]]:
         missing_inputs.append("github control plane: default branch is unavailable")
         return surface, missing_inputs
 
-    branch_payload, branch_errors = gh_json(
-        root,
-        ["api", f"repos/{owner}/{repo}/branches/{quote(str(surface['default_branch']), safe='')}"],
-    )
+    encoded_branch = quote(str(surface["default_branch"]), safe="")
+    branch_payload, branch_errors = gh_json(root, ["api", f"repos/{owner}/{repo}/branches/{encoded_branch}"])
     if branch_errors or branch_payload is None:
         missing_inputs.extend(f"github control plane: {message}" for message in branch_errors)
         return surface, missing_inputs

@@ -13,7 +13,9 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from fact_chain_support import (
     STATUS_FIELDS,
@@ -24,7 +26,8 @@ from fact_chain_support import (
     parse_key_value_section,
     parse_recovery_entry,
     parse_work_item,
-    resolve_target_relative_path,
+    path_boundary_missing_details,
+    resolve_repo_relative_path,
 )
 from governance_surface import build_governance_surface
 from runtime_paths import shared_asset, shared_script
@@ -35,6 +38,14 @@ PR_TEMPLATE_SECTIONS = (
     "## Validation",
     "## Risks And Follow-ups",
     "## Related Work",
+)
+ADOPTION_PR_BODY_SECTIONS = (*PR_TEMPLATE_SECTIONS, "## Review Artifacts")
+ADOPTION_REVIEW_ARTIFACT_LABELS = (
+    "Active Work Item",
+    "Active Recovery Entry",
+    "Status Surface",
+    "Review Record",
+    "Spec Review Record",
 )
 
 OWNED_TEMP_ROOTS = (
@@ -160,6 +171,39 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=".loom/bootstrap/init-result.json",
         help="Init-result path relative to the target root",
     )
+
+    adopt = subparsers.add_parser("adopt", help="Validate Loom downstream adoption contracts")
+    adopt.add_argument("operation", choices=("verify",))
+    adopt.add_argument("--target", required=True, help="Target repository root")
+    adopt.add_argument("--item", help="Expected current item id")
+    adopt.add_argument(
+        "--output",
+        default=".loom/bootstrap/init-result.json",
+        help="Init-result path relative to the target root",
+    )
+
+    carrier = subparsers.add_parser("carrier", help="Refresh Loom-owned carrier metadata")
+    carrier.add_argument("operation", choices=("refresh",))
+    carrier.add_argument("--target", required=True, help="Target repository root")
+    carrier.add_argument("--item", help="Expected current item id")
+    carrier.add_argument(
+        "--output",
+        default=".loom/bootstrap/init-result.json",
+        help="Init-result path relative to the target root",
+    )
+    carrier.add_argument("--dry-run", action="store_true", default=True, help="Preview refresh actions without writing files; this is the default")
+    carrier.add_argument("--write", dest="dry_run", action="store_false", help="Write Loom-owned carrier metadata refreshes")
+
+    host_binding = subparsers.add_parser("host-binding", help="Validate host issue, PR, branch, and SHA bindings")
+    host_binding.add_argument("operation", choices=("validate",))
+    host_binding.add_argument("--target", required=True, help="Target repository root")
+    host_binding.add_argument("--owner", help="GitHub owner; auto-detected from origin when omitted")
+    host_binding.add_argument("--repo", dest="repo_name", help="GitHub repository name; auto-detected from origin when omitted")
+    host_binding.add_argument("--issue", type=int, help="GitHub Work Item issue number")
+    host_binding.add_argument("--pr", type=int, help="GitHub implementation PR number")
+    host_binding.add_argument("--branch", help="GitHub branch name")
+    host_binding.add_argument("--head-sha", help="Implementation head SHA to validate")
+    host_binding.add_argument("--base-sha", help="Base SHA used for diff validation")
 
     state = subparsers.add_parser(
         "state-check",
@@ -441,7 +485,20 @@ def repo_specific_requirements_payload(
         if isinstance(repo_specific_locator, dict)
         else ".loom/companion/repo-interface.json"
     )
-    repo_specific_path = target_root / str(declared_locator)
+    repo_specific_path, locator_errors = resolve_repo_relative_path(
+        target_root,
+        str(declared_locator),
+        label="repo companion requirements locator",
+    )
+    if locator_errors:
+        return {
+            **empty_payload,
+            "result": "block",
+            "summary": "repo companion requirements locator is unsafe.",
+            "missing_inputs": locator_errors,
+            "fallback_to": repo_specific_default_fallback(surface),
+        }
+    assert repo_specific_path is not None
     blocking: list[dict[str, Any]] = []
     advisory: list[dict[str, Any]] = []
     declared: list[dict[str, Any]] = []
@@ -523,19 +580,20 @@ def load_repo_interop_contract(repo_interop: object, *, target_root: Path) -> tu
         if isinstance(contract_locator, dict)
         else ".loom/companion/interop.json"
     )
-    normalized_locator, interop_path, locator_error = resolve_repo_locator(
+    interop_path, locator_errors = resolve_repo_relative_path(
         target_root,
-        declared_locator,
+        str(declared_locator),
         label="repo interop contract locator",
     )
-    if locator_error or interop_path is None:
-        return None, [locator_error or "repo interop contract locator is invalid"]
+    if locator_errors:
+        return None, locator_errors
+    assert interop_path is not None
     try:
         payload = load_json_file(interop_path)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return None, [f"missing repo interop contract: {normalized_locator}"]
+        return None, [f"missing repo interop contract: {interop_path}"]
     if not isinstance(payload, dict):
-        return None, [f"repo interop contract is unreadable: {normalized_locator}"]
+        return None, [f"repo interop contract is unreadable: {interop_path}"]
     return payload, []
 
 
@@ -548,24 +606,19 @@ def sha256_file(path: Path) -> str:
 
 
 def repo_relative_path(target_root: Path, relative: str) -> Path | None:
-    candidate = (target_root / relative).resolve()
-    try:
-        candidate.relative_to(target_root.resolve())
-    except ValueError:
-        return None
-    return candidate
+    candidate, errors = resolve_repo_relative_path(target_root, relative, label="repo locator")
+    return None if errors else candidate
 
 
-def resolve_repo_locator(target_root: Path, locator: object, *, label: str) -> tuple[str | None, Path | None, str | None]:
-    if not isinstance(locator, str) or not locator.strip():
-        return None, None, f"{label} must be a non-empty repository-relative path"
-    normalized = locator.strip()
-    if Path(normalized).is_absolute() or ".." in Path(normalized).parts:
-        return normalized, None, f"{label} must stay inside the repository: {normalized}"
-    candidate = repo_relative_path(target_root, normalized)
-    if candidate is None:
-        return normalized, None, f"{label} must stay inside the repository: {normalized}"
-    return normalized, candidate, None
+def path_boundary_details_from_messages(errors: list[str]) -> list[dict[str, object]]:
+    details: list[dict[str, object]] = []
+    for message in errors:
+        if "must stay" not in message and "repo-relative" not in message and "non-empty repo-relative" not in message:
+            continue
+        label = message.split(" must ", 1)[0] if " must " in message else "repo locator"
+        locator = message.rsplit(": ", 1)[-1] if ": " in message else ""
+        details.extend(path_boundary_missing_details(label=label, locator=locator, errors=[message]))
+    return details
 
 
 def validate_shadow_sources(payload: dict[str, Any], *, path: Path, target_root: Path) -> tuple[dict[str, Any], list[str]]:
@@ -646,38 +699,7 @@ def undeclared_shadow_evidence_errors(target_root: Path, interop_payload: dict[s
     return errors
 
 
-def _normalize_shadow_semantic_fragment(value: Any) -> Any:
-    if isinstance(value, str):
-        return " ".join(value.split()).strip().lower()
-    if isinstance(value, list):
-        return [_normalize_shadow_semantic_fragment(entry) for entry in value]
-    if isinstance(value, dict):
-        return {
-            str(key): _normalize_shadow_semantic_fragment(entry)
-            for key, entry in sorted(value.items(), key=lambda item: str(item[0]))
-        }
-    return value
-
-
-def normalized_shadow_semantics(payload: dict[str, Any], *, path: Path) -> tuple[str | None, str | None]:
-    comparable_payload: dict[str, Any] = {}
-    for key in ("surface", "source_semantics", "evidence_body"):
-        value = payload.get(key)
-        if value is None:
-            continue
-        if isinstance(value, str) and not value.strip():
-            continue
-        comparable_payload[key] = _normalize_shadow_semantic_fragment(value)
-    if not comparable_payload.get("source_semantics") and not comparable_payload.get("evidence_body"):
-        return None, f"shadow evidence `{path}` must declare `source_semantics` or `evidence_body` for stable parity comparison"
-    return json.dumps(comparable_payload, ensure_ascii=False, sort_keys=True), None
-
-
 def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str, Any], str | None]:
-    try:
-        path.resolve().relative_to(target_root.resolve())
-    except ValueError:
-        return {"normalized_value": None}, f"shadow parity locator must stay inside the repository: {path}"
     try:
         if path.is_dir():
             return {"normalized_value": None}, f"shadow parity locator points to a directory: {path}"
@@ -694,11 +716,27 @@ def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str,
 
     if isinstance(payload, dict):
         source_evidence, source_errors = validate_shadow_sources(payload, path=path, target_root=target_root)
-        normalized_semantics, semantics_error = normalized_shadow_semantics(payload, path=path)
-        errors = list(source_errors)
-        if semantics_error:
-            errors.append(semantics_error)
-        return {**source_evidence, "normalized_value": normalized_semantics}, "; ".join(errors) if errors else None
+        for key in ("parity_value", "result", "decision", "status", "verdict", "value"):
+            value = payload.get(key)
+            if isinstance(value, (str, int, float, bool)) and str(value).strip():
+                comparable: object = str(value).strip().lower()
+                semantic_evidence = {
+                    semantic_key: payload[semantic_key]
+                    for semantic_key in ("source_semantics", "evidence_body")
+                    if semantic_key in payload
+                }
+                if semantic_evidence:
+                    comparable = {
+                        "value": comparable,
+                        **semantic_evidence,
+                    }
+                normalized = (
+                    comparable
+                    if isinstance(comparable, str)
+                    else json.dumps(comparable, ensure_ascii=False, sort_keys=True)
+                )
+                return {**source_evidence, "normalized_value": normalized}, "; ".join(source_errors) if source_errors else None
+        return {**source_evidence, "normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, "; ".join(source_errors) if source_errors else None
     if isinstance(payload, list):
         return {"normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, f"shadow evidence `{path}` must be a JSON object with source_files/source_sha256"
     if isinstance(payload, (str, int, float, bool)) and str(payload).strip():
@@ -740,10 +778,16 @@ def shadow_parity_report(
     }
     interop_payload, interop_errors = load_repo_interop_contract(repo_interop, target_root=target_root)
     if interop_errors:
-        return {
+        missing_details = path_boundary_details_from_messages(interop_errors)
+        payload = {
             **empty_report,
             "summary": "shadow parity is unavailable because the repo interop contract is missing or incomplete.",
             "missing_inputs": interop_errors,
+        }
+        if missing_details:
+            payload["missing_details"] = missing_details
+        return {
+            **payload,
         }
     if not isinstance(interop_payload, dict):
         return empty_report
@@ -774,16 +818,41 @@ def shadow_parity_report(
             "repo_native_carriers": relevant_repo_native_carriers,
         }
 
-    loom_locator, loom_path, loom_locator_error = resolve_repo_locator(
+    loom_locator = declared_surface.get("loom_locator")
+    repo_locator = declared_surface.get("repo_locator")
+    loom_path, loom_locator_errors = resolve_repo_relative_path(
         target_root,
-        declared_surface.get("loom_locator"),
-        label=f"shadow surface `{surface}` loom locator",
+        str(loom_locator),
+        label=f"shadow surface `{surface}` loom_locator",
     )
-    repo_locator, repo_path, repo_locator_error = resolve_repo_locator(
+    repo_path, repo_locator_errors = resolve_repo_relative_path(
         target_root,
-        declared_surface.get("repo_locator"),
-        label=f"shadow surface `{surface}` repo locator",
+        str(repo_locator),
+        label=f"shadow surface `{surface}` repo_locator",
     )
+    if loom_locator_errors or repo_locator_errors:
+        missing_details = [
+            *path_boundary_missing_details(
+                label=f"shadow surface `{surface}` loom_locator",
+                locator=loom_locator,
+                errors=loom_locator_errors,
+            ),
+            *path_boundary_missing_details(
+                label=f"shadow surface `{surface}` repo_locator",
+                locator=repo_locator,
+                errors=repo_locator_errors,
+            ),
+        ]
+        return {
+            **empty_report,
+            "summary": "shadow parity is unavailable because a declared surface locator is unsafe.",
+            "missing_inputs": [*loom_locator_errors, *repo_locator_errors],
+            "missing_details": missing_details,
+            "host_adapters": relevant_host_adapters,
+            "repo_native_carriers": relevant_repo_native_carriers,
+        }
+    assert loom_path is not None
+    assert repo_path is not None
 
     loom_surface = {
         "status": "missing",
@@ -797,16 +866,8 @@ def shadow_parity_report(
     }
 
     global_errors = undeclared_shadow_evidence_errors(target_root, interop_payload)
-    loom_evidence, loom_error = (
-        normalized_shadow_value(loom_path, target_root=target_root)
-        if loom_path is not None
-        else ({"normalized_value": None}, loom_locator_error)
-    )
-    repo_evidence, repo_error = (
-        normalized_shadow_value(repo_path, target_root=target_root)
-        if repo_path is not None
-        else ({"normalized_value": None}, repo_locator_error)
-    )
+    loom_evidence, loom_error = normalized_shadow_value(loom_path, target_root=target_root)
+    repo_evidence, repo_error = normalized_shadow_value(repo_path, target_root=target_root)
     loom_value = loom_evidence.get("normalized_value")
     repo_value = repo_evidence.get("normalized_value")
 
@@ -1012,7 +1073,71 @@ def gh_json(root: Path, args: list[str]) -> tuple[dict[str, Any] | None, list[st
 
 
 def gh_rest_json(root: Path, path: str) -> tuple[dict[str, Any] | None, list[str]]:
-    return gh_json(root, ["api", path])
+    payload, errors = gh_json(root, ["api", path])
+    if payload is not None or not errors:
+        return payload, errors
+    fallback_payload, fallback_errors = github_public_rest_json(path)
+    if fallback_payload is not None:
+        return fallback_payload, []
+    return None, errors + [f"public REST fallback: {message}" for message in fallback_errors]
+
+
+def github_public_rest_json(path: str) -> tuple[dict[str, Any] | None, list[str]]:
+    url = f"https://api.github.com/{path.lstrip('/')}"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "loom-governance-runtime",
+    }
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = Request(url, headers=headers)
+    try:
+        with urlopen(request, timeout=20) as response:
+            text = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace").strip()
+        return None, [f"HTTP {exc.code} {exc.reason}: {detail or url}"]
+    except URLError as exc:
+        return None, [f"REST request failed: {exc.reason}"]
+    except OSError as exc:
+        return None, [f"REST request failed: {exc}"]
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, [f"invalid JSON from public REST endpoint: {exc.msg}"]
+    if not isinstance(payload, dict):
+        return None, ["public REST endpoint did not return a JSON object"]
+    return payload, []
+
+
+def github_public_rest_list(path: str) -> tuple[list[dict[str, Any]], list[str]]:
+    url = f"https://api.github.com/{path.lstrip('/')}"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "loom-governance-runtime",
+    }
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = Request(url, headers=headers)
+    try:
+        with urlopen(request, timeout=20) as response:
+            text = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace").strip()
+        return [], [f"HTTP {exc.code} {exc.reason}: {detail or url}"]
+    except URLError as exc:
+        return [], [f"REST request failed: {exc.reason}"]
+    except OSError as exc:
+        return [], [f"REST request failed: {exc}"]
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return [], [f"invalid JSON from public REST endpoint: {exc.msg}"]
+    if not isinstance(payload, list):
+        return [], ["public REST endpoint did not return a list"]
+    return [entry for entry in payload if isinstance(entry, dict)], []
 
 
 def github_issue_state(value: Any) -> str:
@@ -1163,11 +1288,6 @@ def resolve_workspace_path(target_root: Path, workspace_entry: str) -> tuple[Pat
     return resolved, errors
 
 
-def resolve_target_relative_or_errors(target_root: Path, locator: str, *, label: str) -> tuple[Path | None, list[str]]:
-    resolved, error = resolve_target_relative_path(target_root, locator, label=label)
-    return resolved, ([error] if error else [])
-
-
 def current_cwd_relative(target_root: Path) -> str | None:
     cwd = Path.cwd().resolve()
     try:
@@ -1235,7 +1355,7 @@ def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, di
 
 
 def sync_status_surface(target_root: Path, output_relative: str, runtime_evidence: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
-    output_path, output_errors = resolve_target_relative_or_errors(target_root, output_relative, label="init-result path")
+    output_path, output_errors = resolve_repo_relative_path(target_root, output_relative, label="init-result locator")
     if output_errors:
         return {}, output_errors
     assert output_path is not None
@@ -1254,18 +1374,12 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     work_item_ref = str(entry_points.get("work_item", ""))
     recovery_ref = str(entry_points.get("recovery_entry", ""))
     status_ref = str(entry_points.get("status_surface", ""))
-    work_item_path, work_item_errors = resolve_target_relative_or_errors(
-        target_root, work_item_ref, label="fact-chain carrier `work_item`"
-    )
-    recovery_path, recovery_errors = resolve_target_relative_or_errors(
-        target_root, recovery_ref, label="fact-chain carrier `recovery_entry`"
-    )
-    status_path, status_errors = resolve_target_relative_or_errors(
-        target_root, status_ref, label="fact-chain carrier `status_surface`"
-    )
-    errors = [*work_item_errors, *recovery_errors, *status_errors]
-    if errors:
-        return {}, errors
+    work_item_path, work_item_errors = resolve_repo_relative_path(target_root, work_item_ref, label="work item locator")
+    recovery_path, recovery_errors = resolve_repo_relative_path(target_root, recovery_ref, label="recovery entry locator")
+    status_path, status_errors = resolve_repo_relative_path(target_root, status_ref, label="status surface locator")
+    locator_errors = [*work_item_errors, *recovery_errors, *status_errors]
+    if locator_errors:
+        return {}, locator_errors
     assert work_item_path is not None
     assert recovery_path is not None
     assert status_path is not None
@@ -1312,7 +1426,10 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
 
 
 def read_runtime_evidence(target_root: Path, status_relative: str) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    status_path = target_root / status_relative
+    status_path, locator_errors = resolve_repo_relative_path(target_root, status_relative, label="status surface locator")
+    if locator_errors:
+        return {}, locator_errors
+    assert status_path is not None
     if not status_path.exists():
         return {}, [f"missing status surface: {status_relative}"]
     sections = markdown_sections(status_path)
@@ -1778,11 +1895,9 @@ def target_relative_label(target_root: Path, path: Path) -> str:
 
 
 def load_findings_file(target_root: Path, findings_file: str) -> tuple[list[dict[str, Any]] | None, list[str]]:
-    findings_path, findings_errors = resolve_target_relative_or_errors(
-        target_root, findings_file, label="findings file"
-    )
-    if findings_errors:
-        return None, findings_errors
+    findings_path, locator_errors = resolve_repo_relative_path(target_root, findings_file, label="findings file locator")
+    if locator_errors:
+        return None, locator_errors
     assert findings_path is not None
     label = target_relative_label(target_root, findings_path)
     try:
@@ -1805,11 +1920,9 @@ def load_review_record(
     review_file: str | None = None,
 ) -> tuple[dict[str, Any] | None, str, list[str]]:
     relative = review_file or default_review_path(item_id)
-    review_path, review_path_errors = resolve_target_relative_or_errors(
-        target_root, relative, label="review artifact path"
-    )
-    if review_path_errors:
-        return None, relative, review_path_errors
+    review_path, locator_errors = resolve_repo_relative_path(target_root, relative, label="review artifact locator")
+    if locator_errors:
+        return None, relative, locator_errors
     assert review_path is not None
     if not review_path.exists():
         return None, relative, []
@@ -2398,6 +2511,96 @@ def check_pr_template(target_root: Path) -> tuple[dict[str, Any], list[str]]:
     }, missing
 
 
+def render_adoption_pr_body(context: dict[str, Any]) -> str:
+    item_id = context["item_id"]
+    review_record = context["review_entry"]
+    spec_review_record = default_spec_review_path(item_id)
+    return (
+        "## Summary\n\n"
+        f"- Problem: Adopt Loom governance carriers for `{item_id}`.\n"
+        "- Scope: Loom-owned carrier and review metadata only.\n\n"
+        "## Validation\n\n"
+        "- [x] Verified by Loom adoption round-trip.\n\n"
+        "## Risks And Follow-ups\n\n"
+        "- Risks: None identified by the generated adoption body.\n"
+        "- Follow-ups: Keep repo-specific gates repo-owned.\n\n"
+        "## Related Work\n\n"
+        f"- Issue: {item_id}\n"
+        f"- Spec / plan: .loom/specs/{item_id}/spec.md\n\n"
+        "## Review Artifacts\n\n"
+        f"- Active Work Item: {context['report']['fact_chain']['entry_points']['work_item']}\n"
+        f"- Active Recovery Entry: {context['report']['fact_chain']['entry_points']['recovery_entry']}\n"
+        f"- Status Surface: {context['report']['fact_chain']['entry_points']['status_surface']}\n"
+        f"- Review Record: {review_record}\n"
+        f"- Spec Review Record: {spec_review_record}\n"
+    )
+
+
+def adoption_pr_body_sections(body: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in body.splitlines():
+        if line.startswith("## "):
+            current = line.strip()
+            sections[current] = []
+            continue
+        if current is not None:
+            sections[current].append(line.rstrip())
+    return {section: "\n".join(lines).strip() for section, lines in sections.items()}
+
+
+def parse_review_artifact_locators(section: str) -> tuple[dict[str, str], list[str]]:
+    locators: dict[str, str] = {}
+    errors: list[str] = []
+    for raw_line in section.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        match = re.match(r"^- ([^:]+):\s*(.+?)\s*$", stripped)
+        if not match:
+            errors.append(f"invalid Review Artifacts bullet: {stripped}")
+            continue
+        label = match.group(1).strip()
+        value = match.group(2).strip().strip("`")
+        if label in locators:
+            errors.append(f"duplicate Review Artifacts field: {label}")
+            continue
+        locators[label] = value
+    for label in ADOPTION_REVIEW_ARTIFACT_LABELS:
+        if label not in locators:
+            errors.append(f"Review Artifacts missing `{label}`")
+    return locators, errors
+
+
+def validate_adoption_pr_body(body: str, *, target_root: Path) -> dict[str, Any]:
+    sections = adoption_pr_body_sections(body)
+    missing_sections = [section for section in ADOPTION_PR_BODY_SECTIONS if section not in sections]
+    missing_inputs: list[str] = [f"PR body missing section: {section}" for section in missing_sections]
+    artifact_section = sections.get("## Review Artifacts", "")
+    locators, locator_errors = parse_review_artifact_locators(artifact_section)
+    missing_inputs.extend(locator_errors)
+
+    locator_status: dict[str, dict[str, Any]] = {}
+    for label, locator in locators.items():
+        path, errors = resolve_repo_relative_path(target_root, locator, label=f"Review Artifacts `{label}`")
+        exists = bool(path and path.exists() and path.is_file())
+        if errors:
+            missing_inputs.extend(errors)
+        elif not exists:
+            missing_inputs.append(f"Review Artifacts `{label}` points to missing file: {locator}")
+        locator_status[label] = {
+            "locator": locator,
+            "status": "present" if exists and not errors else "missing",
+        }
+
+    return {
+        "result": "pass" if not missing_inputs else "block",
+        "missing_inputs": missing_inputs,
+        "sections": {section: section in sections for section in ADOPTION_PR_BODY_SECTIONS},
+        "review_artifacts": locator_status,
+    }
+
+
 def active_workspace_conflicts(target_root: Path, item_id: str, workspace_entry: str) -> list[str]:
     work_items_dir = target_root / ".loom/work-items"
     if not work_items_dir.exists():
@@ -2417,7 +2620,14 @@ def active_workspace_conflicts(target_root: Path, item_id: str, workspace_entry:
         if str(parsed_item["workspace_entry"]) != workspace_entry:
             continue
         recovery_rel = str(parsed_item["recovery_entry"])
-        recovery_path = target_root / recovery_rel
+        recovery_path, recovery_errors = resolve_repo_relative_path(
+            target_root,
+            recovery_rel,
+            label="work item recovery entry locator",
+        )
+        if recovery_errors or recovery_path is None:
+            conflicts.append(other_item_id)
+            continue
         if not recovery_path.exists():
             conflicts.append(other_item_id)
             continue
@@ -2540,14 +2750,36 @@ def load_context(target_root: Path, output_relative: str, expected_item: str | N
     if workspace_path is None:
         return {}, [f"unable to resolve workspace entry: {workspace_entry}"]
 
+    work_item_path, work_item_errors = resolve_repo_relative_path(
+        target_root,
+        str(report["fact_chain"]["entry_points"]["work_item"]),
+        label="work item locator",
+    )
+    recovery_path, recovery_errors = resolve_repo_relative_path(
+        target_root,
+        str(report["fact_chain"]["entry_points"]["recovery_entry"]),
+        label="recovery entry locator",
+    )
+    status_path, status_errors = resolve_repo_relative_path(
+        target_root,
+        str(report["fact_chain"]["entry_points"]["status_surface"]),
+        label="status surface locator",
+    )
+    locator_errors = [*work_item_errors, *recovery_errors, *status_errors]
+    if locator_errors:
+        return {}, locator_errors
+    assert work_item_path is not None
+    assert recovery_path is not None
+    assert status_path is not None
+
     context = {
         "target_root": target_root,
         "output_relative": output_relative,
         "report": report,
         "item_id": item_id,
-        "work_item_path": target_root / report["fact_chain"]["entry_points"]["work_item"],
-        "recovery_path": target_root / report["fact_chain"]["entry_points"]["recovery_entry"],
-        "status_path": target_root / report["fact_chain"]["entry_points"]["status_surface"],
+        "work_item_path": work_item_path,
+        "recovery_path": recovery_path,
+        "status_path": status_path,
         "workspace_entry": workspace_entry,
         "workspace_path": workspace_path,
         "validation_entry": str(facts["validation_entry"]["value"]),
@@ -2754,9 +2986,9 @@ def load_fact_chain_report(target_root: Path, output_relative: str) -> tuple[dic
 
 def inspect_fact_chain_legacy(target_root: Path, output_relative: str) -> tuple[dict[str, Any], list[str]]:
     errors: list[str] = []
-    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
-    if output_error:
-        return {}, [output_error]
+    output_path, output_errors = resolve_repo_relative_path(target_root, output_relative, label="init-result locator")
+    if output_errors:
+        return {}, output_errors
     assert output_path is not None
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
@@ -2796,9 +3028,17 @@ def inspect_fact_chain_legacy(target_root: Path, output_relative: str) -> tuple[
     if errors:
         return {}, errors
 
-    work_item_path = target_root / str(work_item_ref)
-    recovery_path = target_root / str(recovery_ref)
-    status_path = target_root / str(status_ref)
+    work_item_path, work_item_path_errors = resolve_repo_relative_path(target_root, str(work_item_ref), label="work item locator")
+    recovery_path, recovery_path_errors = resolve_repo_relative_path(target_root, str(recovery_ref), label="recovery entry locator")
+    status_path, status_path_errors = resolve_repo_relative_path(target_root, str(status_ref), label="status surface locator")
+    errors.extend(work_item_path_errors)
+    errors.extend(recovery_path_errors)
+    errors.extend(status_path_errors)
+    if errors:
+        return {}, errors
+    assert work_item_path is not None
+    assert recovery_path is not None
+    assert status_path is not None
     for label, path in (
         ("work_item", work_item_path),
         ("recovery_entry", recovery_path),
@@ -3696,6 +3936,483 @@ def handle_runtime_state(args: argparse.Namespace) -> int:
     )
 
 
+def adoption_verify_payload(target_root: Path, output_relative: str, expected_item: str | None) -> dict[str, Any]:
+    runtime_state = runtime_state_payload(target_root)
+    context, context_errors = load_context(target_root, output_relative, expected_item)
+    pr_template, pr_template_errors = check_pr_template(target_root)
+    governance_surface = build_governance_surface(target_root)
+
+    if context_errors:
+        return {
+            "command": "adopt",
+            "operation": "verify",
+            "schema_version": "loom-adoption-verify/v1",
+            "result": "block",
+            "summary": "adoption verify could not read the Loom fact chain.",
+            "missing_inputs": [f"fact-chain: {message}" for message in context_errors],
+            "fallback_to": "adoption",
+            "runtime_state": runtime_state,
+            "governance_surface": governance_surface,
+            "pr_template": pr_template,
+        }
+
+    produced_body = render_adoption_pr_body(context)
+    produced_validation = validate_adoption_pr_body(produced_body, target_root=target_root)
+    bypass_body = produced_body.replace("\n## Review Artifacts\n\n", "\n## Omitted Review Artifacts\n\n", 1)
+    bypass_validation = validate_adoption_pr_body(bypass_body, target_root=target_root)
+
+    review_record, review_path, review_errors = load_review_record(target_root, context["item_id"], context["review_entry"])
+    spec_review_record, spec_review_path, spec_review_errors = load_review_record(
+        target_root,
+        context["item_id"],
+        default_spec_review_path(context["item_id"]),
+    )
+    review_missing = list(review_errors)
+    if review_record is None and not review_errors:
+        review_missing.append(f"missing review artifact: {review_path}")
+    spec_review_missing = list(spec_review_errors)
+    if spec_review_record is None and not spec_review_errors:
+        spec_review_missing.append(f"missing spec review artifact: {spec_review_path}")
+
+    missing_inputs: list[str] = []
+    if runtime_state.get("result") != "pass":
+        missing_inputs.extend(str(message) for message in runtime_state.get("missing_inputs", []))
+    missing_inputs.extend(pr_template_errors)
+    missing_inputs.extend(produced_validation["missing_inputs"])
+    missing_inputs.extend(review_missing)
+    missing_inputs.extend(spec_review_missing)
+    if bypass_validation["result"] != "block":
+        missing_inputs.append("consumer bypass check failed: removing Review Artifacts must block")
+
+    result = "pass" if not missing_inputs else "block"
+    return {
+        "command": "adopt",
+        "operation": "verify",
+        "schema_version": "loom-adoption-verify/v1",
+        "result": result,
+        "summary": (
+            "downstream adoption producer/consumer round-trip is valid."
+            if result == "pass"
+            else "downstream adoption round-trip has blocking contract gaps."
+        ),
+        "missing_inputs": missing_inputs,
+        "fallback_to": None if result == "pass" else "adoption",
+        "runtime_state": runtime_state,
+        "governance_surface": governance_surface,
+        "pr_template": pr_template,
+        "producer_consumer_roundtrip": {
+            "producer": {
+                "status": "pass",
+                "body_sections": list(ADOPTION_PR_BODY_SECTIONS),
+            },
+            "consumer": produced_validation,
+            "bypass_check": {
+                "scenario": "Review Artifacts section omitted",
+                "result": "pass" if bypass_validation["result"] == "block" else "block",
+                "consumer_result": bypass_validation["result"],
+                "missing_inputs": bypass_validation["missing_inputs"],
+            },
+        },
+        "reviews": {
+            "implementation": {
+                "path": review_path,
+                "status": "present" if review_record is not None and not review_errors else "missing",
+            },
+            "spec": {
+                "path": spec_review_path,
+                "status": "present" if spec_review_record is not None and not spec_review_errors else "missing",
+            },
+        },
+    }
+
+
+def handle_adopt(args: argparse.Namespace) -> int:
+    target_root = Path(args.target).expanduser().resolve()
+    return emit(adoption_verify_payload(target_root, args.output, args.item))
+
+
+def runtime_artifact_updates(target_root: Path, payload: dict[str, Any], *, source: str) -> list[dict[str, Any]]:
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        artifacts = payload.get("initial_artifacts")
+    if not isinstance(artifacts, list):
+        return []
+    updates: list[dict[str, Any]] = []
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        relative = artifact.get("path")
+        if not isinstance(relative, str) or not relative.startswith(".loom/bin/"):
+            continue
+        path, errors = resolve_repo_relative_path(target_root, relative, label=f"{source} artifact path")
+        if errors or path is None or not path.exists() or not path.is_file():
+            updates.append(
+                {
+                    "path": relative,
+                    "source": source,
+                    "status": "block",
+                    "missing_inputs": errors or [f"missing runtime artifact: {relative}"],
+                }
+            )
+            continue
+        expected = sha256_file(path)
+        current = artifact.get("sha256")
+        updates.append(
+            {
+                "path": relative,
+                "source": source,
+                "status": "current" if current == expected else "refresh-needed",
+                "current_sha256": current if isinstance(current, str) else None,
+                "expected_sha256": expected,
+            }
+        )
+    return updates
+
+
+def apply_runtime_artifact_updates(payload: dict[str, Any], updates: list[dict[str, Any]], *, source: str) -> None:
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        artifacts = payload.get("initial_artifacts")
+    if not isinstance(artifacts, list):
+        return
+    expected_by_path = {
+        update["path"]: update.get("expected_sha256")
+        for update in updates
+        if update.get("source") == source and update.get("status") == "refresh-needed"
+    }
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        relative = artifact.get("path")
+        if isinstance(relative, str) and relative in expected_by_path:
+            artifact["sha256"] = expected_by_path[relative]
+
+
+def refresh_shadow_evidence_actions(target_root: Path) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    shadow_root = target_root / ".loom/shadow"
+    if not shadow_root.exists():
+        return actions
+    for path in sorted(shadow_root.glob("*.json")):
+        relative = path.relative_to(target_root).as_posix()
+        if relative == ".loom/shadow/shadow-parity.json":
+            actions.append(
+                {
+                    "path": relative,
+                    "kind": "shadow-evidence-summary",
+                    "status": "skipped",
+                    "summary": "shadow-parity.json is an aggregate command output; per-surface evidence carries source hashes.",
+                }
+            )
+            continue
+        try:
+            payload = load_json_file(path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            actions.append({"path": relative, "kind": "shadow-evidence", "status": "block", "missing_inputs": [str(exc)]})
+            continue
+        if not isinstance(payload, dict):
+            actions.append({"path": relative, "kind": "shadow-evidence", "status": "block", "missing_inputs": ["shadow evidence must be a JSON object"]})
+            continue
+        source_files = payload.get("source_files")
+        if not isinstance(source_files, list) or not source_files:
+            actions.append({"path": relative, "kind": "shadow-evidence", "status": "block", "missing_inputs": ["source_files"]})
+            continue
+        refreshed: dict[str, str] = {}
+        missing: list[str] = []
+        for source in source_files:
+            if not isinstance(source, str):
+                missing.append("source_files entries must be strings")
+                continue
+            source_path, errors = resolve_repo_relative_path(target_root, source, label=f"{relative} source")
+            if errors or source_path is None or not source_path.exists() or source_path.is_dir():
+                missing.extend(errors or [f"missing source file: {source}"])
+                continue
+            refreshed[source] = sha256_file(source_path)
+        if missing:
+            actions.append({"path": relative, "kind": "shadow-evidence", "status": "block", "missing_inputs": missing})
+            continue
+        current = payload.get("source_sha256")
+        actions.append(
+            {
+                "path": relative,
+                "kind": "shadow-evidence",
+                "status": "current" if current == refreshed else "refresh-needed",
+                "expected_source_sha256": refreshed,
+            }
+        )
+    return actions
+
+
+def apply_shadow_evidence_actions(target_root: Path, actions: list[dict[str, Any]]) -> None:
+    for action in actions:
+        if action.get("kind") != "shadow-evidence" or action.get("status") != "refresh-needed":
+            continue
+        relative = action.get("path")
+        expected = action.get("expected_source_sha256")
+        if not isinstance(relative, str) or not isinstance(expected, dict):
+            continue
+        path, errors = resolve_repo_relative_path(target_root, relative, label="shadow evidence path")
+        if errors or path is None:
+            continue
+        payload = load_json_file(path)
+        if isinstance(payload, dict):
+            payload["source_sha256"] = expected
+            write_json_file(path, payload)
+
+
+def carrier_refresh_payload(target_root: Path, output_relative: str, expected_item: str | None, *, dry_run: bool) -> dict[str, Any]:
+    runtime_state = runtime_state_payload(target_root)
+    context, context_errors = load_context(target_root, output_relative, expected_item)
+    missing_inputs: list[str] = [f"fact-chain: {message}" for message in context_errors]
+
+    manifest_path, manifest_path_errors = resolve_repo_relative_path(target_root, ".loom/bootstrap/manifest.json", label="bootstrap manifest")
+    init_path, init_path_errors = resolve_repo_relative_path(target_root, output_relative, label="init-result locator")
+    missing_inputs.extend(manifest_path_errors)
+    missing_inputs.extend(init_path_errors)
+    manifest_payload: dict[str, Any] = {}
+    init_payload: dict[str, Any] = {}
+    for label, path in (("manifest", manifest_path), ("init-result", init_path)):
+        if path is None:
+            continue
+        try:
+            payload = load_json_file(path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            missing_inputs.append(f"invalid {label}: {exc}")
+            continue
+        if label == "manifest":
+            manifest_payload = payload
+        else:
+            init_payload = payload
+
+    actions: list[dict[str, Any]] = []
+    actions.extend(runtime_artifact_updates(target_root, manifest_payload, source="manifest"))
+    actions.extend(runtime_artifact_updates(target_root, init_payload, source="init-result"))
+    actions.extend(refresh_shadow_evidence_actions(target_root))
+    for action in actions:
+        if action.get("status") == "block":
+            missing_inputs.extend(str(message) for message in action.get("missing_inputs", []))
+
+    review_status: dict[str, Any] = {"status": "not_checked"}
+    if not context_errors:
+        assert context
+        review_record, review_path, review_errors = load_review_record(target_root, context["item_id"], context["review_entry"])
+        spec_review_path = default_spec_review_path(context["item_id"])
+        allowed_paths = allowed_post_review_carrier_paths(context, review_path, spec_review_path)
+        if review_errors or review_record is None:
+            review_status = {"status": "missing", "path": review_path, "missing_inputs": review_errors or [f"missing review artifact: {review_path}"]}
+        else:
+            binding, binding_errors = review_head_binding(
+                target_root,
+                reviewed_head=str(review_record.get("reviewed_head", "")),
+                allowed_paths=allowed_paths,
+            )
+            review_status = {"path": review_path, "head_binding": binding, "missing_inputs": binding_errors}
+            if binding.get("status") in {"implementation-drift-only", "stale"}:
+                review_status["status"] = "block"
+                missing_inputs.append("review artifact is stale because non-carrier drift is present")
+            elif binding.get("status") == "carrier-only":
+                review_status["status"] = "refresh-needed"
+            else:
+                review_status["status"] = "current"
+
+    if not dry_run and not missing_inputs:
+        if manifest_path is not None:
+            apply_runtime_artifact_updates(manifest_payload, actions, source="manifest")
+            write_json_file(manifest_path, manifest_payload)
+        if init_path is not None:
+            apply_runtime_artifact_updates(init_payload, actions, source="init-result")
+            write_json_file(init_path, init_payload)
+        apply_shadow_evidence_actions(target_root, actions)
+
+    refresh_needed = [action for action in actions if action.get("status") == "refresh-needed"]
+    result = "block" if missing_inputs else "pass"
+    return {
+        "command": "carrier",
+        "operation": "refresh",
+        "schema_version": "loom-carrier-refresh/v1",
+        "result": result,
+        "summary": (
+            "carrier refresh completed." if result == "pass" and not dry_run
+            else "carrier refresh dry-run completed." if result == "pass"
+            else "carrier refresh found blocking drift."
+        ),
+        "missing_inputs": missing_inputs,
+        "fallback_to": None if result == "pass" else "adoption",
+        "dry_run": dry_run,
+        "runtime_state": runtime_state,
+        "actions": actions,
+        "refresh_needed": refresh_needed,
+        "review": review_status,
+    }
+
+
+def handle_carrier(args: argparse.Namespace) -> int:
+    target_root = Path(args.target).expanduser().resolve()
+    return emit(carrier_refresh_payload(target_root, args.output, args.item, dry_run=args.dry_run))
+
+
+def github_commit_pulls(root: Path, owner: str, repo_name: str, head_sha: str) -> tuple[list[dict[str, Any]], list[str]]:
+    path = f"repos/{owner}/{repo_name}/commits/{head_sha}/pulls"
+    result = run_process(
+        [
+            "gh",
+            "api",
+            path,
+            "-H",
+            "Accept: application/vnd.github+json",
+        ],
+        root,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "gh api commit pulls failed"
+        pulls, fallback_errors = github_public_rest_list(path)
+        if pulls:
+            return pulls, []
+        return [], [detail, *[f"public REST fallback: {message}" for message in fallback_errors]]
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return [], [f"invalid JSON from commit pulls REST endpoint: {exc.msg}"]
+    if not isinstance(payload, list):
+        return [], ["commit pulls REST endpoint did not return a list"]
+    return [entry for entry in payload if isinstance(entry, dict)], []
+
+
+def host_binding_validate_payload(
+    *,
+    target_root: Path,
+    owner: str | None,
+    repo_name: str | None,
+    issue_number: int | None,
+    pr_number: int | None,
+    branch_name: str | None,
+    head_sha: str | None,
+    base_sha: str | None,
+) -> dict[str, Any]:
+    detected_owner, detected_repo = detect_github_repo(target_root)
+    owner = owner or detected_owner
+    repo_name = repo_name or detected_repo
+    missing_inputs: list[str] = []
+    inferences: list[dict[str, Any]] = []
+
+    if not owner or not repo_name:
+        missing_inputs.append("owner/repo")
+
+    inferred_pr = pr_number
+    inferred_branch = branch_name
+    if owner and repo_name and head_sha and inferred_pr is None:
+        pulls, pull_errors = github_commit_pulls(target_root, owner, repo_name, head_sha)
+        if pull_errors:
+            missing_inputs.extend(f"head_sha: {message}" for message in pull_errors)
+        elif len(pulls) == 1:
+            inferred_pr = int(pulls[0].get("number"))
+            head = pulls[0].get("head")
+            if inferred_branch is None and isinstance(head, dict) and isinstance(head.get("ref"), str):
+                inferred_branch = head.get("ref")
+            inferences.append({"from": "head_sha", "to": "pr", "status": "inferred", "pr": inferred_pr})
+        elif len(pulls) > 1:
+            missing_inputs.append("head_sha resolves to multiple PRs; pass --pr explicitly")
+        else:
+            missing_inputs.append("issue_or_pr_binding")
+
+    if inferred_branch is None and head_sha is None and inferred_pr is None and issue_number is None:
+        missing_inputs.append("branch | head-sha | pr | issue")
+
+    branch_payload: dict[str, Any] | None = None
+    branch_errors: list[str] = []
+    if owner and repo_name and inferred_branch:
+        branch_payload, branch_errors = github_branch_payload(target_root, owner, repo_name, inferred_branch)
+        missing_inputs.extend(f"branch: {message}" for message in branch_errors)
+
+    binding_payload = github_binding_payload(
+        target_root=target_root,
+        owner=owner,
+        repo_name=repo_name,
+        phase_number=None,
+        fr_number=None,
+        issue_number=issue_number,
+        pr_number=inferred_pr,
+        branch_name=inferred_branch,
+        sync=False,
+        dry_run=True,
+        require_complete_chain=False,
+    )
+    binding_missing = [
+        message
+        for message in binding_payload.get("missing_inputs", [])
+        if message not in {"work_item issue", "binding_chain"}
+    ]
+    if issue_number is not None or inferred_pr is not None:
+        missing_inputs.extend(str(message) for message in binding_missing)
+    findings = binding_payload.get("binding", {}).get("findings") if isinstance(binding_payload.get("binding"), dict) else []
+    if findings:
+        missing_inputs.append("binding_findings")
+
+    sha_validation: dict[str, Any] = {
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "status": "not_requested" if not head_sha else "validated",
+    }
+    if head_sha and branch_payload is not None:
+        branch_head = branch_payload.get("commit", {}).get("sha") if isinstance(branch_payload.get("commit"), dict) else None
+        sha_validation["branch_head_sha"] = branch_head
+        if branch_head and branch_head != head_sha:
+            sha_validation["status"] = "drift"
+            missing_inputs.append("head_sha does not match branch head")
+    if base_sha and head_sha:
+        changed_paths, diff_errors = git_changed_paths(target_root, base_sha, head_sha)
+        sha_validation["diff"] = {"changed_paths": changed_paths, "errors": diff_errors}
+        if diff_errors:
+            missing_inputs.extend(f"diff: {message}" for message in diff_errors)
+
+    result = "pass" if not missing_inputs else "block"
+    return {
+        "command": "host-binding",
+        "operation": "validate",
+        "schema_version": "loom-host-binding/v1",
+        "result": result,
+        "summary": (
+            "host binding inputs are readable and sufficiently bound."
+            if result == "pass"
+            else "host binding inputs are missing or ambiguous."
+        ),
+        "missing_inputs": missing_inputs,
+        "fallback_to": None if result == "pass" else "github-profile-binding",
+        "repository": {"owner": owner, "name": repo_name},
+        "inputs": {
+            "issue": issue_number,
+            "pr": pr_number,
+            "branch": branch_name,
+            "head_sha": head_sha,
+            "base_sha": base_sha,
+        },
+        "inferences": inferences,
+        "binding": binding_payload.get("binding"),
+        "branch": {
+            "name": inferred_branch,
+            "status": "present" if branch_payload is not None else ("unreadable" if branch_errors else "not_requested"),
+            "errors": branch_errors,
+        },
+        "sha_validation": sha_validation,
+    }
+
+
+def handle_host_binding(args: argparse.Namespace) -> int:
+    target_root = Path(args.target).expanduser().resolve()
+    return emit(
+        host_binding_validate_payload(
+            target_root=target_root,
+            owner=args.owner,
+            repo_name=args.repo_name,
+            issue_number=args.issue,
+            pr_number=args.pr,
+            branch_name=args.branch,
+            head_sha=args.head_sha,
+            base_sha=args.base_sha,
+        )
+    )
+
+
 def host_lifecycle_payload(context: dict[str, Any]) -> dict[str, Any]:
     branch = git_branch(context["target_root"])
     purity = purity_report_from_context(context)
@@ -4475,8 +5192,9 @@ query($owner:String!, $name:String!, $number:Int!) {
 
 def contains_merged_commit(root: Path, merge_commit_sha: str, target_branch: str = "main") -> bool:
     remote_ref = f"refs/remotes/origin/{target_branch}"
-    fetch_result = run_git(root, ["fetch", "origin", f"refs/heads/{target_branch}:{remote_ref}"])
-    if fetch_result is None or fetch_result.returncode != 0:
+    fetched_ref = f"refs/heads/{target_branch}:{remote_ref}"
+    fetched = run_git(root, ["fetch", "origin", fetched_ref])
+    if fetched is None or fetched.returncode != 0:
         return False
     contains = run_git(root, ["merge-base", "--is-ancestor", merge_commit_sha, remote_ref])
     return contains is not None and contains.returncode == 0
@@ -4603,7 +5321,9 @@ def reconciliation_audit_payload(
                 oid = merge_commit.get("oid")
                 if isinstance(oid, str) and oid:
                     merge_commit_sha = oid
-                    merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha)
+                    base_ref = pr_payload.get("baseRefName")
+                    target_branch = base_ref if isinstance(base_ref, str) and base_ref else "main"
+                    merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha, target_branch)
             if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_main):
                 findings.append(
                     make_reconciliation_finding(
@@ -6092,18 +6812,16 @@ def handle_review(args: argparse.Namespace) -> int:
             "normalized_findings": args.normalized_findings,
         },
     }
-    review_abs, review_path_errors = resolve_target_relative_or_errors(
-        target_root, review_path, label="review artifact path"
-    )
+    review_abs, review_path_errors = resolve_repo_relative_path(target_root, review_path, label="review artifact path")
     if review_path_errors:
         return emit(
             {
                 "command": "review",
                 "operation": "record",
                 "result": "block",
-                "summary": "review record refused to write outside the target root.",
+                "summary": "review record refused an unsafe review artifact locator.",
                 "missing_inputs": review_path_errors,
-                "fallback_to": "admission",
+                "fallback_to": "build",
             }
         )
     assert review_abs is not None
@@ -6239,9 +6957,9 @@ def update_active_entry_points(
     recovery_entry: str,
     status_surface: str,
 ) -> None:
-    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
-    if output_error:
-        raise RuntimeError(output_error)
+    output_path, output_errors = resolve_repo_relative_path(target_root, output_relative, label="init-result locator")
+    if output_errors:
+        raise RuntimeError("; ".join(output_errors))
     assert output_path is not None
     payload = load_json_file(output_path)
     fact_chain = payload.get("fact_chain")
@@ -6250,14 +6968,6 @@ def update_active_entry_points(
     entry_points = fact_chain.get("entry_points")
     if not isinstance(entry_points, dict):
         raise RuntimeError("init-result.fact_chain is missing `entry_points`")
-    for label, locator in (
-        ("work_item", work_item),
-        ("recovery_entry", recovery_entry),
-        ("status_surface", status_surface),
-    ):
-        _, path_error = resolve_target_relative_path(target_root, locator, label=f"fact-chain carrier `{label}`")
-        if path_error:
-            raise RuntimeError(path_error)
     entry_points["current_item_id"] = item_id
     entry_points["work_item"] = work_item
     entry_points["recovery_entry"] = recovery_entry
@@ -6267,14 +6977,14 @@ def update_active_entry_points(
 
 def handle_work_item(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    output_path, output_errors = resolve_target_relative_or_errors(target_root, args.output, label="init-result path")
+    output_path, output_errors = resolve_repo_relative_path(target_root, args.output, label="init-result locator")
     if output_errors:
         return emit(
             {
                 "command": "work-item",
                 "operation": args.operation,
                 "result": "block",
-                "summary": "work-item command refused an init-result path outside the target root.",
+                "summary": "work-item command requires a safe init-result fact-chain locator.",
                 "missing_inputs": output_errors,
                 "fallback_to": "admission",
             }
@@ -6293,30 +7003,30 @@ def handle_work_item(args: argparse.Namespace) -> int:
         )
 
     work_item_relative = f".loom/work-items/{args.item}.md"
+    work_item_path, work_item_path_errors = resolve_repo_relative_path(
+        target_root,
+        work_item_relative,
+        label="work item locator",
+    )
     recovery_relative = args.recovery_entry or f".loom/progress/{args.item}.md"
+    recovery_path, recovery_path_errors = resolve_repo_relative_path(
+        target_root,
+        recovery_relative,
+        label="recovery entry locator",
+    )
     review_relative = default_review_path(args.item)
+    review_path, review_path_errors = resolve_repo_relative_path(target_root, review_relative, label="review locator")
     status_relative = ".loom/status/current.md"
-    work_item_path, work_item_path_errors = resolve_target_relative_or_errors(
-        target_root, work_item_relative, label="work item path"
-    )
-    recovery_path, recovery_path_errors = resolve_target_relative_or_errors(
-        target_root, recovery_relative, label="recovery entry path"
-    )
-    review_path, review_path_errors = resolve_target_relative_or_errors(
-        target_root, review_relative, label="review artifact path"
-    )
-    status_path, status_path_errors = resolve_target_relative_or_errors(
-        target_root, status_relative, label="status surface path"
-    )
-    path_errors = [*work_item_path_errors, *recovery_path_errors, *review_path_errors, *status_path_errors]
-    if path_errors:
+    status_path, status_path_errors = resolve_repo_relative_path(target_root, status_relative, label="status surface locator")
+    locator_errors = [*work_item_path_errors, *recovery_path_errors, *review_path_errors, *status_path_errors]
+    if locator_errors:
         return emit(
             {
                 "command": "work-item",
                 "operation": args.operation,
                 "result": "block",
-                "summary": "work-item command refused a carrier path outside the target root.",
-                "missing_inputs": path_errors,
+                "summary": "work-item command refused unsafe repo locator input.",
+                "missing_inputs": locator_errors,
                 "fallback_to": "admission",
             }
         )
@@ -7059,25 +7769,32 @@ def handle_shadow_parity(args: argparse.Namespace) -> int:
             summary = "shadow parity could not fully read the declared governance surfaces."
 
     missing_inputs: list[str] = []
+    missing_details: list[Any] = []
     for report in reports:
         for message in report.get("missing_inputs", []):
             if message not in missing_inputs:
                 missing_inputs.append(message)
+        details = report.get("missing_details")
+        if isinstance(details, list):
+            for detail in details:
+                if detail not in missing_details:
+                    missing_details.append(detail)
 
-    return emit(
-        {
-            "command": "shadow-parity",
-            "mode": mode,
-            "blocking": mode == "blocking",
-            "result": result,
-            "summary": summary,
-            "missing_inputs": missing_inputs,
-            "fallback_to": "manual-reconciliation" if result == "block" else None,
-            "runtime_state": runtime_state,
-            "governance_surface": governance_surface,
-            "reports": reports,
-        }
-    )
+    payload = {
+        "command": "shadow-parity",
+        "mode": mode,
+        "blocking": mode == "blocking",
+        "result": result,
+        "summary": summary,
+        "missing_inputs": missing_inputs,
+        "fallback_to": "manual-reconciliation" if result == "block" else None,
+        "runtime_state": runtime_state,
+        "governance_surface": governance_surface,
+        "reports": reports,
+    }
+    if missing_details:
+        payload["missing_details"] = missing_details
+    return emit(payload)
 
 
 def handle_runtime_parity(args: argparse.Namespace) -> int:
@@ -7097,6 +7814,12 @@ def main(argv: list[str] | None = None) -> int:
         return handle_fact_chain(args)
     if args.command == "runtime-state":
         return handle_runtime_state(args)
+    if args.command == "adopt":
+        return handle_adopt(args)
+    if args.command == "carrier":
+        return handle_carrier(args)
+    if args.command == "host-binding":
+        return handle_host_binding(args)
     if args.command == "runtime-evidence":
         return handle_runtime_evidence(args)
     if args.command == "state-check":

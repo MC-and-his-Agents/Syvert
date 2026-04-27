@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fact_chain_support import inspect_fact_chain
+import governance_surface as governance_surface_module
+import loom_flow as loom_flow_module
+import runtime_state as runtime_state_module
 from governance_surface import build_governance_surface
 from loom_flow import repo_specific_requirements_payload, review_head_binding
 from runtime_paths import repo_local_root
@@ -100,6 +103,7 @@ CORE_DOCS = (
     "docs/evidence/validations/validation-adoption-gate-rollout.md",
     "docs/evidence/validations/validation-external-runtime-devendor-migration.md",
     "docs/evidence/validations/validation-syvert-adversarial-adoption-fixture.md",
+    "docs/evidence/validations/validation-zero-friction-adoption-hardening.md",
     "docs/evidence/validations/validation-github-profile-binding-orchestration.md",
     "docs/evidence/validations/validation-github-profile-drift-reconciliation.md",
     "docs/evidence/validations/validation-github-profile-graphql-budget-guard.md",
@@ -272,6 +276,7 @@ def check_required_paths(root: Path, category: str, paths: tuple[str, ...]) -> l
 def iter_markdown_files(root: Path) -> list[Path]:
     skipped_parts = {
         ".git",
+        ".worktrees",
         "node_modules",
         "dist",
         "payload",
@@ -1057,6 +1062,26 @@ def require_repo_specific_requirements_payload(
             failures.append(Failure(category, f"{context} declared requirements must split cleanly into blocking and advisory"))
 
 
+def require_missing_details(
+    failures: list[Failure],
+    *,
+    category: str,
+    context: str,
+    details: object,
+) -> None:
+    if not isinstance(details, list):
+        failures.append(Failure(category, f"{context} must be a list"))
+        return
+    for index, detail in enumerate(details):
+        if not isinstance(detail, dict):
+            failures.append(Failure(category, f"{context}[{index}] must be an object"))
+            continue
+        for field in ("category", "kind", "scope", "label", "locator", "message"):
+            value = detail.get(field)
+            if not isinstance(value, str) or not value:
+                failures.append(Failure(category, f"{context}[{index}] missing `{field}`"))
+
+
 def require_shadow_parity_payload(
     failures: list[Failure],
     *,
@@ -1085,6 +1110,14 @@ def require_shadow_parity_payload(
         failures.append(Failure(category, f"{context} must include non-empty `summary`"))
     if not isinstance(payload.get("missing_inputs"), list):
         failures.append(Failure(category, f"{context} must include `missing_inputs`"))
+    top_level_details = payload.get("missing_details")
+    if top_level_details is not None:
+        require_missing_details(
+            failures,
+            category=category,
+            context=f"{context}.missing_details",
+            details=top_level_details,
+        )
     require_runtime_state_payload(
         failures,
         category=category,
@@ -1128,6 +1161,14 @@ def require_shadow_parity_payload(
             failures.append(Failure(category, f"{context} reports[{index}] must include non-empty `summary`"))
         if not isinstance(report.get("missing_inputs"), list):
             failures.append(Failure(category, f"{context} reports[{index}] must include `missing_inputs`"))
+        report_details = report.get("missing_details")
+        if report_details is not None:
+            require_missing_details(
+                failures,
+                category=category,
+                context=f"{context} reports[{index}].missing_details",
+                details=report_details,
+            )
         for key in ("host_adapters", "repo_native_carriers"):
             if not isinstance(report.get(key), list):
                 failures.append(Failure(category, f"{context} reports[{index}] must include `{key}` as a list"))
@@ -2534,6 +2575,21 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
             {"pass"},
         ),
         (
+            "adopt-verify",
+            ["python3", "tools/loom_flow.py", "adopt", "verify", "--target", "examples/new-project", "--item", "INIT-0001"],
+            {"pass"},
+        ),
+        (
+            "carrier-refresh",
+            ["python3", "tools/loom_flow.py", "carrier", "refresh", "--target", "examples/new-project", "--item", "INIT-0001", "--dry-run"],
+            {"pass"},
+        ),
+        (
+            "host-binding-validate",
+            ["python3", "tools/loom_flow.py", "host-binding", "validate", "--target", ".", "--owner", "MC-and-his-Agents", "--repo", "Loom", "--branch", "main"],
+            {"pass"},
+        ),
+        (
             "governance-profile-status",
             ["python3", "tools/loom_flow.py", "governance-profile", "status", "--target", "examples/new-project"],
             {"pass"},
@@ -2797,6 +2853,36 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
                 context="`runtime-parity validate`",
                 payload=payload,
             )
+        if label == "adopt-verify":
+            if payload.get("command") != "adopt" or payload.get("operation") != "verify":
+                failures.append(Failure("daily-execution-cli", "`adopt verify` must report command/operation"))
+            if payload.get("schema_version") != "loom-adoption-verify/v1":
+                failures.append(Failure("daily-execution-cli", "`adopt verify` must report schema v1"))
+            roundtrip = payload.get("producer_consumer_roundtrip")
+            if not isinstance(roundtrip, dict):
+                failures.append(Failure("daily-execution-cli", "`adopt verify` must include producer_consumer_roundtrip"))
+            else:
+                consumer = roundtrip.get("consumer")
+                bypass = roundtrip.get("bypass_check")
+                if not isinstance(consumer, dict) or consumer.get("result") != "pass":
+                    failures.append(Failure("daily-execution-cli", "`adopt verify` generated body must pass consumer validation"))
+                if not isinstance(bypass, dict) or bypass.get("result") != "pass":
+                    failures.append(Failure("daily-execution-cli", "`adopt verify` must prove required section deletion blocks"))
+        if label == "carrier-refresh":
+            if payload.get("command") != "carrier" or payload.get("operation") != "refresh":
+                failures.append(Failure("daily-execution-cli", "`carrier refresh` must report command/operation"))
+            if payload.get("schema_version") != "loom-carrier-refresh/v1":
+                failures.append(Failure("daily-execution-cli", "`carrier refresh` must report schema v1"))
+            if not isinstance(payload.get("actions"), list):
+                failures.append(Failure("daily-execution-cli", "`carrier refresh` must include actions"))
+        if label == "host-binding-validate":
+            if payload.get("command") != "host-binding" or payload.get("operation") != "validate":
+                failures.append(Failure("daily-execution-cli", "`host-binding validate` must report command/operation"))
+            if payload.get("schema_version") != "loom-host-binding/v1":
+                failures.append(Failure("daily-execution-cli", "`host-binding validate` must report schema v1"))
+            branch = payload.get("branch")
+            if not isinstance(branch, dict) or branch.get("status") != "present":
+                failures.append(Failure("daily-execution-cli", "`host-binding validate --branch main` must read the branch via REST"))
         if label in {"governance-profile-status", "governance-profile-upgrade-plan"}:
             if payload.get("command") != "governance-profile":
                 failures.append(Failure("daily-execution-cli", f"`{label}` must report `command: governance-profile`"))
@@ -6299,6 +6385,184 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
 
     with tempfile.TemporaryDirectory(prefix="loom-check-syvert-adoption-") as tmp:
         base = Path(tmp)
+
+        original_governance_remote = governance_surface_module.git_remote_origin
+        original_flow_remote = loom_flow_module.git_remote_origin
+        try:
+            governance_surface_module.git_remote_origin = lambda _root: "git@github.com:owner/foo.bar.git"
+            loom_flow_module.git_remote_origin = lambda _root: "git@github.com:owner/foo.bar.git"
+            if governance_surface_module.detect_github_repo(base) != ("owner", "foo.bar"):
+                failures.append(Failure("adversarial-adoption", "governance surface must accept dotted GitHub repository names"))
+            if loom_flow_module.detect_github_repo(base) != ("owner", "foo.bar"):
+                failures.append(Failure("adversarial-adoption", "loom flow must accept dotted GitHub repository names"))
+        finally:
+            governance_surface_module.git_remote_origin = original_governance_remote
+            loom_flow_module.git_remote_origin = original_flow_remote
+
+        branch_calls: list[list[str]] = []
+        original_detect_repo = governance_surface_module.detect_github_repo
+        original_rest_json = governance_surface_module.gh_rest_json
+        original_gh_json = governance_surface_module.gh_json
+        try:
+            governance_surface_module.detect_github_repo = lambda _root: ("owner", "foo.bar")
+            governance_surface_module.gh_rest_json = lambda _root, _path: ({"full_name": "owner/foo.bar", "default_branch": "release/main"}, [])
+
+            def fake_gh_json(_root: Path, args: list[str]) -> tuple[dict[str, object], list[str]]:
+                branch_calls.append(args)
+                return {"protected": False}, []
+
+            governance_surface_module.gh_json = fake_gh_json
+            _, errors = governance_surface_module.detect_github_control_plane(base)
+            if errors:
+                failures.append(Failure("adversarial-adoption", f"governance surface slash-branch fixture failed: {'; '.join(errors)}"))
+            elif not branch_calls or "repos/owner/foo.bar/branches/release%2Fmain" not in branch_calls[0]:
+                failures.append(Failure("adversarial-adoption", "GitHub branch REST endpoint must encode slash-containing branch names"))
+        finally:
+            governance_surface_module.detect_github_repo = original_detect_repo
+            governance_surface_module.gh_rest_json = original_rest_json
+            governance_surface_module.gh_json = original_gh_json
+
+        merge_calls: list[list[str]] = []
+        original_run_git = loom_flow_module.run_git
+        try:
+            def fake_run_git(_root: Path, args: list[str]):
+                merge_calls.append(args)
+
+                class Result:
+                    returncode = 0
+
+                return Result()
+
+            loom_flow_module.run_git = fake_run_git
+            if not loom_flow_module.contains_merged_commit(base, "abc123", "release/main"):
+                failures.append(Failure("adversarial-adoption", "target-branch merge containment fixture unexpectedly failed"))
+            expected_fetch = ["fetch", "origin", "refs/heads/release/main:refs/remotes/origin/release/main"]
+            if not merge_calls or merge_calls[0] != expected_fetch:
+                failures.append(Failure("adversarial-adoption", "merge commit containment must fetch the explicit target branch"))
+        finally:
+            loom_flow_module.run_git = original_run_git
+
+        path_contract_target = base / "path-contract"
+        path_contract_target.mkdir()
+        (path_contract_target / "install-layout.json").write_text('{"required_paths":["../outside"]}', encoding="utf-8")
+        payload, errors, _ = runtime_state_module._validate_install_layout(path_contract_target)
+        if payload.get("status") != "block" or not any("must stay inside" in error for error in errors):
+            failures.append(Failure("adversarial-adoption", "install-layout runtime paths must not escape the runtime root"))
+
+        (path_contract_target / "upgrade-contract.json").write_text('{"upgrade_policy":{"refresh_required":["layout_manifest"]}}', encoding="utf-8")
+        (path_contract_target / "registry.json").write_text(
+            '{"install_layout":"install-layout.json","upgrade_contract":"upgrade-contract.json","entries":[{"id":"x","executable":"../outside-exec","manifest":"../outside-manifest.json"}]}',
+            encoding="utf-8",
+        )
+        payload, errors, _ = runtime_state_module._validate_registry_contract(path_contract_target)
+        if payload.get("status") != "block" or not any("must stay inside" in error for error in errors):
+            failures.append(Failure("adversarial-adoption", "registry executable and manifest paths must not escape the runtime root"))
+
+        fact_chain_escape = base / "fact-chain-error-anchor"
+        (fact_chain_escape / ".loom/bootstrap").mkdir(parents=True)
+        write_json(
+            fact_chain_escape / ".loom/bootstrap/init-result.json",
+            {
+                "schema_version": "loom-init-output/v1",
+                "fact_chain": {
+                    "read_entry": "python3 .loom/bin/loom_init.py fact-chain --target .",
+                    "mode": "work-item + recovery-entry + derived status-surface",
+                    "entry_points": {
+                        "current_item_id": "INIT-0001",
+                        "work_item": "../outside.md",
+                        "recovery_entry": ".loom/progress/INIT-0001.md",
+                        "status_surface": ".loom/status/current.md",
+                    }
+                },
+            },
+        )
+        _, errors = inspect_fact_chain(fact_chain_escape)
+        if not any("must stay within the target root" in error for error in errors):
+            failures.append(Failure("adversarial-adoption", "fact-chain path-boundary errors must expose a stable target-root anchor"))
+
+        shadow_anchor_errors = governance_surface_module.validate_shadow_surface(
+            root=base,
+            surface="review",
+            entry={
+                "summary": "review parity",
+                "loom_locator": ".loom/shadow/review-loom.json",
+                "repo_locator": "../outside.json",
+            },
+        )
+        if not any(
+            "must stay inside the repository" in error
+            and "must stay within the repository root" in error
+            for error in shadow_anchor_errors
+        ):
+            failures.append(Failure("adversarial-adoption", "shadow surface path-boundary errors must expose a stable repository anchor"))
+
+        shadow_boundary_target = base / "shadow-structured-boundary"
+        (shadow_boundary_target / ".loom/companion").mkdir(parents=True)
+        write_json(
+            shadow_boundary_target / ".loom/companion/interop.json",
+            {
+                "schema_version": "loom-repo-interop/v1",
+                "host_adapters": [],
+                "repo_native_carriers": [],
+                "shadow_surfaces": {
+                    "review": {
+                        "summary": "review parity",
+                        "loom_locator": "../outside-loom.json",
+                        "repo_locator": "../outside-repo.json",
+                    }
+                },
+            },
+        )
+        shadow_boundary_report = loom_flow_module.shadow_parity_report(
+            {
+                "availability": "present",
+                "contract": {"locator": ".loom/companion/interop.json"},
+            },
+            target_root=shadow_boundary_target,
+            surface="review",
+        )
+        shadow_boundary_details = shadow_boundary_report.get("missing_details")
+        if not isinstance(shadow_boundary_details, list) or not any(
+            isinstance(detail, dict)
+            and detail.get("category") == "path_boundary"
+            and detail.get("kind") == "repo_locator_escape"
+            and detail.get("scope") == "repository_root"
+            and detail.get("label") == "shadow surface `review` repo_locator"
+            and detail.get("locator") == "../outside-repo.json"
+            for detail in shadow_boundary_details
+        ):
+            failures.append(Failure("adversarial-adoption", "shadow parity path-boundary failures must expose structured missing_details"))
+
+        spec_contract_target = base / "spec-contract"
+        (spec_contract_target / ".loom/specs/INIT-0001").mkdir(parents=True)
+        (spec_contract_target / ".loom/specs/INIT-0001/spec.md").write_text("bootstrap spec\n", encoding="utf-8")
+        context = {
+            "item_id": "WORK-0002",
+            "target_root": spec_contract_target,
+            "associated_artifacts": [".loom/specs/INIT-0001/spec.md"],
+        }
+        if loom_flow_module.formal_spec_path(context) is not None:
+            failures.append(Failure("adversarial-adoption", "active Work Items must not fall back to bootstrap INIT specs"))
+
+        semantics_target = base / "shadow-semantics"
+        (semantics_target / ".loom/shadow").mkdir(parents=True)
+        (semantics_target / "loom.md").write_text("loom\n", encoding="utf-8")
+        write_json(
+            semantics_target / ".loom/shadow/review-loom.json",
+            {
+                "parity_value": "review-v1",
+                "source_semantics": "requires spec review",
+                "source_files": ["loom.md"],
+                "source_sha256": {"loom.md": sha256_file(semantics_target / "loom.md")},
+            },
+        )
+        normalized, _ = loom_flow_module.normalized_shadow_value(
+            semantics_target / ".loom/shadow/review-loom.json",
+            target_root=semantics_target,
+        )
+        if "requires spec review" not in str(normalized.get("normalized_value")):
+            failures.append(Failure("adversarial-adoption", "shadow parity normalization must retain declared source semantics"))
+
         baseline = base / "baseline"
         current_head = prepare_strong_target(baseline)
         if current_head is None:
@@ -6330,12 +6594,116 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
             ("shadow-parity", ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(baseline)], "pass"),
             ("shadow-parity --blocking", ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(baseline), "--blocking"], "pass"),
             ("flow resume", ["python3", "tools/loom_flow.py", "flow", "resume", "--target", str(baseline), "--item", "INIT-0001"], "pass"),
+            ("adopt verify", ["python3", "tools/loom_flow.py", "adopt", "verify", "--target", str(baseline), "--item", "INIT-0001"], "pass"),
         ):
             payload, error = load_command_json(root, args)
             if error:
                 failures.append(Failure("adversarial-adoption", f"`{label}` baseline failed: {error}"))
             elif payload.get("result") != expected:
                 failures.append(Failure("adversarial-adoption", f"`{label}` baseline must return `{expected}`"))
+            elif label == "adopt verify":
+                roundtrip = payload.get("producer_consumer_roundtrip")
+                deleted_section = (
+                    roundtrip.get("bypass_check")
+                    if isinstance(roundtrip, dict)
+                    else None
+                )
+                if not isinstance(deleted_section, dict) or deleted_section.get("consumer_result") != "block":
+                    failures.append(Failure("adversarial-adoption", "`adopt verify` must prove required Review Artifacts deletion cannot bypass the consumer"))
+
+        sha_only_payload, sha_only_error = load_command_json(
+            root,
+            [
+                "python3",
+                "tools/loom_flow.py",
+                "host-binding",
+                "validate",
+                "--target",
+                str(baseline),
+                "--owner",
+                "MC-and-his-Agents",
+                "--repo",
+                "Loom",
+                "--head-sha",
+                current_head,
+            ],
+            timeout_seconds=60,
+        )
+        if sha_only_error:
+            failures.append(Failure("adversarial-adoption", f"SHA-only host-binding negative sample failed: {sha_only_error}"))
+        else:
+            missing_inputs = sha_only_payload.get("missing_inputs")
+            if sha_only_payload.get("result") != "block" or not isinstance(missing_inputs, list) or not missing_inputs:
+                failures.append(Failure("adversarial-adoption", "SHA-only host-binding must fail closed when REST cannot prove issue or PR binding"))
+
+        path_escape_payload, error = load_command_json(
+            root,
+            ["python3", "tools/loom_flow.py", "fact-chain", "--target", str(baseline), "--output", "../outside-init-result.json"],
+        )
+        if error:
+            failures.append(Failure("adversarial-adoption", f"path escape fact-chain sample failed: {error}"))
+        elif path_escape_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "fact-chain must block init-result locators that escape the target root"))
+
+        escape_work_item_payload, error = load_command_json(
+            root,
+            [
+                "python3",
+                "tools/loom_flow.py",
+                "work-item",
+                "create",
+                "--target",
+                str(baseline),
+                "--item",
+                "ESCAPE-0001",
+                "--goal",
+                "Reject path escape",
+                "--scope",
+                "Exercise repo-relative locator hardening",
+                "--execution-path",
+                "execution/support",
+                "--workspace-entry",
+                ".",
+                "--validation-entry",
+                "python3 .loom/bin/loom_init.py verify --target .",
+                "--closing-condition",
+                "Unsafe locators are blocked.",
+                "--recovery-entry",
+                "../escape.md",
+                "--init-recovery",
+            ],
+        )
+        if error:
+            failures.append(Failure("adversarial-adoption", f"path escape work-item sample failed: {error}"))
+        elif escape_work_item_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "work-item create must block recovery locators that escape the target root"))
+
+        shadow_escape_target = base / "shadow-locator-escape"
+        shutil.copytree(baseline, shadow_escape_target)
+        interop_path = shadow_escape_target / ".loom/companion/interop.json"
+        interop_payload = load_json_file(interop_path)
+        shadow_surfaces = interop_payload.get("shadow_surfaces") if isinstance(interop_payload, dict) else None
+        review_surface = shadow_surfaces.get("review") if isinstance(shadow_surfaces, dict) else None
+        if isinstance(review_surface, dict):
+            review_surface["loom_locator"] = "/tmp/outside-shadow-evidence.json"
+            write_json(interop_path, interop_payload)
+        shadow_escape_payload, error = load_command_json(
+            root,
+            ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(shadow_escape_target), "--surface", "review", "--blocking"],
+        )
+        if error:
+            failures.append(Failure("adversarial-adoption", f"path escape shadow-parity sample failed: {error}"))
+        elif shadow_escape_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "shadow-parity blocking mode must reject absolute shadow locators"))
+        else:
+            shadow_escape_details = shadow_escape_payload.get("missing_details")
+            if not isinstance(shadow_escape_details, list) or not any(
+                isinstance(detail, dict)
+                and detail.get("category") == "path_boundary"
+                and "loom_locator" in str(detail.get("label", ""))
+                for detail in shadow_escape_details
+            ):
+                failures.append(Failure("adversarial-adoption", "shadow-parity CLI payload must aggregate structured path-boundary missing_details"))
 
         poisoned_payload, error = load_command_json(
             root,
@@ -6369,6 +6737,61 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
             failures.append(Failure("adversarial-adoption", f"runtime provenance drift sample failed: {error}"))
         elif payload.get("result") != "block":
             failures.append(Failure("adversarial-adoption", "runtime provenance drift must block runtime-parity"))
+
+        carrier_refresh_target = base / "carrier-refresh"
+        shutil.copytree(baseline, carrier_refresh_target)
+        write_json(
+            carrier_refresh_target / ".loom/shadow/shadow-parity.json",
+            {
+                "schema_version": "loom-shadow-parity/v1",
+                "result": "pass",
+                "summary": "Aggregate shadow parity output is not per-surface hash evidence.",
+            },
+        )
+        carrier_manifest_path = carrier_refresh_target / ".loom/bootstrap/manifest.json"
+        carrier_manifest = load_json_file(carrier_manifest_path)
+        carrier_artifacts = carrier_manifest.get("artifacts") if isinstance(carrier_manifest, dict) else []
+        if isinstance(carrier_artifacts, list):
+            for artifact in carrier_artifacts:
+                if isinstance(artifact, dict) and artifact.get("path") == ".loom/bin/loom_flow.py":
+                    artifact["sha256"] = "1" * 64
+                    break
+        write_json(carrier_manifest_path, carrier_manifest)
+        dry_run_payload, dry_run_error = load_command_json(
+            root,
+            ["python3", "tools/loom_flow.py", "carrier", "refresh", "--target", str(carrier_refresh_target), "--dry-run"],
+        )
+        if dry_run_error:
+            failures.append(Failure("adversarial-adoption", f"carrier refresh dry-run sample failed: {dry_run_error}"))
+        else:
+            refresh_needed = dry_run_payload.get("refresh_needed")
+            if dry_run_payload.get("result") != "pass" or not isinstance(refresh_needed, list) or not refresh_needed:
+                failures.append(Failure("adversarial-adoption", "carrier refresh dry-run must report runtime provenance refresh-needed"))
+            actions = dry_run_payload.get("actions")
+            summary_actions = [
+                action
+                for action in actions
+                if isinstance(action, dict)
+                and action.get("path") == ".loom/shadow/shadow-parity.json"
+                and action.get("status") == "skipped"
+            ] if isinstance(actions, list) else []
+            if not summary_actions:
+                failures.append(Failure("adversarial-adoption", "carrier refresh must skip aggregate shadow-parity.json without requiring source hashes"))
+        write_payload, write_error = load_command_json(
+            root,
+            ["python3", "tools/loom_flow.py", "carrier", "refresh", "--target", str(carrier_refresh_target), "--write"],
+        )
+        if write_error:
+            failures.append(Failure("adversarial-adoption", f"carrier refresh write sample failed: {write_error}"))
+        else:
+            after_payload, after_error = load_command_json(
+                root,
+                ["python3", "tools/loom_flow.py", "carrier", "refresh", "--target", str(carrier_refresh_target), "--dry-run"],
+            )
+            if after_error:
+                failures.append(Failure("adversarial-adoption", f"carrier refresh after-write sample failed: {after_error}"))
+            elif after_payload.get("refresh_needed"):
+                failures.append(Failure("adversarial-adoption", "carrier refresh --write must clear runtime provenance drift"))
 
         rollover_target = base / "active-rollover"
         shutil.copytree(baseline, rollover_target)
@@ -6429,28 +6852,66 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
         elif payload.get("result") != "block":
             failures.append(Failure("adversarial-adoption", "metadata spoofing must fail closed in the canonical section"))
 
-        shadow_target = base / "shadow-broken"
-        shutil.copytree(baseline, shadow_target)
-        shadow_payload = load_json_file(shadow_target / ".loom/shadow/review-repo.json")
-        if isinstance(shadow_payload, dict):
-            shadow_payload.pop("source_sha256", None)
-            write_json(shadow_target / ".loom/shadow/review-repo.json", shadow_payload)
-        warn_payload, warn_error = load_command_json(
-            root,
-            ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(shadow_target), "--surface", "review"],
-        )
-        block_payload, block_error = load_command_json(
-            root,
-            ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(shadow_target), "--surface", "review", "--blocking"],
-        )
-        if warn_error:
-            failures.append(Failure("adversarial-adoption", f"shadow evidence validation-only sample failed: {warn_error}"))
-        elif warn_payload.get("result") != "warn":
-            failures.append(Failure("adversarial-adoption", "broken shadow evidence must warn in validation-only mode"))
-        if block_error:
-            failures.append(Failure("adversarial-adoption", f"shadow evidence blocking sample failed: {block_error}"))
-        elif block_payload.get("result") != "block":
-            failures.append(Failure("adversarial-adoption", "broken shadow evidence must block in blocking mode"))
+        def assert_broken_shadow_evidence(
+            label: str,
+            mutate: object,
+            *,
+            expect_validation_warn: bool = True,
+        ) -> None:
+            shadow_target = base / f"shadow-broken-{label}"
+            shutil.copytree(baseline, shadow_target)
+            if callable(mutate):
+                mutate(shadow_target)
+            warn_payload, warn_error = load_command_json(
+                root,
+                ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(shadow_target), "--surface", "review"],
+            )
+            block_payload, block_error = load_command_json(
+                root,
+                ["python3", "tools/loom_flow.py", "shadow-parity", "--target", str(shadow_target), "--surface", "review", "--blocking"],
+            )
+            if warn_error:
+                failures.append(Failure("adversarial-adoption", f"shadow evidence `{label}` validation-only sample failed: {warn_error}"))
+            elif expect_validation_warn and warn_payload.get("result") != "warn":
+                failures.append(Failure("adversarial-adoption", f"shadow evidence `{label}` must warn in validation-only mode"))
+            if block_error:
+                failures.append(Failure("adversarial-adoption", f"shadow evidence `{label}` blocking sample failed: {block_error}"))
+            elif block_payload.get("result") != "block":
+                failures.append(Failure("adversarial-adoption", f"shadow evidence `{label}` must block in blocking mode"))
+
+        def remove_source_hash(target: Path) -> None:
+            shadow_payload = load_json_file(target / ".loom/shadow/review-repo.json")
+            if isinstance(shadow_payload, dict):
+                shadow_payload.pop("source_sha256", None)
+                write_json(target / ".loom/shadow/review-repo.json", shadow_payload)
+
+        def partial_source_hash(target: Path) -> None:
+            shadow_payload = load_json_file(target / ".loom/shadow/review-repo.json")
+            if isinstance(shadow_payload, dict):
+                shadow_payload["source_files"] = ["native/status/review.json", "host/guardian-review.json"]
+                shadow_payload["source_sha256"] = {"native/status/review.json": sha256_file(target / "native/status/review.json")}
+                write_json(target / ".loom/shadow/review-repo.json", shadow_payload)
+
+        def drift_source_hash(target: Path) -> None:
+            shadow_payload = load_json_file(target / ".loom/shadow/review-repo.json")
+            if isinstance(shadow_payload, dict):
+                shadow_payload["source_sha256"] = {"native/status/review.json": "0" * 64}
+                write_json(target / ".loom/shadow/review-repo.json", shadow_payload)
+
+        def undeclared_shadow_evidence(target: Path) -> None:
+            write_json(
+                target / ".loom/shadow/rogue.json",
+                {
+                    "result": "pass",
+                    "source_files": ["native/status/review.json"],
+                    "source_sha256": {"native/status/review.json": sha256_file(target / "native/status/review.json")},
+                },
+            )
+
+        assert_broken_shadow_evidence("missing-hash", remove_source_hash)
+        assert_broken_shadow_evidence("partial-hash", partial_source_hash)
+        assert_broken_shadow_evidence("hash-drift", drift_source_hash)
+        assert_broken_shadow_evidence("undeclared", undeclared_shadow_evidence, expect_validation_warn=False)
 
         head_before_drift = run_command(root, ["git", "rev-parse", "HEAD"], cwd=baseline, timeout_seconds=30).stdout.strip()
         (baseline / "implementation-drift.txt").write_text("changed after review\n", encoding="utf-8")
@@ -6463,6 +6924,14 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
         )
         if not binding_errors or binding_payload.get("status") != "implementation-drift-only":
             failures.append(Failure("adversarial-adoption", "review head binding must classify implementation drift after review"))
+        drift_refresh_payload, drift_refresh_error = load_command_json(
+            root,
+            ["python3", "tools/loom_flow.py", "carrier", "refresh", "--target", str(baseline), "--dry-run"],
+        )
+        if drift_refresh_error:
+            failures.append(Failure("adversarial-adoption", f"carrier refresh implementation-drift sample failed: {drift_refresh_error}"))
+        elif drift_refresh_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "carrier refresh must block implementation drift instead of refreshing review metadata"))
 
     return failures
 
@@ -6482,15 +6951,20 @@ def check_node_installer(root: Path) -> list[Failure]:
         ["npm", "test"],
         ["npm", "pack", "--dry-run"],
     )
-    for args in commands:
-        try:
-            result = run_command(root, args, cwd=package_root, timeout_seconds=300)
-        except subprocess.TimeoutExpired:
-            failures.append(Failure(category, f"`{' '.join(args)}` timed out"))
-            continue
-        if result.returncode != 0:
-            detail = result.stderr.strip() or result.stdout.strip() or "command failed without output"
-            failures.append(Failure(category, f"`{' '.join(args)}` failed: {detail}"))
+    with tempfile.TemporaryDirectory(prefix="loom-check-npm-cache-") as cache_dir:
+        npm_env = {
+            "npm_config_cache": cache_dir,
+            "NPM_CONFIG_CACHE": cache_dir,
+        }
+        for args in commands:
+            try:
+                result = run_command(root, args, cwd=package_root, env=npm_env, timeout_seconds=300)
+            except subprocess.TimeoutExpired:
+                failures.append(Failure(category, f"`{' '.join(args)}` timed out"))
+                continue
+            if result.returncode != 0:
+                detail = result.stderr.strip() or result.stdout.strip() or "command failed without output"
+                failures.append(Failure(category, f"`{' '.join(args)}` failed: {detail}"))
     return failures
 
 

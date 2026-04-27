@@ -204,12 +204,14 @@ def resolve_output_path(target_root: Path, raw_output: str) -> Path:
     output_path = Path(raw_output)
     if output_path.is_absolute():
         raise RuntimeError("--output must be relative to the target root")
-    candidate = (target_root / output_path).resolve()
+    if ".." in output_path.parts:
+        raise RuntimeError("--output must stay inside the target root")
+    resolved = (target_root / output_path).resolve()
     try:
-        candidate.relative_to(target_root.resolve())
+        resolved.relative_to(target_root.resolve())
     except ValueError as exc:
-        raise RuntimeError("--output must stay within the target root") from exc
-    return candidate
+        raise RuntimeError("--output must stay inside the target root") from exc
+    return resolved
 
 
 def runtime_state_payload(target_root: Path) -> dict[str, object]:
@@ -233,8 +235,19 @@ def write_json(path: Path, payload: object, force: bool) -> bool:
 
 
 def ensure_gitignore_has_loom(target_root: Path) -> bool:
-    # Syvert commits the Loom carrier as repository truth instead of ignoring it.
-    return False
+    gitignore = target_root / ".gitignore"
+    desired_line = ".loom/"
+    if gitignore.exists():
+        current = gitignore.read_text(encoding="utf-8")
+        lines = current.splitlines()
+        if desired_line in lines:
+            return False
+        new_content = current if current.endswith("\n") or not current else current + "\n"
+        new_content += desired_line + "\n"
+    else:
+        new_content = desired_line + "\n"
+    gitignore.write_text(new_content, encoding="utf-8")
+    return True
 
 
 def file_exists(root: Path, relative_path: str) -> bool:
