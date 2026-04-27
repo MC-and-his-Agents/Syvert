@@ -3690,6 +3690,42 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
         elif payload.get("result") != "pass":
             failures.append(Failure("daily-execution-cli", "`work-item update` must pass on a clean temp copy"))
 
+        poisoned_authoring_target = temp_root / "authoring-poisoned-workspace"
+        shutil.copytree(authoring_target, poisoned_authoring_target)
+        poisoned_work_item = poisoned_authoring_target / ".loom/work-items/NEXT-0001.md"
+        poisoned_before = poisoned_work_item.read_text(encoding="utf-8").replace(
+            "- Workspace Entry: .",
+            "- Workspace Entry: ../outside.md",
+        )
+        poisoned_work_item.write_text(poisoned_before, encoding="utf-8")
+        poisoned_init = poisoned_authoring_target / ".loom/bootstrap/init-result.json"
+        poisoned_init_before = load_json_file(poisoned_init)
+        payload, error = load_command_json(
+            root,
+            [
+                "python3",
+                "tools/loom_flow.py",
+                "work-item",
+                "update",
+                "--target",
+                str(poisoned_authoring_target),
+                "--item",
+                "NEXT-0001",
+                "--scope",
+                "This update must not persist because the workspace locator is unsafe",
+                "--activate",
+            ],
+        )
+        poisoned_init_after = load_json_file(poisoned_init)
+        if error:
+            failures.append(Failure("daily-execution-cli", f"`work-item update --activate` poisoned workspace sample failed: {error}"))
+        elif payload.get("result") != "block":
+            failures.append(Failure("daily-execution-cli", "`work-item update --activate` must block poisoned workspace locators"))
+        elif poisoned_work_item.read_text(encoding="utf-8") != poisoned_before:
+            failures.append(Failure("daily-execution-cli", "`work-item update --activate` must not rewrite a poisoned Work Item before locator validation passes"))
+        elif poisoned_init_after.get("fact_chain", {}).get("entry_points") != poisoned_init_before.get("fact_chain", {}).get("entry_points"):
+            failures.append(Failure("daily-execution-cli", "`work-item update --activate` must not mutate active fact-chain locators when locator validation blocks"))
+
         payload, error = load_command_json(
             root,
             [
@@ -6677,6 +6713,38 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
             failures.append(Failure("adversarial-adoption", f"path escape work-item sample failed: {error}"))
         elif escape_work_item_payload.get("result") != "block":
             failures.append(Failure("adversarial-adoption", "work-item create must block recovery locators that escape the target root"))
+
+        poisoned_work_item_target = base / "work-item-update-poisoned-locator"
+        shutil.copytree(baseline, poisoned_work_item_target)
+        poisoned_work_item_path = poisoned_work_item_target / ".loom/work-items/INIT-0001.md"
+        poisoned_work_item_text = poisoned_work_item_path.read_text(encoding="utf-8").replace(
+            "- Recovery Entry: .loom/progress/INIT-0001.md",
+            "- Recovery Entry: ../outside.md",
+        )
+        poisoned_work_item_path.write_text(poisoned_work_item_text, encoding="utf-8")
+        poisoned_init_path = poisoned_work_item_target / ".loom/bootstrap/init-result.json"
+        poisoned_init_before = poisoned_init_path.read_text(encoding="utf-8")
+        poisoned_update_payload, error = load_command_json(
+            root,
+            [
+                "python3",
+                "tools/loom_flow.py",
+                "work-item",
+                "update",
+                "--target",
+                str(poisoned_work_item_target),
+                "--item",
+                "INIT-0001",
+                "--activate",
+            ],
+        )
+        poisoned_init_after = poisoned_init_path.read_text(encoding="utf-8")
+        if error:
+            failures.append(Failure("adversarial-adoption", f"poisoned work-item update sample failed: {error}"))
+        elif poisoned_update_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "work-item update --activate must block poisoned recovery locators"))
+        elif poisoned_init_before != poisoned_init_after:
+            failures.append(Failure("adversarial-adoption", "work-item update --activate must not mutate init-result before locator validation passes"))
 
         shadow_escape_target = base / "shadow-locator-escape"
         shutil.copytree(baseline, shadow_escape_target)

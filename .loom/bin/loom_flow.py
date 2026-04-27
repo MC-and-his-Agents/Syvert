@@ -6975,6 +6975,39 @@ def update_active_entry_points(
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def validate_work_item_payload_locators(
+    target_root: Path,
+    work_item_payload: dict[str, Any],
+) -> tuple[dict[str, Path], list[str]]:
+    """Validate final authored locator truth before any Work Item carrier write."""
+    locators: dict[str, str] = {
+        "recovery_entry": str(work_item_payload.get("recovery_entry", "")),
+        "review_entry": str(work_item_payload.get("review_entry", "")),
+    }
+    associated_artifacts = work_item_payload.get("associated_artifacts", [])
+    if isinstance(associated_artifacts, list):
+        for index, artifact in enumerate(associated_artifacts, start=1):
+            locators[f"associated_artifacts[{index}]"] = str(artifact)
+    else:
+        return {}, ["associated_artifacts must be a list of repo-relative locators"]
+
+    resolved: dict[str, Path] = {}
+    errors: list[str] = []
+    workspace_path, workspace_errors = resolve_workspace_path(
+        target_root,
+        str(work_item_payload.get("workspace_entry", "")),
+    )
+    errors.extend(f"work item workspace_entry: {message}" for message in workspace_errors)
+    if workspace_path is not None:
+        resolved["workspace_entry"] = workspace_path
+    for label, locator in locators.items():
+        path, locator_errors = resolve_repo_relative_path(target_root, locator, label=f"work item {label}")
+        errors.extend(locator_errors)
+        if path is not None:
+            resolved[label] = path
+    return resolved, errors
+
+
 def handle_work_item(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
     output_path, output_errors = resolve_repo_relative_path(target_root, args.output, label="init-result locator")
@@ -7090,6 +7123,23 @@ def handle_work_item(args: argparse.Namespace) -> int:
             "closing_condition": args.closing_condition,
             "associated_artifacts": deduped_artifacts,
         }
+        resolved_payload_locators, payload_locator_errors = validate_work_item_payload_locators(
+            target_root,
+            work_item_payload,
+        )
+        if payload_locator_errors:
+            return emit(
+                {
+                    "command": "work-item",
+                    "operation": "create",
+                    "result": "block",
+                    "summary": "work-item create refused unsafe authored locator input.",
+                    "missing_inputs": payload_locator_errors,
+                    "fallback_to": "admission",
+                }
+            )
+        recovery_path = resolved_payload_locators["recovery_entry"]
+        review_path = resolved_payload_locators["review_entry"]
         work_item_path.parent.mkdir(parents=True, exist_ok=True)
         work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
         review_path.parent.mkdir(parents=True, exist_ok=True)
@@ -7199,7 +7249,22 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 entry for entry in work_item_payload["associated_artifacts"] if entry != artifact
             ]
         recovery_relative = work_item_payload["recovery_entry"]
-        recovery_path = target_root / recovery_relative
+        resolved_payload_locators, payload_locator_errors = validate_work_item_payload_locators(
+            target_root,
+            work_item_payload,
+        )
+        if payload_locator_errors:
+            return emit(
+                {
+                    "command": "work-item",
+                    "operation": "update",
+                    "result": "block",
+                    "summary": "work-item update refused unsafe authored locator input.",
+                    "missing_inputs": payload_locator_errors,
+                    "fallback_to": "admission",
+                }
+            )
+        recovery_path = resolved_payload_locators["recovery_entry"]
         work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
 
     if args.activate:

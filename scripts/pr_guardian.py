@@ -109,6 +109,8 @@ REVIEW_GUIDE_HEADINGS = (
 )
 ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
 REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS = ("summary", "item_context", "risk", "validation", "rollback")
+REVIEW_ARTIFACT_REQUIRED_AFTER = datetime(2026, 4, 27, tzinfo=timezone.utc)
+REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS = ("## Loom Runtime Locator",)
 
 
 def codex_review_timeout_seconds() -> int | None:
@@ -160,7 +162,7 @@ def pr_meta(pr_number: int) -> dict:
             "view",
             str(pr_number),
             "--json",
-            "number,title,body,url,isDraft,baseRefName,headRefName,headRefOid,author",
+            "number,title,body,url,isDraft,baseRefName,headRefName,headRefOid,author,createdAt",
         ],
         cwd=REPO_ROOT,
     )
@@ -367,11 +369,32 @@ def looks_like_artifact_locator_set(value: str, *, require_repo_path: bool) -> b
     return True
 
 
+def parse_github_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
+    body = str(meta.get("body") or "")
+    if any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS):
+        return True
+    if not any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS):
+        return False
+    created_at = parse_github_timestamp(meta.get("createdAt"))
+    if created_at is None:
+        return True
+    return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
+
+
 def review_artifact_errors(meta: dict) -> list[str]:
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     section = sections.get("review_artifacts", "")
     if not section:
-        if any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS):
+        if review_artifacts_required(meta, sections):
             return ["PR 描述缺少 `## Review Artifacts` 段落。"]
         return []
     payload = parse_bullet_kv_section(section)

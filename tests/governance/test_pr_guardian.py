@@ -591,6 +591,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
     def test_review_artifact_errors_rejects_missing_section(self) -> None:
         errors = review_artifact_errors(
             {
+                "createdAt": "2026-04-27T00:00:00Z",
                 "body": "\n".join(
                     [
                         "## 摘要",
@@ -602,6 +603,65 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "- Issue: #24",
                     ]
                 )
+            }
+        )
+
+        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
+
+    def test_review_artifact_errors_allows_legacy_pr_without_section(self) -> None:
+        errors = review_artifact_errors(
+            {
+                "createdAt": "2026-04-26T23:59:59Z",
+                "body": "\n".join(
+                    [
+                        "## 摘要",
+                        "",
+                        "- 变更目的：旧模板 PR",
+                        "",
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_review_artifact_errors_requires_section_for_new_template_marker(self) -> None:
+        errors = review_artifact_errors(
+            {
+                "createdAt": "2026-04-26T23:59:59Z",
+                "body": "\n".join(
+                    [
+                        "## 摘要",
+                        "",
+                        "- 变更目的：新模板 PR",
+                        "",
+                        "## Loom Runtime Locator",
+                        "",
+                        "- Loom runtime: `.loom/bin/loom_flow.py`",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
+
+    def test_review_artifact_errors_fails_closed_without_created_at(self) -> None:
+        errors = review_artifact_errors(
+            {
+                "body": "\n".join(
+                    [
+                        "## 摘要",
+                        "",
+                        "- 变更目的：缺少创建时间",
+                        "",
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                    ]
+                ),
             }
         )
 
