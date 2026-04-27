@@ -36,6 +36,13 @@
   },
   "path_categories": [
     {
+      "name": "spec",
+      "patterns": [
+        ".loom/specs/**",
+        "docs/specs/FR-*/**"
+      ]
+    },
+    {
       "name": "governance",
       "patterns": [
         "AGENTS.md",
@@ -52,12 +59,6 @@
         ".githooks/**",
         "scripts/**",
         "tests/governance/**"
-      ]
-    },
-    {
-      "name": "spec",
-      "patterns": [
-        "docs/specs/FR-*/**"
       ]
     },
     {

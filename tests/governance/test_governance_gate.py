@@ -637,7 +637,7 @@ class GovernanceGateTests(unittest.TestCase):
         self.assertEqual(governance_gate.infer_pr_class(changed), "spec")
         self.assertEqual(governance_gate.build_report("spec", changed)["violations"], [])
 
-    def test_loom_carrier_paths_are_governance_scope(self) -> None:
+    def test_loom_carrier_paths_without_specs_are_governance_scope(self) -> None:
         changed = [
             ".loom",
             ".loom/bin/loom_flow.py",
@@ -646,6 +646,14 @@ class GovernanceGateTests(unittest.TestCase):
         ]
         self.assertEqual(governance_gate.infer_pr_class(changed), "governance")
         self.assertEqual(governance_gate.build_report("governance", changed)["violations"], [])
+
+    def test_loom_spec_paths_infer_spec_scope(self) -> None:
+        changed = [
+            ".loom/specs/INIT-0001/spec.md",
+            ".loom/specs/INIT-0001/plan.md",
+        ]
+        self.assertEqual(governance_gate.infer_pr_class(changed), "spec")
+        self.assertEqual(governance_gate.build_report("spec", changed)["violations"], [])
 
     def test_loom_carrier_guard_rejects_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

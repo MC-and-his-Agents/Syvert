@@ -9,8 +9,13 @@
     "docs/exec-plans/GOV-0038-loom-official-adoption.md"
   ],
   "source_sha256": {
-    "scripts/pr_guardian.py": "d12e7a508ad91c12d91a4538529d5db12d03d74a14d8831a4b1c4a4bd92340bd",
+    "scripts/pr_guardian.py": "8764b4820df92dec5ca64367f304546e5a719bb2d12e48cb2ea95ef3a9c021e9",
     "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "8586d996b0a326dcd580e3c909276f75772b272f14faf27f7a934b81ad2a5d3b"
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "3c3c5d5d5ef3b0d2df4b0e5c31f8b7432874c8b13cd13fbc430ddcfea21ba655"
+  },
+  "source_semantics": "Review parity requires durable review evidence, explicit review findings handling, and authoritative review inputs before merge decisions.",
+  "evidence_body": {
+    "authority": "review gate and guardian split",
+    "decision_rule": "merge review decisions stay blocked until required review evidence and findings disposition are present"
   }
 }

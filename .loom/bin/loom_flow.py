@@ -627,6 +627,33 @@ def undeclared_shadow_evidence_errors(target_root: Path, interop_payload: dict[s
     return errors
 
 
+def _normalize_shadow_semantic_fragment(value: Any) -> Any:
+    if isinstance(value, str):
+        return " ".join(value.split()).strip().lower()
+    if isinstance(value, list):
+        return [_normalize_shadow_semantic_fragment(entry) for entry in value]
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_shadow_semantic_fragment(entry)
+            for key, entry in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    return value
+
+
+def normalized_shadow_semantics(payload: dict[str, Any], *, path: Path) -> tuple[str | None, str | None]:
+    comparable_payload: dict[str, Any] = {}
+    for key in ("surface", "source_semantics", "evidence_body"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        comparable_payload[key] = _normalize_shadow_semantic_fragment(value)
+    if not comparable_payload.get("source_semantics") and not comparable_payload.get("evidence_body"):
+        return None, f"shadow evidence `{path}` must declare `source_semantics` or `evidence_body` for stable parity comparison"
+    return json.dumps(comparable_payload, ensure_ascii=False, sort_keys=True), None
+
+
 def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str, Any], str | None]:
     try:
         if path.is_dir():
@@ -644,11 +671,11 @@ def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str,
 
     if isinstance(payload, dict):
         source_evidence, source_errors = validate_shadow_sources(payload, path=path, target_root=target_root)
-        for key in ("parity_value", "result", "decision", "status", "verdict", "value"):
-            value = payload.get(key)
-            if isinstance(value, (str, int, float, bool)) and str(value).strip():
-                return {**source_evidence, "normalized_value": str(value).strip().lower()}, "; ".join(source_errors) if source_errors else None
-        return {**source_evidence, "normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, "; ".join(source_errors) if source_errors else None
+        normalized_semantics, semantics_error = normalized_shadow_semantics(payload, path=path)
+        errors = list(source_errors)
+        if semantics_error:
+            errors.append(semantics_error)
+        return {**source_evidence, "normalized_value": normalized_semantics}, "; ".join(errors) if errors else None
     if isinstance(payload, list):
         return {"normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, f"shadow evidence `{path}` must be a JSON object with source_files/source_sha256"
     if isinstance(payload, (str, int, float, bool)) and str(payload).strip():

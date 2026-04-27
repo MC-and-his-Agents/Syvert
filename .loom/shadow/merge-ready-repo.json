@@ -12,5 +12,10 @@
     "scripts/merge_pr.py": "89c6c757f63ccf13f4e43e03bf70a12258619cd675c5369ed1ccab0bf743cb2a",
     "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
     "WORKFLOW.md": "fbe5787e913d2844cdb30c1e79bcc759568ab34bdb68feaf2602d40ca62fbb4c"
+  },
+  "source_semantics": "Merge-ready parity requires current validation truth, bound head state, and all blocking merge inputs satisfied before merge execution.",
+  "evidence_body": {
+    "authority": "merge-ready gate",
+    "decision_rule": "safe-to-merge stays false until current validation and merge requirements are aligned"
   }
 }

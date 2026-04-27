@@ -10,5 +10,10 @@
   "source_sha256": {
     ".loom/status/current.md": "2c1e9b543789d73b7bea75c4f47b6d7bd7827f7fed69f001cf304f1747b8a0ed",
     ".loom/specs/INIT-0001/implementation-contract.md": "d17ae76f65458938a7ca5ab98e58daa9fb87b113720db6cac62b20be8aaa9579"
+  },
+  "source_semantics": "Merge-ready parity requires current validation truth, bound head state, and all blocking merge inputs satisfied before merge execution.",
+  "evidence_body": {
+    "authority": "merge-ready gate",
+    "decision_rule": "safe-to-merge stays false until current validation and merge requirements are aligned"
   }
 }

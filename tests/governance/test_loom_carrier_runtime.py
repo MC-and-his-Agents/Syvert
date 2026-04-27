@@ -337,6 +337,7 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
                         "surface": "review",
                         "side": "repo",
                         "parity_value": "ok",
+                        "source_semantics": "review parity requires aligned review evidence",
                         "source_sha256": {"WORKFLOW.md": loom_flow.sha256_file(root / "WORKFLOW.md")},
                     }
                 ),
@@ -345,7 +346,7 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
             value, error = loom_flow.normalized_shadow_value(evidence_path, target_root=root)
 
-            self.assertEqual(value["normalized_value"], "ok")
+            self.assertIn("review parity requires aligned review evidence", value["normalized_value"])
             self.assertIn("must declare non-empty `source_files`", error)
 
     def test_shadow_source_hashes_require_exact_source_set(self) -> None:
@@ -363,6 +364,10 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
                         "surface": "review",
                         "side": "repo",
                         "parity_value": "ok",
+                        "evidence_body": {
+                            "authority": "guardian + workflow",
+                            "decision_rule": "blocking review inputs must align",
+                        },
                         "source_files": ["WORKFLOW.md", "code_review.md"],
                         "source_sha256": {"WORKFLOW.md": loom_flow.sha256_file(root / "WORKFLOW.md")},
                     }
@@ -372,8 +377,75 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
             value, error = loom_flow.normalized_shadow_value(evidence_path, target_root=root)
 
-            self.assertEqual(value["normalized_value"], "ok")
+            self.assertIn("guardian + workflow", value["normalized_value"])
             self.assertIn("source_files and source_sha256 keys must match exactly", error)
+
+    def test_shadow_parity_blocks_semantics_drift_even_when_parity_value_matches(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / ".loom/companion").mkdir(parents=True)
+            (root / ".loom/shadow").mkdir(parents=True)
+            (root / "WORKFLOW.md").write_text("workflow\n", encoding="utf-8")
+            (root / ".loom/spec.md").write_text("spec\n", encoding="utf-8")
+            (root / ".loom/companion/interop.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-repo-interop/v1",
+                        "host_adapters": [],
+                        "repo_native_carriers": [],
+                        "shadow_surfaces": {
+                            "review": {
+                                "summary": "review parity",
+                                "loom_locator": ".loom/shadow/review-loom.json",
+                                "repo_locator": ".loom/shadow/review-repo.json",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            common_payload = {
+                "schema_version": "loom-shadow-surface-evidence/v1",
+                "surface": "review",
+                "parity_value": "review-parity-v1",
+            }
+            (root / ".loom/shadow/review-loom.json").write_text(
+                json.dumps(
+                    {
+                        **common_payload,
+                        "side": "loom",
+                        "source_semantics": "review parity requires spec review and linked review evidence before merge decisions.",
+                        "source_files": [".loom/spec.md"],
+                        "source_sha256": {".loom/spec.md": loom_flow.sha256_file(root / ".loom/spec.md")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / ".loom/shadow/review-repo.json").write_text(
+                json.dumps(
+                    {
+                        **common_payload,
+                        "side": "repo",
+                        "source_semantics": "review parity allows merge without spec review as long as guardian returns allow.",
+                        "source_files": ["WORKFLOW.md"],
+                        "source_sha256": {"WORKFLOW.md": loom_flow.sha256_file(root / "WORKFLOW.md")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = loom_flow.shadow_parity_report(
+                {
+                    "availability": "present",
+                    "contract": {"locator": ".loom/companion/interop.json"},
+                },
+                target_root=root,
+                surface="review",
+            )
+
+            self.assertEqual(report["result"], "mismatch")
+            self.assertEqual(report["classification"], "drift")
 
     def test_loom_check_requires_adversarial_adoption_evidence(self) -> None:
         loom_check = load_loom_module("loom_check")

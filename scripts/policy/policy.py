@@ -57,4 +57,7 @@ def formal_spec_dirs(paths: Iterable[str]) -> set[Path]:
         parts = normalized.parts
         if len(parts) >= 3 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-"):
             output.add(Path(*parts[:3]))
+            continue
+        if len(parts) >= 3 and parts[0] == ".loom" and parts[1] == "specs":
+            output.add(Path(*parts[:3]))
     return output

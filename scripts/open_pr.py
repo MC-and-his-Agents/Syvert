@@ -76,6 +76,13 @@ ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
 }
 ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+LOOM_FORMAL_SPEC_CORE_FILES = FORMAL_SPEC_CORE_FILES | {"implementation-contract.md"}
+REVIEW_ARTIFACT_FIELDS = (
+    "Active exec-plan",
+    "Governing spec / bootstrap contract",
+    "Review artifact",
+    "Validation evidence",
+)
 INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
 EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
 MERGE_GATE_CHOICES = field_choices("merge_gate")
@@ -98,6 +105,8 @@ def has_formal_spec_core_file_changes(changed_files: list[str], *, repo_root: Pa
         normalized = Path(path)
         parts = normalized.parts
         if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in FORMAL_SPEC_CORE_FILES:
+            return True
+        if len(parts) == 4 and parts[0] == ".loom" and parts[1] == "specs" and parts[3] in LOOM_FORMAL_SPEC_CORE_FILES:
             return True
     if repo_root is None:
         return False
@@ -440,6 +449,7 @@ def validate_pr_preflight(
     validate_worktree_binding_check: bool = True,
 ) -> list[str]:
     errors: list[str] = []
+    touches_formal_spec = has_formal_spec_core_file_changes(changed_files, repo_root=repo_root)
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
     if validate_worktree_binding_check:
@@ -461,7 +471,7 @@ def validate_pr_preflight(
                 )
             )
 
-    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files, repo_root=repo_root):
+    if pr_class == "spec" and not touches_formal_spec:
         errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
     if pr_class == "spec" and not has_bound_formal_spec_input(
@@ -485,6 +495,14 @@ def validate_pr_preflight(
     ):
         errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
+    if pr_class == "governance" and touches_formal_spec and not has_bound_formal_spec_input(
+        repo_root,
+        item_key,
+        item_type,
+        changed_files,
+        allow_unbound_local_fallback=False,
+    ):
+        errors.append("变更 formal spec 套件时，`governance` 类 PR 也必须绑定 formal spec 输入。")
 
     if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
         if not (
@@ -556,6 +574,58 @@ def render_integration_check_section(values: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+def replace_review_artifact_fields(body: str, values: dict[str, str]) -> str:
+    for label, value in values.items():
+        body = replace_markdown_field(body, label, value)
+    return body
+
+
+def governing_artifact_label(exec_plan: dict[str, str], *, repo_root: Path) -> str:
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        related: list[str] = []
+        spec_dir = normalize_bound_spec_dir(repo_root, str(exec_plan.get("关联 spec", "")).strip())
+        if spec_dir is not None:
+            related.append(spec_dir.relative_to(repo_root).as_posix())
+        additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, exec_plan)
+        if not additional_errors:
+            related.extend(path.as_posix() for path in additional_spec_dirs)
+        decision_path = str(exec_plan.get("关联 decision", "")).strip()
+        if decision_path:
+            related.append(decision_path)
+        unique_related = list(dict.fromkeys(path for path in related if path))
+        return ", ".join(unique_related) or "formal spec 已绑定，详见 active exec-plan"
+    if input_mode == INPUT_MODE_BOOTSTRAP:
+        decision_path = str(exec_plan.get("关联 decision", "")).strip()
+        if decision_path:
+            return decision_path
+        return "bootstrap contract 已绑定，详见 active exec-plan"
+    return "未通过 active exec-plan 绑定 formal spec / bootstrap contract"
+
+
+def build_review_artifact_values(args: argparse.Namespace, changed_files: list[str], *, repo_root: Path) -> dict[str, str]:
+    exec_plan = load_item_context_from_exec_plan(repo_root, args.item_key or "") if args.item_key else {}
+    exec_plan_path = str(exec_plan.get("exec_plan", "")).strip()
+    governing_artifact = governing_artifact_label(exec_plan, repo_root=repo_root) if exec_plan else ""
+    categories = {item.category for item in classify_paths(changed_files)}
+    review_artifacts: list[str] = []
+    if "spec" in categories or args.pr_class == "spec":
+        review_artifacts.append("spec_review.md")
+    if args.pr_class != "spec" or "governance" in categories or "implementation" in categories:
+        review_artifacts.append("code_review.md")
+    review_artifact = ", ".join(f"`{item}`" for item in dict.fromkeys(review_artifacts)) or "`code_review.md`"
+    return {
+        "Active exec-plan": f"`{exec_plan_path}`" if exec_plan_path else "未定位到 active exec-plan",
+        "Governing spec / bootstrap contract": (
+            f"`{governing_artifact}`"
+            if governing_artifact
+            else "未定位到 governing artifact"
+        ),
+        "Review artifact": review_artifact,
+        "Validation evidence": "见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+    }
+
+
 def canonicalize_integration_ref_for_issue(
     issue: int | None,
     integration_ref: str,
@@ -623,6 +693,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     }
     for token, value in replacements.items():
         body = body.replace(token, value)
+    body = replace_review_artifact_fields(body, build_review_artifact_values(args, changed_files, repo_root=REPO_ROOT))
     integration_values = {
         "integration_touchpoint": args.integration_touchpoint,
         "shared_contract_changed": args.shared_contract_changed,

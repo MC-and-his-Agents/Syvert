@@ -11,6 +11,11 @@
   "source_sha256": {
     "WORKFLOW.md": "fbe5787e913d2844cdb30c1e79bcc759568ab34bdb68feaf2602d40ca62fbb4c",
     "docs/process/delivery-funnel.md": "398f9242f00bfdd2be5c418f854de3527d262e2440cc13d6cabbed4ad03ad8e3",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "8586d996b0a326dcd580e3c909276f75772b272f14faf27f7a934b81ad2a5d3b"
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "3c3c5d5d5ef3b0d2df4b0e5c31f8b7432874c8b13cd13fbc430ddcfea21ba655"
+  },
+  "source_semantics": "Admission parity requires an explicit work item entry with tracked goal, scope, recovery entry, validation entry, and closing condition before execution starts.",
+  "evidence_body": {
+    "authority": "work item admission contract",
+    "decision_rule": "execution begins only after the active work item carries durable execution and validation context"
   }
 }

@@ -14,6 +14,7 @@ from scripts.open_pr import (
     build_issue_summary,
     extract_issue_canonical_integration_fields,
     extract_issue_summary_sections,
+    has_formal_spec_core_file_changes,
     parse_args,
     validate_current_worktree_binding,
     validate_integration_args,
@@ -1151,6 +1152,60 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466", body)
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
+
+    def test_build_body_populates_review_artifacts_section(self) -> None:
+        args = parse_args(["--class", "governance"])
+
+        body = build_body(args, [])
+
+        self.assertIn("- Active exec-plan: 未定位到 active exec-plan", body)
+        self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
+        self.assertIn("- Review artifact: `code_review.md`", body)
+        self.assertIn("- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。", body)
+
+    def test_build_body_uses_spec_review_artifact_for_spec_scope_changes(self) -> None:
+        args = parse_args(["--class", "governance"])
+
+        body = build_body(args, [".loom/specs/INIT-0001/spec.md"])
+
+        self.assertIn("- Review artifact: `spec_review.md`, `code_review.md`", body)
+
+    def test_has_formal_spec_core_file_changes_accepts_loom_spec_artifacts(self) -> None:
+        self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/spec.md"]))
+        self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/implementation-contract.md"]))
+
+    def test_validate_pr_preflight_rejects_governance_pr_that_touches_loom_spec_without_formal_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            (repo / "docs/exec-plans").mkdir(parents=True)
+            (repo / "docs/exec-plans/GOV-0001-shadow-parity-hardening.md").write_text(
+                "\n".join(
+                    [
+                        "# Exec Plan",
+                        "",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                        "- Issue：`#6`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S13`",
+                        "- active 收口事项：`GOV-0001-shadow-parity-hardening`",
+                        "- 状态：`active`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
 
     @patch(
         "scripts.open_pr.resolve_issue_canonical_integration",

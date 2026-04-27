@@ -25,6 +25,7 @@ from scripts.pr_guardian import (
     guardian_body_fingerprint,
     integration_status_checked_before_merge_value,
     render_item_context_supplement,
+    review_artifact_errors,
     review_once,
     run_codex_review,
     save_guardian_result,
@@ -585,6 +586,88 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(
             errors,
             ["PR 描述中的 `integration_check.merge_gate` 非法：`experimental_mode`（仅允许 `local_only` / `integration_check_required`）。"],
+        )
+
+    def test_review_artifact_errors_rejects_missing_section(self) -> None:
+        errors = review_artifact_errors(
+            {
+                "body": "\n".join(
+                    [
+                        "## 摘要",
+                        "",
+                        "- 变更目的：补齐门禁",
+                        "",
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                    ]
+                )
+            }
+        )
+
+        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
+
+    def test_review_artifact_errors_rejects_empty_fields(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan:",
+                    "- Governing spec / bootstrap contract: 待补充",
+                    "- Review artifact: code_review.md",
+                    "- Validation evidence: 无",
+                ]
+            )
+        }
+
+        errors = review_artifact_errors(meta)
+
+        self.assertEqual(
+            errors,
+            [
+                "`## Review Artifacts` 中 `Active exec-plan` 不能为空。",
+                "`## Review Artifacts` 中 `Governing spec / bootstrap contract` 不能为空。",
+                "`## Review Artifacts` 中 `Validation evidence` 不能为空。",
+            ],
+        )
+
+    def test_review_artifact_errors_accepts_controlled_flow_payload(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                    "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                    "- Review artifact: code_review.md",
+                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                ]
+            )
+        }
+
+        self.assertEqual(review_artifact_errors(meta), [])
+
+    def test_review_artifact_errors_rejects_unresolved_controlled_flow_placeholders(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: 未定位到 active exec-plan",
+                    "- Governing spec / bootstrap contract: `未定位到 governing artifact`",
+                    "- Review artifact: `code_review.md`",
+                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                ]
+            )
+        }
+
+        self.assertEqual(
+            review_artifact_errors(meta),
+            [
+                "`## Review Artifacts` 中 `Active exec-plan` 不能为空。",
+                "`## Review Artifacts` 中 `Governing spec / bootstrap contract` 不能为空。",
+            ],
         )
 
     def test_integration_merge_gate_errors_requires_metadata_for_required_gate(self) -> None:

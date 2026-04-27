@@ -74,10 +74,31 @@ REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
     "Issue 摘要": "issue_summary",
     "关联事项": "item_context",
+    "Review Artifacts": "review_artifacts",
     "风险": "risk",
     "风险级别": "risk",
     "验证": "validation",
     "回滚": "rollback",
+}
+REVIEW_ARTIFACT_REQUIRED_FIELDS = (
+    "Active exec-plan",
+    "Governing spec / bootstrap contract",
+    "Review artifact",
+    "Validation evidence",
+)
+REVIEW_ARTIFACT_EMPTY_VALUES = {
+    "",
+    "tbd",
+    "todo",
+    "n/a",
+    "na",
+    "none",
+    "无",
+    "待补充",
+    "未填写",
+    "未定位",
+    "未定位到 active exec-plan",
+    "未定位到 governing artifact",
 }
 RAW_BODY_NOISE_HEADINGS = {"变更文件", "检查清单"}
 REVIEW_GUIDE_HEADINGS = (
@@ -87,6 +108,7 @@ REVIEW_GUIDE_HEADINGS = (
     "## 职责边界说明",
 )
 ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS = ("summary", "item_context", "risk", "validation", "rollback")
 
 
 def codex_review_timeout_seconds() -> int | None:
@@ -328,6 +350,27 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
         if current_key and stripped and raw_line[:1].isspace():
             payload[current_key] = "\n".join(filter(None, [payload[current_key], stripped])).strip()
     return payload
+
+
+def review_artifact_errors(meta: dict) -> list[str]:
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    section = sections.get("review_artifacts", "")
+    if not section:
+        if any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS):
+            return ["PR 描述缺少 `## Review Artifacts` 段落。"]
+        return []
+    payload = parse_bullet_kv_section(section)
+    missing = [field for field in REVIEW_ARTIFACT_REQUIRED_FIELDS if field not in payload]
+    if missing:
+        joined = "、".join(f"`{field}`" for field in missing)
+        return [f"`## Review Artifacts` 缺少必填字段：{joined}。"]
+
+    errors: list[str] = []
+    for field in REVIEW_ARTIFACT_REQUIRED_FIELDS:
+        value = str(payload.get(field) or "").strip().strip("`").strip()
+        if value.casefold() in REVIEW_ARTIFACT_EMPTY_VALUES:
+            errors.append(f"`## Review Artifacts` 中 `{field}` 不能为空。")
+    return errors
 
 
 def integration_merge_gate_errors(meta: dict, *, require_live_state: bool = False) -> list[str]:
@@ -1179,6 +1222,16 @@ def merge_if_safe(
                 failure_context="merge 前重跑 guardian 后 PR 描述已变化",
             )
             raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
+    review_artifact_validation_errors = review_artifact_errors(current)
+    if review_artifact_validation_errors:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="Review Artifacts 门禁校验失败后无法保持 PR 元数据一致",
+            )
+        detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
+        raise SystemExit(f"Review Artifacts 门禁未满足，拒绝合并：\n{detail}")
     integration_errors = integration_merge_gate_errors(current, require_live_state=True)
     if integration_errors:
         if merge_time_integration_recheck_recorded:
