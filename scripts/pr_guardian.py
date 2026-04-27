@@ -464,12 +464,23 @@ def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
     body = str(meta.get("body") or "")
     if any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS):
         return True
-    if not any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS):
-        return False
     created_at = parse_github_timestamp(meta.get("createdAt"))
     if created_at is None:
         return True
     return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
+
+
+def review_artifact_gate_applies(meta: dict) -> bool:
+    body = str(meta.get("body") or "")
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    if (
+        "createdAt" not in meta
+        and not sections.get("review_artifacts", "").strip()
+        and not any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS)
+        and not any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS)
+    ):
+        return False
+    return bool(sections.get("review_artifacts", "").strip()) or review_artifacts_required(meta, sections)
 
 
 def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
@@ -1224,12 +1235,13 @@ def all_checks_pass(pr_number: int) -> bool:
 def review_once(pr_number: int, *, post: bool, json_output: str | None) -> tuple[dict, dict]:
     require_auth()
     meta = pr_meta(pr_number)
-    review_artifact_validation_errors = review_artifact_errors(meta)
-    if review_artifact_validation_errors:
-        detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
-        raise SystemExit(f"Review Artifacts 门禁未满足，拒绝进入 guardian review：\n{detail}")
     temp_dir, worktree_dir = prepare_worktree(pr_number, meta)
     try:
+        if review_artifact_gate_applies(meta):
+            review_artifact_validation_errors = review_artifact_errors(meta, repo_root=worktree_dir)
+            if review_artifact_validation_errors:
+                detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
+                raise SystemExit(f"Review Artifacts 门禁未满足，拒绝进入 guardian review：\n{detail}")
         result_path = temp_dir / "review.json"
         result = run_codex_review(worktree_dir, build_prompt(meta, worktree_dir), result_path)
         payload = build_guardian_payload(meta, result)
@@ -1356,7 +1368,13 @@ def merge_if_safe(
                 failure_context="merge 前重跑 guardian 后 PR 描述已变化",
             )
             raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
-    review_artifact_validation_errors = review_artifact_errors(current)
+    review_artifact_validation_errors: list[str] = []
+    if review_artifact_gate_applies(current):
+        artifact_temp_dir, artifact_worktree_dir = prepare_worktree(pr_number, current)
+        try:
+            review_artifact_validation_errors = review_artifact_errors(current, repo_root=artifact_worktree_dir)
+        finally:
+            cleanup(artifact_temp_dir)
     if review_artifact_validation_errors:
         if merge_time_integration_recheck_recorded:
             restore_merge_time_integration_recheck_or_die(

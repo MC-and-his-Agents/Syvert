@@ -667,6 +667,16 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
 
+    def test_review_artifact_errors_requires_section_for_new_pr_even_without_template_sections(self) -> None:
+        errors = review_artifact_errors(
+            {
+                "createdAt": "2026-04-27T00:00:00Z",
+                "body": "free-form body without standard template sections",
+            }
+        )
+
+        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
+
     def test_review_artifact_errors_rejects_empty_fields(self) -> None:
         meta = {
             "body": "\n".join(
@@ -2385,6 +2395,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "baseRefName": "main",
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
+            "createdAt": "2026-04-26T23:59:59Z",
             "body": "",
         }
         prepare_worktree_mock.return_value = (temp_dir, worktree_dir)
@@ -2412,6 +2423,8 @@ class CodexReviewExecutionTests(unittest.TestCase):
         pr_meta_mock,
         prepare_worktree_mock,
     ) -> None:
+        temp_dir = Path("/tmp/guardian-temp-invalid")
+        worktree_dir = Path("/tmp/guardian-temp-invalid/worktree")
         pr_meta_mock.return_value = {
             "number": 24,
             "title": "治理: 精简 guardian review context",
@@ -2419,6 +2432,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "baseRefName": "main",
             "headRefOid": "sha-24",
             "headRefName": "issue-24-branch",
+            "createdAt": "2026-04-27T00:00:00Z",
             "body": "\n".join(
                 [
                     "## Review Artifacts",
@@ -2430,12 +2444,71 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 ]
             ),
         }
+        prepare_worktree_mock.return_value = (temp_dir, worktree_dir)
 
         with self.assertRaises(SystemExit) as exc:
             review_once(24, post=False, json_output=None)
 
         self.assertIn("Review artifact", str(exc.exception))
-        prepare_worktree_mock.assert_not_called()
+        prepare_worktree_mock.assert_called_once()
+
+    @patch("scripts.pr_guardian.cleanup")
+    @patch("scripts.pr_guardian.run_codex_review")
+    @patch("scripts.pr_guardian.save_guardian_result")
+    @patch("scripts.pr_guardian.build_prompt", return_value="lean prompt")
+    @patch("scripts.pr_guardian.prepare_worktree")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    def test_review_once_validates_review_artifacts_against_pr_head_worktree(
+        self,
+        require_auth_mock,
+        pr_meta_mock,
+        prepare_worktree_mock,
+        build_prompt_mock,
+        save_guardian_result_mock,
+        run_codex_review_mock,
+        cleanup_mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_text:
+            temp_dir = Path(temp_dir_text)
+            worktree_dir = temp_dir / "worktree"
+            (worktree_dir / "docs/exec-plans").mkdir(parents=True)
+            (worktree_dir / "docs/specs/FR-0024").mkdir(parents=True)
+            (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text("plan", encoding="utf-8")
+            (worktree_dir / "code_review.md").write_text("review", encoding="utf-8")
+            pr_meta_mock.return_value = {
+                "number": 24,
+                "title": "治理: 精简 guardian review context",
+                "url": "https://example.test/pr/24",
+                "baseRefName": "main",
+                "headRefOid": "sha-24",
+                "headRefName": "issue-24-branch",
+                "createdAt": "2026-04-27T00:00:00Z",
+                "body": "\n".join(
+                    [
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0024",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
+                    ]
+                ),
+            }
+            prepare_worktree_mock.return_value = (temp_dir, worktree_dir)
+            run_codex_review_mock.return_value = {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "ok",
+                "findings": [],
+                "required_actions": [],
+            }
+
+            review_once(24, post=False, json_output=None)
+
+        build_prompt_mock.assert_called_once_with(pr_meta_mock.return_value, worktree_dir)
+        run_codex_review_mock.assert_called_once_with(worktree_dir, "lean prompt", temp_dir / "review.json")
+        save_guardian_result_mock.assert_called_once()
 
     def test_build_prompt_preserves_preamble_in_raw_fallback(self) -> None:
         meta = {
