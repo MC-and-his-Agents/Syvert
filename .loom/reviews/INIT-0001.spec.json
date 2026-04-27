@@ -3,12 +3,21 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "Formal spec review is aligned with current progress/status validation and the trackable vendored carrier boundary.",
-  "reviewer": "syvert-guardian",
-  "reviewed_head": "c2f2b79b92250b7031a45f9532ae5b5954a9eb4e",
+  "summary": "Formal validation truth now consistently points to the downstream Loom consumption chain, and the updated carrier boundary contracts remain within the approved adoption scope.",
+  "reviewer": "codex",
+  "reviewed_head": "f232848082033c9e6a18d84ccae84bcd18e6075a",
   "reviewed_validation_summary": "Trackable vendored carrier, active-item-aware static gate, fresh spec review, self-contained review schema, fetch-failure-safe target-branch closeout, required status/progress fields, consume-side runtime validation chain, bootstrap contract binding, coherent INIT-0001 truth, Syvert docs guard, workflow guard, Loom verify, governance status, runtime parity, shadow parity, and merge checkpoint pass for PR #259.",
   "fallback_to": null,
+  "findings": [],
   "blocking_issues": [],
   "follow_ups": [],
-  "findings": []
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/INIT-0001.md",
+    "recovery_entry": ".loom/progress/INIT-0001.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null
+  }
 }
