@@ -1040,6 +1040,21 @@ def read_text_file(path_str: str) -> tuple[str | None, list[str]]:
     return text, []
 
 
+def read_repo_relative_text_file(root: Path, path_str: str, *, label: str) -> tuple[str | None, list[str]]:
+    path, errors = resolve_repo_relative_path(root, path_str, label=label)
+    if errors:
+        return None, errors
+    if path is None:
+        return None, [f"{label} is unavailable"]
+    if not path.exists() or not path.is_file():
+        return None, [f"{label} points to a missing file: {path_str}"]
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, [f"failed to read {path_str}: {exc.strerror or exc}"]
+    return text, []
+
+
 def write_json_file(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -5322,8 +5337,24 @@ def reconciliation_audit_payload(
                 if isinstance(oid, str) and oid:
                     merge_commit_sha = oid
                     base_ref = pr_payload.get("baseRefName")
-                    target_branch = base_ref if isinstance(base_ref, str) and base_ref else "main"
-                    merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha, target_branch)
+                    if isinstance(base_ref, str) and base_ref:
+                        merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha, base_ref)
+                    else:
+                        findings.append(
+                            make_reconciliation_finding(
+                                kind="merge_signal_drift",
+                                severity="block",
+                                subject=f"PR #{pr_number} merge signal",
+                                evidence={
+                                    "pr_state": pr_payload.get("state"),
+                                    "merge_commit": merge_commit_sha,
+                                    "baseRefName": base_ref,
+                                },
+                                recommended_action="re-read the PR base branch before closeout or reconciliation.",
+                                category="binding_failure",
+                                fallback_to="manual-reconciliation",
+                            )
+                        )
             if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_main):
                 findings.append(
                     make_reconciliation_finding(
@@ -6036,10 +6067,12 @@ def closeout_payload(
             if pr_payload.get("state") != "MERGED":
                 missing_inputs.append("pr is not merged")
             if merge_commit_sha:
-                run_git(target_root, ["fetch", "origin", "main"])
-                contains = run_git(target_root, ["merge-base", "--is-ancestor", merge_commit_sha, "origin/main"])
-                if contains is None or contains.returncode != 0:
-                    missing_inputs.append("origin/main does not contain the merged PR commit")
+                base_ref = pr_payload.get("baseRefName")
+                if isinstance(base_ref, str) and base_ref:
+                    if not contains_merged_commit(target_root, merge_commit_sha, base_ref):
+                        missing_inputs.append(f"origin/{base_ref} does not contain the merged PR commit")
+                else:
+                    missing_inputs.append("pr baseRefName is missing")
 
     project_payload: dict[str, Any] | None = None
     if project_number is not None:
@@ -6303,6 +6336,34 @@ def handle_reconciliation(args: argparse.Namespace) -> int:
                 summary="reconciliation is blocked because the Loom runtime state is inconsistent.",
             )
         )
+    if args.comment and args.comment_file:
+        return emit(
+            {
+                "command": "reconciliation",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "reconciliation sync accepts either --comment or --comment-file, not both.",
+                "missing_inputs": ["choose one comment source"],
+                "fallback_to": "manual-reconciliation",
+                "runtime_state": runtime_state,
+            }
+        )
+
+    comment_body = args.comment
+    if args.comment_file:
+        comment_body, comment_errors = read_repo_relative_text_file(target_root, args.comment_file, label="reconciliation comment file")
+        if comment_errors:
+            return emit(
+                {
+                    "command": "reconciliation",
+                    "operation": args.operation,
+                    "result": "block",
+                    "summary": "reconciliation sync could not read the requested comment file.",
+                    "missing_inputs": comment_errors,
+                    "fallback_to": "manual-reconciliation",
+                    "runtime_state": runtime_state,
+                }
+            )
     owner = args.owner
     repo_name = args.repo_name
     if not owner or not repo_name:
@@ -6321,35 +6382,6 @@ def handle_reconciliation(args: argparse.Namespace) -> int:
                 "runtime_state": runtime_state,
             }
         )
-
-    if args.comment and args.comment_file:
-        return emit(
-            {
-                "command": "reconciliation",
-                "operation": args.operation,
-                "result": "block",
-                "summary": "reconciliation sync accepts either --comment or --comment-file, not both.",
-                "missing_inputs": ["choose one comment source"],
-                "fallback_to": "manual-reconciliation",
-                "runtime_state": runtime_state,
-            }
-        )
-
-    comment_body = args.comment
-    if args.comment_file:
-        comment_body, comment_errors = read_text_file(args.comment_file)
-        if comment_errors:
-            return emit(
-                {
-                    "command": "reconciliation",
-                    "operation": args.operation,
-                    "result": "block",
-                    "summary": "reconciliation sync could not read the requested comment file.",
-                    "missing_inputs": comment_errors,
-                    "fallback_to": "manual-reconciliation",
-                    "runtime_state": runtime_state,
-                }
-            )
 
     payload, errors = reconciliation_audit_payload(
         target_root=target_root,

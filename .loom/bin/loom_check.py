@@ -6915,6 +6915,120 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
             elif after_payload.get("refresh_needed"):
                 failures.append(Failure("adversarial-adoption", "carrier refresh --write must clear runtime provenance drift"))
 
+        outside_comment = base / "outside-comment.md"
+        outside_comment.write_text("sensitive local text\n", encoding="utf-8")
+        comment_escape_payload, error = load_command_json(
+            root,
+            [
+                "python3",
+                "tools/loom_flow.py",
+                "reconciliation",
+                "sync",
+                "--target",
+                str(baseline),
+                "--comment-file",
+                str(outside_comment),
+                "--dry-run",
+            ],
+        )
+        if error:
+            failures.append(Failure("adversarial-adoption", f"reconciliation comment-file boundary sample failed: {error}"))
+        elif comment_escape_payload.get("result") != "block":
+            failures.append(Failure("adversarial-adoption", "reconciliation --comment-file must block absolute paths outside the target root"))
+        else:
+            missing_inputs = comment_escape_payload.get("missing_inputs")
+            if not isinstance(missing_inputs, list) or not any(
+                "reconciliation comment file" in str(item) and "must be repo-relative" in str(item)
+                for item in missing_inputs
+            ):
+                failures.append(Failure("adversarial-adoption", "reconciliation --comment-file boundary block must report the comment file locator boundary error"))
+
+        original_pr_payload = loom_flow_module.github_pr_payload
+        original_issue_payload = loom_flow_module.github_issue_payload
+        original_reconciliation_audit = loom_flow_module.reconciliation_audit_payload
+        original_contains = loom_flow_module.contains_merged_commit
+        seen_target_branches: list[str] = []
+        try:
+            loom_flow_module.github_pr_payload = lambda *_args, **_kwargs: (
+                {
+                    "state": "MERGED",
+                    "baseRefName": "release/main",
+                    "mergeCommit": {"oid": "abc123"},
+                },
+                [],
+            )
+            loom_flow_module.github_issue_payload = lambda *_args, **_kwargs: (
+                {"state": "CLOSED", "id": "issue-id"},
+                [],
+            )
+            loom_flow_module.reconciliation_audit_payload = lambda **_kwargs: (
+                {
+                    "result": "pass",
+                    "findings": [],
+                    "missing_inputs": [],
+                    "fallback_to": None,
+                },
+                [],
+            )
+
+            def fake_contains(_root: Path, _merge_commit_sha: str, target_branch: str = "main") -> bool:
+                seen_target_branches.append(target_branch)
+                return target_branch == "release/main"
+
+            loom_flow_module.contains_merged_commit = fake_contains
+            closeout_target_branch_payload, closeout_errors = loom_flow_module.closeout_payload(
+                target_root=baseline,
+                phase_number=None,
+                fr_number=None,
+                issue_number=1,
+                pr_number=2,
+                project_number=None,
+                branch_name=None,
+                owner="owner",
+                repo_name="repo",
+                skip_gate=True,
+            )
+            if closeout_errors:
+                failures.append(Failure("adversarial-adoption", f"closeout target branch fixture failed: {closeout_errors}"))
+            elif closeout_target_branch_payload.get("result") != "pass":
+                failures.append(Failure("adversarial-adoption", "closeout must pass when the merge commit is contained in the PR base branch"))
+            if seen_target_branches != ["release/main"]:
+                failures.append(Failure("adversarial-adoption", "closeout must check merge commit containment against the PR base branch, including slash branches"))
+
+            seen_target_branches.clear()
+            loom_flow_module.github_pr_payload = lambda *_args, **_kwargs: (
+                {
+                    "state": "MERGED",
+                    "mergeCommit": {"oid": "abc123"},
+                },
+                [],
+            )
+            closeout_missing_base_payload, closeout_errors = loom_flow_module.closeout_payload(
+                target_root=baseline,
+                phase_number=None,
+                fr_number=None,
+                issue_number=1,
+                pr_number=2,
+                project_number=None,
+                branch_name=None,
+                owner="owner",
+                repo_name="repo",
+                skip_gate=True,
+            )
+            if closeout_errors:
+                failures.append(Failure("adversarial-adoption", f"closeout missing baseRefName fixture failed: {closeout_errors}"))
+            else:
+                missing_inputs = closeout_missing_base_payload.get("missing_inputs")
+                if closeout_missing_base_payload.get("result") != "block" or "pr baseRefName is missing" not in missing_inputs:
+                    failures.append(Failure("adversarial-adoption", "closeout must block when PR baseRefName is missing instead of falling back to main"))
+            if seen_target_branches:
+                failures.append(Failure("adversarial-adoption", "closeout must not check origin/main when PR baseRefName is missing"))
+        finally:
+            loom_flow_module.github_pr_payload = original_pr_payload
+            loom_flow_module.github_issue_payload = original_issue_payload
+            loom_flow_module.reconciliation_audit_payload = original_reconciliation_audit
+            loom_flow_module.contains_merged_commit = original_contains
+
         rollover_target = base / "active-rollover"
         shutil.copytree(baseline, rollover_target)
         payload, error = load_command_json(
