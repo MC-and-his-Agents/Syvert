@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Guardian migration findings are addressed: legacy Review Artifacts cutover is restored, and repo-native Loom carrier drift now triggers carrier semantic validation.",
+  "summary": "Guardian Review Artifacts findings are addressed: governing artifact extraction includes extra specs and open_pr now emits a placeholder instead of defaulting to a command that looks executed.",
   "reviewer": "codex",
-  "reviewed_head": "b41e546621b07119444ed49906bf217079610415",
+  "reviewed_head": "c26fd7e78ebd00d90bf9be17b7b12feecfdaa5ac",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
