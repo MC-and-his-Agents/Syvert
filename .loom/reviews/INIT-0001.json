@@ -3,15 +3,15 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Review Artifacts flow is self-consistent and guardian prompt now treats Loom review artifact commits as carrier-only head drift.",
+  "summary": "Loom adoption guardian blockers are classified and addressed: detached host binding was fixed upstream in Loom; Syvert-owned Review Artifacts binding, merge-time metadata restore, and governing spec locator normalization are covered by local tests.",
   "reviewer": "codex",
-  "reviewed_head": "a43c62e79d2121763b9d568198db054188a062bb",
+  "reviewed_head": "52a68d64e6bef021acc3b508fd746df6db9e03b4",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
     {
       "id": "compat-follow-up-1",
-      "summary": "Run final local gates, CI, guardian review, controlled merge, and closeout #258/#257/#256.",
+      "summary": "Run full local gates, push PR #259, wait for CI, rerun guardian, then controlled merge.",
       "severity": "warn",
       "rebuttal": null,
       "disposition": {
@@ -22,7 +22,7 @@
   ],
   "blocking_issues": [],
   "follow_ups": [
-    "Run final local gates, CI, guardian review, controlled merge, and closeout #258/#257/#256."
+    "Run full local gates, push PR #259, wait for CI, rerun guardian, then controlled merge."
   ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
