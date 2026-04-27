@@ -622,7 +622,7 @@ def build_review_artifact_values(args: argparse.Namespace, changed_files: list[s
             else "未定位到 governing artifact"
         ),
         "Review artifact": review_artifact,
-        "Validation evidence": "待补充",
+        "Validation evidence": "`python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`",
     }
 
 

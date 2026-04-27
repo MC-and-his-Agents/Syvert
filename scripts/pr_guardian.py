@@ -373,6 +373,23 @@ def review_artifact_locator_candidates(value: str) -> list[str]:
     return [part.strip().strip("`").strip() for part in value.split(",") if part.strip()]
 
 
+def normalize_review_artifact_locator(value: str) -> str:
+    return value.strip().strip("`").strip().rstrip("/")
+
+
+def normalize_review_artifact_locator_for_repo(value: str, *, repo_root: Path) -> str:
+    normalized = normalize_review_artifact_locator(value)
+    if not normalized:
+        return ""
+    path = Path(normalized)
+    if path.is_absolute():
+        try:
+            return path.resolve().relative_to(repo_root.resolve()).as_posix().rstrip("/")
+        except ValueError:
+            return normalized
+    return normalized
+
+
 def review_artifact_locator_errors(value: str, *, field: str, require_repo_path: bool, repo_root: Path) -> list[str]:
     candidates = review_artifact_locator_candidates(value)
     if not candidates:
@@ -391,6 +408,43 @@ def review_artifact_locator_errors(value: str, *, field: str, require_repo_path:
             continue
         if not (repo_root / candidate).exists():
             errors.append(f"`## Review Artifacts` 中 `{field}` 指向不存在的 artifact：`{candidate}`。")
+    return errors
+
+
+def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_root: Path) -> list[str]:
+    body_context = parse_item_context_from_body(str(meta.get("body") or ""))
+    if not all(body_context.get(field, "").strip() for field in REVIEW_REQUIRED_BODY_FIELDS):
+        return []
+
+    item_context, notes, related_paths = build_item_context_summary(meta, repo_root)
+    if notes:
+        return [f"`## Review Artifacts` 无法绑定到当前 PR 事项上下文：{note}" for note in notes]
+
+    errors: list[str] = []
+    expected_exec_plan = normalize_review_artifact_locator_for_repo(str(item_context.get("exec_plan") or ""), repo_root=repo_root)
+    active_candidates = {
+        normalize_review_artifact_locator(candidate)
+        for candidate in review_artifact_locator_candidates(str(payload.get("Active exec-plan") or ""))
+    }
+    if expected_exec_plan and expected_exec_plan not in active_candidates:
+        errors.append(f"`## Review Artifacts` 中 `Active exec-plan` 必须绑定当前 PR item context 的 exec-plan：`{expected_exec_plan}`。")
+
+    expected_governing = {
+        normalize_review_artifact_locator_for_repo(path, repo_root=repo_root)
+        for path in related_paths
+        if normalize_review_artifact_locator_for_repo(path, repo_root=repo_root)
+        and normalize_review_artifact_locator_for_repo(path, repo_root=repo_root) != expected_exec_plan
+    }
+    governing_candidates = {
+        normalize_review_artifact_locator(candidate)
+        for candidate in review_artifact_locator_candidates(str(payload.get("Governing spec / bootstrap contract") or ""))
+    }
+    if expected_governing and governing_candidates != expected_governing:
+        expected_text = "`, `".join(sorted(expected_governing))
+        errors.append(
+            "`## Review Artifacts` 中 `Governing spec / bootstrap contract` "
+            f"必须绑定当前 exec-plan 声明的 governing artifacts：`{expected_text}`。"
+        )
     return errors
 
 
@@ -504,6 +558,7 @@ def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[s
             errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=False, repo_root=repo_root))
         if field == "Validation evidence":
             errors.extend(validation_evidence_errors(value, sections=sections, repo_root=repo_root))
+    errors.extend(review_artifact_binding_errors(meta, payload, repo_root=repo_root))
     return errors
 
 

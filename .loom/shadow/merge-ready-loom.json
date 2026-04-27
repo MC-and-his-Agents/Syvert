@@ -8,7 +8,7 @@
     ".loom/specs/INIT-0001/implementation-contract.md"
   ],
   "source_sha256": {
-    ".loom/status/current.md": "c40f1291e99206ed8251d3bb9d1ad1db8676b488e505b3183fa225185255a6cd",
+    ".loom/status/current.md": "af4b9aef72aa2ce0809b28c8dade9f5c5bf6645831e2bcab9dd3f0fb792083bb",
     ".loom/specs/INIT-0001/implementation-contract.md": "d17ae76f65458938a7ca5ab98e58daa9fb87b113720db6cac62b20be8aaa9579"
   },
   "source_semantics": "Merge-ready parity requires current validation truth, bound head state, and all blocking merge inputs satisfied before merge execution.",
