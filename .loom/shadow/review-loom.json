@@ -9,7 +9,7 @@
     ".loom/companion/interop.json"
   ],
   "source_sha256": {
-    ".loom/reviews/INIT-0001.spec.json": "1d44beb963e1ee88024ef2042b3140587ab30dae4df8cec80a12ea8a9006e879",
+    ".loom/reviews/INIT-0001.spec.json": "134cc79dc05ac16e54ef3b0fb1b149e629070eaf4e7a871355dc601f6dafc10a",
     ".loom/specs/INIT-0001/spec.md": "2a8faf66c2cfd37d4ad72f6222397b9bea33d486c40088f378f3a4b5a85dcc53",
     ".loom/companion/interop.json": "2d70e1f48967fcfbf84da1a6c63a5f19bdc107bb52708f179d1ecebf2bd3824e"
   },
