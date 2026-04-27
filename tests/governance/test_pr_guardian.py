@@ -692,21 +692,52 @@ class CodexReviewExecutionTests(unittest.TestCase):
             ],
         )
 
-    def test_review_artifact_errors_accepts_controlled_flow_payload(self) -> None:
-        meta = {
-            "body": "\n".join(
-                [
-                    "## Review Artifacts",
-                    "",
-                    "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
-                    "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
-                    "- Review artifact: code_review.md",
-                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
-                ]
-            )
-        }
+    def test_review_artifact_errors_accepts_existing_artifacts_and_executed_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3 -m unittest tests/governance/test_pr_guardian.py`",
+                    ]
+                )
+            }
 
-        self.assertEqual(review_artifact_errors(meta), [])
+            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
+
+    def test_review_artifact_errors_rejects_placeholder_validation_without_executed_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                    ]
+                )
+            }
+
+            self.assertEqual(
+                review_artifact_errors(meta, repo_root=repo_root),
+                ["`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact，不能只使用模板占位说明。"],
+            )
 
     def test_review_artifact_errors_rejects_non_locator_review_artifact_text(self) -> None:
         meta = {
@@ -722,10 +753,13 @@ class CodexReviewExecutionTests(unittest.TestCase):
             )
         }
 
-        self.assertEqual(
-            review_artifact_errors(meta),
-            ["`## Review Artifacts` 中 `Review artifact` 必须指向具体 artifact locator。"],
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
+            errors = review_artifact_errors(meta, repo_root=repo_root)
+            self.assertTrue(any("`Review artifact` 必须指向具体 artifact locator" in error for error in errors))
 
     def test_review_artifact_errors_rejects_unresolved_controlled_flow_placeholders(self) -> None:
         meta = {
@@ -742,10 +776,11 @@ class CodexReviewExecutionTests(unittest.TestCase):
         }
 
         self.assertEqual(
-            review_artifact_errors(meta),
+            review_artifact_errors(meta, repo_root=Path(".")),
             [
                 "`## Review Artifacts` 中 `Active exec-plan` 不能为空。",
                 "`## Review Artifacts` 中 `Governing spec / bootstrap contract` 不能为空。",
+                "`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact，不能只使用模板占位说明。",
             ],
         )
 
@@ -763,10 +798,13 @@ class CodexReviewExecutionTests(unittest.TestCase):
             )
         }
 
-        self.assertEqual(
-            review_artifact_errors(meta),
-            ["`## Review Artifacts` 中 `Governing spec / bootstrap contract` 必须指向具体 artifact locator。"],
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            errors = review_artifact_errors(meta, repo_root=repo_root)
+            self.assertTrue(any("`Governing spec / bootstrap contract` 必须指向" in error for error in errors))
 
     def test_integration_merge_gate_errors_requires_metadata_for_required_gate(self) -> None:
         meta = {

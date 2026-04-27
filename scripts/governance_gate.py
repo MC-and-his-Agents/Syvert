@@ -169,6 +169,8 @@ def markdown_fields(path: Path, *, section_name: str | None = None) -> dict[str,
     has_named_section = bool(
         section_name is not None and any(line.startswith("## ") and line[3:].strip() == section_name for line in lines)
     )
+    if section_name is not None and not has_named_section:
+        return fields
     metadata_started = False
     current_section: str | None = None
     for line in lines:
@@ -228,10 +230,20 @@ def artifact_paths(payload: object, field: str) -> set[str]:
     }
 
 
-def markdown_artifact_refs(path: Path) -> set[str]:
+def markdown_artifact_refs(path: Path, *, section_name: str = "Associated Artifacts") -> set[str]:
     refs: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
+    lines = path.read_text(encoding="utf-8").splitlines()
+    has_named_section = any(line.startswith("## ") and line[3:].strip() == section_name for line in lines)
+    if not has_named_section:
+        return refs
+    current_section: str | None = None
+    for line in lines:
         stripped = line.strip()
+        if line.startswith("## "):
+            current_section = line[3:].strip()
+            continue
+        if current_section != section_name:
+            continue
         if stripped.startswith("- `") and stripped.endswith("`"):
             refs.add(stripped[3:-1])
     return refs

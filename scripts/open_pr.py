@@ -622,7 +622,7 @@ def build_review_artifact_values(args: argparse.Namespace, changed_files: list[s
             else "未定位到 governing artifact"
         ),
         "Review artifact": review_artifact,
-        "Validation evidence": "见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+        "Validation evidence": "待补充",
     }
 
 

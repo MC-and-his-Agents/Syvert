@@ -111,6 +111,21 @@ ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "A
 REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS = ("summary", "item_context", "risk", "validation", "rollback")
 REVIEW_ARTIFACT_REQUIRED_AFTER = datetime(2026, 4, 27, tzinfo=timezone.utc)
 REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS = ("## Loom Runtime Locator",)
+REVIEW_ARTIFACT_PLACEHOLDER_MARKERS = (
+    "由受控流程继续补充",
+    "见 ## 验证",
+    "见 `## 验证`",
+)
+VALIDATION_COMMAND_PREFIXES = (
+    "python",
+    "python3",
+    "python3.11",
+    "npm",
+    "make",
+    "pytest",
+    "env ",
+    "gh ",
+)
 
 
 def codex_review_timeout_seconds() -> int | None:
@@ -354,19 +369,86 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
     return payload
 
 
-def looks_like_artifact_locator_set(value: str, *, require_repo_path: bool) -> bool:
-    candidates = [part.strip().strip("`") for part in value.split(",") if part.strip()]
+def review_artifact_locator_candidates(value: str) -> list[str]:
+    return [part.strip().strip("`").strip() for part in value.split(",") if part.strip()]
+
+
+def review_artifact_locator_errors(value: str, *, field: str, require_repo_path: bool, repo_root: Path) -> list[str]:
+    candidates = review_artifact_locator_candidates(value)
     if not candidates:
-        return False
+        return [f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。"]
+    errors: list[str] = []
     for candidate in candidates:
         parts = Path(candidate).parts
         if Path(candidate).is_absolute() or ".." in parts:
-            return False
+            errors.append(f"`## Review Artifacts` 中 `{field}` 包含非法 artifact locator：`{candidate}`。")
+            continue
         if require_repo_path and "/" not in candidate:
-            return False
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向仓库内具体路径：`{candidate}`。")
+            continue
         if not any(token in candidate for token in ("/", ".md", ".json", ".yml", ".yaml")):
-            return False
-    return True
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator：`{candidate}`。")
+            continue
+        if not (repo_root / candidate).exists():
+            errors.append(f"`## Review Artifacts` 中 `{field}` 指向不存在的 artifact：`{candidate}`。")
+    return errors
+
+
+def review_artifact_locators(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    payload = parse_bullet_kv_section(sections.get("review_artifacts", ""))
+    locators: list[str] = []
+    for field in ("Active exec-plan", "Governing spec / bootstrap contract", "Review artifact", "Validation evidence"):
+        for candidate in review_artifact_locator_candidates(str(payload.get(field) or "")):
+            path = Path(candidate)
+            if path.is_absolute() or ".." in path.parts:
+                continue
+            if (repo_root / candidate).exists():
+                locators.append(candidate)
+    return list(dict.fromkeys(locators))
+
+
+def validation_section_has_executed_evidence(section: str) -> bool:
+    for raw_line in section.splitlines():
+        stripped = raw_line.strip()
+        if not stripped.startswith("- "):
+            continue
+        value = stripped[2:].strip().strip("`")
+        lowered = value.lower()
+        if any(lowered.startswith(prefix) for prefix in VALIDATION_COMMAND_PREFIXES):
+            return True
+    return False
+
+
+def validation_evidence_errors(value: str, *, sections: dict[str, str], repo_root: Path) -> list[str]:
+    normalized = value.strip().strip("`").strip()
+    if any(marker in normalized for marker in REVIEW_ARTIFACT_PLACEHOLDER_MARKERS):
+        if not validation_section_has_executed_evidence(sections.get("validation", "")):
+            return ["`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact，不能只使用模板占位说明。"]
+    candidates = review_artifact_locator_candidates(value)
+    concrete = False
+    errors: list[str] = []
+    for candidate in candidates:
+        if candidate in {"## 验证", "验证"}:
+            if validation_section_has_executed_evidence(sections.get("validation", "")):
+                concrete = True
+            continue
+        lowered = candidate.lower()
+        if any(lowered.startswith(prefix) for prefix in VALIDATION_COMMAND_PREFIXES):
+            concrete = True
+            continue
+        path = Path(candidate)
+        if path.is_absolute() or ".." in path.parts:
+            errors.append(f"`## Review Artifacts` 中 `Validation evidence` 包含非法 artifact locator：`{candidate}`。")
+            continue
+        if any(token in candidate for token in ("/", ".md", ".json", ".yml", ".yaml")):
+            if (repo_root / candidate).exists():
+                concrete = True
+            else:
+                errors.append(f"`## Review Artifacts` 中 `Validation evidence` 指向不存在的 artifact：`{candidate}`。")
+    if not concrete and not errors:
+        errors.append("`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact。")
+    return errors
 
 
 def parse_github_timestamp(value: object) -> datetime | None:
@@ -390,7 +472,7 @@ def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
     return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
 
 
-def review_artifact_errors(meta: dict) -> list[str]:
+def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     section = sections.get("review_artifacts", "")
     if not section:
@@ -409,12 +491,14 @@ def review_artifact_errors(meta: dict) -> list[str]:
         if value.casefold() in REVIEW_ARTIFACT_EMPTY_VALUES:
             errors.append(f"`## Review Artifacts` 中 `{field}` 不能为空。")
             continue
-        if field == "Active exec-plan" and not looks_like_artifact_locator_set(value, require_repo_path=True):
-            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
-        if field == "Governing spec / bootstrap contract" and not looks_like_artifact_locator_set(value, require_repo_path=True):
-            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
-        if field == "Review artifact" and not looks_like_artifact_locator_set(value, require_repo_path=False):
-            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
+        if field == "Active exec-plan":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=True, repo_root=repo_root))
+        if field == "Governing spec / bootstrap contract":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=True, repo_root=repo_root))
+        if field == "Review artifact":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=False, repo_root=repo_root))
+        if field == "Validation evidence":
+            errors.extend(validation_evidence_errors(value, sections=sections, repo_root=repo_root))
     return errors
 
 
@@ -791,6 +875,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
     issue_error = str(meta.get("_issue_canonical_integration_error") or "")
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
+    related_paths.extend(review_artifact_locators(meta, repo_root=worktree_dir))
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))

@@ -1162,7 +1162,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- Active exec-plan: 未定位到 active exec-plan", body)
         self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
         self.assertIn("- Review artifact: `code_review.md`", body)
-        self.assertIn("- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。", body)
+        self.assertIn("- Validation evidence: 待补充", body)
 
     def test_governing_artifact_label_requires_concrete_locator(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
