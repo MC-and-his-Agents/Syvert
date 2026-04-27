@@ -1479,12 +1479,35 @@ def default_spec_review_path(item_id: str) -> str:
     return f".loom/reviews/{item_id}.spec.json"
 
 
+def shadow_evidence_paths_for_sources(target_root: Path, source_paths: set[str]) -> set[str]:
+    shadow_root = target_root / ".loom/shadow"
+    if not shadow_root.exists():
+        return set()
+
+    evidence_paths: set[str] = set()
+    for evidence_path in sorted(shadow_root.glob("*.json")):
+        relative = evidence_path.relative_to(target_root).as_posix()
+        if relative == ".loom/shadow/shadow-parity.json":
+            continue
+        payload = load_json_file(evidence_path)
+        if not isinstance(payload, dict):
+            continue
+        source_files = payload.get("source_files")
+        if not isinstance(source_files, list):
+            continue
+        if any(isinstance(source, str) and source in source_paths for source in source_files):
+            evidence_paths.add(relative)
+    return evidence_paths
+
+
 def allowed_post_review_carrier_paths(context: dict[str, Any], *review_paths: str) -> set[str]:
-    return {
+    allowed = {
         *review_paths,
         str(context["report"]["fact_chain"]["entry_points"]["recovery_entry"]),
         str(context["report"]["fact_chain"]["entry_points"]["status_surface"]),
     }
+    allowed.update(shadow_evidence_paths_for_sources(context["target_root"], set(review_paths)))
+    return allowed
 
 
 def formal_spec_path(context: dict[str, Any]) -> str | None:

@@ -21,7 +21,7 @@ import governance_surface as governance_surface_module
 import loom_flow as loom_flow_module
 import runtime_state as runtime_state_module
 from governance_surface import build_governance_surface
-from loom_flow import repo_specific_requirements_payload, review_head_binding
+from loom_flow import allowed_post_review_carrier_paths, repo_specific_requirements_payload, review_head_binding
 from runtime_paths import repo_local_root
 
 TOP_LEVEL_DIRS = (
@@ -7148,6 +7148,45 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
         assert_broken_shadow_evidence("partial-hash", partial_source_hash)
         assert_broken_shadow_evidence("hash-drift", drift_source_hash)
         assert_broken_shadow_evidence("undeclared", undeclared_shadow_evidence, expect_validation_warn=False)
+
+        review_shadow_target = base / "review-shadow-carrier"
+        shutil.copytree(baseline, review_shadow_target)
+        reviewed_head = run_command(root, ["git", "rev-parse", "HEAD"], cwd=review_shadow_target, timeout_seconds=30).stdout.strip()
+        review_path = ".loom/reviews/INIT-0001.json"
+        review_payload = load_json_file(review_shadow_target / review_path)
+        if isinstance(review_payload, dict):
+            review_payload["summary"] = "Carrier-only review artifact refresh."
+            write_json(review_shadow_target / review_path, review_payload)
+            write_json(
+                review_shadow_target / ".loom/shadow/review-loom.json",
+                {
+                    "decision": "allow",
+                    "source_files": [review_path],
+                    "source_sha256": {review_path: sha256_file(review_shadow_target / review_path)},
+                },
+            )
+            run_command(root, ["git", "add", "-f", review_path, ".loom/shadow/review-loom.json"], cwd=review_shadow_target, timeout_seconds=30)
+            run_command(root, ["git", "commit", "-m", "refresh review carrier evidence"], cwd=review_shadow_target, timeout_seconds=30)
+            carrier_context = {
+                "target_root": review_shadow_target,
+                "report": {
+                    "fact_chain": {
+                        "entry_points": {
+                            "recovery_entry": ".loom/progress/INIT-0001.md",
+                            "status_surface": ".loom/status/current.md",
+                        }
+                    }
+                },
+            }
+            binding_payload, binding_errors = review_head_binding(
+                review_shadow_target,
+                reviewed_head=reviewed_head,
+                allowed_paths=allowed_post_review_carrier_paths(carrier_context, review_path),
+            )
+            if binding_errors or binding_payload.get("status") != "carrier-only":
+                failures.append(Failure("adversarial-adoption", "review shadow evidence tied to a review artifact must be carrier-only after review refresh"))
+        else:
+            failures.append(Failure("adversarial-adoption", "review shadow carrier fixture could not load review artifact"))
 
         head_before_drift = run_command(root, ["git", "rev-parse", "HEAD"], cwd=baseline, timeout_seconds=30).stdout.strip()
         (baseline / "implementation-drift.txt").write_text("changed after review\n", encoding="utf-8")
