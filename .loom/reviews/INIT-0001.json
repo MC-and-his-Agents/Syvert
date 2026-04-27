@@ -3,14 +3,27 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Loom official adoption runtime and governance boundary hardening are aligned on the current PR head, and repo-relative carrier write surfaces now fail closed.",
+  "summary": "Loom official adoption carrier, activation hardening, and guardian migration policy are aligned on the current PR head.",
   "reviewer": "codex",
-  "reviewed_head": "94b876b7ec03e768245a54fed73722ba153921e1",
+  "reviewed_head": "6dea969d4c669984cd262b01656f9fa71e37f4ea",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are all passing locally on the current PR head.",
   "fallback_to": null,
-  "findings": [],
+  "findings": [
+    {
+      "id": "compat-follow-up-1",
+      "summary": "Keep Syvert-specific guardian, integration contract, and release/sprint policy as repo-owned residue while Loom remains the upstream runtime.",
+      "severity": "warn",
+      "rebuttal": null,
+      "disposition": {
+        "status": "deferred",
+        "summary": "Projected from compatibility `follow_ups`."
+      }
+    }
+  ],
   "blocking_issues": [],
-  "follow_ups": [],
+  "follow_ups": [
+    "Keep Syvert-specific guardian, integration contract, and release/sprint policy as repo-owned residue while Loom remains the upstream runtime."
+  ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
     "recovery_entry": ".loom/progress/INIT-0001.md",
