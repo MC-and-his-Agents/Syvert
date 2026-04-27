@@ -320,9 +320,9 @@ def file_exists(root: Path, relative: str) -> bool:
 
 def relative_locator(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
-    except ValueError:
-        return str(path)
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return ""
 
 
 def safe_read_json(path: Path) -> dict[str, Any] | None:
@@ -961,19 +961,24 @@ def first_match(directory: Path, suffix: str, root: Path) -> str:
 
 
 def existing_locator(root: Path, relative: str | None) -> str:
-    if not relative:
+    locator, target = resolve_locator(root, relative)
+    if locator is None or target is None:
         return ""
-    return relative if (root / relative).exists() else ""
+    return locator if target.exists() else ""
 
 
 def active_or_first(root: Path, relative: str | None, directory: Path, suffix: str) -> str:
-    return existing_locator(root, relative) or (first_match(directory, suffix, root) if directory.exists() else "")
+    if relative is not None and str(relative).strip():
+        return existing_locator(root, relative)
+    return first_match(directory, suffix, root) if directory.exists() else ""
 
 
 def current_review_locator(root: Path, review_dir: Path, item_id: str) -> str:
     review_path = review_dir / f"{item_id}.json"
     if review_path.exists():
         return relative_locator(review_path, root)
+    if item_id:
+        return ""
     return first_match(review_dir, ".json", root) if review_dir.exists() else ""
 
 
@@ -1006,7 +1011,6 @@ def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: b
     recovery_dir = root / ".loom/progress"
     review_dir = root / ".loom/reviews"
     status_locator = active.get("status_surface") or ".loom/status/current.md"
-    status_path = root / status_locator
     spec_path = root / f".loom/specs/{active_item_id}/spec.md"
     plan_path = root / f".loom/specs/{active_item_id}/plan.md"
 
@@ -1014,7 +1018,7 @@ def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: b
         "work_item": active_or_first(root, active.get("work_item"), item_dir, ".md"),
         "recovery": active_or_first(root, active.get("recovery_entry"), recovery_dir, ".md"),
         "review": current_review_locator(root, review_dir, active_item_id),
-        "status_surface": relative_locator(status_path, root) if status_path.exists() else "",
+        "status_surface": existing_locator(root, status_locator),
         "spec_path": relative_locator(spec_path, root) if spec_path.exists() else "",
         "plan_path": relative_locator(plan_path, root) if plan_path.exists() else "",
     }

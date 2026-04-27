@@ -3995,6 +3995,31 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
         elif payload.get("result") != "block":
             failures.append(Failure("daily-execution-cli", "`installed runtime-state` must block on scene/carrier conflict"))
 
+        source_repo = tmp_root / "source"
+        sibling_prefix_install = tmp_root / "source-evil" / "skills"
+        source_repo.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(root / "skills", sibling_prefix_install)
+        payload, error = load_command_json(
+            root,
+            [
+                "python3",
+                str(sibling_prefix_install / "shared" / "scripts" / "loom_flow.py"),
+                "runtime-state",
+                "--target",
+                str(target_root),
+            ],
+            env={"LOOM_SOURCE_REPO_ROOT": str(source_repo)},
+        )
+        if error:
+            failures.append(Failure("daily-execution-cli", f"`repo-local runtime-state` sibling-prefix escape failed unexpectedly: {error}"))
+        elif payload.get("result") != "block":
+            failures.append(Failure("daily-execution-cli", "`repo-local runtime-state` must block sibling-prefix install roots outside the source repo"))
+        else:
+            runtime_state = payload.get("runtime_state")
+            missing_inputs = runtime_state.get("missing_inputs") if isinstance(runtime_state, dict) else []
+            if not any("install root must stay inside the source repository" in str(item) for item in missing_inputs):
+                failures.append(Failure("daily-execution-cli", "`repo-local runtime-state` sibling-prefix escape must expose the source-repo containment error"))
+
         payload, error = load_command_json(
             root,
             ["python3", ".loom/bin/loom_init.py", "runtime-state", "--target", "."],
@@ -4055,6 +4080,35 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
             failures.append(Failure("daily-execution-cli", f"`bootstrapped runtime-state` provenance hash drift failed unexpectedly: {error}"))
         elif payload.get("result") != "block":
             failures.append(Failure("daily-execution-cli", "`bootstrapped runtime-state` must block when runtime provenance hashes drift"))
+
+    with tempfile.TemporaryDirectory(prefix="loom-check-governance-surface-boundary-") as tmp:
+        tmp_root = Path(tmp)
+        outside = tmp_root / "outside.md"
+        outside.write_text("# outside\n", encoding="utf-8")
+        for label, unsafe_locator in (
+            ("parent escape", "../outside.md"),
+            ("absolute locator", str(outside)),
+        ):
+            poisoned_target = tmp_root / f"governance-{label.replace(' ', '-')}"
+            shutil.copytree(example_target, poisoned_target)
+            init_result_path = poisoned_target / ".loom/bootstrap/init-result.json"
+            init_result = load_json_file(init_result_path)
+            if isinstance(init_result, dict):
+                entry_points = init_result.get("fact_chain", {}).get("entry_points")
+                if isinstance(entry_points, dict):
+                    entry_points["work_item"] = unsafe_locator
+                    entry_points["recovery_entry"] = unsafe_locator
+                    entry_points["status_surface"] = unsafe_locator
+                init_result_path.write_text(json.dumps(init_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            governance_surface = build_governance_surface(poisoned_target)
+            carrier_summary = governance_surface.get("carrier_summary") if isinstance(governance_surface, dict) else None
+            if not isinstance(carrier_summary, dict):
+                failures.append(Failure("daily-execution-cli", f"`governance surface` {label} fixture must expose carrier summary"))
+                continue
+            for carrier in ("work_item", "recovery", "status_surface"):
+                entry = carrier_summary.get(carrier)
+                if isinstance(entry, dict) and entry.get("status") == "present":
+                    failures.append(Failure("daily-execution-cli", f"`governance surface` must not report unsafe {label} `{carrier}` fact-chain locators as present"))
 
     if shutil.which("git") is not None:
         with tempfile.TemporaryDirectory(prefix="loom-check-installed-pre-merge-") as tmp:

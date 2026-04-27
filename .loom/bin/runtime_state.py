@@ -105,6 +105,14 @@ def _resolve_inside(root: Path, relative: str, *, label: str) -> tuple[Path | No
     return candidate, None
 
 
+def _path_is_inside(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
 def _default_scene_for_carrier(carrier: str) -> str:
     if carrier == "repo-local-wrapper":
         return "repo-local-demo"
@@ -378,7 +386,7 @@ def detect_runtime_state(caller_file: str, entry_family: str, *, target_root: Pa
                 repo_root = repo_local_root(caller_file)
                 if repo_root is None:
                     carrier_errors.append("repo-local wrapper is missing `LOOM_SOURCE_REPO_ROOT`")
-                elif not str(install_root).startswith(str(repo_root)):
+                elif not _path_is_inside(install_root, repo_root):
                     carrier_errors.append("repo-local wrapper install root must stay inside the source repository")
             if not shared.exists():
                 carrier_errors.append(f"shared runtime root is missing: {shared}")
