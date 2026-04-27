@@ -22,7 +22,7 @@
 
 ## 范围
 
-- 本次纳入：`.loom/` runtime / companion carrier、`AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`.github/PULL_REQUEST_TEMPLATE.md` 的 Loom locator、`.github/workflows/governance-gate.yml` 的 repo-local Loom gate wiring、`scripts/governance_gate.py` / `scripts/policy/policy.json` 的 `.loom` governance policy、`tests/governance/**` 回归测试、`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`。
+- 本次纳入：`.loom/` runtime / companion carrier、`AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`.github/PULL_REQUEST_TEMPLATE.md` 的 Loom locator、`.github/workflows/governance-gate.yml` 的 repo-local Loom gate wiring、`scripts/governance_gate.py` / `scripts/policy/policy.json` 的 `.loom` governance policy、`scripts/open_pr.py` / `scripts/pr_guardian.py` 的 Review Artifacts 生成、review admission 与 merge-time recheck 对齐、`tests/governance/**` 回归测试、`docs/decisions/ADR-GOV-0038-loom-official-adoption.md`。
 - 本次不纳入：删除 Syvert guardian、替换 integration contract、修改 adapter/runtime 行为、把 release/sprint/item_key 升级为 Loom core schema。
 
 ## 当前停点
@@ -87,6 +87,8 @@
   - 结果：通过。
 - `python3.11 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
+- `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-258-loom-official-adoption`
+  - 结果：通过；该命令使用显式 head branch，可在 detached guardian review worktree 中复现。
 - `python3.11 -m unittest discover -s tests/governance -p 'test_*.py'`
   - 结果：通过。
 - `python3.11 -m unittest discover -s tests/runtime -p 'test_*.py'`
@@ -97,11 +99,12 @@
 
 - 当前 Loom `v1.3` 要求 vendored `.loom/bin` runtime；未来 Loom runtime 升级时 Syvert 需要刷新 vendored 文件，直到 Loom 支持 external-runtime companion。
 - 若后续继续在 Syvert 中扩写通用治理模型，会重新产生 Loom 与 Syvert 平行治理漂移。
+- Review Artifacts 现在同时被 `open_pr`、guardian review admission 与 merge-time recheck 消费；后续修改任一入口必须同步测试，避免 PR 创建路径与 merge gate 口径漂移。
 - `tests/runtime` 既有 baseline 失败需要由后续 Syvert runtime Work Item 单独处理，不能混入本治理迁移 PR。
 
 ## 回滚方式
 
-- 使用独立 revert PR 撤销 `.loom/` carrier、ADR-GOV-0038、PR template locator 与本轮文档边界增量；Syvert legacy governance、guardian、integration contract 与 runtime 实现未被删除，可直接恢复迁移前状态。
+- 使用独立 revert PR 撤销 `.loom/` carrier、ADR-GOV-0038、PR template locator、Review Artifacts wiring 与本轮文档边界增量；Syvert legacy governance、guardian、integration contract 与 runtime 实现未被删除，可直接恢复迁移前状态。
 
 ## 起始基线 SHA
 

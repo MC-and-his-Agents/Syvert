@@ -1154,7 +1154,8 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
 
-    def test_build_body_populates_review_artifacts_section(self) -> None:
+    @patch("scripts.open_pr.git_current_branch", return_value="feature/review-artifacts")
+    def test_build_body_populates_review_artifacts_section(self, _git_current_branch_mock) -> None:
         args = parse_args(["--class", "governance"])
 
         body = build_body(args, [])
@@ -1163,7 +1164,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
         self.assertIn("- Review artifact: `code_review.md`", body)
         self.assertIn(
-            "- Validation evidence: `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`",
+            "- Validation evidence: `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref feature/review-artifacts`",
             body,
         )
 

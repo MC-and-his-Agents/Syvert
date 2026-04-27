@@ -23,7 +23,7 @@
 ### Phase 3
 
 - Objective: Harden merge-readiness of the carrier itself.
-- Deliverable: `.loom/**` structural gate coverage, formal spec/review/status consistency, GitHub parser hardening, and self-contained vendored bootstrap fallback.
+- Deliverable: `.loom/**` structural gate coverage, formal spec/review/status consistency, GitHub parser hardening, self-contained vendored bootstrap fallback, and Review Artifacts alignment across `open_pr`, guardian review admission, and merge-time recheck.
 - Exit condition: governance gate, spec guard, 消费侧 Loom validation chain, guardian review, and CI pass.
 
 ## Constraints
@@ -44,7 +44,7 @@
   - `python3 -m py_compile .loom/bin/*.py scripts/*.py scripts/policy/*.py`
   - `python3.11 scripts/docs_guard.py --mode ci`
   - `python3.11 scripts/workflow_guard.py --mode ci`
-  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-258-loom-official-adoption`
   - `python3.11 scripts/spec_guard.py --mode ci --base-sha $(git merge-base origin/main HEAD) --head-sha HEAD`
   - `python3.11 -m unittest discover -s tests/governance -p 'test_*.py'`
 - Manual checks:

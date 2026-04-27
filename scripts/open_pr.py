@@ -83,7 +83,6 @@ REVIEW_ARTIFACT_FIELDS = (
     "Review artifact",
     "Validation evidence",
 )
-DEFAULT_VALIDATION_EVIDENCE = "`python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`"
 INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
 EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
 MERGE_GATE_CHOICES = field_choices("merge_gate")
@@ -615,6 +614,10 @@ def build_review_artifact_values(args: argparse.Namespace, changed_files: list[s
     if args.pr_class != "spec" or "governance" in categories or "implementation" in categories:
         review_artifacts.append("code_review.md")
     review_artifact = ", ".join(f"`{item}`" for item in dict.fromkeys(review_artifacts)) or "`code_review.md`"
+    head_ref = git_current_branch(repo=repo_root) or "HEAD"
+    validation_evidence = (
+        f"`python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref {head_ref}`"
+    )
     return {
         "Active exec-plan": f"`{exec_plan_path}`" if exec_plan_path else "未定位到 active exec-plan",
         "Governing spec / bootstrap contract": (
@@ -623,7 +626,7 @@ def build_review_artifact_values(args: argparse.Namespace, changed_files: list[s
             else "未定位到 governing artifact"
         ),
         "Review artifact": review_artifact,
-        "Validation evidence": DEFAULT_VALIDATION_EVIDENCE,
+        "Validation evidence": validation_evidence,
     }
 
 

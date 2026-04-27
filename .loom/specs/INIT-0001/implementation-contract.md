@@ -17,6 +17,7 @@
   - Syvert docs that declare Loom consumption boundary.
   - Syvert governance gate structural coverage for `.loom/**`.
   - Regression tests for GitHub parser and Loom carrier guard.
+  - Syvert-owned Review Artifacts generation and guardian review/merge admission needed to consume the Loom carrier without manual PR body repair.
 - Out Of Scope:
   - Removing Syvert guardian or integration contract.
   - Replacing Syvert release/sprint/item_key semantics.
@@ -32,6 +33,8 @@
   - `python3 .loom/bin/loom_flow.py governance-profile status --target .`
   - `python3 .loom/bin/loom_flow.py runtime-parity validate --target .`
   - `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref issue-258-loom-official-adoption`
+  - Review Artifacts unit coverage for `open_pr`, guardian review admission, and merge-time recheck.
 - Manual Verification:
   - Guardian review.
   - Controlled merge and post-merge main-truth closeout.
@@ -42,8 +45,9 @@
   - Vendored runtime can drift from upstream Loom.
   - `.loom/**` scope can admit runtime changes unless structural gates stay active.
   - GitHub host reads can fail due auth or host signal drift.
+  - Review Artifacts drift can make the PR creation path, guardian review admission, and merge-time recheck disagree unless they share one contract.
 - Rollback Boundary:
-  - Revert PR #259 to remove the carrier, or follow up with external-runtime companion migration while preserving Syvert-owned residue.
+  - Revert PR #259 to remove the carrier and associated Review Artifacts wiring, or follow up with external-runtime companion migration while preserving Syvert-owned residue.
 
 ## Host Binding
 
