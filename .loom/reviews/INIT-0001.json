@@ -3,15 +3,15 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Syvert open_pr now emits concrete Review Artifacts validation evidence by default, so controlled PR creation and guardian consumption share the same contract.",
+  "summary": "Implementation contract and exec-plan now include Review Artifacts generation, guardian admission, merge-time recheck, and detached-worktree reproducible governance_gate validation.",
   "reviewer": "codex",
-  "reviewed_head": "1a9d9e5ad4afd172bc76a33735384c16db31f3b3",
+  "reviewed_head": "a7446ff2920dbfedbf26582ec531d6f27124afdc",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
     {
       "id": "compat-follow-up-1",
-      "summary": "Push PR #259, wait for CI, rerun guardian, then controlled merge.",
+      "summary": "Update PR body validation command, push PR #259, wait for CI, rerun guardian, then controlled merge.",
       "severity": "warn",
       "rebuttal": null,
       "disposition": {
@@ -22,7 +22,7 @@
   ],
   "blocking_issues": [],
   "follow_ups": [
-    "Push PR #259, wait for CI, rerun guardian, then controlled merge."
+    "Update PR body validation command, push PR #259, wait for CI, rerun guardian, then controlled merge."
   ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
