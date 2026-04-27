@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Guardian Codex execution now ignores broken user-level Codex config while preserving Syvert project rules, schema output, and no-timeout review semantics.",
+  "summary": "Syvert open_pr now emits concrete Review Artifacts validation evidence by default, so controlled PR creation and guardian consumption share the same contract.",
   "reviewer": "codex",
-  "reviewed_head": "19890c7b0c4dbfe2d4a4dab2a0ecb3d760a21eae",
+  "reviewed_head": "1a9d9e5ad4afd172bc76a33735384c16db31f3b3",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
