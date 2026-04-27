@@ -611,7 +611,6 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
         "Workspace Entry": ".",
         "Recovery Entry": f".loom/progress/{item_id}.md",
         "Review Entry": f".loom/reviews/{item_id}.json",
-        "Validation Entry": "python3 .loom/bin/loom_init.py verify --target .",
     }
     for path in (
         work_item_path,
@@ -907,6 +906,22 @@ def path_matches_repo_locator(changed_path: str, locator: str) -> bool:
     return normalized_path == normalized_locator or normalized_path.startswith(f"{normalized_locator}/")
 
 
+def collect_repo_interface_locators(payload: object) -> set[str]:
+    locators: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key.endswith("locator") and isinstance(value, str) and value.strip():
+                locators.add(value.strip())
+            elif key.endswith("locators") and isinstance(value, list):
+                locators.update(item.strip() for item in value if isinstance(item, str) and item.strip())
+            else:
+                locators.update(collect_repo_interface_locators(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            locators.update(collect_repo_interface_locators(item))
+    return locators
+
+
 def loom_carrier_semantic_validation_applies(repo_root: Path, changed_paths: list[str]) -> bool:
     if any(path == ".loom" or path.startswith(".loom/") for path in changed_paths):
         return True
@@ -926,6 +941,13 @@ def loom_carrier_semantic_validation_applies(repo_root: Path, changed_paths: lis
             locator = carrier.get("locator")
             if isinstance(locator, str) and locator.strip():
                 watched_locators.add(locator.strip())
+
+    repo_interface_path = repo_root / ".loom/companion/repo-interface.json"
+    try:
+        repo_interface_payload = json.loads(repo_interface_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        repo_interface_payload = {}
+    watched_locators.update(collect_repo_interface_locators(repo_interface_payload))
 
     shadow_root = repo_root / ".loom/shadow"
     if shadow_root.exists():

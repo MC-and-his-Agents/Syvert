@@ -920,6 +920,16 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("source_sha256" in error or "hash" in error for error in errors))
 
+    def test_loom_carrier_guard_runs_when_repo_interface_locator_drifts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            (root / "scripts/pr_guardian.py").unlink()
+
+            errors = governance_gate.validate_loom_carrier_repository(root, ["scripts/pr_guardian.py"])
+
+            self.assertTrue(any("repo interface specialized_gates" in error and "指向缺失文件" in error for error in errors))
+
     def test_loom_carrier_guard_skips_unrelated_non_carrier_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1099,6 +1109,10 @@ class GovernanceGateTests(unittest.TestCase):
             (root / f".loom/work-items/{item_id}.md").write_text(
                 "\n".join(
                     [
+                        f"# {item_id}",
+                        "",
+                        "## Static Facts",
+                        "",
                         f"- Item ID: {item_id}",
                         "- Goal: Adopt Loom",
                         "- Scope: Validate carrier",
@@ -1106,7 +1120,7 @@ class GovernanceGateTests(unittest.TestCase):
                         "- Workspace Entry: .",
                         f"- Recovery Entry: .loom/progress/{item_id}.md",
                         f"- Review Entry: .loom/reviews/{item_id}.json",
-                        "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                        "- Validation Entry: python3 .loom/bin/loom_flow.py flow resume --target . --item WORK-0002",
                         "- Closing Condition: carrier is valid",
                         "",
                         "## Associated Artifacts",
@@ -1120,6 +1134,10 @@ class GovernanceGateTests(unittest.TestCase):
             (root / ".loom/status/current.md").write_text(
                 "\n".join(
                     [
+                        "# Current Status",
+                        "",
+                        "## Derived Fact Chain View",
+                        "",
                         f"- Item ID: {item_id}",
                         "- Goal: Adopt Loom",
                         "- Scope: Validate carrier",
@@ -1127,7 +1145,7 @@ class GovernanceGateTests(unittest.TestCase):
                         "- Workspace Entry: .",
                         f"- Recovery Entry: .loom/progress/{item_id}.md",
                         f"- Review Entry: .loom/reviews/{item_id}.json",
-                        "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                        "- Validation Entry: python3 .loom/bin/loom_flow.py flow resume --target . --item WORK-0002",
                         "- Closing Condition: carrier is valid",
                         "- Current Checkpoint: merge checkpoint",
                         f"- Latest Validation Summary: {summary}",
@@ -1139,6 +1157,10 @@ class GovernanceGateTests(unittest.TestCase):
             (root / f".loom/progress/{item_id}.md").write_text(
                 "\n".join(
                     [
+                        "# Progress",
+                        "",
+                        "## Dynamic Facts",
+                        "",
                         f"- Item ID: {item_id}",
                         "- Current Checkpoint: merge checkpoint",
                         f"- Latest Validation Summary: {summary}",
@@ -1170,6 +1192,7 @@ class GovernanceGateTests(unittest.TestCase):
             errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
 
             self.assertFalse(any("fact_chain.entry_points" in error for error in errors))
+            self.assertFalse(any("Validation Entry" in error for error in errors))
 
     def test_loom_carrier_guard_rejects_undeclared_shadow_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
