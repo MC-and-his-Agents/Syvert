@@ -390,6 +390,8 @@ def review_artifact_errors(meta: dict) -> list[str]:
             errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
         if field == "Governing spec / bootstrap contract" and not looks_like_artifact_locator_set(value, require_repo_path=True):
             errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
+        if field == "Review artifact" and not looks_like_artifact_locator_set(value, require_repo_path=False):
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
     return errors
 
 
@@ -1114,6 +1116,10 @@ def all_checks_pass(pr_number: int) -> bool:
 def review_once(pr_number: int, *, post: bool, json_output: str | None) -> tuple[dict, dict]:
     require_auth()
     meta = pr_meta(pr_number)
+    review_artifact_validation_errors = review_artifact_errors(meta)
+    if review_artifact_validation_errors:
+        detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
+        raise SystemExit(f"Review Artifacts 门禁未满足，拒绝进入 guardian review：\n{detail}")
     temp_dir, worktree_dir = prepare_worktree(pr_number, meta)
     try:
         result_path = temp_dir / "review.json"

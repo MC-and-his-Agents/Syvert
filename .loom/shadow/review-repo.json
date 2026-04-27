@@ -4,14 +4,18 @@
   "side": "repo",
   "parity_value": "syvert-loom-review-v1",
   "source_files": [
+    ".loom/companion/repo-interface.json",
+    "spec_review.md",
+    "code_review.md",
     "scripts/pr_guardian.py",
-    "scripts/policy/integration_contract.json",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md"
+    "scripts/policy/integration_contract.json"
   ],
   "source_sha256": {
-    "scripts/pr_guardian.py": "66f69b9aca40b76c8d07058baffe5af119e1536d1c291823eca101e9314bd544",
-    "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "a29f02ba128fb89f985c633e46147a225b90b67cced97be1a9ccf3d52cb6d490"
+    ".loom/companion/repo-interface.json": "6b6407445fefab9c22bc6bc7aacb7cc84f1065616b8d742ab4fdf92134a0c8f6",
+    "spec_review.md": "9057ddb90e85b732adcd1879903d57f141b770933cdf758ba397ee411dd83a9f",
+    "code_review.md": "43ff9d50d61d371f3644f199a4fb0e6a5a7288d511d0fe249f5f3b1420993ae9",
+    "scripts/pr_guardian.py": "840ff4f84414cd3538ea99a670e2fd1722a7946ea8b51d3abdfad607dd5c2d09",
+    "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a"
   },
   "source_semantics": "Review parity requires durable review evidence, explicit review findings handling, and authoritative review inputs before merge decisions.",
   "evidence_body": {

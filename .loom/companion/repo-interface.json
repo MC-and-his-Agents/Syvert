@@ -5,6 +5,12 @@
     "admission": [],
     "review": [
       {
+        "id": "syvert-spec-review-rubric",
+        "summary": "Syvert formal spec review rubric remains repo-owned.",
+        "locator": "spec_review.md",
+        "enforcement": "blocking"
+      },
+      {
         "id": "syvert-review-rubric",
         "summary": "Syvert implementation review rubric remains repo-owned.",
         "locator": "code_review.md",

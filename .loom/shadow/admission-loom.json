@@ -9,7 +9,7 @@
   ],
   "source_sha256": {
     ".loom/work-items/INIT-0001.md": "71aecca9df97521b81a81faa89365541e26a4cfbaa418df65f655809ea9a150f",
-    ".loom/companion/repo-interface.json": "e14f200429b06253540035da3745db85bd26b11fb2a4c7324768e1b747e72578"
+    ".loom/companion/repo-interface.json": "6b6407445fefab9c22bc6bc7aacb7cc84f1065616b8d742ab4fdf92134a0c8f6"
   },
   "source_semantics": "Admission parity requires an explicit work item entry with tracked goal, scope, recovery entry, validation entry, and closing condition before execution starts.",
   "evidence_body": {

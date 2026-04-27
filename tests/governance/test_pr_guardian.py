@@ -648,6 +648,25 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(review_artifact_errors(meta), [])
 
+    def test_review_artifact_errors_rejects_non_locator_review_artifact_text(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                    "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                    "- Review artifact: review 已完成，详见 guardian",
+                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                ]
+            )
+        }
+
+        self.assertEqual(
+            review_artifact_errors(meta),
+            ["`## Review Artifacts` 中 `Review artifact` 必须指向具体 artifact locator。"],
+        )
+
     def test_review_artifact_errors_rejects_unresolved_controlled_flow_placeholders(self) -> None:
         meta = {
             "body": "\n".join(
@@ -2285,6 +2304,40 @@ class CodexReviewExecutionTests(unittest.TestCase):
         run_codex_review_mock.assert_called_once_with(worktree_dir, "lean prompt", temp_dir / "review.json")
         save_guardian_result_mock.assert_called_once()
         cleanup_mock.assert_called_once_with(temp_dir)
+
+    @patch("scripts.pr_guardian.prepare_worktree")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    def test_review_once_rejects_invalid_review_artifacts_before_running_review(
+        self,
+        require_auth_mock,
+        pr_meta_mock,
+        prepare_worktree_mock,
+    ) -> None:
+        pr_meta_mock.return_value = {
+            "number": 24,
+            "title": "治理: 精简 guardian review context",
+            "url": "https://example.test/pr/24",
+            "baseRefName": "main",
+            "headRefOid": "sha-24",
+            "headRefName": "issue-24-branch",
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
+                    "- Governing spec / bootstrap contract: .loom/specs/INIT-0001",
+                    "- Review artifact: 已评审",
+                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                ]
+            ),
+        }
+
+        with self.assertRaises(SystemExit) as exc:
+            review_once(24, post=False, json_output=None)
+
+        self.assertIn("Review artifact", str(exc.exception))
+        prepare_worktree_mock.assert_not_called()
 
     def test_build_prompt_preserves_preamble_in_raw_fallback(self) -> None:
         meta = {
