@@ -536,20 +536,20 @@ def parse_github_timestamp(value: object) -> datetime | None:
 
 
 def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
-    return True
+    body = str(meta.get("body") or "")
+    if sections.get("review_artifacts", "").strip():
+        return True
+    if any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS):
+        return True
+    created_at = parse_github_timestamp(meta.get("createdAt"))
+    if created_at is None:
+        return any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS)
+    return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
 
 
 def review_artifact_gate_applies(meta: dict) -> bool:
-    body = str(meta.get("body") or "")
     sections = parse_markdown_sections(str(meta.get("body") or ""))
-    if (
-        "createdAt" not in meta
-        and not sections.get("review_artifacts", "").strip()
-        and not any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS)
-        and not any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS)
-    ):
-        return False
-    return bool(sections.get("review_artifacts", "").strip()) or review_artifacts_required(meta, sections)
+    return review_artifacts_required(meta, sections)
 
 
 def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:

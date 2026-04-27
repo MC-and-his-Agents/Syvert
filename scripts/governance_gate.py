@@ -899,8 +899,55 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     return errors
 
 
+def path_matches_repo_locator(changed_path: str, locator: str) -> bool:
+    normalized_path = changed_path.strip().strip("/")
+    normalized_locator = locator.strip().strip("/")
+    if not normalized_path or not normalized_locator:
+        return False
+    return normalized_path == normalized_locator or normalized_path.startswith(f"{normalized_locator}/")
+
+
+def loom_carrier_semantic_validation_applies(repo_root: Path, changed_paths: list[str]) -> bool:
+    if any(path == ".loom" or path.startswith(".loom/") for path in changed_paths):
+        return True
+
+    watched_locators: set[str] = set()
+    interop_path = repo_root / ".loom/companion/interop.json"
+    try:
+        interop_payload = json.loads(interop_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        interop_payload = {}
+
+    repo_native_carriers = interop_payload.get("repo_native_carriers")
+    if isinstance(repo_native_carriers, list):
+        for carrier in repo_native_carriers:
+            if not isinstance(carrier, dict):
+                continue
+            locator = carrier.get("locator")
+            if isinstance(locator, str) and locator.strip():
+                watched_locators.add(locator.strip())
+
+    shadow_root = repo_root / ".loom/shadow"
+    if shadow_root.exists():
+        for evidence_path in shadow_root.glob("*.json"):
+            try:
+                evidence_payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            source_files = evidence_payload.get("source_files")
+            if not isinstance(source_files, list):
+                continue
+            watched_locators.update(source for source in source_files if isinstance(source, str) and source.strip())
+
+    return any(
+        path_matches_repo_locator(changed_path, locator)
+        for changed_path in changed_paths
+        for locator in watched_locators
+    )
+
+
 def validate_loom_carrier_repository(repo_root: Path, changed_paths: list[str]) -> list[str]:
-    if not any(path == ".loom" or path.startswith(".loom/") for path in changed_paths):
+    if not loom_carrier_semantic_validation_applies(repo_root, changed_paths):
         return []
 
     errors: list[str] = []

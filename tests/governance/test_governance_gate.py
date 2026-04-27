@@ -909,6 +909,26 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("缺少 evidence" in error for error in errors))
 
+    def test_loom_carrier_guard_runs_when_repo_native_carrier_drifts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            workflow_path = root / "WORKFLOW.md"
+            workflow_path.write_text("# Workflow\n\nRepo-native carrier drift.\n", encoding="utf-8")
+
+            errors = governance_gate.validate_loom_carrier_repository(root, ["WORKFLOW.md"])
+
+            self.assertTrue(any("source_sha256" in error or "hash" in error for error in errors))
+
+    def test_loom_carrier_guard_skips_unrelated_non_carrier_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+
+            errors = governance_gate.validate_loom_carrier_repository(root, ["src/app.py"])
+
+            self.assertEqual(errors, [])
+
     def test_loom_carrier_guard_rejects_shadow_parity_value_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

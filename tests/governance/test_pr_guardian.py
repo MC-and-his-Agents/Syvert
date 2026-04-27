@@ -608,7 +608,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
         self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
 
-    def test_review_artifact_errors_rejects_legacy_pr_without_section(self) -> None:
+    def test_review_artifact_errors_allows_legacy_pr_without_section(self) -> None:
         errors = review_artifact_errors(
             {
                 "createdAt": "2026-04-26T23:59:59Z",
@@ -626,7 +626,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(errors, ["PR 描述缺少 `## Review Artifacts` 段落。"])
+        self.assertEqual(errors, [])
 
     def test_review_artifact_errors_requires_section_for_new_template_marker(self) -> None:
         errors = review_artifact_errors(
