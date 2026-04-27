@@ -3,15 +3,15 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Review Artifacts are validated against the PR head worktree and stripped-template bypass is closed.",
+  "summary": "Loom closeout/reconciliation boundary refresh is carrier-aligned; local Syvert governance and Loom carrier checks are ready for final rerun.",
   "reviewer": "codex",
-  "reviewed_head": "a81a9cbe6a4f868209da69eae94b2f48d2382779",
+  "reviewed_head": "244426986e6b1d08cadb480e485160ccdf7ffb1b",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are all passing locally on the current PR head.",
   "fallback_to": null,
   "findings": [
     {
       "id": "compat-follow-up-1",
-      "summary": "Run final local gates, CI, guardian review, and controlled merge for PR #259.",
+      "summary": "Run final local gates, CI, guardian review, controlled merge, and closeout #258/#257/#256.",
       "severity": "warn",
       "rebuttal": null,
       "disposition": {
@@ -22,7 +22,7 @@
   ],
   "blocking_issues": [],
   "follow_ups": [
-    "Run final local gates, CI, guardian review, and controlled merge for PR #259."
+    "Run final local gates, CI, guardian review, controlled merge, and closeout #258/#257/#256."
   ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
