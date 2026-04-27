@@ -3982,6 +3982,19 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(all_checks_mock.call_count, 2)
         all_checks_mock.assert_called_with(1)
 
+    @patch(
+        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        return_value={
+            "source": "issue",
+            "status": "review",
+            "dependency_order": "parallel",
+            "joint_acceptance": "ready",
+            "owner_repo": "joint",
+            "contract_status": "accepted",
+            "blocked": False,
+            "error": "",
+        },
+    )
     @patch("scripts.pr_guardian.prepare_worktree", side_effect=SystemExit("worktree failed"))
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3998,6 +4011,7 @@ class MergeIfSafeTests(unittest.TestCase):
         all_checks_mock,
         run_mock,
         prepare_worktree_mock,
+        fetch_live_mock,
     ) -> None:
         body = "\n".join(
             [
@@ -4038,30 +4052,40 @@ class MergeIfSafeTests(unittest.TestCase):
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
                 "body": body,
+                "_issue_canonical_issue_number": 1,
+                "_issue_canonical_integration": parse_integration_check_payload(body),
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
                 "body": body,
+                "_issue_canonical_issue_number": 1,
+                "_issue_canonical_integration": parse_integration_check_payload(body),
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
                 "body": updated_body,
+                "_issue_canonical_issue_number": 1,
+                "_issue_canonical_integration": parse_integration_check_payload(body),
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
                 "body": updated_body,
+                "_issue_canonical_issue_number": 1,
+                "_issue_canonical_integration": parse_integration_check_payload(body),
             },
             {
                 "number": 1,
                 "isDraft": False,
                 "headRefOid": "sha-reviewed",
                 "body": updated_body,
+                "_issue_canonical_issue_number": 1,
+                "_issue_canonical_integration": parse_integration_check_payload(body),
             },
         ]
         find_result_mock.return_value = cached_guardian_result("sha-reviewed", body)
@@ -4093,6 +4117,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         prepare_worktree_mock.assert_called_once()
+        fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
