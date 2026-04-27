@@ -83,6 +83,7 @@ REVIEW_ARTIFACT_FIELDS = (
     "Review artifact",
     "Validation evidence",
 )
+DEFAULT_VALIDATION_EVIDENCE = "`python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`"
 INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
 EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
 MERGE_GATE_CHOICES = field_choices("merge_gate")
@@ -622,7 +623,7 @@ def build_review_artifact_values(args: argparse.Namespace, changed_files: list[s
             else "未定位到 governing artifact"
         ),
         "Review artifact": review_artifact,
-        "Validation evidence": "见 `## 验证`，由受控流程补充已执行验证命令或验证 artifact。",
+        "Validation evidence": DEFAULT_VALIDATION_EVIDENCE,
     }
 
 
