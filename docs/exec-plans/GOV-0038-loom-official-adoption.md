@@ -49,8 +49,6 @@
 
 ## 已验证项
 
-- `python3 .loom/bin/loom_check.py .`
-  - 结果：通过；repo-local Loom gate 覆盖 vendored runtime、runtime parity、shadow parity 与 merge checkpoint。
 - `python3 .loom/bin/loom_init.py verify --target .`
   - 结果：通过。
 - `python3 .loom/bin/loom_init.py route --target . --task 'inspect adoption carrier'`
@@ -63,6 +61,8 @@
   - 结果：`pass`。
 - `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
   - 结果：`pass`。
+- `Governance Gate` workflow 中的 Loom carrier 校验入口
+  - 结果：改为消费侧验证链 `verify -> governance-profile status -> runtime-parity validate -> shadow-parity -> shadow-parity --blocking`，不再错误调用 `python3 .loom/bin/loom_check.py .` 这一源仓自检入口。
 - `python3 .loom/bin/loom_flow.py checkpoint merge --target . --item INIT-0001`
   - 结果：`pass`；review head binding 为 `carrier-only`，spec review head binding 为 `implementation-drift-only` 且 `spec_changed_paths=[]`。
 - `python3 .loom/bin/loom_init.py bootstrap --target . --output ../loom-escape.json --verify`

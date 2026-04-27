@@ -11,6 +11,6 @@
   "source_sha256": {
     "scripts/pr_guardian.py": "d12e7a508ad91c12d91a4538529d5db12d03d74a14d8831a4b1c4a4bd92340bd",
     "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "cf7df644504fe7c2ec7e576325d598c84306116d8441ad6a36cd71cb4e12d9cf"
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "8586d996b0a326dcd580e3c909276f75772b272f14faf27f7a934b81ad2a5d3b"
   }
 }
