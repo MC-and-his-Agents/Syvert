@@ -1198,7 +1198,6 @@ def run_codex_review(worktree_dir: Path, prompt: str, result_path: Path) -> dict
                 str(worktree_dir),
                 "-s",
                 "workspace-write",
-                "--ignore-user-config",
                 "--output-schema",
                 str(SCHEMA_PATH),
                 "-o",

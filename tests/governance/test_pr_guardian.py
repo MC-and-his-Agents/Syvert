@@ -1481,7 +1481,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertTrue(result["safe_to_merge"])
         command = subprocess_run_mock.call_args.args[0]
         self.assertIn("workspace-write", command)
-        self.assertIn("--ignore-user-config", command)
+        self.assertNotIn("--ignore-user-config", command)
         env = subprocess_run_mock.call_args.kwargs["env"]
         self.assertTrue(env["TMPDIR"].endswith(".codex-tmp"))
         self.assertIsNone(subprocess_run_mock.call_args.kwargs["timeout"])
