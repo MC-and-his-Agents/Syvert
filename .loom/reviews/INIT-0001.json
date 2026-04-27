@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Syvert-owned Loom residue enforcement now validates spec review rubric, interop inventories, and current-head Review Artifacts requirements.",
+  "summary": "Syvert residue enforcement and refreshed shadow evidence are current for PR #259 final guardian pass.",
   "reviewer": "codex",
-  "reviewed_head": "11f0a18aff99af266bf1dd90a8fcbc0f9eb42b8b",
+  "reviewed_head": "08b07096d798959191d9477aabf98a8738f1e4ae",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are all passing locally on the current PR head.",
   "fallback_to": null,
   "findings": [
