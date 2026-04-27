@@ -3,15 +3,15 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Loom official adoption carrier is refreshed to upstream path-boundary hardening and remains aligned with Syvert-owned governance residue.",
+  "summary": "Syvert guardian Review Artifacts gate and Loom carrier markdown gate are hardened on the current PR head.",
   "reviewer": "codex",
-  "reviewed_head": "29b3943736fbc73f8a552eb02af1ef6bbe9464b3",
+  "reviewed_head": "ff6c84abe7c359d8c6056f88f57982064417b377",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are all passing locally on the current PR head.",
   "fallback_to": null,
   "findings": [
     {
       "id": "compat-follow-up-1",
-      "summary": "Proceed through local gates, CI, guardian, and controlled merge for PR #259.",
+      "summary": "Proceed through full local gates, CI, guardian review, and controlled merge for PR #259.",
       "severity": "warn",
       "rebuttal": null,
       "disposition": {
@@ -22,7 +22,7 @@
   ],
   "blocking_issues": [],
   "follow_ups": [
-    "Proceed through local gates, CI, guardian, and controlled merge for PR #259."
+    "Proceed through full local gates, CI, guardian review, and controlled merge for PR #259."
   ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
