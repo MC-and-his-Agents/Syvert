@@ -163,10 +163,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def markdown_fields(path: Path) -> dict[str, str]:
+def markdown_fields(path: Path, *, section_name: str | None = None) -> dict[str, str]:
     fields: dict[str, str] = {}
+    lines = path.read_text(encoding="utf-8").splitlines()
+    has_named_section = bool(
+        section_name is not None and any(line.startswith("## ") and line[3:].strip() == section_name for line in lines)
+    )
     metadata_started = False
-    for line in path.read_text(encoding="utf-8").splitlines():
+    current_section: str | None = None
+    for line in lines:
+        if line.startswith("## "):
+            current_section = line[3:].strip()
+            if metadata_started:
+                break
+            continue
+        if has_named_section and current_section != section_name:
+            continue
         if not line.startswith("- ") or ":" not in line:
             if metadata_started and line.strip():
                 break
@@ -498,7 +510,7 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
 
     if not status_path.exists():
         return errors
-    status = markdown_fields(status_path)
+    status = markdown_fields(status_path, section_name="Derived Fact Chain View")
     item_id = status.get("Item ID") or "INIT-0001"
     work_item_path = repo_root / f".loom/work-items/{item_id}.md"
     progress_path = repo_root / f".loom/progress/{item_id}.md"
@@ -526,8 +538,8 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     if errors:
         return errors
 
-    work_item = markdown_fields(work_item_path)
-    progress = markdown_fields(progress_path)
+    work_item = markdown_fields(work_item_path, section_name="Static Facts")
+    progress = markdown_fields(progress_path, section_name="Dynamic Facts")
     try:
         bootstrap_manifest = json.loads(bootstrap_manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

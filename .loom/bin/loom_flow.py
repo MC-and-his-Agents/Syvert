@@ -24,6 +24,7 @@ from fact_chain_support import (
     parse_key_value_section,
     parse_recovery_entry,
     parse_work_item,
+    resolve_target_relative_path,
 )
 from governance_surface import build_governance_surface
 from runtime_paths import shared_asset, shared_script
@@ -1162,6 +1163,11 @@ def resolve_workspace_path(target_root: Path, workspace_entry: str) -> tuple[Pat
     return resolved, errors
 
 
+def resolve_target_relative_or_errors(target_root: Path, locator: str, *, label: str) -> tuple[Path | None, list[str]]:
+    resolved, error = resolve_target_relative_path(target_root, locator, label=label)
+    return resolved, ([error] if error else [])
+
+
 def current_cwd_relative(target_root: Path) -> str | None:
     cwd = Path.cwd().resolve()
     try:
@@ -1229,7 +1235,10 @@ def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, di
 
 
 def sync_status_surface(target_root: Path, output_relative: str, runtime_evidence: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
-    output_path = target_root / output_relative
+    output_path, output_errors = resolve_target_relative_or_errors(target_root, output_relative, label="init-result path")
+    if output_errors:
+        return {}, output_errors
+    assert output_path is not None
     try:
         init_result = load_json_file(output_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -1245,9 +1254,21 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     work_item_ref = str(entry_points.get("work_item", ""))
     recovery_ref = str(entry_points.get("recovery_entry", ""))
     status_ref = str(entry_points.get("status_surface", ""))
-    work_item_path = target_root / work_item_ref
-    recovery_path = target_root / recovery_ref
-    status_path = target_root / status_ref
+    work_item_path, work_item_errors = resolve_target_relative_or_errors(
+        target_root, work_item_ref, label="fact-chain carrier `work_item`"
+    )
+    recovery_path, recovery_errors = resolve_target_relative_or_errors(
+        target_root, recovery_ref, label="fact-chain carrier `recovery_entry`"
+    )
+    status_path, status_errors = resolve_target_relative_or_errors(
+        target_root, status_ref, label="fact-chain carrier `status_surface`"
+    )
+    errors = [*work_item_errors, *recovery_errors, *status_errors]
+    if errors:
+        return {}, errors
+    assert work_item_path is not None
+    assert recovery_path is not None
+    assert status_path is not None
     if not work_item_path.exists() or not recovery_path.exists():
         return {}, ["fact-chain carrier is missing during status sync"]
     work_item, work_item_errors = parse_work_item(work_item_path, target_root)
@@ -1757,10 +1778,12 @@ def target_relative_label(target_root: Path, path: Path) -> str:
 
 
 def load_findings_file(target_root: Path, findings_file: str) -> tuple[list[dict[str, Any]] | None, list[str]]:
-    findings_path = Path(findings_file).expanduser()
-    if not findings_path.is_absolute():
-        findings_path = (target_root / findings_path).resolve()
-
+    findings_path, findings_errors = resolve_target_relative_or_errors(
+        target_root, findings_file, label="findings file"
+    )
+    if findings_errors:
+        return None, findings_errors
+    assert findings_path is not None
     label = target_relative_label(target_root, findings_path)
     try:
         payload = json.loads(findings_path.read_text(encoding="utf-8"))
@@ -1782,7 +1805,12 @@ def load_review_record(
     review_file: str | None = None,
 ) -> tuple[dict[str, Any] | None, str, list[str]]:
     relative = review_file or default_review_path(item_id)
-    review_path = target_root / relative
+    review_path, review_path_errors = resolve_target_relative_or_errors(
+        target_root, relative, label="review artifact path"
+    )
+    if review_path_errors:
+        return None, relative, review_path_errors
+    assert review_path is not None
     if not review_path.exists():
         return None, relative, []
     try:
@@ -2726,7 +2754,10 @@ def load_fact_chain_report(target_root: Path, output_relative: str) -> tuple[dic
 
 def inspect_fact_chain_legacy(target_root: Path, output_relative: str) -> tuple[dict[str, Any], list[str]]:
     errors: list[str] = []
-    output_path = target_root / output_relative
+    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
+    if output_error:
+        return {}, [output_error]
+    assert output_path is not None
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
 
@@ -6061,7 +6092,21 @@ def handle_review(args: argparse.Namespace) -> int:
             "normalized_findings": args.normalized_findings,
         },
     }
-    review_abs = target_root / review_path
+    review_abs, review_path_errors = resolve_target_relative_or_errors(
+        target_root, review_path, label="review artifact path"
+    )
+    if review_path_errors:
+        return emit(
+            {
+                "command": "review",
+                "operation": "record",
+                "result": "block",
+                "summary": "review record refused to write outside the target root.",
+                "missing_inputs": review_path_errors,
+                "fallback_to": "admission",
+            }
+        )
+    assert review_abs is not None
     review_abs.parent.mkdir(parents=True, exist_ok=True)
     write_json_file(review_abs, review_payload)
 
@@ -6194,7 +6239,10 @@ def update_active_entry_points(
     recovery_entry: str,
     status_surface: str,
 ) -> None:
-    output_path = target_root / output_relative
+    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
+    if output_error:
+        raise RuntimeError(output_error)
+    assert output_path is not None
     payload = load_json_file(output_path)
     fact_chain = payload.get("fact_chain")
     if not isinstance(fact_chain, dict):
@@ -6202,6 +6250,14 @@ def update_active_entry_points(
     entry_points = fact_chain.get("entry_points")
     if not isinstance(entry_points, dict):
         raise RuntimeError("init-result.fact_chain is missing `entry_points`")
+    for label, locator in (
+        ("work_item", work_item),
+        ("recovery_entry", recovery_entry),
+        ("status_surface", status_surface),
+    ):
+        _, path_error = resolve_target_relative_path(target_root, locator, label=f"fact-chain carrier `{label}`")
+        if path_error:
+            raise RuntimeError(path_error)
     entry_points["current_item_id"] = item_id
     entry_points["work_item"] = work_item
     entry_points["recovery_entry"] = recovery_entry
@@ -6211,7 +6267,19 @@ def update_active_entry_points(
 
 def handle_work_item(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    output_path = target_root / args.output
+    output_path, output_errors = resolve_target_relative_or_errors(target_root, args.output, label="init-result path")
+    if output_errors:
+        return emit(
+            {
+                "command": "work-item",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "work-item command refused an init-result path outside the target root.",
+                "missing_inputs": output_errors,
+                "fallback_to": "admission",
+            }
+        )
+    assert output_path is not None
     if not output_path.exists():
         return emit(
             {
@@ -6225,11 +6293,37 @@ def handle_work_item(args: argparse.Namespace) -> int:
         )
 
     work_item_relative = f".loom/work-items/{args.item}.md"
-    work_item_path = target_root / work_item_relative
     recovery_relative = args.recovery_entry or f".loom/progress/{args.item}.md"
-    recovery_path = target_root / recovery_relative
     review_relative = default_review_path(args.item)
     status_relative = ".loom/status/current.md"
+    work_item_path, work_item_path_errors = resolve_target_relative_or_errors(
+        target_root, work_item_relative, label="work item path"
+    )
+    recovery_path, recovery_path_errors = resolve_target_relative_or_errors(
+        target_root, recovery_relative, label="recovery entry path"
+    )
+    review_path, review_path_errors = resolve_target_relative_or_errors(
+        target_root, review_relative, label="review artifact path"
+    )
+    status_path, status_path_errors = resolve_target_relative_or_errors(
+        target_root, status_relative, label="status surface path"
+    )
+    path_errors = [*work_item_path_errors, *recovery_path_errors, *review_path_errors, *status_path_errors]
+    if path_errors:
+        return emit(
+            {
+                "command": "work-item",
+                "operation": args.operation,
+                "result": "block",
+                "summary": "work-item command refused a carrier path outside the target root.",
+                "missing_inputs": path_errors,
+                "fallback_to": "admission",
+            }
+        )
+    assert work_item_path is not None
+    assert recovery_path is not None
+    assert review_path is not None
+    assert status_path is not None
     runtime_evidence: dict[str, dict[str, Any]] | None = None
 
     if args.operation == "create":
@@ -6288,7 +6382,6 @@ def handle_work_item(args: argparse.Namespace) -> int:
         }
         work_item_path.parent.mkdir(parents=True, exist_ok=True)
         work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
-        review_path = target_root / review_relative
         review_path.parent.mkdir(parents=True, exist_ok=True)
         review_path.write_text(
             json.dumps(

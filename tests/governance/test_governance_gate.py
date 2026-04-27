@@ -768,6 +768,43 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("Loom status 与 work item 的 `Goal` 不一致" in error for error in errors))
 
+    def test_loom_carrier_guard_uses_canonical_metadata_section_over_preamble_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            status_path = root / ".loom/status/current.md"
+            status_path.write_text(
+                "\n".join(
+                    [
+                        "# Current Status",
+                        "",
+                        "## Notes",
+                        "",
+                        "- Goal: Adopt Loom",
+                        "",
+                        "## Derived Fact Chain View",
+                        "",
+                        "- Item ID: INIT-0001",
+                        "- Goal: Spoofed Goal",
+                        "- Scope: Validate carrier",
+                        "- Execution Path: governance/loom",
+                        "- Workspace Entry: .",
+                        "- Recovery Entry: .loom/progress/INIT-0001.md",
+                        "- Review Entry: .loom/reviews/INIT-0001.json",
+                        "- Validation Entry: python3 .loom/bin/loom_init.py verify --target .",
+                        "- Closing Condition: carrier is valid",
+                        "- Current Checkpoint: merge checkpoint",
+                        "- Latest Validation Summary: carrier validation passed",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Loom status 与 work item 的 `Goal` 不一致" in error for error in errors))
+
     def test_loom_carrier_guard_rejects_missing_shadow_surface_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

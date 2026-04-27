@@ -312,6 +312,127 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             self.assertEqual(exit_code, 2)
             self.assertFalse(outside_path.exists())
 
+    def test_fact_chain_rejects_entry_point_path_escape(self) -> None:
+        fact_chain_support = load_loom_module("fact_chain_support")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            (root / ".loom/bootstrap").mkdir(parents=True)
+            (root / ".loom/bootstrap/init-result.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "loom-init-output/v1",
+                        "fact_chain": {
+                            "read_entry": "python3 .loom/bin/loom_init.py fact-chain --target .",
+                            "mode": "work-item + recovery-entry + derived status-surface",
+                            "entry_points": {
+                                "current_item_id": "INIT-0001",
+                                "work_item": "../outside.md",
+                                "recovery_entry": ".loom/progress/INIT-0001.md",
+                                "status_surface": ".loom/status/current.md",
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            _, errors = fact_chain_support.inspect_fact_chain(root)
+
+        self.assertTrue(any("must stay within the target root" in error for error in errors))
+
+    def test_work_item_create_rejects_recovery_entry_escape(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            (root / ".loom/bootstrap").mkdir(parents=True)
+            (root / ".loom/bootstrap/init-result.json").write_text("{}", encoding="utf-8")
+            outside = root.parent / "outside.md"
+
+            exit_code = loom_flow.handle_work_item(
+                loom_flow.parse_args(
+                    [
+                        "work-item",
+                        "create",
+                        "--target",
+                        str(root),
+                        "--item",
+                        "INIT-0002",
+                        "--goal",
+                        "Goal",
+                        "--scope",
+                        "Scope",
+                        "--execution-path",
+                        "governance/test",
+                        "--workspace-entry",
+                        ".",
+                        "--recovery-entry",
+                        "../outside.md",
+                        "--validation-entry",
+                        "python3 .loom/bin/loom_init.py verify --target .",
+                        "--closing-condition",
+                        "Done",
+                    ]
+                )
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(outside.exists())
+
+    def test_review_record_rejects_review_file_escape(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "repo"
+            root.mkdir()
+            captured: dict[str, object] = {}
+            args = loom_flow.parse_args(
+                [
+                    "review",
+                    "record",
+                    "--target",
+                    str(root),
+                    "--item",
+                    "INIT-0001",
+                    "--review-file",
+                    "../outside.json",
+                    "--decision",
+                    "allow",
+                    "--kind",
+                    "general_review",
+                    "--summary",
+                    "ok",
+                    "--reviewer",
+                    "codex",
+                ]
+            )
+            context = {
+                "item_id": "INIT-0001",
+                "review_entry": ".loom/reviews/INIT-0001.json",
+                "latest_validation_summary": "ok",
+                "report": {
+                    "fact_chain": {
+                        "entry_points": {
+                            "work_item": ".loom/work-items/INIT-0001.md",
+                            "recovery_entry": ".loom/progress/INIT-0001.md",
+                            "status_surface": ".loom/status/current.md",
+                        }
+                    }
+                },
+            }
+
+            def capture(payload):
+                captured.update(payload)
+                return 1
+
+            with patch.object(loom_flow, "load_context", return_value=(context, [])):
+                with patch.object(loom_flow, "checkpoint_payload", return_value={"result": "pass", "missing_inputs": [], "fallback_to": None, "summary": "ok"}):
+                    with patch.object(loom_flow, "spec_review_gate_payload", return_value={"result": "pass", "missing_inputs": [], "fallback_to": None}):
+                        with patch.object(loom_flow, "emit", side_effect=capture):
+                            exit_code = loom_flow.handle_review(args)
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(captured.get("result"), "block")
+            self.assertIn("review artifact path", " ".join(captured.get("missing_inputs", [])))
+
     def test_governance_surface_rejects_companion_locator_escape(self) -> None:
         governance_surface = load_loom_module("governance_surface")
         with tempfile.TemporaryDirectory() as temp_dir:

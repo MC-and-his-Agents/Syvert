@@ -98,6 +98,21 @@ def load_json_file(path: Path) -> dict[str, object]:
     return payload
 
 
+def resolve_target_relative_path(target_root: Path, locator: str, *, label: str) -> tuple[Path | None, str | None]:
+    raw = str(locator or "").strip()
+    if not raw:
+        return None, f"{label} must be a non-empty path relative to the target root"
+    candidate = Path(raw)
+    if candidate.is_absolute():
+        return None, f"{label} must be relative to the target root: {raw}"
+    resolved = (target_root / candidate).resolve()
+    try:
+        resolved.relative_to(target_root.resolve())
+    except ValueError:
+        return None, f"{label} must stay within the target root: {raw}"
+    return resolved, None
+
+
 def _clean_value(raw: str) -> str:
     value = raw.strip()
     if value.startswith("`") and value.endswith("`") and len(value) >= 2:
@@ -301,7 +316,10 @@ def inspect_fact_chain(
     output_relative: str = ".loom/bootstrap/init-result.json",
 ) -> tuple[dict[str, object], list[str]]:
     errors: list[str] = []
-    output_path = target_root / output_relative
+    output_path, output_error = resolve_target_relative_path(target_root, output_relative, label="init-result path")
+    if output_error:
+        return {}, [output_error]
+    assert output_path is not None
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
 
@@ -346,19 +364,30 @@ def inspect_fact_chain(
     if errors:
         return {}, errors
 
-    work_item_path = target_root / str(work_item_ref)
-    recovery_path = target_root / str(recovery_ref)
-    status_path = target_root / str(status_ref)
-    for label, path in (
-        ("work_item", work_item_path),
-        ("recovery_entry", recovery_path),
-        ("status_surface", status_path),
+    resolved_paths: dict[str, Path] = {}
+    for label, locator in (
+        ("work_item", str(work_item_ref)),
+        ("recovery_entry", str(recovery_ref)),
+        ("status_surface", str(status_ref)),
     ):
+        path, path_error = resolve_target_relative_path(target_root, locator, label=f"fact-chain carrier `{label}`")
+        if path_error:
+            errors.append(path_error)
+            continue
+        assert path is not None
+        resolved_paths[label] = path
+    if errors:
+        return {}, errors
+
+    for label, path in resolved_paths.items():
         if not path.exists():
             errors.append(f"declared fact-chain carrier is missing on disk: {label} -> {_relative(path, target_root)}")
     if errors:
         return {}, errors
 
+    work_item_path = resolved_paths["work_item"]
+    recovery_path = resolved_paths["recovery_entry"]
+    status_path = resolved_paths["status_surface"]
     work_item, work_item_errors = parse_work_item(work_item_path, target_root)
     recovery_entry, recovery_errors = parse_recovery_entry(recovery_path, target_root)
     status_surface, runtime_evidence, status_sources, status_errors = parse_status_surface(status_path, target_root)
