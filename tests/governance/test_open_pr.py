@@ -21,6 +21,7 @@ from scripts.open_pr import (
     validate_integration_args,
     validate_pr_preflight,
 )
+from scripts.pr_guardian import review_artifact_errors
 
 
 def write_exec_plan(
@@ -1179,6 +1180,66 @@ class OpenPrPreflightTests(unittest.TestCase):
             }
 
             self.assertEqual(governing_artifact_label(exec_plan, repo_root=repo), "")
+
+    def test_governing_artifact_label_uses_unbound_fr_local_spec_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            exec_plan = {
+                "item_key": "FR-0001-governance-stack-v1",
+                "item_type": "FR",
+                "exec_plan": "docs/exec-plans/FR-0001-governance-stack-v1.md",
+            }
+
+            self.assertEqual(
+                governing_artifact_label(exec_plan, repo_root=repo),
+                "docs/specs/FR-0001-governance-stack-v1",
+            )
+
+    @patch("scripts.open_pr.fetch_issue_body", return_value="")
+    @patch("scripts.open_pr.git_current_branch", return_value="feature/unbound-fr-spec")
+    def test_build_body_review_artifacts_pass_guardian_for_unbound_fr_local_spec(self, _branch_mock, _issue_mock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            (repo / "code_review.md").write_text("review", encoding="utf-8")
+            (repo / "spec_review.md").write_text("spec review", encoding="utf-8")
+            args = parse_args(
+                [
+                    "--class",
+                    "spec",
+                    "--issue",
+                    "1",
+                    "--item-key",
+                    "FR-0001-governance-stack-v1",
+                    "--item-type",
+                    "FR",
+                    "--release",
+                    "v0.1.0",
+                    "--sprint",
+                    "2026-S14",
+                ]
+            )
+            changed_files = ["docs/specs/FR-0001-governance-stack-v1/spec.md"]
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                body = build_body(args, changed_files)
+
+            self.assertIn("- Governing spec / bootstrap contract: `docs/specs/FR-0001-governance-stack-v1`", body)
+            self.assertEqual(review_artifact_errors({"body": body}, repo_root=repo), [])
 
     def test_build_body_uses_spec_review_artifact_for_spec_scope_changes(self) -> None:
         args = parse_args(["--class", "governance"])

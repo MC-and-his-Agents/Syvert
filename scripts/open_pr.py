@@ -600,12 +600,24 @@ def governing_artifact_label(exec_plan: dict[str, str], *, repo_root: Path) -> s
         if decision_path:
             return decision_path
         return ""
+    if input_mode == INPUT_MODE_UNBOUND and exec_plan.get("item_type") == "FR":
+        item_key = str(exec_plan.get("item_key") or "").strip()
+        expected_dir = repo_root / "docs" / "specs" / item_key
+        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
+            return expected_dir.relative_to(repo_root).as_posix()
     return ""
 
 
 def build_review_artifact_values(args: argparse.Namespace, changed_files: list[str], *, repo_root: Path) -> dict[str, str]:
     exec_plan = load_item_context_from_exec_plan(repo_root, args.item_key or "") if args.item_key else {}
     exec_plan_path = str(exec_plan.get("exec_plan", "")).strip()
+    if exec_plan_path:
+        exec_plan_locator = Path(exec_plan_path)
+        if exec_plan_locator.is_absolute():
+            try:
+                exec_plan_path = exec_plan_locator.resolve().relative_to(repo_root.resolve()).as_posix()
+            except ValueError:
+                pass
     governing_artifact = governing_artifact_label(exec_plan, repo_root=repo_root) if exec_plan else ""
     categories = {item.category for item in classify_paths(changed_files)}
     review_artifacts: list[str] = []
