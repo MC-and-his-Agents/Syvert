@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Review Artifacts now align open_pr, guardian preflight, item-context binding, and carrier-only Loom evidence semantics.",
+  "summary": "Review Artifacts flow is self-consistent and guardian prompt now treats Loom review artifact commits as carrier-only head drift.",
   "reviewer": "codex",
-  "reviewed_head": "65c7a4baee08bcbd64f6862901e79de1b014a3ca",
+  "reviewed_head": "a43c62e79d2121763b9d568198db054188a062bb",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
