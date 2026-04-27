@@ -26,7 +26,7 @@ from fact_chain_support import (
     parse_work_item,
 )
 from governance_surface import build_governance_surface
-from runtime_paths import bootstrap_runtime_root, shared_asset, shared_script
+from runtime_paths import shared_asset, shared_script
 from runtime_state import detect_runtime_state
 
 PR_TEMPLATE_SECTIONS = (
@@ -373,19 +373,11 @@ def runtime_state_block_payload(
 
 def repo_specific_default_fallback(surface: str) -> str:
     return {
-        "admission": "admission",
         "spec_review": "build",
         "review": "build",
         "merge_ready": "merge",
         "closeout": "merge",
     }[surface]
-
-
-def target_runtime_entry(target_root: Path) -> tuple[str, str]:
-    """Return a copyable Loom flow entrypoint for the target repository."""
-    if (target_root / ".loom/bin/loom_flow.py").exists():
-        return ".loom/bin/loom_flow.py", "."
-    return "tools/loom_flow.py", str(target_root)
 
 
 def repo_specific_requirements_payload(
@@ -548,51 +540,102 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validate_shadow_source_hashes(payload: dict[str, Any], *, target_root: Path, evidence_path: Path) -> list[str]:
-    source_files = payload.get("source_files")
-    source_hashes = payload.get("source_sha256")
-    if not isinstance(source_files, list) or not source_files or not all(isinstance(entry, str) and entry for entry in source_files):
-        return [f"shadow parity evidence `{evidence_path}` has invalid source_files"]
-    if not isinstance(source_hashes, dict) or not source_hashes:
-        return [f"shadow parity evidence `{evidence_path}` has invalid source_sha256"]
-    source_file_set = set(source_files)
-    source_hash_set = set(source_hashes)
-    if source_file_set != source_hash_set:
-        return [f"shadow parity evidence `{evidence_path}` source_files must exactly match source_sha256 keys"]
+def repo_relative_path(target_root: Path, relative: str) -> Path | None:
+    candidate = (target_root / relative).resolve()
+    try:
+        candidate.relative_to(target_root.resolve())
+    except ValueError:
+        return None
+    return candidate
 
+
+def validate_shadow_sources(payload: dict[str, Any], *, path: Path, target_root: Path) -> tuple[dict[str, Any], list[str]]:
+    source_files = payload.get("source_files")
+    source_sha256 = payload.get("source_sha256")
     errors: list[str] = []
-    root = target_root.resolve()
-    for relative_path in source_files:
-        expected_hash = source_hashes.get(relative_path)
-        if not isinstance(relative_path, str) or not isinstance(expected_hash, str) or not expected_hash.strip():
-            errors.append(f"shadow parity evidence `{evidence_path}` has invalid source hash entry")
+    if not isinstance(source_files, list) or not source_files:
+        errors.append(f"shadow evidence `{path}` must declare non-empty `source_files`")
+        source_files = []
+    if not isinstance(source_sha256, dict) or not source_sha256:
+        errors.append(f"shadow evidence `{path}` must declare non-empty `source_sha256`")
+        source_sha256 = {}
+
+    normalized_sources: list[str] = []
+    for index, source in enumerate(source_files, start=1):
+        if not isinstance(source, str) or not source.strip():
+            errors.append(f"shadow evidence `{path}` source_files[{index}] must be a non-empty relative path")
             continue
-        source_path = (root / relative_path).resolve()
-        try:
-            source_path.relative_to(root)
-        except ValueError:
-            errors.append(f"shadow parity evidence `{evidence_path}` references source outside repo: {relative_path}")
+        source = source.strip()
+        if Path(source).is_absolute() or ".." in Path(source).parts:
+            errors.append(f"shadow evidence `{path}` source `{source}` must stay inside the repository")
             continue
-        if not source_path.is_file():
-            errors.append(f"shadow parity evidence `{evidence_path}` references missing source: {relative_path}")
+        source_path = repo_relative_path(target_root, source)
+        if source_path is None:
+            errors.append(f"shadow evidence `{path}` source `{source}` must stay inside the repository")
             continue
-        actual_hash = sha256_file(source_path)
-        if actual_hash != expected_hash:
-            errors.append(
-                f"shadow parity evidence `{evidence_path}` source hash drift: {relative_path}"
-            )
+        if not source_path.exists() or source_path.is_dir():
+            errors.append(f"shadow evidence `{path}` source `{source}` must be an existing file")
+            continue
+        normalized_sources.append(source)
+
+    source_keys = set(normalized_sources)
+    hash_keys = {key for key in source_sha256.keys() if isinstance(key, str)}
+    if source_keys != hash_keys:
+        errors.append(f"shadow evidence `{path}` source_files and source_sha256 keys must match exactly")
+    for source in sorted(source_keys & hash_keys):
+        expected = source_sha256.get(source)
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+            errors.append(f"shadow evidence `{path}` source `{source}` must declare a 64-character sha256")
+            continue
+        actual = sha256_file(target_root / source)
+        if actual.lower() != expected.lower():
+            errors.append(f"shadow evidence `{path}` source `{source}` sha256 drifted")
+
+    return {
+        "source_files": normalized_sources,
+        "source_sha256": {source: source_sha256.get(source) for source in normalized_sources if isinstance(source_sha256.get(source), str)},
+    }, errors
+
+
+def declared_shadow_locators(interop_payload: dict[str, Any]) -> set[str]:
+    shadow_surfaces = interop_payload.get("shadow_surfaces")
+    declared: set[str] = set()
+    if not isinstance(shadow_surfaces, dict):
+        return declared
+    for entry in shadow_surfaces.values():
+        if not isinstance(entry, dict):
+            continue
+        for key in ("loom_locator", "repo_locator"):
+            value = entry.get(key)
+            if isinstance(value, str) and value.strip():
+                declared.add(value.strip())
+    return declared
+
+
+def undeclared_shadow_evidence_errors(target_root: Path, interop_payload: dict[str, Any]) -> list[str]:
+    shadow_root = target_root / ".loom/shadow"
+    if not shadow_root.exists():
+        return []
+    declared = declared_shadow_locators(interop_payload)
+    errors: list[str] = []
+    for path in sorted(shadow_root.glob("*.json")):
+        relative = path.relative_to(target_root).as_posix()
+        if relative == ".loom/shadow/shadow-parity.json":
+            continue
+        if relative not in declared:
+            errors.append(f"shadow evidence `{relative}` is not declared in repo interop shadow_surfaces")
     return errors
 
 
-def normalized_shadow_value(path: Path, *, target_root: Path | None = None) -> tuple[str | None, str | None]:
+def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str, Any], str | None]:
     try:
         if path.is_dir():
-            return None, f"shadow parity locator points to a directory: {path}"
+            return {"normalized_value": None}, f"shadow parity locator points to a directory: {path}"
         raw_text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        return None, f"cannot read shadow parity locator `{path}`: {exc.strerror or exc}"
+        return {"normalized_value": None}, f"cannot read shadow parity locator `{path}`: {exc.strerror or exc}"
     if not raw_text.strip():
-        return None, f"shadow parity locator is empty: {path}"
+        return {"normalized_value": None}, f"shadow parity locator is empty: {path}"
 
     try:
         payload = json.loads(raw_text)
@@ -600,25 +643,22 @@ def normalized_shadow_value(path: Path, *, target_root: Path | None = None) -> t
         payload = None
 
     if isinstance(payload, dict):
-        root = target_root or path.resolve().parents[2]
-        source_errors = validate_shadow_source_hashes(payload, target_root=root, evidence_path=path)
-        if source_errors:
-            return None, "; ".join(source_errors)
+        source_evidence, source_errors = validate_shadow_sources(payload, path=path, target_root=target_root)
         for key in ("parity_value", "result", "decision", "status", "verdict", "value"):
             value = payload.get(key)
             if isinstance(value, (str, int, float, bool)) and str(value).strip():
-                return str(value).strip().lower(), None
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True), None
+                return {**source_evidence, "normalized_value": str(value).strip().lower()}, "; ".join(source_errors) if source_errors else None
+        return {**source_evidence, "normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, "; ".join(source_errors) if source_errors else None
     if isinstance(payload, list):
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True), None
+        return {"normalized_value": json.dumps(payload, ensure_ascii=False, sort_keys=True)}, f"shadow evidence `{path}` must be a JSON object with source_files/source_sha256"
     if isinstance(payload, (str, int, float, bool)) and str(payload).strip():
-        return str(payload).strip().lower(), None
+        return {"normalized_value": str(payload).strip().lower()}, f"shadow evidence `{path}` must be a JSON object with source_files/source_sha256"
 
     for line in raw_text.splitlines():
         stripped = line.strip()
         if stripped and not stripped.startswith("#"):
-            return stripped.lower(), None
-    return None, f"shadow parity locator does not expose a comparable value: {path}"
+            return {"normalized_value": stripped.lower()}, f"shadow evidence `{path}` must be a JSON object with source_files/source_sha256"
+    return {"normalized_value": None}, f"shadow parity locator does not expose a comparable value: {path}"
 
 
 def shadow_parity_report(
@@ -689,27 +729,42 @@ def shadow_parity_report(
     loom_path = target_root / str(loom_locator)
     repo_path = target_root / str(repo_locator)
 
-    loom_value, loom_error = normalized_shadow_value(loom_path, target_root=target_root)
-    repo_value, repo_error = normalized_shadow_value(repo_path, target_root=target_root)
+    loom_surface = {
+        "status": "missing",
+        "locator": str(loom_locator),
+        "normalized_value": None,
+    }
+    repo_surface = {
+        "status": "missing",
+        "locator": str(repo_locator),
+        "normalized_value": None,
+    }
+
+    global_errors = undeclared_shadow_evidence_errors(target_root, interop_payload)
+    loom_evidence, loom_error = normalized_shadow_value(loom_path, target_root=target_root)
+    repo_evidence, repo_error = normalized_shadow_value(repo_path, target_root=target_root)
+    loom_value = loom_evidence.get("normalized_value")
+    repo_value = repo_evidence.get("normalized_value")
 
     missing_inputs: list[str] = []
+    missing_inputs.extend(global_errors)
     if loom_error:
         missing_inputs.append(loom_error)
     if repo_error:
         missing_inputs.append(repo_error)
 
     loom_surface = {
+        **loom_evidence,
         "status": "readable" if loom_error is None else "missing",
         "locator": str(loom_locator),
-        "normalized_value": loom_value,
     }
     repo_surface = {
+        **repo_evidence,
         "status": "readable" if repo_error is None else "missing",
         "locator": str(repo_locator),
-        "normalized_value": repo_value,
     }
 
-    if loom_error or repo_error or loom_value is None or repo_value is None:
+    if global_errors or loom_error or repo_error or loom_value is None or repo_value is None:
         return {
             **empty_report,
             "summary": "shadow parity is unreadable because one or both declared surfaces cannot be normalized.",
@@ -863,43 +918,6 @@ def read_text_file(path_str: str) -> tuple[str | None, list[str]]:
 def write_json_file(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-def atomic_write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_name(f".{path.name}.tmp-{os.getpid()}")
-    try:
-        temp_path.write_text(text, encoding="utf-8")
-        os.replace(temp_path, path)
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
-
-
-def atomic_write_json(path: Path, payload: Any) -> None:
-    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-
-
-def resolve_target_relative_path(target_root: Path, value: str, label: str) -> tuple[Path | None, str | None, list[str]]:
-    if not isinstance(value, str) or not value.strip():
-        return None, None, [f"{label} must be a non-empty path relative to target root"]
-    raw = Path(value)
-    if raw.is_absolute():
-        return None, None, [f"{label} must be relative to target root: {value}"]
-    resolved = (target_root / raw).resolve()
-    try:
-        relative = resolved.relative_to(target_root.resolve())
-    except ValueError:
-        return None, None, [f"{label} escapes target root: {value}"]
-    return resolved, str(relative), []
-
-
-def validate_work_item_id(value: str) -> list[str]:
-    if not isinstance(value, str) or not value.strip():
-        return ["work item id must be a non-empty string"]
-    if value in {".", ".."} or ".." in value or "/" in value or "\\" in value:
-        return [f"work item id must not contain path traversal or separators: {value}"]
-    return []
 
 
 def cleanup_scratch_tree(target_root: Path, scratch_dir: Path) -> None:
@@ -1090,16 +1108,13 @@ def current_cwd_relative(target_root: Path) -> str | None:
 
 
 def update_markdown_bullet(path: Path, label: str, value: str) -> None:
-    atomic_write_text(path, update_markdown_bullet_text(path.read_text(encoding="utf-8"), label, value, str(path)))
-
-
-def update_markdown_bullet_text(text: str, label: str, value: str, path_label: str) -> str:
     pattern = re.compile(rf"(?m)^- {re.escape(label)}:\s*.*$")
     replacement = f"- {label}: {value}"
+    text = path.read_text(encoding="utf-8")
     updated, count = pattern.subn(replacement, text, count=1)
     if count != 1:
-        raise RuntimeError(f"unable to update `{label}` in {path_label}")
-    return updated
+        raise RuntimeError(f"unable to update `{label}` in {path}")
+    path.write_text(updated, encoding="utf-8")
 
 
 def replace_markdown_section(path: Path, section_name: str, new_lines: list[str]) -> None:
@@ -1117,7 +1132,6 @@ def replace_markdown_section(path: Path, section_name: str, new_lines: list[str]
 def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, dict[str, Any]]) -> str:
     facts = report["facts"]
     status_path = report["fact_chain"]["entry_points"]["status_surface"]
-    init_result = report["fact_chain"].get("init_result", ".loom/bootstrap/init-result.json")
     return (
         "# Current Status\n\n"
         "## Derived Fact Chain View\n\n"
@@ -1146,15 +1160,13 @@ def render_status_surface(report: dict[str, Any], runtime_evidence: dict[str, di
         "## Sources\n\n"
         f"- Static Truth: {report['fact_chain']['entry_points']['work_item']}\n"
         f"- Dynamic Truth: {report['fact_chain']['entry_points']['recovery_entry']}\n"
-        f"- Locator Truth: {init_result}\n"
+        "- Locator Truth: .loom/bootstrap/init-result.json\n"
         f"- Fact Chain CLI: {report['fact_chain']['read_entry']}\n"
     )
 
 
 def sync_status_surface(target_root: Path, output_relative: str, runtime_evidence: dict[str, dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
-    output_path, normalized_output, path_errors = resolve_target_relative_path(target_root, output_relative, "init-result")
-    if path_errors or output_path is None or normalized_output is None:
-        return {}, path_errors
+    output_path = target_root / output_relative
     try:
         init_result = load_json_file(output_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -1170,12 +1182,9 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     work_item_ref = str(entry_points.get("work_item", ""))
     recovery_ref = str(entry_points.get("recovery_entry", ""))
     status_ref = str(entry_points.get("status_surface", ""))
-    work_item_path, _, work_item_path_errors = resolve_target_relative_path(target_root, work_item_ref, "work item")
-    recovery_path, _, recovery_path_errors = resolve_target_relative_path(target_root, recovery_ref, "recovery entry")
-    status_path, normalized_status, status_path_errors = resolve_target_relative_path(target_root, status_ref, "status surface")
-    path_errors = [*work_item_path_errors, *recovery_path_errors, *status_path_errors]
-    if path_errors or work_item_path is None or recovery_path is None or status_path is None or normalized_status is None:
-        return {}, path_errors
+    work_item_path = target_root / work_item_ref
+    recovery_path = target_root / recovery_ref
+    status_path = target_root / status_ref
     if not work_item_path.exists() or not recovery_path.exists():
         return {}, ["fact-chain carrier is missing during status sync"]
     work_item, work_item_errors = parse_work_item(work_item_path, target_root)
@@ -1184,12 +1193,11 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
     if errors:
         return {}, errors
     pseudo_report = {
-            "fact_chain": {
-                "read_entry": str(fact_chain.get("read_entry", "python3 .loom/bin/loom_init.py fact-chain --target .")),
-                "init_result": normalized_output,
-                "entry_points": {
-                    "work_item": work_item_ref,
-                    "recovery_entry": recovery_ref,
+        "fact_chain": {
+            "read_entry": str(fact_chain.get("read_entry", "python3 .loom/bin/loom_init.py fact-chain --target .")),
+            "entry_points": {
+                "work_item": work_item_ref,
+                "recovery_entry": recovery_ref,
                 "status_surface": status_ref,
             },
         },
@@ -1212,15 +1220,9 @@ def sync_status_surface(target_root: Path, output_relative: str, runtime_evidenc
             "current_lane": {"value": recovery_entry["current_lane"]},
         },
     }
-    status_text = render_status_surface(pseudo_report, runtime_evidence)
-    original_status_text = status_path.read_text(encoding="utf-8") if status_path.exists() else None
-    atomic_write_text(status_path, status_text)
-    refreshed, refresh_errors = load_fact_chain_report(target_root, normalized_output)
+    status_path.write_text(render_status_surface(pseudo_report, runtime_evidence), encoding="utf-8")
+    refreshed, refresh_errors = load_fact_chain_report(target_root, output_relative)
     if refresh_errors:
-        if original_status_text is None:
-            status_path.unlink(missing_ok=True)
-        else:
-            atomic_write_text(status_path, original_status_text)
         return {}, refresh_errors
     return refreshed, []
 
@@ -1273,16 +1275,42 @@ def formal_spec_path(context: dict[str, Any]) -> str | None:
     preferred = f".loom/specs/{context['item_id']}/spec.md"
     if (context["target_root"] / preferred).exists():
         return preferred
+
+    for artifact in context.get("associated_artifacts", []):
+        if (
+            isinstance(artifact, str)
+            and artifact == preferred
+            and (context["target_root"] / artifact).exists()
+        ):
+            return artifact
+
+    fallback = context["target_root"] / ".loom/specs/INIT-0001/spec.md"
+    if context["item_id"] == "INIT-0001" and fallback.exists():
+        return ".loom/specs/INIT-0001/spec.md"
     return None
 
 
 def spec_suite_paths(context: dict[str, Any]) -> dict[str, str]:
     item_id = context["item_id"]
-    return {
-        "spec": f".loom/specs/{item_id}/spec.md",
-        "plan": f".loom/specs/{item_id}/plan.md",
-        "implementation_contract": f".loom/specs/{item_id}/implementation-contract.md",
-    }
+    candidates = [
+        {
+            "spec": f".loom/specs/{item_id}/spec.md",
+            "plan": f".loom/specs/{item_id}/plan.md",
+            "implementation_contract": f".loom/specs/{item_id}/implementation-contract.md",
+        },
+    ]
+    if item_id == "INIT-0001":
+        candidates.append(
+            {
+                "spec": ".loom/specs/INIT-0001/spec.md",
+                "plan": ".loom/specs/INIT-0001/plan.md",
+                "implementation_contract": ".loom/specs/INIT-0001/implementation-contract.md",
+            }
+        )
+    for suite in candidates:
+        if (context["target_root"] / suite["spec"]).exists():
+            return suite
+    return candidates[0]
 
 
 def review_head_binding(
@@ -1305,7 +1333,7 @@ def review_head_binding(
     if not isinstance(current_head, str) or not current_head.strip():
         return payload, ["current HEAD is unavailable"]
     if reviewed_head == current_head:
-        payload["status"] = "current"
+        payload["status"] = "fresh"
         payload["stale"] = False
         return payload, []
 
@@ -1320,6 +1348,11 @@ def review_head_binding(
         payload["status"] = "carrier-only"
         payload["stale"] = False
         return payload, []
+
+    if disallowed_paths and len(disallowed_paths) == len(changed_paths):
+        payload["status"] = "implementation-drift-only"
+        payload["stale"] = True
+        return payload, ["review artifact has implementation drift after review"]
 
     payload["status"] = "stale"
     payload["stale"] = True
@@ -1348,7 +1381,7 @@ def spec_review_head_binding(
     if not isinstance(current_head, str) or not current_head.strip():
         return payload, ["current HEAD is unavailable"]
     if reviewed_head == current_head:
-        payload["status"] = "current"
+        payload["status"] = "fresh"
         payload["stale"] = False
         return payload, []
 
@@ -1661,9 +1694,11 @@ def target_relative_label(target_root: Path, path: Path) -> str:
 
 
 def load_findings_file(target_root: Path, findings_file: str) -> tuple[list[dict[str, Any]] | None, list[str]]:
-    findings_path, label, path_errors = resolve_target_relative_path(target_root, findings_file, "findings file")
-    if path_errors or findings_path is None or label is None:
-        return None, path_errors
+    findings_path = Path(findings_file).expanduser()
+    if not findings_path.is_absolute():
+        findings_path = (target_root / findings_path).resolve()
+
+    label = target_relative_label(target_root, findings_path)
     try:
         payload = json.loads(findings_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1684,10 +1719,7 @@ def load_review_record(
     review_file: str | None = None,
 ) -> tuple[dict[str, Any] | None, str, list[str]]:
     relative = review_file or default_review_path(item_id)
-    review_path, normalized_relative, path_errors = resolve_target_relative_path(target_root, relative, "review artifact")
-    if path_errors or review_path is None or normalized_relative is None:
-        return None, str(relative), path_errors
-    relative = normalized_relative
+    review_path = target_root / relative
     if not review_path.exists():
         return None, relative, []
     try:
@@ -2012,23 +2044,6 @@ def run_default_review_engine(
     findings_path = runtime_root / "normalized-findings.json"
     metadata_path = runtime_root / "engine-metadata.json"
     scratch_dir = context["target_root"] / ".loom/runtime/tmp" / "review-engine" / context["item_id"]
-    try:
-        schema_path = review_engine_schema_path()
-    except RuntimeError as exc:
-        return {
-            "result": "block",
-            "summary": "default review engine cannot run because the vendored runtime is missing installed review assets.",
-            "missing_inputs": [f"review engine schema: {exc}"],
-            "fallback_to": "build",
-            "engine": {
-                "engine": DEFAULT_REVIEW_ENGINE,
-                "adapter": DEFAULT_REVIEW_ADAPTER,
-                "result": "block",
-                "failure_reason": "runtime_asset_missing",
-                "reviewed_head": reviewed_head,
-                "evidence": None,
-            },
-        }
     prompt_text = build_default_review_prompt(
         context=context,
         build_payload=build_payload,
@@ -2084,7 +2099,7 @@ def run_default_review_engine(
                 "-s",
                 "workspace-write",
                 "--output-schema",
-                str(schema_path),
+                str(review_engine_schema_path()),
                 "-o",
                 str(result_path),
                 "-",
@@ -2423,9 +2438,6 @@ def load_context(target_root: Path, output_relative: str, expected_item: str | N
         return {}, errors
 
     item_id = report["fact_chain"]["entry_points"]["current_item_id"]
-    item_errors = validate_work_item_id(str(item_id))
-    if item_errors:
-        return {}, item_errors
     if expected_item and expected_item != item_id:
         return {}, [f"current item mismatch: expected `{expected_item}`, got `{item_id}`"]
 
@@ -2500,32 +2512,7 @@ def review_focus_paths(context: dict[str, Any]) -> list[str]:
 
 
 def review_engine_schema_path() -> Path:
-    try:
-        return shared_asset(__file__, "review/loom-review-result-schema.json")
-    except RuntimeError:
-        runtime_root = bootstrap_runtime_root(__file__)
-        if runtime_root is None:
-            raise
-        schema_path = runtime_root.parent / "runtime/review/loom-review-result-schema.json"
-        schema_path.parent.mkdir(parents=True, exist_ok=True)
-        schema_path.write_text(
-            json.dumps(
-                {
-                    "type": "object",
-                    "required": ["decision", "summary", "findings"],
-                    "properties": {
-                        "decision": {"enum": sorted(REVIEW_DECISIONS)},
-                        "summary": {"type": "string", "minLength": 1},
-                        "findings": {"type": "array"},
-                    },
-                    "additionalProperties": True,
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        return schema_path
+    return shared_asset(__file__, "review/loom-review-result-schema.json")
 
 
 def normalize_engine_review_result(payload: Any, *, relative: str) -> tuple[dict[str, Any] | None, list[str]]:
@@ -2560,14 +2547,13 @@ def manual_review_payload(
     kind: str,
     review_record_path: str,
 ) -> dict[str, Any]:
-    flow_entry, target_arg = target_runtime_entry(context["target_root"])
     command = [
         "python3",
-        flow_entry,
+        "tools/loom_flow.py",
         "review",
         "record",
         "--target",
-        target_arg,
+        str(context["target_root"]),
         "--item",
         context["item_id"],
         "--decision",
@@ -2666,6 +2652,8 @@ def build_default_review_prompt(
 
 def load_fact_chain_report(target_root: Path, output_relative: str) -> tuple[dict[str, Any], list[str]]:
     report, errors = inspect_fact_chain(target_root, output_relative)
+    if errors and all("missing section `Runtime Evidence`" in message for message in errors):
+        report, errors = inspect_fact_chain_legacy(target_root, output_relative)
     if errors:
         return {}, errors
     if not report:
@@ -2812,7 +2800,6 @@ def inspect_fact_chain_legacy(target_root: Path, output_relative: str) -> tuple[
         "fact_chain": {
             "mode": str(mode),
             "read_entry": str(read_entry),
-            "init_result": output_relative,
             "entry_points": {
                 "current_item_id": str(current_item_id),
                 "work_item": str(work_item_ref),
@@ -3689,6 +3676,7 @@ def governance_profile_payload(target_root: Path, operation: str) -> dict[str, A
 
     current = maturity.get("current")
     next_level = maturity.get("next")
+    gate_rollout = maturity.get("gate_rollout")
     missing_by_level = maturity.get("missing_by_level")
     missing_details_by_level = maturity.get("missing_details_by_level")
     missing_inputs: list[Any] = []
@@ -3717,6 +3705,7 @@ def governance_profile_payload(target_root: Path, operation: str) -> dict[str, A
         "recommended_action": "run governance-profile upgrade --dry-run" if result == "block" else None,
         "fallback_to": None if result == "pass" else "adoption",
         "maturity": maturity,
+        "gate_rollout": gate_rollout,
         "governance_control_plane": control_plane,
     }
 
@@ -3862,11 +3851,11 @@ def governance_profile_upgrade_payload(
         "actions": actions,
         "written_files": written_files,
         "maturity": maturity,
+        "gate_rollout": maturity.get("gate_rollout") if isinstance(maturity, dict) else None,
     }
 
 
 def maturity_upgrade_path(governance_surface: dict[str, Any], target_root: Path) -> dict[str, Any]:
-    flow_entry, target_arg = target_runtime_entry(target_root)
     control_plane = governance_surface.get("governance_control_plane")
     maturity = control_plane.get("maturity") if isinstance(control_plane, dict) else None
     if not isinstance(maturity, dict):
@@ -3882,6 +3871,7 @@ def maturity_upgrade_path(governance_surface: dict[str, Any], target_root: Path)
         }
     current = maturity.get("current")
     next_level = maturity.get("next")
+    gate_rollout = maturity.get("gate_rollout")
     missing_by_level = maturity.get("missing_by_level")
     missing_details_by_level = maturity.get("missing_details_by_level")
     missing_inputs = []
@@ -3899,14 +3889,15 @@ def maturity_upgrade_path(governance_surface: dict[str, Any], target_root: Path)
         "missing_details": missing_details,
         "fallback_to": None if next_level is None else "adoption",
         "upgrade_entry": (
-            f"python3 {flow_entry} governance-profile upgrade --target {target_arg} --to {next_level} --dry-run"
+            f"python3 tools/loom_flow.py governance-profile upgrade --target {target_root} --to {next_level} --dry-run"
             if isinstance(next_level, str)
             else None
         ),
         "validation_entries": [
-            f"python3 {flow_entry} governance-profile status --target {target_arg}",
-            f"python3 {flow_entry} governance-profile upgrade-plan --target {target_arg}",
+            f"python3 tools/loom_flow.py governance-profile status --target {target_root}",
+            f"python3 tools/loom_flow.py governance-profile upgrade-plan --target {target_root}",
         ],
+        "gate_rollout": gate_rollout,
     }
 
 
@@ -4388,13 +4379,10 @@ query($owner:String!, $name:String!, $number:Int!) {
     return issue, []
 
 
-def contains_merged_commit(root: Path, merge_commit_sha: str, target_branch: str) -> bool:
-    if not target_branch.strip():
-        return False
+def contains_merged_commit(root: Path, merge_commit_sha: str, target_branch: str = "main") -> bool:
     remote_ref = f"refs/remotes/origin/{target_branch}"
-    fetch_refspec = f"refs/heads/{target_branch}:{remote_ref}"
-    fetch = run_git(root, ["fetch", "origin", fetch_refspec])
-    if fetch is None or fetch.returncode != 0:
+    fetch_result = run_git(root, ["fetch", "origin", f"refs/heads/{target_branch}:{remote_ref}"])
+    if fetch_result is None or fetch_result.returncode != 0:
         return False
     contains = run_git(root, ["merge-base", "--is-ancestor", merge_commit_sha, remote_ref])
     return contains is not None and contains.returncode == 0
@@ -4510,27 +4498,19 @@ def reconciliation_audit_payload(
 
     pr_payload: dict[str, Any] | None = None
     merge_commit_sha: str | None = None
-    merge_commit_in_target_branch = False
-    merge_target_branch: str | None = None
+    merge_commit_in_main = False
     if pr_number is not None:
         pr_payload, pr_errors = github_pr_payload(target_root, owner, repo_name, pr_number)
         if pr_errors:
             missing_inputs.extend(f"pr: {message}" for message in pr_errors)
         elif pr_payload is not None:
-            raw_target_branch = pr_payload.get("baseRefName") or branch_name
-            if isinstance(raw_target_branch, str) and raw_target_branch:
-                merge_target_branch = raw_target_branch
             merge_commit = pr_payload.get("mergeCommit")
             if isinstance(merge_commit, dict):
                 oid = merge_commit.get("oid")
-                if isinstance(oid, str) and oid and merge_target_branch:
+                if isinstance(oid, str) and oid:
                     merge_commit_sha = oid
-                    merge_commit_in_target_branch = contains_merged_commit(
-                        target_root,
-                        merge_commit_sha,
-                        merge_target_branch,
-                    )
-            if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_target_branch):
+                    merge_commit_in_main = contains_merged_commit(target_root, merge_commit_sha)
+            if pr_payload.get("state") == "MERGED" and (not merge_commit_sha or not merge_commit_in_main):
                 findings.append(
                     make_reconciliation_finding(
                         kind="merge_signal_drift",
@@ -4538,9 +4518,8 @@ def reconciliation_audit_payload(
                         subject=f"PR #{pr_number} merge signal",
                         evidence={
                             "pr_state": pr_payload.get("state"),
-                            "target_branch": merge_target_branch,
                             "merge_commit": merge_commit_sha,
-                            "merge_commit_in_target_branch": merge_commit_in_target_branch,
+                            "merge_commit_in_main": merge_commit_in_main,
                         },
                         recommended_action="repair or re-read the merge commit basis before closeout.",
                         category="drift",
@@ -4550,12 +4529,7 @@ def reconciliation_audit_payload(
 
     merged_issue_open = False
     if issue_payload is not None and pr_payload is not None:
-        if (
-            issue_payload.get("state") == "OPEN"
-            and pr_payload.get("state") == "MERGED"
-            and merge_commit_sha
-            and merge_commit_in_target_branch
-        ):
+        if issue_payload.get("state") == "OPEN" and pr_payload.get("state") == "MERGED" and merge_commit_sha and merge_commit_in_main:
             merged_issue_open = True
             findings.append(
                 make_reconciliation_finding(
@@ -4566,9 +4540,8 @@ def reconciliation_audit_payload(
                         "issue_state": issue_payload.get("state"),
                         "pr_number": pr_number,
                         "pr_state": pr_payload.get("state"),
-                        "target_branch": merge_target_branch,
                         "merge_commit": merge_commit_sha,
-                        "merge_commit_in_target_branch": merge_commit_in_target_branch,
+                        "merge_commit_in_main": merge_commit_in_main,
                     },
                     recommended_action="close the merged issue or run reconciliation sync after reviewing the evidence.",
                 )
@@ -5187,37 +5160,17 @@ def closeout_payload(
     )
     gate: dict[str, Any] = {"skipped": skip_gate}
     if not skip_gate:
-        if (target_root / "scripts/docs_guard.py").exists() and (target_root / "scripts/workflow_guard.py").exists():
-            gate_commands = [
-                [sys.executable, "scripts/docs_guard.py", "--mode", "ci"],
-                [sys.executable, "scripts/workflow_guard.py", "--mode", "ci"],
-            ]
-            gate["commands"] = [" ".join(command) for command in gate_commands]
-            gate_stdout: list[str] = []
-            gate_exit_code = 0
-            for command in gate_commands:
-                gate_result = run_process(command, target_root)
-                gate_stdout.append(gate_result.stdout.strip())
-                if gate_result.returncode != 0:
-                    gate_exit_code = gate_result.returncode
-                    break
-            gate["command"] = " && ".join(gate["commands"])
-            gate["exit_code"] = gate_exit_code
-            gate["stdout"] = "\n".join(entry for entry in gate_stdout if entry)
-            if gate_exit_code != 0:
-                missing_inputs.append("repo_closeout_gate")
+        repo_gate = target_root / ".loom/bin/loom_check.py"
+        if repo_gate.exists():
+            gate_command = ["python3", ".loom/bin/loom_check.py", "."]
         else:
-            repo_gate = target_root / ".loom/bin/loom_check.py"
-            if repo_gate.exists():
-                gate_command = ["python3", ".loom/bin/loom_check.py", "."]
-            else:
-                gate_command = ["python3", str(shared_script(__file__, "loom_check.py")), str(target_root)]
-            gate_result = run_process(gate_command, target_root)
-            gate["command"] = " ".join(gate_command)
-            gate["exit_code"] = gate_result.returncode
-            gate["stdout"] = gate_result.stdout.strip()
-            if gate_result.returncode != 0:
-                missing_inputs.append("loom_check")
+            gate_command = ["python3", str(shared_script(__file__, "loom_check.py")), str(target_root)]
+        gate_result = run_process(gate_command, target_root)
+        gate["command"] = " ".join(gate_command)
+        gate["exit_code"] = gate_result.returncode
+        gate["stdout"] = gate_result.stdout.strip()
+        if gate_result.returncode != 0:
+            missing_inputs.append("loom_check")
 
     reconciliation_payload: dict[str, Any] | None = None
     closeout_fallback: str | None = None
@@ -5261,8 +5214,6 @@ def closeout_payload(
         if pr_errors:
             missing_inputs.extend(f"pr: {message}" for message in pr_errors)
         elif pr_payload is not None:
-            raw_target_branch = pr_payload.get("baseRefName") or branch_name
-            merge_target_branch = raw_target_branch if isinstance(raw_target_branch, str) and raw_target_branch else None
             merge_commit = pr_payload.get("mergeCommit")
             if isinstance(merge_commit, dict):
                 oid = merge_commit.get("oid")
@@ -5271,10 +5222,10 @@ def closeout_payload(
             if pr_payload.get("state") != "MERGED":
                 missing_inputs.append("pr is not merged")
             if merge_commit_sha:
-                if not merge_target_branch:
-                    missing_inputs.append("merged PR target branch is unavailable")
-                elif not contains_merged_commit(target_root, merge_commit_sha, merge_target_branch):
-                    missing_inputs.append(f"target branch `{merge_target_branch}` does not contain the merged PR commit")
+                run_git(target_root, ["fetch", "origin", "main"])
+                contains = run_git(target_root, ["merge-base", "--is-ancestor", merge_commit_sha, "origin/main"])
+                if contains is None or contains.returncode != 0:
+                    missing_inputs.append("origin/main does not contain the merged PR commit")
 
     project_payload: dict[str, Any] | None = None
     if project_number is not None:
@@ -5572,33 +5523,15 @@ def handle_reconciliation(args: argparse.Namespace) -> int:
 
     comment_body = args.comment
     if args.comment_file:
-        comment_path, comment_relative, comment_path_errors = resolve_target_relative_path(
-            target_root,
-            args.comment_file,
-            "reconciliation comment file",
-        )
-        if comment_path_errors:
+        comment_body, comment_errors = read_text_file(args.comment_file)
+        if comment_errors:
             return emit(
                 {
                     "command": "reconciliation",
                     "operation": args.operation,
                     "result": "block",
                     "summary": "reconciliation sync could not read the requested comment file.",
-                    "missing_inputs": comment_path_errors,
-                    "fallback_to": "manual-reconciliation",
-                    "runtime_state": runtime_state,
-                }
-            )
-        try:
-            comment_body = comment_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            return emit(
-                {
-                    "command": "reconciliation",
-                    "operation": args.operation,
-                    "result": "block",
-                    "summary": "reconciliation sync could not read the requested comment file.",
-                    "missing_inputs": [f"reconciliation comment file `{comment_relative}` could not be read: {exc}"],
+                    "missing_inputs": comment_errors,
                     "fallback_to": "manual-reconciliation",
                     "runtime_state": runtime_state,
                 }
@@ -6106,19 +6039,7 @@ def handle_review(args: argparse.Namespace) -> int:
 
 def handle_recovery(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    _, output_relative, output_errors = resolve_target_relative_path(target_root, args.output, "init-result")
-    if output_errors or output_relative is None:
-        return emit(
-            {
-                "command": "recovery",
-                "operation": args.operation,
-                "result": "block",
-                "summary": "recovery command refused an unsafe init-result path.",
-                "missing_inputs": output_errors,
-                "fallback_to": "admission",
-            }
-        )
-    context, errors = load_context(target_root, output_relative, args.item)
+    context, errors = load_context(target_root, args.output, args.item)
     if errors:
         return emit(
             {
@@ -6167,28 +6088,19 @@ def handle_recovery(args: argparse.Namespace) -> int:
             }
         )
 
-    original_recovery_text = context["recovery_path"].read_text(encoding="utf-8")
-    candidate_recovery_text = original_recovery_text
     for field_name, value in provided.items():
         if field_name == "current_checkpoint":
             value = normalize_checkpoint(value) if value.strip().lower() == "retired" else value
-        candidate_recovery_text = update_markdown_bullet_text(
-            candidate_recovery_text,
-            RECOVERY_FIELD_LABELS[field_name],
-            value,
-            str(context["recovery_path"]),
-        )
+        update_markdown_bullet(context["recovery_path"], RECOVERY_FIELD_LABELS[field_name], value)
 
-    atomic_write_text(context["recovery_path"], candidate_recovery_text)
-    refreshed, refresh_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
+    refreshed, refresh_errors = sync_status_surface(target_root, args.output, runtime_evidence)
     if refresh_errors:
-        atomic_write_text(context["recovery_path"], original_recovery_text)
         return emit(
             {
                 "command": "recovery",
                 "operation": "writeback",
                 "result": "block",
-                "summary": "recovery writeback refused to retain carrier changes because fact-chain verification failed during status sync.",
+                "summary": "recovery writeback updated the recovery entry, but fact-chain verification failed during status sync.",
                 "missing_inputs": refresh_errors,
                 "fallback_to": "admission",
             }
@@ -6219,9 +6131,7 @@ def update_active_entry_points(
     recovery_entry: str,
     status_surface: str,
 ) -> None:
-    output_path, _, errors = resolve_target_relative_path(target_root, output_relative, "init-result")
-    if errors or output_path is None:
-        raise RuntimeError("; ".join(errors))
+    output_path = target_root / output_relative
     payload = load_json_file(output_path)
     fact_chain = payload.get("fact_chain")
     if not isinstance(fact_chain, dict):
@@ -6233,24 +6143,12 @@ def update_active_entry_points(
     entry_points["work_item"] = work_item
     entry_points["recovery_entry"] = recovery_entry
     entry_points["status_surface"] = status_surface
-    atomic_write_json(output_path, payload)
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def handle_work_item(args: argparse.Namespace) -> int:
     target_root = Path(args.target).expanduser().resolve()
-    item_errors = validate_work_item_id(args.item)
-    output_path, output_relative, output_errors = resolve_target_relative_path(target_root, args.output, "init-result")
-    if item_errors or output_errors or output_path is None or output_relative is None:
-        return emit(
-            {
-                "command": "work-item",
-                "operation": args.operation,
-                "result": "block",
-                "summary": "work-item command refused unsafe identifiers or paths.",
-                "missing_inputs": [*item_errors, *output_errors],
-                "fallback_to": "admission",
-            }
-        )
+    output_path = target_root / args.output
     if not output_path.exists():
         return emit(
             {
@@ -6258,40 +6156,17 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 "operation": args.operation,
                 "result": "block",
                 "summary": "work-item command requires an existing init-result fact-chain locator.",
-                "missing_inputs": [f"missing init-result: {output_relative}"],
+                "missing_inputs": [f"missing init-result: {args.output}"],
                 "fallback_to": "admission",
             }
         )
 
     work_item_relative = f".loom/work-items/{args.item}.md"
-    work_item_path, work_item_relative, work_item_path_errors = resolve_target_relative_path(target_root, work_item_relative, "work item")
+    work_item_path = target_root / work_item_relative
     recovery_relative = args.recovery_entry or f".loom/progress/{args.item}.md"
-    recovery_path, recovery_relative, recovery_path_errors = resolve_target_relative_path(target_root, recovery_relative, "recovery entry")
+    recovery_path = target_root / recovery_relative
     review_relative = default_review_path(args.item)
-    review_path, review_relative, review_path_errors = resolve_target_relative_path(target_root, review_relative, "review entry")
-    status_path, status_relative, status_path_errors = resolve_target_relative_path(target_root, ".loom/status/current.md", "status surface")
-    artifact_errors: list[str] = []
-    for artifact in [*args.artifact, *args.add_artifact, *args.remove_artifact]:
-        _, _, errors = resolve_target_relative_path(target_root, artifact, "associated artifact")
-        artifact_errors.extend(errors)
-    path_errors = [
-        *work_item_path_errors,
-        *recovery_path_errors,
-        *review_path_errors,
-        *status_path_errors,
-        *artifact_errors,
-    ]
-    if path_errors or work_item_path is None or recovery_path is None or review_path is None or status_path is None:
-        return emit(
-            {
-                "command": "work-item",
-                "operation": args.operation,
-                "result": "block",
-                "summary": "work-item command refused paths that escape the target root.",
-                "missing_inputs": path_errors,
-                "fallback_to": "admission",
-            }
-        )
+    status_relative = ".loom/status/current.md"
     runtime_evidence: dict[str, dict[str, Any]] | None = None
 
     if args.operation == "create":
@@ -6312,18 +6187,6 @@ def handle_work_item(args: argparse.Namespace) -> int:
                     "result": "block",
                     "summary": "work-item create is missing required static fields.",
                     "missing_inputs": missing,
-                    "fallback_to": "admission",
-                }
-            )
-        _, workspace_errors = resolve_workspace_path(target_root, args.workspace_entry)
-        if workspace_errors:
-            return emit(
-                {
-                    "command": "work-item",
-                    "operation": "create",
-                    "result": "block",
-                    "summary": "work-item create refused an unsafe or unreadable workspace entry before writing carriers.",
-                    "missing_inputs": workspace_errors,
                     "fallback_to": "admission",
                 }
             )
@@ -6360,10 +6223,11 @@ def handle_work_item(args: argparse.Namespace) -> int:
             "closing_condition": args.closing_condition,
             "associated_artifacts": deduped_artifacts,
         }
-        atomic_write_text(work_item_path, render_work_item(work_item_payload))
+        work_item_path.parent.mkdir(parents=True, exist_ok=True)
+        work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
+        review_path = target_root / review_relative
         review_path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(
-            review_path,
+        review_path.write_text(
             json.dumps(
                 {
                     "schema_version": "loom-review/v1",
@@ -6404,12 +6268,12 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 indent=2,
             )
             + "\n",
+            encoding="utf-8",
         )
 
         if args.init_recovery:
             recovery_path.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(
-                recovery_path,
+            recovery_path.write_text(
                 render_recovery_entry(
                     args.item,
                     {
@@ -6422,6 +6286,7 @@ def handle_work_item(args: argparse.Namespace) -> int:
                         "current_lane": "not yet assigned",
                     },
                 ),
+                encoding="utf-8",
             )
 
     else:
@@ -6460,18 +6325,6 @@ def handle_work_item(args: argparse.Namespace) -> int:
             "closing_condition": args.closing_condition or str(parsed_work_item["closing_condition"]),
             "associated_artifacts": list(parsed_work_item["associated_artifacts"]),
         }
-        _, workspace_errors = resolve_workspace_path(target_root, str(work_item_payload["workspace_entry"]))
-        if workspace_errors:
-            return emit(
-                {
-                    "command": "work-item",
-                    "operation": "update",
-                    "result": "block",
-                    "summary": "work-item update refused an unsafe or unreadable workspace entry before writing carriers.",
-                    "missing_inputs": workspace_errors,
-                    "fallback_to": "admission",
-                }
-            )
         for artifact in args.add_artifact:
             if artifact not in work_item_payload["associated_artifacts"]:
                 work_item_payload["associated_artifacts"].append(artifact)
@@ -6480,19 +6333,8 @@ def handle_work_item(args: argparse.Namespace) -> int:
                 entry for entry in work_item_payload["associated_artifacts"] if entry != artifact
             ]
         recovery_relative = work_item_payload["recovery_entry"]
-        recovery_path, recovery_relative, recovery_path_errors = resolve_target_relative_path(target_root, recovery_relative, "recovery entry")
-        if recovery_path_errors or recovery_path is None:
-            return emit(
-                {
-                    "command": "work-item",
-                    "operation": "update",
-                    "result": "block",
-                    "summary": "work-item update refused an unsafe recovery entry path.",
-                    "missing_inputs": recovery_path_errors,
-                    "fallback_to": "admission",
-                }
-            )
-        atomic_write_text(work_item_path, render_work_item(work_item_payload))
+        recovery_path = target_root / recovery_relative
+        work_item_path.write_text(render_work_item(work_item_payload), encoding="utf-8")
 
     if args.activate:
         if not recovery_path.exists():
@@ -6518,24 +6360,22 @@ def handle_work_item(args: argparse.Namespace) -> int:
                     "fallback_to": "admission",
                 }
             )
-        original_init_result = output_path.read_text(encoding="utf-8")
         update_active_entry_points(
             target_root,
-            output_relative,
+            args.output,
             item_id=args.item,
             work_item=work_item_relative,
             recovery_entry=recovery_relative,
             status_surface=status_relative,
         )
-        _, sync_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
+        _, sync_errors = sync_status_surface(target_root, args.output, runtime_evidence)
         if sync_errors:
-            atomic_write_text(output_path, original_init_result)
             return emit(
                 {
                     "command": "work-item",
                     "operation": args.operation,
                     "result": "block",
-                    "summary": "work-item activation could not sync the fact chain; locator truth was rolled back.",
+                    "summary": "work-item activation updated the locator truth, but fact-chain sync failed.",
                     "missing_inputs": sync_errors,
                     "fallback_to": "admission",
                 }
@@ -6557,7 +6397,7 @@ def handle_work_item(args: argparse.Namespace) -> int:
                         "fallback_to": "admission",
                     }
                 )
-            _, sync_errors = sync_status_surface(target_root, output_relative, runtime_evidence)
+            _, sync_errors = sync_status_surface(target_root, args.output, runtime_evidence)
             if sync_errors:
                 return emit(
                     {

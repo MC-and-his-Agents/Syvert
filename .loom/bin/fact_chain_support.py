@@ -131,6 +131,7 @@ def parse_key_value_section(
         return {}, [f"{relative_path}: missing section `{section_name}`"]
 
     values: dict[str, str] = {}
+    seen: dict[str, str] = {}
     for raw_line in lines:
         stripped = raw_line.strip()
         if not stripped:
@@ -143,7 +144,15 @@ def parse_key_value_section(
         if label not in field_map:
             errors.append(f"{relative_path}: unexpected field `{label}` in `{section_name}`")
             continue
-        values[field_map[label]] = _clean_value(match.group(2))
+        canonical = field_map[label]
+        if canonical in seen:
+            errors.append(
+                f"{relative_path}: duplicate field `{label}` in `{section_name}` "
+                f"(canonical `{canonical}` already set by `{seen[canonical]}`)"
+            )
+            continue
+        seen[canonical] = label
+        values[canonical] = _clean_value(match.group(2))
 
     for label, canonical in field_map.items():
         if canonical not in values:
@@ -177,30 +186,6 @@ def _relative(path: Path, root: Path) -> str:
     return str(path.relative_to(root))
 
 
-def resolve_target_relative_path(root: Path, raw_value: object, label: str) -> tuple[Path | None, str | None]:
-    if not isinstance(raw_value, str) or not raw_value:
-        return None, f"{label} must be a non-empty string"
-    raw_path = Path(raw_value)
-    if raw_path.is_absolute():
-        return None, f"{label} must be relative to target root"
-    resolved = (root / raw_path).resolve()
-    try:
-        resolved.relative_to(root.resolve())
-    except ValueError:
-        return None, f"{label} escapes target root: {raw_value}"
-    return resolved, None
-
-
-def validate_item_id(value: object, label: str) -> list[str]:
-    if not isinstance(value, str) or not value.strip():
-        return [f"{label} must be a non-empty string"]
-    if value in {".", ".."} or ".." in value or "/" in value or "\\" in value:
-        return [f"{label} must not contain path traversal or separators: {value}"]
-    if value != value.strip():
-        return [f"{label} must not include leading or trailing whitespace"]
-    return []
-
-
 def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str]]:
     relative_path = _relative(path, root)
     sections = markdown_sections(path)
@@ -213,7 +198,6 @@ def parse_work_item(path: Path, root: Path) -> tuple[dict[str, object], list[str
     for forbidden_key in FORBIDDEN_DYNAMIC_KEYS:
         if forbidden_key in static_facts:
             errors.append(f"{relative_path}: `{forbidden_key}` must not be authored in `Static Facts`")
-    errors.extend(validate_item_id(static_facts.get("item_id"), f"{relative_path}: Item ID"))
 
     return data, errors
 
@@ -226,7 +210,6 @@ def parse_recovery_entry(path: Path, root: Path) -> tuple[dict[str, str], list[s
     for forbidden_key in FORBIDDEN_STATIC_KEYS:
         if forbidden_key in dynamic_facts:
             errors.append(f"{relative_path}: `{forbidden_key}` must not be authored in `Dynamic Facts`")
-    errors.extend(validate_item_id(dynamic_facts.get("item_id"), f"{relative_path}: Item ID"))
 
     return dynamic_facts, errors
 
@@ -318,9 +301,7 @@ def inspect_fact_chain(
     output_relative: str = ".loom/bootstrap/init-result.json",
 ) -> tuple[dict[str, object], list[str]]:
     errors: list[str] = []
-    output_path, output_error = resolve_target_relative_path(target_root, output_relative, "init-result")
-    if output_error or output_path is None:
-        return {}, [output_error or "invalid init-result path"]
+    output_path = target_root / output_relative
     if not output_path.exists():
         return {}, [f"missing init-result: {output_relative}"]
 
@@ -361,17 +342,13 @@ def inspect_fact_chain(
     ):
         if not isinstance(value, str) or not value:
             errors.append(f"init-result.fact_chain.entry_points.{label} must be a non-empty string")
-    errors.extend(validate_item_id(current_item_id, "init-result.fact_chain.entry_points.current_item_id"))
 
     if errors:
         return {}, errors
 
-    work_item_path, work_item_path_error = resolve_target_relative_path(target_root, work_item_ref, "work_item")
-    recovery_path, recovery_path_error = resolve_target_relative_path(target_root, recovery_ref, "recovery_entry")
-    status_path, status_path_error = resolve_target_relative_path(target_root, status_ref, "status_surface")
-    errors.extend(error for error in (work_item_path_error, recovery_path_error, status_path_error) if error)
-    if errors or work_item_path is None or recovery_path is None or status_path is None:
-        return {}, errors
+    work_item_path = target_root / str(work_item_ref)
+    recovery_path = target_root / str(recovery_ref)
+    status_path = target_root / str(status_ref)
     for label, path in (
         ("work_item", work_item_path),
         ("recovery_entry", recovery_path),
@@ -449,7 +426,6 @@ def inspect_fact_chain(
         "fact_chain": {
             "mode": str(mode),
             "read_entry": str(read_entry),
-            "init_result": output_relative,
             "entry_points": {
                 "current_item_id": str(current_item_id),
                 "work_item": str(work_item_ref),

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 from typing import Any
@@ -65,21 +66,6 @@ def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     return payload, None
 
 
-def _resolve_skills_relative_path(skills_root: Path, relative: str, label: str, errors: list[str]) -> Path | None:
-    candidate = Path(relative)
-    if candidate.is_absolute() or ".." in candidate.parts:
-        errors.append(f"{label} must be a relative path inside the installed skills root: `{relative}`")
-        return None
-    resolved_root = skills_root.resolve()
-    resolved = (skills_root / candidate).resolve()
-    try:
-        resolved.relative_to(resolved_root)
-    except ValueError:
-        errors.append(f"{label} escapes the installed skills root: `{relative}`")
-        return None
-    return resolved
-
-
 def _check(status: str, summary: str, *, evidence: object | None = None) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "status": status,
@@ -91,13 +77,21 @@ def _check(status: str, summary: str, *, evidence: object | None = None) -> dict
 
 
 def detect_carrier(caller_file: str) -> str | None:
-    if source_repo_root() is not None:
-        return "repo-local-wrapper"
     if bootstrap_runtime_root(caller_file) is not None:
         return "bootstrapped-target-runtime"
+    if source_repo_root() is not None:
+        return "repo-local-wrapper"
     if installed_skills_root(caller_file) is not None:
         return "installed-skills-root"
     return None
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _default_scene_for_carrier(carrier: str) -> str:
@@ -150,8 +144,7 @@ def _validate_install_layout(skills_root: Path) -> tuple[dict[str, Any], list[st
             if not isinstance(relative, str) or not relative:
                 errors.append("`install-layout.json` required paths must be non-empty strings")
                 continue
-            resolved = _resolve_skills_relative_path(skills_root, relative, "install layout required path", errors)
-            if resolved is not None and not resolved.exists():
+            if not (skills_root / relative).exists():
                 missing.append(relative)
         if missing:
             errors.append("install layout is missing required paths: " + ", ".join(sorted(missing)))
@@ -193,26 +186,12 @@ def _validate_registry_contract(skills_root: Path) -> tuple[dict[str, Any], list
                 continue
             if not isinstance(executable, str) or not executable:
                 errors.append(f"registry entry `{skill_id}` must declare a non-empty `executable`")
-            else:
-                resolved_executable = _resolve_skills_relative_path(
-                    skills_root,
-                    executable,
-                    f"registry entry `{skill_id}` executable",
-                    errors,
-                )
-                if resolved_executable is not None and not resolved_executable.exists():
-                    errors.append(f"registry entry `{skill_id}` points to missing executable `{executable}`")
+            elif not (skills_root / executable).exists():
+                errors.append(f"registry entry `{skill_id}` points to missing executable `{executable}`")
             if not isinstance(manifest, str) or not manifest:
                 errors.append(f"registry entry `{skill_id}` must declare a non-empty `manifest`")
-            else:
-                resolved_manifest = _resolve_skills_relative_path(
-                    skills_root,
-                    manifest,
-                    f"registry entry `{skill_id}` manifest",
-                    errors,
-                )
-                if resolved_manifest is not None and not resolved_manifest.exists():
-                    errors.append(f"registry entry `{skill_id}` points to missing manifest `{manifest}`")
+            elif not (skills_root / manifest).exists():
+                errors.append(f"registry entry `{skill_id}` points to missing manifest `{manifest}`")
 
     upgrade_path = skills_root / "upgrade-contract.json"
     upgrade_contract, upgrade_error = _load_json(upgrade_path)
@@ -314,6 +293,14 @@ def _validate_bootstrapped_runtime(caller_file: str) -> tuple[dict[str, Any], li
         runtime_file = runtime_root / Path(relative).name
         if not runtime_file.exists():
             errors.append(f"bootstrapped runtime file is missing: `{relative}`")
+            continue
+        expected_hash = artifact.get("sha256")
+        if not isinstance(expected_hash, str) or not expected_hash.strip():
+            errors.append(f"bootstrap runtime artifact `{relative}` must declare sha256 provenance")
+            continue
+        actual_hash = sha256_file(runtime_file)
+        if actual_hash != expected_hash:
+            errors.append(f"bootstrap runtime artifact `{relative}` sha256 drifted")
 
     status = "pass" if not errors else "block"
     summary = (
@@ -360,11 +347,8 @@ def detect_runtime_state(caller_file: str, entry_family: str, *, target_root: Pa
                 repo_root = repo_local_root(caller_file)
                 if repo_root is None:
                     carrier_errors.append("repo-local wrapper is missing `LOOM_SOURCE_REPO_ROOT`")
-                else:
-                    try:
-                        install_root.resolve().relative_to(repo_root.resolve())
-                    except ValueError:
-                        carrier_errors.append("repo-local wrapper install root must stay inside the source repository")
+                elif not str(install_root).startswith(str(repo_root)):
+                    carrier_errors.append("repo-local wrapper install root must stay inside the source repository")
             if not shared.exists():
                 carrier_errors.append(f"shared runtime root is missing: {shared}")
             checks["carrier_layout"] = _check(

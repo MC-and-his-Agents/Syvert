@@ -253,6 +253,58 @@ MATURITY_REQUIRED_FIELDS = {
         },
     ],
 }
+ADOPTION_GATE_ROLLOUT_MODES = {
+    "advisory": {
+        "summary": "Default mode for newly adopted repositories; Loom reports gate signals without becoming the blocking authority.",
+        "blocking": False,
+    },
+    "blocking": {
+        "summary": "Explicit opt-in mode for strong governance repositories after adversarial adoption checks pass.",
+        "blocking": True,
+    },
+    "rollback": {
+        "summary": "Emergency switch back to advisory consumption when runtime, evidence, or host bindings drift.",
+        "blocking": False,
+    },
+}
+
+
+def adoption_gate_rollout_status(*, maturity_current: str) -> dict[str, Any]:
+    blocking_preconditions = [
+        {
+            "id": "strong_maturity",
+            "status": "pass" if maturity_current == "strong" else "missing",
+            "layer": "github-profile",
+            "recommended_action": "upgrade the repository to strong maturity before enabling blocking gates",
+        },
+        {
+            "id": "adversarial_adoption_checks",
+            "status": "missing",
+            "layer": "core",
+            "recommended_action": "run the Loom-owned Syvert-style adversarial adoption fixture and record the validation evidence",
+        },
+        {
+            "id": "rollback_switch",
+            "status": "pass",
+            "layer": "core",
+            "recommended_action": "keep rollback available by switching gate mode back to advisory and rerunning governance-profile status",
+        },
+    ]
+    blocking_allowed = all(entry["status"] == "pass" for entry in blocking_preconditions)
+    return {
+        "schema_version": "loom-adoption-gate-rollout/v1",
+        "default_mode": "advisory",
+        "current_mode": "advisory",
+        "recommended_mode": "blocking" if blocking_allowed else "advisory",
+        "allowed_modes": ADOPTION_GATE_ROLLOUT_MODES,
+        "blocking_allowed": blocking_allowed,
+        "blocking_preconditions": blocking_preconditions,
+        "rollback": {
+            "mode": "rollback",
+            "switch_to": "advisory",
+            "recommended_action": "disable blocking consumption, preserve evidence, repair drift, then rerun adversarial adoption checks before re-enabling blocking",
+        },
+    }
 
 
 def run_process(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -418,14 +470,10 @@ def relative_locator_from_value(root: Path, raw_locator: object) -> str | None:
     locator_path = Path(locator)
     if locator_path.is_absolute():
         try:
-            return str(locator_path.resolve().relative_to(root.resolve()))
+            return str(locator_path.relative_to(root))
         except ValueError:
-            return None
-    resolved = (root / locator_path).resolve()
-    try:
-        return str(resolved.relative_to(root.resolve()))
-    except ValueError:
-        return None
+            return str(locator_path)
+    return str(locator_path)
 
 
 def resolve_locator(root: Path, raw_locator: object) -> tuple[str | None, Path | None]:
@@ -898,41 +946,60 @@ def first_match(directory: Path, suffix: str, root: Path) -> str:
     return ""
 
 
-def markdown_fields(path: Path) -> dict[str, str]:
-    fields: dict[str, str] = {}
+def existing_locator(root: Path, relative: str | None) -> str:
+    if not relative:
+        return ""
+    return relative if (root / relative).exists() else ""
+
+
+def active_or_first(root: Path, relative: str | None, directory: Path, suffix: str) -> str:
+    return existing_locator(root, relative) or (first_match(directory, suffix, root) if directory.exists() else "")
+
+
+def current_review_locator(root: Path, review_dir: Path, item_id: str) -> str:
+    review_path = review_dir / f"{item_id}.json"
+    if review_path.exists():
+        return relative_locator(review_path, root)
+    return first_match(review_dir, ".json", root) if review_dir.exists() else ""
+
+
+def active_entry_points(root: Path) -> dict[str, str]:
+    init_result = root / ".loom/bootstrap/init-result.json"
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return fields
-    for line in lines:
-        if not line.startswith("- ") or ":" not in line:
-            continue
-        key, value = line[2:].split(":", 1)
-        fields[key.strip()] = value.strip()
-    return fields
-
-
-def active_item_id(root: Path) -> str:
-    status_path = root / ".loom/status/current.md"
-    item_id = markdown_fields(status_path).get("Item ID")
-    if isinstance(item_id, str) and item_id.strip():
-        return item_id.strip()
-    return "INIT-0001"
+        payload = json.loads(init_result.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    fact_chain = payload.get("fact_chain")
+    if not isinstance(fact_chain, dict):
+        return {}
+    entry_points = fact_chain.get("entry_points")
+    if not isinstance(entry_points, dict):
+        return {}
+    active: dict[str, str] = {}
+    for key in ("current_item_id", "work_item", "recovery_entry", "status_surface"):
+        value = entry_points.get(key)
+        if isinstance(value, str) and value.strip():
+            active[key] = value.strip()
+    return active
 
 
 def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: bool) -> dict[str, dict[str, str]]:
-    item_id = active_item_id(root)
-    work_item_path = root / f".loom/work-items/{item_id}.md"
-    recovery_path = root / f".loom/progress/{item_id}.md"
-    review_path = root / f".loom/reviews/{item_id}.json"
-    status_path = root / ".loom/status/current.md"
-    spec_path = root / f".loom/specs/{item_id}/spec.md"
-    plan_path = root / f".loom/specs/{item_id}/plan.md"
+    active = active_entry_points(root)
+    active_item_id = active.get("current_item_id") or "INIT-0001"
+    item_dir = root / ".loom/work-items"
+    recovery_dir = root / ".loom/progress"
+    review_dir = root / ".loom/reviews"
+    status_locator = active.get("status_surface") or ".loom/status/current.md"
+    status_path = root / status_locator
+    spec_path = root / f".loom/specs/{active_item_id}/spec.md"
+    plan_path = root / f".loom/specs/{active_item_id}/plan.md"
 
     present_locators = {
-        "work_item": relative_locator(work_item_path, root) if work_item_path.exists() else "",
-        "recovery": relative_locator(recovery_path, root) if recovery_path.exists() else "",
-        "review": relative_locator(review_path, root) if review_path.exists() else "",
+        "work_item": active_or_first(root, active.get("work_item"), item_dir, ".md"),
+        "recovery": active_or_first(root, active.get("recovery_entry"), recovery_dir, ".md"),
+        "review": current_review_locator(root, review_dir, active_item_id),
         "status_surface": relative_locator(status_path, root) if status_path.exists() else "",
         "spec_path": relative_locator(spec_path, root) if spec_path.exists() else "",
         "plan_path": relative_locator(plan_path, root) if plan_path.exists() else "",
@@ -950,12 +1017,11 @@ def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: b
     return summary
 
 
-def detect_execution_entry(root: Path, loom_state: str, *, bootstrap_mode: bool) -> str:
-    item_id = active_item_id(root)
+def detect_execution_entry(root: Path, loom_state: str, *, bootstrap_mode: bool, active_item_id: str = "INIT-0001") -> str:
     if bootstrap_mode:
-        return f"python3 .loom/bin/loom_flow.py flow resume --target . --item {item_id}"
+        return f"python3 .loom/bin/loom_flow.py flow resume --target . --item {active_item_id}"
     if loom_state == "active":
-        return f"{command_prefix(root, 'loom_flow.py')} flow resume --target . --item {item_id}"
+        return f"{command_prefix(root, 'loom_flow.py')} flow resume --target . --item {active_item_id}"
     if loom_state == "partial":
         return f"{command_prefix(root, 'loom_init.py')} route --target <repo> --task \"请接手当前事项并恢复上下文后继续推进\""
     return "unknown"
@@ -971,17 +1037,16 @@ def detect_validation_entry(loom_state: str, *, bootstrap_mode: bool) -> str:
     return "unknown"
 
 
-def detect_review_merge_surface(root: Path, loom_state: str, *, bootstrap_mode: bool) -> dict[str, str]:
-    item_id = active_item_id(root)
+def detect_review_merge_surface(root: Path, loom_state: str, *, bootstrap_mode: bool, active_item_id: str = "INIT-0001") -> dict[str, str]:
     pr_template = ".github/PULL_REQUEST_TEMPLATE.md" if file_exists(root, ".github/PULL_REQUEST_TEMPLATE.md") else "unknown"
     validation_surface = ".loom/status/current.md" if file_exists(root, ".loom/status/current.md") else "unknown"
     if bootstrap_mode and validation_surface == "unknown":
         validation_surface = ".loom/status/current.md"
 
     if bootstrap_mode:
-        merge_surface = f"python3 .loom/bin/loom_flow.py checkpoint merge --target . --item {item_id}"
+        merge_surface = f"python3 .loom/bin/loom_flow.py checkpoint merge --target . --item {active_item_id}"
     elif loom_state == "active":
-        merge_surface = f"{command_prefix(root, 'loom_flow.py')} checkpoint merge --target . [--item <id>]"
+        merge_surface = f"{command_prefix(root, 'loom_flow.py')} checkpoint merge --target . --item {active_item_id}"
     else:
         merge_surface = "unknown"
     return {
@@ -1023,7 +1088,7 @@ def detect_github_control_plane(root: Path) -> tuple[dict[str, Any], list[str]]:
 
     branch_payload, branch_errors = gh_json(
         root,
-        ["api", f"repos/{owner}/{repo}/branches/{quote(surface['default_branch'], safe='')}"],
+        ["api", f"repos/{owner}/{repo}/branches/{quote(str(surface['default_branch']), safe='')}"],
     )
     if branch_errors or branch_payload is None:
         missing_inputs.extend(f"github control plane: {message}" for message in branch_errors)
@@ -1200,6 +1265,7 @@ def maturity_status(
         "required_fields": MATURITY_REQUIRED_FIELDS,
         "missing_by_level": missing_by_level,
         "missing_details_by_level": missing_details_by_level,
+        "gate_rollout": adoption_gate_rollout_status(maturity_current=current),
     }
 
 
@@ -1240,11 +1306,12 @@ def build_governance_surface(
     loom_state = detect_loom_state(root)
     repository_mode = detect_repository_mode(root, loom_state, scenario_override=scenario_override)
     planning_mode = bootstrap_mode and repository_mode == "new" and loom_state != "active"
+    active_item_id = active_entry_points(root).get("current_item_id", "INIT-0001")
     carrier_summary = detect_carrier_summary(root, repository_mode=repository_mode, planning_mode=planning_mode)
     github_control_plane, github_missing = detect_github_control_plane(root)
-    execution_entry = detect_execution_entry(root, loom_state, bootstrap_mode=bootstrap_mode)
+    execution_entry = detect_execution_entry(root, loom_state, bootstrap_mode=bootstrap_mode, active_item_id=active_item_id)
     validation_entry = detect_validation_entry(loom_state, bootstrap_mode=bootstrap_mode)
-    review_merge_surface = detect_review_merge_surface(root, loom_state, bootstrap_mode=bootstrap_mode)
+    review_merge_surface = detect_review_merge_surface(root, loom_state, bootstrap_mode=bootstrap_mode, active_item_id=active_item_id)
     repo_interface, repo_interface_missing = detect_repo_interface(root)
     repo_interop, repo_interop_missing = detect_repo_interop(root)
     host_binding = detect_host_binding_surface(

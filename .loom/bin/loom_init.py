@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,6 +27,17 @@ GOVERNANCE_RUNTIME_SOURCE = "skills/shared/scripts/governance_surface.py"
 TOOL_VERSION = "1.3.0"
 CONTRACT_VERSION = "1.3.0"
 WORK_ITEM_ID = "INIT-0001"
+
+RUNTIME_ARTIFACT_SOURCES = {
+    ".loom/bin/loom_init.py": RUNTIME_SOURCE,
+    ".loom/bin/fact_chain_support.py": FACT_CHAIN_RUNTIME_SOURCE,
+    ".loom/bin/governance_surface.py": GOVERNANCE_RUNTIME_SOURCE,
+    ".loom/bin/loom_flow.py": FLOW_RUNTIME_SOURCE,
+    ".loom/bin/loom_status.py": STATUS_RUNTIME_SOURCE,
+    ".loom/bin/runtime_paths.py": "skills/shared/scripts/runtime_paths.py",
+    ".loom/bin/runtime_state.py": "skills/shared/scripts/runtime_state.py",
+    ".loom/bin/loom_check.py": CHECK_RUNTIME_SOURCE,
+}
 
 ROOT_BOUNDARY_FILES = (
     "AGENTS.md",
@@ -191,12 +204,7 @@ def resolve_output_path(target_root: Path, raw_output: str) -> Path:
     output_path = Path(raw_output)
     if output_path.is_absolute():
         raise RuntimeError("--output must be relative to the target root")
-    resolved = (target_root / output_path).resolve()
-    try:
-        resolved.relative_to(target_root.resolve())
-    except ValueError as exc:
-        raise RuntimeError("--output must stay inside the target root") from exc
-    return resolved
+    return target_root / output_path
 
 
 def runtime_state_payload(target_root: Path) -> dict[str, object]:
@@ -219,17 +227,8 @@ def write_json(path: Path, payload: object, force: bool) -> bool:
     return write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n", force=force)
 
 
-def assert_write_path_inside_target(target_root: Path, path: Path) -> None:
-    root = target_root.resolve()
-    resolved = path.resolve(strict=False)
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise RuntimeError(f"refusing to write outside target root: {path}") from exc
-
-
 def ensure_gitignore_has_loom(target_root: Path) -> bool:
-    # Vendored Loom carriers are intended to be reviewed and committed as repo truth.
+    # Syvert commits the Loom carrier as repository truth instead of ignoring it.
     return False
 
 
@@ -243,11 +242,6 @@ def load_registry_skill_ids() -> tuple[tuple[str, ...] | None, str | None]:
     except RuntimeError as exc:
         return None, str(exc)
     if not active_registry.exists():
-        bootstrap_manifest = Path(__file__).resolve().parent.parent / "bootstrap" / "manifest.json"
-        if bootstrap_manifest.exists():
-            # Bootstrapped target runtimes vendor only .loom/bin; route with the
-            # built-in matrix instead of requiring a full installed skills tree.
-            return tuple(sorted({"loom-init", *SKILL_SIGNAL_RULES})), None
         return None, f"{active_registry} is missing"
     try:
         registry = read_json(active_registry)
@@ -740,100 +734,6 @@ def attach_only_artifact_paths(target_root: Path, install_pr_template: bool) -> 
     return artifacts
 
 
-BUILTIN_SCAFFOLD_ASSETS = {
-    "templates/scaffold/spec.md": """# Spec
-
-## Goal
-
-- Define the target outcome for this Loom work item.
-
-## Scope
-
-- In scope:
-- Out of scope:
-
-## Key Scenarios
-
-### Scenario 1
-
-Given
-- a clear starting state
-
-When
-- the actor performs the target action
-
-Then
-- the expected observable outcome happens
-
-## Exceptions And Boundaries
-
-- Failure modes:
-- Operational boundaries:
-- Rollback or fallback expectations:
-
-## Acceptance Criteria
-
-- [ ] Target outcome is observable
-- [ ] Validation evidence is identified
-""",
-    "templates/scaffold/plan.md": """# Plan
-
-## Implementation Goal
-
-- Describe what will be delivered and what is deferred.
-
-## Phases
-
-- Phase 1:
-
-## Validation
-
-- Automated checks:
-- Manual checks:
-
-## Ready For Implementation
-
-- [ ] Scope and non-goals are clear
-- [ ] Validation path is defined
-""",
-    "templates/scaffold/implementation-contract.md": """# Implementation Contract
-
-## Work Item
-
-- Item:
-- Execution Entry:
-
-## Approved Spec
-
-- Spec Path:
-- Spec Review Entry:
-
-## Validation Plan
-
-- Automated Checks:
-- Manual Verification:
-""",
-    "github/PULL_REQUEST_TEMPLATE.md": """## Summary
-
-## Validation
-
-## Risks And Follow-ups
-
-## Related Work
-""",
-}
-
-
-def copy_or_write_shared_asset(relative_path: str, destination: Path, *, force: bool) -> bool:
-    try:
-        return copy_file(shared_asset(__file__, relative_path), destination, force=force)
-    except RuntimeError:
-        fallback = BUILTIN_SCAFFOLD_ASSETS.get(relative_path)
-        if fallback is None:
-            raise
-        return write_text(destination, fallback, force=force)
-
-
 def initial_work_items(scenario: str, target_root: Path, adoption_path: str, install_pr_template: bool) -> list[dict[str, object]]:
     if uses_attach_only_path(adoption_path):
         return [
@@ -917,46 +817,14 @@ def initial_artifacts(target_root: Path, install_pr_template: bool, adoption_pat
             "kind": "capability-map",
             "source": "generated",
         },
-        {
-            "path": ".loom/bin/loom_init.py",
-            "kind": "loom-tool",
-            "source": RUNTIME_SOURCE,
-        },
-        {
-            "path": ".loom/bin/fact_chain_support.py",
-            "kind": "loom-tool-support",
-            "source": FACT_CHAIN_RUNTIME_SOURCE,
-        },
-        {
-            "path": ".loom/bin/governance_surface.py",
-            "kind": "loom-tool-support",
-            "source": GOVERNANCE_RUNTIME_SOURCE,
-        },
-        {
-            "path": ".loom/bin/loom_flow.py",
-            "kind": "loom-tool",
-            "source": FLOW_RUNTIME_SOURCE,
-        },
-        {
-            "path": ".loom/bin/loom_status.py",
-            "kind": "loom-tool",
-            "source": STATUS_RUNTIME_SOURCE,
-        },
-        {
-            "path": ".loom/bin/runtime_paths.py",
-            "kind": "loom-tool-support",
-            "source": "skills/shared/scripts/runtime_paths.py",
-        },
-        {
-            "path": ".loom/bin/runtime_state.py",
-            "kind": "loom-tool-support",
-            "source": "skills/shared/scripts/runtime_state.py",
-        },
-        {
-            "path": ".loom/bin/loom_check.py",
-            "kind": "loom-tool",
-            "source": CHECK_RUNTIME_SOURCE,
-        },
+        runtime_artifact(".loom/bin/loom_init.py", "loom-tool", RUNTIME_SOURCE),
+        runtime_artifact(".loom/bin/fact_chain_support.py", "loom-tool-support", FACT_CHAIN_RUNTIME_SOURCE),
+        runtime_artifact(".loom/bin/governance_surface.py", "loom-tool-support", GOVERNANCE_RUNTIME_SOURCE),
+        runtime_artifact(".loom/bin/loom_flow.py", "loom-tool", FLOW_RUNTIME_SOURCE),
+        runtime_artifact(".loom/bin/loom_status.py", "loom-tool", STATUS_RUNTIME_SOURCE),
+        runtime_artifact(".loom/bin/runtime_paths.py", "loom-tool-support", "skills/shared/scripts/runtime_paths.py"),
+        runtime_artifact(".loom/bin/runtime_state.py", "loom-tool-support", "skills/shared/scripts/runtime_state.py"),
+        runtime_artifact(".loom/bin/loom_check.py", "loom-tool", CHECK_RUNTIME_SOURCE),
     ]
     if uses_attach_only_path(adoption_path):
         artifacts.extend(
@@ -1187,6 +1055,7 @@ def init_maturity_upgrade_path(governance_surface: dict[str, object]) -> dict[st
             "validation_entries": [],
         }
     next_level = maturity.get("next")
+    gate_rollout = maturity.get("gate_rollout")
     missing_by_level = maturity.get("missing_by_level")
     missing_details_by_level = maturity.get("missing_details_by_level")
     missing_inputs: list[object] = []
@@ -1212,6 +1081,7 @@ def init_maturity_upgrade_path(governance_surface: dict[str, object]) -> dict[st
             "python3 .loom/bin/loom_flow.py governance-profile status --target .",
             "python3 .loom/bin/loom_flow.py governance-profile upgrade-plan --target .",
         ],
+        "gate_rollout": gate_rollout,
     }
 
 
@@ -1242,8 +1112,7 @@ def render_loom_readme(result: dict[str, object]) -> str:
         "- Runtime-state entry: `.loom/bin/loom_init.py runtime-state --target .`\n"
         "- Daily execution CLI: `.loom/bin/loom_flow.py`\n"
         "- Unified status CLI: `.loom/bin/loom_status.py --target .`\n"
-        "- Carrier verification: `.loom/bin/loom_init.py verify --target .`\n"
-        "- Repo-native gates remain owned by this repository.\n"
+        "- Gate CLI: `.loom/bin/loom_check.py`\n"
     )
 
 
@@ -1335,7 +1204,6 @@ def render_work_item(result: dict[str, object]) -> str:
 
 def render_progress(result: dict[str, object]) -> str:
     checkpoint = "admission checkpoint" if result["run"]["scenario_key"] != "complex-existing" else "build checkpoint"
-    output_locator = str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json"))
     return (
         f"# {WORK_ITEM_ID} Progress\n\n"
         "## Dynamic Facts\n\n"
@@ -1345,7 +1213,7 @@ def render_progress(result: dict[str, object]) -> str:
         "- Next Step: Accept the generated Loom entry and promote the first real repository work item.\n"
         "- Blockers: None recorded.\n"
         "- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.\n"
-        f"- Recovery Boundary: Bootstrap result at `{output_locator}`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
+        "- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
         "- Current Lane: bootstrap verification only\n"
     )
 
@@ -1408,7 +1276,6 @@ def default_runtime_evidence(result: dict[str, object]) -> dict[str, str]:
 def render_status(result: dict[str, object]) -> str:
     item = result["initial_work_items"][0]
     fact_chain = result["fact_chain"]
-    output_locator = str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json"))
     checkpoint = "admission checkpoint" if result["run"]["scenario_key"] != "complex-existing" else "build checkpoint"
     runtime_evidence = default_runtime_evidence(result)
     return (
@@ -1428,7 +1295,7 @@ def render_status(result: dict[str, object]) -> str:
         "- Next Step: Accept the generated Loom entry and promote the first real repository work item.\n"
         "- Blockers: None recorded.\n"
         "- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.\n"
-        f"- Recovery Boundary: Bootstrap result at `{output_locator}`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
+        "- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.\n"
         "- Current Lane: bootstrap verification only\n\n"
         "## Governance Status\n\n"
         "- Item Key: INIT-0001\n"
@@ -1455,7 +1322,7 @@ def render_status(result: dict[str, object]) -> str:
         "## Sources\n\n"
         f"- Static Truth: {fact_chain['entry_points']['work_item']}\n"
         f"- Dynamic Truth: {fact_chain['entry_points']['recovery_entry']}\n"
-        f"- Locator Truth: {output_locator}\n"
+        "- Locator Truth: .loom/bootstrap/init-result.json\n"
         f"- Fact Chain CLI: {fact_chain['read_entry']}\n"
     )
 
@@ -1466,6 +1333,34 @@ def copy_file(source: Path, target: Path, force: bool) -> bool:
     return write_text(target, content, force=force)
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def runtime_artifact(path: str, kind: str, source: str) -> dict[str, str]:
+    runtime_sources = {
+        ".loom/bin/loom_init.py": Path(__file__),
+        ".loom/bin/fact_chain_support.py": Path(__file__).with_name("fact_chain_support.py"),
+        ".loom/bin/governance_surface.py": Path(__file__).with_name("governance_surface.py"),
+        ".loom/bin/loom_flow.py": Path(__file__).with_name("loom_flow.py"),
+        ".loom/bin/loom_status.py": Path(__file__).with_name("loom_status.py"),
+        ".loom/bin/runtime_paths.py": Path(__file__).with_name("runtime_paths.py"),
+        ".loom/bin/runtime_state.py": Path(__file__).with_name("runtime_state.py"),
+        ".loom/bin/loom_check.py": Path(__file__).with_name("loom_check.py"),
+    }
+    source_path = runtime_sources[path]
+    return {
+        "path": path,
+        "kind": kind,
+        "source": source,
+        "sha256": sha256_file(source_path),
+    }
+
+
 def manifest_payload(result: dict[str, object]) -> dict[str, object]:
     return {
         "schema_version": "loom-bootstrap-manifest/v1",
@@ -1473,7 +1368,7 @@ def manifest_payload(result: dict[str, object]) -> dict[str, object]:
         "tool_version": TOOL_VERSION,
         "root_entry": "loom-init",
         "contract_version": CONTRACT_VERSION,
-        "output": str(result.get("bootstrap_output", ".loom/bootstrap/init-result.json")),
+        "output": ".loom/bootstrap/init-result.json",
         "artifacts": result["initial_artifacts"],
     }
 
@@ -1518,7 +1413,6 @@ def scaffold_target(
         )
 
     for path, payload, kind in writes:
-        assert_write_path_inside_target(target_root, path)
         changed = write_json(path, payload, force=force) if kind == "json" else write_text(path, payload, force=force)
         if changed:
             written += 1
@@ -1534,31 +1428,30 @@ def scaffold_target(
         (Path(__file__).with_name("runtime_state.py"), target_root / ".loom/bin/runtime_state.py"),
         (Path(__file__).with_name("loom_check.py"), target_root / ".loom/bin/loom_check.py"),
     ):
-        assert_write_path_inside_target(target_root, destination)
         if copy_file(source, destination, force=force):
             written += 1
             touched.append(str(destination.relative_to(target_root)))
     if not attach_only:
-        for relative_asset, destination in (
-            ("templates/scaffold/spec.md", target_root / ".loom/specs/INIT-0001/spec.md"),
-            ("templates/scaffold/plan.md", target_root / ".loom/specs/INIT-0001/plan.md"),
-            ("templates/scaffold/implementation-contract.md", target_root / ".loom/specs/INIT-0001/implementation-contract.md"),
+        for source, destination in (
+            (shared_asset(__file__, "templates/scaffold/spec.md"), target_root / ".loom/specs/INIT-0001/spec.md"),
+            (shared_asset(__file__, "templates/scaffold/plan.md"), target_root / ".loom/specs/INIT-0001/plan.md"),
+            (
+                shared_asset(__file__, "templates/scaffold/implementation-contract.md"),
+                target_root / ".loom/specs/INIT-0001/implementation-contract.md",
+            ),
         ):
-            assert_write_path_inside_target(target_root, destination)
-            if copy_or_write_shared_asset(relative_asset, destination, force=force):
+            if copy_file(source, destination, force=force):
                 written += 1
                 touched.append(str(destination.relative_to(target_root)))
 
     pr_template_target = target_root / ".github/PULL_REQUEST_TEMPLATE.md"
     if install_pr_template or not pr_template_target.exists():
-        assert_write_path_inside_target(target_root, pr_template_target)
-        if copy_or_write_shared_asset("github/PULL_REQUEST_TEMPLATE.md", pr_template_target, force=force):
+        if copy_file(shared_asset(__file__, "github/PULL_REQUEST_TEMPLATE.md"), pr_template_target, force=force):
             written += 1
             touched.append(str(pr_template_target.relative_to(target_root)))
 
     root_agents = target_root / "AGENTS.md"
     if not attach_only and not root_agents.exists():
-        assert_write_path_inside_target(target_root, root_agents)
         if write_text(root_agents, render_root_agents(), force=force):
             written += 1
             touched.append(str(root_agents.relative_to(target_root)))
@@ -1725,24 +1618,23 @@ def verify_target(target_root: Path, output_path: Path) -> list[str]:
                 ):
                     if field not in runtime_evidence_report:
                         errors.append(f"fact-chain: runtime_evidence is missing `{field}`")
-            matching_work_item = None
-            for work_item in validated_work_items:
-                if work_item.get("id") == current_item_id:
-                    matching_work_item = work_item
-                    break
-            if matching_work_item is None:
-                errors.append(f"init-result is missing the current work item `{current_item_id}`")
-            else:
+            bootstrap_work_item = next(
+                (work_item for work_item in validated_work_items if work_item.get("id") == WORK_ITEM_ID),
+                None,
+            )
+            if bootstrap_work_item is None:
+                errors.append(f"init-result is missing the bootstrap work item `{WORK_ITEM_ID}`")
+            elif current_item_id == WORK_ITEM_ID:
                 expected_init_fields = {
                     "recovery_entry": fact_chain_report["fact_chain"]["entry_points"]["recovery_entry"],
                     "validation_entry": fact_chain_report["facts"]["validation_entry"]["value"],
                     "workspace_entry": fact_chain_report["facts"]["workspace_entry"]["value"],
                 }
                 for field, expected_value in expected_init_fields.items():
-                    actual_value = matching_work_item.get(field)
+                    actual_value = bootstrap_work_item.get(field)
                     if actual_value != expected_value:
                         errors.append(
-                            f"init-result work item `{current_item_id}` has inconsistent `{field}`: "
+                            f"init-result bootstrap work item `{WORK_ITEM_ID}` has inconsistent `{field}`: "
                             f"expected `{expected_value}`, got `{actual_value}`"
                         )
 
@@ -1852,12 +1744,16 @@ def verify_target(target_root: Path, output_path: Path) -> list[str]:
             )
 
         for label, command, allowed in commands:
+            command_env = os.environ.copy()
+            for key in ("LOOM_SOURCE_REPO_ROOT", "LOOM_INSTALLED_SKILLS_ROOT", "LOOM_RUNTIME_SCENE"):
+                command_env.pop(key, None)
             result = subprocess.run(
                 command,
                 cwd=target_root,
                 check=False,
                 capture_output=True,
                 text=True,
+                env=command_env,
             )
             output = result.stdout.strip()
             if not output:
@@ -1898,7 +1794,6 @@ def bootstrap(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         print(f"loom-init: {exc}", file=sys.stderr)
         return 2
-    result["bootstrap_output"] = str(output_path.relative_to(target_root))
 
     if args.write:
         try:
