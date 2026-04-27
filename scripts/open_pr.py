@@ -594,13 +594,13 @@ def governing_artifact_label(exec_plan: dict[str, str], *, repo_root: Path) -> s
         if decision_path:
             related.append(decision_path)
         unique_related = list(dict.fromkeys(path for path in related if path))
-        return ", ".join(unique_related) or "formal spec 已绑定，详见 active exec-plan"
+        return ", ".join(unique_related)
     if input_mode == INPUT_MODE_BOOTSTRAP:
         decision_path = str(exec_plan.get("关联 decision", "")).strip()
         if decision_path:
             return decision_path
-        return "bootstrap contract 已绑定，详见 active exec-plan"
-    return "未通过 active exec-plan 绑定 formal spec / bootstrap contract"
+        return ""
+    return ""
 
 
 def build_review_artifact_values(args: argparse.Namespace, changed_files: list[str], *, repo_root: Path) -> dict[str, str]:

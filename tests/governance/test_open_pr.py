@@ -12,6 +12,7 @@ from scripts.common import CommandError, default_github_repo, normalize_integrat
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
+    governing_artifact_label,
     extract_issue_canonical_integration_fields,
     extract_issue_summary_sections,
     has_formal_spec_core_file_changes,
@@ -1162,6 +1163,18 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
         self.assertIn("- Review artifact: `code_review.md`", body)
         self.assertIn("- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。", body)
+
+    def test_governing_artifact_label_requires_concrete_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo, item_key="GOV-0015-item-context-gate")
+            exec_plan = {
+                "item_key": "GOV-0015-item-context-gate",
+                "item_type": "GOV",
+                "exec_plan": str(repo / "docs/exec-plans/GOV-0015-item-context-gate.md"),
+            }
+
+            self.assertEqual(governing_artifact_label(exec_plan, repo_root=repo), "")
 
     def test_build_body_uses_spec_review_artifact_for_spec_scope_changes(self) -> None:
         args = parse_args(["--class", "governance"])

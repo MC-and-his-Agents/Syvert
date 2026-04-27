@@ -119,5 +119,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 当前 checkpoint 真相由 `.loom/reviews/INIT-0001.json` 的 `reviewed_head`、`.loom/progress/INIT-0001.md` 与 `.loom/status/current.md` 共同记录。
+- 当前 checkpoint 真相由 `.loom/work-items/INIT-0001.md`、`.loom/progress/INIT-0001.md` 与 `.loom/status/current.md` 共同记录；`.loom/reviews/*.json` 的 `reviewed_head` 只用于 review freshness / merge gate 绑定，不作为 checkpoint truth。
 - 当前文本不把起始基线 SHA 伪装为 checkpoint；执行恢复时以 Loom carrier 为准。

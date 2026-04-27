@@ -670,6 +670,25 @@ class CodexReviewExecutionTests(unittest.TestCase):
             ],
         )
 
+    def test_review_artifact_errors_rejects_non_locator_governing_artifact_text(self) -> None:
+        meta = {
+            "body": "\n".join(
+                [
+                    "## Review Artifacts",
+                    "",
+                    "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                    "- Governing spec / bootstrap contract: bootstrap contract 已绑定，详见 active exec-plan",
+                    "- Review artifact: `code_review.md`",
+                    "- Validation evidence: 见 `## 验证`，由受控流程继续补充已执行/未执行项。",
+                ]
+            )
+        }
+
+        self.assertEqual(
+            review_artifact_errors(meta),
+            ["`## Review Artifacts` 中 `Governing spec / bootstrap contract` 必须指向具体 artifact locator。"],
+        )
+
     def test_integration_merge_gate_errors_requires_metadata_for_required_gate(self) -> None:
         meta = {
             "body": "\n".join(

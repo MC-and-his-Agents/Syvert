@@ -522,13 +522,19 @@ def load_repo_interop_contract(repo_interop: object, *, target_root: Path) -> tu
         if isinstance(contract_locator, dict)
         else ".loom/companion/interop.json"
     )
-    interop_path = target_root / str(declared_locator)
+    normalized_locator, interop_path, locator_error = resolve_repo_locator(
+        target_root,
+        declared_locator,
+        label="repo interop contract locator",
+    )
+    if locator_error or interop_path is None:
+        return None, [locator_error or "repo interop contract locator is invalid"]
     try:
         payload = load_json_file(interop_path)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return None, [f"missing repo interop contract: {interop_path}"]
+        return None, [f"missing repo interop contract: {normalized_locator}"]
     if not isinstance(payload, dict):
-        return None, [f"repo interop contract is unreadable: {interop_path}"]
+        return None, [f"repo interop contract is unreadable: {normalized_locator}"]
     return payload, []
 
 
@@ -547,6 +553,18 @@ def repo_relative_path(target_root: Path, relative: str) -> Path | None:
     except ValueError:
         return None
     return candidate
+
+
+def resolve_repo_locator(target_root: Path, locator: object, *, label: str) -> tuple[str | None, Path | None, str | None]:
+    if not isinstance(locator, str) or not locator.strip():
+        return None, None, f"{label} must be a non-empty repository-relative path"
+    normalized = locator.strip()
+    if Path(normalized).is_absolute() or ".." in Path(normalized).parts:
+        return normalized, None, f"{label} must stay inside the repository: {normalized}"
+    candidate = repo_relative_path(target_root, normalized)
+    if candidate is None:
+        return normalized, None, f"{label} must stay inside the repository: {normalized}"
+    return normalized, candidate, None
 
 
 def validate_shadow_sources(payload: dict[str, Any], *, path: Path, target_root: Path) -> tuple[dict[str, Any], list[str]]:
@@ -656,6 +674,10 @@ def normalized_shadow_semantics(payload: dict[str, Any], *, path: Path) -> tuple
 
 def normalized_shadow_value(path: Path, *, target_root: Path) -> tuple[dict[str, Any], str | None]:
     try:
+        path.resolve().relative_to(target_root.resolve())
+    except ValueError:
+        return {"normalized_value": None}, f"shadow parity locator must stay inside the repository: {path}"
+    try:
         if path.is_dir():
             return {"normalized_value": None}, f"shadow parity locator points to a directory: {path}"
         raw_text = path.read_text(encoding="utf-8")
@@ -751,10 +773,16 @@ def shadow_parity_report(
             "repo_native_carriers": relevant_repo_native_carriers,
         }
 
-    loom_locator = declared_surface.get("loom_locator")
-    repo_locator = declared_surface.get("repo_locator")
-    loom_path = target_root / str(loom_locator)
-    repo_path = target_root / str(repo_locator)
+    loom_locator, loom_path, loom_locator_error = resolve_repo_locator(
+        target_root,
+        declared_surface.get("loom_locator"),
+        label=f"shadow surface `{surface}` loom locator",
+    )
+    repo_locator, repo_path, repo_locator_error = resolve_repo_locator(
+        target_root,
+        declared_surface.get("repo_locator"),
+        label=f"shadow surface `{surface}` repo locator",
+    )
 
     loom_surface = {
         "status": "missing",
@@ -768,8 +796,16 @@ def shadow_parity_report(
     }
 
     global_errors = undeclared_shadow_evidence_errors(target_root, interop_payload)
-    loom_evidence, loom_error = normalized_shadow_value(loom_path, target_root=target_root)
-    repo_evidence, repo_error = normalized_shadow_value(repo_path, target_root=target_root)
+    loom_evidence, loom_error = (
+        normalized_shadow_value(loom_path, target_root=target_root)
+        if loom_path is not None
+        else ({"normalized_value": None}, loom_locator_error)
+    )
+    repo_evidence, repo_error = (
+        normalized_shadow_value(repo_path, target_root=target_root)
+        if repo_path is not None
+        else ({"normalized_value": None}, repo_locator_error)
+    )
     loom_value = loom_evidence.get("normalized_value")
     repo_value = repo_evidence.get("normalized_value")
 

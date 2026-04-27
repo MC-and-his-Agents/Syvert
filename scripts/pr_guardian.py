@@ -352,6 +352,21 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
     return payload
 
 
+def looks_like_artifact_locator_set(value: str, *, require_repo_path: bool) -> bool:
+    candidates = [part.strip().strip("`") for part in value.split(",") if part.strip()]
+    if not candidates:
+        return False
+    for candidate in candidates:
+        parts = Path(candidate).parts
+        if Path(candidate).is_absolute() or ".." in parts:
+            return False
+        if require_repo_path and "/" not in candidate:
+            return False
+        if not any(token in candidate for token in ("/", ".md", ".json", ".yml", ".yaml")):
+            return False
+    return True
+
+
 def review_artifact_errors(meta: dict) -> list[str]:
     sections = parse_markdown_sections(str(meta.get("body") or ""))
     section = sections.get("review_artifacts", "")
@@ -370,6 +385,11 @@ def review_artifact_errors(meta: dict) -> list[str]:
         value = str(payload.get(field) or "").strip().strip("`").strip()
         if value.casefold() in REVIEW_ARTIFACT_EMPTY_VALUES:
             errors.append(f"`## Review Artifacts` 中 `{field}` 不能为空。")
+            continue
+        if field == "Active exec-plan" and not looks_like_artifact_locator_set(value, require_repo_path=True):
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
+        if field == "Governing spec / bootstrap contract" and not looks_like_artifact_locator_set(value, require_repo_path=True):
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。")
     return errors
 
 

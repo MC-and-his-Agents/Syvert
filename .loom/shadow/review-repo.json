@@ -9,9 +9,9 @@
     "docs/exec-plans/GOV-0038-loom-official-adoption.md"
   ],
   "source_sha256": {
-    "scripts/pr_guardian.py": "8764b4820df92dec5ca64367f304546e5a719bb2d12e48cb2ea95ef3a9c021e9",
+    "scripts/pr_guardian.py": "66f69b9aca40b76c8d07058baffe5af119e1536d1c291823eca101e9314bd544",
     "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a",
-    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "51fde291b9dd7ba92853a0f91e63415f21b7cc06ea12c32ee8ad794c633b93da"
+    "docs/exec-plans/GOV-0038-loom-official-adoption.md": "a29f02ba128fb89f985c633e46147a225b90b67cced97be1a9ccf3d52cb6d490"
   },
   "source_semantics": "Review parity requires durable review evidence, explicit review findings handling, and authoritative review inputs before merge decisions.",
   "evidence_body": {

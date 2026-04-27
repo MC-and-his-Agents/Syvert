@@ -120,7 +120,20 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             payload, errors, _ = runtime_state._validate_install_layout(root)
 
         self.assertEqual(payload["status"], "block")
-        self.assertTrue(any("missing required paths" in error for error in errors))
+        self.assertTrue(any("must stay inside" in error for error in errors))
+
+    def test_runtime_state_rejects_install_layout_path_escape_even_when_target_exists(self) -> None:
+        runtime_state = load_loom_module("runtime_state")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            outside = root.parent / "outside"
+            outside.write_text("ok\n", encoding="utf-8")
+            (root / "install-layout.json").write_text('{"required_paths":["../outside"]}', encoding="utf-8")
+
+            payload, errors, _ = runtime_state._validate_install_layout(root)
+
+        self.assertEqual(payload["status"], "block")
+        self.assertTrue(any("must stay inside" in error for error in errors))
 
     def test_runtime_state_rejects_registry_path_escape(self) -> None:
         runtime_state = load_loom_module("runtime_state")
@@ -134,7 +147,26 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
             payload, errors, _ = runtime_state._validate_registry_contract(root)
 
         self.assertEqual(payload["status"], "block")
-        self.assertTrue(any("missing executable" in error or "missing manifest" in error for error in errors))
+        self.assertTrue(any("must stay inside" in error for error in errors))
+
+    def test_runtime_state_rejects_registry_path_escape_even_when_targets_exist(self) -> None:
+        runtime_state = load_loom_module("runtime_state")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            outside_exec = root.parent / "outside-exec"
+            outside_manifest = root.parent / "outside-manifest.json"
+            outside_exec.write_text("#!/bin/sh\n", encoding="utf-8")
+            outside_manifest.write_text("{}\n", encoding="utf-8")
+            (root / "registry.json").write_text(
+                '{"install_layout":"install-layout.json","upgrade_contract":"upgrade-contract.json","entries":[{"id":"x","executable":"../outside-exec","manifest":"../outside-manifest.json"}]}',
+                encoding="utf-8",
+            )
+            (root / "upgrade-contract.json").write_text('{"upgrade_policy":{"refresh_required":["layout_manifest"]}}', encoding="utf-8")
+
+            payload, errors, _ = runtime_state._validate_registry_contract(root)
+
+        self.assertEqual(payload["status"], "block")
+        self.assertTrue(any("must stay inside" in error for error in errors))
 
     def test_bootstrapped_runtime_wins_over_unrelated_source_repo_env(self) -> None:
         runtime_state = load_loom_module("runtime_state")
@@ -446,6 +478,53 @@ class LoomCarrierRuntimeTests(unittest.TestCase):
 
             self.assertEqual(report["result"], "mismatch")
             self.assertEqual(report["classification"], "drift")
+
+    def test_shadow_parity_rejects_external_shadow_locators(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = loom_flow.shadow_parity_report(
+                {
+                    "availability": "present",
+                    "contract": {"locator": "../outside-interop.json"},
+                },
+                target_root=root,
+                surface="review",
+            )
+
+            self.assertEqual(report["result"], "unreadable")
+            self.assertTrue(any("repo interop contract" in item for item in report["missing_inputs"]))
+
+    def test_shadow_parity_rejects_declared_repo_external_surface_locator(self) -> None:
+        loom_flow = load_loom_module("loom_flow")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / ".loom/companion").mkdir(parents=True)
+            interop = {
+                "schema_version": "loom-repo-interop/v1",
+                "host_adapters": [],
+                "repo_native_carriers": [],
+                "shadow_surfaces": {
+                    "review": {
+                        "summary": "review parity",
+                        "loom_locator": "../outside-loom.json",
+                        "repo_locator": "../outside-repo.json",
+                    }
+                },
+            }
+            (root / ".loom/companion/interop.json").write_text(json.dumps(interop), encoding="utf-8")
+
+            report = loom_flow.shadow_parity_report(
+                {
+                    "availability": "present",
+                    "contract": {"locator": ".loom/companion/interop.json"},
+                },
+                target_root=root,
+                surface="review",
+            )
+
+            self.assertEqual(report["result"], "unreadable")
+            self.assertTrue(any("must stay inside the repository" in item for item in report["missing_inputs"]))
 
     def test_loom_check_requires_adversarial_adoption_evidence(self) -> None:
         loom_check = load_loom_module("loom_check")
