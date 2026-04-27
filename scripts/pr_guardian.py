@@ -60,6 +60,7 @@ REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "spr
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
     "若缺少必要工件或验证证据，应明确指出阻断项；merge gate、head 绑定与 squash merge 安全性由 guardian gate 入口单独消费。",
+    "Loom review artifacts use `loom-review/v1` head-binding semantics: carrier-only drift from committing review metadata is not implementation drift.",
 )
 METADATA_ONLY_CLOSEOUT_DOC_PREFIXES = (
     "docs/exec-plans/",
