@@ -5,7 +5,7 @@
   "kind": "general_review",
   "summary": "Loom official adoption runtime and governance boundary hardening are aligned on the current PR head, and repo-relative carrier write surfaces now fail closed.",
   "reviewer": "codex",
-  "reviewed_head": "abf8ddea8251cac85b99fe08715244c69f59ab70",
+  "reviewed_head": "94b876b7ec03e768245a54fed73722ba153921e1",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are all passing locally on the current PR head.",
   "fallback_to": null,
   "findings": [],
