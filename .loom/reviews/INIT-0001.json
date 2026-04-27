@@ -5,7 +5,7 @@
   "kind": "general_review",
   "summary": "Syvert governance gate now validates repo-interface locator drift, active item validation entries are no longer bootstrap-hardcoded, and review shadow evidence includes the general review artifact.",
   "reviewer": "codex",
-  "reviewed_head": "ceed38b6c50e7f2af1cbea7e504c4b793e49f359",
+  "reviewed_head": "56fa60ebdaa0dfd4194d0d9fc0a1ebd081fb3358",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
