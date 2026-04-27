@@ -707,6 +707,53 @@ class CodexReviewExecutionTests(unittest.TestCase):
             repo_root = Path(temp_dir)
             (repo_root / "docs/exec-plans").mkdir(parents=True)
             (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text(
+                "\n".join(
+                    [
+                        "# GOV-0015",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- Issue：`#15`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`",
+                        "- active 收口事项：`GOV-0015-item-context-gate`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #15",
+                        "- item_key: `GOV-0015-item-context-gate`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3 -m unittest tests/governance/test_pr_guardian.py`",
+                    ]
+                )
+            }
+
+            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
+
+    def test_review_artifact_errors_rejects_artifacts_without_item_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
             (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text("plan", encoding="utf-8")
             (repo_root / "code_review.md").write_text("review", encoding="utf-8")
             meta = {
@@ -722,7 +769,15 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 )
             }
 
-            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
+            errors = review_artifact_errors(meta, repo_root=repo_root)
+
+            self.assertEqual(
+                errors,
+                [
+                    "`## Review Artifacts` 无法绑定到当前 PR 事项上下文，PR 描述缺少："
+                    "`issue`、`item_key`、`item_type`、`release`、`sprint`。"
+                ],
+            )
 
     def test_review_artifact_errors_binds_artifacts_to_item_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -788,6 +843,56 @@ class CodexReviewExecutionTests(unittest.TestCase):
             }
             errors = review_artifact_errors(unrelated_meta, repo_root=repo_root)
             self.assertTrue(any("Active exec-plan` 必须绑定当前 PR item context" in error for error in errors))
+
+    def test_review_artifact_errors_normalizes_file_level_governing_spec_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs/exec-plans/GOV-0024-guardian-review-context.md"
+            spec_dir = repo_root / ".loom/specs/INIT-0001"
+            exec_plan_path.parent.mkdir(parents=True)
+            spec_dir.mkdir(parents=True)
+            exec_plan_path.write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`.loom/specs/INIT-0001/spec.md`",
+                        "- active 收口事项：`GOV-0024-guardian-review-context`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "spec.md").write_text("spec", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                        "- item_key: `GOV-0024-guardian-review-context`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
+                        "- Governing spec / bootstrap contract: .loom/specs/INIT-0001",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
+                    ]
+                )
+            }
+
+            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
 
     def test_review_artifact_errors_rejects_placeholder_validation_without_executed_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2455,7 +2560,24 @@ class CodexReviewExecutionTests(unittest.TestCase):
         worktree_dir = Path("/tmp/guardian-temp/worktree")
         (worktree_dir / "docs/exec-plans").mkdir(parents=True, exist_ok=True)
         (worktree_dir / ".loom/specs/INIT-0001").mkdir(parents=True, exist_ok=True)
-        (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text("plan", encoding="utf-8")
+        (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text(
+            "\n".join(
+                [
+                    "# GOV-0024",
+                    "",
+                    "## 关联信息",
+                    "",
+                    "- item_key：`GOV-0024-guardian-review-context`",
+                    "- Issue：`#24`",
+                    "- item_type：`GOV`",
+                    "- release：`v0.1.0`",
+                    "- sprint：`2026-S14`",
+                    "- 关联 spec：`.loom/specs/INIT-0001/spec.md`",
+                    "- active 收口事项：`GOV-0024-guardian-review-context`",
+                ]
+            ),
+            encoding="utf-8",
+        )
         (worktree_dir / ".loom/specs/INIT-0001/spec.md").write_text("spec", encoding="utf-8")
         (worktree_dir / "code_review.md").write_text("review", encoding="utf-8")
         pr_meta_mock.return_value = {
@@ -2468,6 +2590,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
             "createdAt": "2026-04-26T23:59:59Z",
             "body": "\n".join(
                 [
+                    "## 关联事项",
+                    "",
+                    "- Issue: #24",
+                    "- item_key: `GOV-0024-guardian-review-context`",
+                    "- item_type: `GOV`",
+                    "- release: `v0.1.0`",
+                    "- sprint: `2026-S14`",
+                    "",
                     "## Review Artifacts",
                     "",
                     "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
@@ -2553,7 +2683,24 @@ class CodexReviewExecutionTests(unittest.TestCase):
             worktree_dir = temp_dir / "worktree"
             (worktree_dir / "docs/exec-plans").mkdir(parents=True)
             (worktree_dir / "docs/specs/FR-0024").mkdir(parents=True)
-            (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text("plan", encoding="utf-8")
+            (worktree_dir / "docs/exec-plans/GOV-0024-guardian-review-context.md").write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`docs/specs/FR-0024/`",
+                        "- active 收口事项：`GOV-0024-guardian-review-context`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
             (worktree_dir / "code_review.md").write_text("review", encoding="utf-8")
             pr_meta_mock.return_value = {
                 "number": 24,
@@ -2565,6 +2712,14 @@ class CodexReviewExecutionTests(unittest.TestCase):
                 "createdAt": "2026-04-27T00:00:00Z",
                 "body": "\n".join(
                     [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                        "- item_key: `GOV-0024-guardian-review-context`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
                         "## Review Artifacts",
                         "",
                         "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
@@ -3826,6 +3981,121 @@ class MergeIfSafeTests(unittest.TestCase):
         require_auth_mock.assert_called_once()
         self.assertEqual(all_checks_mock.call_count, 2)
         all_checks_mock.assert_called_with(1)
+
+    @patch("scripts.pr_guardian.prepare_worktree", side_effect=SystemExit("worktree failed"))
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_reverts_merge_time_recheck_when_review_artifact_worktree_fails(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+        prepare_worktree_mock,
+    ) -> None:
+        body = "\n".join(
+            [
+                INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+                "",
+                "## 关联事项",
+                "",
+                "- Issue: #1",
+                "- item_key: `GOV-0001`",
+                "- item_type: `GOV`",
+                "- release: `v0.1.0`",
+                "- sprint: `2026-S14`",
+                "",
+                "## Review Artifacts",
+                "",
+                "- Active exec-plan: docs/exec-plans/GOV-0001.md",
+                "- Governing spec / bootstrap contract: docs/decisions/ADR-0001.md",
+                "- Review artifact: code_review.md",
+                "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
+            ]
+        )
+        updated_body = body.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        edited_bodies: list[str] = []
+
+        def run_side_effect(command, cwd=None, check=True):
+            if command[:4] == ["gh", "pr", "edit", "1"]:
+                body_file = Path(command[command.index("--body-file") + 1])
+                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+                return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+        ]
+        find_result_mock.return_value = cached_guardian_result("sha-reviewed", body)
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
+        run_mock.side_effect = run_side_effect
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("Review Artifacts 门禁校验异常", str(ctx.exception))
+        self.assertEqual(len(edited_bodies), 2)
+        self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
+        self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
+        prepare_worktree_mock.assert_called_once()
+        review_once_mock.assert_called_once_with(1, post=False, json_output=None)
+        require_auth_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)

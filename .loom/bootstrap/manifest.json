@@ -47,7 +47,7 @@
       "path": ".loom/bin/governance_surface.py",
       "kind": "loom-tool-support",
       "source": "skills/shared/scripts/governance_surface.py",
-      "sha256": "02e6f66afcfad5b117ea9a801c7153466f24c6d5721da1546f286aa046c548f1"
+      "sha256": "543e10c205be62f5be78704fe9bf27e808fc07ffe035382e3d4dd78ffa8c80cc"
     },
     {
       "path": ".loom/bin/loom_flow.py",

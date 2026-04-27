@@ -45,7 +45,12 @@ from scripts.integration_contract import (
     validate_issue_fetch,
     validate_pr_integration_contract,
 )
-from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.item_context import (
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    normalize_bound_spec_dir,
+    parse_item_context_from_body,
+)
 from scripts.open_pr import extract_issue_summary_sections
 from scripts.policy.policy import classify_paths
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
@@ -391,6 +396,19 @@ def normalize_review_artifact_locator_for_repo(value: str, *, repo_root: Path) -
     return normalized
 
 
+def normalize_governing_artifact_locator_for_repo(value: str, *, repo_root: Path) -> str:
+    normalized = normalize_review_artifact_locator_for_repo(value, repo_root=repo_root)
+    if not normalized:
+        return ""
+    spec_dir = normalize_bound_spec_dir(repo_root, normalized)
+    if spec_dir is None:
+        return normalized
+    try:
+        return spec_dir.resolve().relative_to(repo_root.resolve()).as_posix().rstrip("/")
+    except ValueError:
+        return normalized
+
+
 def review_artifact_locator_errors(value: str, *, field: str, require_repo_path: bool, repo_root: Path) -> list[str]:
     candidates = review_artifact_locator_candidates(value)
     if not candidates:
@@ -414,8 +432,10 @@ def review_artifact_locator_errors(value: str, *, field: str, require_repo_path:
 
 def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_root: Path) -> list[str]:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
-    if not all(body_context.get(field, "").strip() for field in REVIEW_REQUIRED_BODY_FIELDS):
-        return []
+    missing_context = [field for field in REVIEW_REQUIRED_BODY_FIELDS if not body_context.get(field, "").strip()]
+    if missing_context:
+        joined = "、".join(f"`{field}`" for field in missing_context)
+        return [f"`## Review Artifacts` 无法绑定到当前 PR 事项上下文，PR 描述缺少：{joined}。"]
 
     item_context, notes, related_paths = build_item_context_summary(meta, repo_root)
     if notes:
@@ -431,13 +451,13 @@ def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_
         errors.append(f"`## Review Artifacts` 中 `Active exec-plan` 必须绑定当前 PR item context 的 exec-plan：`{expected_exec_plan}`。")
 
     expected_governing = {
-        normalize_review_artifact_locator_for_repo(path, repo_root=repo_root)
+        normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root)
         for path in related_paths
-        if normalize_review_artifact_locator_for_repo(path, repo_root=repo_root)
-        and normalize_review_artifact_locator_for_repo(path, repo_root=repo_root) != expected_exec_plan
+        if normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root)
+        and normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root) != expected_exec_plan
     }
     governing_candidates = {
-        normalize_review_artifact_locator(candidate)
+        normalize_governing_artifact_locator_for_repo(candidate, repo_root=repo_root)
         for candidate in review_artifact_locator_candidates(str(payload.get("Governing spec / bootstrap contract") or ""))
     }
     if expected_governing and governing_candidates != expected_governing:
@@ -559,7 +579,8 @@ def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[s
             errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=False, repo_root=repo_root))
         if field == "Validation evidence":
             errors.extend(validation_evidence_errors(value, sections=sections, repo_root=repo_root))
-    errors.extend(review_artifact_binding_errors(meta, payload, repo_root=repo_root))
+    if not errors:
+        errors.extend(review_artifact_binding_errors(meta, payload, repo_root=repo_root))
     return errors
 
 
@@ -1420,11 +1441,20 @@ def merge_if_safe(
             raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
     review_artifact_validation_errors: list[str] = []
     if review_artifact_gate_applies(current):
-        artifact_temp_dir, artifact_worktree_dir = prepare_worktree(pr_number, current)
         try:
-            review_artifact_validation_errors = review_artifact_errors(current, repo_root=artifact_worktree_dir)
-        finally:
-            cleanup(artifact_temp_dir)
+            artifact_temp_dir, artifact_worktree_dir = prepare_worktree(pr_number, current)
+            try:
+                review_artifact_validation_errors = review_artifact_errors(current, repo_root=artifact_worktree_dir)
+            finally:
+                cleanup(artifact_temp_dir)
+        except (CommandError, SystemExit) as exc:
+            if merge_time_integration_recheck_recorded:
+                restore_merge_time_integration_recheck_or_die(
+                    pr_number,
+                    previous_merge_recheck_value or "no",
+                    failure_context="Review Artifacts 门禁校验异常后无法保持 PR 元数据一致",
+                )
+            raise SystemExit(f"Review Artifacts 门禁校验异常，拒绝合并：{exc}") from exc
     if review_artifact_validation_errors:
         if merge_time_integration_recheck_recorded:
             restore_merge_time_integration_recheck_or_die(

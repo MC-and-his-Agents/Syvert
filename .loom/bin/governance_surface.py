@@ -1004,6 +1004,35 @@ def active_entry_points(root: Path) -> dict[str, str]:
     return active
 
 
+def bootstrap_host_binding_branch(root: Path) -> str:
+    init_result = root / ".loom/bootstrap/init-result.json"
+    try:
+        payload = json.loads(init_result.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    governance_surface = payload.get("governance_surface")
+    if not isinstance(governance_surface, dict):
+        return ""
+    control_plane = governance_surface.get("governance_control_plane")
+    if not isinstance(control_plane, dict):
+        return ""
+    host_binding = control_plane.get("host_binding")
+    if not isinstance(host_binding, dict):
+        return ""
+    required_objects = host_binding.get("required_objects")
+    if not isinstance(required_objects, dict):
+        return ""
+    branch = required_objects.get("branch")
+    if not isinstance(branch, dict):
+        return ""
+    locator = branch.get("locator")
+    if isinstance(locator, str) and locator.strip() and locator != "unknown":
+        return locator.strip()
+    return ""
+
+
 def detect_carrier_summary(root: Path, *, repository_mode: str, planning_mode: bool) -> dict[str, dict[str, str]]:
     active = active_entry_points(root)
     active_item_id = active.get("current_item_id") or "INIT-0001"
@@ -1140,6 +1169,11 @@ def detect_host_binding_surface(
 ) -> dict[str, Any]:
     branch_result = run_process(["git", "branch", "--show-current"], root)
     branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
+    branch_authority = "git"
+    if not branch:
+        branch = bootstrap_host_binding_branch(root)
+        if branch:
+            branch_authority = "bootstrap host binding"
     worktree_result = run_process(["git", "rev-parse", "--show-toplevel"], root)
     worktree = worktree_result.stdout.strip() if worktree_result.returncode == 0 else ""
     default_branch = github_control_plane.get("default_branch")
@@ -1152,7 +1186,7 @@ def detect_host_binding_surface(
         "branch": {
             "status": "present" if branch else "missing",
             "locator": branch or "unknown",
-            "authority": "git",
+            "authority": branch_authority,
         },
         "worktree": {
             "status": "present" if worktree else "missing",
