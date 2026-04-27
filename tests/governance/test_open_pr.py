@@ -1163,7 +1163,7 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
         self.assertIn("- Review artifact: `code_review.md`", body)
         self.assertIn(
-            "- Validation evidence: `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`",
+            "- Validation evidence: 见 `## 验证`，由受控流程补充已执行验证命令或验证 artifact。",
             body,
         )
 

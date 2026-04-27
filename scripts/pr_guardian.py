@@ -866,20 +866,24 @@ def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]
 def extract_related_links_from_exec_plan(exec_plan_path: Path) -> list[str]:
     links = [exec_plan_path.as_posix()]
     patterns = (
-        re.compile(r"^- 关联 spec[:：]\s*`?([^`]+)`?\s*$"),
-        re.compile(r"^- 关联 decision[:：]\s*`?([^`]+)`?\s*$"),
+        (re.compile(r"^- 关联 spec[:：]\s*`?([^`]+)`?\s*$"), False),
+        (re.compile(r"^- 额外关联 specs[:：]\s*(.+?)\s*$"), True),
+        (re.compile(r"^- 关联 decision[:：]\s*`?([^`]+)`?\s*$"), False),
     )
     for raw_line in exec_plan_path.read_text(encoding="utf-8").splitlines():
         stripped = raw_line.strip()
-        for pattern in patterns:
+        for pattern, split_values in patterns:
             match = pattern.match(stripped)
             if not match:
                 continue
-            value = match.group(1).strip()
-            if not value or value.startswith("无"):
-                continue
-            if "/" in value or value.endswith(".md"):
-                links.append(value)
+            raw_value = match.group(1).strip()
+            values = raw_value.split(",") if split_values else [raw_value]
+            for value in values:
+                value = value.strip().strip("`").strip()
+                if not value or value.startswith("无"):
+                    continue
+                if "/" in value or value.endswith(".md"):
+                    links.append(value)
     return links
 
 
