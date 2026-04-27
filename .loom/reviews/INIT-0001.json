@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Guardian Review Artifacts findings are addressed: governing artifact extraction includes extra specs and open_pr now emits a placeholder instead of defaulting to a command that looks executed.",
+  "summary": "Guardian Review Artifacts parser findings are addressed: generated validation placeholders pass only when validation section contains executed evidence, and extra specs parsing supports Chinese and ASCII separators.",
   "reviewer": "codex",
-  "reviewed_head": "c26fd7e78ebd00d90bf9be17b7b12feecfdaa5ac",
+  "reviewed_head": "252162d9860e743911740d2c772b77c1917714f5",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
