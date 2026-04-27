@@ -3,9 +3,9 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Implementation contract and exec-plan now include Review Artifacts generation, guardian admission, merge-time recheck, and detached-worktree reproducible governance_gate validation.",
+  "summary": "Review Artifacts scope, open_pr branch-bound validation evidence, guardian admission, merge-time recheck, and detached-worktree reproducible governance_gate validation are aligned.",
   "reviewer": "codex",
-  "reviewed_head": "a7446ff2920dbfedbf26582ec531d6f27124afdc",
+  "reviewed_head": "bf3acad66c9355b5751ae0b527f5869301744491",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
