@@ -3,15 +3,15 @@
   "item_id": "INIT-0001",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Final Syvert adoption gate update is reviewed: CI-only test fixture now avoids live issue metadata dependency while preserving merge-time Review Artifacts rollback semantics.",
+  "summary": "Guardian migration findings are addressed: legacy Review Artifacts cutover is restored, and repo-native Loom carrier drift now triggers carrier semantic validation.",
   "reviewer": "codex",
-  "reviewed_head": "4e9e140a561289820d23fdb4b199fb67d17e67a9",
+  "reviewed_head": "b41e546621b07119444ed49906bf217079610415",
   "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
   "fallback_to": null,
   "findings": [
     {
       "id": "compat-follow-up-1",
-      "summary": "Push refreshed head, wait for CI, run guardian, and execute controlled merge.",
+      "summary": "Run full local gates, push current PR #259 head, wait for CI, rerun guardian, then controlled merge.",
       "severity": "warn",
       "rebuttal": null,
       "disposition": {
@@ -22,7 +22,7 @@
   ],
   "blocking_issues": [],
   "follow_ups": [
-    "Push refreshed head, wait for CI, run guardian, and execute controlled merge."
+    "Run full local gates, push current PR #259 head, wait for CI, rerun guardian, then controlled merge."
   ],
   "consumed_inputs": {
     "work_item": ".loom/work-items/INIT-0001.md",
