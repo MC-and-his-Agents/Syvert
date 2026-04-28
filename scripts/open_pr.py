@@ -225,6 +225,14 @@ def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
     return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
 
 
+def touches_only_loom_spec_suite(changed_files: list[str]) -> bool:
+    touched_spec_dirs = formal_spec_dirs(changed_files)
+    return bool(touched_spec_dirs) and all(
+        len(spec_dir.parts) >= 3 and spec_dir.parts[0] == ".loom" and spec_dir.parts[1] == "specs"
+        for spec_dir in touched_spec_dirs
+    )
+
+
 def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type: str | None) -> bool:
     if not item_key or not item_type:
         return False
@@ -508,12 +516,15 @@ def validate_pr_preflight(
     ):
         errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
-    if pr_class == "governance" and touches_formal_spec_suite and not has_bound_formal_spec_input(
-        repo_root,
-        item_key,
-        item_type,
-        changed_files,
-        allow_unbound_local_fallback=False,
+    if pr_class == "governance" and touches_formal_spec_suite and not (
+        has_bound_formal_spec_input(
+            repo_root,
+            item_key,
+            item_type,
+            changed_files,
+            allow_unbound_local_fallback=False,
+        )
+        or (has_bound_bootstrap_contract(repo_root, item_key) and touches_only_loom_spec_suite(changed_files))
     ):
         errors.append("变更 formal spec 套件时，`governance` 类 PR 也必须绑定 formal spec 输入。")
 

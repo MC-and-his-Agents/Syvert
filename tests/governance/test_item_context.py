@@ -223,9 +223,21 @@ class ItemContextTests(unittest.TestCase):
             write_file(suite_dir / "plan.md", "# plan\n")
             write_file(suite_dir / "implementation-contract.md", "# contract\n")
 
-            errors = validate_bound_spec_contract(repo, {"关联 spec": ".loom/specs/INIT-0001/"})
+            errors = validate_bound_spec_contract(repo, {"item_type": "GOV", "关联 spec": ".loom/specs/INIT-0001/"})
 
         self.assertEqual(errors, [])
+
+    def test_validate_bound_spec_contract_rejects_loom_spec_for_non_governance_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            suite_dir = repo / ".loom" / "specs" / "INIT-0001"
+            write_file(suite_dir / "spec.md", "# spec\n")
+            write_file(suite_dir / "plan.md", "# plan\n")
+            write_file(suite_dir / "implementation-contract.md", "# contract\n")
+
+            errors = validate_bound_spec_contract(repo, {"item_type": "FR", "关联 spec": ".loom/specs/INIT-0001/"})
+
+        self.assertTrue(any("governance/Loom carrier" in error for error in errors))
 
     def test_validate_bound_spec_contract_rejects_loom_spec_without_implementation_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -234,7 +246,7 @@ class ItemContextTests(unittest.TestCase):
             write_file(suite_dir / "spec.md", "# spec\n")
             write_file(suite_dir / "plan.md", "# plan\n")
 
-            errors = validate_bound_spec_contract(repo, {"关联 spec": ".loom/specs/INIT-0001/"})
+            errors = validate_bound_spec_contract(repo, {"item_type": "GOV", "关联 spec": ".loom/specs/INIT-0001/"})
 
         self.assertTrue(any("implementation-contract.md" in error for error in errors))
 

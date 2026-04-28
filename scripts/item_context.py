@@ -457,6 +457,8 @@ def validate_bound_spec_contract(repo_root: Path, payload: Mapping[str, str]) ->
     parts = normalize_bound_spec_parts(related_spec)
     if parts is None:
         return [f"`关联 spec` 必须绑定到 {bound_spec_binding_hint(related_spec)}：`{related_spec}`。"]
+    if is_loom_bound_spec(related_spec) and str(payload.get("item_type", "")).strip() != "GOV":
+        return [f"`关联 spec` 指向 `.loom/specs/**` 时，当前事项必须是 Syvert governance/Loom carrier 事项：`{related_spec}`。"]
 
     if len(parts) == 4:
         if not candidate.exists():

@@ -1291,6 +1291,47 @@ class OpenPrPreflightTests(unittest.TestCase):
 
         self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
 
+    def test_validate_pr_preflight_allows_bootstrap_governance_pr_to_touch_loom_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text(
+                "\n".join(
+                    [
+                        "# decision",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+            )
+            (repo / ".loom/specs/INIT-0001").mkdir(parents=True)
+            (repo / ".loom/specs/INIT-0001/spec.md").write_text("# spec\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/plan.md").write_text("# plan\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/implementation-contract.md").write_text("# contract\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertFalse(any("变更 formal spec 套件时" in error for error in errors))
+
     def test_validate_pr_preflight_rejects_governance_pr_that_touches_non_core_spec_with_bootstrap_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
