@@ -1955,23 +1955,29 @@ def route(args: argparse.Namespace) -> int:
 
     registry_skill_ids, registry_error = load_registry_skill_ids()
     if registry_error:
-        print(
-            json.dumps(
-                route_payload(
-                    result="block",
-                    selected_skill="loom-init",
-                    mode="fallback",
-                    matched_signals=[],
-                    summary=f"cannot route because {registry_error}",
-                    missing_inputs=["a valid installed registry"],
-                    fallback_to="loom-init",
-                    runtime_state=runtime_state,
-                ),
-                ensure_ascii=False,
-                indent=2,
+        if runtime_state.get("carrier") == "bootstrapped-target-runtime":
+            registry_skill_ids = tuple(sorted({"loom-init", *SKILL_SIGNAL_RULES.keys()}))
+        else:
+            print(
+                json.dumps(
+                    route_payload(
+                        result="block",
+                        selected_skill="loom-init",
+                        mode="fallback",
+                        matched_signals=[],
+                        summary=f"cannot route because {registry_error}",
+                        missing_inputs=["a valid installed registry"],
+                        fallback_to="loom-init",
+                        runtime_state=runtime_state,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
             )
-        )
-        return 1
+            return 1
+
+    if registry_error and runtime_state.get("carrier") == "bootstrapped-target-runtime":
+        registry_error = None
 
     known_skills = set(registry_skill_ids or ())
     governance_surface: dict[str, object] | None = None

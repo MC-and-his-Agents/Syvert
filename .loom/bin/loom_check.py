@@ -4039,6 +4039,34 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
                 allowed_results={"pass"},
             )
 
+        payload, error = load_command_json(
+            root,
+            ["python3", ".loom/bin/loom_init.py", "route", "--target", ".", "--task", "inspect adoption carrier"],
+            cwd=bootstrap_target,
+        )
+        if error:
+            failures.append(Failure("daily-execution-cli", f"`bootstrapped loom-init route` failed: {error}"))
+        else:
+            require_route_payload(
+                failures,
+                category="daily-execution-cli",
+                context="`bootstrapped loom-init route`",
+                payload=payload,
+                expected_skill="loom-adopt",
+                expected_mode="implicit",
+                allowed_results={"pass"},
+            )
+            runtime_state = payload.get("runtime_state")
+            if not isinstance(runtime_state, dict) or runtime_state.get("carrier") != "bootstrapped-target-runtime":
+                failures.append(Failure("daily-execution-cli", "`bootstrapped loom-init route` must use the bootstrapped target runtime carrier"))
+            registry_check = (
+                runtime_state.get("checks", {}).get("registry_contract")
+                if isinstance(runtime_state, dict) and isinstance(runtime_state.get("checks"), dict)
+                else None
+            )
+            if not isinstance(registry_check, dict) or registry_check.get("status") != "not_applicable":
+                failures.append(Failure("daily-execution-cli", "`bootstrapped loom-init route` must not require skills/registry.json"))
+
         broken_bootstrap = tmp_root / "broken-bootstrapped-target"
         shutil.copytree(example_target, broken_bootstrap)
         manifest_path = broken_bootstrap / ".loom" / "bootstrap" / "manifest.json"
