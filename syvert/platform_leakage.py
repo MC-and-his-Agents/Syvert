@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +52,12 @@ _RUNTIME_SYMBOL_BOUNDARIES = {
     "invalid_input_error": "shared_error_model",
     "unsupported_error": "shared_error_model",
 }
+_RUNTIME_STATEMENT_BOUNDARY_OVERRIDE_FUNCTIONS = frozenset(
+    {
+        "execute_task_internal",
+        "run_adapter_attempt_with_timeout",
+    }
+)
 
 _PLATFORM_FIELD_RE = re.compile(r"\b(note_id|aweme_id|sign_base_url|sec_uid|xsec_token|web_rid)\b")
 _PLATFORM_STRING_FRAGMENT_RE = re.compile(
@@ -306,8 +312,8 @@ def _build_boundary_resolver(relative_name: str, source_text: str) -> Any:
 
 def _collect_runtime_statement_boundary_overrides(module: ast.Module) -> list[tuple[int, int, str]]:
     ranges: list[tuple[int, int, str]] = []
-    for node in module.body:
-        if not isinstance(node, ast.FunctionDef) or node.name != "execute_task_internal":
+    for node in ast.walk(module):
+        if not isinstance(node, ast.FunctionDef) or node.name not in _RUNTIME_STATEMENT_BOUNDARY_OVERRIDE_FUNCTIONS:
             continue
         for statement in sorted(
             (
@@ -330,6 +336,8 @@ def _classify_execute_task_statement_boundary(statement: ast.stmt) -> str | None
         return "shared_error_model"
     if isinstance(statement, (ast.Assign, ast.AnnAssign)) and _is_failure_envelope_expr(value):
         return "shared_error_model"
+    if isinstance(statement, ast.Return) and _return_contains_success_envelope(value):
+        return "shared_result_contract"
     if _is_success_envelope_expr(value):
         return "shared_result_contract"
     return None
@@ -349,7 +357,14 @@ def _is_failure_envelope_expr(value: ast.AST | None) -> bool:
     return (
         isinstance(value, ast.Call)
         and isinstance(value.func, ast.Name)
-        and value.func.id == "failure_envelope"
+        and value.func.id
+        in {
+            "failure_envelope",
+            "pre_accepted_failure_envelope",
+            "runtime_contract_error",
+            "invalid_input_error",
+            "unsupported_error",
+        }
     )
 
 
@@ -357,6 +372,12 @@ def _return_contains_failure_envelope(value: ast.AST | None) -> bool:
     if value is None:
         return False
     return any(_is_failure_envelope_expr(node) for node in ast.walk(value))
+
+
+def _return_contains_success_envelope(value: ast.AST | None) -> bool:
+    if value is None:
+        return False
+    return any(_is_success_envelope_expr(node) for node in ast.walk(value))
 
 
 def _is_success_envelope_expr(value: ast.AST | None) -> bool:
@@ -498,6 +519,7 @@ def _scan_file(
         ]
 
     findings: list[dict[str, str]] = []
+    statement_source_segment = _build_statement_source_segment(source_text)
     parent_index = _build_parent_index(module)
     platform_alias_histories = _build_platform_alias_histories(module, parent_index)
     key_signal_histories = _build_key_signal_histories(module, parent_index, platform_alias_histories)
@@ -533,7 +555,7 @@ def _scan_file(
                 continue
             boundary = boundary_resolver(line_number)
             evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
-            function_source = _statement_source_segment(source_text, node)
+            function_source = statement_source_segment(node)
             if _function_has_single_platform_semantic(
                 node,
                 function_source,
@@ -595,7 +617,7 @@ def _scan_file(
 
         boundary = boundary_resolver(line_number)
         evidence_ref = f"platform_leakage:{boundary}:{relative_name}:{line_number}"
-        statement_source = _statement_source_segment(source_text, node)
+        statement_source = statement_source_segment(node)
         if _is_docstring_statement(node):
             continue
         if isinstance(node, ast.ClassDef) and _definition_has_platform_metadata(
@@ -682,8 +704,47 @@ def _statement_identity(node: ast.AST) -> tuple[int, int, int, int]:
     )
 
 
-def _statement_source_segment(source_text: str, node: ast.AST) -> str:
-    return ast.get_source_segment(source_text, node) or ""
+def _build_statement_source_segment(source_text: str) -> Callable[[ast.AST], str]:
+    source_lines = _split_source_lines_for_ast_positions(source_text)
+
+    def statement_source_segment(node: ast.AST) -> str:
+        try:
+            if node.end_lineno is None or node.end_col_offset is None:
+                return ""
+            line_index = node.lineno - 1
+            end_line_index = node.end_lineno - 1
+            col_offset = node.col_offset
+            end_col_offset = node.end_col_offset
+        except AttributeError:
+            return ""
+
+        if end_line_index == line_index:
+            return source_lines[line_index].encode()[col_offset:end_col_offset].decode()
+
+        first_line = source_lines[line_index].encode()[col_offset:].decode()
+        last_line = source_lines[end_line_index].encode()[:end_col_offset].decode()
+        return "".join((first_line, *source_lines[line_index + 1 : end_line_index], last_line))
+
+    return statement_source_segment
+
+
+def _split_source_lines_for_ast_positions(source_text: str) -> list[str]:
+    lines: list[str] = []
+    current_line = ""
+    index = 0
+    while index < len(source_text):
+        character = source_text[index]
+        current_line += character
+        index += 1
+        if character == "\r" and index < len(source_text) and source_text[index] == "\n":
+            current_line += "\n"
+            index += 1
+        if character in "\r\n":
+            lines.append(current_line)
+            current_line = ""
+    if current_line:
+        lines.append(current_line)
+    return lines
 
 
 def _build_parent_index(module: ast.AST) -> dict[ast.AST, ast.AST]:

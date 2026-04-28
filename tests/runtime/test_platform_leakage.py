@@ -162,8 +162,8 @@ class PlatformLeakageTests(unittest.TestCase):
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
-                    "    supported_targets = declaration.supported_targets\n",
-                    '    runtime_platform_hint = "xhs"\n    supported_targets = declaration.supported_targets\n',
+                    "    supported_targets = adapter_declaration.supported_targets\n",
+                    '    runtime_platform_hint = "xhs"\n    supported_targets = adapter_declaration.supported_targets\n',
                 )
             }
         )
