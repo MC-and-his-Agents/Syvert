@@ -1,0 +1,28 @@
+{
+  "schema_version": "loom-shadow-parity-evidence/v1",
+  "result": "pass",
+  "mode": "validation-only",
+  "blocking_smoke": "pass",
+  "surfaces": [
+    "admission",
+    "review",
+    "merge_ready",
+    "closeout"
+  ],
+  "loom_sources": [
+    ".loom/shadow/admission-loom.json",
+    ".loom/shadow/review-loom.json",
+    ".loom/shadow/merge-ready-loom.json",
+    ".loom/shadow/closeout-loom.json"
+  ],
+  "repo_sources": [
+    ".loom/shadow/admission-repo.json",
+    ".loom/shadow/review-repo.json",
+    ".loom/shadow/merge-ready-repo.json",
+    ".loom/shadow/closeout-repo.json"
+  ],
+  "validation_entries": [
+    "python3 .loom/bin/loom_flow.py shadow-parity --target .",
+    "python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking"
+  ]
+}

@@ -60,7 +60,7 @@ from scripts.integration_contract import (
 )
 from scripts.policy.policy import classify_paths, formal_spec_dirs, get_policy, risk_level
 from scripts.pr_scope_guard import build_report
-from scripts.spec_guard import validate_suite
+from scripts.spec_guard import validate_formal_spec_suite, validate_suite
 
 
 TEMPLATE_PATH = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
@@ -76,6 +76,13 @@ ISSUE_SUMMARY_HEADING_ALIASES: dict[str, tuple[str, ...]] = {
 }
 ISSUE_SUMMARY_HEADINGS = tuple(ISSUE_SUMMARY_HEADING_ALIASES.keys())
 FORMAL_SPEC_CORE_FILES = {"spec.md", "plan.md"}
+LOOM_FORMAL_SPEC_CORE_FILES = FORMAL_SPEC_CORE_FILES | {"implementation-contract.md"}
+REVIEW_ARTIFACT_FIELDS = (
+    "Active exec-plan",
+    "Governing spec / bootstrap contract",
+    "Review artifact",
+    "Validation evidence",
+)
 INTEGRATION_TOUCHPOINT_CHOICES = field_choices("integration_touchpoint")
 EXTERNAL_DEPENDENCY_CHOICES = field_choices("external_dependency")
 MERGE_GATE_CHOICES = field_choices("merge_gate")
@@ -98,6 +105,20 @@ def has_formal_spec_core_file_changes(changed_files: list[str], *, repo_root: Pa
         normalized = Path(path)
         parts = normalized.parts
         if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in FORMAL_SPEC_CORE_FILES:
+            return True
+        if len(parts) == 4 and parts[0] == ".loom" and parts[1] == "specs" and parts[3] in LOOM_FORMAL_SPEC_CORE_FILES:
+            return True
+    if repo_root is None:
+        return False
+    return bool(changed_files) and all(is_deleted_legacy_todo_change(path, repo_root=repo_root) for path in changed_files)
+
+
+def has_formal_spec_suite_changes(changed_files: list[str], *, repo_root: Path | None = None) -> bool:
+    for path in changed_files:
+        parts = Path(path).parts
+        if len(parts) >= 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-"):
+            return True
+        if len(parts) >= 4 and parts[0] == ".loom" and parts[1] == "specs":
             return True
     if repo_root is None:
         return False
@@ -171,12 +192,12 @@ def has_bound_formal_spec_input(
                 and allows_legacy_metadata_free_formal_spec_decision(exec_plan, decision_errors)
             ):
                 return False
-        if validate_suite(spec_dir):
+        if validate_formal_spec_suite(spec_dir):
             return False
         for extra_spec_dir in additional_spec_dirs:
             if extra_spec_dir == spec_dir.relative_to(repo_root.resolve()):
                 continue
-            if validate_suite(repo_root / extra_spec_dir):
+            if validate_formal_spec_suite(repo_root / extra_spec_dir):
                 return False
         return True
 
@@ -199,9 +220,42 @@ def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
     if not item_key:
         return False
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
-    if classify_exec_plan_input_mode(exec_plan) != INPUT_MODE_BOOTSTRAP:
+    return classify_exec_plan_input_mode(exec_plan) == INPUT_MODE_BOOTSTRAP and not validate_bound_decision_contract(
+        repo_root,
+        exec_plan,
+        require_present=True,
+    )
+
+
+def has_bound_bootstrap_decision_contract(repo_root: Path, item_key: str | None) -> bool:
+    if not item_key:
         return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
     return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
+
+
+def touches_only_bound_loom_spec_suite(repo_root: Path, changed_files: list[str], item_key: str | None) -> bool:
+    if not item_key:
+        return False
+    touched_spec_dirs = formal_spec_dirs(changed_files)
+    if not touched_spec_dirs:
+        return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    related_spec = str(exec_plan.get("关联 spec", "")).strip()
+    bound_spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
+    if bound_spec_dir is None:
+        return False
+    try:
+        bound_spec_rel = bound_spec_dir.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    if len(bound_spec_rel.parts) < 3 or bound_spec_rel.parts[0] != ".loom" or bound_spec_rel.parts[1] != "specs":
+        return False
+    return touched_spec_dirs == {bound_spec_rel}
+
+
+def touches_only_loom_spec_paths(changed_files: list[str]) -> bool:
+    return bool(changed_files) and all(Path(path).as_posix().startswith(".loom/specs/") for path in changed_files)
 
 
 def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type: str | None) -> bool:
@@ -440,6 +494,8 @@ def validate_pr_preflight(
     validate_worktree_binding_check: bool = True,
 ) -> list[str]:
     errors: list[str] = []
+    touches_formal_spec = has_formal_spec_core_file_changes(changed_files, repo_root=repo_root)
+    touches_formal_spec_suite = has_formal_spec_suite_changes(changed_files, repo_root=repo_root)
 
     errors.extend(validate_item_context(issue, item_key, item_type, release, sprint, repo_root=repo_root))
     if validate_worktree_binding_check:
@@ -461,7 +517,7 @@ def validate_pr_preflight(
                 )
             )
 
-    if pr_class == "spec" and not has_formal_spec_core_file_changes(changed_files, repo_root=repo_root):
+    if pr_class == "spec" and not touches_formal_spec:
         errors.append("`spec` 类 PR 必须包含 formal spec 套件核心文件变更。")
 
     if pr_class == "spec" and not has_bound_formal_spec_input(
@@ -485,6 +541,22 @@ def validate_pr_preflight(
     ):
         errors.append("核心事项缺少 formal spec 或 bootstrap contract。")
         errors.append("`governance` 类 PR 缺少 `exec-plan` 或 formal spec 套件。")
+    if pr_class == "governance" and touches_formal_spec_suite and not (
+        has_bound_formal_spec_input(
+            repo_root,
+            item_key,
+            item_type,
+            changed_files,
+            allow_unbound_local_fallback=False,
+        )
+        or (
+            has_bound_bootstrap_decision_contract(repo_root, item_key)
+            and touches_only_bound_loom_spec_suite(repo_root, changed_files, item_key)
+        )
+    ):
+        errors.append("变更 formal spec 套件时，`governance` 类 PR 也必须绑定 formal spec 输入。")
+    if pr_class == "governance" and touches_formal_spec_suite and touches_only_loom_spec_paths(changed_files):
+        errors.append("仅变更 `.loom/specs/**` 时必须使用 `spec` 类 PR，避免本地 admission 与 CI class 推断分叉。")
 
     if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
         if not (
@@ -556,6 +628,74 @@ def render_integration_check_section(values: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+def replace_review_artifact_fields(body: str, values: dict[str, str]) -> str:
+    for label, value in values.items():
+        body = replace_markdown_field(body, label, value)
+    return body
+
+
+def governing_artifact_label(exec_plan: dict[str, str], *, repo_root: Path) -> str:
+    input_mode = classify_exec_plan_input_mode(exec_plan)
+    if input_mode == INPUT_MODE_FORMAL_SPEC:
+        related: list[str] = []
+        spec_dir = normalize_bound_spec_dir(repo_root, str(exec_plan.get("关联 spec", "")).strip())
+        if spec_dir is not None:
+            related.append(spec_dir.relative_to(repo_root).as_posix())
+        additional_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, exec_plan)
+        if not additional_errors:
+            related.extend(path.as_posix() for path in additional_spec_dirs)
+        decision_path = str(exec_plan.get("关联 decision", "")).strip()
+        if decision_path:
+            related.append(decision_path)
+        unique_related = list(dict.fromkeys(path for path in related if path))
+        return ", ".join(unique_related)
+    if input_mode == INPUT_MODE_BOOTSTRAP:
+        decision_path = str(exec_plan.get("关联 decision", "")).strip()
+        if decision_path:
+            return decision_path
+        return ""
+    if input_mode == INPUT_MODE_UNBOUND and exec_plan.get("item_type") == "FR":
+        item_key = str(exec_plan.get("item_key") or "").strip()
+        expected_dir = repo_root / "docs" / "specs" / item_key
+        if expected_dir.exists() and spec_dir_has_minimum_suite(expected_dir) and not validate_suite(expected_dir):
+            return expected_dir.relative_to(repo_root).as_posix()
+    return ""
+
+
+def build_review_artifact_values(args: argparse.Namespace, changed_files: list[str], *, repo_root: Path) -> dict[str, str]:
+    exec_plan = load_item_context_from_exec_plan(repo_root, args.item_key or "") if args.item_key else {}
+    exec_plan_path = str(exec_plan.get("exec_plan", "")).strip()
+    if exec_plan_path:
+        exec_plan_locator = Path(exec_plan_path)
+        if exec_plan_locator.is_absolute():
+            try:
+                exec_plan_path = exec_plan_locator.resolve().relative_to(repo_root.resolve()).as_posix()
+            except ValueError:
+                pass
+    governing_artifact = governing_artifact_label(exec_plan, repo_root=repo_root) if exec_plan else ""
+    categories = {item.category for item in classify_paths(changed_files)}
+    review_artifacts: list[str] = []
+    if "spec" in categories or args.pr_class == "spec":
+        review_artifacts.append("spec_review.md")
+    if args.pr_class != "spec" or "governance" in categories or "implementation" in categories:
+        review_artifacts.append("code_review.md")
+    review_artifact = ", ".join(f"`{item}`" for item in dict.fromkeys(review_artifacts)) or "`code_review.md`"
+    head_ref = git_current_branch(repo=repo_root) or "HEAD"
+    validation_evidence = (
+        f"`python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref {head_ref}`"
+    )
+    return {
+        "Active exec-plan": f"`{exec_plan_path}`" if exec_plan_path else "未定位到 active exec-plan",
+        "Governing spec / bootstrap contract": (
+            f"`{governing_artifact}`"
+            if governing_artifact
+            else "未定位到 governing artifact"
+        ),
+        "Review artifact": review_artifact,
+        "Validation evidence": validation_evidence,
+    }
+
+
 def canonicalize_integration_ref_for_issue(
     issue: int | None,
     integration_ref: str,
@@ -623,6 +763,7 @@ def build_body(args: argparse.Namespace, changed_files: list[str]) -> str:
     }
     for token, value in replacements.items():
         body = body.replace(token, value)
+    body = replace_review_artifact_fields(body, build_review_artifact_values(args, changed_files, repo_root=REPO_ROOT))
     integration_values = {
         "integration_touchpoint": args.integration_touchpoint,
         "shared_contract_changed": args.shared_contract_changed,

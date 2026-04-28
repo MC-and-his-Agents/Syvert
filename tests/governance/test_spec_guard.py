@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.spec_guard import validate_changed_paths, validate_suite
+from scripts.spec_guard import validate_changed_paths, validate_loom_suite, validate_suite
 
 
 GOOD_SPEC = """# FR-0001-example
@@ -65,6 +65,62 @@ GOOD_PLAN = """# Plan
 """
 
 
+GOOD_LOOM_SPEC = """# Spec
+
+## Goal
+
+- adopt loom
+
+## Scope
+
+- carrier
+
+## Key Scenarios
+
+- scenario
+
+## Acceptance Criteria
+
+- [x] pass
+"""
+
+
+GOOD_LOOM_PLAN = """# Plan
+
+## Implementation Goal
+
+- goal
+
+## Phases
+
+- phase
+
+## Validation
+
+- validate
+"""
+
+
+GOOD_LOOM_IMPLEMENTATION_CONTRACT = """# Implementation Contract
+
+## Work Item
+
+- INIT-0001
+
+## Approved Spec
+
+- spec
+
+## Implementation Scope
+
+- scope
+
+## Validation Plan
+
+- plan
+"""
+
+
 class SpecGuardTests(unittest.TestCase):
     def test_valid_suite_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -101,6 +157,30 @@ class SpecGuardTests(unittest.TestCase):
             (fr_dir / "TODO.md").write_text("# TODO\n", encoding="utf-8")
             errors = validate_changed_paths(repo, ["docs/specs/FR-0001-example/TODO.md"])
         self.assertTrue(any("退出正式治理流" in error for error in errors))
+
+    def test_loom_spec_changes_use_loom_suite_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            spec_dir = repo / ".loom" / "specs" / "INIT-0001"
+            spec_dir.mkdir(parents=True)
+            (spec_dir / "spec.md").write_text(GOOD_LOOM_SPEC, encoding="utf-8")
+            (spec_dir / "plan.md").write_text(GOOD_LOOM_PLAN, encoding="utf-8")
+
+            errors = validate_changed_paths(repo, [".loom/specs/INIT-0001/spec.md"])
+
+        self.assertTrue(any("缺少 `implementation-contract.md`" in error for error in errors))
+
+    def test_valid_loom_spec_suite_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            spec_dir = Path(temp_dir) / ".loom" / "specs" / "INIT-0001"
+            spec_dir.mkdir(parents=True)
+            (spec_dir / "spec.md").write_text(GOOD_LOOM_SPEC, encoding="utf-8")
+            (spec_dir / "plan.md").write_text(GOOD_LOOM_PLAN, encoding="utf-8")
+            (spec_dir / "implementation-contract.md").write_text(GOOD_LOOM_IMPLEMENTATION_CONTRACT, encoding="utf-8")
+
+            errors = validate_loom_suite(spec_dir)
+
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

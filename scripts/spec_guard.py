@@ -76,6 +76,42 @@ def validate_suite(fr_dir: Path) -> list[str]:
     return errors
 
 
+LOOM_SPEC_REQUIRED_FILES = ("spec.md", "plan.md", "implementation-contract.md")
+LOOM_SPEC_REQUIRED_HEADINGS = {
+    "spec.md": ("## Goal", "## Scope", "## Key Scenarios", "## Acceptance Criteria"),
+    "plan.md": ("## Implementation Goal", "## Phases", "## Validation"),
+    "implementation-contract.md": ("## Work Item", "## Approved Spec", "## Implementation Scope", "## Validation Plan"),
+}
+
+
+def validate_loom_suite(spec_dir: Path) -> list[str]:
+    errors: list[str] = []
+    for filename in LOOM_SPEC_REQUIRED_FILES:
+        target = spec_dir / filename
+        if not target.exists():
+            errors.append(f"{spec_dir}: 缺少 `{filename}`")
+            continue
+        text = target.read_text(encoding="utf-8").strip()
+        if not text:
+            errors.append(f"{spec_dir}: `{filename}` 不能为空")
+            continue
+        for heading in LOOM_SPEC_REQUIRED_HEADINGS.get(filename, ()):
+            if heading not in text:
+                errors.append(f"{target}: 缺少 `{heading}`")
+    return errors
+
+
+def is_loom_spec_dir(spec_dir: Path) -> bool:
+    normalized = spec_dir.as_posix().rstrip("/")
+    return normalized.startswith(".loom/specs/") or "/.loom/specs/" in normalized
+
+
+def validate_formal_spec_suite(spec_dir: Path) -> list[str]:
+    if is_loom_spec_dir(spec_dir):
+        return validate_loom_suite(spec_dir)
+    return validate_suite(spec_dir)
+
+
 def validate_changed_paths(repo_root: Path, changed_paths: list[str]) -> list[str]:
     errors: list[str] = []
 
@@ -95,18 +131,24 @@ def validate_changed_paths(repo_root: Path, changed_paths: list[str]) -> list[st
     if "governance" in categories and "implementation" in categories:
         errors.append("治理基线变更不得与实现代码混在同一 PR。")
 
-    for fr_dir in formal_spec_dirs(changed_paths):
-        if fr_dir.name == "_template":
+    for spec_dir in formal_spec_dirs(changed_paths):
+        if spec_dir.name == "_template":
             continue
-        errors.extend(validate_suite(repo_root / fr_dir))
+        errors.extend(validate_formal_spec_suite(repo_root / spec_dir))
     return errors
 
 
 def all_formal_spec_dirs(repo_root: Path) -> list[Path]:
-    specs_root = repo_root / "docs" / "specs"
-    if not specs_root.exists():
-        return []
-    return sorted(path for path in specs_root.iterdir() if path.is_dir() and path.name.startswith("FR-"))
+    output: list[Path] = []
+    docs_specs_root = repo_root / "docs" / "specs"
+    if docs_specs_root.exists():
+        output.extend(
+            path for path in docs_specs_root.iterdir() if path.is_dir() and path.name.startswith("FR-")
+        )
+    loom_specs_root = repo_root / ".loom" / "specs"
+    if loom_specs_root.exists():
+        output.extend(path for path in loom_specs_root.iterdir() if path.is_dir())
+    return sorted(output)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -115,8 +157,8 @@ def main(argv: list[str] | None = None) -> int:
     errors: list[str] = []
 
     if args.all:
-        for fr_dir in all_formal_spec_dirs(repo_root):
-            errors.extend(validate_suite(fr_dir))
+        for spec_dir in all_formal_spec_dirs(repo_root):
+            errors.extend(validate_formal_spec_suite(spec_dir))
     else:
         base_ref = args.base_ref or args.base_sha
         head_ref = args.head_sha or args.head_ref
@@ -129,8 +171,8 @@ def main(argv: list[str] | None = None) -> int:
         if changed:
             errors.extend(validate_changed_paths(repo_root, changed))
         else:
-            for fr_dir in all_formal_spec_dirs(repo_root):
-                errors.extend(validate_suite(fr_dir))
+            for spec_dir in all_formal_spec_dirs(repo_root):
+                errors.extend(validate_formal_spec_suite(spec_dir))
 
     if errors:
         for error in errors:

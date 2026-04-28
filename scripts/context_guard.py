@@ -33,7 +33,7 @@ from scripts.item_context import (
     validate_bound_spec_contract,
 )
 from scripts.policy.policy import formal_spec_dirs, spec_suite_policy
-from scripts.spec_guard import validate_suite
+from scripts.spec_guard import validate_formal_spec_suite, validate_suite
 
 
 ALLOWED_ITEM_TYPES = {"FR", "HOTFIX", "GOV", "CHORE"}
@@ -214,7 +214,7 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
                     bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                     errors.extend(
                         f"{path}: 绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
-                        for error in validate_suite(spec_dir)
+                        for error in validate_formal_spec_suite(spec_dir)
                     )
             additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
             errors.extend(f"{path}: {error}" for error in additional_spec_errors)
@@ -224,7 +224,7 @@ def validate_exec_plan(path: Path, *, repo_root: Path) -> list[str]:
                         continue
                     errors.extend(
                         f"{path}: `额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
-                        for error in validate_suite(repo_root / extra_spec_dir)
+                        for error in validate_formal_spec_suite(repo_root / extra_spec_dir)
                     )
             if fields.get("关联 decision", ""):
                 decision_errors = validate_bound_decision_contract(repo_root, fields, require_present=True)
@@ -416,7 +416,7 @@ def validate_formal_spec_authorization_contract(
                 bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
-                    for error in validate_suite(spec_dir)
+                    for error in validate_formal_spec_suite(spec_dir)
                 )
         additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
         errors.extend(additional_spec_errors)
@@ -426,7 +426,7 @@ def validate_formal_spec_authorization_contract(
                     continue
                 errors.extend(
                     f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
-                    for error in validate_suite(repo_root / extra_spec_dir)
+                    for error in validate_formal_spec_suite(repo_root / extra_spec_dir)
                 )
     elif input_mode == INPUT_MODE_UNBOUND and item_type == "FR" and item_key:
         expected_dir = repo_root / "docs" / "specs" / item_key
@@ -467,7 +467,7 @@ def validate_decision_authorization_contract(
                 bound_spec_relative = spec_dir.relative_to(repo_root.resolve())
                 errors.extend(
                     f"绑定 `关联 spec` 的 formal spec 套件不可审查：{error}"
-                    for error in validate_suite(spec_dir)
+                    for error in validate_formal_spec_suite(spec_dir)
                 )
         additional_spec_errors, additional_spec_dirs = validate_additional_spec_contracts(repo_root, fields)
         errors.extend(additional_spec_errors)
@@ -477,7 +477,7 @@ def validate_decision_authorization_contract(
                     continue
                 errors.extend(
                     f"`额外关联 specs` 绑定的 formal spec 套件不可审查：{error}"
-                    for error in validate_suite(repo_root / extra_spec_dir)
+                    for error in validate_formal_spec_suite(repo_root / extra_spec_dir)
                 )
 
     require_present = input_mode in {INPUT_MODE_BOOTSTRAP, INPUT_MODE_FORMAL_SPEC} or has_meaningful_binding(

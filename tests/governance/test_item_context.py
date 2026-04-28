@@ -29,6 +29,10 @@ class ItemContextTests(unittest.TestCase):
             INPUT_MODE_FORMAL_SPEC,
         )
         self.assertEqual(
+            classify_exec_plan_input_mode({"item_type": "GOV", "关联 spec": ".loom/specs/INIT-0001/"}),
+            INPUT_MODE_FORMAL_SPEC,
+        )
+        self.assertEqual(
             classify_exec_plan_input_mode({"item_type": "GOV"}),
             INPUT_MODE_BOOTSTRAP,
         )
@@ -57,6 +61,27 @@ class ItemContextTests(unittest.TestCase):
                 suite_dir.resolve(),
             )
             self.assertIsNone(normalize_bound_spec_dir(repo, "docs/specs/_template/"))
+
+    def test_normalize_bound_spec_dir_accepts_loom_spec_directory_and_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            suite_dir = repo / ".loom" / "specs" / "INIT-0001"
+            write_file(suite_dir / "spec.md", "# spec\n")
+            write_file(suite_dir / "plan.md", "# plan\n")
+            write_file(suite_dir / "implementation-contract.md", "# contract\n")
+
+            self.assertEqual(
+                normalize_bound_spec_dir(repo, ".loom/specs/INIT-0001/"),
+                suite_dir.resolve(),
+            )
+            self.assertEqual(
+                normalize_bound_spec_dir(repo, ".loom/specs/INIT-0001/spec.md"),
+                suite_dir.resolve(),
+            )
+            self.assertEqual(
+                normalize_bound_spec_dir(repo, ".loom/specs/INIT-0001/implementation-contract.md"),
+                suite_dir.resolve(),
+            )
 
     def test_validate_bound_decision_contract_checks_issue_and_item_key_consistency(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -189,6 +214,41 @@ class ItemContextTests(unittest.TestCase):
                 {"关联 spec": "docs/specs/FR-0001-example/shadow/"},
             )
         self.assertTrue(any("FR formal spec 套件根目录" in error for error in errors))
+
+    def test_validate_bound_spec_contract_accepts_loom_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            suite_dir = repo / ".loom" / "specs" / "INIT-0001"
+            write_file(suite_dir / "spec.md", "# spec\n")
+            write_file(suite_dir / "plan.md", "# plan\n")
+            write_file(suite_dir / "implementation-contract.md", "# contract\n")
+
+            errors = validate_bound_spec_contract(repo, {"item_type": "GOV", "关联 spec": ".loom/specs/INIT-0001/"})
+
+        self.assertEqual(errors, [])
+
+    def test_validate_bound_spec_contract_rejects_loom_spec_for_non_governance_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            suite_dir = repo / ".loom" / "specs" / "INIT-0001"
+            write_file(suite_dir / "spec.md", "# spec\n")
+            write_file(suite_dir / "plan.md", "# plan\n")
+            write_file(suite_dir / "implementation-contract.md", "# contract\n")
+
+            errors = validate_bound_spec_contract(repo, {"item_type": "FR", "关联 spec": ".loom/specs/INIT-0001/"})
+
+        self.assertTrue(any("governance/Loom carrier" in error for error in errors))
+
+    def test_validate_bound_spec_contract_rejects_loom_spec_without_implementation_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            suite_dir = repo / ".loom" / "specs" / "INIT-0001"
+            write_file(suite_dir / "spec.md", "# spec\n")
+            write_file(suite_dir / "plan.md", "# plan\n")
+
+            errors = validate_bound_spec_contract(repo, {"item_type": "GOV", "关联 spec": ".loom/specs/INIT-0001/"})
+
+        self.assertTrue(any("implementation-contract.md" in error for error in errors))
 
     def test_validate_bound_formal_spec_scope_accepts_gov_0029_delete_only_legacy_todo_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

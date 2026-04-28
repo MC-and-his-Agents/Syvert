@@ -45,7 +45,13 @@ from scripts.integration_contract import (
     validate_issue_fetch,
     validate_pr_integration_contract,
 )
-from scripts.item_context import active_exec_plans_for_issue, load_item_context_from_exec_plan, parse_item_context_from_body
+from scripts.item_context import (
+    active_exec_plans_for_issue,
+    load_item_context_from_exec_plan,
+    normalize_bound_spec_dir,
+    parse_item_context_from_body,
+    spec_dir_has_minimum_suite,
+)
 from scripts.open_pr import extract_issue_summary_sections
 from scripts.policy.policy import classify_paths
 from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
@@ -53,6 +59,7 @@ from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 CODE_REVIEW_PATH = "code_review.md"
+REVIEW_RUBRIC_ARTIFACTS = {"code_review.md", "spec_review.md"}
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
 INTEGRATION_STATUS_VALUES = set(field_choices("integration_status_checked_before_pr"))
@@ -60,6 +67,7 @@ REVIEW_REQUIRED_BODY_FIELDS = ("issue", "item_key", "item_type", "release", "spr
 REVIEW_EXECUTION_RULES = (
     "工件完整性只用于确认输入是否足够，不要把 checks、Draft 状态或 merge 动作当成 reviewer 结论来源。",
     "若缺少必要工件或验证证据，应明确指出阻断项；merge gate、head 绑定与 squash merge 安全性由 guardian gate 入口单独消费。",
+    "Loom review artifacts use `loom-review/v1` head-binding semantics: carrier-only drift from committing review metadata is not implementation drift.",
 )
 METADATA_ONLY_CLOSEOUT_DOC_PREFIXES = (
     "docs/exec-plans/",
@@ -74,10 +82,31 @@ REVIEW_SECTION_ALIASES = {
     "摘要": "summary",
     "Issue 摘要": "issue_summary",
     "关联事项": "item_context",
+    "Review Artifacts": "review_artifacts",
     "风险": "risk",
     "风险级别": "risk",
     "验证": "validation",
     "回滚": "rollback",
+}
+REVIEW_ARTIFACT_REQUIRED_FIELDS = (
+    "Active exec-plan",
+    "Governing spec / bootstrap contract",
+    "Review artifact",
+    "Validation evidence",
+)
+REVIEW_ARTIFACT_EMPTY_VALUES = {
+    "",
+    "tbd",
+    "todo",
+    "n/a",
+    "na",
+    "none",
+    "无",
+    "待补充",
+    "未填写",
+    "未定位",
+    "未定位到 active exec-plan",
+    "未定位到 governing artifact",
 }
 RAW_BODY_NOISE_HEADINGS = {"变更文件", "检查清单"}
 REVIEW_GUIDE_HEADINGS = (
@@ -87,6 +116,24 @@ REVIEW_GUIDE_HEADINGS = (
     "## 职责边界说明",
 )
 ISSUE_CONTEXT_HEADINGS = ("Goal", "Scope", "Required Outcomes", "Acceptance", "Acceptance Criteria", "Out of Scope", "Dependency")
+REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS = ("summary", "item_context", "risk", "validation", "rollback")
+REVIEW_ARTIFACT_REQUIRED_AFTER = datetime(2026, 4, 27, tzinfo=timezone.utc)
+REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS = ("## Loom Runtime Locator",)
+REVIEW_ARTIFACT_PLACEHOLDER_MARKERS = (
+    "由受控流程继续补充",
+    "见 ## 验证",
+    "见 `## 验证`",
+)
+VALIDATION_COMMAND_PREFIXES = (
+    "python",
+    "python3",
+    "python3.11",
+    "npm",
+    "make",
+    "pytest",
+    "env ",
+    "gh ",
+)
 
 
 def codex_review_timeout_seconds() -> int | None:
@@ -131,18 +178,21 @@ def require_auth() -> None:
 
 
 def pr_meta(pr_number: int) -> dict:
-    completed = run(
-        [
-            "gh",
-            "pr",
-            "view",
-            str(pr_number),
-            "--json",
-            "number,title,body,url,isDraft,baseRefName,headRefName,headRefOid,author",
-        ],
-        cwd=REPO_ROOT,
-    )
-    return json.loads(completed.stdout)
+    repo_slug = default_github_repo()
+    completed = run(["gh", "api", f"repos/{repo_slug}/pulls/{pr_number}"], cwd=REPO_ROOT)
+    payload = json.loads(completed.stdout or "{}")
+    return {
+        "number": payload.get("number", pr_number),
+        "title": payload.get("title") or "",
+        "body": payload.get("body") or "",
+        "url": payload.get("html_url") or "",
+        "isDraft": bool(payload.get("draft")),
+        "baseRefName": (payload.get("base") or {}).get("ref") or "",
+        "headRefName": (payload.get("head") or {}).get("ref") or "",
+        "headRefOid": (payload.get("head") or {}).get("sha") or "",
+        "author": {"login": (payload.get("user") or {}).get("login") or ""},
+        "createdAt": payload.get("created_at") or "",
+    }
 
 
 def prepare_worktree(pr_number: int, meta: dict) -> tuple[Path, Path]:
@@ -330,6 +380,239 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
     return payload
 
 
+def review_artifact_locator_candidates(value: str) -> list[str]:
+    return [part.strip().strip("`").strip() for part in re.split(r"[,，]", value) if part.strip()]
+
+
+def normalize_review_artifact_locator(value: str) -> str:
+    return value.strip().strip("`").strip().rstrip("/")
+
+
+def normalize_review_artifact_locator_for_repo(value: str, *, repo_root: Path) -> str:
+    normalized = normalize_review_artifact_locator(value)
+    if not normalized:
+        return ""
+    path = Path(normalized)
+    if path.is_absolute():
+        try:
+            return path.resolve().relative_to(repo_root.resolve()).as_posix().rstrip("/")
+        except ValueError:
+            return normalized
+    return normalized
+
+
+def normalize_governing_artifact_locator_for_repo(value: str, *, repo_root: Path) -> str:
+    normalized = normalize_review_artifact_locator_for_repo(value, repo_root=repo_root)
+    if not normalized:
+        return ""
+    spec_dir = normalize_bound_spec_dir(repo_root, normalized)
+    if spec_dir is None:
+        return normalized
+    try:
+        return spec_dir.resolve().relative_to(repo_root.resolve()).as_posix().rstrip("/")
+    except ValueError:
+        return normalized
+
+
+def review_artifact_locator_errors(value: str, *, field: str, require_repo_path: bool, repo_root: Path) -> list[str]:
+    candidates = review_artifact_locator_candidates(value)
+    if not candidates:
+        return [f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator。"]
+    errors: list[str] = []
+    for candidate in candidates:
+        parts = Path(candidate).parts
+        if Path(candidate).is_absolute() or ".." in parts:
+            errors.append(f"`## Review Artifacts` 中 `{field}` 包含非法 artifact locator：`{candidate}`。")
+            continue
+        if require_repo_path and "/" not in candidate:
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向仓库内具体路径：`{candidate}`。")
+            continue
+        if not any(token in candidate for token in ("/", ".md", ".json", ".yml", ".yaml")):
+            errors.append(f"`## Review Artifacts` 中 `{field}` 必须指向具体 artifact locator：`{candidate}`。")
+            continue
+        if not (repo_root / candidate).exists():
+            errors.append(f"`## Review Artifacts` 中 `{field}` 指向不存在的 artifact：`{candidate}`。")
+    return errors
+
+
+def review_rubric_artifact_errors(value: str) -> list[str]:
+    errors: list[str] = []
+    candidates = {
+        normalize_review_artifact_locator(candidate)
+        for candidate in review_artifact_locator_candidates(value)
+    }
+    unexpected = sorted(candidate for candidate in candidates if candidate not in REVIEW_RUBRIC_ARTIFACTS)
+    if unexpected:
+        expected_text = "`, `".join(sorted(REVIEW_RUBRIC_ARTIFACTS))
+        errors.append(
+            "`## Review Artifacts` 中 `Review artifact` "
+            f"必须绑定 reviewer rubric artifacts：`{expected_text}`；发现：`{'`, `'.join(unexpected)}`。"
+        )
+    return errors
+
+
+def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_root: Path) -> list[str]:
+    body_context = parse_item_context_from_body(str(meta.get("body") or ""))
+    missing_context = [field for field in REVIEW_REQUIRED_BODY_FIELDS if not body_context.get(field, "").strip()]
+    if missing_context:
+        joined = "、".join(f"`{field}`" for field in missing_context)
+        return [f"`## Review Artifacts` 无法绑定到当前 PR 事项上下文，PR 描述缺少：{joined}。"]
+
+    item_context, notes, related_paths = build_item_context_summary(meta, repo_root)
+    if notes:
+        return [f"`## Review Artifacts` 无法绑定到当前 PR 事项上下文：{note}" for note in notes]
+
+    errors: list[str] = []
+    expected_exec_plan = normalize_review_artifact_locator_for_repo(str(item_context.get("exec_plan") or ""), repo_root=repo_root)
+    active_candidates = {
+        normalize_review_artifact_locator(candidate)
+        for candidate in review_artifact_locator_candidates(str(payload.get("Active exec-plan") or ""))
+    }
+    if expected_exec_plan and expected_exec_plan not in active_candidates:
+        errors.append(f"`## Review Artifacts` 中 `Active exec-plan` 必须绑定当前 PR item context 的 exec-plan：`{expected_exec_plan}`。")
+
+    expected_governing = {
+        normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root)
+        for path in related_paths
+        if normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root)
+        and normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root) != expected_exec_plan
+    }
+    if not expected_governing and str(item_context.get("item_type") or "") == "FR":
+        fallback_spec = repo_root / "docs" / "specs" / str(item_context.get("item_key") or "")
+        if spec_dir_has_minimum_suite(fallback_spec):
+            expected_governing.add(fallback_spec.relative_to(repo_root).as_posix())
+    governing_candidates = {
+        normalize_governing_artifact_locator_for_repo(candidate, repo_root=repo_root)
+        for candidate in review_artifact_locator_candidates(str(payload.get("Governing spec / bootstrap contract") or ""))
+    }
+    if not expected_governing:
+        errors.append("`## Review Artifacts` 无法从当前 exec-plan 推导 governing spec / bootstrap contract，必须 fail closed。")
+    elif governing_candidates != expected_governing:
+        expected_text = "`, `".join(sorted(expected_governing))
+        errors.append(
+            "`## Review Artifacts` 中 `Governing spec / bootstrap contract` "
+            f"必须绑定当前 exec-plan 声明的 governing artifacts：`{expected_text}`。"
+        )
+    return errors
+
+
+def review_artifact_locators(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    payload = parse_bullet_kv_section(sections.get("review_artifacts", ""))
+    locators: list[str] = []
+    for field in ("Active exec-plan", "Governing spec / bootstrap contract", "Review artifact", "Validation evidence"):
+        for candidate in review_artifact_locator_candidates(str(payload.get(field) or "")):
+            path = Path(candidate)
+            if path.is_absolute() or ".." in path.parts:
+                continue
+            if (repo_root / candidate).exists():
+                locators.append(candidate)
+    return list(dict.fromkeys(locators))
+
+
+def validation_section_has_executed_evidence(section: str) -> bool:
+    for raw_line in section.splitlines():
+        stripped = raw_line.strip()
+        if not stripped.startswith("- "):
+            continue
+        value = stripped[2:].strip().strip("`")
+        lowered = value.lower()
+        if any(lowered.startswith(prefix) for prefix in VALIDATION_COMMAND_PREFIXES):
+            return True
+    return False
+
+
+def validation_evidence_errors(value: str, *, sections: dict[str, str], repo_root: Path) -> list[str]:
+    normalized = value.strip().strip("`").strip()
+    section_has_executed_evidence = validation_section_has_executed_evidence(sections.get("validation", ""))
+    if any(marker in normalized for marker in REVIEW_ARTIFACT_PLACEHOLDER_MARKERS):
+        if not section_has_executed_evidence:
+            return ["`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact，不能只使用模板占位说明。"]
+    candidates = review_artifact_locator_candidates(value)
+    concrete = "验证" in normalized and section_has_executed_evidence
+    errors: list[str] = []
+    for candidate in candidates:
+        if candidate in {"## 验证", "验证"}:
+            if validation_section_has_executed_evidence(sections.get("validation", "")):
+                concrete = True
+            continue
+        lowered = candidate.lower()
+        if any(lowered.startswith(prefix) for prefix in VALIDATION_COMMAND_PREFIXES):
+            concrete = True
+            continue
+        path = Path(candidate)
+        if path.is_absolute() or ".." in path.parts:
+            errors.append(f"`## Review Artifacts` 中 `Validation evidence` 包含非法 artifact locator：`{candidate}`。")
+            continue
+        if any(token in candidate for token in ("/", ".md", ".json", ".yml", ".yaml")):
+            if (repo_root / candidate).exists():
+                concrete = True
+            else:
+                errors.append(f"`## Review Artifacts` 中 `Validation evidence` 指向不存在的 artifact：`{candidate}`。")
+    if not concrete and not errors:
+        errors.append("`## Review Artifacts` 中 `Validation evidence` 必须指向已执行验证命令或存在的验证 artifact。")
+    return errors
+
+
+def parse_github_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def review_artifacts_required(meta: dict, sections: dict[str, str]) -> bool:
+    body = str(meta.get("body") or "")
+    if sections.get("review_artifacts", "").strip():
+        return True
+    if any(marker in body for marker in REVIEW_ARTIFACT_NEW_TEMPLATE_MARKERS):
+        return True
+    created_at = parse_github_timestamp(meta.get("createdAt"))
+    if created_at is None:
+        return any(sections.get(name, "").strip() for name in REVIEW_ARTIFACT_REQUIRED_TEMPLATE_SECTIONS)
+    return created_at >= REVIEW_ARTIFACT_REQUIRED_AFTER
+
+
+def review_artifact_gate_applies(meta: dict) -> bool:
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    return review_artifacts_required(meta, sections)
+
+
+def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[str]:
+    sections = parse_markdown_sections(str(meta.get("body") or ""))
+    section = sections.get("review_artifacts", "")
+    if not section:
+        if review_artifacts_required(meta, sections):
+            return ["PR 描述缺少 `## Review Artifacts` 段落。"]
+        return []
+    payload = parse_bullet_kv_section(section)
+    missing = [field for field in REVIEW_ARTIFACT_REQUIRED_FIELDS if field not in payload]
+    if missing:
+        joined = "、".join(f"`{field}`" for field in missing)
+        return [f"`## Review Artifacts` 缺少必填字段：{joined}。"]
+
+    errors: list[str] = []
+    for field in REVIEW_ARTIFACT_REQUIRED_FIELDS:
+        value = str(payload.get(field) or "").strip().strip("`").strip()
+        if value.casefold() in REVIEW_ARTIFACT_EMPTY_VALUES:
+            errors.append(f"`## Review Artifacts` 中 `{field}` 不能为空。")
+            continue
+        if field == "Active exec-plan":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=True, repo_root=repo_root))
+        if field == "Governing spec / bootstrap contract":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=True, repo_root=repo_root))
+        if field == "Review artifact":
+            errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=False, repo_root=repo_root))
+            errors.extend(review_rubric_artifact_errors(value))
+        if field == "Validation evidence":
+            errors.extend(validation_evidence_errors(value, sections=sections, repo_root=repo_root))
+    if not errors:
+        errors.extend(review_artifact_binding_errors(meta, payload, repo_root=repo_root))
+    return errors
+
+
 def integration_merge_gate_errors(meta: dict, *, require_live_state: bool = False) -> list[str]:
     body = str(meta.get("body") or "")
     issue_number, issue_canonical_integration = resolve_issue_canonical_integration(meta)
@@ -439,10 +722,10 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[d
 
 def update_pr_body(pr_number: int, body: str) -> None:
     with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
-        handle.write(body)
+        json.dump({"body": body}, handle, ensure_ascii=False)
         temp_path = Path(handle.name)
     try:
-        run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
+        run(["gh", "api", "-X", "PATCH", f"repos/{default_github_repo()}/pulls/{pr_number}", "--input", str(temp_path)], cwd=REPO_ROOT)
     finally:
         temp_path.unlink(missing_ok=True)
 
@@ -518,7 +801,7 @@ def extract_named_markdown_sections(body: str, headings: tuple[str, ...]) -> dic
 
 def fetch_issue_context(issue_number: int) -> dict[str, object]:
     completed = run(
-        ["gh", "issue", "view", str(issue_number), "--repo", default_github_repo(), "--json", "number,title,body,url"],
+        ["gh", "api", f"repos/{default_github_repo()}/issues/{issue_number}"],
         cwd=REPO_ROOT,
         check=False,
     )
@@ -535,7 +818,7 @@ def fetch_issue_context(issue_number: int) -> dict[str, object]:
     identity = [
         f"- Issue: #{payload.get('number', issue_number)}",
         f"- 标题: {payload.get('title', '')}",
-        f"- 链接: {payload.get('url', '')}",
+        f"- 链接: {payload.get('html_url', '')}",
     ]
     sections = extract_named_markdown_sections(body, ISSUE_CONTEXT_HEADINGS)
     if not sections:
@@ -612,20 +895,24 @@ def fetch_diff_stats(worktree_dir: Path, base_ref: str) -> tuple[list[str], str]
 def extract_related_links_from_exec_plan(exec_plan_path: Path) -> list[str]:
     links = [exec_plan_path.as_posix()]
     patterns = (
-        re.compile(r"^- 关联 spec[:：]\s*`?([^`]+)`?\s*$"),
-        re.compile(r"^- 关联 decision[:：]\s*`?([^`]+)`?\s*$"),
+        (re.compile(r"^- 关联 spec[:：]\s*`?([^`]+)`?\s*$"), False),
+        (re.compile(r"^- 额外关联 specs[:：]\s*(.+?)\s*$"), True),
+        (re.compile(r"^- 关联 decision[:：]\s*`?([^`]+)`?\s*$"), False),
     )
     for raw_line in exec_plan_path.read_text(encoding="utf-8").splitlines():
         stripped = raw_line.strip()
-        for pattern in patterns:
+        for pattern, split_values in patterns:
             match = pattern.match(stripped)
             if not match:
                 continue
-            value = match.group(1).strip()
-            if not value or value.startswith("无"):
-                continue
-            if "/" in value or value.endswith(".md"):
-                links.append(value)
+            raw_value = match.group(1).strip()
+            values = re.split(r"[,，]", raw_value) if split_values else [raw_value]
+            for value in values:
+                value = value.strip().strip("`").strip()
+                if not value or value.startswith("无"):
+                    continue
+                if "/" in value or value.endswith(".md"):
+                    links.append(value)
     return links
 
 
@@ -703,6 +990,7 @@ def build_review_context(meta: dict, worktree_dir: Path) -> dict[str, object]:
     issue_number, issue_canonical = resolve_issue_canonical_integration(meta)
     issue_error = str(meta.get("_issue_canonical_integration_error") or "")
     needs_issue_context = bool(issue_number) and not sections.get("issue_summary")
+    related_paths.extend(review_artifact_locators(meta, repo_root=worktree_dir))
     related_paths.extend(path for path in changed_files if path.startswith("docs/specs/"))
     related_paths.extend(path for path in changed_files if path.startswith("docs/decisions/"))
     related_paths = list(dict.fromkeys(path for path in related_paths if path))
@@ -1053,6 +1341,11 @@ def review_once(pr_number: int, *, post: bool, json_output: str | None) -> tuple
     meta = pr_meta(pr_number)
     temp_dir, worktree_dir = prepare_worktree(pr_number, meta)
     try:
+        if review_artifact_gate_applies(meta):
+            review_artifact_validation_errors = review_artifact_errors(meta, repo_root=worktree_dir)
+            if review_artifact_validation_errors:
+                detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
+                raise SystemExit(f"Review Artifacts 门禁未满足，拒绝进入 guardian review：\n{detail}")
         result_path = temp_dir / "review.json"
         result = run_codex_review(worktree_dir, build_prompt(meta, worktree_dir), result_path)
         payload = build_guardian_payload(meta, result)
@@ -1179,6 +1472,31 @@ def merge_if_safe(
                 failure_context="merge 前重跑 guardian 后 PR 描述已变化",
             )
             raise SystemExit("merge 前重跑 guardian 后 PR 描述已变化，拒绝合并。")
+    review_artifact_validation_errors: list[str] = []
+    if review_artifact_gate_applies(current):
+        try:
+            artifact_temp_dir, artifact_worktree_dir = prepare_worktree(pr_number, current)
+            try:
+                review_artifact_validation_errors = review_artifact_errors(current, repo_root=artifact_worktree_dir)
+            finally:
+                cleanup(artifact_temp_dir)
+        except (CommandError, SystemExit) as exc:
+            if merge_time_integration_recheck_recorded:
+                restore_merge_time_integration_recheck_or_die(
+                    pr_number,
+                    previous_merge_recheck_value or "no",
+                    failure_context="Review Artifacts 门禁校验异常后无法保持 PR 元数据一致",
+                )
+            raise SystemExit(f"Review Artifacts 门禁校验异常，拒绝合并：{exc}") from exc
+    if review_artifact_validation_errors:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="Review Artifacts 门禁校验失败后无法保持 PR 元数据一致",
+            )
+        detail = "\n".join(f"- {item}" for item in review_artifact_validation_errors)
+        raise SystemExit(f"Review Artifacts 门禁未满足，拒绝合并：\n{detail}")
     integration_errors = integration_merge_gate_errors(current, require_live_state=True)
     if integration_errors:
         if merge_time_integration_recheck_recorded:

@@ -1,0 +1,23 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "INIT-0001",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec review consumes the complete Loom formal spec suite after upstream #408.",
+  "reviewer": "codex",
+  "reviewed_head": "d86d168b760f80936c476aecbbe674f16b67e921",
+  "reviewed_validation_summary": "Repo-relative carrier write boundaries, fact-chain locator boundaries, canonical Loom metadata parsing, runtime provenance, shadow parity closure, and Syvert governance gates are passing locally; latest review artifact commits may create carrier-only head drift.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/INIT-0001.md",
+    "recovery_entry": ".loom/progress/INIT-0001.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null
+  }
+}

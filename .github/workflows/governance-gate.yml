@@ -33,6 +33,44 @@ jobs:
           set -euo pipefail
           python3 scripts/workflow_guard.py --mode ci
           python3 scripts/governance_gate.py             --mode ci             --base-sha "$PR_BASE_SHA"             --head-sha "$PR_HEAD_SHA"             --head-ref "$PR_HEAD_REF"
+          python3 .loom/bin/loom_init.py verify --target .
+          python3 .loom/bin/loom_flow.py governance-profile status --target . > /tmp/loom-governance-profile-status.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("/tmp/loom-governance-profile-status.json").read_text(encoding="utf-8"))
+          if payload.get("result") != "pass":
+              raise SystemExit("Loom governance profile status must pass")
+
+          maturity = payload.get("maturity") or {}
+          missing_by_level = maturity.get("missing_by_level") or {}
+          light_missing = missing_by_level.get("light") or []
+          standard_missing = missing_by_level.get("standard") or []
+          strong_missing = missing_by_level.get("strong") or []
+          allowed_host_missing = {"basic_host_binding", "github_controlled_merge", "standard"}
+          unexpected_missing = set(light_missing + standard_missing + strong_missing) - allowed_host_missing
+          if unexpected_missing:
+              raise SystemExit(f"Loom carrier readiness has unexpected missing inputs: {sorted(unexpected_missing)!r}")
+
+          repo_interface = json.loads(Path(".loom/companion/repo-interface.json").read_text(encoding="utf-8"))
+          interop = json.loads(Path(".loom/companion/interop.json").read_text(encoding="utf-8"))
+          if repo_interface.get("schema_version") != "loom-repo-interface/v2":
+              raise SystemExit("Loom repo interface schema_version must be loom-repo-interface/v2")
+          if interop.get("schema_version") != "loom-repo-interop/v1":
+              raise SystemExit("Loom repo interop schema_version must be loom-repo-interop/v1")
+          expected_surfaces = {"admission", "review", "merge_ready", "closeout"}
+          if set((interop.get("shadow_surfaces") or {}).keys()) != expected_surfaces:
+              raise SystemExit("Loom repo interop shadow_surfaces must cover admission/review/merge_ready/closeout")
+          required_residue = {"syvert-guardian", "syvert-workflow", "syvert-exec-plans", "syvert-integration-contract"}
+          declared_residue = {item.get("id") for item in (interop.get("host_adapters") or [])}
+          declared_residue.update(item.get("id") for item in (interop.get("repo_native_carriers") or []))
+          if not required_residue.issubset(declared_residue):
+              raise SystemExit(f"Loom interop must preserve Syvert-owned residue: {sorted(required_residue - declared_residue)!r}")
+          PY
+          python3 .loom/bin/loom_flow.py runtime-parity validate --target .
+          python3 .loom/bin/loom_flow.py shadow-parity --target .
+          python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking
 
       - name: Run governance tests
         run: |

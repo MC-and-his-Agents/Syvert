@@ -1,0 +1,23 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "review",
+  "side": "loom",
+  "parity_value": "syvert-loom-review-v1",
+  "source_files": [
+    ".loom/reviews/INIT-0001.json",
+    ".loom/reviews/INIT-0001.spec.json",
+    ".loom/specs/INIT-0001/spec.md",
+    ".loom/companion/interop.json"
+  ],
+  "source_sha256": {
+    ".loom/reviews/INIT-0001.json": "64f4e554af1d70f95082668b434cb2c94a834bdb2c22d5a74dd1c77a7ee748cb",
+    ".loom/reviews/INIT-0001.spec.json": "a6813fd78f4b428ebb144d5209461e4bfd6d6fb582554d8ed199d1e930c32301",
+    ".loom/specs/INIT-0001/spec.md": "2a8faf66c2cfd37d4ad72f6222397b9bea33d486c40088f378f3a4b5a85dcc53",
+    ".loom/companion/interop.json": "2d70e1f48967fcfbf84da1a6c63a5f19bdc107bb52708f179d1ecebf2bd3824e"
+  },
+  "source_semantics": "Review parity requires durable review evidence, explicit review findings handling, and authoritative review inputs before merge decisions.",
+  "evidence_body": {
+    "authority": "review gate and guardian split",
+    "decision_rule": "merge review decisions stay blocked until required review evidence and findings disposition are present"
+  }
+}

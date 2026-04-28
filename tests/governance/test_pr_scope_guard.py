@@ -18,6 +18,26 @@ class PrScopeGuardTests(unittest.TestCase):
         )
         self.assertEqual(report["violations"], [])
 
+    def test_loom_formal_spec_suite_is_not_swallowed_by_governance_scope(self) -> None:
+        report = build_report(
+            "governance",
+            [
+                ".loom/specs/INIT-0001/spec.md",
+            ],
+        )
+        self.assertEqual(report["categories"], ["spec"])
+        self.assertEqual(report["violations"], [])
+
+    def test_spec_allows_loom_formal_spec_suite(self) -> None:
+        report = build_report(
+            "spec",
+            [
+                ".loom/specs/INIT-0001/spec.md",
+                ".loom/specs/INIT-0001/plan.md",
+            ],
+        )
+        self.assertEqual(report["violations"], [])
+
     def test_implementation_rejects_legacy_todo(self) -> None:
         report = build_report(
             "implementation",

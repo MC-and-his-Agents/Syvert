@@ -1,0 +1,117 @@
+{
+  "schema_version": "loom-repo-interface/v2",
+  "companion_entry": ".loom/companion/README.md",
+  "repo_specific_requirements": {
+    "admission": [],
+    "review": [
+      {
+        "id": "syvert-spec-review-rubric",
+        "summary": "Syvert formal spec review rubric remains repo-owned.",
+        "locator": "spec_review.md",
+        "enforcement": "blocking"
+      },
+      {
+        "id": "syvert-review-rubric",
+        "summary": "Syvert implementation review rubric remains repo-owned.",
+        "locator": "code_review.md",
+        "enforcement": "blocking"
+      }
+    ],
+    "merge_ready": [
+      {
+        "id": "syvert-guardian-merge-gate",
+        "summary": "Syvert guardian safe_to_merge and current head binding remain repo-owned merge gate inputs.",
+        "locator": "code_review.md",
+        "enforcement": "blocking"
+      }
+    ],
+    "closeout": [
+      {
+        "id": "syvert-delivery-closeout",
+        "summary": "Syvert closeout remains tied to Work Item, PR, release, and parent issue reconciliation.",
+        "locator": "docs/process/delivery-funnel.md",
+        "enforcement": "advisory"
+      }
+    ]
+  },
+  "specialized_gates": [
+    {
+      "id": "workflow-guard",
+      "summary": "Syvert workflow guard validates governance process structure.",
+      "locator": "scripts/workflow_guard.py",
+      "gate_type": "admission"
+    },
+    {
+      "id": "governance-gate",
+      "summary": "Syvert governance gate validates workflow tooling and PR scope boundaries.",
+      "locator": "scripts/governance_gate.py",
+      "gate_type": "build"
+    },
+    {
+      "id": "pr-guardian",
+      "summary": "Syvert guardian validates current PR head before controlled merge.",
+      "locator": "scripts/pr_guardian.py",
+      "gate_type": "merge_ready"
+    }
+  ],
+  "metadata_contract": {
+    "fields": [
+      {
+        "id": "integration_check",
+        "summary": "Syvert integration metadata is repo-owned and consumed by open_pr/review/guardian/merge_pr.",
+        "applicability_locator": "WORKFLOW.md",
+        "authority_locator": "scripts/policy/integration_contract.json",
+        "enforcement": "blocking"
+      }
+    ]
+  },
+  "context_schema": {
+    "fields": [
+      {
+        "id": "issue",
+        "summary": "GitHub Work Item issue number required before Syvert execution.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "integer",
+        "required": true,
+        "mapping_rule_locator": "docs/process/delivery-funnel.md"
+      },
+      {
+        "id": "item_key",
+        "summary": "Syvert Work Item context key.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "string",
+        "required": true,
+        "mapping_rule_locator": "WORKFLOW.md"
+      },
+      {
+        "id": "item_type",
+        "summary": "Syvert Work Item type remains repo-owned.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "string",
+        "required": true,
+        "mapping_rule_locator": "WORKFLOW.md"
+      },
+      {
+        "id": "release",
+        "summary": "Syvert release context remains repo-owned.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "string",
+        "required": true,
+        "mapping_rule_locator": "WORKFLOW.md"
+      },
+      {
+        "id": "sprint",
+        "summary": "Syvert sprint context remains repo-owned.",
+        "authority_locator": "WORKFLOW.md",
+        "enforcement": "blocking",
+        "type": "string",
+        "required": true,
+        "mapping_rule_locator": "WORKFLOW.md"
+      }
+    ]
+  }
+}

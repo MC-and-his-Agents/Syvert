@@ -17,6 +17,13 @@
 - sprint: `{{SPRINT}}`
 - Closing: {{CLOSING}}
 
+## Review Artifacts
+
+- Active exec-plan:
+- Governing spec / bootstrap contract:
+- Review artifact:
+- Validation evidence:
+
 ## 风险
 
 - 风险级别：`{{RISK_LEVEL}}`
@@ -49,3 +56,24 @@ Canonical integration contract source: `scripts/policy/integration_contract.json
 ## 回滚
 
 - 回滚方式：{{ROLLBACK}}
+
+## Loom Runtime Locator
+
+- Loom companion: `.loom/companion/README.md`
+- Loom runtime: `.loom/bin/loom_flow.py`
+
+## Summary
+
+- Loom-compatible summary: see `## 摘要`.
+
+## Validation
+
+- Loom-compatible validation: see `## 验证`.
+
+## Risks And Follow-ups
+
+- Loom-compatible risks and follow-ups: see `## 风险`.
+
+## Related Work
+
+- Loom-compatible related work: see `## 关联事项`.

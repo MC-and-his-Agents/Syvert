@@ -12,13 +12,17 @@ from scripts.common import CommandError, default_github_repo, normalize_integrat
 from scripts.open_pr import (
     build_body,
     build_issue_summary,
+    governing_artifact_label,
     extract_issue_canonical_integration_fields,
     extract_issue_summary_sections,
+    has_formal_spec_core_file_changes,
+    has_formal_spec_suite_changes,
     parse_args,
     validate_current_worktree_binding,
     validate_integration_args,
     validate_pr_preflight,
 )
+from scripts.pr_guardian import review_artifact_errors
 
 
 def write_exec_plan(
@@ -1151,6 +1155,364 @@ class OpenPrPreflightTests(unittest.TestCase):
         self.assertIn("- integration_ref: https://github.com/MC-and-his-Agents/WebEnvoy/issues/466", body)
         self.assertIn("- merge_gate: integration_check_required", body)
         self.assertIn("- contract_surface: runtime_modes", body)
+
+    @patch("scripts.open_pr.git_current_branch", return_value="feature/review-artifacts")
+    def test_build_body_populates_review_artifacts_section(self, _git_current_branch_mock) -> None:
+        args = parse_args(["--class", "governance"])
+
+        body = build_body(args, [])
+
+        self.assertIn("- Active exec-plan: 未定位到 active exec-plan", body)
+        self.assertIn("- Governing spec / bootstrap contract: 未定位到 governing artifact", body)
+        self.assertIn("- Review artifact: `code_review.md`", body)
+        self.assertIn(
+            "- Validation evidence: `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref feature/review-artifacts`",
+            body,
+        )
+
+    def test_governing_artifact_label_requires_concrete_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(repo, item_key="GOV-0015-item-context-gate")
+            exec_plan = {
+                "item_key": "GOV-0015-item-context-gate",
+                "item_type": "GOV",
+                "exec_plan": str(repo / "docs/exec-plans/GOV-0015-item-context-gate.md"),
+            }
+
+            self.assertEqual(governing_artifact_label(exec_plan, repo_root=repo), "")
+
+    def test_governing_artifact_label_uses_unbound_fr_local_spec_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            exec_plan = {
+                "item_key": "FR-0001-governance-stack-v1",
+                "item_type": "FR",
+                "exec_plan": "docs/exec-plans/FR-0001-governance-stack-v1.md",
+            }
+
+            self.assertEqual(
+                governing_artifact_label(exec_plan, repo_root=repo),
+                "docs/specs/FR-0001-governance-stack-v1",
+            )
+
+    @patch("scripts.open_pr.fetch_issue_body", return_value="")
+    @patch("scripts.open_pr.git_current_branch", return_value="feature/unbound-fr-spec")
+    def test_build_body_review_artifacts_pass_guardian_for_unbound_fr_local_spec(self, _branch_mock, _issue_mock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_exec_plan(
+                repo,
+                item_key="FR-0001-governance-stack-v1",
+                issue="#1",
+                item_type="FR",
+                active_item_key="FR-0001-governance-stack-v1",
+            )
+            write_formal_spec_suite(repo, with_todo=False)
+            (repo / "code_review.md").write_text("review", encoding="utf-8")
+            (repo / "spec_review.md").write_text("spec review", encoding="utf-8")
+            args = parse_args(
+                [
+                    "--class",
+                    "spec",
+                    "--issue",
+                    "1",
+                    "--item-key",
+                    "FR-0001-governance-stack-v1",
+                    "--item-type",
+                    "FR",
+                    "--release",
+                    "v0.1.0",
+                    "--sprint",
+                    "2026-S14",
+                ]
+            )
+            changed_files = ["docs/specs/FR-0001-governance-stack-v1/spec.md"]
+            with patch("scripts.open_pr.REPO_ROOT", repo):
+                body = build_body(args, changed_files)
+
+            self.assertIn("- Governing spec / bootstrap contract: `docs/specs/FR-0001-governance-stack-v1`", body)
+            self.assertEqual(review_artifact_errors({"body": body}, repo_root=repo), [])
+
+    def test_build_body_uses_spec_review_artifact_for_spec_scope_changes(self) -> None:
+        args = parse_args(["--class", "governance"])
+
+        body = build_body(args, [".loom/specs/INIT-0001/spec.md"])
+
+        self.assertIn("- Review artifact: `spec_review.md`, `code_review.md`", body)
+
+    def test_has_formal_spec_core_file_changes_accepts_loom_spec_artifacts(self) -> None:
+        self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/spec.md"]))
+        self.assertTrue(has_formal_spec_core_file_changes([".loom/specs/INIT-0001/implementation-contract.md"]))
+
+    def test_has_formal_spec_suite_changes_accepts_non_core_spec_artifacts(self) -> None:
+        self.assertTrue(has_formal_spec_suite_changes(["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"]))
+        self.assertTrue(has_formal_spec_suite_changes([".loom/specs/INIT-0001/references/risk.md"]))
+        self.assertFalse(has_formal_spec_core_file_changes(["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"]))
+
+    def test_validate_pr_preflight_rejects_governance_pr_that_touches_loom_spec_without_formal_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            (repo / "docs/exec-plans").mkdir(parents=True)
+            (repo / "docs/exec-plans/GOV-0001-shadow-parity-hardening.md").write_text(
+                "\n".join(
+                    [
+                        "# Exec Plan",
+                        "",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                        "- Issue：`#6`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S13`",
+                        "- active 收口事项：`GOV-0001-shadow-parity-hardening`",
+                        "- 状态：`active`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
+
+    def test_validate_pr_preflight_rejects_governance_class_for_loom_spec_only_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text(
+                "\n".join(
+                    [
+                        "# decision",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+            )
+            (repo / ".loom/specs/INIT-0001").mkdir(parents=True)
+            (repo / ".loom/specs/INIT-0001/spec.md").write_text("# spec\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/plan.md").write_text("# plan\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/implementation-contract.md").write_text("# contract\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("仅变更 `.loom/specs/**` 时必须使用 `spec` 类 PR" in error for error in errors))
+
+    def test_validate_pr_preflight_accepts_spec_class_for_bound_loom_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text(
+                "\n".join(
+                    [
+                        "# decision",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                sprint="2026-S13",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+                related_spec=".loom/specs/INIT-0001/",
+            )
+            (repo / ".loom/specs/INIT-0001").mkdir(parents=True)
+            (repo / ".loom/specs/INIT-0001/spec.md").write_text(
+                "\n".join(
+                    [
+                        "# spec",
+                        "",
+                        "## Goal",
+                        "",
+                        "x",
+                        "",
+                        "## Scope",
+                        "",
+                        "x",
+                        "",
+                        "## Key Scenarios",
+                        "",
+                        "x",
+                        "",
+                        "## Acceptance Criteria",
+                        "",
+                        "- [ ] x",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo / ".loom/specs/INIT-0001/plan.md").write_text(
+                "\n".join(
+                    [
+                        "# plan",
+                        "",
+                        "## Implementation Goal",
+                        "",
+                        "x",
+                        "",
+                        "## Phases",
+                        "",
+                        "x",
+                        "",
+                        "## Validation",
+                        "",
+                        "x",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo / ".loom/specs/INIT-0001/implementation-contract.md").write_text(
+                "\n".join(
+                    [
+                        "# implementation contract",
+                        "",
+                        "## Work Item",
+                        "",
+                        "x",
+                        "",
+                        "## Approved Spec",
+                        "",
+                        "x",
+                        "",
+                        "## Implementation Scope",
+                        "",
+                        "x",
+                        "",
+                        "## Validation Plan",
+                        "",
+                        "x",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            errors = validate_pr_preflight(
+                "spec",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0001/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertEqual(errors, [])
+
+
+    def test_validate_pr_preflight_rejects_bootstrap_governance_pr_touching_unbound_loom_spec_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text(
+                "\n".join(
+                    [
+                        "# decision",
+                        "",
+                        "- Issue：`#6`",
+                        "- item_key：`GOV-0001-shadow-parity-hardening`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+                related_spec=".loom/specs/INIT-0001/",
+            )
+            (repo / ".loom/specs/INIT-0001").mkdir(parents=True)
+            (repo / ".loom/specs/INIT-0001/spec.md").write_text("# spec\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/plan.md").write_text("# plan\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0001/implementation-contract.md").write_text("# contract\n", encoding="utf-8")
+            (repo / ".loom/specs/INIT-0002").mkdir(parents=True)
+            (repo / ".loom/specs/INIT-0002/spec.md").write_text("# spec\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S13",
+                [".loom/specs/INIT-0002/spec.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
+
+    def test_validate_pr_preflight_rejects_governance_pr_that_touches_non_core_spec_with_bootstrap_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            decision_path = repo / "docs/decisions/ADR-0001-bootstrap.md"
+            decision_path.parent.mkdir(parents=True)
+            decision_path.write_text("# decision\n", encoding="utf-8")
+            write_exec_plan(
+                repo,
+                item_key="GOV-0001-shadow-parity-hardening",
+                issue="#6",
+                item_type="GOV",
+                active_item_key="GOV-0001-shadow-parity-hardening",
+                related_decision="docs/decisions/ADR-0001-bootstrap.md",
+            )
+            (repo / "docs/specs/FR-0001-governance-stack-v1/contracts").mkdir(parents=True)
+            (repo / "docs/specs/FR-0001-governance-stack-v1/contracts/README.md").write_text("# contract\n", encoding="utf-8")
+            errors = validate_pr_preflight(
+                "governance",
+                6,
+                "GOV-0001-shadow-parity-hardening",
+                "GOV",
+                "v0.1.0",
+                "2026-S14",
+                ["docs/specs/FR-0001-governance-stack-v1/contracts/README.md"],
+                repo_root=repo,
+            )
+
+        self.assertTrue(any("变更 formal spec 套件时" in error for error in errors))
 
     @patch(
         "scripts.open_pr.resolve_issue_canonical_integration",

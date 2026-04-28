@@ -4,6 +4,12 @@ Syvert 的唯一默认交付路径如下：
 
 `Roadmap / 阶段目标 -> GitHub Phase -> GitHub FR -> GitHub Work Item -> spec / contract -> spec review -> implementation PR -> PR review -> squash merge`
 
+## Loom consumption boundary
+
+Syvert 正式消费 Loom 作为上游 governance runtime。Loom 承接通用交付漏斗能力：Work Item admission、gate chain、GitHub profile binding、closeout / reconciliation 与 shadow parity boundary。
+
+本文档只保留 Syvert 对这些通用能力的 repo-specific 约束：release / sprint / item_key 语义、guardian merge gate、integration contract、exec-plan 历史证据与 Syvert runtime 相关门禁。
+
 ## 阶段解释
 
 1. `Roadmap / 阶段目标`

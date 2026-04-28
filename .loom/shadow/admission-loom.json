@@ -1,0 +1,19 @@
+{
+  "schema_version": "loom-shadow-surface-evidence/v1",
+  "surface": "admission",
+  "side": "loom",
+  "parity_value": "syvert-loom-admission-v1",
+  "source_files": [
+    ".loom/work-items/INIT-0001.md",
+    ".loom/companion/repo-interface.json"
+  ],
+  "source_sha256": {
+    ".loom/work-items/INIT-0001.md": "598f745bafb0e823cf616d16a11b2a07a862a1a5e1aa183033e580879da39192",
+    ".loom/companion/repo-interface.json": "6b6407445fefab9c22bc6bc7aacb7cc84f1065616b8d742ab4fdf92134a0c8f6"
+  },
+  "source_semantics": "Admission parity requires an explicit work item entry with tracked goal, scope, recovery entry, validation entry, and closing condition before execution starts.",
+  "evidence_body": {
+    "authority": "work item admission contract",
+    "decision_rule": "execution begins only after the active work item carries durable execution and validation context"
+  }
+}

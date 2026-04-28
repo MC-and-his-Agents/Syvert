@@ -3,6 +3,12 @@
 本文档只定义 `docs/` 子树语义与交付工件职责。
 根级约束以 [AGENTS.md](../AGENTS.md) 为准，运行契约以 [WORKFLOW.md](../WORKFLOW.md) 为准。
 
+## Loom 边界
+
+Syvert 的通用治理 runtime 由 Loom 承接；`.loom/companion/` 记录 Loom 如何读取 Syvert 的 repo-specific residue。
+
+`docs/` 不再平行维护跨仓通用治理模型，只保留 Syvert 的 roadmap、release/sprint、formal spec、exec-plan、decision、guardian 与 integration contract 相关语义。
+
 ## 目录职责
 
 - `docs/roadmap-v0-to-v1.md`：阶段目标与版本边界
@@ -15,6 +21,7 @@
 - `docs/specs/`：正式规约区
 - `docs/decisions/`：决策记录
 - `docs/exec-plans/`：事项执行上下文、执行计划与恢复工件
+- `.loom/companion/`：Loom 读取 Syvert repo-specific residue 的机器可读入口
 
 ## 术语与状态
 

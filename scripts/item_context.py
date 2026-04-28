@@ -33,6 +33,7 @@ EXEC_PLAN_METADATA_KEYS = {
 EXEC_PLAN_METADATA_HEADERS = {"## 关联信息", "## 事项上下文"}
 DECISION_METADATA_KEYS = {"Issue", "item_key", "item_type", "release", "sprint"}
 BOUND_SPEC_FILE_NAMES = {"spec.md", "plan.md"}
+BOUND_LOOM_SPEC_FILE_NAMES = {"spec.md", "plan.md", "implementation-contract.md"}
 INPUT_MODE_FORMAL_SPEC = "formal_spec"
 INPUT_MODE_BOOTSTRAP = "bootstrap"
 INPUT_MODE_UNBOUND = "unbound"
@@ -218,7 +219,16 @@ def classify_exec_plan_input_mode(payload: Mapping[str, str]) -> str:
 
 def normalize_bound_spec_parts(related_spec: str) -> tuple[str, ...] | None:
     normalized = related_spec.rstrip("/")
-    if not normalized or not normalized.startswith("docs/specs/"):
+    if not normalized:
+        return None
+    if normalized.startswith(".loom/specs/"):
+        parts = Path(normalized).parts
+        if len(parts) == 3 and parts[0] == ".loom" and parts[1] == "specs":
+            return parts
+        if len(parts) == 4 and parts[0] == ".loom" and parts[1] == "specs" and parts[3] in BOUND_LOOM_SPEC_FILE_NAMES:
+            return parts
+        return None
+    if not normalized.startswith("docs/specs/"):
         return None
     parts = Path(normalized).parts
     if len(parts) == 3 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-"):
@@ -226,6 +236,23 @@ def normalize_bound_spec_parts(related_spec: str) -> tuple[str, ...] | None:
     if len(parts) == 4 and parts[0] == "docs" and parts[1] == "specs" and parts[2].startswith("FR-") and parts[3] in BOUND_SPEC_FILE_NAMES:
         return parts
     return None
+
+
+def is_loom_bound_spec(related_spec: str) -> bool:
+    parts = normalize_bound_spec_parts(related_spec)
+    return parts is not None and len(parts) >= 3 and parts[0] == ".loom" and parts[1] == "specs"
+
+
+def bound_spec_required_files(related_spec: str) -> set[str]:
+    if is_loom_bound_spec(related_spec):
+        return set(BOUND_LOOM_SPEC_FILE_NAMES)
+    return set(spec_suite_policy()["required_files"])
+
+
+def bound_spec_binding_hint(related_spec: str) -> str:
+    if is_loom_bound_spec(related_spec):
+        return "formal spec 套件根目录，或其下的 `spec.md`/`plan.md`/`implementation-contract.md` 文件"
+    return "FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件"
 
 
 def normalize_bound_spec_dir(repo_root: Path, related_spec: str) -> Path | None:
@@ -262,10 +289,10 @@ def normalize_bound_decision_path(repo_root: Path, related_decision: str) -> Pat
     return candidate
 
 
-def spec_dir_has_minimum_suite(spec_dir: Path) -> bool:
+def spec_dir_has_minimum_suite(spec_dir: Path, *, related_spec: str | None = None) -> bool:
     if not spec_dir.exists() or not spec_dir.is_dir():
         return False
-    required_files = set(spec_suite_policy()["required_files"])
+    required_files = bound_spec_required_files(related_spec or spec_dir.as_posix())
     child_names = {child.name for child in spec_dir.iterdir()}
     return required_files.issubset(child_names)
 
@@ -424,27 +451,29 @@ def validate_bound_spec_contract(repo_root: Path, payload: Mapping[str, str]) ->
         candidate.relative_to(repo_root.resolve())
     except ValueError:
         return [f"`关联 spec` 指向仓库外路径：`{related_spec}`。"]
-    if not related_spec.startswith("docs/specs/"):
-        return [f"`关联 spec` 必须绑定到具体 FR formal spec 套件：`{related_spec}`。"]
+    if not related_spec.startswith("docs/specs/") and not related_spec.startswith(".loom/specs/"):
+        return [f"`关联 spec` 必须绑定到 formal spec 套件：`{related_spec}`。"]
 
     parts = normalize_bound_spec_parts(related_spec)
     if parts is None:
-        return [f"`关联 spec` 必须绑定到 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+        return [f"`关联 spec` 必须绑定到 {bound_spec_binding_hint(related_spec)}：`{related_spec}`。"]
+    if is_loom_bound_spec(related_spec) and str(payload.get("item_type", "")).strip() != "GOV":
+        return [f"`关联 spec` 指向 `.loom/specs/**` 时，当前事项必须是 Syvert governance/Loom carrier 事项：`{related_spec}`。"]
 
     if len(parts) == 4:
         if not candidate.exists():
             return [f"`关联 spec` 指向的路径不存在：`{related_spec}`。"]
         if not candidate.is_file():
-            return [f"`关联 spec` 必须指向 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+            return [f"`关联 spec` 必须指向 {bound_spec_binding_hint(related_spec)}：`{related_spec}`。"]
         candidate = candidate.parent
     else:
         if not candidate.exists():
             return [f"`关联 spec` 指向的路径不存在：`{related_spec}`。"]
         if not candidate.is_dir():
-            return [f"`关联 spec` 必须指向 FR formal spec 套件根目录，或其下的 `spec.md`/`plan.md` 文件：`{related_spec}`。"]
+            return [f"`关联 spec` 必须指向 {bound_spec_binding_hint(related_spec)}：`{related_spec}`。"]
 
-    if not spec_dir_has_minimum_suite(candidate):
-        required_files = set(spec_suite_policy()["required_files"])
+    if not spec_dir_has_minimum_suite(candidate, related_spec=related_spec):
+        required_files = bound_spec_required_files(related_spec)
         child_names = {child.name for child in candidate.iterdir()}
         missing = sorted(required_files - child_names)
         return [f"`关联 spec` 指向的 formal spec 套件缺少最小必需文件：{', '.join(missing)}。"]

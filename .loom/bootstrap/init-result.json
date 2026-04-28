@@ -1,0 +1,807 @@
+{
+  "schema_version": "loom-init-output/v1",
+  "generator": {
+    "tool": "skills/shared/scripts/loom_init.py",
+    "tool_version": "1.3.0",
+    "root_entry": "loom-init",
+    "contract_version": "1.3.0"
+  },
+  "run": {
+    "target": ".",
+    "scenario": "复杂既有仓库",
+    "scenario_key": "complex-existing",
+    "integration_mode": "companion",
+    "recovery_mode": "standard"
+  },
+  "intake": {
+    "schema_version": "loom-init-intake/v1",
+    "repository_type": "existing",
+    "root_boundary_docs": "clear",
+    "ci_or_basic_tests": true,
+    "repository_level_validation_entry": false,
+    "primary_gap_category": "execution-support",
+    "long_running_recovery_pain": false,
+    "shared_contract_or_high_risk_boundary": true,
+    "purity_or_scope_signals": "clean",
+    "merge_review_semantic_overload": false,
+    "notes": "autodetected by loom_init.py"
+  },
+  "project_judgment": {
+    "scenario": "复杂既有仓库",
+    "intensity": "强化",
+    "primary_structural_problem": "the repo needs execution support, recovery, and status carriers instead of more ad hoc guidance",
+    "why_this_path": "the repo shows execution-support pressure, so the bootstrap must materialize recovery and status carriers immediately"
+  },
+  "recommended_adoption": {
+    "path": "full-bootstrap",
+    "integration_mode": "companion",
+    "recovery_mode": "standard",
+    "capabilities": [
+      {
+        "name": "bootstrap/root",
+        "rules": [
+          "skills/loom-init/SKILL.md",
+          "skills/loom-init/references/intake-signals.md",
+          "skills/loom-init/references/output-contract.md"
+        ]
+      },
+      {
+        "name": "formal-templates",
+        "rules": [
+          "skills/shared/references/templates/spec-suite.md",
+          "skills/shared/references/templates/pull-request.md"
+        ]
+      },
+      {
+        "name": "execution-support",
+        "rules": [
+          "skills/shared/references/harness/work-item-contract.md",
+          "skills/shared/references/harness/recovery-model.md",
+          "skills/shared/references/harness/status-surface.md",
+          "skills/shared/references/harness/workspace-and-purity.md"
+        ]
+      }
+    ]
+  },
+  "deferred_capabilities": [
+    {
+      "name": "host-specific-skill-regression-matrix",
+      "reason": "Loom core should not absorb a full host test matrix",
+      "upgrade_trigger": "a host adapter or marketplace package is added"
+    }
+  ],
+  "fact_chain": {
+    "mode": "work-item + recovery-entry + derived status-surface",
+    "read_entry": "python3 .loom/bin/loom_init.py fact-chain --target .",
+    "entry_points": {
+      "current_item_id": "INIT-0001",
+      "work_item": ".loom/work-items/INIT-0001.md",
+      "recovery_entry": ".loom/progress/INIT-0001.md",
+      "status_surface": ".loom/status/current.md"
+    }
+  },
+  "initial_artifacts": [
+    {
+      "path": ".loom/README.md",
+      "kind": "rule-entry",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/bootstrap/intake.snapshot.json",
+      "kind": "intake",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/bootstrap/init-result.json",
+      "kind": "init-result",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/bootstrap/manifest.json",
+      "kind": "manifest",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/bootstrap/capability-map.md",
+      "kind": "capability-map",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/bin/loom_init.py",
+      "kind": "loom-tool",
+      "source": "skills/shared/scripts/loom_init.py",
+      "sha256": "5d6bca788639db8d58548ebf2b0603e4286262d8847003babf817639b5308424"
+    },
+    {
+      "path": ".loom/bin/fact_chain_support.py",
+      "kind": "loom-tool-support",
+      "source": "skills/shared/scripts/fact_chain_support.py",
+      "sha256": "78cf0d0022a4c03933a5e46cba676e80cafa5d0802fb95191a761ec9f9417e65"
+    },
+    {
+      "path": ".loom/bin/governance_surface.py",
+      "kind": "loom-tool-support",
+      "source": "skills/shared/scripts/governance_surface.py",
+      "sha256": "543e10c205be62f5be78704fe9bf27e808fc07ffe035382e3d4dd78ffa8c80cc"
+    },
+    {
+      "path": ".loom/bin/loom_flow.py",
+      "kind": "loom-tool",
+      "source": "skills/shared/scripts/loom_flow.py",
+      "sha256": "f8fe63875c5abce92281c4fce0fa329c3584a25a85c131ba2d0364ac39b78997"
+    },
+    {
+      "path": ".loom/bin/loom_status.py",
+      "kind": "loom-tool",
+      "source": "skills/shared/scripts/loom_status.py",
+      "sha256": "b8c74d31898ba4fdd5326abe82d175ec10e0a30cc2ea61810f1ec096052519f6"
+    },
+    {
+      "path": ".loom/bin/runtime_paths.py",
+      "kind": "loom-tool-support",
+      "source": "skills/shared/scripts/runtime_paths.py",
+      "sha256": "2e2701f2ca131482cabf1efd00d1c58790bec807f5ef1203d7332256892653f5"
+    },
+    {
+      "path": ".loom/bin/runtime_state.py",
+      "kind": "loom-tool-support",
+      "source": "skills/shared/scripts/runtime_state.py",
+      "sha256": "e4de653a5206269faa731808a0f44667a7db811053b8488e8b61a6393917815b"
+    },
+    {
+      "path": ".loom/bin/loom_check.py",
+      "kind": "loom-tool",
+      "source": "skills/shared/scripts/loom_check.py",
+      "sha256": "e48281477bbb35b887e21034570ed519a40dae718ea97e99886a66b04dbd1d50"
+    },
+    {
+      "path": "AGENTS.md",
+      "kind": "root-entry",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/work-items/INIT-0001.md",
+      "kind": "work-item",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/progress/INIT-0001.md",
+      "kind": "progress",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/reviews/INIT-0001.json",
+      "kind": "review-entry",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/reviews/INIT-0001.spec.json",
+      "kind": "review-entry",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/status/current.md",
+      "kind": "status-surface",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/specs/INIT-0001/spec.md",
+      "kind": "spec",
+      "source": "skills/shared/assets/templates/scaffold/spec.md"
+    },
+    {
+      "path": ".loom/specs/INIT-0001/plan.md",
+      "kind": "plan",
+      "source": "skills/shared/assets/templates/scaffold/plan.md"
+    },
+    {
+      "path": ".loom/specs/INIT-0001/implementation-contract.md",
+      "kind": "implementation-contract",
+      "source": "skills/shared/assets/templates/scaffold/implementation-contract.md"
+    },
+    {
+      "path": ".loom/companion/manifest.json",
+      "kind": "repo-companion-manifest",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/companion/repo-interface.json",
+      "kind": "repo-interface",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/companion/interop.json",
+      "kind": "repo-interop",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/admission-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/admission-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/review-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/review-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/merge-ready-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/merge-ready-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/closeout-loom.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/closeout-repo.json",
+      "kind": "shadow-parity-evidence",
+      "source": "generated"
+    },
+    {
+      "path": ".loom/shadow/shadow-parity.json",
+      "kind": "shadow-parity-summary",
+      "source": "generated"
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "kind": "pr-template",
+      "source": "skills/shared/assets/github/PULL_REQUEST_TEMPLATE.md"
+    },
+    {
+      "path": ".loom/companion/README.md",
+      "kind": "companion-entry",
+      "source": "official-adoption"
+    }
+  ],
+  "initial_work_items": [
+    {
+      "id": "INIT-0001",
+      "goal": "Formally adopt Loom as Syvert's upstream governance runtime while preserving Syvert-owned residue.",
+      "scope": "Install and validate the vendored `.loom` carrier, companion contracts, shadow parity, review/status/spec surfaces, and Syvert gate coverage for PR #259 / Work Item #258.",
+      "execution_path": "governance/loom-official-adoption",
+      "workspace_entry": ".",
+      "recovery_entry": ".loom/progress/INIT-0001.md",
+      "review_entry": ".loom/reviews/INIT-0001.json",
+      "validation_entry": "python3 .loom/bin/loom_init.py verify --target .",
+      "artifacts": [
+        ".loom/README.md",
+        ".loom/bin/fact_chain_support.py",
+        ".loom/bin/governance_surface.py",
+        ".loom/bin/loom_check.py",
+        ".loom/bin/loom_flow.py",
+        ".loom/bin/loom_init.py",
+        ".loom/bin/loom_status.py",
+        ".loom/bin/runtime_paths.py",
+        ".loom/bin/runtime_state.py",
+        ".loom/bootstrap/capability-map.md",
+        ".loom/bootstrap/init-result.json",
+        ".loom/bootstrap/intake.snapshot.json",
+        ".loom/bootstrap/manifest.json",
+        ".loom/companion/README.md",
+        ".loom/companion/interop.json",
+        ".loom/companion/manifest.json",
+        ".loom/companion/repo-interface.json",
+        ".loom/progress/INIT-0001.md",
+        ".loom/reviews/INIT-0001.json",
+        ".loom/reviews/INIT-0001.spec.json",
+        ".loom/shadow/admission-loom.json",
+        ".loom/shadow/admission-repo.json",
+        ".loom/shadow/closeout-loom.json",
+        ".loom/shadow/closeout-repo.json",
+        ".loom/shadow/merge-ready-loom.json",
+        ".loom/shadow/merge-ready-repo.json",
+        ".loom/shadow/review-loom.json",
+        ".loom/shadow/review-repo.json",
+        ".loom/shadow/shadow-parity.json",
+        ".loom/specs/INIT-0001/implementation-contract.md",
+        ".loom/specs/INIT-0001/plan.md",
+        ".loom/specs/INIT-0001/spec.md",
+        ".loom/status/current.md",
+        ".loom/work-items/INIT-0001.md",
+        "AGENTS.md",
+        "WORKFLOW.md",
+        "docs/AGENTS.md",
+        "docs/decisions/ADR-GOV-0038-loom-official-adoption.md",
+        "docs/process/delivery-funnel.md",
+        "scripts/governance_gate.py",
+        "tests/governance/test_governance_gate.py",
+        "tests/governance/test_loom_carrier_runtime.py"
+      ],
+      "closing_condition": "Loom carrier verification, runtime parity, blocking shadow parity, merge checkpoint, Syvert governance gates, guardian review, controlled merge, and issue closeout all agree on the same adoption truth.",
+      "post_build_continuation": "Complete guardian review, controlled merge, and Work Item / FR / Phase closeout.",
+      "owner_for_checkpoint_lite": "Syvert governance maintainer"
+    }
+  ],
+  "validation_and_closing": {
+    "validation_entry": "python3 .loom/bin/loom_init.py verify --target .",
+    "checkpoint_relationship": [
+      "admission checkpoint confirms the bootstrap work item and first artifacts are readable",
+      "build checkpoint confirms generated carriers and templates are internally consistent",
+      "merge checkpoint should only pass after downstream repo truth, docs, and delivery state align"
+    ],
+    "clean_state": "all generated Loom artifacts are readable, verified, and free of conflicting duplicates",
+    "close_when": [
+      "the target repo has a readable root or companion Loom entry",
+      "the first work item, progress carrier, and spec/plan artifacts exist",
+      "the bootstrap manifest and init-result are verifiable"
+    ]
+  },
+  "runtime_state": {
+    "result": "pass",
+    "summary": "runtime carrier `bootstrapped-target-runtime` is executing as `installed-runtime` with a consistent bundled runtime.",
+    "missing_inputs": [],
+    "fallback_to": null,
+    "scene": "installed-runtime",
+    "carrier": "bootstrapped-target-runtime",
+    "entry_family": "loom-init",
+    "install_root": null,
+    "runtime_root": ".loom/bin",
+    "registry_path": null,
+    "layout_or_manifest_path": ".loom/bootstrap/manifest.json",
+    "source_repo_root": null,
+    "target_root": ".",
+    "checks": {
+      "scene_marker": {
+        "status": "pass",
+        "summary": "scene defaults to `installed-runtime` for carrier `bootstrapped-target-runtime`."
+      },
+      "carrier_layout": {
+        "status": "pass",
+        "summary": "bootstrap manifest and .loom/bin runtime files are aligned.",
+        "evidence": {
+          "path": ".loom/bootstrap/manifest.json"
+        }
+      },
+      "registry_contract": {
+        "status": "not_applicable",
+        "summary": "bootstrapped target runtime does not consume `skills/registry.json`; it uses `.loom/bootstrap/manifest.json`.",
+        "evidence": null
+      },
+      "shared_runtime": {
+        "status": "pass",
+        "summary": "bootstrap manifest and .loom/bin runtime files are aligned.",
+        "evidence": {
+          "path": ".loom/bin"
+        }
+      },
+      "referenced_resources": {
+        "status": "not_applicable",
+        "summary": "bootstrapped target runtime validates copied runtime artifacts via the bootstrap manifest instead of shared references."
+      }
+    }
+  },
+  "governance_surface": {
+    "repository_mode": "complex-existing",
+    "loom_state": "active",
+    "carrier_summary": {
+      "work_item": {
+        "status": "present",
+        "locator": ".loom/work-items/INIT-0001.md",
+        "source": "repository scan"
+      },
+      "recovery": {
+        "status": "present",
+        "locator": ".loom/progress/INIT-0001.md",
+        "source": "repository scan"
+      },
+      "review": {
+        "status": "present",
+        "locator": ".loom/reviews/INIT-0001.json",
+        "source": "repository scan"
+      },
+      "status_surface": {
+        "status": "present",
+        "locator": ".loom/status/current.md",
+        "source": "repository scan"
+      },
+      "spec_path": {
+        "status": "present",
+        "locator": ".loom/specs/INIT-0001/spec.md",
+        "source": "repository scan"
+      },
+      "plan_path": {
+        "status": "present",
+        "locator": ".loom/specs/INIT-0001/plan.md",
+        "source": "repository scan"
+      }
+    },
+    "execution_entry": "python3 .loom/bin/loom_flow.py flow resume --target . --item INIT-0001",
+    "validation_entry": "python3 .loom/bin/loom_init.py verify --target .",
+    "review_merge_surface": {
+      "pr_template": ".github/PULL_REQUEST_TEMPLATE.md",
+      "validation_surface": ".loom/status/current.md",
+      "merge_surface": "python3 .loom/bin/loom_flow.py checkpoint merge --target . [--item <id>]"
+    },
+    "github_control_plane": {
+      "repository": "MC-and-his-Agents/Syvert",
+      "default_branch": "main",
+      "branch_protection": "enabled",
+      "required_checks": [
+        "Validate Commit Messages",
+        "Validate Docs And Guard Scripts",
+        "Validate Spec Review Boundaries",
+        "Validate Governance Tooling"
+      ],
+      "pr_reviews": "not_required"
+    },
+    "repo_interface": {
+      "availability": "present",
+      "manifest": {
+        "status": "present",
+        "locator": ".loom/companion/manifest.json",
+        "source": "repository scan"
+      },
+      "companion_entry": {
+        "status": "present",
+        "locator": ".loom/companion/README.md",
+        "source": "repo companion interface.companion_entry"
+      },
+      "repo_specific_requirements": {
+        "status": "present",
+        "locator": ".loom/companion/repo-interface.json",
+        "source": "repo companion manifest.repo_interface"
+      },
+      "specialized_gates": {
+        "status": "present",
+        "locator": ".loom/companion/repo-interface.json",
+        "source": "repo companion manifest.repo_interface"
+      },
+      "summary": "repo companion manifest and machine-readable repo interface are readable.",
+      "missing_inputs": []
+    },
+    "repo_interop": {
+      "availability": "present",
+      "contract": {
+        "status": "present",
+        "locator": ".loom/companion/interop.json",
+        "source": "repository scan"
+      },
+      "host_adapters": {
+        "status": "present",
+        "locator": ".loom/companion/interop.json",
+        "source": "repo interop contract"
+      },
+      "repo_native_carriers": {
+        "status": "present",
+        "locator": ".loom/companion/interop.json",
+        "source": "repo interop contract"
+      },
+      "shadow_surfaces": {
+        "status": "present",
+        "locator": ".loom/companion/interop.json",
+        "source": "repo interop contract"
+      },
+      "summary": "repo interop contract is readable for host adapters, repo-native carriers, and shadow parity.",
+      "missing_inputs": []
+    },
+    "governance_control_plane": {
+      "schema_version": "loom-governance-control/v1",
+      "execution_entry": {
+        "only_default_entry": "work_item",
+        "illegal_entry_fallbacks": {
+          "roadmap": "phase",
+          "phase": "fr",
+          "fr": "work_item",
+          "implementation_pr": "work_item",
+          "merge_commit": "closeout"
+        },
+        "result": "pass"
+      },
+      "host_binding": {
+        "schema_version": "loom-host-binding/v1",
+        "required_objects": {
+          "phase": {
+            "status": "profile-defined",
+            "locator": "GitHub parent issue or equivalent planning object",
+            "authority": "github-profile"
+          },
+          "fr": {
+            "status": "profile-defined",
+            "locator": "GitHub sub-issue or equivalent formal request",
+            "authority": "github-profile"
+          },
+          "work_item": {
+            "status": "present",
+            "locator": ".loom/work-items/INIT-0001.md",
+            "authority": "loom fact chain"
+          },
+          "branch": {
+            "status": "present",
+            "locator": "issue-258-loom-official-adoption",
+            "authority": "git"
+          },
+          "worktree": {
+            "status": "present",
+            "locator": ".",
+            "authority": "git"
+          },
+          "implementation_pr": {
+            "status": "host-managed",
+            "locator": "GitHub PR linked from Work Item or branch",
+            "authority": "host"
+          },
+          "merge_commit": {
+            "status": "host-managed",
+            "locator": "GitHub merged PR mergeCommit",
+            "authority": "host"
+          },
+          "closeout": {
+            "status": "present",
+            "locator": "reconciliation audit + closeout gate",
+            "authority": "loom + host"
+          }
+        },
+        "default_branch": "main",
+        "missing_inputs": [],
+        "result": "pass",
+        "summary": "host binding surface can relate the active Work Item to branch, worktree, PR, merge commit, and closeout."
+      },
+      "taxonomy": {
+        "spec_stale": "Approved spec no longer covers the implementation surface.",
+        "review_stale": "Implementation review no longer covers the current head or scope.",
+        "head_drift": "The head SHA changed after an approval gate was recorded.",
+        "host_signal_drift": "GitHub issue, PR, project, branch, or check state no longer agrees with Loom's local carriers.",
+        "gate_failure": "A required predecessor gate is missing, blocking, or unreadable.",
+        "closeout_reconciliation_drift": "Merged work and issue/project closeout state are not yet aligned."
+      },
+      "gate_chain": [
+        {
+          "id": "work_item_admission",
+          "requires": [],
+          "fallback_to": "admission"
+        },
+        {
+          "id": "spec_gate",
+          "requires": [
+            "work_item_admission",
+            "formal_spec_or_not_applicable",
+            "spec_review_approved"
+          ],
+          "fallback_to": "admission"
+        },
+        {
+          "id": "build_gate",
+          "requires": [
+            "work_item_admission",
+            "spec_gate",
+            "head_sha",
+            "validation_summary",
+            "approved_scope"
+          ],
+          "fallback_to": "build"
+        },
+        {
+          "id": "review_gate",
+          "requires": [
+            "build_gate",
+            "head_sha",
+            "validation_summary",
+            "single_review_record"
+          ],
+          "fallback_to": "review"
+        },
+        {
+          "id": "merge_gate",
+          "requires": [
+            "review_gate",
+            "head_binding",
+            "validation_summary",
+            "no_stale_or_drift"
+          ],
+          "fallback_to": "merge"
+        },
+        {
+          "id": "github_controlled_merge",
+          "requires": [
+            "merge_gate",
+            "required_checks",
+            "branch_protection",
+            "merge_policy"
+          ],
+          "fallback_to": "merge"
+        },
+        {
+          "id": "closeout",
+          "requires": [
+            "github_controlled_merge",
+            "merge_commit",
+            "target_main",
+            "reconciliation_audit"
+          ],
+          "fallback_to": "reconciliation-sync"
+        }
+      ],
+      "maturity": {
+        "schema_version": "loom-governance-maturity/v1",
+        "current": "strong",
+        "achieved": [
+          "light",
+          "standard",
+          "strong"
+        ],
+        "next": null,
+        "levels": {
+          "light": {
+            "requires": [
+              "work_item",
+              "recovery",
+              "status_surface",
+              "review"
+            ],
+            "summary": "Minimal Work Item -> review -> merge-ready governance is available."
+          },
+          "standard": {
+            "requires": [
+              "light",
+              "fr_work_item_layer",
+              "spec_path",
+              "plan_path",
+              "spec_gate",
+              "status_control_plane",
+              "basic_host_binding",
+              "closeout_reconciliation_read"
+            ],
+            "summary": "Formal spec, spec gate, status control plane, basic host binding, and closeout/reconciliation reads are available."
+          },
+          "strong": {
+            "requires": [
+              "standard",
+              "repo_interface",
+              "repo_interop",
+              "github_controlled_merge"
+            ],
+            "summary": "Host-backed binding, reconciliation, controlled merge, and closeout gates are available."
+          }
+        },
+        "required_fields": {
+          "light": [
+            {
+              "id": "work_item",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "run loom-init or restore the Work Item carrier"
+            },
+            {
+              "id": "recovery",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "restore the recovery carrier"
+            },
+            {
+              "id": "status_surface",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "restore the status surface carrier"
+            },
+            {
+              "id": "review",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "restore the review carrier"
+            }
+          ],
+          "standard": [
+            {
+              "id": "fr_work_item_layer",
+              "layer": "github-profile",
+              "required": true,
+              "defaulting": "profile",
+              "recommended_action": "declare the FR -> Work Item split through the GitHub profile upgrade path"
+            },
+            {
+              "id": "spec_path",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "install formal spec scaffold"
+            },
+            {
+              "id": "plan_path",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "install execution plan scaffold"
+            },
+            {
+              "id": "spec_gate",
+              "layer": "core",
+              "required": true,
+              "defaulting": "generated",
+              "recommended_action": "record or restore the spec review gate"
+            },
+            {
+              "id": "status_control_plane",
+              "layer": "core",
+              "required": true,
+              "defaulting": "builtin",
+              "recommended_action": "run loom_status or loom_check to rebuild the status control plane"
+            },
+            {
+              "id": "basic_host_binding",
+              "layer": "github-profile",
+              "required": true,
+              "defaulting": "profile",
+              "recommended_action": "run governance-profile binding and repair missing host bindings"
+            },
+            {
+              "id": "closeout_reconciliation_read",
+              "layer": "github-profile",
+              "required": true,
+              "defaulting": "profile",
+              "recommended_action": "install repo interop so closeout can consume reconciliation"
+            }
+          ],
+          "strong": [
+            {
+              "id": "repo_interface",
+              "layer": "repo-owned-residue",
+              "required": true,
+              "defaulting": "scaffold",
+              "recommended_action": "install or repair the repo companion interface"
+            },
+            {
+              "id": "repo_interop",
+              "layer": "repo-owned-residue",
+              "required": true,
+              "defaulting": "scaffold",
+              "recommended_action": "install or repair the repo interop contract"
+            },
+            {
+              "id": "github_controlled_merge",
+              "layer": "github-profile",
+              "required": true,
+              "defaulting": "host",
+              "recommended_action": "enable controlled merge binding and required host gates"
+            }
+          ]
+        },
+        "missing_by_level": {
+          "light": [],
+          "standard": [],
+          "strong": []
+        },
+        "missing_details_by_level": {
+          "light": [],
+          "standard": [],
+          "strong": []
+        }
+      }
+    },
+    "summary": "resume chain is readable and the current governance carriers can support continued execution.",
+    "missing_inputs": []
+  },
+  "maturity_upgrade_path": {
+    "result": "pass",
+    "current": "strong",
+    "next": null,
+    "missing_inputs": [],
+    "missing_details": [],
+    "fallback_to": null,
+    "upgrade_entry": null,
+    "validation_entries": [
+      "python3 .loom/bin/loom_flow.py governance-profile status --target .",
+      "python3 .loom/bin/loom_flow.py governance-profile upgrade-plan --target ."
+    ]
+  }
+}
