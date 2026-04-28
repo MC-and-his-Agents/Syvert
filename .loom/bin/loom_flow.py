@@ -1489,7 +1489,10 @@ def shadow_evidence_paths_for_sources(target_root: Path, source_paths: set[str])
         relative = evidence_path.relative_to(target_root).as_posix()
         if relative == ".loom/shadow/shadow-parity.json":
             continue
-        payload = load_json_file(evidence_path)
+        try:
+            payload = load_json_file(evidence_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
         if not isinstance(payload, dict):
             continue
         source_files = payload.get("source_files")
@@ -1509,10 +1512,13 @@ def allowed_post_review_carrier_paths(context: dict[str, Any], *review_paths: st
     allowed.update(shadow_evidence_paths_for_sources(context["target_root"], set(review_paths)))
     review_shadow_root = context["target_root"] / ".loom/shadow"
     if review_shadow_root.exists():
-        allowed.update(
-            evidence_path.relative_to(context["target_root"]).as_posix()
-            for evidence_path in sorted(review_shadow_root.glob("review-*.json"))
-        )
+        for evidence_path in sorted(review_shadow_root.glob("review-*.json")):
+            try:
+                payload = load_json_file(evidence_path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            if isinstance(payload, dict):
+                allowed.add(evidence_path.relative_to(context["target_root"]).as_posix())
     return allowed
 
 
@@ -2107,7 +2113,7 @@ def build_review_flow_payload(
 
     build_payload = checkpoint_payload("build", context)
     governance_surface = build_governance_surface(target_root)
-    surface_name = "review" if operation == "review" else "spec_review"
+    surface_name = "review"
     repo_specific_requirements = repo_specific_requirements_payload(
         governance_surface.get("repo_interface"),
         target_root=target_root,
@@ -4237,6 +4243,15 @@ def carrier_refresh_payload(target_root: Path, output_relative: str, expected_it
     for action in actions:
         if action.get("status") == "block":
             missing_inputs.extend(str(message) for message in action.get("missing_inputs", []))
+    if runtime_state.get("result") != "pass":
+        refreshable_runtime_drift = {
+            f"bootstrap runtime artifact `{action.get('path')}` sha256 drifted"
+            for action in actions
+            if action.get("kind") is None and action.get("status") == "refresh-needed" and action.get("path")
+        }
+        for message in runtime_state.get("missing_inputs", []):
+            if str(message) not in refreshable_runtime_drift:
+                missing_inputs.append(f"runtime-state: {message}")
 
     review_status: dict[str, Any] = {"status": "not_checked"}
     if not context_errors:

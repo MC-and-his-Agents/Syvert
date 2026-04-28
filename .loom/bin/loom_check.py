@@ -7229,6 +7229,39 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
         else:
             failures.append(Failure("adversarial-adoption", "review shadow carrier fixture could not load review artifact"))
 
+        unreadable_review_shadow_target = base / "unreadable-review-shadow"
+        shutil.copytree(baseline, unreadable_review_shadow_target)
+        (unreadable_review_shadow_target / ".loom/shadow/review-repo.json").write_text("{not-json", encoding="utf-8")
+        run_command(
+            root,
+            ["git", "add", "-f", ".loom/shadow/review-repo.json"],
+            cwd=unreadable_review_shadow_target,
+            timeout_seconds=30,
+        )
+        run_command(
+            root,
+            ["git", "commit", "-m", "corrupt review shadow evidence"],
+            cwd=unreadable_review_shadow_target,
+            timeout_seconds=30,
+        )
+        unreadable_payload, unreadable_error = load_command_json(
+            root,
+            [
+                "python3",
+                str(unreadable_review_shadow_target / ".loom/bin/loom_flow.py"),
+                "checkpoint",
+                "merge",
+                "--target",
+                str(unreadable_review_shadow_target),
+                "--item",
+                "INIT-0001",
+            ],
+        )
+        if unreadable_error:
+            failures.append(Failure("adversarial-adoption", f"unreadable review shadow evidence must fail closed without crashing: {unreadable_error}"))
+        elif unreadable_payload.get("result") == "pass":
+            failures.append(Failure("adversarial-adoption", "unreadable review shadow evidence must fail closed instead of passing"))
+
         invalid_review_schema_target = base / "invalid-review-schema"
         shutil.copytree(baseline, invalid_review_schema_target)
         invalid_review_payload = load_json_file(invalid_review_schema_target / review_path)

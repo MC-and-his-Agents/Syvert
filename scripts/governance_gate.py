@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import py_compile
+import re
 import tempfile
 
 from scripts.common import REPO_ROOT, git_changed_files, git_current_branch
@@ -154,6 +155,8 @@ REQUIRED_CONTEXT_SCHEMA_LOCATORS = {
         "enforcement": "blocking",
     },
 }
+
+SAFE_LOOM_ITEM_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[0-9][A-Z0-9]*)+$")
 REQUIRED_INTEROP_HOST_ADAPTERS = {
     "syvert-guardian": {
         "locator": "scripts/pr_guardian.py",
@@ -239,6 +242,17 @@ def repo_relative_path(repo_root: Path, raw_locator: object, *, label: str) -> t
     if not resolved.exists():
         return raw_locator, f"{label} 指向缺失文件: {raw_locator}"
     return raw_locator, None
+
+
+def validate_loom_item_id(raw_item_id: object) -> tuple[str | None, str | None]:
+    if not isinstance(raw_item_id, str) or not raw_item_id.strip():
+        return None, "Loom status Item ID 必须是非空安全标识符"
+    item_id = raw_item_id.strip()
+    if "/" in item_id or "\\" in item_id or ".." in item_id:
+        return None, f"Loom status Item ID 非法，不能包含路径片段: {item_id}"
+    if not SAFE_LOOM_ITEM_ID_RE.fullmatch(item_id):
+        return None, f"Loom status Item ID 非法，必须是稳定事项标识符: {item_id}"
+    return item_id, None
 
 
 def artifact_paths(payload: object, field: str) -> set[str]:
@@ -601,7 +615,11 @@ def validate_loom_carrier_semantics(repo_root: Path) -> list[str]:
     if not status_path.exists():
         return errors
     status = markdown_fields(status_path, section_name="Derived Fact Chain View")
-    item_id = status.get("Item ID") or "INIT-0001"
+    raw_item_id = status.get("Item ID") or "INIT-0001"
+    item_id, item_id_error = validate_loom_item_id(raw_item_id)
+    if item_id_error:
+        errors.append(item_id_error)
+        return errors
     work_item_path = repo_root / f".loom/work-items/{item_id}.md"
     progress_path = repo_root / f".loom/progress/{item_id}.md"
     review_path = repo_root / f".loom/reviews/{item_id}.json"

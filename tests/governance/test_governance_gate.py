@@ -801,6 +801,25 @@ class GovernanceGateTests(unittest.TestCase):
 
             self.assertTrue(any("Review Entry" in error and "必须是" in error for error in errors))
 
+    def test_loom_carrier_guard_rejects_unsafe_status_item_id_before_path_construction(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_loom_carrier(root)
+            status_path = root / ".loom/status/current.md"
+            status_path.write_text(
+                status_path.read_text(encoding="utf-8").replace(
+                    "- Item ID: INIT-0001",
+                    "- Item ID: ../outside",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = governance_gate.validate_loom_carrier_repository(root, [".loom/status/current.md"])
+
+            self.assertTrue(any("Item ID 非法" in error and "路径片段" in error for error in errors))
+            self.assertFalse((root.parent / "outside.md").exists())
+
     def test_loom_carrier_guard_ignores_late_metadata_spoofing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
