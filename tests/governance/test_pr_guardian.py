@@ -749,6 +749,104 @@ class CodexReviewExecutionTests(unittest.TestCase):
 
             self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
 
+    def test_review_artifact_errors_rejects_arbitrary_existing_review_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/specs/FR-0001-governance-stack-v1").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text(
+                "\n".join(
+                    [
+                        "# GOV-0015",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- Issue：`#15`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`docs/specs/FR-0001-governance-stack-v1/`",
+                        "- active 收口事项：`GOV-0015-item-context-gate`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "README.md").write_text("not a review rubric", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #15",
+                        "- item_key: `GOV-0015-item-context-gate`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0001-governance-stack-v1",
+                        "- Review artifact: README.md",
+                        "- Validation evidence: `python3 -m unittest tests/governance/test_pr_guardian.py`",
+                    ]
+                )
+            }
+
+            errors = review_artifact_errors(meta, repo_root=repo_root)
+
+        self.assertTrue(any("reviewer rubric artifacts" in error for error in errors))
+
+    def test_review_artifact_errors_fail_closed_without_governing_artifact_derivation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/exec-plans").mkdir(parents=True)
+            (repo_root / "docs/exec-plans/GOV-0015-item-context-gate.md").write_text(
+                "\n".join(
+                    [
+                        "# GOV-0015",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0015-item-context-gate`",
+                        "- Issue：`#15`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- active 收口事项：`GOV-0015-item-context-gate`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "docs/notes").mkdir(parents=True)
+            (repo_root / "docs/notes/governing.md").write_text("not a governing artifact", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #15",
+                        "- item_key: `GOV-0015-item-context-gate`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0015-item-context-gate.md",
+                        "- Governing spec / bootstrap contract: docs/notes/governing.md",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3 -m unittest tests/governance/test_pr_guardian.py`",
+                    ]
+                )
+            }
+
+            errors = review_artifact_errors(meta, repo_root=repo_root)
+
+        self.assertTrue(any("无法从当前 exec-plan 推导" in error for error in errors))
+
     def test_review_artifact_errors_rejects_artifacts_without_item_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

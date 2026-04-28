@@ -58,6 +58,7 @@ from scripts.state_paths import guardian_legacy_state_path, guardian_state_path
 
 SCHEMA_PATH = REPO_ROOT / "scripts" / "policy" / "pr_review_result_schema.json"
 CODE_REVIEW_PATH = "code_review.md"
+REVIEW_RUBRIC_ARTIFACTS = {"code_review.md", "spec_review.md"}
 DEFAULT_STATE_FILE = guardian_state_path()
 VALID_VERDICTS = {"APPROVE", "REQUEST_CHANGES"}
 INTEGRATION_STATUS_VALUES = set(field_choices("integration_status_checked_before_pr"))
@@ -430,6 +431,22 @@ def review_artifact_locator_errors(value: str, *, field: str, require_repo_path:
     return errors
 
 
+def review_rubric_artifact_errors(value: str) -> list[str]:
+    errors: list[str] = []
+    candidates = {
+        normalize_review_artifact_locator(candidate)
+        for candidate in review_artifact_locator_candidates(value)
+    }
+    unexpected = sorted(candidate for candidate in candidates if candidate not in REVIEW_RUBRIC_ARTIFACTS)
+    if unexpected:
+        expected_text = "`, `".join(sorted(REVIEW_RUBRIC_ARTIFACTS))
+        errors.append(
+            "`## Review Artifacts` 中 `Review artifact` "
+            f"必须绑定 reviewer rubric artifacts：`{expected_text}`；发现：`{'`, `'.join(unexpected)}`。"
+        )
+    return errors
+
+
 def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_root: Path) -> list[str]:
     body_context = parse_item_context_from_body(str(meta.get("body") or ""))
     missing_context = [field for field in REVIEW_REQUIRED_BODY_FIELDS if not body_context.get(field, "").strip()]
@@ -460,7 +477,9 @@ def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_
         normalize_governing_artifact_locator_for_repo(candidate, repo_root=repo_root)
         for candidate in review_artifact_locator_candidates(str(payload.get("Governing spec / bootstrap contract") or ""))
     }
-    if expected_governing and governing_candidates != expected_governing:
+    if not expected_governing:
+        errors.append("`## Review Artifacts` 无法从当前 exec-plan 推导 governing spec / bootstrap contract，必须 fail closed。")
+    elif governing_candidates != expected_governing:
         expected_text = "`, `".join(sorted(expected_governing))
         errors.append(
             "`## Review Artifacts` 中 `Governing spec / bootstrap contract` "
@@ -578,6 +597,7 @@ def review_artifact_errors(meta: dict, *, repo_root: Path = REPO_ROOT) -> list[s
             errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=True, repo_root=repo_root))
         if field == "Review artifact":
             errors.extend(review_artifact_locator_errors(value, field=field, require_repo_path=False, repo_root=repo_root))
+            errors.extend(review_rubric_artifact_errors(value))
         if field == "Validation evidence":
             errors.extend(validation_evidence_errors(value, sections=sections, repo_root=repo_root))
     if not errors:
