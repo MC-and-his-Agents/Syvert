@@ -50,6 +50,7 @@ from scripts.item_context import (
     load_item_context_from_exec_plan,
     normalize_bound_spec_dir,
     parse_item_context_from_body,
+    spec_dir_has_minimum_suite,
 )
 from scripts.open_pr import extract_issue_summary_sections
 from scripts.policy.policy import classify_paths
@@ -473,6 +474,10 @@ def review_artifact_binding_errors(meta: dict, payload: dict[str, str], *, repo_
         if normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root)
         and normalize_governing_artifact_locator_for_repo(path, repo_root=repo_root) != expected_exec_plan
     }
+    if not expected_governing and str(item_context.get("item_type") or "") == "FR":
+        fallback_spec = repo_root / "docs" / "specs" / str(item_context.get("item_key") or "")
+        if spec_dir_has_minimum_suite(fallback_spec):
+            expected_governing.add(fallback_spec.relative_to(repo_root).as_posix())
     governing_candidates = {
         normalize_governing_artifact_locator_for_repo(candidate, repo_root=repo_root)
         for candidate in review_artifact_locator_candidates(str(payload.get("Governing spec / bootstrap contract") or ""))
