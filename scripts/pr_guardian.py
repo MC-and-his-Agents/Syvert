@@ -178,18 +178,21 @@ def require_auth() -> None:
 
 
 def pr_meta(pr_number: int) -> dict:
-    completed = run(
-        [
-            "gh",
-            "pr",
-            "view",
-            str(pr_number),
-            "--json",
-            "number,title,body,url,isDraft,baseRefName,headRefName,headRefOid,author,createdAt",
-        ],
-        cwd=REPO_ROOT,
-    )
-    return json.loads(completed.stdout)
+    repo_slug = default_github_repo()
+    completed = run(["gh", "api", f"repos/{repo_slug}/pulls/{pr_number}"], cwd=REPO_ROOT)
+    payload = json.loads(completed.stdout or "{}")
+    return {
+        "number": payload.get("number", pr_number),
+        "title": payload.get("title") or "",
+        "body": payload.get("body") or "",
+        "url": payload.get("html_url") or "",
+        "isDraft": bool(payload.get("draft")),
+        "baseRefName": (payload.get("base") or {}).get("ref") or "",
+        "headRefName": (payload.get("head") or {}).get("ref") or "",
+        "headRefOid": (payload.get("head") or {}).get("sha") or "",
+        "author": {"login": (payload.get("user") or {}).get("login") or ""},
+        "createdAt": payload.get("created_at") or "",
+    }
 
 
 def prepare_worktree(pr_number: int, meta: dict) -> tuple[Path, Path]:
@@ -719,10 +722,10 @@ def record_merge_time_integration_recheck(pr_number: int, meta: dict) -> tuple[d
 
 def update_pr_body(pr_number: int, body: str) -> None:
     with NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
-        handle.write(body)
+        json.dump({"body": body}, handle, ensure_ascii=False)
         temp_path = Path(handle.name)
     try:
-        run(["gh", "pr", "edit", str(pr_number), "--body-file", str(temp_path)], cwd=REPO_ROOT)
+        run(["gh", "api", "-X", "PATCH", f"repos/{default_github_repo()}/pulls/{pr_number}", "--input", str(temp_path)], cwd=REPO_ROOT)
     finally:
         temp_path.unlink(missing_ok=True)
 
@@ -798,7 +801,7 @@ def extract_named_markdown_sections(body: str, headings: tuple[str, ...]) -> dic
 
 def fetch_issue_context(issue_number: int) -> dict[str, object]:
     completed = run(
-        ["gh", "issue", "view", str(issue_number), "--repo", default_github_repo(), "--json", "number,title,body,url"],
+        ["gh", "api", f"repos/{default_github_repo()}/issues/{issue_number}"],
         cwd=REPO_ROOT,
         check=False,
     )
@@ -815,7 +818,7 @@ def fetch_issue_context(issue_number: int) -> dict[str, object]:
     identity = [
         f"- Issue: #{payload.get('number', issue_number)}",
         f"- 标题: {payload.get('title', '')}",
-        f"- 链接: {payload.get('url', '')}",
+        f"- 链接: {payload.get('html_url', '')}",
     ]
     sections = extract_named_markdown_sections(body, ISSUE_CONTEXT_HEADINGS)
     if not sections:

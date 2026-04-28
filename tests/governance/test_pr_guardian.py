@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -31,6 +32,15 @@ from scripts.pr_guardian import (
     save_guardian_result,
     set_integration_status_checked_before_merge,
 )
+
+
+def is_pr_body_patch_command(command: list[str], pr_number: str = "1") -> bool:
+    return command[:5] == ["gh", "api", "-X", "PATCH", f"repos/MC-and-his-Agents/Syvert/pulls/{pr_number}"]
+
+
+def read_pr_body_patch(command: list[str]) -> str:
+    input_path = Path(command[command.index("--input") + 1])
+    return str(json.loads(input_path.read_text(encoding="utf-8")).get("body") or "")
 
 
 LOCAL_ONLY_INTEGRATION_CHECK_BODY = "\n".join(
@@ -3486,8 +3496,8 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 2)
         edit_command = run_mock.call_args_list[0].args[0]
         merge_command = run_mock.call_args_list[1].args[0]
-        self.assertEqual(edit_command[:4], ["gh", "pr", "edit", "1"])
-        self.assertIn("--body-file", edit_command)
+        self.assertTrue(is_pr_body_patch_command(edit_command))
+        self.assertIn("--input", edit_command)
         self.assertEqual(
             merge_command,
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-needs-recheck"],
@@ -3519,9 +3529,8 @@ class MergeIfSafeTests(unittest.TestCase):
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
-                body_file = Path(command[command.index("--body-file") + 1])
-                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+            if is_pr_body_patch_command(command):
+                edited_bodies.append(read_pr_body_patch(command))
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             if command[:4] == ["gh", "pr", "merge", "1"]:
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
@@ -3625,7 +3634,7 @@ class MergeIfSafeTests(unittest.TestCase):
         concurrent_body = updated_body + "\n\n补充说明：refresh 后被编辑\n"
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
+            if is_pr_body_patch_command(command):
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             raise AssertionError(f"unexpected command: {command}")
 
@@ -3767,9 +3776,8 @@ class MergeIfSafeTests(unittest.TestCase):
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
-                body_file = Path(command[command.index("--body-file") + 1])
-                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+            if is_pr_body_patch_command(command):
+                edited_bodies.append(read_pr_body_patch(command))
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             raise AssertionError(f"unexpected command: {command}")
 
@@ -3840,9 +3848,8 @@ class MergeIfSafeTests(unittest.TestCase):
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
-                body_file = Path(command[command.index("--body-file") + 1])
-                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+            if is_pr_body_patch_command(command):
+                edited_bodies.append(read_pr_body_patch(command))
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             raise AssertionError(f"unexpected command: {command}")
 
@@ -3965,8 +3972,8 @@ class MergeIfSafeTests(unittest.TestCase):
 
         self.assertIn("merge 前重跑 guardian 后 PR 描述已变化", str(ctx.exception))
         self.assertEqual(run_mock.call_count, 2)
-        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
-        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[0].args[0]))
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[1].args[0]))
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
@@ -4036,8 +4043,8 @@ class MergeIfSafeTests(unittest.TestCase):
 
         self.assertIn("merge 前 integration 复核后 PR HEAD 已变化", str(ctx.exception))
         self.assertEqual(run_mock.call_count, 2)
-        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
-        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[0].args[0]))
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[1].args[0]))
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
@@ -4131,9 +4138,9 @@ class MergeIfSafeTests(unittest.TestCase):
             )
 
         self.assertEqual(run_mock.call_count, 3)
-        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[0].args[0]))
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
-        self.assertEqual(run_mock.call_args_list[2].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[2].args[0]))
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
         self.assertEqual(all_checks_mock.call_count, 2)
@@ -4197,9 +4204,8 @@ class MergeIfSafeTests(unittest.TestCase):
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
-                body_file = Path(command[command.index("--body-file") + 1])
-                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+            if is_pr_body_patch_command(command):
+                edited_bodies.append(read_pr_body_patch(command))
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             raise AssertionError(f"unexpected command: {command}")
 
@@ -4350,9 +4356,8 @@ class MergeIfSafeTests(unittest.TestCase):
         edited_bodies: list[str] = []
 
         def run_side_effect(command, cwd=None, check=True):
-            if command[:4] == ["gh", "pr", "edit", "1"]:
-                body_file = Path(command[command.index("--body-file") + 1])
-                edited_bodies.append(body_file.read_text(encoding="utf-8"))
+            if is_pr_body_patch_command(command):
+                edited_bodies.append(read_pr_body_patch(command))
                 return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
             if command[:4] == ["gh", "pr", "merge", "1"]:
                 raise CommandError(command, "命令失败", "", "merge failed")
@@ -4371,8 +4376,8 @@ class MergeIfSafeTests(unittest.TestCase):
 
         self.assertIn("merge 前重跑 guardian 后 PR 描述已变化", str(ctx.exception))
         self.assertEqual(run_mock.call_count, 2)
-        self.assertEqual(run_mock.call_args_list[0].args[0][:4], ["gh", "pr", "edit", "1"])
-        self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "edit", "1"])
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[0].args[0]))
+        self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[1].args[0]))
         self.assertEqual(len(edited_bodies), 2)
         self.assertIn("其他人已更新 PR 描述", edited_bodies[1])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
