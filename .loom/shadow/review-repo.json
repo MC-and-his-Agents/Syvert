@@ -14,7 +14,7 @@
     ".loom/companion/repo-interface.json": "6b6407445fefab9c22bc6bc7aacb7cc84f1065616b8d742ab4fdf92134a0c8f6",
     "spec_review.md": "9057ddb90e85b732adcd1879903d57f141b770933cdf758ba397ee411dd83a9f",
     "code_review.md": "43ff9d50d61d371f3644f199a4fb0e6a5a7288d511d0fe249f5f3b1420993ae9",
-    "scripts/pr_guardian.py": "b2c3ba7ac773107b66fc3c112340e117adfc0fc2231b65a75ae23d7afc989370",
+    "scripts/pr_guardian.py": "8b35705d7fe23bcb737a5eba6853959aa3946cae8a113d09550727c3f47b3db8",
     "scripts/policy/integration_contract.json": "cf743853470ef432870beca975a4eddfc7c0e316f24de57ea574c33b830e319a"
   },
   "source_semantics": "Review parity requires durable review evidence, explicit review findings handling, and authoritative review inputs before merge decisions.",
