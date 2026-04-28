@@ -4466,6 +4466,42 @@ def check_daily_execution_cli(root: Path) -> list[Failure]:
                 elif payload.get("result") != "pass":
                     failures.append(Failure("daily-execution-cli", "`installed spec review record allow` must pass"))
 
+                spec_plan_path = positive_target / ".loom/specs/INIT-0001/plan.md"
+                spec_plan_text = spec_plan_path.read_text(encoding="utf-8")
+                spec_plan_path.unlink()
+                try:
+                    payload, error = load_command_json(
+                        root,
+                        [
+                            "python3",
+                            str(install_root / "loom-spec-review" / "scripts" / "loom-spec-review.py"),
+                            "review",
+                            "record",
+                            "--target",
+                            str(positive_target),
+                            "--item",
+                            "INIT-0001",
+                            "--review-file",
+                            ".loom/reviews/INIT-0001.spec.json",
+                            "--decision",
+                            "allow",
+                            "--kind",
+                            "spec_review",
+                            "--summary",
+                            "Incomplete formal spec suite should not be approved.",
+                            "--reviewer",
+                            "loom-check",
+                        ],
+                    )
+                    if error:
+                        failures.append(Failure("daily-execution-cli", f"`installed incomplete spec review record` failed: {error}"))
+                    elif payload.get("result") != "block":
+                        failures.append(Failure("daily-execution-cli", "`installed incomplete spec review record` must block"))
+                    elif not any("plan.md" in str(item) for item in payload.get("missing_inputs", [])):
+                        failures.append(Failure("daily-execution-cli", "`installed incomplete spec review record` must name the missing plan.md"))
+                finally:
+                    spec_plan_path.write_text(spec_plan_text, encoding="utf-8")
+
                 payload, error = load_command_json(
                     root,
                     [

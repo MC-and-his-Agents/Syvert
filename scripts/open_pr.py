@@ -220,17 +220,42 @@ def has_bound_bootstrap_contract(repo_root: Path, item_key: str | None) -> bool:
     if not item_key:
         return False
     exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
-    if classify_exec_plan_input_mode(exec_plan) != INPUT_MODE_BOOTSTRAP:
+    return classify_exec_plan_input_mode(exec_plan) == INPUT_MODE_BOOTSTRAP and not validate_bound_decision_contract(
+        repo_root,
+        exec_plan,
+        require_present=True,
+    )
+
+
+def has_bound_bootstrap_decision_contract(repo_root: Path, item_key: str | None) -> bool:
+    if not item_key:
         return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
     return not validate_bound_decision_contract(repo_root, exec_plan, require_present=True)
 
 
-def touches_only_loom_spec_suite(changed_files: list[str]) -> bool:
+def touches_only_bound_loom_spec_suite(repo_root: Path, changed_files: list[str], item_key: str | None) -> bool:
+    if not item_key:
+        return False
     touched_spec_dirs = formal_spec_dirs(changed_files)
-    return bool(touched_spec_dirs) and all(
-        len(spec_dir.parts) >= 3 and spec_dir.parts[0] == ".loom" and spec_dir.parts[1] == "specs"
-        for spec_dir in touched_spec_dirs
-    )
+    if not touched_spec_dirs:
+        return False
+    exec_plan = load_item_context_from_exec_plan(repo_root, item_key)
+    related_spec = str(exec_plan.get("关联 spec", "")).strip()
+    bound_spec_dir = normalize_bound_spec_dir(repo_root, related_spec)
+    if bound_spec_dir is None:
+        return False
+    try:
+        bound_spec_rel = bound_spec_dir.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    if len(bound_spec_rel.parts) < 3 or bound_spec_rel.parts[0] != ".loom" or bound_spec_rel.parts[1] != "specs":
+        return False
+    return touched_spec_dirs == {bound_spec_rel}
+
+
+def touches_only_loom_spec_paths(changed_files: list[str]) -> bool:
+    return bool(changed_files) and all(Path(path).as_posix().startswith(".loom/specs/") for path in changed_files)
 
 
 def item_requires_formal_input(repo_root: Path, item_key: str | None, item_type: str | None) -> bool:
@@ -524,9 +549,14 @@ def validate_pr_preflight(
             changed_files,
             allow_unbound_local_fallback=False,
         )
-        or (has_bound_bootstrap_contract(repo_root, item_key) and touches_only_loom_spec_suite(changed_files))
+        or (
+            has_bound_bootstrap_decision_contract(repo_root, item_key)
+            and touches_only_bound_loom_spec_suite(repo_root, changed_files, item_key)
+        )
     ):
         errors.append("变更 formal spec 套件时，`governance` 类 PR 也必须绑定 formal spec 输入。")
+    if pr_class == "governance" and touches_formal_spec_suite and touches_only_loom_spec_paths(changed_files):
+        errors.append("仅变更 `.loom/specs/**` 时必须使用 `spec` 类 PR，避免本地 admission 与 CI class 推断分叉。")
 
     if pr_class == "implementation" and item_requires_formal_input(repo_root, item_key, item_type):
         if not (

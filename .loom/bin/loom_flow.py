@@ -1541,6 +1541,16 @@ def formal_spec_path(context: dict[str, Any]) -> str | None:
     return None
 
 
+def formal_spec_suite_status(context: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
+    suite = spec_suite_paths(context)
+    missing = [
+        path
+        for path in (suite["spec"], suite["plan"], suite["implementation_contract"])
+        if not (context["target_root"] / path).is_file()
+    ]
+    return suite, missing
+
+
 def spec_suite_paths(context: dict[str, Any]) -> dict[str, str]:
     item_id = context["item_id"]
     candidates = [
@@ -1757,15 +1767,25 @@ def review_gate_payload(
 
 
 def spec_review_gate_payload(context: dict[str, Any]) -> dict[str, Any]:
-    spec_path = formal_spec_path(context)
-    return review_gate_payload(
+    suite, missing_suite_paths = formal_spec_suite_status(context)
+    spec_path = suite["spec"] if not missing_suite_paths else formal_spec_path(context)
+    payload = review_gate_payload(
         context,
         review_path=default_spec_review_path(context["item_id"]),
         expected_kind="spec_review",
         gate_name="spec_review",
-        required=spec_path is not None,
+        required=not missing_suite_paths,
         path_label=spec_path,
     )
+    payload["formal_spec_suite"] = suite
+    if missing_suite_paths:
+        payload["result"] = "block"
+        payload["summary"] = "spec review is blocked until the complete formal spec suite is present."
+        payload["missing_inputs"] = [
+            f"missing formal spec suite file: {path}" for path in missing_suite_paths
+        ] + list(payload.get("missing_inputs", []))
+        payload["fallback_to"] = "build"
+    return payload
 
 
 def implementation_review_status_payload(context: dict[str, Any]) -> dict[str, Any]:
@@ -6813,15 +6833,17 @@ def handle_review(args: argparse.Namespace) -> int:
             }
         )
     if args.decision == "allow" and args.kind == "spec_review":
-        spec_path = formal_spec_path(context)
-        if spec_path is None:
+        _, missing_suite_paths = formal_spec_suite_status(context)
+        if missing_suite_paths:
             return emit(
                 {
                     "command": "review",
                     "operation": "record",
                     "result": "block",
-                    "summary": "spec review cannot be recorded as `allow` without a readable formal spec path.",
-                    "missing_inputs": ["formal spec path"],
+                    "summary": "spec review cannot be recorded as `allow` without the complete formal spec suite.",
+                    "missing_inputs": [
+                        f"missing formal spec suite file: {path}" for path in missing_suite_paths
+                    ],
                     "fallback_to": "build",
                     "build_checkpoint": build_payload,
                 }

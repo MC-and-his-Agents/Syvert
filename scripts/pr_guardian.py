@@ -381,7 +381,7 @@ def parse_bullet_kv_section(section: str) -> dict[str, str]:
 
 
 def review_artifact_locator_candidates(value: str) -> list[str]:
-    return [part.strip().strip("`").strip() for part in value.split(",") if part.strip()]
+    return [part.strip().strip("`").strip() for part in re.split(r"[,，]", value) if part.strip()]
 
 
 def normalize_review_artifact_locator(value: str) -> str:

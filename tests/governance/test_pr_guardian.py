@@ -959,6 +959,65 @@ class CodexReviewExecutionTests(unittest.TestCase):
             errors = review_artifact_errors(unrelated_meta, repo_root=repo_root)
             self.assertTrue(any("Active exec-plan` 必须绑定当前 PR item context" in error for error in errors))
 
+
+    def test_review_artifact_errors_accepts_chinese_comma_separated_governing_locators(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            exec_plan_path = repo_root / "docs/exec-plans/GOV-0024-guardian-review-context.md"
+            spec_dir = repo_root / "docs/specs/FR-0024"
+            extra_spec_dir = repo_root / "docs/specs/FR-0025-extra"
+            decision_path = repo_root / "docs/decisions/ADR-0024-review-context.md"
+            exec_plan_path.parent.mkdir(parents=True)
+            spec_dir.mkdir(parents=True)
+            extra_spec_dir.mkdir(parents=True)
+            decision_path.parent.mkdir(parents=True)
+            exec_plan_path.write_text(
+                "\n".join(
+                    [
+                        "# GOV-0024",
+                        "",
+                        "## 关联信息",
+                        "",
+                        "- item_key：`GOV-0024-guardian-review-context`",
+                        "- Issue：`#24`",
+                        "- item_type：`GOV`",
+                        "- release：`v0.1.0`",
+                        "- sprint：`2026-S14`",
+                        "- 关联 spec：`docs/specs/FR-0024/`",
+                        "- 额外关联 specs：docs/specs/FR-0025-extra/",
+                        "- 关联 decision：`docs/decisions/ADR-0024-review-context.md`",
+                        "- active 收口事项：`GOV-0024-guardian-review-context`",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "spec.md").write_text("spec", encoding="utf-8")
+            (extra_spec_dir / "spec.md").write_text("spec", encoding="utf-8")
+            decision_path.write_text("decision", encoding="utf-8")
+            (repo_root / "code_review.md").write_text("review", encoding="utf-8")
+            meta = {
+                "body": "\n".join(
+                    [
+                        "## 关联事项",
+                        "",
+                        "- Issue: #24",
+                        "- item_key: `GOV-0024-guardian-review-context`",
+                        "- item_type: `GOV`",
+                        "- release: `v0.1.0`",
+                        "- sprint: `2026-S14`",
+                        "",
+                        "## Review Artifacts",
+                        "",
+                        "- Active exec-plan: docs/exec-plans/GOV-0024-guardian-review-context.md",
+                        "- Governing spec / bootstrap contract: docs/specs/FR-0024， docs/specs/FR-0025-extra， docs/decisions/ADR-0024-review-context.md",
+                        "- Review artifact: code_review.md",
+                        "- Validation evidence: `python3.11 -m unittest tests.governance.test_pr_guardian`",
+                    ]
+                )
+            }
+
+            self.assertEqual(review_artifact_errors(meta, repo_root=repo_root), [])
+
     def test_review_artifact_errors_normalizes_file_level_governing_spec_locator(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
