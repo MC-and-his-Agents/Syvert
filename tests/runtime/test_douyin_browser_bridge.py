@@ -247,6 +247,8 @@ class DouyinBrowserBridgeTests(unittest.TestCase):
     def test_extract_page_state_falls_back_to_authenticated_detail_request_when_page_state_misses_target(self) -> None:
         from syvert.adapters.douyin_browser_bridge import DouyinAuthenticatedBrowserBridge
 
+        detail_request_scripts = []
+
         def run_applescript(script: str) -> str:
             if "set outputLines" in script:
                 return "1|目标页|https://www.douyin.com/video/7580570616932224282"
@@ -263,6 +265,7 @@ class DouyinBrowserBridgeTests(unittest.TestCase):
                     }
                 )
             if "new XMLHttpRequest()" in script:
+                detail_request_scripts.append(script)
                 return json.dumps(
                     {
                         "status": 200,
@@ -279,7 +282,31 @@ class DouyinBrowserBridgeTests(unittest.TestCase):
                 )
             raise AssertionError(script)
 
-        bridge = DouyinAuthenticatedBrowserBridge(run_applescript=run_applescript)
+        signer_calls = []
+
+        def fake_sign_browser_detail_request(
+            *,
+            sign_base_url: str,
+            query_params: str,
+            user_agent: str,
+            cookies: str,
+            timeout_seconds: int,
+        ) -> str:
+            signer_calls.append(
+                {
+                    "sign_base_url": sign_base_url,
+                    "query_params": query_params,
+                    "user_agent": user_agent,
+                    "cookies": cookies,
+                    "timeout_seconds": timeout_seconds,
+                }
+            )
+            return "fake-a-bogus"
+
+        bridge = DouyinAuthenticatedBrowserBridge(
+            run_applescript=run_applescript,
+            _sign_browser_detail_request=fake_sign_browser_detail_request,
+        )
 
         payload = bridge.extract_page_state(
             target_url="https://www.douyin.com/video/7580570616932224282",
@@ -288,6 +315,18 @@ class DouyinBrowserBridgeTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["AWEME_DETAIL"]["desc"], "浏览器请求命中")
+        self.assertEqual(len(signer_calls), 1)
+        self.assertEqual(signer_calls[0]["sign_base_url"], "http://127.0.0.1:8989")
+        self.assertEqual(signer_calls[0]["user_agent"], "Mozilla/5.0 TestAgent")
+        self.assertEqual(signer_calls[0]["cookies"], "s_v_web_id=verify-browser-1")
+        signed_params = dict(parse.parse_qsl(signer_calls[0]["query_params"]))
+        self.assertEqual(signed_params["aweme_id"], "7580570616932224282")
+        self.assertEqual(signed_params["verifyFp"], "verify-browser-1")
+        self.assertEqual(signed_params["fp"], "verify-browser-1")
+        self.assertEqual(signed_params["msToken"], "ms-token-browser-1")
+        self.assertEqual(signed_params["webid"], "webid-browser-1")
+        self.assertEqual(len(detail_request_scripts), 1)
+        self.assertIn("a_bogus=fake-a-bogus", detail_request_scripts[0])
 
     def test_extract_page_state_accepts_percent_encoded_render_data_payload(self) -> None:
         from syvert.adapters.douyin_browser_bridge import DouyinAuthenticatedBrowserBridge

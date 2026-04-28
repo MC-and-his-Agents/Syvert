@@ -149,9 +149,16 @@ def default_run_applescript(script: str, *, timeout_seconds: int) -> str:
 
 
 class DouyinAuthenticatedBrowserBridge:
-    def __init__(self, *, run_applescript=default_run_applescript, timeout_seconds: int = 10) -> None:
+    def __init__(
+        self,
+        *,
+        run_applescript=default_run_applescript,
+        timeout_seconds: int = 10,
+        _sign_browser_detail_request=None,
+    ) -> None:
         self._run_applescript = run_applescript
         self._timeout_seconds = max(timeout_seconds, 1)
+        self._sign_browser_detail_request = _sign_browser_detail_request or sign_browser_detail_request
 
     def list_tabs(self) -> list[ChromeTab]:
         output = self._run_script(self._build_list_tabs_script())
@@ -276,7 +283,7 @@ end tell
             ms_token=context.ms_token,
             webid=context.webid,
         )
-        params["a_bogus"] = sign_browser_detail_request(
+        params["a_bogus"] = self._sign_browser_detail_request(
             sign_base_url=sign_base_url,
             query_params=parse.urlencode(params),
             user_agent=context.user_agent,

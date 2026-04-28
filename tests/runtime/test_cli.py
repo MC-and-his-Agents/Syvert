@@ -4,6 +4,7 @@ from contextlib import ExitStack
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -93,27 +94,59 @@ class BrokenWriteStream(io.StringIO):
         raise BrokenPipeError("forced-broken-pipe")
 
 
+_EQUIVALENT_ENTRYPOINT_TASK_IDS = (
+    "task-cli-shared-legacy-1",
+    "task-cli-shared-run-equivalent-1",
+)
+_ISO_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+_DYNAMIC_TASK_ID_REF_PATHS = {
+    ("task_id",),
+    ("task_record_ref",),
+    ("result", "envelope", "task_id"),
+    ("result", "envelope", "task_record_ref"),
+    ("runtime_structured_log_events", "*", "event_id"),
+    ("runtime_structured_log_events", "*", "task_id"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "ref_id"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "task_id"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "terminal_envelope", "task_id"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "terminal_envelope", "task_record_ref"),
+    ("runtime_execution_metric_samples", "*", "metric_id"),
+    ("runtime_execution_metric_samples", "*", "task_id"),
+}
+_DYNAMIC_TIMESTAMP_PATHS = {
+    ("created_at",),
+    ("updated_at",),
+    ("terminal_at",),
+    ("logs", "*", "occurred_at"),
+    ("runtime_structured_log_events", "*", "occurred_at"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "started_at"),
+    ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "ended_at"),
+    ("runtime_execution_metric_samples", "*", "occurred_at"),
+}
+_EXECUTION_DURATION_METRIC_SAMPLE_PATH = ("runtime_execution_metric_samples", "*")
+
+
+def normalize_persisted_task_record_value(value: object, *, path: tuple[str, ...] = ()) -> object:
+    if isinstance(value, dict):
+        normalized = {key: normalize_persisted_task_record_value(item, path=path + (key,)) for key, item in value.items()}
+        if path == _EXECUTION_DURATION_METRIC_SAMPLE_PATH and normalized.get("metric_name") == "execution_duration_ms":
+            normalized["metric_value"] = "normalized-execution-duration-ms"
+        return normalized
+    if isinstance(value, list):
+        return [normalize_persisted_task_record_value(item, path=path + ("*",)) for item in value]
+    if isinstance(value, str):
+        if path in _DYNAMIC_TIMESTAMP_PATHS and _ISO_TIMESTAMP_RE.match(value):
+            return "normalized-timestamp"
+        if path in _DYNAMIC_TASK_ID_REF_PATHS:
+            normalized = value
+            for task_id in _EQUIVALENT_ENTRYPOINT_TASK_IDS:
+                normalized = normalized.replace(task_id, "normalized-task-id")
+            return normalized
+    return value
+
+
 def normalize_persisted_task_record_payload(payload: dict[str, object]) -> dict[str, object]:
-    normalized = json.loads(json.dumps(payload))
-    normalized["task_id"] = "normalized-task-id"
-    if isinstance(normalized.get("task_record_ref"), str):
-        normalized["task_record_ref"] = "normalized-task-record-ref"
-    result = normalized.get("result")
-    if isinstance(result, dict):
-        envelope = result.get("envelope")
-        if isinstance(envelope, dict) and isinstance(envelope.get("task_id"), str):
-            envelope["task_id"] = "normalized-task-id"
-        if isinstance(envelope, dict) and isinstance(envelope.get("task_record_ref"), str):
-            envelope["task_record_ref"] = "normalized-task-record-ref"
-    for field in ("created_at", "updated_at", "terminal_at"):
-        if isinstance(normalized.get(field), str):
-            normalized[field] = f"normalized-{field}"
-    logs = normalized.get("logs")
-    if isinstance(logs, list):
-        for index, entry in enumerate(logs, start=1):
-            if isinstance(entry, dict) and isinstance(entry.get("occurred_at"), str):
-                entry["occurred_at"] = f"normalized-log-{index}-occurred-at"
-    return normalized
+    return normalize_persisted_task_record_value(json.loads(json.dumps(payload)))  # type: ignore[return-value]
 
 
 def unexpected_secondary_filesystem_consultation(*args: object, **kwargs: object) -> object:
