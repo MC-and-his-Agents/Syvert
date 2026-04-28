@@ -7193,7 +7193,20 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
                     "source_sha256": {review_path: sha256_file(review_shadow_target / review_path)},
                 },
             )
-            run_command(root, ["git", "add", "-f", review_path, ".loom/shadow/review-loom.json"], cwd=review_shadow_target, timeout_seconds=30)
+            write_json(
+                review_shadow_target / ".loom/shadow/review-repo.json",
+                {
+                    "decision": "allow",
+                    "source_files": ["native/status/review.json"],
+                    "source_sha256": {"native/status/review.json": sha256_file(review_shadow_target / "native/status/review.json")},
+                },
+            )
+            run_command(
+                root,
+                ["git", "add", "-f", review_path, ".loom/shadow/review-loom.json", ".loom/shadow/review-repo.json"],
+                cwd=review_shadow_target,
+                timeout_seconds=30,
+            )
             run_command(root, ["git", "commit", "-m", "refresh review carrier evidence"], cwd=review_shadow_target, timeout_seconds=30)
             carrier_context = {
                 "target_root": review_shadow_target,
