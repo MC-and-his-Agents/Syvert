@@ -8,7 +8,7 @@
     ".loom/progress/INIT-0001.md"
   ],
   "source_sha256": {
-    ".loom/bin/loom_flow.py": "de815cf27623c6529d21ce47966f428d84d5c5f456792f2334e2391ea03831a8",
+    ".loom/bin/loom_flow.py": "92e83310b827ce99e3ab1c60216d07e65c2dc1b74511c1dd06297b226a00f94c",
     ".loom/progress/INIT-0001.md": "59b66a9a70c9292448e866f211c30df0cbbdc9adb765f8d0e05a9ab685687809"
   },
   "source_semantics": "Closeout parity requires merged delivery state, reconciled status or progress truth, and parent closeout evidence after execution completes.",

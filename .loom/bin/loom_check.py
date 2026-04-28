@@ -7188,6 +7188,22 @@ def check_adversarial_adoption_fixture(root: Path) -> list[Failure]:
         else:
             failures.append(Failure("adversarial-adoption", "review shadow carrier fixture could not load review artifact"))
 
+        invalid_review_schema_target = base / "invalid-review-schema"
+        shutil.copytree(baseline, invalid_review_schema_target)
+        invalid_review_payload = load_json_file(invalid_review_schema_target / review_path)
+        if isinstance(invalid_review_payload, dict):
+            invalid_review_payload["schema_version"] = "loom-review/v0"
+            write_json(invalid_review_schema_target / review_path, invalid_review_payload)
+            _, _, invalid_review_errors = loom_flow_module.load_review_record(
+                invalid_review_schema_target,
+                "INIT-0001",
+                review_path,
+            )
+            if not any("schema_version must be `loom-review/v1`" in error for error in invalid_review_errors):
+                failures.append(Failure("adversarial-adoption", "review artifact schema_version must be enforced before runtime consumption"))
+        else:
+            failures.append(Failure("adversarial-adoption", "invalid review schema fixture could not load review artifact"))
+
         head_before_drift = run_command(root, ["git", "rev-parse", "HEAD"], cwd=baseline, timeout_seconds=30).stdout.strip()
         (baseline / "implementation-drift.txt").write_text("changed after review\n", encoding="utf-8")
         run_command(root, ["git", "add", "implementation-drift.txt"], cwd=baseline, timeout_seconds=30)

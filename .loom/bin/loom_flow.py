@@ -1971,6 +1971,8 @@ def load_review_record(
     if not isinstance(payload, dict):
         return None, relative, [f"review artifact `{relative}` must be a JSON object"]
     errors: list[str] = []
+    if payload.get("schema_version") != "loom-review/v1":
+        errors.append(f"review artifact `{relative}` schema_version must be `loom-review/v1`")
     for field in ("item_id", "decision", "kind", "summary", "reviewer", "reviewed_head", "reviewed_validation_summary"):
         value = payload.get(field)
         if not isinstance(value, str) or not value.strip():
