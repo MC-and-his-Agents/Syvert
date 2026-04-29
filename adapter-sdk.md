@@ -42,22 +42,71 @@ Adapter SDK 的目标是：
 - 无副作用落盘：适配器不直接持久化共享内容数据
 - 可测试：每个适配器都必须支持独立测试
 
+## v0.7.0 兼容性基线
+
+`v0.7.0` 稳定的是 Core-facing Adapter contract，而不是外部 provider contract。当前主干的最小运行时表面为：
+
+- `adapter_key`
+- `supported_capabilities`
+- `supported_targets`
+- `supported_collection_modes`
+- `resource_requirement_declarations`
+- `execute(request: AdapterExecutionContext) -> dict`
+
+当前 approved capability metadata 仍只覆盖双参考验证切片：
+
+- public operation：`content_detail_by_url`
+- adapter-facing capability family：`content_detail`
+- target type：`url`
+- collection mode：`hybrid`
+- reference adapters：`xhs`、`douyin`
+- required resource capabilities：`account`、`proxy`
+- success payload：`{"raw": ..., "normalized": ...}`
+
+`content_detail_by_url` 是 Core/public operation id；进入 Adapter 前继续投影为 `content_detail` capability family。Adapter 作者不得把 `content_detail_by_url`、`xsec_token`、`verify_fp`、`ms_token`、browser page state、sign service 或 provider key 写入 `supported_capabilities` / `resource_requirement_declarations`。
+
+## Adapter-Owned Provider Port
+
+`FR-0021` 批准的 provider port 是 adapter-owned 内部执行边界：
+
+```text
+Core Runtime
+  -> Adapter.execute(AdapterExecutionContext)
+      -> Adapter-owned Provider Port
+          -> Native Provider
+      -> Adapter normalizer
+```
+
+该边界只允许 Adapter 把已验证 URL、已解析 target、已消费 resource bundle 后得到的平台 session config 与 legacy transport hooks 交给 native provider。Native provider 返回 raw platform payload 与 platform detail object；normalized result 仍由 Adapter 生成。
+
+该边界明确不提供：
+
+- 外部 provider SDK
+- provider plugin registration
+- Core provider registry
+- provider selector
+- provider fallback priority
+- provider resource supply model
+
+`provider=` constructor seam 只允许作为仓内测试/本地注入 seam；它不能被声明为第三方 provider 接入能力，也不能替代现有 `sign_transport`、`detail_transport`、`page_transport`、`page_state_transport` 等 legacy transport hooks。
+
 
 ## 最小能力面
 
 一个适配器最少必须声明：
 
-- `adapter_id`
-- `platform_name`
+- `adapter_key`
 - `supported_capabilities`
 - `supported_targets`
 - `supported_collection_modes`
+- `resource_requirement_declarations`
 
 其中：
 
 - `supported_capabilities` 表示它支持哪些任务类型
 - `supported_targets` 表示它支持哪些输入目标
 - `supported_collection_modes` 表示它支持哪些采集模式
+- `resource_requirement_declarations` 表示 Core 进入该 capability 前必须注入哪些共享资源能力
 
 
 ## 核心接口
@@ -67,137 +116,32 @@ Adapter SDK 的目标是：
 ```python
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Mapping, Sequence
+from typing import Any, Protocol
+
+from syvert.runtime import AdapterExecutionContext
 
 
-class Capability(str, Enum):
-    CONTENT_DETAIL = "content_detail"
-    CREATOR_DETAIL = "creator_detail"
-    SEARCH = "search"
-    COMMENTS = "comments"
-    FEED = "feed"
+class PlatformAdapter(Protocol):
+    adapter_key: str
+    supported_capabilities: frozenset[str]
+    supported_targets: frozenset[str]
+    supported_collection_modes: frozenset[str]
+    resource_requirement_declarations: tuple[object, ...]
 
-
-class TargetType(str, Enum):
-    URL = "url"
-    CONTENT_ID = "content_id"
-    CREATOR_ID = "creator_id"
-    KEYWORD = "keyword"
-
-
-class CollectionMode(str, Enum):
-    PUBLIC = "public"
-    AUTHENTICATED = "authenticated"
-    HYBRID = "hybrid"
-
-
-@dataclass(slots=True)
-class AdapterRequest:
-    task_id: str
-    capability: Capability
-    target_type: TargetType
-    target_value: str
-    collection_mode: CollectionMode
-    options: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class ResourceHandle:
-    account_id: str | None = None
-    proxy_id: str | None = None
-    cookie_ref: str | None = None
-    user_agent: str | None = None
-    headers: dict[str, str] = field(default_factory=dict)
-    extra: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class AdapterContext:
-    client_id: str
-    request_id: str
-    resource: ResourceHandle | None
-    deadline_ms: int | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class AdapterRawResult:
-    payload: Mapping[str, Any] | Sequence[Mapping[str, Any]] | str | bytes
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class NormalizedEntity:
-    entity_type: str
-    entity_id: str
-    data: dict[str, Any]
-
-
-@dataclass(slots=True)
-class AdapterResult:
-    raw: AdapterRawResult
-    normalized: list[NormalizedEntity]
-    diagnostics: dict[str, Any] = field(default_factory=dict)
-
-
-class AdapterErrorCode(str, Enum):
-    AUTH_REQUIRED = "auth_required"
-    ACCESS_DENIED = "access_denied"
-    NOT_FOUND = "not_found"
-    RATE_LIMITED = "rate_limited"
-    TEMPORARY_BLOCK = "temporary_block"
-    RESOURCE_UNAVAILABLE = "resource_unavailable"
-    INVALID_REQUEST = "invalid_request"
-    PLATFORM_ERROR = "platform_error"
-    PARSE_ERROR = "parse_error"
-
-
-class AdapterError(Exception):
-    def __init__(
-        self,
-        code: AdapterErrorCode,
-        message: str,
-        retryable: bool = False,
-        details: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.retryable = retryable
-        self.details = details or {}
-
-
-class PlatformAdapter(ABC):
-    adapter_id: str
-    platform_name: str
-    supported_capabilities: set[Capability]
-    supported_targets: set[TargetType]
-    supported_collection_modes: set[CollectionMode]
-
-    @abstractmethod
-    async def collect(
-        self,
-        request: AdapterRequest,
-        context: AdapterContext,
-    ) -> AdapterResult:
-        raise NotImplementedError
+    def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
+        ...
 ```
 
 
 ## 输入契约
 
-Core 调用适配器时，只应传入两类对象：
-
-- `AdapterRequest`
-- `AdapterContext`
+Core 调用适配器时，只应传入一个 `AdapterExecutionContext`。
 
 其中：
 
-- `AdapterRequest` 描述任务想做什么
-- `AdapterContext` 描述任务运行时可用什么
+- `request` 描述 adapter-facing capability、target type、target value 与 collection mode
+- `resource_bundle` 描述 Core 已 acquire 并注入给 Adapter 的资源包
+- `task_id`、resource trace 与 failure envelope 由 Core 继续拥有
 
 适配器不得自行推断：
 
@@ -210,13 +154,12 @@ Core 调用适配器时，只应传入两类对象：
 
 ## 输出契约
 
-适配器必须返回 `AdapterResult`。
+适配器必须返回 `dict` success payload。
 
 输出应至少包含：
 
 - `raw`
 - `normalized`
-- `diagnostics`
 
 ### raw
 
@@ -229,32 +172,22 @@ Core 调用适配器时，只应传入两类对象：
 
 ### normalized
 
-返回标准化实体列表。
+返回当前 capability family 的标准化结果。
 
-这些实体是 Core 后续持久化和查询的基础。
-
-### diagnostics
-
-用于返回执行附加信息，例如：
-
-- 实际使用的模式
-- 是否使用认证资源
-- 请求次数
-- 分页信息
-- 平台特定警告
+在 `v0.7.0` 当前 approved slice 中，`normalized` 仍是 `content_detail` 结果对象，至少覆盖 `platform`、`content_id`、`content_type`、`canonical_url`、`title`、`body_text`、`published_at`、`author`、`stats` 与 `media`。
 
 
 ## 错误契约
 
 适配器不能随意抛出底层异常到 Core。
 
-所有平台错误都必须映射成 `AdapterError`。
+所有平台错误都必须映射成 `PlatformAdapterError`。
 
 错误最少需要提供：
 
 - `code`
 - `message`
-- `retryable`
+- `category`
 - `details`
 
 这样 Core 才能统一处理：
@@ -269,13 +202,18 @@ Core 调用适配器时，只应传入两类对象：
 
 资源由 Core 提供，适配器只消费。
 
-适配器可以依赖：
+当前 `v0.7.0` approved resource capabilities 只有：
 
 - account
-- cookie
 - proxy
-- user-agent
-- extra headers
+
+`cookies`、`user_agent`、`headers`、`xsec_token`、`verify_fp`、`ms_token`、browser page state 与 sign request 参数只能作为 Adapter 从 account material 或站点解析结果中抽取出的内部执行材料。它们不得进入：
+
+- `resource_requirement_declarations`
+- Adapter registry discovery
+- Core routing metadata
+- TaskRecord public envelope
+- resource lifecycle state
 
 适配器不可以：
 
@@ -295,9 +233,9 @@ Core 调用适配器时，只应传入两类对象：
 Core creates task
     -> Core resolves target and policy
     -> Core acquires resource bundle
-    -> Core builds AdapterRequest + AdapterContext
-    -> Adapter.collect()
-    -> Adapter returns AdapterResult or AdapterError
+    -> Core builds AdapterExecutionContext
+    -> Adapter.execute()
+    -> Adapter returns {"raw": ..., "normalized": ...} or PlatformAdapterError
     -> Core updates task state
     -> Core persists results
     -> Core releases resources
@@ -313,25 +251,20 @@ Core creates task
 例如：
 
 ```python
+from syvert.registry import baseline_required_resource_requirement_declaration
+
+
 class ExampleAdapter(PlatformAdapter):
-    adapter_id = "example.xhs"
-    platform_name = "xhs"
-    supported_capabilities = {
-        Capability.CONTENT_DETAIL,
-        Capability.SEARCH,
-        Capability.CREATOR_DETAIL,
-    }
-    supported_targets = {
-        TargetType.URL,
-        TargetType.CONTENT_ID,
-        TargetType.KEYWORD,
-        TargetType.CREATOR_ID,
-    }
-    supported_collection_modes = {
-        CollectionMode.PUBLIC,
-        CollectionMode.AUTHENTICATED,
-        CollectionMode.HYBRID,
-    }
+    adapter_key = "example"
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        baseline_required_resource_requirement_declaration(
+            adapter_key=adapter_key,
+            capability="content_detail",
+        ),
+    )
 ```
 
 Core 可以基于这些声明做：
@@ -350,34 +283,57 @@ Core 应支持适配器注册机制。
 
 ```python
 class AdapterRegistry:
-    def register(self, adapter: PlatformAdapter) -> None: ...
-    def get(self, platform_name: str, capability: Capability) -> PlatformAdapter: ...
-    def list(self) -> list[PlatformAdapter]: ...
+    @classmethod
+    def from_mapping(cls, adapters: Mapping[str, object]) -> "AdapterRegistry": ...
+    def lookup(self, adapter_key: str) -> AdapterDeclaration | None: ...
+    def discover_capabilities(self, adapter_key: str) -> frozenset[str] | None: ...
+    def discover_targets(self, adapter_key: str) -> frozenset[str] | None: ...
+    def discover_collection_modes(self, adapter_key: str) -> frozenset[str] | None: ...
+    def discover_resource_requirements(
+        self,
+        adapter_key: str,
+    ) -> tuple[AdapterResourceRequirementDeclaration, ...] | None: ...
 ```
 
 原则：
 
-- 一个适配器可以支持多个 capability
-- 一个平台可以存在多个适配器实现
-- Core 应允许按策略选择具体适配器
+- `adapter_key` 是 Core-facing adapter lookup identity
+- registry discovery 只返回 Adapter public metadata
+- registry 不暴露 provider key、provider priority、native provider 或 provider resource requirement
+- 多 adapter / 多 capability 扩展必须先获得新的 formal spec 批准
 
 
 ## 版本兼容
 
 Adapter SDK 必须有清晰版本边界。
 
-建议：
+`v0.7.0` 的兼容性声明：
+
+- Adapter SDK contract id：`syvert-adapter-sdk/v0.7`
+- Core runtime compatibility range：`>=0.7,<1.0`
+- `#269` native provider 拆分不改变 Core / Adapter runtime contract。
+- Adapter public metadata、resource requirement declaration、`execute()` 输入输出、`raw + normalized` success payload 与错误分类保持兼容。
+- 小红书、抖音当前 only-approved capability baseline 仍是 `content_detail_by_url -> content_detail`。
+- registry / TaskRecord / resource lifecycle 不暴露 provider 字段。
+- 任何外部 provider 接入、新业务能力、provider selector 或新资源模型都必须通过后续独立 FR。
+
+第三方 adapter 的最小兼容性声明建议写在 adapter 包文档或 manifest 中；`v0.7.0` 不要求 AdapterRegistry 读取这些字段：
+
+```python
+ADAPTER_COMPATIBILITY = {
+    "adapter_sdk_contract": "syvert-adapter-sdk/v0.7",
+    "core_runtime": ">=0.7,<1.0",
+    "adapter_surface": "adapter_key+execute+resource_requirement_declarations",
+    "capability_baseline": "content_detail_by_url->content_detail",
+    "provider_port": "internal-only",
+}
+```
+
+通用建议：
 
 - Core 主版本变化可以打破 SDK 契约
 - Core 次版本变化应保持 SDK 向后兼容
 - 适配器应声明自己兼容的 SDK 版本
-
-例如：
-
-```python
-SDK_VERSION = "1.0"
-COMPATIBLE_CORE_RANGE = ">=1.0,<2.0"
-```
 
 
 ## 测试要求
@@ -411,13 +367,26 @@ COMPATIBLE_CORE_RANGE = ">=1.0,<2.0"
 - 不把平台专有字段扩散到共享模型中
 
 
+## v0.7.0 最小迁移说明
+
+第三方 adapter 从旧草案迁移到当前 `v0.7.0` 表面时，至少需要完成：
+
+1. 将 `adapter_id` / `platform_name` 收敛为单一 `adapter_key`。
+2. 将 `collect(request, context)` 改为 `execute(request: AdapterExecutionContext) -> dict`。
+3. 将 success result 改为 `{"raw": ..., "normalized": ...}`，不要返回旧 `AdapterResult` / `NormalizedEntity` 列表。
+4. 将 capability metadata 收敛到已批准 baseline：`supported_capabilities=frozenset({"content_detail"})`、`supported_targets=frozenset({"url"})`、`supported_collection_modes=frozenset({"hybrid"})`。
+5. 新增或确认 `resource_requirement_declarations` 只声明 `account` 与 `proxy`，不得写入 cookie、user-agent、headers、provider key、browser provider、sign service 或 fallback priority。
+6. 如果 adapter 内部拆出 provider port，只能作为 adapter-owned 内部边界；Core / registry / TaskRecord / resource lifecycle 不得发现或选择 provider。
+7. 保留 legacy transport hooks 的测试注入能力；新增 provider test seam 时必须标注为 internal test seam，不得作为外部 provider 接入文档发布。
+
+
 ## 推荐开发流程
 
 接入一个新平台的建议路径：
 
 1. 定义 capability 与 target 支持范围
-2. 定义平台原始结果到 `NormalizedEntity` 的映射
-3. 实现 `collect()`
+2. 定义平台原始结果到当前 `normalized` shape 的映射
+3. 实现 `execute()`
 4. 实现错误映射
 5. 补齐适配器测试
 6. 注册到 Core
