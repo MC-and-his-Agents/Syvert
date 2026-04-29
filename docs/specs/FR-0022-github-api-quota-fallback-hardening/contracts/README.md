@@ -54,6 +54,17 @@
 - `search/issues` 只能作为 index 缺失、异常修复或向后兼容 fallback。
 - 创建/更新 mirror issue 仍使用 REST。
 
+## Review poller state reuse contract
+
+- known unchanged PR 的最小判定：
+  - `pr_number` 在 review-poller state 中存在。
+  - state 中的 `head_sha` 等于当前 `gh pr list` 返回的 `headRefOid`。
+  - 当前 PR 未被 CLI filter 排除。
+- known unchanged PR 不得再次触发 `scripts/pr_guardian.py review`，也不得重写 state。
+- 当前 head 变化时，最多触发一次 guardian review；guardian review 成功后才允许更新 state。
+- guardian review 失败时，不得把新 `headRefOid` 写入 state。
+- review-poller state 是唯一可复用输入；guardian verdict、checks 或 PR body cache 不得替代 review-poller state 的 head 记录。
+
 ## Repo settings sync contract
 
 - `current_rulesets()` 或等价读取函数失败时必须返回 hard failure。

@@ -45,7 +45,9 @@
   - `pr_guardian` 在 `merge_gate=integration_check_required` 时必须保留 merge 前 live integration recheck；该 recheck 不得使用 stale fallback 放行。
   - `spec_issue_sync` 不得对每个 changed spec 默认调用 `search/issues`；实现必须优先批量读取已有 mirror issue 或复用本回合 lookup 结果，search 只能作为修复 fallback。
   - `sync_repo_settings` 读取 rulesets 失败时必须 fail closed；不得把读取失败返回为空列表后继续 POST / PUT ruleset。
-  - `review_poller` 本 FR 只要求最小收敛：复用 state、过滤已知无变化 PR、避免扩大 polling 范围；webhook 不属于本 FR mandatory scope。
+  - `review_poller` 本 FR 只要求最小收敛：对同一 `pr_number + headRefOid + baseRefName + isDraft + pr_class + milestone` 组合，若本地 review-poller state 已记录同一 `headRefOid`，且当前 CLI filter 与记录适用范围一致，则必须判定为 known unchanged PR，并且不得再次触发 guardian review。
+  - `review_poller` 必须只复用自己维护的 review-poller state；不得把 guardian verdict、GitHub checks 或 PR body cache 当作“已审查”的替代真相。
+  - `review_poller` 发现 PR head 变化、base branch 不匹配、draft 状态、milestone / pr_class filter 不匹配或 state 缺失时，必须按现有过滤语义跳过或触发一次 guardian review；不得为节省 quota 而扩大 polling 范围或跳过新 head。
 - 契约需求：
   - 后续实现必须提供两个语义清晰的 lookup surface：cached/non-merge lookup 与 uncached/live gate lookup。
   - cached/non-merge lookup 的结果必须携带可机判的 verification status：`verified`、`unverified` 或等价字段。
@@ -112,6 +114,18 @@ Given 一次 spec mirror sync 涉及多个 changed spec
 When `spec_issue_sync` 查找已有 mirror issue  
 Then 它必须优先使用批量读取或本回合缓存结果，不能对每个 spec 都默认调用 `search/issues`
 
+### 场景 8
+
+Given `review_poller` 本地 state 已记录 PR `#278` 的 `headRefOid=sha-a`，且当前轮 `gh pr list` 返回同一 PR、同一 head、非 Draft、base branch 与 CLI filter 匹配、pr_class 与 milestone filter 匹配  
+When `review_poller` 处理该 PR  
+Then 它必须把该 PR 判定为 known unchanged PR，不得调用 `scripts/pr_guardian.py review`，也不得更新该 PR 的 state entry
+
+### 场景 9
+
+Given `review_poller` 本地 state 已记录 PR `#278` 的 `headRefOid=sha-a`  
+When 当前轮 `gh pr list` 返回同一 PR 但 `headRefOid=sha-b`  
+Then 它必须至多触发一次 guardian review，并在成功后把 state 更新为 `sha-b`；若 guardian review 失败，不得把 state 更新为 `sha-b`
+
 ## 异常与边界场景
 
 - 异常场景：
@@ -119,11 +133,13 @@ Then 它必须优先使用批量读取或本回合缓存结果，不能对每个
   - REST 读取 PR metadata 或 checks 失败时，merge gate 必须阻断；不得用旧快照继续 merge。
   - cached result 中缺少 required live fields 时，不得被视作 verified。
   - rulesets endpoint 因权限、网络或 rate limit 失败时，同步不得写入。
+  - review_poller state 文件损坏或缺失时，不得把所有 PR 视为已审查；必须按现有初始化语义重建空 state，并只对匹配 filter 的 open PR 触发审查。
 - 边界场景：
   - 不同原始 URL 形式但 normalized identity 相同的 issue ref 可以共享同一缓存条目。
   - project item URL 与 issue ref 只有在 live state 可验证同一 content issue 时才能语义等价。
   - `integration_ref=none`、空 ref 或不可核查 ref 不进入 GraphQL lookup。
   - review_poller 的 polling 仍可存在；本 FR 只要求不扩大 polling 面和不重复触发已知无变化 PR。
+  - known unchanged PR 的最小身份只由 `pr_number` 与 `headRefOid` 决定；filter 字段用于决定当前轮是否纳入处理范围，不得作为替代 head 变更的依据。
 
 ## 验收标准
 
@@ -133,6 +149,7 @@ Then 它必须优先使用批量读取或本回合缓存结果，不能对每个
 - [ ] formal spec 明确非合并路径可返回 unverified/fallback，但不得误判通过。
 - [ ] formal spec 明确 rulesets 读取失败不得 fallback 为空列表。
 - [ ] formal spec 明确 search endpoint 只能作为 fallback，不得每个 spec 默认 search。
+- [ ] formal spec 明确 review_poller 的 known unchanged PR 判定、state 复用边界与 head 变化触发规则。
 - [ ] formal spec 明确 `#275` 为 spec Work Item、`#276` 为 implementation Work Item、`#277` 为 parent closeout Work Item。
 
 ## 依赖与外部前提

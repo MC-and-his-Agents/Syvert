@@ -49,6 +49,7 @@
   - `tests.governance.test_governance_status` 覆盖 unverified 状态面。
   - `tests.governance.test_pr_guardian` 覆盖 merge gate live recheck 继续 hard fail 与 PR/checks 快照复用。
   - `tests.governance.test_spec_issue_sync` 覆盖 search fallback 使用策略。
+  - `tests.governance.test_review_poller` 覆盖 known unchanged PR 不触发 guardian、head 变化只触发一次 guardian、guardian 失败不更新 state。
   - `tests.governance.test_governance_gate` 覆盖 spec / governance PR 边界。
 - 集成/契约测试：
   - 使用 mock 的 `gh api graphql` 与 `gh api repos/...`，不依赖真实 GitHub quota。
@@ -64,6 +65,7 @@
   - `tests.governance.test_governance_status`
   - `tests.governance.test_pr_guardian`
   - `tests.governance.test_spec_issue_sync`
+  - `tests.governance.test_review_poller`
 - 暂不纳入 TDD 的模块与理由：
   - 真实 GitHub rate limit 行为不做 live integration test；该行为依赖外部 quota 状态，使用 mock contract 覆盖。
   - webhook 替代 polling 不属于本 FR scope。
