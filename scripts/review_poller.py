@@ -68,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     state = load_json(state_path)
 
     reviewed = 0
+    state_changed = False
     for pr in list_open_prs():
         if pr["baseRefName"] != args.base_branch or pr["isDraft"]:
             continue
@@ -87,8 +88,9 @@ def main(argv: list[str] | None = None) -> int:
             state.setdefault("prs", {})[str(pr["number"])] = {
                 "head_sha": pr["headRefOid"],
             }
+            state_changed = True
 
-    if not args.dry_run:
+    if not args.dry_run and state_changed:
         dump_json(state_path, state)
 
     print(f"轮询完成，触发审查 {reviewed} 个 PR。")

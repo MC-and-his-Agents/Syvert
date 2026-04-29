@@ -36,6 +36,7 @@ from scripts.integration_contract import (
     build_review_packet,
     extract_issue_canonical_integration_fields,
     fetch_integration_ref_live_state,
+    fetch_integration_ref_live_state_uncached,
     field_choices,
     merge_gate_requires_integration_recheck as merge_gate_requires_integration_recheck_payload,
     parse_integration_check_payload,
@@ -632,7 +633,7 @@ def integration_merge_gate_errors(meta: dict, *, require_live_state: bool = Fals
     if not require_live_state or not merge_gate_requires_integration_recheck_payload(integration_payload):
         return []
     integration_ref = str(integration_payload.get("integration_ref") or "").strip()
-    live_state = fetch_integration_ref_live_state(integration_ref)
+    live_state = fetch_integration_ref_live_state_uncached(integration_ref)
     meta["_integration_ref_live_state"] = live_state
     return validate_integration_ref_live_state(
         integration_payload,
@@ -1407,8 +1408,6 @@ def merge_if_safe(
         raise SystemExit("审查后 PR HEAD 已变化，拒绝合并。")
     if guardian_verdict_body_bound and str(current.get("body") or "") != reviewed_body:
         raise SystemExit("guardian 审查后 PR 描述已变化，拒绝合并。")
-    if not all_checks_pass(pr_number):
-        raise SystemExit("GitHub checks 未全部通过，拒绝合并。")
     merge_time_integration_recheck_recorded = False
     previous_merge_recheck_value: str | None = None
     if merge_gate_requires_integration_recheck(current):
@@ -1419,7 +1418,7 @@ def merge_if_safe(
             )
         preview_current = dict(current)
         preview_current["body"] = set_integration_status_checked_before_merge(str(current.get("body") or ""), "yes")
-        preview_errors = integration_merge_gate_errors(preview_current, require_live_state=True)
+        preview_errors = integration_merge_gate_errors(preview_current, require_live_state=False)
         if preview_errors:
             detail = "\n".join(f"- {item}" for item in preview_errors)
             raise SystemExit(f"integration merge gate 未满足，拒绝合并：\n{detail}")
@@ -1525,7 +1524,17 @@ def merge_if_safe(
             )
         raise SystemExit("执行 `gh pr merge` 前 PR 描述已变化，拒绝合并。")
     current = latest_before_merge
-    if not all_checks_pass(pr_number):
+    try:
+        checks_pass = all_checks_pass(pr_number)
+    except (SystemExit, json.JSONDecodeError) as exc:
+        if merge_time_integration_recheck_recorded:
+            restore_merge_time_integration_recheck_or_die(
+                pr_number,
+                previous_merge_recheck_value or "no",
+                failure_context="执行 `gh pr merge` 前读取 GitHub checks 失败",
+            )
+        raise SystemExit(f"执行 `gh pr merge` 前读取 GitHub checks 失败，拒绝合并：{exc}") from exc
+    if not checks_pass:
         if merge_time_integration_recheck_recorded:
             restore_merge_time_integration_recheck_or_die(
                 pr_number,
