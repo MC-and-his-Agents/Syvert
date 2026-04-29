@@ -18,6 +18,7 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
 )
+from syvert.adapters.douyin_provider import DouyinProviderContext, DouyinProviderResult
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
     build_managed_resource_bundle,
@@ -97,6 +98,50 @@ class DouyinAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
             adapter.execute(build_douyin_execution_context(collection_mode="authenticated"))
 
         self.assertEqual(raised.exception.code, "invalid_douyin_request")
+
+    def test_douyin_adapter_delegates_content_detail_to_provider_port_after_resource_resolution(self) -> None:
+        from syvert.adapters.douyin import DouyinAdapter
+
+        class FakeDouyinProvider:
+            def __init__(self) -> None:
+                self.context: DouyinProviderContext | None = None
+                self.input_url = ""
+
+            def fetch_content_detail(self, context: DouyinProviderContext, input_url: str) -> DouyinProviderResult:
+                self.context = context
+                self.input_url = input_url
+                return DouyinProviderResult(
+                    raw_payload={"provider_raw": {"aweme_id": context.parsed_target.aweme_id}},
+                    platform_detail=build_douyin_aweme_detail(
+                        aweme_id=context.parsed_target.aweme_id,
+                        desc="provider 正文",
+                        preview_title="provider 标题",
+                    ),
+                )
+
+        provider = FakeDouyinProvider()
+        adapter = DouyinAdapter(provider=provider)
+
+        payload = adapter.execute(
+            build_douyin_execution_context(
+                url="https://www.iesdouyin.com/share/video/7580570616932224282/?region=CN",
+            )
+        )
+
+        self.assertIsInstance(provider.context, DouyinProviderContext)
+        assert provider.context is not None
+        self.assertEqual(provider.input_url, "https://www.iesdouyin.com/share/video/7580570616932224282/?region=CN")
+        self.assertEqual(provider.context.parsed_target.aweme_id, "7580570616932224282")
+        self.assertEqual(provider.context.parsed_target.canonical_url, "https://www.douyin.com/video/7580570616932224282")
+        self.assertEqual(provider.context.session.cookies, "a=1; b=2")
+        self.assertEqual(provider.context.session.user_agent, "Mozilla/5.0 TestAgent")
+        self.assertFalse(hasattr(provider.context, "resource_bundle"))
+        self.assertEqual(payload["raw"], {"provider_raw": {"aweme_id": "7580570616932224282"}})
+        self.assertEqual(payload["normalized"]["platform"], "douyin")
+        self.assertEqual(payload["normalized"]["content_id"], "7580570616932224282")
+        self.assertEqual(payload["normalized"]["canonical_url"], "https://www.douyin.com/video/7580570616932224282")
+        self.assertEqual(payload["normalized"]["title"], "provider 标题")
+        self.assertNotIn("provider", payload["normalized"])
 
     def test_parse_douyin_detail_url_extracts_aweme_id_from_canonical_url(self) -> None:
         from syvert.adapters.douyin import parse_douyin_detail_url

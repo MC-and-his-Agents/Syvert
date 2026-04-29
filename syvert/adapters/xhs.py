@@ -11,6 +11,7 @@ from urllib import error, parse, request
 
 from syvert.registry import baseline_required_resource_requirement_declaration
 from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
+from syvert.adapters.xhs_provider import NativeXhsProvider, XhsProviderContext
 from syvert.runtime import AdapterExecutionContext, CONTENT_DETAIL, PlatformAdapterError
 
 
@@ -66,6 +67,7 @@ class XhsAdapter:
         detail_transport: DetailTransport | None = None,
         page_transport: PageTransport | None = None,
         page_state_transport: PageStateTransport | None = None,
+        provider: Any | None = None,
     ) -> None:
         self._session_path = session_path or DEFAULT_XHS_SESSION_PATH
         self._session_provider = session_provider or load_session_config
@@ -73,73 +75,37 @@ class XhsAdapter:
         self._detail_transport = detail_transport or default_detail_transport
         self._page_transport = page_transport or default_page_transport
         self._page_state_transport = page_state_transport or default_page_state_transport
+        # Adapter-owned test seam; Core and registry never select providers.
+        self._provider = provider or NativeXhsProvider(
+            session_path=self._session_path,
+            api_base_url=XHS_API_BASE_URL,
+            detail_uri=XHS_DETAIL_URI,
+            sign_transport=self._sign_transport,
+            detail_transport=self._detail_transport,
+            page_transport=self._page_transport,
+            page_state_transport=self._page_state_transport,
+            build_detail_body=build_detail_body,
+            normalize_detail_response=normalize_detail_response,
+            extract_note_card=extract_note_card,
+            extract_note_card_from_html_page=extract_note_card_from_html_page,
+            extract_note_card_from_page_state=extract_note_card_from_page_state,
+            choose_preferred_html_error=choose_preferred_html_error,
+        )
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
         context = resolve_execution_context(request=request)
         input_url = resolve_input_url(request=context)
         url_info = parse_xhs_detail_url(input_url)
         session = build_session_config_from_context(context)
-        body = build_detail_body(url_info)
-        try:
-            headers = self._build_headers(session, body)
-            raw_response = self._fetch_detail(session, headers, body)
-            detail_response = normalize_detail_response(raw_response)
-            note_card = extract_note_card(detail_response, source_note_id=url_info.note_id)
-        except PlatformAdapterError as exc:
-            raw_response, note_card = self._recover_note_card_from_html(
-                exc,
-                session=session,
-                input_url=input_url,
-                source_note_id=url_info.note_id,
-            )
-        normalized = normalize_note_card(note_card, input_url)
-        return {"raw": raw_response, "normalized": normalized}
+        provider_result = self._provider.fetch_content_detail(
+            XhsProviderContext(session=session, parsed_target=url_info),
+            input_url,
+        )
+        normalized = normalize_note_card(provider_result.platform_detail, input_url)
+        return {"raw": provider_result.raw_payload, "normalized": normalized}
 
     def _build_headers(self, session: XhsSessionConfig, body: dict[str, Any]) -> dict[str, str]:
-        if not session.sign_base_url:
-            raise PlatformAdapterError(
-                code="xhs_sign_unavailable",
-                message="xhs sign_base_url 缺失",
-                details={"session_path": str(self._session_path)},
-            )
-        sign_payload = {
-            "uri": XHS_DETAIL_URI,
-            "data": body,
-            "cookies": session.cookies,
-        }
-        try:
-            signed = dict(self._sign_transport(session.sign_base_url, sign_payload, session.timeout_seconds))
-        except PlatformAdapterError:
-            raise
-        except Exception as exc:
-            raise PlatformAdapterError(
-                code="xhs_sign_unavailable",
-                message="小红书签名服务不可用",
-                details={"error_type": exc.__class__.__name__},
-            ) from exc
-
-        required_fields = ("x_s", "x_t", "x_s_common", "x_b3_traceid")
-        for field in required_fields:
-            value = signed.get(field)
-            if not isinstance(value, str) or not value:
-                raise PlatformAdapterError(
-                    code="xhs_sign_unavailable",
-                    message="小红书签名结果缺失必需字段",
-                    details={"field": field},
-                )
-
-        return {
-            "accept": "application/json, text/plain, */*",
-            "content-type": "application/json;charset=UTF-8",
-            "origin": "https://www.xiaohongshu.com",
-            "referer": "https://www.xiaohongshu.com/",
-            "user-agent": session.user_agent,
-            "cookie": session.cookies,
-            "X-s": signed["x_s"],
-            "X-t": signed["x_t"],
-            "x-s-common": signed["x_s_common"],
-            "X-B3-Traceid": signed["x_b3_traceid"],
-        }
+        return self._provider.build_headers(session, body)
 
     def _fetch_detail(
         self,
@@ -147,28 +113,7 @@ class XhsAdapter:
         headers: dict[str, str],
         body: dict[str, Any],
     ) -> Mapping[str, Any]:
-        try:
-            response = self._detail_transport(
-                url=f"{XHS_API_BASE_URL}{XHS_DETAIL_URI}",
-                headers=headers,
-                body=body,
-                timeout_seconds=session.timeout_seconds,
-            )
-        except PlatformAdapterError:
-            raise
-        except Exception as exc:
-            raise PlatformAdapterError(
-                code="xhs_detail_request_failed",
-                message="小红书 detail 请求失败",
-                details={"error_type": exc.__class__.__name__},
-            ) from exc
-        if not isinstance(response, Mapping):
-            raise PlatformAdapterError(
-                code="xhs_detail_request_failed",
-                message="小红书 detail 响应不是对象",
-                details={},
-            )
-        return response
+        return self._provider.fetch_detail(session, headers, body)
 
     def _recover_note_card_from_html(
         self,
@@ -178,55 +123,15 @@ class XhsAdapter:
         input_url: str,
         source_note_id: str,
     ) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
-        if original_error.code not in {
-            "xhs_detail_request_failed",
-            "xhs_content_not_found",
-            "xhs_sign_unavailable",
-        }:
-            raise original_error
-
-        html_error: PlatformAdapterError | None = None
-        try:
-            html = self._fetch_html_page(session, input_url)
-        except PlatformAdapterError as exc:
-            html_error = exc
-        else:
-            try:
-                return extract_note_card_from_html_page(html, source_note_id=source_note_id)
-            except PlatformAdapterError as exc:
-                html_error = exc
-
-        try:
-            page_state = self._page_state_transport(
-                url=input_url,
-                timeout_seconds=session.timeout_seconds,
-                source_note_id=source_note_id,
-                cookies=session.cookies,
-                user_agent=session.user_agent,
-            )
-            return extract_note_card_from_page_state(
-                page_state,
-                source_note_id=source_note_id,
-            )
-        except PlatformAdapterError as exc:
-            if exc.code == "xhs_browser_target_tab_missing":
-                preferred_error = choose_preferred_html_error(original_error, html_error)
-                if preferred_error is not None:
-                    raise preferred_error
-                raise original_error
-            raise exc
+        return self._provider.recover_note_card_from_html(
+            original_error,
+            session=session,
+            input_url=input_url,
+            source_note_id=source_note_id,
+        )
 
     def _fetch_html_page(self, session: XhsSessionConfig, input_url: str) -> str:
-        return self._page_transport(
-            url=input_url,
-            headers={
-                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "referer": "https://www.xiaohongshu.com/",
-                "user-agent": session.user_agent,
-                "cookie": session.cookies,
-            },
-            timeout_seconds=session.timeout_seconds,
-        )
+        return self._provider.fetch_html_page(session, input_url)
 
 
 def build_adapters() -> dict[str, object]:

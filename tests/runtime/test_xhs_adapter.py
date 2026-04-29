@@ -30,6 +30,7 @@ from syvert.adapters.xhs import (
     parse_xhs_detail_url,
     post_json,
 )
+from syvert.adapters.xhs_provider import XhsProviderContext, XhsProviderResult
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
     baseline_resource_requirement_declarations,
@@ -136,6 +137,55 @@ class XhsAdapterTests(ResourceStoreEnvMixin, unittest.TestCase):
             )
 
         self.assertEqual(raised.exception.code, "invalid_xhs_request")
+
+    def test_xhs_adapter_delegates_content_detail_to_provider_port_after_resource_resolution(self) -> None:
+        class FakeXhsProvider:
+            def __init__(self) -> None:
+                self.context: XhsProviderContext | None = None
+                self.input_url = ""
+
+            def fetch_content_detail(self, context: XhsProviderContext, input_url: str) -> XhsProviderResult:
+                self.context = context
+                self.input_url = input_url
+                note_card = {
+                    "note_id": context.parsed_target.note_id,
+                    "type": "normal",
+                    "title": "provider 标题",
+                    "desc": "provider 正文",
+                    "user": {"user_id": "user-provider", "nickname": "Provider 作者"},
+                    "interact_info": {"liked_count": "9"},
+                }
+                return XhsProviderResult(
+                    raw_payload={"provider_raw": {"note_id": context.parsed_target.note_id}},
+                    platform_detail=note_card,
+                )
+
+        provider = FakeXhsProvider()
+        adapter = XhsAdapter(provider=provider)
+
+        payload = adapter.execute(
+            self.build_xhs_context(
+                url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8?xsec_token=token-1",
+                account_material=build_xhs_account_material(timeout_seconds=7),
+            )
+        )
+
+        self.assertIsInstance(provider.context, XhsProviderContext)
+        assert provider.context is not None
+        self.assertEqual(
+            provider.input_url,
+            "https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8?xsec_token=token-1",
+        )
+        self.assertEqual(provider.context.parsed_target.note_id, "66fad51c000000001b0224b8")
+        self.assertEqual(provider.context.parsed_target.xsec_token, "token-1")
+        self.assertEqual(provider.context.session.cookies, "a=1; b=2")
+        self.assertEqual(provider.context.session.timeout_seconds, 7)
+        self.assertFalse(hasattr(provider.context, "resource_bundle"))
+        self.assertEqual(payload["raw"], {"provider_raw": {"note_id": "66fad51c000000001b0224b8"}})
+        self.assertEqual(payload["normalized"]["platform"], "xhs")
+        self.assertEqual(payload["normalized"]["content_id"], "66fad51c000000001b0224b8")
+        self.assertEqual(payload["normalized"]["title"], "provider 标题")
+        self.assertNotIn("provider", payload["normalized"])
 
     def test_default_page_state_transport_returns_browser_bridge_page_state_without_rewrapping(self) -> None:
         note_id = "69d33f6a000000001f0078b3"
