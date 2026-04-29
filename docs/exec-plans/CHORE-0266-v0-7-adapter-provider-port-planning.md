@@ -9,7 +9,7 @@
 - sprint：`2026-S20`
 - 关联 spec：
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#267`
 - active 收口事项：`CHORE-0266-v0-7-adapter-provider-port-planning`
 - 状态：`active`
 
@@ -35,14 +35,14 @@
 ## 当前停点
 
 - GitHub Phase `#264`、FR `#265` 与 Work Item `#266` 已通过 GitHub REST 建立。
-- `create_worktree.py` 受 `gh issue view` GraphQL rate limit 影响无法直接读取新 issue；当前 worktree 已按同一命名规则手动创建并补齐本地 worktree 状态绑定。
-- 仓内文档正在当前分支更新，尚未进入 PR review / guardian。
+- `create_worktree.py` 曾受 `gh issue view` GraphQL rate limit 影响无法直接读取新 issue；quota reset 后已复核当前 worktree 绑定。
+- PR `#267` 已创建，当前尚未完成 guardian / merge gate。
 
 ## 下一步动作
 
-- 完成文档修改。
-- 执行文档与 workflow 门禁。
-- 创建 PR，关联 `#266`，并把 PR 元数据与本 exec-plan 对齐。
+- 等待或触发 PR checks。
+- 执行 guardian review。
+- 若 guardian、checks 与 merge gate 均通过，通过受控入口合并 PR。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -69,10 +69,16 @@
   - 结果：通过，`PR scope 校验通过。`
 - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过，`governance-gate 通过。`
+- `python3.11 scripts/create_worktree.py --issue 266 --class docs`
+  - 结果：通过，复用 `issue-266-v0-7-0-adapter-provider-port` worktree，并记录 head `79260a98f7d89b2a1d1a11b678b93588fb0e987b`。
+- `python3.11 scripts/open_pr.py --class docs --issue 266 --item-key CHORE-0266-v0-7-adapter-provider-port-planning --item-type CHORE --release v0.7.0 --sprint 2026-S20 --title 'docs(roadmap): 建立 v0.7 provider port 规划真相' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no --dry-run`
+  - 结果：通过，PR body 预览生成成功。
+- `python3.11 scripts/open_pr.py --class docs --issue 266 --item-key CHORE-0266-v0-7-adapter-provider-port-planning --item-type CHORE --release v0.7.0 --sprint 2026-S20 --title 'docs(roadmap): 建立 v0.7 provider port 规划真相' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：通过，已创建 PR `#267`。
 
 ## 未决风险
 
-- `gh issue view` GraphQL quota 在当前回合中暂时耗尽；受控脚本中依赖 GraphQL 的步骤需要等待 quota reset 或改用 REST 手动校验。
+- `gh issue view` GraphQL quota 曾在当前回合中暂时耗尽；已在 quota reset 后用受控脚本复核 worktree 与创建 PR。
 - 本 PR 只建立规划真相；若后续实现 PR 把外部 provider 或新业务能力混入 `v0.7.0`，仍需在 spec / review 阶段阻断。
 
 ## 回滚方式
