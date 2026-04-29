@@ -43,23 +43,38 @@ def existing_issue_number(directory_name: str, repo: str) -> str:
     completed = run(
         [
             "gh",
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--state",
-            "all",
-            "--search",
-            f"\"[{directory_name}]\" in:title",
-            "--json",
-            "number,title",
+            "api",
+            "--method",
+            "GET",
+            "search/issues",
+            "-f",
+            f'q=repo:{repo} "[{directory_name}]" in:title type:issue',
+            "-f",
+            "per_page=100",
         ]
     )
-    issues = json.loads(completed.stdout or "[]")
+    issues = json.loads(completed.stdout or "{}").get("items", [])
     for issue in issues:
         if issue["title"].startswith(f"[{directory_name}] "):
             return str(issue["number"])
     return ""
+
+
+def close_spec_mirror_issue(issue_number: str, repo: str) -> None:
+    run(
+        [
+            "gh",
+            "api",
+            "--method",
+            "PATCH",
+            f"repos/{repo}/issues/{issue_number}",
+            "-f",
+            "state=closed",
+            "-f",
+            "state_reason=not_planned",
+        ],
+        cwd=REPO_ROOT,
+    )
 
 
 def upsert_issue(file_path: str, repo: str) -> None:
@@ -77,14 +92,45 @@ def upsert_issue(file_path: str, repo: str) -> None:
             f"- 最近同步时间: `{updated_at}`",
             "",
             "正式契约以仓库内 `spec.md` 为准，Issue 只保留索引信息，不镜像正文。",
+            "该索引 issue 同步后必须保持 closed，避免污染 GitHub open issue 调度真相。",
         ]
     )
 
     existing = existing_issue_number(directory_name, repo)
     if existing:
-        run(["gh", "issue", "edit", existing, "--repo", repo, "--title", issue_title, "--body", body], cwd=REPO_ROOT)
+        run(
+            [
+                "gh",
+                "api",
+                "--method",
+                "PATCH",
+                f"repos/{repo}/issues/{existing}",
+                "-f",
+                f"title={issue_title}",
+                "-f",
+                f"body={body}",
+            ],
+            cwd=REPO_ROOT,
+        )
+        close_spec_mirror_issue(existing, repo)
     else:
-        run(["gh", "issue", "create", "--repo", repo, "--title", issue_title, "--body", body], cwd=REPO_ROOT)
+        completed = run(
+            [
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                f"repos/{repo}/issues",
+                "-f",
+                f"title={issue_title}",
+                "-f",
+                f"body={body}",
+                "--jq",
+                ".number",
+            ],
+            cwd=REPO_ROOT,
+        )
+        close_spec_mirror_issue(completed.stdout.strip(), repo)
 
 
 def main(argv: list[str] | None = None) -> int:
