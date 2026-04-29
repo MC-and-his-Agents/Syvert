@@ -55,6 +55,11 @@ class MissingExecuteAdapter:
     supported_collection_modes = frozenset({"hybrid"})
 
 
+class ProviderOnlyObject:
+    def fetch_content_detail(self) -> None:
+        raise AssertionError("provider-only object must not be registered as an adapter")
+
+
 class DeclarativeAdapter:
     supported_capabilities = frozenset({"content_detail"})
     supported_targets = frozenset({"url"})
@@ -96,6 +101,25 @@ class UnsupportedDeclarationAdapter:
             "resource_dependency_mode": "none",
             "required_capabilities": (),
             "evidence_refs": ("fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",),
+        },
+    )
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
+class ProviderFieldDeclarationAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        {
+            "adapter_key": "xhs",
+            "capability": "content_detail",
+            "resource_dependency_mode": "required",
+            "required_capabilities": ("account", "proxy"),
+            "evidence_refs": ("fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",),
+            "native_provider": "native-xhs",
         },
     )
 
@@ -159,6 +183,30 @@ class RegistryTests(unittest.TestCase):
             (declaration,),
         )
 
+    def test_registry_materializes_real_reference_adapters_without_provider_fields(self) -> None:
+        from syvert.adapters.douyin import DouyinAdapter
+        from syvert.adapters.xhs import XhsAdapter
+
+        registry = AdapterRegistry.from_mapping({"xhs": XhsAdapter(), "douyin": DouyinAdapter()})
+
+        for adapter_key in ("xhs", "douyin"):
+            declaration = registry.lookup(adapter_key)
+            self.assertIsNotNone(declaration)
+            assert declaration is not None
+            self.assertFalse(hasattr(declaration, "provider"))
+            self.assertFalse(hasattr(declaration, "native_provider"))
+            self.assertEqual(declaration.supported_capabilities, frozenset({"content_detail"}))
+            self.assertEqual(declaration.supported_targets, frozenset({"url"}))
+            self.assertEqual(declaration.supported_collection_modes, frozenset({"hybrid"}))
+            requirements = registry.discover_resource_requirements(adapter_key)
+            self.assertIsNotNone(requirements)
+            assert requirements is not None
+            self.assertEqual(len(requirements), 1)
+            requirement = requirements[0]
+            self.assertFalse(hasattr(requirement, "provider"))
+            self.assertFalse(hasattr(requirement, "native_provider"))
+            self.assertEqual(requirement.required_capabilities, ("account", "proxy"))
+
     def test_registry_allows_partial_resource_requirement_coverage(self) -> None:
         registry = AdapterRegistry.from_mapping({"xhs": PartialDeclarationAdapter()})
 
@@ -211,6 +259,19 @@ class RegistryTests(unittest.TestCase):
             AdapterRegistry.from_mapping({"stub": MissingExecuteAdapter()})
 
         self.assertEqual(context.exception.code, "invalid_adapter_declaration")
+
+    def test_registry_rejects_provider_only_object_as_adapter(self) -> None:
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping({"xhs": ProviderOnlyObject()})
+
+        self.assertEqual(context.exception.code, "invalid_adapter_declaration")
+
+    def test_registry_rejects_provider_fields_in_resource_requirement_declarations(self) -> None:
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping({"xhs": ProviderFieldDeclarationAdapter()})
+
+        self.assertEqual(context.exception.code, "invalid_adapter_resource_requirements")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("native_provider",))
 
 
 if __name__ == "__main__":

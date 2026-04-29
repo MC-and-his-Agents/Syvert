@@ -11,6 +11,7 @@ from urllib import error, parse, request
 from syvert.registry import baseline_required_resource_requirement_declaration
 from syvert.adapters.douyin_browser_bridge import extract_aweme_detail_from_page_state
 from syvert.adapters.douyin_browser_bridge import DouyinAuthenticatedBrowserBridge
+from syvert.adapters.douyin_provider import DouyinProviderContext, NativeDouyinProvider
 from syvert.runtime import AdapterExecutionContext, CONTENT_DETAIL, PlatformAdapterError
 
 
@@ -64,97 +65,53 @@ class DouyinAdapter:
         sign_transport: SignTransport | None = None,
         detail_transport: DetailTransport | None = None,
         page_state_transport: PageStateTransport | None = None,
+        provider: Any | None = None,
     ) -> None:
         self._session_path = session_path or DEFAULT_DOUYIN_SESSION_PATH
         self._session_provider = session_provider or load_session_config
         self._sign_transport = sign_transport or default_sign_transport
         self._detail_transport = detail_transport or default_detail_transport
         self._page_state_transport = page_state_transport or default_page_state_transport
+        # Adapter-owned test seam; Core and registry never select providers.
+        self._provider = provider or NativeDouyinProvider(
+            session_path=self._session_path,
+            api_base_url=DOUYIN_API_BASE_URL,
+            detail_uri=DOUYIN_DETAIL_URI,
+            sign_transport=self._sign_transport,
+            detail_transport=self._detail_transport,
+            page_state_transport=self._page_state_transport,
+            build_detail_params=build_detail_params,
+            build_detail_headers=build_detail_headers,
+            normalize_detail_response=normalize_detail_response,
+            extract_aweme_detail_from_page_state=extract_aweme_detail_from_page_state,
+            synthesize_detail_response=synthesize_detail_response,
+        )
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
         context = resolve_execution_context(request=request)
         input_url = resolve_input_url(request=context)
         url_info = parse_douyin_detail_url(input_url)
         session = build_session_config_from_context(context)
-        try:
-            params = self._build_detail_params(session, url_info)
-            raw_response = self._fetch_detail(session, params)
-            aweme_detail = normalize_detail_response(raw_response)
-        except PlatformAdapterError as exc:
-            raw_response, aweme_detail = self._recover_aweme_detail_from_page_state(
-                exc,
-                session=session,
-                input_url=input_url,
-                source_aweme_id=url_info.aweme_id,
-            )
-        normalized = normalize_aweme_detail(aweme_detail, canonical_url=url_info.canonical_url)
-        return {"raw": raw_response, "normalized": normalized}
+        provider_result = self._provider.fetch_content_detail(
+            DouyinProviderContext(session=session, parsed_target=url_info),
+            input_url,
+        )
+        normalized = normalize_aweme_detail(provider_result.platform_detail, canonical_url=url_info.canonical_url)
+        return {"raw": provider_result.raw_payload, "normalized": normalized}
 
     def _build_detail_params(
         self,
         session: DouyinSessionConfig,
         url_info: DouyinUrlInfo,
     ) -> dict[str, Any]:
-        if not session.sign_base_url:
-            raise PlatformAdapterError(
-                code="douyin_sign_unavailable",
-                message="douyin sign_base_url 缺失",
-                details={"session_path": str(self._session_path)},
-            )
-        params = build_detail_params(session, url_info.aweme_id)
-        sign_payload = {
-            "uri": DOUYIN_DETAIL_URI,
-            "query_params": parse.urlencode(params),
-            "user_agent": session.user_agent,
-            "cookies": session.cookies,
-        }
-        try:
-            signed = dict(self._sign_transport(session.sign_base_url, sign_payload, session.timeout_seconds))
-        except PlatformAdapterError:
-            raise
-        except Exception as exc:
-            raise PlatformAdapterError(
-                code="douyin_sign_unavailable",
-                message="抖音签名服务不可用",
-                details={"error_type": exc.__class__.__name__},
-            ) from exc
-        a_bogus = signed.get("a_bogus")
-        if not isinstance(a_bogus, str) or not a_bogus:
-            raise PlatformAdapterError(
-                code="douyin_sign_unavailable",
-                message="抖音签名结果缺少 `a_bogus`",
-                details={},
-            )
-        params["a_bogus"] = a_bogus
-        return params
+        return self._provider.build_detail_params(session, url_info)
 
     def _fetch_detail(
         self,
         session: DouyinSessionConfig,
         params: dict[str, Any],
     ) -> Mapping[str, Any]:
-        try:
-            response = self._detail_transport(
-                url=f"{DOUYIN_API_BASE_URL}{DOUYIN_DETAIL_URI}",
-                headers=build_detail_headers(session),
-                params=params,
-                timeout_seconds=session.timeout_seconds,
-            )
-        except PlatformAdapterError:
-            raise
-        except Exception as exc:
-            raise PlatformAdapterError(
-                code="douyin_detail_request_failed",
-                message="抖音 detail 请求失败",
-                details={"error_type": exc.__class__.__name__},
-            ) from exc
-        if not isinstance(response, Mapping):
-            raise PlatformAdapterError(
-                code="douyin_detail_request_failed",
-                message="抖音 detail 响应不是对象",
-                details={},
-            )
-        return response
+        return self._provider.fetch_detail(session, params)
 
     def _recover_aweme_detail_from_page_state(
         self,
@@ -164,27 +121,12 @@ class DouyinAdapter:
         input_url: str,
         source_aweme_id: str,
     ) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
-        if original_error.code not in {
-            "douyin_detail_request_failed",
-            "douyin_content_not_found",
-            "douyin_sign_unavailable",
-        }:
-            raise original_error
-        try:
-            page_state = self._page_state_transport(
-                url=input_url,
-                timeout_seconds=session.timeout_seconds,
-                source_aweme_id=source_aweme_id,
-                cookies=session.cookies,
-                user_agent=session.user_agent,
-                sign_base_url=session.sign_base_url,
-            )
-            aweme_detail = extract_aweme_detail_from_page_state(page_state, source_aweme_id=source_aweme_id)
-            return synthesize_detail_response(aweme_detail), aweme_detail
-        except PlatformAdapterError as exc:
-            if exc.code in {"douyin_browser_target_tab_missing", "douyin_content_not_found"}:
-                raise original_error
-            raise exc
+        return self._provider.recover_aweme_detail_from_page_state(
+            original_error,
+            session=session,
+            input_url=input_url,
+            source_aweme_id=source_aweme_id,
+        )
 
 
 def build_adapters() -> dict[str, object]:
