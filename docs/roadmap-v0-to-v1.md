@@ -31,8 +31,10 @@
 - `v0.1.0`：跑通最小 Core
 - `v0.2.0`：把“能跑”变成“可验证”
 - `v0.3.0` 到 `v0.6.0`：补齐运行时闭环（先闭环再暴露服务面）
-- `v0.7.0` 到 `v0.9.0`：收敛稳定边界
+- `v0.7.0`：仓内拆出 adapter-owned provider port，稳定适配器表面
+- `v0.8.0` 到 `v0.9.0`：清理边界、迁移文档、稳定 SDK
 - `v1.0.0`：宣布 Core 稳定
+- `v1.x`：在稳定契约之后接入外部 provider、扩展更多能力，并评估 adapter 独立仓库
 
 ## 跨版本强制 gate（自 v0.2.0 起）
 
@@ -258,18 +260,39 @@
 
 ### 目标
 
-稳定适配器表面。
+稳定适配器表面，并在仓内拆清 Adapter 与 provider-like 执行逻辑的边界。
+
+`v0.7.0` 的边界目标是：
+
+```text
+Syvert Adapter
+  -> Syvert-owned Provider Port
+      -> Native Provider
+```
+
+当前小红书、抖音 adapter 内部的 HTTP/sign/browser bridge 属于 native provider 实现细节。`v0.7.0` 只把这个边界拆清并稳定下来，不把 WebEnvoy、OpenCLI、bb-browser 或其他外部 provider 纳入交付范围。
 
 ### 必须具备
 
 - SDK 版本标识
 - 适配器兼容性声明
 - 适配器能力元数据
+- adapter-owned provider port 边界
+- 当前 native provider 拆分约束
 - 稳定化文档与迁移约束
+
+### 明确不在范围内
+
+- 外部 provider 接入
+- 新增小红书/抖音采集、发布、通知、互动等业务能力
+- Core 级 provider registry、provider selector 或跨 provider fallback 策略
+- adapter 独立仓库拆分
 
 ### 成功标准
 
 - 第三方适配器作者可以面向稳定契约开发
+- Core 继续只调用 Adapter，不感知 provider 实现、外部工具或 provider 选择策略
+- 小红书、抖音当前已批准 `content_detail_by_url` 验证切片保持兼容
 - Core 的变更不再轻易破坏适配器
 
 
@@ -345,6 +368,26 @@
 它代表：
 
 - Core 已经足够稳定，可以承载一个生态
+
+
+## v1.x
+
+### 目标
+
+在 `v1.0.0` 稳定契约之后扩展生态接入，而不是在稳定化阶段提前扩大业务面。
+
+### 候选方向
+
+- 接入 WebEnvoy、OpenCLI、bb-browser、agent-browser 等外部 provider
+- 为小红书、抖音新增搜索结果采集、评论采集、账号信息、发布、通知、浏览/点赞/收藏/评论等能力
+- 评估 adapter 是否从主仓拆出独立仓库
+- 在真实外部 provider 接入后，再决定是否需要更正式的 provider SDK 或 provider compatibility contract
+
+### 成功标准
+
+- 新 provider 接入不改变 `v1.0.0` 已冻结的 Core / Adapter contract
+- 新能力通过独立 FR 批准，不反向污染 `content_detail_by_url` 基线
+- adapter 仓库边界只在主仓 contract 稳定后调整
 
 
 ## 所有 v0.x 版本的开发规则
