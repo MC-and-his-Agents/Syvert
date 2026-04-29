@@ -12,6 +12,7 @@
 - 关联 decision：`docs/decisions/ADR-GOV-0287-v0-7-0-phase-and-release-closeout.md`
 - 阶段 A PR：`#288`
 - 阶段 B PR：`#289`
+- 最终状态同步 PR：`#290`
 - 状态：`active`
 
 ## 目标
@@ -40,19 +41,21 @@
 - 阶段 A docs carrier 已由 PR `#288` 合入主干，merge commit `c58ed98391c91aa7ac8532cb45f5e8a88ac585ba`。
 - Git tag `v0.7.0` 已创建并推送，tag 锚点为 `c58ed98391c91aa7ac8532cb45f5e8a88ac585ba`。
 - GitHub Release `v0.7.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.7.0`。
-- 阶段 B published-truth follow-up 正由本分支回写。
-- Phase `#264` 与 Work Item `#287` 当前仍为 `open`，等待阶段 B published-truth follow-up 合入后完成 GitHub closeout。
+- 阶段 B published-truth follow-up 已由 PR `#289` 合入主干，merge commit `c342bd43511f0e2cd718ea87096c9b63108b280c`。
+- 最终状态同步正由 PR `#290` 执行，用于让 release / sprint 文案与 PR `#289` 已合入、`#264/#287` 即将关闭的状态一致。
+- Phase `#264` 与 Work Item `#287` 当前仍为 `open`，等待 PR `#290` 合入后完成 GitHub closeout。
 - 当前 worktree：`/Users/mc/code/worktrees/syvert/issue-287-v0-7-0-published-truth`
-- 当前承载分支：`issue-287-v0-7-0-published-truth`
-- 当前主干基线：`c58ed98391c91aa7ac8532cb45f5e8a88ac585ba`
+- 当前承载分支：`issue-287-v0-7-0-final-closeout`
+- 当前主干基线：`c342bd43511f0e2cd718ea87096c9b63108b280c`
 
 ## 下一步动作
 
 - 阶段 A：创建 docs PR，建立 release / sprint / decision / exec-plan carrier。已完成，PR `#288`。
 - 阶段 A 合入后 fast-forward main，并在阶段 A merge commit 上创建并推送 `v0.7.0` annotated tag。已完成。
 - 创建 GitHub Release `v0.7.0`。已完成。
-- 阶段 B：通过 metadata-only/docs follow-up 回写 published truth。当前进行中。
-- 阶段 B PR 合入后关闭 `#264/#287`，并退役 worktree / branch。
+- 阶段 B：通过 metadata-only/docs follow-up 回写 published truth。已完成，PR `#289`。
+- 最终状态同步：通过 PR `#290` 对齐 release / sprint / exec-plan 当前状态。当前进行中。
+- PR `#290` 合入后关闭 `#264/#287`，并退役 worktree / branch。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -61,10 +64,10 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`2026-S20` 的 phase / release closeout Work Item，承接 `FR-0021` parent closeout 与 `FR-0022` governance support closeout 后的最终发布动作。
-- 位置：本事项是 `v0.7.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 A 合入后的发布动作建立 tag / GitHub Release，阶段 B 回写 published truth，并在合入后完成 GitHub closeout。
+- 位置：本事项是 `v0.7.0` 收口链路的最后一个 Work Item；阶段 A 建立仓内 carrier，阶段 A 合入后的发布动作建立 tag / GitHub Release，阶段 B 通过 PR `#289` 回写 published truth，最终状态同步 PR `#290` 合入后再完成 GitHub closeout。
 - 阻塞：
   - 阶段 A PR 合入前不得创建 `v0.7.0` tag 或 GitHub Release。
-  - 阶段 B PR 合入并完成 Phase / Work Item closeout 前，不得声明 `v0.7.0` 完成。
+  - PR `#290` 合入并完成 Phase / Work Item closeout 前，不得声明 `v0.7.0` 完成。
 
 ## 已验证项
 
@@ -138,13 +141,45 @@
   - 结果：已创建阶段 B PR `#289`。
 - `python3.11 scripts/pr_guardian.py review 289 --post-review --json-output /tmp/syvert-pr-289-guardian.json`
   - 结果：`REQUEST_CHANGES`。guardian 指出 `当前停点` 同时声明 tag / GitHub Release 不存在与已创建，published-truth 当前状态自相矛盾。
-  - 处理：已移除 `当前停点` 中阶段 A 前的“不存在”描述，仅在“发布前基线验证”保留历史检查结果；当前状态只表达 tag / GitHub Release 已存在且 `#264/#287` 待阶段 B 合入后关闭。
+  - 处理：已移除 `当前停点` 中阶段 A 前的“不存在”描述，仅在“发布前基线验证”保留历史检查结果；当前状态只表达 tag / GitHub Release 已存在且 `#264/#287` 待后续 closeout 关闭。
 - R1 修正后复核：
   - `python3.11 scripts/docs_guard.py --mode ci`：通过。
   - `python3.11 scripts/workflow_guard.py --mode ci`：通过。
   - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过。
   - `python3.11 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`：通过，`PR class=docs`。
   - 说明：当前 live review head 由 PR `#289` head SHA、GitHub checks 与 guardian verdict 绑定；本 exec-plan 记录 R1 修正后的最小复核结果，不把 review metadata 追写为新的 runtime/spec checkpoint。
+- release / sprint final wording 复核：
+  - 调整：release / sprint 改为记录 PR `#289` 回写 published truth，并由 PR `#290` 合入后的 `#264/#287` issue 状态同步完成 closeout。
+  - `python3.11 scripts/docs_guard.py --mode ci`：通过。
+  - `python3.11 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过。
+  - `python3.11 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`：通过，`PR class=docs`。
+- `python3.11 scripts/open_pr.py --class docs --issue 287 --item-key GOV-0287-v0-7-0-phase-and-release-closeout --item-type GOV --release v0.7.0 --sprint 2026-S20 --title 'docs(release): 收口 v0.7.0 最终状态同步' --closing none --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建最终状态同步 PR `#290`。
+- `python3.11 scripts/pr_guardian.py review 290 --post-review --json-output /tmp/syvert-pr-290-guardian.json`
+  - 结果：`REQUEST_CHANGES`。guardian 指出 exec-plan 仍把阶段 B PR `#289` 描述为当前进行中，与 release / sprint 已改成 PR `#290` 最终状态同步的叙述冲突。
+  - 处理：已将 `当前停点`、`下一步动作` 与 `剩余 closeout 动作` 更新为：PR `#289` 已合入 published truth，PR `#290` 只负责最终状态同步与后续 `#264/#287` GitHub closeout。
+- `#290` R1 修正后复核：
+  - `python3.11 scripts/docs_guard.py --mode ci`：通过。
+  - `python3.11 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过。
+  - `python3.11 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`：通过，`PR class=docs`。
+- `python3.11 scripts/pr_guardian.py review 290 --post-review --json-output /tmp/syvert-pr-290-guardian-r2.json`
+  - 结果：`REQUEST_CHANGES`。guardian 指出 release / sprint / exec-plan 已表达 PR `#289` 已合入与 PR `#290` 最终状态同步，但关联 decision 仍保留阶段 B 直接关闭 Phase / Work Item 的旧叙事。
+  - 处理：已更新 `docs/decisions/ADR-GOV-0287-v0-7-0-phase-and-release-closeout.md`，把 closeout 明确拆成 PR `#288` carrier、PR `#289` published truth、PR `#290` 最终状态同步与后续 `#264/#287` GitHub closeout。
+- `#290` R2 修正后复核：
+  - `python3.11 scripts/docs_guard.py --mode ci`：通过。
+  - `python3.11 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过。
+  - `python3.11 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`：通过，`PR class=docs`。
+- `python3.11 scripts/pr_guardian.py review 290 --post-review --json-output /tmp/syvert-pr-290-guardian-r3.json`
+  - 结果：`REQUEST_CHANGES`。guardian 指出 `当前事项在 sprint 中的角色 / 阻塞` 仍保留阶段 B 合入后即完成 closeout 的旧时间线。
+  - 处理：已更新该段落，明确 PR `#289` 仅回写 published truth，PR `#290` 合入并完成 `#264/#287` GitHub closeout 前不得声明 `v0.7.0` 完成。
+- `#290` R3 修正后复核：
+  - `python3.11 scripts/docs_guard.py --mode ci`：通过。
+  - `python3.11 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3.11 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过。
+  - `python3.11 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`：通过，`PR class=docs`。
 
 ## closeout 证据
 
@@ -163,10 +198,10 @@
 
 ## 剩余 closeout 动作
 
-- 合入阶段 B published-truth follow-up PR。
-- 阶段 B PR 合入后通过 closing keyword 或 REST 关闭 `#287`。
-- 阶段 B PR 合入后通过 GitHub REST 关闭 Phase `#264`，并留言记录 `v0.7.0` tag / GitHub Release URL。
-- 阶段 B PR 合入后 fast-forward main，并退役 active branch / worktree。
+- 合入最终状态同步 PR `#290`。
+- PR `#290` 合入后通过 closing keyword 或 REST 关闭 `#287`。
+- PR `#290` 合入后通过 GitHub REST 关闭 Phase `#264`，并留言记录 `v0.7.0` tag / GitHub Release URL。
+- PR `#290` 合入后 fast-forward main，并退役 active branch / worktree。
 
 ## 未决风险
 
