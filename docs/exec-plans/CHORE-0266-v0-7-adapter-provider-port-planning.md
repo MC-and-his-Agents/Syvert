@@ -8,7 +8,7 @@
 - release：`v0.7.0`
 - sprint：`2026-S20`
 - 关联 spec：
-- 关联 decision：
+- 关联 decision：`docs/decisions/ADR-CHORE-0266-v0-7-adapter-provider-port-planning.md`
 - 关联 PR：`#267`
 - active 收口事项：`CHORE-0266-v0-7-adapter-provider-port-planning`
 - 状态：`active`
@@ -25,6 +25,7 @@
   - 创建 GitHub Phase `#264`、FR `#265` 与 Work Item `#266`。
   - 更新 `docs/roadmap-v0-to-v1.md` 中 `v0.7.0`、`v0.8.0` 到 `v0.9.0`、`v1.0.0` 与 `v1.x` 的范围关系。
   - 新增 `docs/releases/v0.7.0.md` 与 `docs/sprints/2026-S20.md`。
+  - 新增 `docs/decisions/ADR-CHORE-0266-v0-7-adapter-provider-port-planning.md` 作为本规划 Work Item 的 bootstrap contract。
   - 新增本 active exec-plan，记录当前 Work Item 的范围、验证、风险与恢复上下文。
 - 本次不纳入：
   - 创建或修改 `FR-0021` formal spec 正文。
