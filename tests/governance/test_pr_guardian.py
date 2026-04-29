@@ -376,7 +376,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         self.assertEqual(integration_merge_gate_errors(meta), [])
 
     @patch(
-        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
         return_value={
             "source": "project_item",
             "status": "blocked",
@@ -411,7 +411,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         live_state_mock.assert_called_once()
 
     @patch(
-        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
         return_value={
             "source": "project_item",
             "error": "无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。",
@@ -442,7 +442,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         live_state_mock.assert_called_once()
 
     @patch(
-        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
         return_value={
             "source": "project_item",
             "status": "review",
@@ -479,7 +479,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
         live_state_mock.assert_called_once()
 
     @patch(
-        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
         return_value={
             "source": "project_item",
             "status": "in_progress",
@@ -2399,7 +2399,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.fetch_issue_context",
                         return_value={"identity": [], "summary": "", "canonical_integration": {}},
                     ):
-                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state_uncached") as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
                                 return_value={"issue_number": 24},
@@ -2446,7 +2446,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.fetch_issue_context",
                         return_value={"identity": ["- Issue: #24"], "summary": "issue summary", "canonical_integration": {}},
                     ):
-                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state_uncached") as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
                                 return_value={"issue_number": 24},
@@ -2496,7 +2496,7 @@ class CodexReviewExecutionTests(unittest.TestCase):
                         "scripts.pr_guardian.fetch_issue_context",
                         return_value={"identity": [], "summary": "", "canonical_integration": {}},
                     ):
-                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state") as fetch_live_mock:
+                        with patch("scripts.pr_guardian.fetch_integration_ref_live_state_uncached") as fetch_live_mock:
                             with patch(
                                 "scripts.pr_guardian.build_review_packet",
                                 return_value={"issue_number": 24},
@@ -3011,7 +3011,7 @@ class MergeIfSafeTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self._integration_live_state_patcher = patch(
-            "scripts.pr_guardian.fetch_integration_ref_live_state",
+            "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
             return_value={
                 "source": "project_item",
                 "status": "review",
@@ -3163,7 +3163,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
         run_mock.assert_called_once_with(
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-1"],
@@ -3224,7 +3224,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
         run_mock.assert_called_once_with(
             ["gh", "pr", "merge", "1", "--squash", "--match-head-commit", "sha-2", "--delete-branch"],
@@ -3338,7 +3338,7 @@ class MergeIfSafeTests(unittest.TestCase):
         find_result_mock.assert_not_called()
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.run")
@@ -3403,6 +3403,83 @@ class MergeIfSafeTests(unittest.TestCase):
         require_auth_mock.assert_called_once()
         all_checks_mock.assert_called_once_with(1)
 
+    @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
+    @patch("scripts.pr_guardian.record_merge_time_integration_recheck")
+    @patch("scripts.pr_guardian.run")
+    @patch("scripts.pr_guardian.all_checks_pass", side_effect=SystemExit("checks read failed"))
+    @patch("scripts.pr_guardian.find_latest_guardian_result")
+    @patch("scripts.pr_guardian.pr_meta")
+    @patch("scripts.pr_guardian.require_auth")
+    @patch("scripts.pr_guardian.review_once")
+    def test_merge_restores_recheck_when_final_checks_read_fails(
+        self,
+        review_once_mock,
+        require_auth_mock,
+        pr_meta_mock,
+        find_result_mock,
+        all_checks_mock,
+        run_mock,
+        record_recheck_mock,
+        restore_recheck_mock,
+    ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        updated_meta = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-reviewed",
+            "body": updated_body,
+        }
+        pr_meta_mock.side_effect = [
+            {
+                "number": 1,
+                "isDraft": False,
+                "headRefOid": "sha-reviewed",
+                "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+            },
+            updated_meta,
+            updated_meta,
+        ]
+        find_result_mock.return_value = cached_guardian_result(
+            "sha-reviewed",
+            INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
+        )
+        record_recheck_mock.return_value = (updated_meta, "no")
+        review_once_mock.return_value = (
+            {
+                "number": 1,
+                "headRefOid": "sha-reviewed",
+                "body": updated_body,
+            },
+            {
+                "verdict": "APPROVE",
+                "safe_to_merge": True,
+                "summary": "fresh-for-final-body",
+            },
+        )
+
+        with self.assertRaises(SystemExit) as ctx:
+            merge_if_safe(
+                1,
+                post=False,
+                delete_branch=False,
+                refresh_review=False,
+                confirm_integration_recheck=True,
+            )
+
+        self.assertIn("读取 GitHub checks 失败", str(ctx.exception))
+        restore_recheck_mock.assert_called_once_with(
+            1,
+            "no",
+            failure_context="执行 `gh pr merge` 前读取 GitHub checks 失败",
+        )
+        record_recheck_mock.assert_called_once()
+        all_checks_mock.assert_called_once_with(1)
+        run_mock.assert_not_called()
+        require_auth_mock.assert_called_once()
+
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
     @patch("scripts.pr_guardian.find_latest_guardian_result")
@@ -3437,7 +3514,7 @@ class MergeIfSafeTests(unittest.TestCase):
         review_once_mock.assert_not_called()
         run_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3472,7 +3549,7 @@ class MergeIfSafeTests(unittest.TestCase):
         review_once_mock.assert_not_called()
         run_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3563,7 +3640,7 @@ class MergeIfSafeTests(unittest.TestCase):
         )
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.run")
@@ -3666,7 +3743,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 2)
         self.assertEqual(run_mock.call_args_list[1].args[0][:4], ["gh", "pr", "merge", "1"])
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
 
     @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
@@ -3761,7 +3838,7 @@ class MergeIfSafeTests(unittest.TestCase):
         restore_merge_time_mock.assert_called_once()
         self.assertEqual(run_mock.call_count, 1)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3811,7 +3888,7 @@ class MergeIfSafeTests(unittest.TestCase):
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3883,7 +3960,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -3948,7 +4025,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -4035,7 +4112,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[1].args[0]))
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -4106,7 +4183,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[1].args[0]))
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -4202,11 +4279,11 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertTrue(is_pr_body_patch_command(run_mock.call_args_list[2].args[0]))
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        self.assertEqual(all_checks_mock.call_count, 2)
+        self.assertEqual(all_checks_mock.call_count, 1)
         all_checks_mock.assert_called_with(1)
 
     @patch(
-        "scripts.pr_guardian.fetch_integration_ref_live_state",
+        "scripts.pr_guardian.fetch_integration_ref_live_state_uncached",
         return_value={
             "source": "issue",
             "status": "review",
@@ -4339,10 +4416,10 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("- integration_status_checked_before_merge: yes", edited_bodies[0])
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         prepare_worktree_mock.assert_called_once()
-        fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
+        fetch_live_mock.assert_not_called()
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
@@ -4442,7 +4519,7 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("- integration_status_checked_before_merge: no", edited_bodies[1])
         review_once_mock.assert_called_once_with(1, post=False, json_output=None)
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
     def test_fetch_issue_context_parses_issue_form_headings(self) -> None:
         with patch(
@@ -4498,9 +4575,11 @@ class MergeIfSafeTests(unittest.TestCase):
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
-    @patch("scripts.pr_guardian.fetch_integration_ref_live_state")
+    @patch("scripts.pr_guardian.fetch_integration_ref_live_state_uncached")
+    @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
+    @patch("scripts.pr_guardian.record_merge_time_integration_recheck")
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
     @patch("scripts.pr_guardian.find_latest_guardian_result")
@@ -4515,18 +4594,33 @@ class MergeIfSafeTests(unittest.TestCase):
         find_result_mock,
         all_checks_mock,
         run_mock,
+        record_recheck_mock,
+        restore_recheck_mock,
         fetch_live_mock,
     ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        updated_meta = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-live-not-ready",
+            "body": updated_body,
+        }
         pr_meta_mock.return_value = {
             "number": 1,
             "isDraft": False,
             "headRefOid": "sha-live-not-ready",
             "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         }
-        find_result_mock.return_value = cached_guardian_result(
+        cached_result = cached_guardian_result(
             "sha-live-not-ready",
             INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         )
+        cached_result["schema_version"] = 1
+        find_result_mock.return_value = cached_result
+        record_recheck_mock.return_value = (updated_meta, "no")
         fetch_live_mock.return_value = {
             "source": "project_item",
             "status": "review",
@@ -4550,11 +4644,19 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("联合验收状态未就绪", str(ctx.exception))
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
+        record_recheck_mock.assert_called_once()
+        restore_recheck_mock.assert_called_once_with(
+            1,
+            "no",
+            failure_context="integration merge gate 校验失败后无法保持 PR 元数据一致",
+        )
         fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
-    @patch("scripts.pr_guardian.fetch_integration_ref_live_state")
+    @patch("scripts.pr_guardian.fetch_integration_ref_live_state_uncached")
+    @patch("scripts.pr_guardian.restore_merge_time_integration_recheck_or_die")
+    @patch("scripts.pr_guardian.record_merge_time_integration_recheck")
     @patch("scripts.pr_guardian.run")
     @patch("scripts.pr_guardian.all_checks_pass", return_value=True)
     @patch("scripts.pr_guardian.find_latest_guardian_result")
@@ -4569,18 +4671,33 @@ class MergeIfSafeTests(unittest.TestCase):
         find_result_mock,
         all_checks_mock,
         run_mock,
+        record_recheck_mock,
+        restore_recheck_mock,
         fetch_live_mock,
     ) -> None:
+        updated_body = INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY.replace(
+            "- integration_status_checked_before_merge: no",
+            "- integration_status_checked_before_merge: yes",
+        )
+        updated_meta = {
+            "number": 1,
+            "isDraft": False,
+            "headRefOid": "sha-live-unreadable",
+            "body": updated_body,
+        }
         pr_meta_mock.return_value = {
             "number": 1,
             "isDraft": False,
             "headRefOid": "sha-live-unreadable",
             "body": INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         }
-        find_result_mock.return_value = cached_guardian_result(
+        cached_result = cached_guardian_result(
             "sha-live-unreadable",
             INTEGRATION_GATED_PENDING_MERGE_RECHECK_BODY,
         )
+        cached_result["schema_version"] = 1
+        find_result_mock.return_value = cached_result
+        record_recheck_mock.return_value = (updated_meta, "no")
         fetch_live_mock.return_value = {
             "source": "project_item",
             "error": "无法读取 `integration_ref` 指向的 project item `PVTI_test`，拒绝继续。",
@@ -4598,9 +4715,15 @@ class MergeIfSafeTests(unittest.TestCase):
         self.assertIn("无法读取 `integration_ref` 指向的 project item", str(ctx.exception))
         run_mock.assert_not_called()
         review_once_mock.assert_not_called()
+        record_recheck_mock.assert_called_once()
+        restore_recheck_mock.assert_called_once_with(
+            1,
+            "no",
+            failure_context="integration merge gate 校验失败后无法保持 PR 元数据一致",
+        )
         fetch_live_mock.assert_called_once_with("https://github.com/MC-and-his-Agents/WebEnvoy/issues/466")
         require_auth_mock.assert_called_once()
-        all_checks_mock.assert_called_once_with(1)
+        all_checks_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -133,7 +133,7 @@ def current_branch_protection(repo: str) -> dict:
 def current_rulesets(repo: str) -> list[dict]:
     completed = run(["gh", "api", f"repos/{repo}/rulesets"], cwd=REPO_ROOT, check=False)
     if completed.returncode != 0:
-        return []
+        raise SystemExit(completed.stderr.strip() or f"无法读取 `{repo}` rulesets。")
     return json.loads(completed.stdout or "[]")
 
 
@@ -170,8 +170,8 @@ def run_gh_with_json(method: str, endpoint: str, payload: dict) -> None:
         path.unlink(missing_ok=True)
 
 
-def ruleset_id_for_name(repo: str, name: str) -> int | None:
-    for item in current_rulesets(repo):
+def ruleset_id_for_name(rulesets: list[dict], name: str) -> int | None:
+    for item in rulesets:
         if item.get("name") == name:
             return int(item["id"])
     return None
@@ -200,7 +200,8 @@ def main(argv: list[str] | None = None) -> int:
     expected_repo = desired_repo_settings()
     expected_branch = desired_branch_protection()
     expected_ruleset = desired_ruleset()
-    current_ruleset = next((item for item in current_rulesets(args.repo) if item.get("name") == RULESET_NAME), {})
+    rulesets = current_rulesets(args.repo)
+    current_ruleset = next((item for item in rulesets if item.get("name") == RULESET_NAME), {})
 
     diff = {
         "repo": diff_settings(repo_settings, expected_repo),
@@ -212,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         run_gh_with_json("PATCH", f"repos/{args.repo}", expected_repo)
     if diff["branch_protection"]:
         run_gh_with_json("PUT", f"repos/{args.repo}/branches/main/protection", expected_branch)
-    ruleset_id = ruleset_id_for_name(args.repo, RULESET_NAME)
+    ruleset_id = ruleset_id_for_name(rulesets, RULESET_NAME)
     if ruleset_id is None:
         run_gh_with_json("POST", f"repos/{args.repo}/rulesets", expected_ruleset)
     elif diff["ruleset"]:

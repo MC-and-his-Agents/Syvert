@@ -11,7 +11,7 @@ import argparse
 import datetime as dt
 import json
 
-from scripts.common import REPO_ROOT, git_changed_files, require_cli, run
+from scripts.common import REPO_ROOT, default_github_repo, git_changed_files, require_cli, run
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -39,7 +39,48 @@ def spec_title(path: Path) -> str:
     return path.parent.name
 
 
-def existing_issue_number(directory_name: str, repo: str) -> str:
+def directory_name_from_mirror_title(title: str) -> str:
+    if not title.startswith("[") or "]" not in title:
+        return ""
+    return title[1 : title.index("]")]
+
+
+def existing_issue_index(repo: str) -> dict[str, str]:
+    index: dict[str, str] = {}
+    page = 1
+    while True:
+        completed = run(
+            [
+                "gh",
+                "api",
+                "--method",
+                "GET",
+                f"repos/{repo}/issues",
+                "-f",
+                "state=all",
+                "-f",
+                "per_page=100",
+                "-f",
+                f"page={page}",
+            ],
+            cwd=REPO_ROOT,
+        )
+        issues = json.loads(completed.stdout or "[]")
+        for issue in issues:
+            if issue.get("pull_request"):
+                continue
+            directory_name = directory_name_from_mirror_title(str(issue.get("title") or ""))
+            if directory_name:
+                index.setdefault(directory_name, str(issue.get("number") or ""))
+        if len(issues) < 100:
+            break
+        page += 1
+    return {key: value for key, value in index.items() if value}
+
+
+def existing_issue_number(directory_name: str, repo: str, existing_issues: dict[str, str] | None = None) -> str:
+    if existing_issues is not None:
+        return existing_issues.get(directory_name, "")
     completed = run(
         [
             "gh",
@@ -77,7 +118,7 @@ def close_spec_mirror_issue(issue_number: str, repo: str) -> None:
     )
 
 
-def upsert_issue(file_path: str, repo: str) -> None:
+def upsert_issue(file_path: str, repo: str, existing_issues: dict[str, str] | None = None) -> None:
     absolute = REPO_ROOT / file_path
     directory_name = absolute.parent.name
     title = spec_title(absolute)
@@ -96,7 +137,7 @@ def upsert_issue(file_path: str, repo: str) -> None:
         ]
     )
 
-    existing = existing_issue_number(directory_name, repo)
+    existing = existing_issue_number(directory_name, repo, existing_issues)
     if existing:
         run(
             [
@@ -136,11 +177,12 @@ def upsert_issue(file_path: str, repo: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     require_cli("gh")
-    run(["gh", "auth", "status"], cwd=REPO_ROOT)
-    repo = args.repo or run(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], cwd=REPO_ROOT).stdout.strip()
+    run(["gh", "api", "user", "--jq", ".login"], cwd=REPO_ROOT)
+    repo = args.repo or default_github_repo()
     files = changed_spec_files(args)
+    existing_issues = existing_issue_index(repo) if files else {}
     for file_path in files:
-        upsert_issue(file_path, repo)
+        upsert_issue(file_path, repo, existing_issues)
     print(f"已同步 {len(files)} 个 spec 索引。")
     return 0
 

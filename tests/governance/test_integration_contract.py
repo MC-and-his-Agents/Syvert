@@ -15,7 +15,9 @@ from scripts.integration_contract import (
     ISSUE_SCOPE_FIELDS,
     PR_SCOPE_FIELDS,
     build_review_packet,
+    clear_integration_ref_live_state_cache,
     fetch_integration_ref_live_state,
+    fetch_integration_ref_live_state_uncached,
     extract_issue_canonical_integration_fields,
     field_choices,
     markdown_section_label,
@@ -49,6 +51,14 @@ LOCAL_ONLY_PR_BODY = "\n".join(
 
 
 class IntegrationContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        clear_integration_ref_live_state_cache()
+
+    def tearDown(self) -> None:
+        clear_integration_ref_live_state_cache()
+        super().tearDown()
+
     def test_scope_fields_follow_contract_order(self) -> None:
         self.assertEqual(ISSUE_SCOPE_FIELDS, FIELD_ORDER[: len(ISSUE_SCOPE_FIELDS)])
         self.assertEqual(PR_SCOPE_FIELDS, FIELD_ORDER)
@@ -587,6 +597,41 @@ class IntegrationContractTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "issue")
         self.assertIn("无法读取", payload["error"])
+        self.assertEqual(payload["verification_status"], "unverified")
+
+    def test_fetch_integration_ref_live_state_caches_by_normalized_ref_and_returns_copy(self) -> None:
+        with patch(
+            "scripts.integration_contract.fetch_issue_integration_ref_live_state",
+            return_value={
+                "source": "issue",
+                "status": "review",
+                "nested": {"value": "original"},
+                "error": "",
+            },
+        ) as fetch_issue_mock:
+            first = fetch_integration_ref_live_state("MC-and-his-Agents/Syvert#105")
+            first["nested"]["value"] = "mutated"
+            second = fetch_integration_ref_live_state("https://github.com/MC-and-his-Agents/Syvert/issues/105")
+
+        fetch_issue_mock.assert_called_once_with("MC-and-his-Agents/Syvert#105", "MC-and-his-Agents/Syvert", 105)
+        self.assertEqual(second["nested"]["value"], "original")
+        self.assertEqual(second["verification_status"], "verified")
+
+    def test_fetch_integration_ref_live_state_uncached_reads_remote_every_time(self) -> None:
+        with patch(
+            "scripts.integration_contract.fetch_issue_integration_ref_live_state",
+            side_effect=[
+                {"source": "issue", "status": "review", "counter": 1, "error": ""},
+                {"source": "issue", "status": "review", "counter": 2, "error": ""},
+            ],
+        ) as fetch_issue_mock:
+            first = fetch_integration_ref_live_state_uncached("MC-and-his-Agents/Syvert#105")
+            second = fetch_integration_ref_live_state_uncached("MC-and-his-Agents/Syvert#105")
+
+        self.assertEqual(fetch_issue_mock.call_count, 2)
+        self.assertEqual(first["counter"], 1)
+        self.assertEqual(second["counter"], 2)
+        self.assertEqual(second["verification_status"], "verified")
 
     def test_fetch_integration_ref_live_state_fail_closed_on_malformed_issue_json(self) -> None:
         with patch("scripts.integration_contract.run") as run_mock:

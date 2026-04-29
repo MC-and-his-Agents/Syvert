@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ CANONICAL_INTEGRATION_PROJECT_REQUIRED_FIELDS = frozenset(
 MERGE_TIME_ALLOWED_LIVE_STATUSES = tuple(
     str(item).strip().lower() for item in RAW_CONTRACT["rules"].get("merge_time_allowed_live_statuses", [])
 )
+INTEGRATION_REF_LIVE_STATE_CACHE: dict[str, dict[str, object]] = {}
 INTEGRATION_PROJECT_ITEM_QUERY = """
 query($id: ID!) {
   node(id: $id) {
@@ -958,34 +960,57 @@ def fetch_project_item_integration_ref_live_state(
     return live_state
 
 
-def fetch_integration_ref_live_state(integration_ref: str) -> dict[str, object]:
+def _live_state_with_verification_status(payload: dict[str, object]) -> dict[str, object]:
+    if payload and "verification_status" not in payload:
+        payload["verification_status"] = "unverified" if str(payload.get("error") or "").strip() else "verified"
+    return payload
+
+
+def clear_integration_ref_live_state_cache() -> None:
+    INTEGRATION_REF_LIVE_STATE_CACHE.clear()
+
+
+def fetch_integration_ref_live_state_uncached(integration_ref: str) -> dict[str, object]:
     ref = integration_ref.strip()
     if not ref:
         return {}
     if not integration_ref_is_checkable(ref):
-        return {
+        return _live_state_with_verification_status({
             "integration_ref": ref,
             "normalized_ref": normalize_integration_ref_for_comparison(ref),
             "source": "unknown",
             "error": "`integration_ref` 不是可核查的 issue / project item 引用，拒绝继续。",
-        }
+        })
 
     issue_ref = parse_issue_ref(ref)
     if issue_ref:
         repo_slug, issue_number = issue_ref
-        return fetch_issue_integration_ref_live_state(ref, repo_slug, issue_number)
+        return _live_state_with_verification_status(
+            fetch_issue_integration_ref_live_state(ref, repo_slug, issue_number)
+        )
 
     project_item_ref = parse_project_item_ref(ref)
     if project_item_ref:
         organization, project_number, item_id = project_item_ref
-        return fetch_project_item_integration_ref_live_state(ref, organization, project_number, item_id)
+        return _live_state_with_verification_status(
+            fetch_project_item_integration_ref_live_state(ref, organization, project_number, item_id)
+        )
 
-    return {
+    return _live_state_with_verification_status({
         "integration_ref": ref,
         "normalized_ref": normalize_integration_ref_for_comparison(ref),
         "source": "unknown",
         "error": "`integration_ref` 格式无法解析为 issue / project item，拒绝继续。",
-    }
+    })
+
+
+def fetch_integration_ref_live_state(integration_ref: str) -> dict[str, object]:
+    normalized_ref = normalize_integration_ref_for_comparison(integration_ref)
+    if normalized_ref in {"", "none"} or not integration_ref_is_checkable(integration_ref):
+        return fetch_integration_ref_live_state_uncached(integration_ref)
+    if normalized_ref not in INTEGRATION_REF_LIVE_STATE_CACHE:
+        INTEGRATION_REF_LIVE_STATE_CACHE[normalized_ref] = fetch_integration_ref_live_state_uncached(integration_ref)
+    return copy.deepcopy(INTEGRATION_REF_LIVE_STATE_CACHE[normalized_ref])
 
 
 def validate_integration_ref_live_state(
