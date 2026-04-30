@@ -78,4 +78,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<pending-checkpoint-sha>`
+- `c39eff1459c652c3b103b328aacf4a8cdec5e3eb`
+- 说明：该 checkpoint 首次把 `FR-0027` profile evidence carrier、formal research truth、测试、release / sprint 索引与当前 active exec-plan 同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
