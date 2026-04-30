@@ -35,11 +35,22 @@ _REQUIRED_MANIFEST_FIELDS = frozenset(
 )
 _FORBIDDEN_MANIFEST_FIELDS = frozenset(
     {
+        "browser_provider",
+        "cdp",
+        "chromium",
         "compatibility_decision",
+        "external_provider_ref",
         "fallback",
+        "fallback_order",
         "marketplace",
+        "native_provider",
+        "optional_capabilities",
+        "playwright",
+        "preferred_capabilities",
+        "preferred_profiles",
         "priority",
         "provider_fallback",
+        "provider_capabilities",
         "provider_key",
         "provider_marketplace",
         "provider_offer",
@@ -48,8 +59,11 @@ _FORBIDDEN_MANIFEST_FIELDS = frozenset(
         "provider_registry",
         "provider_score",
         "provider_selector",
+        "provider_selection",
+        "resource_provider",
         "score",
         "selector",
+        "sign_service",
     }
 )
 _DECLARATION_V2_FIELD_NAMES = frozenset(
@@ -836,10 +850,17 @@ def _compare_adapter_public_metadata_attr(
         actual = _MISSING
     if attr_name == "fixture_refs" and actual is not _MISSING:
         try:
-            actual = tuple(actual)
-        except TypeError:
-            pass
-        if isinstance(actual, tuple) and tuple(sorted(actual)) == tuple(sorted(expected)):
+            actual = _require_non_empty_string_tuple(actual, field="adapter.fixture_refs")
+        except ThirdPartyContractEntryError as error:
+            mismatches[attr_name] = {
+                "expected": expected,
+                "actual": "invalid",
+                "adapter_key": manifest.adapter_key,
+                "error_code": error.code,
+                "error_details": error.details,
+            }
+            return
+        if tuple(sorted(actual)) == tuple(sorted(expected)):
             return
     if actual != expected:
         mismatches[attr_name] = {
@@ -1005,6 +1026,12 @@ def _normalize_fixture(
             details={"actual_type": type(fixture).__name__},
         )
     raw_keys = {key for key in fixture}
+    if any(not isinstance(key, str) for key in raw_keys):
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_shape",
+            "third-party adapter fixture field names must be strings",
+            details={"actual_keys": tuple(sorted(str(key) for key in raw_keys))},
+        )
     required_fields = frozenset({"fixture_id", "manifest_ref", "case_type", "input", "expected"})
     missing_fields = tuple(sorted(required_fields - raw_keys))
     extra_fields = tuple(sorted(raw_keys - required_fields))

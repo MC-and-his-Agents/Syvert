@@ -29,6 +29,14 @@ class AdapterWithProviderFacingMetadata(ThirdPartyContractFixtureAdapter):
     selector = "runtime-selector"
 
 
+class AdapterWithExtendedProviderFacingMetadata(ThirdPartyContractFixtureAdapter):
+    browser_provider = "browser-provider"
+    external_provider_ref = "external-provider"
+    native_provider = "native-provider"
+    provider_capabilities = ("content_detail",)
+    provider_selection = "runtime-selector"
+
+
 class AdapterWithUserIdTargetMetadata(ThirdPartyContractFixtureAdapter):
     supported_targets = frozenset({"user_id"})
 
@@ -92,6 +100,13 @@ class AdapterWithMismatchedSourceErrorDetails(ThirdPartyContractFixtureAdapter):
                 details={"source_error": "different_source_error"},
             )
         return super().execute(request)
+
+
+class AdapterWithInvalidFixtureRefs(ThirdPartyContractFixtureAdapter):
+    fixture_refs = (
+        THIRD_PARTY_SUCCESS_FIXTURE_ID,
+        1,
+    )
 
 
 class AdapterWithReorderedPublicMetadata(ThirdPartyContractFixtureAdapter):
@@ -230,6 +245,11 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             "provider_offer",
             "compatibility_decision",
             "provider_key",
+            "provider_selection",
+            "provider_capabilities",
+            "external_provider_ref",
+            "native_provider",
+            "browser_provider",
             "selector",
             "fallback",
             "priority",
@@ -246,6 +266,18 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, "forbidden_adapter_manifest_fields")
                 self.assertEqual(context.exception.details["forbidden_fields"], (field,))
+
+    def test_rejects_provider_fields_in_resource_declarations_fail_closed(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
+        declarations[0]["native_provider"] = "must-not-pass"
+        manifest["resource_requirement_declarations"] = declarations
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("native_provider",))
 
     def test_rejects_sdk_contract_id_with_provider_or_compatibility_case_insensitive(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
@@ -453,6 +485,39 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "forbidden_adapter_public_metadata_fields")
         self.assertEqual(context.exception.details["forbidden_fields"], ("provider_key", "selector"))
 
+    def test_rejects_extended_adapter_public_metadata_provider_facing_fields(self) -> None:
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithExtendedProviderFacingMetadata(),
+            )
+
+        self.assertEqual(context.exception.code, "forbidden_adapter_public_metadata_fields")
+        self.assertEqual(
+            context.exception.details["forbidden_fields"],
+            (
+                "browser_provider",
+                "external_provider_ref",
+                "native_provider",
+                "provider_capabilities",
+                "provider_selection",
+            ),
+        )
+
+    def test_rejects_invalid_adapter_fixture_refs_without_unhandled_exception(self) -> None:
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithInvalidFixtureRefs(),
+            )
+
+        self.assertEqual(context.exception.code, "adapter_manifest_metadata_mismatch")
+        fixture_ref_mismatch = context.exception.details["mismatches"]["fixture_refs"]
+        self.assertEqual(fixture_ref_mismatch["actual"], "invalid")
+        self.assertEqual(fixture_ref_mismatch["error_code"], "invalid_manifest_public_metadata")
+
     def test_rejects_fixture_refs_that_do_not_resolve(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
         manifest["fixture_refs"] = (
@@ -469,6 +534,20 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "unresolvable_fixture_refs")
         self.assertEqual(context.exception.details["missing_refs"], ("missing-error-mapping-fixture",))
+
+    def test_rejects_fixture_top_level_non_string_field_names(self) -> None:
+        fixtures = list(copy.deepcopy(minimal_third_party_adapter_fixtures()))
+        fixtures[0][1] = "must-not-pass"
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_shape")
+        self.assertIn("1", context.exception.details["actual_keys"])
 
     def test_rejects_fixtures_without_success_and_error_mapping_coverage(self) -> None:
         fixtures = tuple(
