@@ -9,7 +9,7 @@ import re
 from typing import Any, Callable, Mapping
 from urllib import error, parse, request
 
-from syvert.registry import baseline_required_resource_requirement_declaration
+from syvert.registry import baseline_multi_profile_resource_requirement_declaration
 from syvert.adapters.xhs_browser_bridge import XhsAuthenticatedBrowserBridge
 from syvert.adapters.xhs_provider import NativeXhsProvider, XhsProviderContext
 from syvert.runtime import AdapterExecutionContext, CONTENT_DETAIL, PlatformAdapterError
@@ -52,7 +52,7 @@ class XhsAdapter:
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
     resource_requirement_declarations = (
-        baseline_required_resource_requirement_declaration(
+        baseline_multi_profile_resource_requirement_declaration(
             adapter_key=adapter_key,
             capability=CONTENT_DETAIL,
         ),
