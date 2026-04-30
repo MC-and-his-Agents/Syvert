@@ -356,6 +356,7 @@ def validate_third_party_adapter_fixtures(
         )
     fixture_inputs = tuple(_normalize_fixture_input(manifest, fixture) for fixture in normalized)
     _validate_fixture_public_metadata_coverage(manifest, fixture_inputs)
+    _validate_fixture_resource_profiles(manifest, normalized, fixture_inputs)
     return normalized
 
 
@@ -1318,6 +1319,19 @@ def _validate_fixture_public_metadata_coverage(
                 "missing_targets": missing_targets,
                 "missing_collection_modes": missing_collection_modes,
             },
+        )
+
+
+def _validate_fixture_resource_profiles(
+    manifest: ThirdPartyAdapterManifest,
+    fixtures: tuple[AdapterContractFixture, ...],
+    fixture_inputs: tuple[dict[str, str], ...],
+) -> None:
+    for fixture, fixture_input in zip(fixtures, fixture_inputs):
+        _resource_profile_for_fixture(
+            manifest,
+            fixture,
+            fixture_input["resource_profile_key"],
         )
 
 

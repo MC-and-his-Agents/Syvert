@@ -78,6 +78,16 @@ class AdapterWithUnexpectedException(ThirdPartyContractFixtureAdapter):
         raise RuntimeError("unexpected adapter bug")
 
 
+class AdapterWithCallCount(ThirdPartyContractFixtureAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.execute_calls = 0
+
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        self.execute_calls += 1
+        return super().execute(request)
+
+
 class AdapterWithInvalidPlatformErrorDetails(ThirdPartyContractFixtureAdapter):
     def __init__(self, *, details) -> None:  # type: ignore[no-untyped-def]
         super().__init__()
@@ -458,6 +468,40 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_fixture_input")
         self.assertEqual(context.exception.details["field"], "fixture.input")
         self.assertEqual(context.exception.details["missing_fields"], ("resource_profile_key",))
+
+    def test_rejects_invalid_resource_profile_before_adapter_execute(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        fixtures[1]["input"]["resource_profile_key"] = "missing-profile"
+        adapter = AdapterWithCallCount()
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=adapter,
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_resource_profile")
+        self.assertEqual(context.exception.details["fixture_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
+        self.assertEqual(adapter.execute_calls, 0)
+
+    def test_rejects_resource_profile_proof_path_mismatch_before_adapter_execute(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["supported_collection_modes"] = ("hybrid", "public")
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        fixtures[1]["input"]["collection_mode"] = "public"
+        adapter = AdapterWithCallCount()
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=fixtures,
+                adapter=adapter,
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_resource_profile")
+        self.assertEqual(context.exception.details["fixture_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
+        self.assertEqual(adapter.execute_calls, 0)
 
     def test_rejects_error_mapping_fixture_that_does_not_match_manifest_mapping(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
