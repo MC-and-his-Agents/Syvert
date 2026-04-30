@@ -63,6 +63,11 @@ class AdapterWithNoneResourceProfile(ThirdPartyContractFixtureAdapter):
     resource_requirement_declarations = _none_profile_resource_requirement_declarations()
 
 
+class AdapterWithUnexpectedException(ThirdPartyContractFixtureAdapter):
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        raise RuntimeError("unexpected adapter bug")
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
         adapter = ThirdPartyContractFixtureAdapter()
@@ -84,6 +89,10 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[1]["observed_status"], "failed")
         self.assertEqual(results[1]["observed_error"]["category"], "platform")
         self.assertEqual(results[1]["observed_error"]["code"], "content_not_found")
+        self.assertEqual(results[0]["observed_capability"], "content_detail")
+        self.assertEqual(results[1]["observed_capability"], "content_detail")
+        self.assertEqual(adapter.last_request_capability, "content_detail")
+        self.assertEqual(adapter.last_resource_bundle_capability, "content_detail")
         self.assertEqual(adapter.last_resource_slots, ("account", "proxy"))
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
@@ -346,6 +355,20 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
         self.assertEqual(success_result["verdict"], "contract_violation")
         self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
+
+    def test_reports_unexpected_adapter_exception_as_structured_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithUnexpectedException(),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "adapter_execution_exception")
 
     def test_reports_adapter_error_mapping_mismatch(self) -> None:
         results = run_third_party_adapter_contract_test(

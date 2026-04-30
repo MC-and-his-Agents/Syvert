@@ -143,6 +143,8 @@ class ThirdPartyContractFixtureAdapter:
     success_payload_shape: str = "valid"
     error_code: str = "content_not_found"
     last_resource_slots: tuple[str, ...] | None = None
+    last_request_capability: str | None = None
+    last_resource_bundle_capability: str | None = None
 
     adapter_key = THIRD_PARTY_FIXTURE_ADAPTER_KEY
     sdk_contract_id = THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID
@@ -168,6 +170,12 @@ class ThirdPartyContractFixtureAdapter:
     contract_test_profile = "adapter_only_content_detail_v0_8"
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
+        self.last_request_capability = request.request.capability
+        self.last_resource_bundle_capability = (
+            request.resource_bundle.capability
+            if request.resource_bundle is not None
+            else None
+        )
         self.last_resource_slots = (
             request.resource_bundle.requested_slots
             if request.resource_bundle is not None

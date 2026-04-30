@@ -47,11 +47,13 @@
 - guardian review 第五次返回 `REQUEST_CHANGES`，阻断项为纯 provider product name 仍可作为 `adapter_key`，以及 manifest 可声明未批准 capability；已显式阻断 `xhs` / `douyin` provider product key，并限制 supported_capabilities 只能使用当前 `content_detail` approved slice 且必须有 resource declaration 覆盖。
 - guardian review 第六次返回 `REQUEST_CHANGES`，阻断项为非 mapping success payload 会触发未处理异常，以及 sequence 字段会误收 dict keys；已改为结构化 contract violation，并让 sequence helper 拒绝 mapping。
 - guardian review 第七次返回 `REQUEST_CHANGES`，阻断项为 `resource_dependency_mode=none` 且 `required_capabilities=()` 的 FR-0027 合法 profile 会被第三方入口误拒绝；已允许 none profile 空能力集合，并补充第三方 manifest / fixture / execute 准入回归。
+- guardian review 第八次返回 `REQUEST_CHANGES`，阻断项为执行结果和 resource bundle 使用 operation 而不是 adapter capability family，以及 unexpected adapter exception 会中断 contract run；已统一为 fixture capability，并把 unexpected exception 归一为结构化 runtime_contract observation。
 
 ## 下一步动作
 
 - 提交第七轮 guardian 修复并推送 PR `#330` 新 head。
-- 重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第八轮 guardian 修复并推送 PR `#330` 新 head。
+- rebase 到包含 `#314` 的最新 `origin/main` 后重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -141,11 +143,36 @@
   - 结果：通过。
 - 第七轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第八次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - runtime envelope 与 resource bundle 使用 operation `content_detail_by_url`，而不是 adapter capability family `content_detail`。
+    - unexpected adapter exception 会直接中断 contract run，而不是形成结构化 contract violation observation。
+    - FR-0023 registry discovery 约束与 reference adapter baseline 约束需要在工件中明确落地位置或后续 ownership。
+  - 修正：
+    - resource bundle、success envelope、failed envelope 统一使用 fixture capability family。
+    - unexpected exception 归一为 `runtime_contract + adapter_execution_exception` failed envelope，由 sample validator 归类为 contract violation。
+    - 本工件明确：registry discovery 的既有约束由 `syvert/registry.py` 与 `tests/runtime/test_registry.py` 继续承担；本 PR 只新增第三方 contract entry 的 adapter public metadata fail-closed 校验。
+    - 本工件明确：reference adapter baseline 不在 `#310` ownership 内，后续由 `#311` SDK docs / migration 与 `#312` parent closeout 消费，本 PR 不修改 reference adapters。
+- 第八轮 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，71 tests。
+- 第八轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 未决风险
 
 - 本事项只实现 Adapter-only contract test entry，不代表 Provider offer 或 compatibility decision 已定义；相关字段继续 fail-closed。
 - 当前第三方样例只消费 `FR-0027` profile tuple / proof truth，不定义第三方 adapter key 的 provider 兼容性或真实外部资源支持。
+- Registry discovery 的 public metadata 输出面继续由既有 `syvert/registry.py` / `tests/runtime/test_registry.py` 覆盖；本事项只验证第三方 contract entry 不接受 provider-facing metadata。
+- Reference adapter baseline 不在本事项 ownership 内；`#311` 负责 SDK docs / migration 说明，`#312` 负责父 FR closeout 时核对 reference baseline、contract entry 与 GitHub 状态。
 - 若后续 `#314/#319` 并行修改相邻 validator 或 docs，本事项只消费主干合并后的事实，不覆盖其 ownership 文件。
 
 ## 回滚方式
