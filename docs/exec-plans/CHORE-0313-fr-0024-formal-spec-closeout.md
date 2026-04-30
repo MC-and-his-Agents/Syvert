@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0024-adapter-capability-requirement-contract/`
 - 关联 decision：
-- 关联 PR：无
+- 关联 PR：`#317`
 - active 收口事项：`CHORE-0313-fr-0024-formal-spec-closeout`
 - 状态：`active`
 
@@ -41,14 +41,14 @@
 
 - worktree：`/Users/mc/code/worktrees/syvert/issue-313-fr-0024-adapter-capability-requirement-formal-spec`
 - 分支：`issue-313-fr-0024-adapter-capability-requirement-formal-spec`
-- worktree 创建基线：`16c4b8b6f36e96d1b401b2b513f61f8041c6562f`
+- worktree 创建基线：`16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`FR-0027` formal spec、`FR-0021` formal spec、`#296` 与 `#313` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0024` formal spec 套件与 active exec-plan；spec/docs/workflow/governance/scope 本地门禁已通过，当前回合停点为已提交本地 closeout，等待主线程统一开 PR / review / GitHub 状态收口。
+- 当前 checkpoint：已创建 `FR-0024` formal spec 套件与 active exec-plan；PR `#317` 已通过受控入口创建并绑定 `Fixes #313`，当前回合停点为修正 guardian 审查发现的 exec-plan 状态漂移后等待 review / merge gate 收口。
 
 ## 下一步动作
 
-- 由主线程统一开 PR / review / GitHub 状态收口。
-- 不开 PR、不合并、不关闭 `#296` 或 `#313`。
+- 在 PR `#317` 上完成 guardian review、GitHub checks 与受控 merge。
+- PR `#317` 合入后由 `Fixes #313` 关闭当前 Work Item；父 FR `#296` 保持 open，等待 `#314/#315/#316` 后续收口。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -121,7 +121,7 @@
 
 ## 待验证项
 
-- 无；本地 spec/docs/workflow/governance/scope 门禁已通过。PR review、guardian、GitHub checks 与 issue closeout 由后续主线程统一处理。
+- PR `#317` 最新 head 的 guardian review 与受控 merge gate。
 
 ## 未决风险
 
