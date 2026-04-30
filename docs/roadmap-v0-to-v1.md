@@ -32,9 +32,10 @@
 - `v0.2.0`：把“能跑”变成“可验证”
 - `v0.3.0` 到 `v0.6.0`：补齐运行时闭环（先闭环再暴露服务面）
 - `v0.7.0`：仓内拆出 adapter-owned provider port，稳定适配器表面
-- `v0.8.0` 到 `v0.9.0`：清理边界、迁移文档、稳定 SDK
+- `v0.8.0`：清理边界，稳定第三方 Adapter 接入路径与 Adapter / Provider 兼容性判断模型
+- `v0.9.0`：在真实外部 provider 验证样本上压测兼容性判断，并完成 SDK / 文档稳定化
 - `v1.0.0`：宣布 Core 稳定
-- `v1.x`：在稳定契约之后接入外部 provider、扩展更多能力，并评估 adapter 独立仓库
+- `v1.x`：在稳定契约之后产品化扩展 provider 接入、更多能力与 adapter 仓库边界
 
 ## 跨版本强制 gate（自 v0.2.0 起）
 
@@ -45,6 +46,14 @@
 - 平台泄漏检查（Core 主路径不得引入平台特定分支）
 
 这些 gate 是持续门禁，不是 `v0.9.0` 的一次性清债动作。
+
+自 `v0.8.0` 起，开放接入稳定化还必须额外满足：
+
+- 第三方 Adapter 接入路径可被文档、SDK 表面与 contract test 一致解释。
+- Adapter + Provider 不以“某个 provider 覆盖所有能力”为前提，而以 `Adapter capability requirement x Provider capability offer -> compatibility decision` 判断绑定合法性。
+- 至少一个真实外部 provider 验证样本必须在 `v1.0.0` 前证明兼容性判断链路可执行；该样本不构成指定 provider 产品的正式支持承诺。
+
+该路线由 `ADR-CHORE-0291` 与本 roadmap 作为 `v0.8.0+` canonical carrier。`FR-0021` 继续只约束 `v0.7.0` adapter-owned provider port 范围，不作为后续 provider compatibility / 真实 provider 验证时间线的 canonical carrier。
 
 
 ## v0.1.0
@@ -300,7 +309,7 @@ Syvert Adapter
 
 ### 目标
 
-清理系统边界并收敛可演进约束。
+清理系统边界并收敛可演进约束，同时把开放接入路径从“能本地加载 Adapter”推进到“第三方 Adapter 与 Adapter + Provider 兼容性可以被稳定判断”。
 
 ### 必须具备
 
@@ -308,9 +317,18 @@ Syvert Adapter
 - 关键状态语义一致性检查
 - 非兼容变更策略与弃用策略
 - 参考适配器升级指引
+- 第三方 Adapter 接入路径说明与 contract test 进入条件
+- Adapter capability requirement 声明
+- Provider capability offer 声明
+- Adapter / Provider compatibility decision 模型
+- 不兼容、缺能力、版本不匹配与资源前提不满足时的 fail-closed 语义
+- provider 字段不得进入 Core routing、TaskRecord、resource lifecycle 或 registry discovery 的边界检查
 
 ### 明确不在范围内
 
+- 指定外部 provider 产品的正式支持
+- 多 provider 自动选择、排序、fallback 或打分策略
+- Core provider registry、provider marketplace 或 provider 产品白名单
 - 多租户身份模型
 - 最小认证模型
 - RBAC 与组织层级能力
@@ -319,13 +337,15 @@ Syvert Adapter
 
 - Core 边界在文档和实现上都可被一致解释
 - 适配器升级路径可预测且可验证
+- 社区接入的默认入口被明确为 Adapter；provider 只能作为 Adapter-bound 执行能力参与兼容性判断
+- 后续真实 provider 验证样本可以在不改写 Core / Adapter 主契约的前提下进入 `v0.9.0`
 
 
 ## v0.9.0
 
 ### 目标
 
-为 Core 稳定化做准备。
+为 Core 稳定化做准备，并用真实 provider 验证样本检验 `v0.8.0` 冻结的兼容性判断模型。
 
 ### 必须具备
 
@@ -334,11 +354,17 @@ Syvert Adapter
 - 文档重建
 - SDK 清理
 - 借助两个参考适配器进行更强的端到端验证与稳定性回归
+- 至少一个真实外部 provider 验证样本
+- 至少覆盖一个已批准 Adapter capability 的端到端兼容性 evidence
+- provider 错误、资源、生命周期与观测证据在真实执行边界中的验证
+- 明确真实 provider 验证样本不等于指定 provider 产品正式支持
 
 ### 成功标准
 
 - Core 与适配器职责之间不再存在重大歧义
 - 两个参考适配器不再需要 Core 中的特殊处理支持
+- Adapter / Provider compatibility decision 在真实 provider 样本中可执行、可审计、可失败关闭
+- `v1.0.0` 前的开放接入证据不依赖纸面 contract 或仓内 native provider 自证
 
 
 ## v1.0.0
@@ -356,6 +382,9 @@ Syvert Adapter
 - API 和 CLI 共享同一运行时路径
 - 两个参考适配器运行在稳定的 Core 契约之下
 - 新适配器拥有受限且有文档说明的接入路径
+- 第三方 Adapter 可以通过稳定 SDK 表面、contract test 与 registry 校验接入
+- Adapter / Provider 兼容性判断链路稳定，且已有真实 provider 验证样本作为 evidence
+- Core 不承担 provider selector、fallback、routing 或指定 provider 产品适配职责
 
 ### v1.0.0 不代表什么
 
@@ -364,6 +393,9 @@ Syvert Adapter
 - 每个平台都已支持
 - 每项能力都已实现
 - 每种资源类型都有提供方
+- OpenCLI、bb-browser、agent-browser 或任何指定 provider 产品已被正式支持
+- 某一个 provider 可以覆盖所有 Adapter capability
+- 已具备 provider marketplace、自动 provider selector 或跨 provider fallback 策略
 
 它代表：
 
@@ -374,20 +406,21 @@ Syvert Adapter
 
 ### 目标
 
-在 `v1.0.0` 稳定契约之后扩展生态接入，而不是在稳定化阶段提前扩大业务面。
+在 `v1.0.0` 稳定契约之后扩展生态接入，而不是把指定 provider 产品支持写成 Core 稳定化主线目标。
 
 ### 候选方向
 
-- 接入 WebEnvoy、OpenCLI、bb-browser、agent-browser 等外部 provider
+- 基于 `v1.0.0` 已稳定的兼容性判断，产品化接入具体外部 provider
 - 为小红书、抖音新增搜索结果采集、评论采集、账号信息、发布、通知、浏览/点赞/收藏/评论等能力
 - 评估 adapter 是否从主仓拆出独立仓库
-- 在真实外部 provider 接入后，再决定是否需要更正式的 provider SDK 或 provider compatibility contract
+- 扩展 provider SDK、compatibility matrix、selector / fallback 策略；这些都必须通过独立 FR 批准
 
 ### 成功标准
 
 - 新 provider 接入不改变 `v1.0.0` 已冻结的 Core / Adapter contract
 - 新能力通过独立 FR 批准，不反向污染 `content_detail_by_url` 基线
 - adapter 仓库边界只在主仓 contract 稳定后调整
+- 任一 provider 产品的正式支持都绑定到明确的 Adapter capability、compatibility decision 与 evidence，而不是成为全局支持承诺
 
 
 ## 所有 v0.x 版本的开发规则
@@ -410,6 +443,7 @@ Syvert Adapter
 - 最小认证模型
 - 企业级 RBAC / 组织层级语义
 - 尚未被双参考适配器真实压力验证的高级资源抽象
+- 指定 provider 产品的官方支持清单与 provider marketplace
 
 
 ## 总结
@@ -419,4 +453,5 @@ Syvert Adapter
 - `v0.1.0` 证明 Core 能运行
 - `v0.2.0` 证明 Core 可被持续验证
 - `v0.6.0` 证明 Core 既能运维也能通过服务面被使用
+- `v0.8.0` 到 `v0.9.0` 证明开放接入路径与 Provider 兼容性判断可被验证
 - `v1.0.0` 证明 Core 值得依赖

@@ -90,6 +90,70 @@ Core Runtime
 
 `provider=` constructor seam 只允许作为仓内测试/本地注入 seam；它不能被声明为第三方 provider 接入能力，也不能替代现有 `sign_transport`、`detail_transport`、`page_transport`、`page_state_transport` 等 legacy transport hooks。
 
+## v1.0 前开放接入目标
+
+`v1.0.0` 前，Adapter SDK 需要把两类接入路径解释清楚：
+
+- Adapter-only：第三方直接实现 Syvert Adapter，承担目标系统语义、输入校验、资源需求、错误映射与 `raw + normalized` 输出责任。
+- Adapter + Provider：Adapter 仍是 Syvert 接入入口，provider 只作为 Adapter 内部可替换执行能力，通过兼容性判断后被绑定。
+
+Provider 产品若已经封装目标系统语义，可以选择构建 Adapter；若只提供浏览器、远程执行、CLI、agent 或其他通用执行能力，则应通过 Adapter-bound provider offer 接入。Syvert 不把 provider 直接接入 Core，也不要求某一个 provider 覆盖所有 Adapter capability。
+
+`v1.0.0` 前需要冻结的最小判断模型是：
+
+```text
+Adapter capability requirement
+  x Provider capability offer
+  -> compatibility decision
+```
+
+该判断至少需要能表达：
+
+- Adapter 需要的执行能力、资源前提、错误证据、生命周期与观测要求
+- Provider 提供的执行能力、资源消费方式、错误 carrier、版本与 evidence 能力
+- 不兼容、缺能力、版本不匹配或资源前提不满足时的 fail-closed 原因
+
+`v0.8.0` 路线中的声明承载面应先保持在 Adapter / Provider 包文档、manifest 或 contract-test fixture 中，不进入 AdapterRegistry discovery。建议最小形态为：
+
+```python
+ADAPTER_PROVIDER_REQUIREMENTS = {
+    "adapter_key": "example",
+    "capability": "content_detail",
+    "requires": {
+        "execution_modes": ("browser.page_state_read",),
+        "resource_capabilities": ("account", "proxy"),
+        "evidence": ("raw_payload", "platform_detail"),
+        "lifecycle": ("execute", "timeout", "close"),
+    },
+}
+
+PROVIDER_CAPABILITY_OFFER = {
+    "provider_key": "example-provider",
+    "contract": "syvert-provider-compat/v0",
+    "offers": {
+        "execution_modes": ("browser.page_state_read",),
+        "resource_consumption": ("adapter_supplied_context",),
+        "evidence": ("raw_payload", "platform_detail"),
+        "error_carrier": "provider_error",
+    },
+}
+```
+
+contract test 入口应消费这些声明并产出 `compatibility decision`：
+
+- `matched`：provider offer 满足该 Adapter capability requirement，可以进入绑定验证。
+- `unmatched`：provider offer 不满足 requirement，必须 fail-closed，并给出缺失能力、版本或资源前提。
+- `invalid_contract`：声明本身不可信，必须 fail-closed，不得继续执行 provider。
+
+这些声明只能用于 Adapter-bound compatibility test 与 evidence artifact。Core registry discovery 仍只暴露 Adapter public metadata；TaskRecord、resource lifecycle 与 runtime envelope 不新增 provider key、provider priority 或 provider selector 字段。
+
+该模型不代表：
+
+- 指定 provider 产品获得正式支持
+- Core 可以发现、选择或排序 provider
+- provider 可以绕过 Adapter 生成 Syvert normalized result
+- provider 可以绕过 Core 注入资源包自行获取账号、代理或会话资源
+
 
 ## 最小能力面
 
@@ -301,6 +365,7 @@ class AdapterRegistry:
 - registry discovery 只返回 Adapter public metadata
 - registry 不暴露 provider key、provider priority、native provider 或 provider resource requirement
 - 多 adapter / 多 capability 扩展必须先获得新的 formal spec 批准
+- provider 兼容性判断不得改写 registry discovery 为 provider selector 或 provider 产品目录
 
 
 ## 版本兼容
@@ -334,6 +399,7 @@ ADAPTER_COMPATIBILITY = {
 - Core 主版本变化可以打破 SDK 契约
 - Core 次版本变化应保持 SDK 向后兼容
 - 适配器应声明自己兼容的 SDK 版本
+- provider offer 只能声明可服务的 Adapter capability 范围，不能声明“支持 Syvert 全部能力”
 
 
 ## 测试要求
@@ -353,6 +419,8 @@ ADAPTER_COMPATIBILITY = {
 - 限流测试
 - 降级测试
 - 资源失败测试
+- Adapter / Provider compatibility decision 测试
+- 真实 provider 验证样本的 evidence 回归测试
 
 
 ## 实现约束
@@ -391,6 +459,13 @@ ADAPTER_COMPATIBILITY = {
 5. 补齐适配器测试
 6. 注册到 Core
 7. 用 API/CLI 跑通任务
+
+如果接入方已有 provider 产品：
+
+1. 若产品已具备目标系统语义，优先包装成 Syvert Adapter。
+2. 若产品只提供通用执行能力，先声明 Provider capability offer，再绑定到具体 Adapter capability。
+3. 任何 Adapter + Provider 绑定都必须产出 compatibility decision 与 evidence。
+4. 不得把 provider 产品名写成全局能力承诺；只能声明它通过验证的 Adapter capability 范围。
 
 
 ## 一句话总结

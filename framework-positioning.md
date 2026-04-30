@@ -61,7 +61,7 @@ Syvert Core 不应被定义为：
 - 接入成本可控
 - 测试与兼容策略明确
 
-社区贡献的重点应该是 adapter，而不是持续修改 core。
+社区贡献的主入口应该是 Adapter，而不是持续修改 Core。若贡献方拥有通用执行产品，它可以作为 Adapter-bound Provider 参与某些 capability 的执行，但必须通过兼容性判断证明可绑定范围。
 
 ### 2. 风险边界更清晰
 
@@ -110,7 +110,7 @@ Syvert Core 不应内置：
 
 ## 产品结构
 
-Syvert 应被拆成三个层次：
+Syvert 应以 Core、Adapter SDK、Adapters 为主结构，并以 Providers 作为 Adapter-bound 执行能力扩展层：
 
 ### 1. Core
 
@@ -131,6 +131,8 @@ Syvert 应被拆成三个层次：
 - 输入输出模型
 - 错误模型
 - 测试规范
+- 第三方 Adapter 接入路径
+- Adapter / Provider 兼容性判断入口
 
 ### 3. Adapters
 
@@ -140,6 +142,23 @@ Syvert 应被拆成三个层次：
 - 平台响应解析
 - 平台错误映射
 - 平台特定策略
+
+Adapter 可以只包含自身执行逻辑，也可以绑定 provider 执行能力。无论哪种形态，Adapter 都仍然负责 Syvert 语义边界：capability、资源需求、错误映射与 normalized result。
+
+### 4. Providers
+
+负责：
+
+- 浏览器、远程执行、CLI、agent 或其他可替换执行能力
+- 声明可服务的 Adapter capability 范围
+- 返回 Adapter 生成最终结果所需的执行证据与原始载荷
+
+Provider 不负责：
+
+- 直接接入 Syvert Core
+- 生成 Syvert normalized result
+- 声明覆盖所有 Adapter capability
+- 成为官方 provider 产品清单的默认成员
 
 
 ## 用户价值
@@ -171,6 +190,8 @@ Syvert 应被拆成三个层次：
 
 不是来自“主仓库里塞了多少平台”。
 
+同样也不是来自“官方支持了多少 provider 产品”。OpenCLI、bb-browser、agent-browser 或其他具体 provider 只能作为验证样本或后续独立 FR 的候选，不应成为 `v1.0.0` 的主线成功标准。
+
 
 ## 成功信号
 
@@ -182,6 +203,8 @@ Syvert 应被拆成三个层次：
 - 资源系统与平台代码保持解耦
 - 社区贡献主要集中在适配器层
 - Core 的版本演进不会频繁破坏现有适配器
+- 第三方可以按自身能力选择 Adapter-only 或 Adapter + Provider 接入
+- Provider 兼容性围绕具体 Adapter capability 判断，而不是围绕全局产品承诺判断
 
 
 ## 失败信号
@@ -193,6 +216,8 @@ Syvert 应被拆成三个层次：
 - 每接一个平台都要改 task/resource/data 主链路
 - 平台能力成了产品卖点，Core 退化成容器
 - 适配器无法独立演进，只能跟着主仓库同步改动
+- 指定 provider 产品支持清单取代了 Adapter / Provider 兼容性判断
+- Provider 绕过 Adapter 直接侵入 Core routing、TaskRecord 或 resource lifecycle
 
 
 ## 一句话定位
