@@ -8,6 +8,11 @@ from syvert.adapter_capability_requirement import (
     ADAPTER_REQUIREMENT_STATUS_DECLARED,
     ADAPTER_REQUIREMENT_STATUS_INVALID,
     ADAPTER_REQUIREMENT_STATUS_UNMATCHED,
+    AdapterCapabilityExecutionRequirement,
+    AdapterCapabilityLifecycleExpectation,
+    AdapterCapabilityObservabilityExpectation,
+    AdapterCapabilityRequirement,
+    AdapterCapabilityRequirementEvidence,
     AdapterCapabilityRequirementValidationInput,
     validate_adapter_capability_requirement,
 )
@@ -118,6 +123,54 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
         result = validate_adapter_capability_requirement(requirement)
 
         self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
+    def test_validator_rejects_canonical_dataclass_with_raw_resource_requirement_without_crashing(self) -> None:
+        raw_requirement = copy_requirement()
+        raw_requirement["resource_requirement"]["resource_requirement_profiles"][0]["evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:proxy"
+        ]
+        requirement = AdapterCapabilityRequirement(
+            adapter_key=raw_requirement["adapter_key"],
+            capability=raw_requirement["capability"],
+            execution_requirement=AdapterCapabilityExecutionRequirement(
+                **raw_requirement["execution_requirement"],
+            ),
+            resource_requirement=raw_requirement["resource_requirement"],  # type: ignore[arg-type]
+            evidence=AdapterCapabilityRequirementEvidence(
+                resource_profile_evidence_refs=tuple(
+                    raw_requirement["evidence"]["resource_profile_evidence_refs"],
+                ),
+                capability_requirement_evidence_refs=tuple(
+                    raw_requirement["evidence"]["capability_requirement_evidence_refs"],
+                ),
+            ),
+            lifecycle=AdapterCapabilityLifecycleExpectation(
+                **raw_requirement["lifecycle"],
+            ),
+            observability=AdapterCapabilityObservabilityExpectation(
+                requirement_id=raw_requirement["observability"]["requirement_id"],
+                profile_keys=tuple(raw_requirement["observability"]["profile_keys"]),
+                proof_refs=tuple(raw_requirement["observability"]["proof_refs"]),
+                admission_outcome_fields=tuple(raw_requirement["observability"]["admission_outcome_fields"]),
+            ),
+            fail_closed=raw_requirement["fail_closed"],
+        )
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
+    def test_validator_rejects_unapproved_requirement_level_evidence(self) -> None:
+        requirement = copy_requirement()
+        requirement["evidence"]["capability_requirement_evidence_refs"] = ["tmp:runtime-log"]
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
+        self.assertEqual(
+            result.details["unsupported_capability_requirement_evidence_refs"],
+            ("tmp:runtime-log",),
+        )
 
     def test_validator_rejects_lifecycle_boundary_violation(self) -> None:
         requirement = copy_requirement()

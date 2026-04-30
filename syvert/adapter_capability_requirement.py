@@ -50,6 +50,13 @@ EVIDENCE_FIELDS = frozenset(
         "capability_requirement_evidence_refs",
     }
 )
+APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES = (
+    "fr-0024:formal-spec:",
+    "fr-0024:manifest-fixture-validator:",
+    "fr-0024:reference-adapter-migration:",
+    "fr-0024:parent-closeout:",
+    "fr-0024:closeout:",
+)
 LIFECYCLE_FIELDS = frozenset(
     {
         "requires_core_resource_bundle",
@@ -283,7 +290,39 @@ def _normalize_validation_input(
 
 def _normalize_requirement(raw_value: AdapterCapabilityRequirement | Mapping[str, Any]) -> AdapterCapabilityRequirement:
     if type(raw_value) is AdapterCapabilityRequirement:
-        return raw_value
+        adapter_key = _require_non_empty_string(raw_value.adapter_key, field_name="adapter_key")
+        capability = _require_non_empty_string(raw_value.capability, field_name="capability")
+        execution_requirement = _normalize_execution_requirement(raw_value.execution_requirement)
+        evidence = _normalize_evidence(raw_value.evidence)
+        lifecycle = _normalize_lifecycle(raw_value.lifecycle)
+        observability = _normalize_observability(raw_value.observability)
+        fail_closed = raw_value.fail_closed
+        if type(fail_closed) is not bool:
+            raise AdapterCapabilityRequirementContractError(
+                ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
+                "AdapterCapabilityRequirement.fail_closed must be a boolean",
+                details={"actual_type": type(fail_closed).__name__},
+            )
+        _validate_top_level_slice(
+            capability=capability,
+            execution_requirement=execution_requirement,
+            fail_closed=fail_closed,
+        )
+        resource_requirement = _normalize_resource_requirement(
+            raw_value.resource_requirement,
+            adapter_key=adapter_key,
+            capability=capability,
+        )
+        return AdapterCapabilityRequirement(
+            adapter_key=adapter_key,
+            capability=capability,
+            execution_requirement=execution_requirement,
+            resource_requirement=resource_requirement,
+            evidence=evidence,
+            lifecycle=lifecycle,
+            observability=observability,
+            fail_closed=fail_closed,
+        )
     if not isinstance(raw_value, Mapping):
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
@@ -343,7 +382,14 @@ def _normalize_requirement(raw_value: AdapterCapabilityRequirement | Mapping[str
 
 def _normalize_execution_requirement(raw_value: Any) -> AdapterCapabilityExecutionRequirement:
     if type(raw_value) is AdapterCapabilityExecutionRequirement:
-        return raw_value
+        return AdapterCapabilityExecutionRequirement(
+            operation=_require_non_empty_string(raw_value.operation, field_name="execution_requirement.operation"),
+            target_type=_require_non_empty_string(raw_value.target_type, field_name="execution_requirement.target_type"),
+            collection_mode=_require_non_empty_string(
+                raw_value.collection_mode,
+                field_name="execution_requirement.collection_mode",
+            ),
+        )
     if not isinstance(raw_value, Mapping):
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
@@ -399,7 +445,20 @@ def _normalize_resource_requirement(
 
 def _normalize_evidence(raw_value: Any) -> AdapterCapabilityRequirementEvidence:
     if type(raw_value) is AdapterCapabilityRequirementEvidence:
-        return raw_value
+        capability_requirement_evidence_refs = _normalize_string_tuple(
+            raw_value.capability_requirement_evidence_refs,
+            field_name="evidence.capability_requirement_evidence_refs",
+            allow_empty=False,
+        )
+        _validate_capability_requirement_evidence_refs(capability_requirement_evidence_refs)
+        return AdapterCapabilityRequirementEvidence(
+            resource_profile_evidence_refs=_normalize_string_tuple(
+                raw_value.resource_profile_evidence_refs,
+                field_name="evidence.resource_profile_evidence_refs",
+                allow_empty=False,
+            ),
+            capability_requirement_evidence_refs=capability_requirement_evidence_refs,
+        )
     if not isinstance(raw_value, Mapping):
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
@@ -408,23 +467,38 @@ def _normalize_evidence(raw_value: Any) -> AdapterCapabilityRequirementEvidence:
         )
     raw_keys = _require_string_keys(raw_value, carrier_name="evidence")
     _require_exact_fields(raw_keys, required_fields=EVIDENCE_FIELDS, carrier_name="evidence")
+    capability_requirement_evidence_refs = _normalize_string_tuple(
+        raw_value["capability_requirement_evidence_refs"],
+        field_name="evidence.capability_requirement_evidence_refs",
+        allow_empty=False,
+    )
+    _validate_capability_requirement_evidence_refs(capability_requirement_evidence_refs)
     return AdapterCapabilityRequirementEvidence(
         resource_profile_evidence_refs=_normalize_string_tuple(
             raw_value["resource_profile_evidence_refs"],
             field_name="evidence.resource_profile_evidence_refs",
             allow_empty=False,
         ),
-        capability_requirement_evidence_refs=_normalize_string_tuple(
-            raw_value["capability_requirement_evidence_refs"],
-            field_name="evidence.capability_requirement_evidence_refs",
-            allow_empty=False,
-        ),
+        capability_requirement_evidence_refs=capability_requirement_evidence_refs,
     )
 
 
 def _normalize_lifecycle(raw_value: Any) -> AdapterCapabilityLifecycleExpectation:
     if type(raw_value) is AdapterCapabilityLifecycleExpectation:
-        return raw_value
+        return AdapterCapabilityLifecycleExpectation(
+            requires_core_resource_bundle=_require_bool(
+                raw_value.requires_core_resource_bundle,
+                field_name="lifecycle.requires_core_resource_bundle",
+            ),
+            resource_profiles_drive_admission=_require_bool(
+                raw_value.resource_profiles_drive_admission,
+                field_name="lifecycle.resource_profiles_drive_admission",
+            ),
+            uses_existing_disposition_hint=_require_bool(
+                raw_value.uses_existing_disposition_hint,
+                field_name="lifecycle.uses_existing_disposition_hint",
+            ),
+        )
     if not isinstance(raw_value, Mapping):
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
@@ -451,7 +525,27 @@ def _normalize_lifecycle(raw_value: Any) -> AdapterCapabilityLifecycleExpectatio
 
 def _normalize_observability(raw_value: Any) -> AdapterCapabilityObservabilityExpectation:
     if type(raw_value) is AdapterCapabilityObservabilityExpectation:
-        return raw_value
+        return AdapterCapabilityObservabilityExpectation(
+            requirement_id=_require_non_empty_string(
+                raw_value.requirement_id,
+                field_name="observability.requirement_id",
+            ),
+            profile_keys=_normalize_string_tuple(
+                raw_value.profile_keys,
+                field_name="observability.profile_keys",
+                allow_empty=False,
+            ),
+            proof_refs=_normalize_string_tuple(
+                raw_value.proof_refs,
+                field_name="observability.proof_refs",
+                allow_empty=False,
+            ),
+            admission_outcome_fields=_normalize_string_tuple(
+                raw_value.admission_outcome_fields,
+                field_name="observability.admission_outcome_fields",
+                allow_empty=False,
+            ),
+        )
     if not isinstance(raw_value, Mapping):
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
@@ -588,6 +682,23 @@ def _validate_top_level_slice(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
             "AdapterCapabilityRequirement.fail_closed must be true",
             details={"fail_closed": fail_closed},
+        )
+
+
+def _validate_capability_requirement_evidence_refs(evidence_refs: tuple[str, ...]) -> None:
+    unsupported_refs = tuple(
+        evidence_ref
+        for evidence_ref in evidence_refs
+        if not evidence_ref.startswith(APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES)
+    )
+    if unsupported_refs:
+        raise AdapterCapabilityRequirementContractError(
+            ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
+            "evidence.capability_requirement_evidence_refs must point to approved FR-0024 requirement evidence",
+            details={
+                "unsupported_capability_requirement_evidence_refs": unsupported_refs,
+                "allowed_prefixes": APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES,
+            },
         )
 
 

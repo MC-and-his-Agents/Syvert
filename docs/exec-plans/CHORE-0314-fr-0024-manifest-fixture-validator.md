@@ -41,11 +41,12 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：已新增独立 validator、fixture 与测试，并通过目标测试、指定 FR-0027 / registry 回归、全 runtime discover、基础文档/流程门禁、governance gate 与 implementation PR scope gate；下一步使用受控脚本开 PR。
+- 当前 checkpoint：PR `#329` 首次 guardian review 返回 `REQUEST_CHANGES`，已修复两个阻断项并补充复现测试；下一步提交修复、推送并重新运行门禁与 guardian。
 
 ## 下一步动作
 
-- 使用受控脚本开 PR、等待 guardian、checks 通过后受控合并。
+- 提交 guardian 修复，推送 PR `#329` 新 head，重新运行门禁与 guardian。
+- guardian 与 checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -100,10 +101,34 @@
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/open_pr.py --class implementation --issue 314 ...`
+  - 结果：首次未通过；原因是受控脚本不负责推送，本地分支尚无同名远端 head。处理：执行 `git push -u origin issue-314-fr-0024-adapter-requirement-manifest-validator` 后重试。
+- `git push -u origin issue-314-fr-0024-adapter-requirement-manifest-validator`
+  - 结果：通过，远端分支创建。
+- `python3 scripts/open_pr.py --class implementation --issue 314 ...`
+  - 结果：通过，创建 PR `#329`。
+- `python3 scripts/pr_guardian.py review 329 --post-review`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - canonical dataclass 输入中的 raw `resource_requirement` 未归一化，可能抛出 `AttributeError` 而非稳定返回 `invalid_resource_requirement`。
+    - `capability_requirement_evidence_refs` 只校验非空/去重，任意字符串可冒充 requirement 级 evidence。
+- 已处理 guardian 阻断：
+  - `AdapterCapabilityRequirement` dataclass 输入现在会重新归一化 nested execution/evidence/lifecycle/observability 与 `resource_requirement`，非法资源声明稳定返回 `invalid_resource_requirement`。
+  - `capability_requirement_evidence_refs` 现在限制为 `FR-0024` formal spec / manifest fixture / migration / closeout evidence 前缀。
+  - 新增对应复现测试。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement`
+  - 结果：通过，15 tests。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，10 tests。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_resource_capability_matcher`
+  - 结果：通过，17 tests。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_registry`
+  - 结果：通过，15 tests。
+- guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，861 tests。
 
 ## 待验证项
 
-- guardian review、GitHub checks、受控 merge、closeout reconciliation。
+- guardian 修复提交后的 governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
 
