@@ -14,8 +14,10 @@ from syvert.real_adapter_regression import seed_reference_regression_resources
 from syvert import resource_capability_evidence
 from syvert.registry import AdapterRegistry, baseline_required_resource_requirement_declaration
 from syvert.resource_capability_evidence import (
+    approved_shared_resource_requirement_profile_evidence_entries,
     approved_resource_capability_ids,
     approved_resource_capability_vocabulary_entries,
+    frozen_resource_requirement_profile_evidence_records,
     frozen_dual_reference_resource_capability_evidence_records,
     frozen_evidence_reference_entries,
     validate_frozen_resource_capability_evidence_contract,
@@ -153,6 +155,64 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                     "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
                     "fr-0015:regression:xhs:managed-proxy-seed",
                     "fr-0015:regression:douyin:managed-proxy-seed",
+                ),
+            },
+        )
+        self.assertEqual(
+            {entry.profile_ref for entry in approved_shared_resource_requirement_profile_evidence_entries()},
+            {
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            },
+        )
+
+    def test_profile_evidence_records_freeze_shared_adapter_only_and_rejected_truth(self) -> None:
+        self.assertEqual(
+            {
+                record.profile_ref: (
+                    record.resource_dependency_mode,
+                    record.required_capabilities,
+                    record.reference_adapters,
+                    record.shared_status,
+                    record.decision,
+                )
+                for record in frozen_resource_requirement_profile_evidence_records()
+            },
+            {
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy": (
+                    "required",
+                    ("account", "proxy"),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:account": (
+                    "required",
+                    ("account",),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material": (
+                    "required",
+                    ("account", "verify_fp", "ms_token", "webid"),
+                    ("douyin",),
+                    "adapter_only",
+                    "keep_adapter_local",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:proxy": (
+                    "required",
+                    ("proxy",),
+                    ("xhs", "douyin"),
+                    "rejected",
+                    "reject_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:none": (
+                    "none",
+                    (),
+                    ("xhs", "douyin"),
+                    "rejected",
+                    "reject_profile_for_v0_8_0",
                 ),
             },
         )

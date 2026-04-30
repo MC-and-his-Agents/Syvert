@@ -8,12 +8,23 @@ import re
 
 _ALLOWED_ADAPTER_KEYS = frozenset({"xhs", "douyin"})
 _ALLOWED_CAPABILITY_FAMILIES = frozenset({"content_detail"})
+_ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
 _ALLOWED_SHARED_STATUSES = frozenset({"shared", "adapter_only", "rejected"})
 _ALLOWED_DECISIONS = frozenset({"approve_for_v0_5_0", "keep_adapter_local", "reject_for_v0_5_0"})
 _ALLOWED_SHARED_STATUS_TO_DECISION = {
     "shared": "approve_for_v0_5_0",
     "adapter_only": "keep_adapter_local",
     "rejected": "reject_for_v0_5_0",
+}
+_ALLOWED_PROFILE_DECISIONS = frozenset({
+    "approve_profile_for_v0_8_0",
+    "keep_adapter_local",
+    "reject_profile_for_v0_8_0",
+})
+_ALLOWED_PROFILE_SHARED_STATUS_TO_DECISION = {
+    "shared": "approve_profile_for_v0_8_0",
+    "adapter_only": "keep_adapter_local",
+    "rejected": "reject_profile_for_v0_8_0",
 }
 _ALLOWED_APPROVAL_STATUS = frozenset({"approved"})
 _APPROVED_RESOURCE_CAPABILITY_IDS = ("account", "proxy")
@@ -63,6 +74,32 @@ class ApprovedResourceCapabilityVocabularyEntry:
 
 
 @dataclass(frozen=True)
+class ResourceRequirementProfileEvidenceRecord:
+    profile_ref: str
+    capability: str
+    execution_path: ExecutionPathDescriptor
+    resource_dependency_mode: str
+    required_capabilities: tuple[str, ...]
+    reference_adapters: tuple[str, ...]
+    shared_status: str
+    decision: str
+    evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ApprovedSharedResourceRequirementProfileEvidenceEntry:
+    profile_ref: str
+    capability: str
+    execution_path: ExecutionPathDescriptor
+    resource_dependency_mode: str
+    required_capabilities: tuple[str, ...]
+    reference_adapters: tuple[str, ...]
+    shared_status: str
+    decision: str
+    evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FormalResearchEvidenceReferenceEntry:
     evidence_ref: str
     source_file: str
@@ -87,10 +124,24 @@ class FormalResearchEvidenceRecordEntry:
 
 
 @dataclass(frozen=True)
+class FormalResearchProfileEvidenceRecordEntry:
+    profile_ref: str
+    capability: str
+    execution_path: ExecutionPathDescriptor
+    resource_dependency_mode: str
+    required_capabilities: tuple[str, ...]
+    reference_adapters: tuple[str, ...]
+    shared_status: str
+    decision: str
+    evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FormalResearchBaseline:
     evidence_reference_entries: tuple[FormalResearchEvidenceReferenceEntry, ...]
     approved_capability_entries: tuple[FormalResearchApprovedCapabilityEntry, ...]
     evidence_record_entries: tuple[FormalResearchEvidenceRecordEntry, ...]
+    profile_evidence_record_entries: tuple[FormalResearchProfileEvidenceRecordEntry, ...]
 
 
 _FROZEN_EVIDENCE_REFERENCE_ENTRIES = (
@@ -619,6 +670,96 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
     ),
 )
 
+_FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS = (
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_dependency_mode="required",
+        required_capabilities=("account", "proxy"),
+        reference_adapters=("xhs", "douyin"),
+        shared_status="shared",
+        decision="approve_profile_for_v0_8_0",
+        evidence_refs=(
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+            "fr-0015:regression:xhs:managed-proxy-seed",
+            "fr-0015:regression:douyin:managed-proxy-seed",
+        ),
+    ),
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:content-detail-by-url-hybrid:account",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_dependency_mode="required",
+        required_capabilities=("account",),
+        reference_adapters=("xhs", "douyin"),
+        shared_status="shared",
+        decision="approve_profile_for_v0_8_0",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+    ),
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_dependency_mode="required",
+        required_capabilities=("account", "verify_fp", "ms_token", "webid"),
+        reference_adapters=("douyin",),
+        shared_status="adapter_only",
+        decision="keep_adapter_local",
+        evidence_refs=(
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+    ),
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:content-detail-by-url-hybrid:proxy",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_dependency_mode="required",
+        required_capabilities=("proxy",),
+        reference_adapters=("xhs", "douyin"),
+        shared_status="rejected",
+        decision="reject_profile_for_v0_8_0",
+        evidence_refs=(
+            "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+            "fr-0015:regression:xhs:managed-proxy-seed",
+            "fr-0015:regression:douyin:managed-proxy-seed",
+        ),
+    ),
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:content-detail-by-url-hybrid:none",
+        capability="content_detail",
+        execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+        resource_dependency_mode="none",
+        required_capabilities=(),
+        reference_adapters=("xhs", "douyin"),
+        shared_status="rejected",
+        decision="reject_profile_for_v0_8_0",
+        evidence_refs=(
+            "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+    ),
+)
+
+_EXPECTED_FROZEN_PROFILE_RECORD_BASELINE = {
+    record.profile_ref: {
+        "capability": record.capability,
+        "execution_path": record.execution_path,
+        "resource_dependency_mode": record.resource_dependency_mode,
+        "required_capabilities": record.required_capabilities,
+        "reference_adapters": record.reference_adapters,
+        "shared_status": record.shared_status,
+        "decision": record.decision,
+        "evidence_refs": record.evidence_refs,
+    }
+    for record in _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS
+}
+
 
 def frozen_evidence_reference_entries() -> tuple[EvidenceReferenceEntry, ...]:
     _validate_internal_frozen_resource_capability_evidence_baseline()
@@ -641,6 +782,20 @@ def approved_resource_capability_vocabulary_entries() -> tuple[ApprovedResourceC
 def approved_resource_capability_ids() -> frozenset[str]:
     _validate_internal_frozen_resource_capability_evidence_baseline()
     return frozenset(entry.capability_id for entry in _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES)
+
+
+def frozen_resource_requirement_profile_evidence_records() -> tuple[ResourceRequirementProfileEvidenceRecord, ...]:
+    _validate_internal_frozen_resource_capability_evidence_baseline()
+    return _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS
+
+
+def approved_shared_resource_requirement_profile_evidence_entries() -> tuple[
+    ApprovedSharedResourceRequirementProfileEvidenceEntry, ...
+]:
+    _validate_internal_frozen_resource_capability_evidence_baseline()
+    return _approved_shared_resource_requirement_profile_evidence_entries(
+        _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS
+    )
 
 
 
@@ -760,6 +915,8 @@ def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
         if shared_adapters != _ALLOWED_ADAPTER_KEYS:
             raise ValueError("approved capability ids must be backed by shared xhs and douyin evidence records")
 
+    _validate_resource_requirement_profile_evidence_records(evidence_entry_index, approved_capability_ids)
+
     return evidence_entry_index, record_index, vocabulary_index
 
 
@@ -810,6 +967,29 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         if vocabulary_entry.approval_basis_evidence_refs != formal_capability_entry.evidence_refs:
             raise ValueError("approved capability vocabulary entries must stay aligned with the formal research baseline")
 
+    profile_record_index = _validate_resource_requirement_profile_evidence_records(
+        evidence_entry_index,
+        frozenset(vocabulary_index),
+    )
+    formal_profile_record_index = {
+        entry.profile_ref: entry for entry in formal_research_baseline.profile_evidence_record_entries
+    }
+    if frozenset(profile_record_index) != frozenset(formal_profile_record_index):
+        raise ValueError("profile evidence records must stay aligned with the formal research baseline")
+    for profile_ref, formal_record in formal_profile_record_index.items():
+        record = profile_record_index[profile_ref]
+        if (
+            record.capability != formal_record.capability
+            or record.execution_path != formal_record.execution_path
+            or record.resource_dependency_mode != formal_record.resource_dependency_mode
+            or record.required_capabilities != formal_record.required_capabilities
+            or record.reference_adapters != formal_record.reference_adapters
+            or record.shared_status != formal_record.shared_status
+            or record.decision != formal_record.decision
+            or record.evidence_refs != formal_record.evidence_refs
+        ):
+            raise ValueError("profile evidence records must stay aligned with the formal research baseline")
+
 
 
 def _require_non_empty_string(value: str, *, field_name: str) -> None:
@@ -821,6 +1001,15 @@ def _require_non_empty_string(value: str, *, field_name: str) -> None:
 def _require_unique_non_empty_strings(values: tuple[str, ...], *, field_name: str) -> None:
     if not isinstance(values, tuple) or not values:
         raise ValueError(f"{field_name} must be a non-empty tuple of strings")
+    if len(set(values)) != len(values):
+        raise ValueError(f"{field_name} must not contain duplicates")
+    for value in values:
+        _require_non_empty_string(value, field_name=field_name)
+
+
+def _require_unique_strings(values: tuple[str, ...], *, field_name: str) -> None:
+    if not isinstance(values, tuple):
+        raise ValueError(f"{field_name} must be a tuple of strings")
     if len(set(values)) != len(values):
         raise ValueError(f"{field_name} must not contain duplicates")
     for value in values:
@@ -855,6 +1044,98 @@ def _expected_approved_vocabulary_entries(
     )
 
 
+def _validate_resource_requirement_profile_evidence_records(
+    evidence_entry_index: dict[str, EvidenceReferenceEntry],
+    approved_capability_ids: frozenset[str],
+) -> dict[str, ResourceRequirementProfileEvidenceRecord]:
+    records = _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS
+    if not records:
+        raise ValueError("frozen resource requirement profile evidence records must not be empty")
+    record_index = {record.profile_ref: record for record in records}
+    if len(record_index) != len(records):
+        raise ValueError("profile evidence records must not duplicate profile_ref values")
+    if frozenset(record_index) != frozenset(_EXPECTED_FROZEN_PROFILE_RECORD_BASELINE):
+        raise ValueError("profile evidence records must keep the full canonical profile matrix")
+
+    for record in records:
+        expected_record = _EXPECTED_FROZEN_PROFILE_RECORD_BASELINE[record.profile_ref]
+        _require_non_empty_string(record.profile_ref, field_name="profile_ref")
+        if record.capability not in _ALLOWED_CAPABILITY_FAMILIES:
+            raise ValueError(f"unsupported capability family in profile evidence record: {record.capability}")
+        if record.execution_path != ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH):
+            raise ValueError("profile evidence records must all bind to the approved execution path")
+        if record.resource_dependency_mode not in _ALLOWED_RESOURCE_DEPENDENCY_MODES:
+            raise ValueError("profile evidence records must use a supported resource_dependency_mode")
+        if record.shared_status not in _ALLOWED_SHARED_STATUSES:
+            raise ValueError("profile evidence records must use a supported shared_status")
+        if record.decision not in _ALLOWED_PROFILE_DECISIONS:
+            raise ValueError("profile evidence records must use a supported profile decision")
+        if _ALLOWED_PROFILE_SHARED_STATUS_TO_DECISION[record.shared_status] != record.decision:
+            raise ValueError("profile shared_status and decision mapping must stay canonical")
+        if record.resource_dependency_mode == "none" and record.required_capabilities:
+            raise ValueError("none profile evidence records must not carry required_capabilities")
+        if record.resource_dependency_mode == "required" and not record.required_capabilities:
+            raise ValueError("required profile evidence records must carry required_capabilities")
+        _require_unique_strings(record.required_capabilities, field_name="required_capabilities")
+        _require_unique_non_empty_strings(record.reference_adapters, field_name="reference_adapters")
+        if any(adapter_key not in _ALLOWED_ADAPTER_KEYS for adapter_key in record.reference_adapters):
+            raise ValueError("profile evidence records reference unsupported adapters")
+        _require_unique_non_empty_strings(record.evidence_refs, field_name="evidence_refs")
+        if any(ref not in evidence_entry_index for ref in record.evidence_refs):
+            raise ValueError("profile evidence record references unknown evidence_ref")
+        if (
+            record.capability != expected_record["capability"]
+            or record.execution_path != expected_record["execution_path"]
+            or record.resource_dependency_mode != expected_record["resource_dependency_mode"]
+            or record.required_capabilities != expected_record["required_capabilities"]
+            or record.reference_adapters != expected_record["reference_adapters"]
+            or record.shared_status != expected_record["shared_status"]
+            or record.decision != expected_record["decision"]
+            or record.evidence_refs != expected_record["evidence_refs"]
+        ):
+            raise ValueError("profile evidence records must keep canonical tuples, evidence refs, and outcomes")
+        if record.shared_status == "shared":
+            if frozenset(record.reference_adapters) != _ALLOWED_ADAPTER_KEYS:
+                raise ValueError("approved shared profile evidence records must cover xhs and douyin")
+            if not frozenset(record.required_capabilities) <= approved_capability_ids:
+                raise ValueError("approved shared profile evidence records must only use approved capability ids")
+            canonical_required_capabilities = tuple(
+                capability_id
+                for capability_id in _APPROVED_RESOURCE_CAPABILITY_IDS
+                if capability_id in record.required_capabilities
+            )
+            if canonical_required_capabilities != record.required_capabilities:
+                raise ValueError("approved shared profile evidence records must use canonical capability order")
+
+    approved_profile_entries = _approved_shared_resource_requirement_profile_evidence_entries(records)
+    if {entry.profile_ref for entry in approved_profile_entries} != {
+        "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+        "fr-0027:profile:content-detail-by-url-hybrid:account",
+    }:
+        raise ValueError("approved shared profile entries must stay frozen to account+proxy and account")
+    return record_index
+
+
+def _approved_shared_resource_requirement_profile_evidence_entries(
+    records: tuple[ResourceRequirementProfileEvidenceRecord, ...],
+) -> tuple[ApprovedSharedResourceRequirementProfileEvidenceEntry, ...]:
+    return tuple(
+        ApprovedSharedResourceRequirementProfileEvidenceEntry(
+            profile_ref=record.profile_ref,
+            capability=record.capability,
+            execution_path=record.execution_path,
+            resource_dependency_mode=record.resource_dependency_mode,
+            required_capabilities=record.required_capabilities,
+            reference_adapters=record.reference_adapters,
+            shared_status=record.shared_status,
+            decision=record.decision,
+            evidence_refs=record.evidence_refs,
+        )
+        for record in records
+        if record.shared_status == "shared"
+    )
+
+
 def _load_formal_research_baseline() -> FormalResearchBaseline:
     if not _FORMAL_RESEARCH_PATH.is_file():
         raise ValueError("formal research registry must resolve to a real file")
@@ -866,12 +1147,15 @@ def _load_formal_research_baseline() -> FormalResearchBaseline:
     evidence_reference_entries = tuple(_parse_formal_research_evidence_reference_entries(research_text))
     approved_capability_entries = tuple(_parse_formal_research_approved_capability_entries(research_text))
     evidence_record_entries = tuple(_parse_formal_research_evidence_record_entries(research_text))
+    profile_evidence_record_entries = tuple(_parse_formal_research_profile_evidence_record_entries(research_text))
     if not evidence_reference_entries:
         raise ValueError("formal research registry must enumerate evidence reference entries")
     if not approved_capability_entries:
         raise ValueError("formal research registry must enumerate approved capabilities")
     if not evidence_record_entries:
         raise ValueError("formal research registry must enumerate evidence records")
+    if not profile_evidence_record_entries:
+        raise ValueError("formal research registry must enumerate profile evidence records")
     _require_unique_formal_research_rows(
         evidence_reference_entries,
         key_fn=lambda entry: entry.evidence_ref,
@@ -887,10 +1171,16 @@ def _load_formal_research_baseline() -> FormalResearchBaseline:
         key_fn=lambda entry: (entry.adapter_key, entry.candidate_abstract_capability),
         error_message="formal research evidence record table must not duplicate adapter/candidate rows",
     )
+    _require_unique_formal_research_rows(
+        profile_evidence_record_entries,
+        key_fn=lambda entry: entry.profile_ref,
+        error_message="formal research profile evidence table must not duplicate profile_ref rows",
+    )
     return FormalResearchBaseline(
         evidence_reference_entries=evidence_reference_entries,
         approved_capability_entries=approved_capability_entries,
         evidence_record_entries=evidence_record_entries,
+        profile_evidence_record_entries=profile_evidence_record_entries,
     )
 
 
@@ -953,6 +1243,29 @@ def _parse_formal_research_evidence_record_entries(
     return entries
 
 
+def _parse_formal_research_profile_evidence_record_entries(
+    research_text: str,
+) -> list[FormalResearchProfileEvidenceRecordEntry]:
+    entries: list[FormalResearchProfileEvidenceRecordEntry] = []
+    for cells in _read_markdown_table_cells(research_text, heading="## 冻结的 `v0.8.0` profile evidence truth"):
+        if len(cells) != 9:
+            raise ValueError("formal research profile evidence rows must keep nine columns")
+        entries.append(
+            FormalResearchProfileEvidenceRecordEntry(
+                profile_ref=_unwrap_inline_code(cells[0]),
+                capability=_unwrap_inline_code(cells[1]),
+                execution_path=_parse_execution_path_descriptor(_unwrap_inline_code(cells[2])),
+                resource_dependency_mode=_unwrap_inline_code(cells[3]),
+                required_capabilities=_parse_optional_inline_code_list(cells[4]),
+                reference_adapters=_parse_inline_code_list(cells[5]),
+                shared_status=_unwrap_inline_code(cells[6]),
+                decision=_unwrap_inline_code(cells[7]),
+                evidence_refs=_parse_inline_code_list(cells[8]),
+            )
+        )
+    return entries
+
+
 def _read_markdown_table_cells(research_text: str, *, heading: str) -> list[list[str]]:
     section_match = re.search(
         rf"{re.escape(heading)}\n\n(?P<table>(?:\|.*\n)+?)(?:\n## |\Z)",
@@ -985,6 +1298,12 @@ def _parse_inline_code_list(value: str) -> tuple[str, ...]:
     if not parts:
         raise ValueError("formal research registry evidence ref lists must not be empty")
     return tuple(_unwrap_inline_code(part) for part in parts)
+
+
+def _parse_optional_inline_code_list(value: str) -> tuple[str, ...]:
+    if value == "-":
+        return ()
+    return _parse_inline_code_list(value)
 
 
 def _parse_execution_path_descriptor(value: str) -> ExecutionPathDescriptor:
