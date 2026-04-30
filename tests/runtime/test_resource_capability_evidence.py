@@ -12,7 +12,7 @@ from syvert.adapters.douyin import build_session_config_from_context as build_do
 from syvert.adapters.xhs import build_session_config_from_context as build_xhs_session_config_from_context
 from syvert.real_adapter_regression import seed_reference_regression_resources
 from syvert import resource_capability_evidence
-from syvert.registry import AdapterRegistry, baseline_required_resource_requirement_declaration
+from syvert.registry import AdapterRegistry, baseline_multi_profile_resource_requirement_declaration, baseline_required_resource_requirement_declaration
 from syvert.resource_capability_evidence import (
     approved_shared_resource_requirement_profile_evidence_entries,
     approved_resource_capability_ids,
@@ -227,16 +227,17 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 assert declaration is not None
                 self.assertEqual(
                     declaration,
-                    baseline_required_resource_requirement_declaration(
+                    baseline_multi_profile_resource_requirement_declaration(
                         adapter_key=adapter_key,
                         capability=CONTENT_DETAIL,
                     ),
                 )
                 self.assertEqual(
-                    declaration.required_capabilities,
-                    RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE[
-                        (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE)
+                    [
+                        profile.required_capabilities
+                        for profile in declaration.resource_requirement_profiles
                     ],
+                    [("account", "proxy"), ("account",)],
                 )
         self.assertEqual(
             {
@@ -785,8 +786,18 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         declaration = registry.lookup_resource_requirement("xhs", CONTENT_DETAIL)
         self.assertIsNotNone(declaration)
         assert declaration is not None
-        self.assertEqual(declaration.required_capabilities, ("account", "proxy"))
-        self.assertEqual(frozenset(declaration.required_capabilities), approved_resource_capability_ids())
+        self.assertEqual(
+            [profile.required_capabilities for profile in declaration.resource_requirement_profiles],
+            [("account", "proxy"), ("account",)],
+        )
+        self.assertEqual(
+            frozenset(
+                capability
+                for profile in declaration.resource_requirement_profiles
+                for capability in profile.required_capabilities
+            ),
+            approved_resource_capability_ids(),
+        )
 
         available_capabilities = resolve_runtime_available_resource_capabilities(
             type(

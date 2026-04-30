@@ -281,7 +281,12 @@ class RegistryTests(unittest.TestCase):
             requirement = requirements[0]
             self.assertFalse(hasattr(requirement, "provider"))
             self.assertFalse(hasattr(requirement, "native_provider"))
-            self.assertEqual(requirement.required_capabilities, ("account", "proxy"))
+            self.assertIsInstance(requirement, AdapterResourceRequirementDeclarationV2)
+            assert isinstance(requirement, AdapterResourceRequirementDeclarationV2)
+            self.assertEqual(
+                [profile.required_capabilities for profile in requirement.resource_requirement_profiles],
+                [("account", "proxy"), ("account",)],
+            )
 
     def test_registry_allows_partial_resource_requirement_coverage(self) -> None:
         registry = AdapterRegistry.from_mapping({"xhs": PartialDeclarationAdapter()})

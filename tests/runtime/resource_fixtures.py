@@ -5,7 +5,7 @@ import tempfile
 from typing import Any
 from unittest import mock
 
-from syvert.registry import baseline_required_resource_requirement_declaration
+from syvert.registry import baseline_multi_profile_resource_requirement_declaration
 from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceBundle, ResourceRecord
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
 from syvert.resource_trace_store import default_resource_trace_store
@@ -58,7 +58,7 @@ def baseline_resource_requirement_declarations(
     capability: str = "content_detail",
 ) -> tuple[object, ...]:
     return (
-        baseline_required_resource_requirement_declaration(
+        baseline_multi_profile_resource_requirement_declaration(
             adapter_key=adapter_key,
             capability=capability,
         ),

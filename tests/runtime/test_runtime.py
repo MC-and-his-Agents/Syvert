@@ -1127,7 +1127,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_execute_task_returns_resource_unavailable_when_runtime_capability_projection_is_unmatched(self) -> None:
         with mock.patch.dict(
             runtime_module.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
-            {(runtime_module.CONTENT_DETAIL_BY_URL, runtime_module.LEGACY_COLLECTION_MODE): ("account",)},
+            {(runtime_module.CONTENT_DETAIL_BY_URL, runtime_module.LEGACY_COLLECTION_MODE): ("proxy",)},
             clear=True,
         ), mock.patch(
             "syvert.runtime.acquire_runtime_resource_bundle",

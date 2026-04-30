@@ -257,6 +257,31 @@ def baseline_required_resource_requirement_declaration(
     )
 
 
+def baseline_multi_profile_resource_requirement_declaration(
+    *,
+    adapter_key: str,
+    capability: str,
+) -> AdapterResourceRequirementDeclarationV2:
+    return AdapterResourceRequirementDeclarationV2(
+        adapter_key=adapter_key,
+        capability=capability,
+        resource_requirement_profiles=(
+            AdapterResourceRequirementProfile(
+                profile_key="account_proxy",
+                resource_dependency_mode=RESOURCE_DEPENDENCY_MODE_REQUIRED,
+                required_capabilities=("account", "proxy"),
+                evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account-proxy",),
+            ),
+            AdapterResourceRequirementProfile(
+                profile_key="account",
+                resource_dependency_mode=RESOURCE_DEPENDENCY_MODE_REQUIRED,
+                required_capabilities=("account",),
+                evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account",),
+            ),
+        ),
+    )
+
+
 def approved_resource_requirement_evidence_refs() -> frozenset[str]:
     return _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS
 
