@@ -79,7 +79,7 @@
 - 字段：
   - `supported_profiles`
     - 类型：`ProviderSupportedResourceProfile[]`
-    - 约束：非空；每个元素必须满足 `FR-0027` profile tuple、canonicalization、single proof binding 与 approved execution slice 规则。
+    - 约束：非空；每个元素必须满足 `FR-0027` profile tuple、canonicalization、single proof binding、approved execution slice 与 adapter coverage proof binding 规则。
   - `resource_profile_contract_ref`
     - 类型：`string`
     - 允许值：当前必须为 `FR-0027`
@@ -106,7 +106,7 @@
     - 允许值：当前只允许空数组、`account`、`proxy`、`account + proxy`，并按 `FR-0027` 规则规范化。
   - `evidence_refs`
     - 类型：`string[]`
-    - 约束：当前长度必须恰为 1；必须唯一命中与 profile tuple、capability 与 execution slice 完全一致的 `FR-0027` approved profile proof。
+    - 约束：当前长度必须恰为 1；必须唯一命中与 profile tuple、capability 与 execution slice 完全一致，且 `reference_adapters` 覆盖当前 `adapter_binding.adapter_key` 的 `FR-0027` approved profile proof。
 
 ## ProviderOfferErrorCarrier
 
@@ -160,7 +160,7 @@
     - 约束：非空、去重；回指本 FR formal spec、offer manifest fixture、SDK docs 或 closeout evidence。
   - `resource_profile_evidence_refs`
     - 类型：`string[]`
-    - 约束：必须与 `resource_support.supported_profiles[*].evidence_refs` 对齐；每个 ref 最终必须唯一命中 `FR-0027` approved profile proof。
+    - 约束：必须与 `resource_support.supported_profiles[*].evidence_refs` 对齐；每个 ref 最终必须唯一命中 tuple / execution slice 完全一致且 `reference_adapters` 覆盖当前 `adapter_binding.adapter_key` 的 `FR-0027` approved profile proof。
   - `adapter_binding_evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；证明该 offer 只通过 Adapter-owned provider port 进入系统。
@@ -236,6 +236,6 @@
 - `adapter_binding.binding_scope != adapter_bound` -> `runtime_contract + invalid_provider_offer`
 - `capability_offer` 超出 `content_detail_by_url + url + hybrid` -> `runtime_contract + invalid_provider_offer`
 - `resource_support` 不满足 `FR-0027` profile tuple / proof binding -> `runtime_contract + invalid_provider_offer`
-- proof refs 不可解析、不唯一、不对齐或越过 approved execution slice -> `runtime_contract + invalid_provider_offer`
+- proof refs 不可解析、不唯一、不对齐、越过 approved execution slice，或未在 `reference_adapters` 中覆盖当前 `adapter_binding.adapter_key` -> `runtime_contract + invalid_provider_offer`
 - 出现 compatibility decision、selector、priority、fallback、marketplace、产品支持或 runtime 技术字段 -> contract violation
 - `ProviderCapabilityOffer` 合法 -> 仅代表 Provider offer declared，不代表任何 Adapter requirement compatible

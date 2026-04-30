@@ -99,6 +99,8 @@
   - 结果：通过，远端分支已创建并设置 upstream
 - `python3 scripts/open_pr.py --class spec --issue 319 --item-key CHORE-0319-fr-0025-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0025 Provider capability offer formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建当前受审 spec PR `#328 https://github.com/MC-and-his-Agents/Syvert/pull/328`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 328 --post-review --json-output /tmp/syvert-pr-328-guardian.json`
+  - 结果：REQUEST_CHANGES。guardian 指出 `FR-0025` 消费 `FR-0027` proof binding 时缺少 `reference_adapters` 必须覆盖当前 `adapter_binding.adapter_key` 的显式约束，需在 `spec.md`、`data-model.md` 与 `contracts/README.md` 补齐并 fail-closed。
 
 ## 待验证项
 

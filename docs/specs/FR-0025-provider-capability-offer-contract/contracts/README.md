@@ -73,6 +73,7 @@
 - `resource_dependency_mode=required` -> `required_capabilities` 非空、去重，且只能来自 `account`、`proxy`。
 - `required_capabilities` 在 proof lookup 和 equality 判断前必须按 `FR-0027` 规则规范化。
 - `evidence_refs` 长度恰为 1，并且这唯一一个引用必须唯一命中与 `capability + operation + target_type + collection_mode + resource_dependency_mode + required_capabilities` 完全一致的 `FR-0027` approved profile proof。
+- 命中的 `FR-0027` approved profile proof 必须在 `reference_adapters` 中显式覆盖当前 `adapter_binding.adapter_key`；未覆盖当前 adapter 的 proof 不得被当前 offer 借用。
 - 同一 offer 内不得出现语义重复 profile。
 - 本 contract 不重新定义 `FR-0027` matcher `one-of`、profile approval proof 或 `resource_unavailable` 语义。
 
@@ -121,7 +122,7 @@
 ### validation rules
 
 - `provider_offer_evidence_refs` 必须非空、去重，并回指本 FR formal spec、offer manifest fixture、SDK docs 或 closeout evidence。
-- `resource_profile_evidence_refs` 必须与 `resource_support.supported_profiles[*].evidence_refs` 对齐。
+- `resource_profile_evidence_refs` 必须与 `resource_support.supported_profiles[*].evidence_refs` 对齐，并且每个 ref 都必须唯一命中 tuple / execution slice 完全一致且 `reference_adapters` 覆盖当前 `adapter_binding.adapter_key` 的 `FR-0027` approved profile proof。
 - `adapter_binding_evidence_refs` 必须非空、去重，并证明 offer 只通过 Adapter-owned provider port 进入系统。
 - evidence 不得引用 provider 私有注释、运行期临时日志、marketplace 文案或未经批准的 provider 产品材料作为 canonical proof。
 
@@ -168,7 +169,7 @@
 ## fail-closed contract
 
 - `fail_closed` 必须存在且必须为 `true`。
-- 任一固定字段缺失、字段不一致、proof 不合法、resource support 不合法、approved slice 越界、adapter binding 越界或出现被禁止字段时，必须阻断。
+- 任一固定字段缺失、字段不一致、proof 不合法、proof 未覆盖当前 adapter、resource support 不合法、approved slice 越界、adapter binding 越界或出现被禁止字段时，必须阻断。
 - 合法 Provider offer 只代表 offer declared；不得推出 Adapter requirement compatible、Provider selected 或 Core 可以绑定执行。
 
 ## explicitly forbidden

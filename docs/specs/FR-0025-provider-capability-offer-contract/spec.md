@@ -52,13 +52,14 @@
     - `target_type=url`
     - `collection_mode=hybrid`
   - `resource_support` 必须表达 Provider 对该 capability offer 的资源前提或资源容忍边界，并且只能消费 `FR-0027` 已冻结的 profile tuple 与 proof binding 语义。当前允许引用的 profile 组合空间只来自 `none`、`required + [account]`、`required + [proxy]`、`required + [account, proxy]`，但是否与某个 Adapter requirement 兼容必须留给 `FR-0026`。
-  - `resource_support.supported_profiles` 可以声明 Provider offer 声称支持的一组 resource profile tuple；每个 profile 必须带有 `profile_key`、`resource_dependency_mode`、`required_capabilities` 与 `evidence_refs`，并按 `FR-0027` 的 canonicalization、single proof binding、approved execution slice 与 fail-closed 口径验证。
+  - `resource_support.supported_profiles` 可以声明 Provider offer 声称支持的一组 resource profile tuple；每个 profile 必须带有 `profile_key`、`resource_dependency_mode`、`required_capabilities` 与 `evidence_refs`，并按 `FR-0027` 的 canonicalization、single proof binding、approved execution slice、adapter coverage proof binding 与 fail-closed 口径验证。
+  - `resource_support.supported_profiles[*].evidence_refs` 命中的 `FR-0027` approved profile proof 除了必须与 profile tuple 和 approved execution slice 完全一致，还必须满足该 proof 的 `reference_adapters` 显式覆盖当前 `adapter_binding.adapter_key`；不得借用只批准给其它 Adapter 的 shared profile proof。
   - `resource_support` 不得表达 profile priority、preferred profile、fallback order、自动选择、资源 acquisition / release、账号池、代理池、provider-owned resource lifecycle 或 provider resource supply。
   - `error_carrier` 必须表达 Provider offer 侧错误如何被 Adapter 映射到既有 Adapter / runtime failed envelope。当前固定允许 `invalid_provider_offer`、`provider_unavailable` 与 `provider_contract_violation` 作为 offer / provider 层内部错误口径；外显到 Core 时必须经 Adapter 映射，不得新增 Core-facing provider failed envelope category。
   - `version` 必须表达 offer carrier 的语义版本与适用边界，当前固定 `contract_version=v0.8.0`，且必须声明 `requirement_contract_ref=FR-0024`、`resource_profile_contract_ref=FR-0027`；不得用 version 字段承诺真实 provider 产品支持、SLA、市场发布或 runtime rollout。
   - `evidence` 必须把 offer 声明回指到可审查、可迁移、可验证的证据。当前至少必须包含：
     - `provider_offer_evidence_refs`：回指本 FR、后续 offer manifest fixture / validator、SDK docs 或 closeout evidence。
-    - `resource_profile_evidence_refs`：与 `resource_support.supported_profiles[*].evidence_refs` 对齐，并最终唯一命中 `FR-0027` 的 approved profile proof。
+    - `resource_profile_evidence_refs`：与 `resource_support.supported_profiles[*].evidence_refs` 对齐，并最终唯一命中 `FR-0027` 中 tuple / execution slice 完全一致且 `reference_adapters` 覆盖当前 `adapter_binding.adapter_key` 的 approved profile proof。
     - `adapter_binding_evidence_refs`：证明该 Provider offer 只通过 Adapter-owned provider port 进入系统的文档或实现证据。
   - `lifecycle` 必须表达 Provider offer 对既有 Adapter-owned provider port 与 Core resource lifecycle 的消费边界，而不是定义新的 lifecycle store。当前只允许声明：
     - Provider 由 Adapter 调用，不由 Core 调用。
@@ -74,7 +75,7 @@
     - `adapter_binding.adapter_key` 为空，或 `binding_scope` 不是 `adapter_bound`
     - `capability_offer` 超出 `content_detail_by_url + url + hybrid` approved slice
     - `resource_support` 未消费 `FR-0027` profile tuple / proof binding，或包含 profile priority、fallback、selection、resource supply、acquire/release、pooling 语义
-    - `resource_profile_evidence_refs` 与 `resource_support.supported_profiles[*].evidence_refs` 不一致、不可唯一解析或未处于 `FR-0027` approved execution slice
+    - `resource_profile_evidence_refs` 与 `resource_support.supported_profiles[*].evidence_refs` 不一致、不可唯一解析、未处于 `FR-0027` approved execution slice，或命中的 proof 未在 `reference_adapters` 中覆盖当前 `adapter_binding.adapter_key`
     - `version` 未声明 `v0.8.0` offer contract boundary，或把 version 字段扩写成 provider 产品支持承诺
     - `lifecycle` 试图定义 Core provider discovery、Core routing、provider-owned lifecycle 或跨 adapter resource scheduling
     - `observability` 暴露 provider selector、priority、fallback outcome、marketplace metadata、Playwright、CDP、browser profile、network tier、transport 等技术字段
@@ -116,6 +117,12 @@ Given 一个合法 `ProviderCapabilityOffer` 声明支持 `required + [account, 
 When 尚未存在 `FR-0026` compatibility decision  
 Then 系统只能认为 Provider offer 已声明完成，不得推导出它满足任何 `AdapterCapabilityRequirement`
 
+### 场景 2A：profile proof 必须覆盖当前 Adapter
+
+Given `adapter_binding.adapter_key=external_adapter` 的 Provider offer 声明了 `required + [account]` resource profile，且该 profile 的 `evidence_refs` 命中一个只在 `reference_adapters=[xhs, douyin]` 中批准的 `FR-0027` approved profile proof
+When offer manifest validator 或 spec review 校验该 offer
+Then 该 offer 必须按 `invalid_provider_offer` fail-closed，因为命中的 proof 未覆盖当前 `adapter_binding.adapter_key`
+
 ### 场景 3：Provider key 不能进入 Core discovery
 
 Given Provider offer 包含稳定 `provider_key` 与 `adapter_binding.adapter_key`  
@@ -153,7 +160,7 @@ Then 该声明必须被视为 contract violation，因为这些字段不是 Prov
   - `adapter_binding.binding_scope` 不是 `adapter_bound`，或 `adapter_binding.adapter_key` 为空时，必须视为 contract violation。
   - `capability_offer` 把 approved slice 外推到搜索、评论、发布、通知、互动、账号管理、非 URL target 或非 hybrid collection mode 时，必须 fail-closed。
   - `resource_support` 回退到 provider-private resource list、旧单声明模型、resource supply model 或未经 `FR-0027` 批准的 profile tuple 时，必须视为 contract violation。
-  - proof 不可解析、不唯一、不匹配 approved execution slice 或不匹配 profile tuple 时，必须 fail-closed。
+  - proof 不可解析、不唯一、不匹配 approved execution slice、不匹配 profile tuple，或 proof 的 `reference_adapters` 未覆盖当前 `adapter_binding.adapter_key` 时，必须 fail-closed。
   - `version` 缺失 `FR-0024` / `FR-0027` contract refs，或把版本扩写成产品发布、市场上架、SLA 或真实 provider 支持承诺时，必须视为 contract violation。
 - 边界场景：
   - 本 FR 允许 offer 声明多个合法 resource profiles，但这些 profile 没有优先级、fallback、自动选择、compatibility approval 或 provider routing 语义。
@@ -168,7 +175,7 @@ Then 该声明必须被视为 contract violation，因为这些字段不是 Prov
 - [ ] formal spec 明确 provider key / adapter binding / capability offer / resource support / error carrier / version / evidence / lifecycle / observability / fail-closed 字段边界
 - [ ] formal spec 明确消费 `FR-0024` 的 `AdapterCapabilityRequirement` 作为后续 decision 输入语义，但不反向改写 requirement carrier
 - [ ] formal spec 明确消费 `FR-0027` 的 resource profile tuple、approved execution slice 与 proof binding，不重写 matcher / approval proof
-- [ ] formal spec 明确 proof 不可解析、不唯一、不对齐或越过 approved slice 时必须 fail-closed
+- [ ] formal spec 明确 proof 不可解析、不唯一、不对齐、未覆盖当前 adapter 或越过 approved slice 时必须 fail-closed
 - [ ] formal spec 明确禁止 compatibility decision、provider selector、priority、fallback、marketplace、真实 provider 产品支持、Core discovery / routing 与 runtime 实现
 - [ ] formal spec 明确合法 Provider offer 不等于 Provider compatibility approved
 - [ ] formal spec 为 `#320/#321/#322` 提供可执行进入条件
