@@ -41,7 +41,7 @@
 - 已新增第三方 Adapter manifest / fixture contract entry；当前实现直接归一化 `AdapterResourceRequirementDeclarationV2` carrier，并通过 `approved_shared_resource_requirement_profile_evidence_entries()` 构建 FR-0027 approved proof index 校验 profile tuple 与 execution path，不调用 `AdapterRegistry.from_mapping()`。
 - 已确认当前 FR-0027 approved profile proof 只覆盖 `xhs` / `douyin` reference slice；本事项不扩张 resource proof，不创建第二套第三方 resource declaration truth。
 - guardian review 初次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界与 adapter public metadata provider-facing 字段未显式 fail-closed；已补充对应校验与回归测试。
-- guardian review 第二次返回 `REQUEST_CHANGES`，阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；已改为 harness 内第三方 profile-proof 校验，保留 FR-0027 profile tuple / evidence proof 对齐，但不要求非参考第三方 `adapter_key` 冒充 reference adapter。
+- guardian review 第二次返回 `REQUEST_CHANGES`，当时阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；后续第十七次复盘确认当前 FR-0027 truth 仍要求 proof `reference_adapters` 覆盖 declaration `adapter_key`，implementation PR 不再保留非参考 adapter_key 复用 proof 的例外。
 - guardian review 第三次返回 `REQUEST_CHANGES`，阻断项为执行阶段硬编码 capability / target / mode 且未注入 required resource profile；已将 fixture input 扩展为 operation / capability / target / collection mode / resource profile 驱动，并在执行时构造与 FR-0027 profile 对齐的 resource bundle。
 - guardian review 第四次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界使用任意子串导致误杀，以及 error_mapping fixture 未绑定 manifest 声明；已改为 token / segment 级 key 校验，并要求 error_mapping fixture 通过 `source_error` 与 manifest `error_mapping` 对齐。
 - guardian review 第五次返回 `REQUEST_CHANGES`，阻断项为纯 provider product name 仍可作为 `adapter_key`，以及 manifest 可声明未批准 capability；已显式阻断 `xhs` / `douyin` provider product key，并限制 supported_capabilities 只能使用当前 `content_detail` approved slice 且必须有 resource declaration 覆盖。
@@ -56,10 +56,11 @@
 - guardian review 第十四次返回 `REQUEST_CHANGES`，阻断项为 provider-facing forbidden 字段集合未覆盖 registry 已禁止变体、adapter `fixture_refs` 非字符串序列会触发未处理异常、fixture 顶层非字符串 key 会触发未处理排序异常；已扩展 forbidden 字段集合，adapter fixture refs 比对前先做字符串序列校验，fixture 顶层 key 先做字符串校验。
 - guardian review 第十五次返回 `REQUEST_CHANGES`，阻断项为 fixture resource profile 可解析性仍在执行循环内校验，无法保证整组 fixture fail-closed 后再调用 Adapter；已将 resource profile / FR-0027 proof path 校验前移到 `validate_third_party_adapter_fixtures`，并补充 adapter execute 调用次数为 0 的准入顺序回归。
 - guardian review 第十六次返回 `REQUEST_CHANGES`，阻断项为 harness 允许真实 runtime 不会保留的 `unsupported` PlatformAdapterError category，且 exec-plan 对 resource declaration 校验路径仍描述为 `AdapterRegistry.from_mapping()`；已将 error mapping category 收窄到 runtime 会保留的 `invalid_input` / `platform`，PlatformAdapterError observation 复用 `classify_adapter_error()`，并校正文档真相。
+- guardian review 第十七次返回 `REQUEST_CHANGES`，阻断项为第三方入口绕过 FR-0027 proof `reference_adapters` 覆盖校验；已恢复与 registry / FR-0027 truth 一致的 `adapter_key in proof.reference_adapters` 校验，最小通过 fixture 使用当前 proof 覆盖的 `xhs` adapter key，非参考 key 借用 proof 时 fail-closed。
 
 ## 下一步动作
 
-- 提交第十六次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十七次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -108,7 +109,8 @@
   - 修正：新增 `adapter_key` provider / account / environment / routing strategy 语义片段阻断；新增 adapter 对象 provider / compatibility 字段暴露阻断；新增回归测试。
   - 第二次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：第三方 manifest resource declaration 校验仍通过 reference adapter proof 绑定 `xhs/douyin`，非参考第三方 key 无法通过。
-  - 修正：将 contract entry 的 resource declaration 校验改为第三方 profile-proof 校验，仍校验 FR-0027 evidence ref、capability、resource dependency mode 与 required capabilities；最小样例改为非参考 key `community_content`。
+  - 当时修正：将 contract entry 的 resource declaration 校验改为第三方 profile-proof 校验，仍校验 FR-0027 evidence ref、capability、resource dependency mode 与 required capabilities；最小样例改为非参考 key。
+  - 后续第十七次复盘：当前 FR-0027 truth 不支持非参考 key 复用该 proof，已恢复 proof `reference_adapters` 覆盖校验并把最小通过 fixture 改为当前 proof 覆盖的 `xhs` adapter key。
   - 第三次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：执行阶段硬编码 `content_detail` / `url` / `hybrid`；required resource profiles 未通过 fixture 输入和 resource bundle 证明。
   - 修正：fixture input 必须声明 operation、capability、target_type、target_value、collection_mode、resource_profile_key；entry 校验这些输入与 manifest metadata 及 FR-0027 profile proof execution path 一致，并向 adapter execute 注入对应 resource bundle。
@@ -359,6 +361,27 @@
 - 第十六次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十六次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十七次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：`_normalize_third_party_resource_requirement_profile()` 只校验 proof capability、resource_dependency_mode、required_capabilities 与 execution path，未校验 `adapter_key in proof.reference_adapters`；当前最小 fixture 使用非参考 adapter key 借用了只覆盖 `xhs` / `douyin` 的 approved proof，导致 contract entry 与 registry / FR-0027 truth 漂移。
+  - 系统性复盘结论：本 implementation PR 不修改 formal spec 或 evidence，因此不能定义“第三方 adapter 复用 reference proof”的例外；入口必须消费当前 FR-0027 truth，只有 proof 覆盖的 adapter_key 可通过，未覆盖的第三方 key 必须 fail-closed。
+  - 修正：新增 proof `reference_adapters` 覆盖 declaration `adapter_key` 校验；最小通过 fixture 使用当前 approved proof 覆盖的 `xhs` adapter key；新增非参考 adapter key 借用 FR-0027 proof 的 fail-closed 回归；exec-plan 历史记录中标明第二次 guardian 后的非参考 key 例外已由本次复盘撤回。
+- 第十七次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，91 tests。
+- 第十七次 guardian 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
+- 第十七次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十七次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十七次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十七次 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十七次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 第十七次 guardian 修复后 `git diff --check`
   - 结果：通过。
 
 ## 未决风险
