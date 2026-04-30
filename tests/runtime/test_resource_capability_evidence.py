@@ -14,8 +14,10 @@ from syvert.real_adapter_regression import seed_reference_regression_resources
 from syvert import resource_capability_evidence
 from syvert.registry import AdapterRegistry, baseline_required_resource_requirement_declaration
 from syvert.resource_capability_evidence import (
+    approved_shared_resource_requirement_profile_evidence_entries,
     approved_resource_capability_ids,
     approved_resource_capability_vocabulary_entries,
+    frozen_resource_requirement_profile_evidence_records,
     frozen_dual_reference_resource_capability_evidence_records,
     frozen_evidence_reference_entries,
     validate_frozen_resource_capability_evidence_contract,
@@ -156,6 +158,137 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 ),
             },
         )
+        self.assertEqual(
+            {entry.profile_ref for entry in approved_shared_resource_requirement_profile_evidence_entries()},
+            {
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            },
+        )
+
+    def test_profile_evidence_records_freeze_shared_adapter_only_and_rejected_truth(self) -> None:
+        self.assertEqual(
+            {
+                record.profile_ref: (
+                    record.resource_dependency_mode,
+                    record.required_capabilities,
+                    record.reference_adapters,
+                    record.shared_status,
+                    record.decision,
+                )
+                for record in frozen_resource_requirement_profile_evidence_records()
+            },
+            {
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy": (
+                    "required",
+                    ("account", "proxy"),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:account": (
+                    "required",
+                    ("account",),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material": (
+                    "required",
+                    ("account", "verify_fp", "ms_token", "webid"),
+                    ("douyin",),
+                    "adapter_only",
+                    "keep_adapter_local",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:proxy": (
+                    "required",
+                    ("proxy",),
+                    ("xhs", "douyin"),
+                    "rejected",
+                    "reject_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:none": (
+                    "none",
+                    (),
+                    ("xhs", "douyin"),
+                    "rejected",
+                    "reject_profile_for_v0_8_0",
+                ),
+            },
+        )
+
+    def test_approved_profile_entries_are_fr_0027_consumer_proofs_only(self) -> None:
+        approved_entries = approved_shared_resource_requirement_profile_evidence_entries()
+
+        self.assertEqual(
+            {
+                entry.profile_ref: (
+                    entry.capability,
+                    entry.resource_dependency_mode,
+                    entry.required_capabilities,
+                    entry.reference_adapters,
+                    entry.shared_status,
+                    entry.decision,
+                )
+                for entry in approved_entries
+            },
+            {
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy": (
+                    "content_detail",
+                    "required",
+                    ("account", "proxy"),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+                "fr-0027:profile:content-detail-by-url-hybrid:account": (
+                    "content_detail",
+                    "required",
+                    ("account",),
+                    ("xhs", "douyin"),
+                    "shared",
+                    "approve_profile_for_v0_8_0",
+                ),
+            },
+        )
+        self.assertTrue(all(entry.shared_status == "shared" for entry in approved_entries))
+        self.assertNotIn(
+            "fr-0027:profile:content-detail-by-url-hybrid:none",
+            {entry.profile_ref for entry in approved_entries},
+        )
+
+    def test_validate_fails_closed_when_profile_truth_drifts(self) -> None:
+        records = frozen_resource_requirement_profile_evidence_records()
+        tampered_records = tuple(
+            replace(record, shared_status="shared", decision="approve_profile_for_v0_8_0")
+            if record.profile_ref == "fr-0027:profile:content-detail-by-url-hybrid:none"
+            else record
+            for record in records
+        )
+
+        with mock.patch.object(
+            resource_capability_evidence,
+            "_FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS",
+            tampered_records,
+        ):
+            with self.assertRaisesRegex(ValueError, "canonical tuples, evidence refs, and outcomes"):
+                validate_frozen_resource_capability_evidence_contract()
+
+    def test_validate_fails_closed_when_formal_research_profile_row_duplicates_ref(self) -> None:
+        research_path = resource_capability_evidence._FORMAL_RESEARCH_PATH.resolve()
+        original_read_text = Path.read_text
+        patched_research_text = self._patched_research_text_with_duplicate_row(
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        )
+
+        def fake_read_text(path_obj: Path, *args: object, **kwargs: object) -> str:
+            if path_obj.resolve() == research_path:
+                return patched_research_text
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
+            with self.assertRaisesRegex(ValueError, "must not duplicate profile_ref rows"):
+                validate_frozen_resource_capability_evidence_contract()
 
     def test_reference_adapter_resource_requirement_declarations_stay_aligned_with_frozen_baseline(self) -> None:
         registry = AdapterRegistry.from_mapping(build_adapters())
