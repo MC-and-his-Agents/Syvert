@@ -58,6 +58,12 @@
 ## 已验证项
 
 - 已通过 GitHub REST / PR view 核对 `#304/#305/#306/#307` 均已 merged，且 `#299/#300/#301/#302` 均已 closed。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-303-fr-0027`
+  - 结果：通过。
 
 ## 未决风险
 
@@ -71,4 +77,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<pending-checkpoint-sha>`
+- `ffb35a1e18bf21487eb9462bd828f8dd5588518e`
+- 说明：该 checkpoint 首次把 FR-0027 parent closeout requirement container、active closeout exec-plan 与 release / sprint 索引同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
