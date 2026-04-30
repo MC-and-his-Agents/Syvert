@@ -70,6 +70,16 @@
   - 结果：通过，116 tests。
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_task_record tests.runtime.test_cli tests.runtime.test_http_api`
   - 结果：通过，122 tests。
+- `python3 -m unittest tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_resource_capability_matcher tests.runtime.test_runtime tests.runtime.test_xhs_adapter tests.runtime.test_douyin_adapter tests.runtime.test_real_adapter_regression tests.runtime.test_task_record tests.runtime.test_cli tests.runtime.test_http_api`
+  - 结果：通过，297 tests。
+- `python3 -m py_compile syvert/registry.py syvert/adapters/xhs.py syvert/adapters/douyin.py`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-302-fr-0027-adapter`
+  - 结果：通过。
 
 ## 未决风险
 
@@ -83,4 +93,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<pending-checkpoint-sha>`
+- `7a9c36d46927f10429e4cacb012472bc7a75692c`
+- 说明：该 checkpoint 首次把 reference adapter V2 declaration baseline、fixtures、registry helper、受影响测试与 release / sprint 索引同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
