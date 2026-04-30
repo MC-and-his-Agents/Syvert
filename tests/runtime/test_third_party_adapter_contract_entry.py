@@ -78,6 +78,17 @@ class AdapterWithInvalidPlatformErrorDetails(ThirdPartyContractFixtureAdapter):
         )
 
 
+class AdapterWithMismatchedSourceErrorDetails(ThirdPartyContractFixtureAdapter):
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        if "content-not-found" in request.target_value:
+            raise PlatformAdapterError(
+                code="content_not_found",
+                message="third-party fixture mapped platform error",
+                details={"source_error": "different_source_error"},
+            )
+        return super().execute(request)
+
+
 class AdapterWithReorderedPublicMetadata(ThirdPartyContractFixtureAdapter):
     fixture_refs = (
         THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID,
@@ -498,6 +509,20 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
         self.assertEqual(error_result["verdict"], "contract_violation")
         self.assertEqual(error_result["reason"]["code"], "error_mapping_mismatch")
+
+    def test_reports_adapter_error_mapping_source_error_mismatch(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithMismatchedSourceErrorDetails(),
+        )
+
+        success_result = results[0]
+        error_result = results[1]
+        self.assertEqual(success_result["verdict"], "pass")
+        self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
+        self.assertEqual(error_result["verdict"], "contract_violation")
+        self.assertEqual(error_result["reason"]["code"], "error_mapping_source_error_mismatch")
 
 
 if __name__ == "__main__":
