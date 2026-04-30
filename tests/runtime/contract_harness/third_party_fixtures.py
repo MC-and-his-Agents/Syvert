@@ -179,6 +179,8 @@ class ThirdPartyContractFixtureAdapter:
                 message="third-party fixture mapped platform error",
                 details={"source_error": "content_not_found"},
             )
+        if self.success_payload_shape == "non_mapping":
+            return ["not", "a", "mapping"]  # type: ignore[return-value]
         if self.success_payload_shape == "missing_normalized":
             return {"raw": {"content_id": "third-party-invalid-raw"}}
         return _success_payload(request.target_value)

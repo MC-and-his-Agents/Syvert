@@ -142,6 +142,17 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "unsupported_manifest_capabilities")
         self.assertEqual(context.exception.details["unsupported_capabilities"], ("unapproved_capability",))
 
+    def test_rejects_mapping_where_manifest_requires_explicit_sequence(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["supported_capabilities"] = {"content_detail": True}
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_manifest_public_metadata")
+        self.assertEqual(context.exception.details["field"], "supported_capabilities")
+        self.assertEqual(context.exception.details["actual_type"], "dict")
+
     def test_allows_adapter_key_with_non_semantic_forbidden_letter_sequences(self) -> None:
         allowed_adapter_keys = (
             "adventure_feed",
@@ -278,6 +289,18 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             manifest=minimal_third_party_adapter_manifest(),
             fixtures=minimal_third_party_adapter_fixtures(),
             adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="missing_normalized"),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
+
+    def test_reports_non_mapping_adapter_success_payload_as_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="non_mapping"),
         )
 
         success_result = results[0]
