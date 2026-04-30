@@ -29,6 +29,7 @@
     - 约束：
       - 当 mode=`none` 时必须为空数组
       - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
+      - 比较、重复检测与 proof 对齐前，必须先按 `FR-0015` 已批准词汇顺序规范化；当前顺序固定为 `account`、`proxy`
   - `evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；每个引用都必须唯一命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
@@ -48,7 +49,11 @@
     - 允许值：`none`、`required`
   - `required_capabilities`
     - 类型：`string[]`
-    - 约束：与被批准 profile 的 canonical tuple 完全一致
+    - 约束：
+      - 与被批准 profile 的 canonical tuple 完全一致
+      - 当 mode=`none` 时必须为空数组
+      - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
+      - 比较与解析前必须先按 `FR-0015` 已批准词汇顺序规范化；当前顺序固定为 `account`、`proxy`
   - `reference_adapters`
     - 类型：`string[]`
     - 约束：当前必须且只能覆盖 `xhs`、`douyin`；任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
@@ -57,7 +62,7 @@
     - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `shared`
   - `decision`
     - 类型：`enum`
-    - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `FR-0015` 的正向批准结论
+    - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `approve_for_v0_5_0`
   - `evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；回指 `FR-0015` 中更细粒度的 research / artifact 证据
@@ -80,7 +85,7 @@
     - 约束：必须合法
   - `available_resource_capabilities`
     - 类型：`string[] | set[string]`
-    - 约束：去重集合；元素只能来自 `FR-0015` 已批准词汇
+    - 约束：去重集合；元素只能来自 `FR-0015` 已批准词汇；非法或重复输入一律归类为 `invalid_resource_requirement`
 
 ## ResourceCapabilityMatchResultV2
 
@@ -97,6 +102,7 @@
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
 - declaration profile 无法唯一映射到在 `capability + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
 - declaration `adapter_key` 不在被引用 entry 的 `reference_adapters` 中 -> `runtime_contract + invalid_resource_requirement`
+- `available_resource_capabilities` 非法、重复或包含未知词汇 -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`
 - declaration 合法但全部 profile 未命中 -> `match_status=unmatched`
 - `unmatched` 若向外映射失败 envelope，继续使用 `resource_unavailable`

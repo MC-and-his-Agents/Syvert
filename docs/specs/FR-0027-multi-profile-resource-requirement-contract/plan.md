@@ -17,8 +17,8 @@
 
 ## 分阶段拆分
 
-- 阶段 1：`#299` 收口 `FR-0027` formal spec 套件，冻结 declaration/profile/matcher/error boundary 与 supersede 边界。
-- 阶段 2：`#300` 基于本 spec 刷新 `FR-0015` 的 profile-level shared / adapter-local / rejected evidence truth，并产出 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 对应的主干 carrier。
+- 阶段 1：`#299` 收口 `FR-0027` formal spec 套件，冻结 declaration/profile/matcher/error boundary 与 `v0.8.0` version boundary。
+- 阶段 2：`#300` 基于本 spec 刷新 `FR-0015` 的 profile-level `shared / adapter_only / rejected` evidence truth，并产出 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 对应的主干 carrier。
 - 阶段 3：`#301` 与 `#302` 分别按本 spec 落地 matcher/runtime 和 reference adapter declaration migration。
 - 阶段 4：`#303` 汇总 spec、evidence、runtime、adapter baseline 与 GitHub 状态，完成 FR parent closeout。
 
@@ -33,6 +33,7 @@
   - 必须满足 `vision.md` 对 “Core 负责运行时语义、Adapter 负责目标系统语义” 的边界
   - 必须满足 `docs/roadmap-v0-to-v1.md` 对 `v0.8.0` “稳定第三方 Adapter 接入路径与 Adapter / Provider 兼容性判断模型” 的阶段目标
   - 必须把 `FR-0013` / `FR-0014` / `FR-0015` 作为 `v0.5.0` 历史基线引用，而不是在本 PR 中混合重写多个旧 formal spec 套件
+  - 必须避免在仓内形成两个并行的 `v0.8.0` canonical truth：`FR-0027` 是 `v0.8.0` multi-profile declaration / matcher / proof binding 的唯一正式规约入口
 
 ## 测试与验证策略
 
@@ -48,7 +49,9 @@
 - 手动验证：
   - 核对 spec 中是否只有 `none`、`account`、`proxy` 组合空间，没有偷渡新能力词汇
   - 核对 `one-of` 语义是否未退化为排序 / fallback 机制
-  - 核对 supersede 边界是否明确：`FR-0027` 只治理 `v0.8.0` multi-profile truth，`FR-0013` / `FR-0014` / `FR-0015` 保留历史语义
+  - 核对 `FR-0027` 与 `FR-0015` 的 evidence status / decision 词汇没有漂移，继续使用 `shared / adapter_only / rejected` 与 `approve_for_v0_5_0`
+  - 核对 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref` 的唯一性、proof tuple shape、declaration adapter 覆盖与 `available_resource_capabilities` 的 fail-closed 口径都已明文冻结
+  - 核对 version boundary 是否明确：`FR-0027` 只治理 `v0.8.0` multi-profile truth，`FR-0013` / `FR-0014` / `FR-0015` 保留历史语义
 
 ## TDD 范围
 
@@ -73,4 +76,5 @@
 
 - [ ] `spec review` 已通过
 - [ ] `FR-0027` 已明确 declaration/profile carrier、`one-of` matcher 语义与 evidence 边界
+- [ ] `FR-0027` 已明确 proof carrier 的唯一性、tuple canonicalization、adapter 覆盖与 matcher 输入 fail-closed 口径
 - [ ] `#300/#301/#302` 的进入条件均可直接回指 `FR-0027` formal spec
