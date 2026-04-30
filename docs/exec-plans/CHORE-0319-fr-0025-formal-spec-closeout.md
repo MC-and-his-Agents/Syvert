@@ -46,7 +46,7 @@
 - 分支：`issue-319-fr-0025-provider-capability-offer-formal-spec`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`FR-0021`、`FR-0024`、`FR-0027`、`#297`、`#298` 与 `#319` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0025` formal spec 套件与 active exec-plan；待完成本地门禁、提交、受控开 PR、spec review / guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0025` formal spec 套件与 active exec-plan；本地 spec / docs / workflow / governance / scope 门禁已通过，待受控开 PR、spec review / guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -81,14 +81,21 @@
 - 已核对 `#298`，确认 compatibility decision 属于 `FR-0026`，本事项不得定义 requirement x offer decision。
 - 已核对 `FR-0024` formal spec，确认本 FR 必须消费 `AdapterCapabilityRequirement` 作为后续 decision 输入，不反向改写 requirement carrier。
 - 已核对 `FR-0027` formal spec，确认 resource support 必须消费 `AdapterResourceRequirementDeclarationV2` 的 profile tuple、approved execution slice 与 proof binding 语义，不重写 matcher / proof truth。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-319-fr-0025-provider-capability-offer-formal-spec`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
+- `git commit -m 'docs(spec): 收口 FR-0025 provider offer 规约'`
+  - 结果：已生成语义 checkpoint `9f9b54e17382a40b59a38647d69c261505202ad5`
 
 ## 待验证项
 
-- `python3 scripts/spec_guard.py --mode ci --all`
-- `python3 scripts/docs_guard.py --mode ci`
-- `python3 scripts/workflow_guard.py --mode ci`
-- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-319-fr-0025-provider-capability-offer-formal-spec`
-- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
 - PR head 的 spec review、guardian review、GitHub checks 与受控 merge gate
 
 ## 未决风险
@@ -104,5 +111,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- formal spec 语义 checkpoint：待提交
+- formal spec 语义 checkpoint：`9f9b54e17382a40b59a38647d69c261505202ad5`
 - worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
