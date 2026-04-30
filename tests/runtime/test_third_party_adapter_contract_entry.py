@@ -393,6 +393,24 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(success_result["verdict"], "contract_violation")
         self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
 
+    def test_reports_reserved_runtime_fields_in_success_payload_as_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="reserved_runtime_fields"),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "adapter_payload_reserved_runtime_fields")
+        self.assertEqual(
+            success_result["observed_error"]["details"]["reserved_fields"],
+            ("adapter_key", "capability", "status"),
+        )
+
     def test_reports_unexpected_adapter_exception_as_structured_contract_violation(self) -> None:
         results = run_third_party_adapter_contract_test(
             manifest=minimal_third_party_adapter_manifest(),

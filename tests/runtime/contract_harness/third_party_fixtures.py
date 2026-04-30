@@ -191,6 +191,13 @@ class ThirdPartyContractFixtureAdapter:
             return ["not", "a", "mapping"]  # type: ignore[return-value]
         if self.success_payload_shape == "missing_normalized":
             return {"raw": {"content_id": "third-party-invalid-raw"}}
+        if self.success_payload_shape == "reserved_runtime_fields":
+            return {
+                **_success_payload(request.target_value),
+                "adapter_key": "drifted-adapter",
+                "capability": "drifted-capability",
+                "status": "success",
+            }
         return _success_payload(request.target_value)
 
 
