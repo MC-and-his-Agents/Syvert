@@ -95,6 +95,7 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
             "expected": {
                 "status": "failed",
                 "error": {
+                    "source_error": "content_not_found",
                     "category": "platform",
                     "code": "content_not_found",
                 },
