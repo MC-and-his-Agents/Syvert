@@ -117,6 +117,8 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_rejects_adapter_key_with_provider_account_or_runtime_strategy_semantics(self) -> None:
         invalid_adapter_keys = (
             "provider-xhs",
+            "xhs",
+            "douyin",
             "xhs-prod-account-1",
             "xhs-selector-fallback",
         )
@@ -129,6 +131,16 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
                     validate_third_party_adapter_manifest(manifest)
 
                 self.assertEqual(context.exception.code, "invalid_adapter_key_boundary")
+
+    def test_rejects_manifest_capability_outside_current_approved_slice(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["supported_capabilities"] = ("content_detail", "unapproved_capability")
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "unsupported_manifest_capabilities")
+        self.assertEqual(context.exception.details["unsupported_capabilities"], ("unapproved_capability",))
 
     def test_allows_adapter_key_with_non_semantic_forbidden_letter_sequences(self) -> None:
         allowed_adapter_keys = (

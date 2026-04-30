@@ -78,6 +78,7 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "account",
         "acct",
         "dev",
+        "douyin",
         "env",
         "fallback",
         "marketplace",
@@ -89,8 +90,10 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "score",
         "selector",
         "staging",
+        "xhs",
     }
 )
+_APPROVED_CONTRACT_CAPABILITIES = frozenset({"content_detail"})
 _MISSING = object()
 
 
@@ -229,10 +232,12 @@ def validate_third_party_adapter_manifest(manifest: Mapping[str, Any]) -> ThirdP
     _validate_result_contract(normalized_manifest.result_contract)
     _validate_error_mapping(normalized_manifest.error_mapping)
     resource_declarations = _normalize_manifest_resource_declarations(normalized_manifest)
-    return replace(
+    normalized_manifest = replace(
         normalized_manifest,
         resource_requirement_declarations=resource_declarations,
     )
+    _validate_manifest_capability_coverage(normalized_manifest)
+    return normalized_manifest
 
 
 def validate_third_party_adapter_fixtures(
@@ -291,6 +296,31 @@ def _normalize_manifest_resource_declarations(manifest: ThirdPartyAdapterManifes
         supported_capabilities=manifest.supported_capabilities,
         source="manifest",
     )
+
+
+def _validate_manifest_capability_coverage(manifest: ThirdPartyAdapterManifest) -> None:
+    unsupported_capabilities = tuple(
+        sorted(set(manifest.supported_capabilities) - _APPROVED_CONTRACT_CAPABILITIES)
+    )
+    if unsupported_capabilities:
+        raise ThirdPartyContractEntryError(
+            "unsupported_manifest_capabilities",
+            "third-party adapter manifest cannot approve capabilities outside the current FR-0023 slice",
+            details={"adapter_key": manifest.adapter_key, "unsupported_capabilities": unsupported_capabilities},
+        )
+    declaration_capabilities = frozenset(
+        declaration.capability
+        for declaration in manifest.resource_requirement_declarations
+    )
+    missing_declarations = tuple(
+        sorted(set(manifest.supported_capabilities) - declaration_capabilities)
+    )
+    if missing_declarations:
+        raise ThirdPartyContractEntryError(
+            "missing_resource_declaration_for_capability",
+            "each manifest supported_capability must have resource_requirement_declarations coverage",
+            details={"adapter_key": manifest.adapter_key, "missing_capabilities": missing_declarations},
+        )
 
 
 def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapter: Any) -> None:

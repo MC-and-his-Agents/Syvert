@@ -44,6 +44,7 @@
 - guardian review 第二次返回 `REQUEST_CHANGES`，阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；已改为 harness 内第三方 profile-proof 校验，保留 FR-0027 profile tuple / evidence proof 对齐，但不要求非参考第三方 `adapter_key` 冒充 reference adapter。
 - guardian review 第三次返回 `REQUEST_CHANGES`，阻断项为执行阶段硬编码 capability / target / mode 且未注入 required resource profile；已将 fixture input 扩展为 operation / capability / target / collection mode / resource profile 驱动，并在执行时构造与 FR-0027 profile 对齐的 resource bundle。
 - guardian review 第四次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界使用任意子串导致误杀，以及 error_mapping fixture 未绑定 manifest 声明；已改为 token / segment 级 key 校验，并要求 error_mapping fixture 通过 `source_error` 与 manifest `error_mapping` 对齐。
+- guardian review 第五次返回 `REQUEST_CHANGES`，阻断项为纯 provider product name 仍可作为 `adapter_key`，以及 manifest 可声明未批准 capability；已显式阻断 `xhs` / `douyin` provider product key，并限制 supported_capabilities 只能使用当前 `content_detail` approved slice 且必须有 resource declaration 覆盖。
 
 ## 下一步动作
 
@@ -73,11 +74,11 @@
 - `python3 -m pytest tests/runtime/test_third_party_adapter_contract_entry.py -q`
   - 结果：未执行通过；当前环境 `python3` 无 `pytest` 模块，改用 `unittest` 执行同等测试。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
-  - 结果：通过，16 tests。
+  - 结果：通过，17 tests。
 - `python3 -m unittest tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
   - 结果：通过，50 tests。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
-  - 结果：通过，66 tests。
+  - 结果：通过，67 tests。
 - `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
   - 结果：通过。
 - `git diff --check`
@@ -106,6 +107,9 @@
   - 第四次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：`adapter_key` 禁词使用子串匹配导致合法 key 误杀；error_mapping fixture 未绑定 manifest `error_mapping` 声明。
   - 修正：`adapter_key` 改为分隔符 token 级语义阻断；error_mapping fixture 必须声明 `source_error`，且 expected category/code 必须与 manifest mapping 一致后才进入执行观测比对。
+  - 第五次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：纯 provider product name 如 `xhs` / `douyin` 仍可作为 `adapter_key`；manifest 可声明当前 approved slice 之外的 capability。
+  - 修正：将 `xhs` / `douyin` 纳入 token 级 adapter_key 边界阻断；manifest supported_capabilities 限制为当前 approved slice `content_detail`，并要求每个 supported capability 有 resource declaration 覆盖。
 
 ## 未决风险
 
