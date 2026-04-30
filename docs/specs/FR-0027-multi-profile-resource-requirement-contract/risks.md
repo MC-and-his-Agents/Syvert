@@ -10,6 +10,7 @@
 | declaration adapter 借用未覆盖自己的 shared proof | 未验证 adapter 可错误复用 `xhs/douyin` approved profile，破坏 fail-closed 边界 | formal spec 要求 proof `reference_adapters` 必须覆盖 declaration `adapter_key`，否则 `invalid_resource_requirement` | 回滚违规 binding，并在 evidence carrier 中重新声明合法覆盖面 |
 | matcher 输入违法口径在 spec/data-model/contracts 间不一致 | `#301` 运行时实现可能把同一非法输入分别实现成 `unmatched` 或 `invalid_resource_requirement` | formal suite 明确：proof 不可解析、不唯一、不对齐、不覆盖 adapter，以及非法/重复/未知 `available_resource_capabilities` 一律 `invalid_resource_requirement` | 回滚漂移文案，重新对齐 formal suite 三个载体 |
 | approved proof 丢失执行路径边界 | 同一 approved profile 会被无依据复用到其他 `content_detail` 路径，放宽证据适用面 | formal spec 保留等价于 `FR-0015` `ExecutionPathDescriptor` 的 proof path 约束，并把当前 approved slice 固定为 `content_detail_by_url + url + hybrid` | 回滚被放宽的 proof carrier，恢复路径绑定 |
+| 把 profile approval 误写成 `v0.5.0` capability approval | `#300` 会被迫用错误词汇表达新的 profile truth，version boundary 失真 | formal spec 将 proof `decision` 明确建模为当前双参考 slice 的 profile-level approval，不再复用 `approve_for_v0_5_0` | 回滚错误词汇，恢复分层表达 |
 
 ## 检查清单
 

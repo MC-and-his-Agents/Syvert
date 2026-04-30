@@ -61,13 +61,13 @@
       - 比较与解析前必须先按 `FR-0015` 已批准词汇顺序规范化；当前顺序固定为 `account`、`proxy`
   - `reference_adapters`
     - 类型：`string[]`
-    - 约束：当前必须且只能覆盖 `xhs`、`douyin`；任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
+    - 约束：在 `FR-0027` 当前双参考 slice 中必须且只能覆盖 `xhs`、`douyin`；任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
   - `shared_status`
     - 类型：`enum`
     - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `shared`
   - `decision`
     - 类型：`enum`
-    - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `approve_for_v0_5_0`
+    - 允许值：表达 profile-level approval；在 `FR-0027` 当前双参考 slice 中当前 shared declaration 只接受 `approve_profile_for_v0_8_0`
   - `evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；回指 `FR-0015` 中更细粒度的 research / artifact 证据

@@ -10,8 +10,8 @@
 
 ## 背景与目标
 
-- 背景：`FR-0013`、`FR-0014`、`FR-0015` 在 `v0.5.0` 冻结了单条 `resource_dependency_mode + required_capabilities[]` 声明、全量满足 matcher 与共享能力词汇证据基线。这套 contract 适合最小双参考切片，但已经无法表达“同一 adapter capability 存在多个都合法的资源依赖 profile”这一 `v0.8.0` 现实。
-- 目标：为 `v0.8.0` 冻结多 profile 资源依赖声明、matcher `one-of` 满足性判断与 profile 级 evidence 消费边界，使同一 capability 可以声明多个合法 profile，同时保持 fail-closed，不引入排序、自动 fallback、provider 选择或新共享能力词汇。
+- 背景：`FR-0013`、`FR-0014`、`FR-0015` 在 `v0.5.0` 冻结了单条 `resource_dependency_mode + required_capabilities[]` 声明、全量满足 matcher 与共享能力词汇证据基线。这套 contract 适合最小双参考切片，但已经无法表达“同一 adapter capability 存在多个都合法的资源依赖 profile”这一 `v0.8.0` 当前双参考 slice 现实。
+- 目标：为 `v0.8.0` 当前双参考 slice 冻结多 profile 资源依赖声明、matcher `one-of` 满足性判断与 profile 级 evidence 消费边界，使同一 capability 可以声明多个合法 profile，同时保持 fail-closed，不引入排序、自动 fallback、provider 选择或新共享能力词汇。
 
 ## 范围
 
@@ -60,9 +60,9 @@
     - `capability`：当前只允许 `content_detail`
     - `execution_path`：必须保留与 `FR-0015` `ExecutionPathDescriptor` 等价的路径边界；在当前 `v0.8.0` approved slice 中，必须且只能表达 `operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`
     - `resource_dependency_mode` / `required_capabilities`：与 declaration profile 的 canonical tuple 完全对齐；比较前必须先做同一套 canonicalization
-    - `reference_adapters`：当前必须且只能覆盖 `xhs` 与 `douyin`
+    - `reference_adapters`：在 `FR-0027` 当前双参考 slice 中，必须且只能覆盖 `xhs` 与 `douyin`
     - `shared_status`：沿用 `FR-0015` 已冻结词汇；当前 shared declaration 只接受 `shared`
-    - `decision`：沿用 `FR-0015` 的批准词汇，不在 `FR-0027` 另起新枚举；当前 shared declaration 只接受 `approve_for_v0_5_0`
+    - `decision`：当前 proof carrier 明确表达 profile-level approval，而不是复用 `FR-0015` 的 capability-level approval；在 `FR-0027` 当前双参考 slice 中，当前 shared declaration 只接受 `approve_profile_for_v0_8_0`
     - `evidence_refs`：非空、去重字符串数组；用于回指 `FR-0015` research / artifact 中更细粒度的双参考证据
   - `#300` 的职责不是替 `FR-0027` 发明新的批准证明 shape，而是把 `FR-0015` 更新到至少能产出上述 `ApprovedSharedResourceRequirementProfileEvidenceEntry`，并补齐 `shared / adapter_only / rejected` profile truth。
   - `profile_key` 必须是声明内唯一的非空字符串，用于稳定标识一个合法 profile；它只承担声明内追溯与 evidence 对齐职责，不承载优先级或执行顺序语义。
@@ -111,7 +111,7 @@
     - `provider_offer`
     - 任何 Playwright / CDP / Chromium / browser profile / network tier 一类技术字段
   - `FR-0027` 只冻结 shared contract，不允许把 `adapter_only` 宽松路径直接塞进 canonical declaration。`adapter_only / rejected` profile 的完整判定真相继续由 `FR-0015` evidence follow-up 持有，但 shared declaration 能否落地，只以这里冻结的 approved shared profile entry contract 为准。
-  - `FR-0027` 是 `v0.8.0` multi-profile requirement 的 governing artifact。`FR-0013` / `FR-0014` / `FR-0015` 继续保留 `v0.5.0` 单声明历史语义；自 `v0.8.0` 起，当前 approved slice 的 multi-profile declaration / matcher / proof binding 只以 `FR-0027` 为准。
+  - `FR-0027` 是 `v0.8.0` 当前双参考 slice 的 governing artifact。`FR-0013` / `FR-0014` / `FR-0015` 继续保留 `v0.5.0` 单声明历史语义；自 `v0.8.0` 起，当前 approved slice 的 multi-profile declaration / matcher / proof binding 只以 `FR-0027` 为准。
 - 非功能需求：
   - contract 必须 fail-closed；任何无法证明 profile 合法、证据有效或输入一致的情况，都不得宽松返回 `matched`。
   - contract 必须保持 Core / Adapter / Provider 实现无关，只回答“哪些 shared profile 合法、当前能力集合是否命中其中之一”。
@@ -121,7 +121,7 @@
 ## 约束
 
 - 阶段约束：
-  - 本事项只服务 `v0.8.0` 的多 profile requirement contract，不提前进入 provider compatibility、开放接入 SDK 稳定化或真实外部 provider 验证样本。
+  - 本事项只服务 `v0.8.0` 当前双参考 slice 的多 profile requirement contract，不提前进入 provider compatibility、开放接入 SDK 稳定化或真实外部 provider 验证样本。
   - 本事项不新增共享能力词汇；当前 profile 只能重组 `account`、`proxy` 与 `none`。
 - 架构约束：
   - `FR-0010` 继续持有资源生命周期 truth；`FR-0012` 继续持有 Core 注入边界；`FR-0027` 不得重开这两个相邻 contract。

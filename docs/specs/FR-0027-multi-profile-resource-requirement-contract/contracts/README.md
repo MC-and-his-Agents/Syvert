@@ -57,10 +57,10 @@
 - `resource_dependency_mode=none` -> `required_capabilities=[]`
 - `resource_dependency_mode=required` -> `required_capabilities` 非空、去重，且只能来自 `account`、`proxy`
 - `resource_dependency_mode` / `required_capabilities` 必须与 declaration profile 的 canonical tuple 完全一致；比较前必须先按 `FR-0015` 已批准词汇顺序规范化
-- `reference_adapters` 当前必须且只能覆盖 `xhs`、`douyin`
+- `reference_adapters` 在 `FR-0027` 当前双参考 slice 中必须且只能覆盖 `xhs`、`douyin`
 - 任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
 - `shared_status` 沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `shared`
-- `decision` 沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `approve_for_v0_5_0`
+- `decision` 表达 profile-level approval；在 `FR-0027` 当前双参考 slice 中当前 shared declaration 只接受 `approve_profile_for_v0_8_0`
 - `evidence_refs` 必须回指 `FR-0015` research / artifact 中更细粒度的双参考证据
 - proof 不可解析、不唯一、不对齐、不在当前 approved execution path 内，或不覆盖 declaration adapter 时，一律归类为 `runtime_contract + invalid_resource_requirement`
 

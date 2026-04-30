@@ -13,7 +13,7 @@
 
 ## 实施目标
 
-- 在进入 evidence、runtime 与 reference adapter migration 之前，先冻结 `v0.8.0` 的 multi-profile declaration carrier、matcher `one-of` 语义与 profile evidence 消费边界，使 `FR-0027` 成为后续三类实现 Work Item 的 governing artifact。
+- 在进入 evidence、runtime 与 reference adapter migration 之前，先冻结 `v0.8.0` 当前双参考 slice 的 multi-profile declaration carrier、matcher `one-of` 语义与 profile evidence 消费边界，使 `FR-0027` 成为后续三类实现 Work Item 的 governing artifact。
 
 ## 分阶段拆分
 
@@ -33,7 +33,7 @@
   - 必须满足 `vision.md` 对 “Core 负责运行时语义、Adapter 负责目标系统语义” 的边界
   - 必须满足 `docs/roadmap-v0-to-v1.md` 对 `v0.8.0` “稳定第三方 Adapter 接入路径与 Adapter / Provider 兼容性判断模型” 的阶段目标
   - 必须把 `FR-0013` / `FR-0014` / `FR-0015` 作为 `v0.5.0` 历史基线引用，而不是在本 PR 中混合重写多个旧 formal spec 套件
-  - 必须避免在仓内形成两个并行的 `v0.8.0` canonical truth：`FR-0027` 是 `v0.8.0` multi-profile declaration / matcher / proof binding 的唯一正式规约入口
+  - 必须避免在仓内形成两个并行的 `v0.8.0` canonical truth：`FR-0027` 是当前双参考 slice 的 multi-profile declaration / matcher / proof binding 的唯一正式规约入口
 
 ## 测试与验证策略
 
