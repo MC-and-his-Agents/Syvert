@@ -41,12 +41,11 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：PR `#329` 第二次 guardian review 返回 `REQUEST_CHANGES`，已继续收紧 string[] 类型、observability 泄漏、requirement evidence truth 与错误码口径，并通过目标测试与全 runtime discover；下一步补齐 PR carrier、提交、重跑门禁并复审。
+- 当前 checkpoint：PR `#329` 第二次 guardian review 返回 `REQUEST_CHANGES`，已继续收紧 string[] 类型、observability 泄漏、requirement evidence truth 与错误码口径，补齐 PR carrier，并通过目标测试、全 runtime discover 与门禁；下一步推送并复审。
 
 ## 下一步动作
 
-- 补齐 PR carrier 的审查输入。
-- 提交第二轮 guardian 修复，重跑门禁并推送 PR `#329` 新 head，重新运行 guardian。
+- 推送 PR `#329` 新 head，重新运行 guardian。
 - guardian 与 checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
@@ -187,10 +186,30 @@
   - 结果：通过，15 tests。
 - 第二轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，863 tests。
+- `gh pr edit 329 --body-file -`
+  - 结果：通过；补齐 PR carrier 的变更目的、主要改动、审查关注与已执行验证。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement`
+  - 结果：通过，17 tests。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，10 tests。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 -m unittest tests.runtime.test_resource_capability_matcher`
+  - 结果：通过，17 tests。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 -m unittest tests.runtime.test_registry`
+  - 结果：通过，15 tests。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- PR carrier update、第二轮 guardian 修复提交后的 governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
+- PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
 
@@ -210,3 +229,4 @@
 - validation follow-up checkpoint：`295f560bb1b21975b30701080b7aa4eb1a2c7774`
 - guardian fix checkpoint：`01c0bf982bfcfb45af4aa4d603e51c719556af7f`
 - main-sync checkpoint：`509d6e903b20e9ddd576f9023eda5b1059ce8f69`
+- second guardian fix checkpoint：`8acf2a70451f69fe23080fa3474944015d4dc8af`
