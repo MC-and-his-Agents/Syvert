@@ -78,3 +78,22 @@
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `user_agent` | `rejected` | `reject_for_v0_5_0` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
 | `xhs` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `browser_state` | `rejected` | `reject_for_v0_5_0` | `fr-0015:xhs:content-detail:url:hybrid:page-state-fallback` |
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `browser_state` | `rejected` | `reject_for_v0_5_0` | `fr-0015:douyin:content-detail:url:hybrid:page-state-fallback` |
+
+## `v0.8.0` profile evidence 判定口径
+
+- `FR-0027` 消费本 FR 时，不再只读取 `account`、`proxy` 这两个 capability-level 词汇，而是读取 profile-level 判定真相。
+- `account+proxy` profile 由共享 runtime 请求、两侧 account material 消费与两侧 proxy regression seed 共同支撑，可进入 `ApprovedSharedResourceRequirementProfileEvidenceEntry`。
+- `account-only` profile 由两侧 adapter 对 Core 注入 account material 的稳定消费共同支撑；当前证据没有证明 adapter 直接消费 proxy，因此该 profile 可作为当前双参考 slice 的 shared 宽松 profile。
+- `proxy-only` profile 缺少账号材料，不能满足两侧 reference adapter 的 session 构造前提，必须作为 `rejected` 收口。
+- `none` profile 缺少账号材料，不能满足当前 `content_detail_by_url + url + hybrid` 共享路径的双参考执行前提，必须作为 `rejected` 收口。
+- 抖音 `verify_fp`、`ms_token`、`webid` 仍属于 adapter 私有 account material；若作为 profile 维度观察，只能保留为 `adapter_only + keep_adapter_local`，不得进入 shared declaration。
+
+## 冻结的 `v0.8.0` profile evidence truth
+
+| profile_ref | capability | execution_path | resource_dependency_mode | required_capabilities | reference_adapters | shared_status | decision | evidence_refs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `fr-0027:profile:content-detail-by-url-hybrid:account-proxy` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account`、`proxy` | `xhs`、`douyin` | `shared` | `approve_profile_for_v0_8_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed` |
+| `fr-0027:profile:content-detail-by-url-hybrid:account` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account` | `xhs`、`douyin` | `shared` | `approve_profile_for_v0_8_0` | `fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |
+| `fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account`、`verify_fp`、`ms_token`、`webid` | `douyin` | `adapter_only` | `keep_adapter_local` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
+| `fr-0027:profile:content-detail-by-url-hybrid:proxy` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `proxy` | `xhs`、`douyin` | `rejected` | `reject_profile_for_v0_8_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed` |
+| `fr-0027:profile:content-detail-by-url-hybrid:none` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `none` | - | `xhs`、`douyin` | `rejected` | `reject_profile_for_v0_8_0` | `fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |

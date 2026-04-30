@@ -3,8 +3,8 @@
 ## 接口名称与版本
 
 - 接口名称：`dual-reference-resource-capability-evidence`
-- contract 版本：`v0.5.0`
-- 作用：定义双参考适配器资源能力证据记录的最小 carrier、批准规则与 `FR-0013 / FR-0014` 可消费的资源能力词汇边界
+- contract 版本：`v0.5.0` capability vocabulary baseline；`v0.8.0` profile evidence extension
+- 作用：定义双参考适配器资源能力证据记录的最小 carrier、批准规则、`FR-0013 / FR-0014` 可消费的资源能力词汇边界，以及 `FR-0027` 可消费的 profile approval proof
 
 ## 证据记录结构
 
@@ -31,6 +31,31 @@
     - `shared` 只能映射到 `approve_for_v0_5_0`
     - `adapter_only` 只能映射到 `keep_adapter_local`
     - `rejected` 只能映射到 `reject_for_v0_5_0`
+- `ResourceRequirementProfileEvidenceRecord`
+  - 必填字段：
+    - `profile_ref`
+    - `capability`
+    - `execution_path`
+    - `resource_dependency_mode`
+    - `required_capabilities`
+    - `reference_adapters`
+    - `shared_status`
+    - `decision`
+    - `evidence_refs`
+  - 字段约束：
+    - `profile_ref`：非空、稳定、唯一
+    - `capability`：当前只允许 `content_detail`
+    - `execution_path`：当前固定为 `operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`
+    - `resource_dependency_mode`：只允许 `none`、`required`
+    - `required_capabilities`：mode=`none` 时为空；mode=`required` 时非空、去重
+    - `reference_adapters`：非空、去重；shared profile 必须覆盖 `xhs` 与 `douyin`
+    - `shared_status`：只允许 `shared`、`adapter_only`、`rejected`
+    - `decision`：只允许 `approve_profile_for_v0_8_0`、`keep_adapter_local`、`reject_profile_for_v0_8_0`
+    - `evidence_refs`：非空、去重，且必须回指 `research.md` 中稳定 evidence registry 条目
+  - 映射约束：
+    - `shared` 只能映射到 `approve_profile_for_v0_8_0`
+    - `adapter_only` 只能映射到 `keep_adapter_local`
+    - `rejected` 只能映射到 `reject_profile_for_v0_8_0`
 
 ## 批准词汇投影
 
@@ -48,12 +73,26 @@
   - `FR-0014` 只能匹配上述批准标识
   - 下游 FR 不得通过实现或 matcher 输入反向新增能力名
 
+## `FR-0027` profile proof 投影
+
+- `ApprovedSharedResourceRequirementProfileEvidenceEntry` 只允许由 `shared + approve_profile_for_v0_8_0` 的 `ResourceRequirementProfileEvidenceRecord` 投影产生。
+- 当前唯一批准 shared profile：
+  - `fr-0027:profile:content-detail-by-url-hybrid:account-proxy`
+  - `fr-0027:profile:content-detail-by-url-hybrid:account`
+- 当前禁止进入 shared declaration 的 profile：
+  - `fr-0027:profile:content-detail-by-url-hybrid:proxy`
+  - `fr-0027:profile:content-detail-by-url-hybrid:none`
+  - `fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material`
+- `FR-0027` declaration profile 的 `evidence_refs` 只能引用上述 approved shared profile proof；不得引用 `adapter_only`、`rejected` profile 或 capability-level evidence record。
+
 ## research 入口与证据引用
 
 - `research.md` 必须至少保留以下章节：
   - 共性资源语义
   - 单平台特例
   - 被拒绝的抽象候选
+  - `v0.8.0` profile evidence 判定口径
+  - 冻结的 `v0.8.0` profile evidence truth
 - `evidence_refs` 的合法来源：
   - 仓内稳定代码路径、研究条目或回归基线条目
   - 能被 future review 复验的静态引用
