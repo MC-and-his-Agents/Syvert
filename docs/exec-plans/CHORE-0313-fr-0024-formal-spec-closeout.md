@@ -83,7 +83,7 @@
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：首次尝试未通过；原因是该脚本只消费已提交的 `HEAD` diff，当前新增文件尚未提交，返回“当前分支相对基线没有变更，无法创建或校验 PR”。提交 checkpoint 后必须重跑。
 - `git commit -m 'docs(spec): 收口 FR-0024 适配器能力需求规约'`
-  - 结果：已生成语义 checkpoint `9bee64898949c3069b9e1c2e7fd44cd7ac9c1de6`
+  - 结果：已生成语义 checkpoint `59bed8351a7b1758cad9cbaf4afac3ab456f927b`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -95,7 +95,7 @@
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 - `git commit -m 'docs(spec): 记录 FR-0024 规约验证结果'`
-  - 结果：已生成 validation follow-up checkpoint `8052738c67fbfa9b1058d41793b7685f1318ca63`
+  - 结果：已生成 validation follow-up checkpoint `812edf6788e41bc6facfa21ebb66b2170035d38f`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -107,7 +107,7 @@
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 - `git commit -m 'docs(spec): 校正 FR-0024 执行计划元数据'`
-  - 结果：已生成 metadata 修正 checkpoint `f71357e1e425650f05784d34cf2a59360d64e2d7`
+  - 结果：已生成 metadata 修正 checkpoint `08bb25f6000624a12f40db304e2c3ce7cc001f12`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
 - `python3 scripts/docs_guard.py --mode ci`
@@ -136,7 +136,8 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- formal spec 语义 checkpoint：`9bee64898949c3069b9e1c2e7fd44cd7ac9c1de6`
-- metadata / validation follow-up checkpoint：`f71357e1e425650f05784d34cf2a59360d64e2d7`
-- validation result follow-up checkpoint：`8052738c67fbfa9b1058d41793b7685f1318ca63`
-- worktree 创建基线：`16c4b8b6f36e96d1b401b2b513f61f8041c6562f`
+- formal spec 语义 checkpoint：`59bed8351a7b1758cad9cbaf4afac3ab456f927b`
+- metadata 修正 checkpoint：`08bb25f6000624a12f40db304e2c3ce7cc001f12`
+- validation result follow-up checkpoint：`812edf6788e41bc6facfa21ebb66b2170035d38f`
+- review-sync follow-up checkpoint：`2be4b0c57cf4fac82132438bd4e269b75acab801`
+- worktree 创建基线：`ea44f9cdc863b244b7ceba5a3a70f2e23e41b7a5`

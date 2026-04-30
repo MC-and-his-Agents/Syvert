@@ -95,44 +95,44 @@
 
 ### 场景 1：合法 requirement 声明
 
-Given `adapter_key=xhs` 的 `AdapterCapabilityRequirement` 声明 `capability=content_detail`、`operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`，且 `resource_requirement` 使用 `FR-0027` 合法 declaration 与 proof binding  
-When manifest fixture validator 或 spec review 消费该 requirement  
+Given `adapter_key=xhs` 的 `AdapterCapabilityRequirement` 声明 `capability=content_detail`、`operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`，且 `resource_requirement` 使用 `FR-0027` 合法 declaration 与 proof binding
+When manifest fixture validator 或 spec review 消费该 requirement
 Then requirement 必须被视为合法声明输入，可进入后续 `#314/#315` 实现工作
 
 ### 场景 2：资源 profile proof 不一致
 
-Given `AdapterCapabilityRequirement.resource_requirement` 中某个 profile 的 `evidence_refs` 无法唯一命中与 `adapter_key`、`capability`、execution slice 和 profile tuple 完全一致的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
-When requirement 被 validator 或 runtime admission 消费  
+Given `AdapterCapabilityRequirement.resource_requirement` 中某个 profile 的 `evidence_refs` 无法唯一命中与 `adapter_key`、`capability`、execution slice 和 profile tuple 完全一致的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`
+When requirement 被 validator 或 runtime admission 消费
 Then 它必须 fail-closed，并归类为 `invalid_resource_requirement`
 
 ### 场景 3：不能表达 provider offer
 
-Given 一个合法 `AdapterCapabilityRequirement` 需要 `required + [account, proxy]` profile  
-When 作者试图在同一 carrier 中加入 `provider_offer`、`provider_key` 或 `provider_selection` 字段  
+Given 一个合法 `AdapterCapabilityRequirement` 需要 `required + [account, proxy]` profile
+When 作者试图在同一 carrier 中加入 `provider_offer`、`provider_key` 或 `provider_selection` 字段
 Then spec review 或 validator 必须阻断该声明，因为 Provider offer 与 compatibility decision 不属于 `FR-0024`
 
 ### 场景 4：不能表达 profile fallback
 
-Given 一个 requirement 合法包含多个 `FR-0027` resource profiles  
-When 作者试图给 profile 添加 `priority`、`fallback_order` 或 `preferred_profile`  
+Given 一个 requirement 合法包含多个 `FR-0027` resource profiles
+When 作者试图给 profile 添加 `priority`、`fallback_order` 或 `preferred_profile`
 Then 该声明必须 fail-closed，因为多 profile 只表示合法集合，不表示排序、偏好或自动 fallback
 
 ### 场景 5：lifecycle 只能表达消费预期
 
-Given requirement 声明该 capability 需要 Core 注入资源 bundle  
-When 作者试图在 `lifecycle` 中声明 resource acquire/release 实现、账号池策略或 provider-owned lifecycle  
+Given requirement 声明该 capability 需要 Core 注入资源 bundle
+When 作者试图在 `lifecycle` 中声明 resource acquire/release 实现、账号池策略或 provider-owned lifecycle
 Then 该声明必须被视为越界，因为 lifecycle runtime truth 由 `FR-0010` / `FR-0012` 持有
 
 ### 场景 6：observability 不泄漏实现技术
 
-Given requirement 需要记录 requirement id、profile key、proof refs 与 fail-closed 结果  
-When 作者试图在 `observability` 中记录 Playwright、CDP、browser profile、network tier 或 provider fallback outcome  
+Given requirement 需要记录 requirement id、profile key、proof refs 与 fail-closed 结果
+When 作者试图在 `observability` 中记录 Playwright、CDP、browser profile、network tier 或 provider fallback outcome
 Then 该声明必须被视为 contract violation，因为这些字段不是 Adapter capability requirement 的 canonical surface
 
 ### 场景 7：合法 requirement 不等于 compatibility approved
 
-Given 某 Adapter 的 `AdapterCapabilityRequirement` 完全合法  
-When 尚未存在 Provider offer 与 `FR-0026` compatibility decision  
+Given 某 Adapter 的 `AdapterCapabilityRequirement` 完全合法
+When 尚未存在 Provider offer 与 `FR-0026` compatibility decision
 Then 系统只能认为 Adapter requirement 已声明完成，不得推导出任何 Provider 已兼容或可绑定
 
 ## 异常与边界场景
