@@ -9,6 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：无（roadmap / SDK / positioning 文档校准）
 - 关联 decision：`docs/decisions/ADR-CHORE-0291-open-adapter-provider-boundary.md`
+- 关联 PR：`#292`
 - 状态：`active`
 
 ## 目标
@@ -76,6 +77,8 @@
   - 结果：通过，`PR class=docs`。
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过。
+- `python3 scripts/open_pr.py --class docs --issue 291 --item-key CHORE-0291-open-adapter-provider-boundary --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(roadmap): 校准开放接入与 provider 兼容性路线' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建 PR `#292`。
 
 ## 风险与回滚
 
