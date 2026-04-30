@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#308`
 - active 收口事项：`CHORE-0302-fr-0027-parent-closeout`
 - 状态：`active`
 
