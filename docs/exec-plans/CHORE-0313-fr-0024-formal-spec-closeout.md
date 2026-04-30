@@ -43,13 +43,11 @@
 - 分支：`issue-313-fr-0024-adapter-capability-requirement-formal-spec`
 - worktree 创建基线：`16c4b8b6f36e96d1b401b2b513f61f8041c6562f`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`FR-0027` formal spec、`FR-0021` formal spec、`#296` 与 `#313` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0024` formal spec 套件草案与 active exec-plan；filesystem-based spec/docs/workflow 门禁已通过，等待提交后重新运行基于 HEAD diff 的 governance/scope 门禁。
+- 当前 checkpoint：已创建 `FR-0024` formal spec 套件与 active exec-plan；spec/docs/workflow/governance/scope 本地门禁已通过，当前回合停点为已提交本地 closeout，等待主线程统一开 PR / review / GitHub 状态收口。
 
 ## 下一步动作
 
-- 运行 spec/docs/workflow/governance/scope 门禁。
-- 若门禁失败，只在 #313 ownership 范围内修正文档/spec 问题。
-- 生成中文 Conventional Commit。
+- 由主线程统一开 PR / review / GitHub 状态收口。
 - 不开 PR、不合并、不关闭 `#296` 或 `#313`。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -96,11 +94,22 @@
   - 结果：未通过；`关联 decision：无` 被解析为有意义路径，触发“必须绑定到 `docs/decisions/*.md`”；同时 formal spec input 绑定因此未通过 preflight。处理：将 `关联 decision` 留空，对齐既有 formal spec closeout exec-plan 样式。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
+- `git commit -m 'docs(spec): 校正 FR-0024 执行计划元数据'`
+  - 结果：已生成 metadata 修正 checkpoint `f71357e1e425650f05784d34cf2a59360d64e2d7`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-313-fr-0024-adapter-capability-requirement-formal-spec`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 
 ## 待验证项
 
-- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-313-fr-0024-adapter-capability-requirement-formal-spec`
-- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- 无；本地 spec/docs/workflow/governance/scope 门禁已通过。PR review、guardian、GitHub checks 与 issue closeout 由后续主线程统一处理。
 
 ## 未决风险
 
@@ -115,5 +124,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 待提交后刷新为本事项语义 checkpoint commit SHA。
+- formal spec 语义 checkpoint：`9bee64898949c3069b9e1c2e7fd44cd7ac9c1de6`
+- metadata / validation follow-up checkpoint：`f71357e1e425650f05784d34cf2a59360d64e2d7`
 - worktree 创建基线：`16c4b8b6f36e96d1b401b2b513f61f8041c6562f`
