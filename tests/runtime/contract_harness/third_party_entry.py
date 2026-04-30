@@ -812,7 +812,7 @@ def _execute_and_validate_fixture(
     resource_bundle = build_managed_resource_bundle(
         adapter_key=manifest.adapter_key,
         task_id=task_id,
-        capability=fixture_input["operation"],
+        capability=fixture_input["capability"],
         requested_slots=resource_profile.required_capabilities,
     )
     try:
@@ -830,14 +830,14 @@ def _execute_and_validate_fixture(
         runtime_envelope = _build_success_runtime_envelope(
             task_id=task_id,
             adapter_key=manifest.adapter_key,
-            capability=fixture_input["operation"],
+            capability=fixture_input["capability"],
             payload=payload,
         )
     except PlatformAdapterError as error:
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
-            "capability": fixture_input["operation"],
+            "capability": fixture_input["capability"],
             "status": "failed",
             "error": {
                 "category": error.category,
@@ -846,7 +846,21 @@ def _execute_and_validate_fixture(
                 "details": dict(error.details),
             },
         }
+    except Exception as error:
+        runtime_envelope = {
+            "task_id": task_id,
+            "adapter_key": manifest.adapter_key,
+            "capability": fixture_input["capability"],
+            "status": "failed",
+            "error": {
+                "category": "runtime_contract",
+                "code": "adapter_execution_exception",
+                "message": "adapter raised an unexpected exception during contract execution",
+                "details": {"error_type": error.__class__.__name__},
+            },
+        }
     result = validate_contract_sample(sample, HarnessExecutionResult(runtime_envelope=runtime_envelope))
+    result["observed_capability"] = runtime_envelope.get("capability")
     if result["verdict"] == "legal_failure":
         return _validate_error_mapping_observation(fixture, result)
     return result
