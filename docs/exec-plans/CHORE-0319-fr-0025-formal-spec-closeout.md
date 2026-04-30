@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0025-provider-capability-offer-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#328`
 - active 收口事项：`CHORE-0319-fr-0025-formal-spec-closeout`
 - 状态：`active`
 
@@ -46,7 +46,7 @@
 - 分支：`issue-319-fr-0025-provider-capability-offer-formal-spec`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`FR-0021`、`FR-0024`、`FR-0027`、`#297`、`#298` 与 `#319` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0025` formal spec 套件与 active exec-plan；本地 spec / docs / workflow / governance / scope 门禁已通过，待受控开 PR、spec review / guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0025` formal spec 套件与 active exec-plan；PR `#328` 已通过受控入口创建并绑定 `Fixes #319`，待 spec review / guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -93,10 +93,16 @@
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 - `git commit -m 'docs(spec): 收口 FR-0025 provider offer 规约'`
   - 结果：已生成语义 checkpoint `9f9b54e17382a40b59a38647d69c261505202ad5`
+- `git commit -m 'docs(spec): 记录 FR-0025 规约验证结果'`
+  - 结果：已生成 validation follow-up checkpoint `32d6fb53abd8b245bc06c8386ab422edc74bbedc`
+- `git push -u origin issue-319-fr-0025-provider-capability-offer-formal-spec`
+  - 结果：通过，远端分支已创建并设置 upstream
+- `python3 scripts/open_pr.py --class spec --issue 319 --item-key CHORE-0319-fr-0025-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0025 Provider capability offer formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#328 https://github.com/MC-and-his-Agents/Syvert/pull/328`
 
 ## 待验证项
 
-- PR head 的 spec review、guardian review、GitHub checks 与受控 merge gate
+- PR `#328` 最新 head 的 spec review、guardian review、GitHub checks 与受控 merge gate
 
 ## 未决风险
 
@@ -112,4 +118,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - formal spec 语义 checkpoint：`9f9b54e17382a40b59a38647d69c261505202ad5`
+- validation result follow-up checkpoint：`32d6fb53abd8b245bc06c8386ab422edc74bbedc`
 - worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
