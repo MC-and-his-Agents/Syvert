@@ -1240,6 +1240,20 @@ def _validate_error_mapping_observation(
                 "message": "observed failed envelope does not match fixture error_mapping expectation",
             },
         }
+    observed_details = observed_error.get("details")
+    expected_source_error = expected_error["source_error"]
+    if (
+        not isinstance(observed_details, Mapping)
+        or observed_details.get("source_error") != expected_source_error
+    ):
+        return {
+            **result,
+            "verdict": "contract_violation",
+            "reason": {
+                "code": "error_mapping_source_error_mismatch",
+                "message": "observed failed envelope does not match fixture source_error expectation",
+            },
+        }
     return result
 
 
