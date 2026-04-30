@@ -52,6 +52,10 @@
 
 - 为 `v0.8.0` 建立开放接入路线的入口 truth，使后续 formal spec / implementation Work Item 能围绕第三方 Adapter 接入与 Provider 兼容性判断继续推进。
 
+## 最近一次 checkpoint 对应的 head SHA
+
+- `d9945f10a74f290e088722f0622f9177d07ecb4b`
+
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`2026-S21` 的 roadmap / SDK 边界校准 Work Item。
