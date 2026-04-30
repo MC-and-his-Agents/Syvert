@@ -22,8 +22,8 @@ ADAPTER_REQUIREMENT_STATUS_DECLARED = "declared"
 ADAPTER_REQUIREMENT_STATUS_UNMATCHED = "unmatched"
 ADAPTER_REQUIREMENT_STATUS_INVALID = "invalid"
 
-ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT = "invalid_contract"
 ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT = "invalid_resource_requirement"
+ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT = ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT
 
 APPROVED_ADAPTER_CAPABILITY = "content_detail"
 APPROVED_EXECUTION_REQUIREMENT = {
@@ -50,12 +50,13 @@ EVIDENCE_FIELDS = frozenset(
         "capability_requirement_evidence_refs",
     }
 )
-APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES = (
-    "fr-0024:formal-spec:",
-    "fr-0024:manifest-fixture-validator:",
-    "fr-0024:reference-adapter-migration:",
-    "fr-0024:parent-closeout:",
-    "fr-0024:closeout:",
+APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS = frozenset(
+    {
+        "fr-0024:formal-spec:adapter-capability-requirement-contract",
+        "fr-0024:manifest-fixture-validator:content-detail-by-url-hybrid",
+        "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+        "fr-0024:parent-closeout:fr-0024",
+    }
 )
 LIFECYCLE_FIELDS = frozenset(
     {
@@ -689,7 +690,7 @@ def _validate_capability_requirement_evidence_refs(evidence_refs: tuple[str, ...
     unsupported_refs = tuple(
         evidence_ref
         for evidence_ref in evidence_refs
-        if not evidence_ref.startswith(APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES)
+        if evidence_ref not in APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS
     )
     if unsupported_refs:
         raise AdapterCapabilityRequirementContractError(
@@ -697,7 +698,9 @@ def _validate_capability_requirement_evidence_refs(evidence_refs: tuple[str, ...
             "evidence.capability_requirement_evidence_refs must point to approved FR-0024 requirement evidence",
             details={
                 "unsupported_capability_requirement_evidence_refs": unsupported_refs,
-                "allowed_prefixes": APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES,
+                "approved_capability_requirement_evidence_refs": tuple(
+                    sorted(APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS)
+                ),
             },
         )
 
@@ -724,7 +727,7 @@ def _reject_observability_leakage(observability: AdapterCapabilityObservabilityE
 
 def _contains_forbidden_observability_token(value: str) -> bool:
     normalized = value.lower().replace("-", "_")
-    return any(token in normalized.split("_") for token in FORBIDDEN_OBSERVABILITY_TOKENS)
+    return any(token in normalized for token in FORBIDDEN_OBSERVABILITY_TOKENS)
 
 
 def _require_exact_fields(
@@ -810,6 +813,12 @@ def _normalize_string_tuple(raw_values: Any, *, field_name: str, allow_empty: bo
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
             f"{field_name} must be a deduplicated string collection",
+            details={"actual_type": type(raw_values).__name__},
+        )
+    if isinstance(raw_values, Mapping):
+        raise AdapterCapabilityRequirementContractError(
+            ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
+            f"{field_name} must be a string array, not a mapping",
             details={"actual_type": type(raw_values).__name__},
         )
     try:

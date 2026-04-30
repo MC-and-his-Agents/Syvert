@@ -172,6 +172,38 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
             ("tmp:runtime-log",),
         )
 
+    def test_validator_rejects_fabricated_requirement_level_evidence_with_approved_prefix(self) -> None:
+        requirement = copy_requirement()
+        requirement["evidence"]["capability_requirement_evidence_refs"] = [
+            "fr-0024:manifest-fixture-validator:not-real"
+        ]
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+        self.assertEqual(
+            result.details["unsupported_capability_requirement_evidence_refs"],
+            ("fr-0024:manifest-fixture-validator:not-real",),
+        )
+
+    def test_validator_rejects_mapping_payloads_for_string_array_fields(self) -> None:
+        cases = (
+            ("evidence", "resource_profile_evidence_refs"),
+            ("evidence", "capability_requirement_evidence_refs"),
+            ("observability", "profile_keys"),
+            ("observability", "proof_refs"),
+            ("observability", "admission_outcome_fields"),
+        )
+        for section, field_name in cases:
+            with self.subTest(section=section, field_name=field_name):
+                requirement = copy_requirement()
+                requirement[section][field_name] = {"account": True}
+
+                result = validate_adapter_capability_requirement(requirement)
+
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+                self.assertEqual(result.details["actual_type"], "dict")
+
     def test_validator_rejects_lifecycle_boundary_violation(self) -> None:
         requirement = copy_requirement()
         requirement["lifecycle"]["resource_profiles_drive_admission"] = False
@@ -190,12 +222,15 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
         self.assertEqual(result.details["extra_fields"], ("acquire_strategy",))
 
     def test_validator_rejects_observability_technical_field_leakage(self) -> None:
-        requirement = copy_requirement()
-        requirement["observability"]["admission_outcome_fields"].append("browser_profile")
+        leaked_values = ("browser_profile", "browserProfile", "networkTier", "providerKey", "xhs:provider:native")
+        for leaked_value in leaked_values:
+            with self.subTest(leaked_value=leaked_value):
+                requirement = copy_requirement()
+                requirement["observability"]["requirement_id"] = leaked_value
 
-        result = validate_adapter_capability_requirement(requirement)
+                result = validate_adapter_capability_requirement(requirement)
 
-        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
 
     def test_validator_rejects_provider_priority_and_fallback_fields(self) -> None:
         requirement = copy_requirement()

@@ -41,11 +41,12 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：PR `#329` 首次 guardian review 返回 `REQUEST_CHANGES`，已修复两个阻断项并补充复现测试；随后同步 `origin/main` 最新主干 `5cc4a6c4b12bfb74e852472705e8c3fb5d98ed93` 并重跑目标测试与门禁通过，下一步推送并重新运行 guardian。
+- 当前 checkpoint：PR `#329` 第二次 guardian review 返回 `REQUEST_CHANGES`，已继续收紧 string[] 类型、observability 泄漏、requirement evidence truth 与错误码口径，并通过目标测试与全 runtime discover；下一步补齐 PR carrier、提交、重跑门禁并复审。
 
 ## 下一步动作
 
-- 推送 PR `#329` 新 head，重新运行 guardian。
+- 补齐 PR carrier 的审查输入。
+- 提交第二轮 guardian 修复，重跑门禁并推送 PR `#329` 新 head，重新运行 guardian。
 - guardian 与 checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
@@ -163,10 +164,33 @@
   - 结果：通过。
 - rebase 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 329 --post-review`
+  - 结果：第二次返回 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - `string[]` 字段会错误接受 mapping。
+    - observability 泄漏检测可被 camelCase / 冒号分隔绕过。
+    - `capability_requirement_evidence_refs` 只做前缀校验，伪造 approved-looking ref 仍可通过。
+    - 错误码口径与 `FR-0024` formal truth 漂移，需统一到 `runtime_contract + invalid_resource_requirement`。
+    - PR carrier 缺少 review-critical validation context。
+- 已处理第二轮 guardian 阻断：
+  - `_normalize_string_tuple` 显式拒绝 `Mapping`。
+  - observability 禁止 token 使用 substring fail-closed，覆盖 camelCase、冒号分隔与连写词。
+  - requirement-level evidence refs 改为 exact approved ref set。
+  - `ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT` 对齐为 `invalid_resource_requirement`，避免与 formal truth 漂移。
+  - 新增 mapping string[]、伪造 evidence、camelCase / 冒号 observability 泄漏测试。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement`
+  - 结果：通过，17 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，10 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_resource_capability_matcher`
+  - 结果：通过，17 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_registry`
+  - 结果：通过，15 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，863 tests。
 
 ## 待验证项
 
-- PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
+- PR carrier update、第二轮 guardian 修复提交后的 governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
 
