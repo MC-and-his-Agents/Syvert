@@ -23,6 +23,11 @@ class AdapterMissingSdkContractMetadata(ThirdPartyContractFixtureAdapter):
     sdk_contract_id = ""
 
 
+class AdapterWithProviderFacingMetadata(ThirdPartyContractFixtureAdapter):
+    provider_key = "native-provider"
+    selector = "runtime-selector"
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
         results = run_third_party_adapter_contract_test(
@@ -92,6 +97,22 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
                 self.assertEqual(context.exception.code, "forbidden_adapter_manifest_fields")
                 self.assertEqual(context.exception.details["forbidden_fields"], (field,))
 
+    def test_rejects_adapter_key_with_provider_account_or_runtime_strategy_semantics(self) -> None:
+        invalid_adapter_keys = (
+            "provider-xhs",
+            "xhs-prod-account-1",
+            "xhs-selector-fallback",
+        )
+        for adapter_key in invalid_adapter_keys:
+            with self.subTest(adapter_key=adapter_key):
+                manifest = minimal_third_party_adapter_manifest()
+                manifest["adapter_key"] = adapter_key
+
+                with self.assertRaises(ThirdPartyContractEntryError) as context:
+                    validate_third_party_adapter_manifest(manifest)
+
+                self.assertEqual(context.exception.code, "invalid_adapter_key_boundary")
+
     def test_rejects_invalid_fr0027_resource_declaration_via_registry(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
         declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
@@ -114,6 +135,17 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "adapter_manifest_metadata_mismatch")
         self.assertIn("sdk_contract_id", context.exception.details["mismatches"])
+
+    def test_rejects_adapter_public_metadata_with_provider_facing_fields(self) -> None:
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithProviderFacingMetadata(),
+            )
+
+        self.assertEqual(context.exception.code, "forbidden_adapter_public_metadata_fields")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_key", "selector"))
 
     def test_rejects_fixture_refs_that_do_not_resolve(self) -> None:
         manifest = minimal_third_party_adapter_manifest()

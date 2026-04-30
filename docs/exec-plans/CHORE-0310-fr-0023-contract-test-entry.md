@@ -40,6 +40,7 @@
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#310` GitHub issue、`FR-0023` formal spec 与现有 contract harness / registry resource declaration 校验。
 - 已新增第三方 Adapter manifest / fixture contract entry，并复用 `AdapterRegistry.from_mapping()` 消费现有 `AdapterResourceRequirementDeclarationV2` / FR-0027 校验。
 - 已确认当前 FR-0027 approved profile proof 只覆盖 `xhs` / `douyin` reference slice；本事项不扩张 resource proof，不创建第二套第三方 resource declaration truth。
+- guardian review 初次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界与 adapter public metadata provider-facing 字段未显式 fail-closed；已补充对应校验与回归测试。
 
 ## 下一步动作
 
@@ -69,11 +70,11 @@
 - `python3 -m pytest tests/runtime/test_third_party_adapter_contract_entry.py -q`
   - 结果：未执行通过；当前环境 `python3` 无 `pytest` 模块，改用 `unittest` 执行同等测试。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
-  - 结果：通过，10 tests。
+  - 结果：通过，12 tests。
 - `python3 -m unittest tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
   - 结果：通过，50 tests。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
-  - 结果：通过，60 tests。
+  - 结果：通过，62 tests。
 - `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
   - 结果：通过。
 - `git diff --check`
@@ -89,6 +90,10 @@
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class 为 `implementation`，变更类别为 `docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 初次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：`adapter_key` 只校验非空；adapter public metadata 可暴露 provider-facing 字段。
+  - 修正：新增 `adapter_key` provider / account / environment / routing strategy 语义片段阻断；新增 adapter 对象 provider / compatibility 字段暴露阻断；新增回归测试。
 
 ## 未决风险
 

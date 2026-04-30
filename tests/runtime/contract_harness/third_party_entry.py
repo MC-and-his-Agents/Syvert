@@ -55,6 +55,24 @@ _FORBIDDEN_MANIFEST_FIELDS = frozenset(
 _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
     {"invalid_input", "unsupported", "platform"}
 )
+_FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
+    {
+        "account",
+        "acct",
+        "dev",
+        "env",
+        "fallback",
+        "marketplace",
+        "priority",
+        "prod",
+        "provider",
+        "route",
+        "routing",
+        "score",
+        "selector",
+        "staging",
+    }
+)
 _MISSING = object()
 
 
@@ -169,6 +187,7 @@ def validate_third_party_adapter_manifest(manifest: Mapping[str, Any]) -> ThirdP
         code="invalid_manifest_public_metadata",
         field="adapter_key",
     )
+    _validate_adapter_key_boundary(adapter_key)
     sdk_contract_id = _require_non_empty_string(
         manifest["sdk_contract_id"],
         code="invalid_manifest_public_metadata",
@@ -291,6 +310,7 @@ def _normalize_manifest_resource_declarations(manifest: ThirdPartyAdapterManifes
 
 
 def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapter: Any) -> None:
+    _reject_forbidden_adapter_public_metadata(adapter, manifest.adapter_key)
     try:
         registry = AdapterRegistry.from_mapping({manifest.adapter_key: adapter})
     except RegistryError as error:
@@ -362,6 +382,38 @@ def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapt
             "adapter_manifest_metadata_mismatch",
             "adapter public metadata must match the manifest before execution",
             details={"adapter_key": manifest.adapter_key, "mismatches": mismatches},
+        )
+
+
+def _validate_adapter_key_boundary(adapter_key: str) -> None:
+    normalized = adapter_key.lower()
+    forbidden_fragments = tuple(
+        sorted(fragment for fragment in _FORBIDDEN_ADAPTER_KEY_FRAGMENTS if fragment in normalized)
+    )
+    if forbidden_fragments:
+        raise ThirdPartyContractEntryError(
+            "invalid_adapter_key_boundary",
+            "adapter_key must not carry provider, account, environment, or routing strategy semantics",
+            details={"adapter_key": adapter_key, "forbidden_fragments": forbidden_fragments},
+        )
+
+
+def _reject_forbidden_adapter_public_metadata(adapter: Any, adapter_key: str) -> None:
+    exposed_fields: list[str] = []
+    for field in sorted(_FORBIDDEN_MANIFEST_FIELDS):
+        try:
+            getattr(adapter, field)
+        except AttributeError:
+            continue
+        except Exception:
+            exposed_fields.append(field)
+            continue
+        exposed_fields.append(field)
+    if exposed_fields:
+        raise ThirdPartyContractEntryError(
+            "forbidden_adapter_public_metadata_fields",
+            "adapter public metadata must not expose provider or compatibility fields",
+            details={"adapter_key": adapter_key, "forbidden_fields": tuple(exposed_fields)},
         )
 
 
