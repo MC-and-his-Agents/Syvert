@@ -6,7 +6,10 @@ import re
 from typing import Any, Literal
 
 from syvert.registry import AdapterResourceRequirementDeclarationV2, AdapterResourceRequirementProfile
-from syvert.resource_capability_evidence import approved_shared_resource_requirement_profile_evidence_entries
+from syvert.resource_capability_evidence import (
+    approved_shared_resource_requirement_profile_evidence_entries,
+    frozen_resource_requirement_profile_evidence_records,
+)
 from syvert.runtime import AdapterExecutionContext, AdapterTaskRequest, PlatformAdapterError
 from tests.runtime.contract_harness.validation_tool import (
     ContractSampleDefinition,
@@ -73,6 +76,13 @@ _APPROVED_PROFILE_PROOF_BY_REF = {
     entry.profile_ref: entry
     for entry in approved_shared_resource_requirement_profile_evidence_entries()
 }
+_APPROVED_PROFILE_PROOF_BY_REF.update(
+    {
+        entry.profile_ref: entry
+        for entry in frozen_resource_requirement_profile_evidence_records()
+        if entry.resource_dependency_mode == "none" and not entry.required_capabilities
+    }
+)
 _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
     {
         "account",
@@ -684,10 +694,17 @@ def _normalize_third_party_resource_requirement_profile(
                 "source": source,
             },
         )
-    required_capabilities = _require_non_empty_string_tuple(
+    required_capabilities = _require_string_tuple(
         raw_required_capabilities,
         field=f"{source}.resource_requirement_profiles.required_capabilities",
+        allow_empty=resource_dependency_mode == "none",
     )
+    if resource_dependency_mode == "required" and not required_capabilities:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "required resource profiles must declare at least one capability",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key, "source": source},
+        )
     evidence_refs = _require_non_empty_string_tuple(
         raw_evidence_refs,
         field=f"{source}.resource_requirement_profiles.evidence_refs",
@@ -1219,8 +1236,12 @@ def _require_non_string_sequence(value: Any, *, field: str) -> tuple[Any, ...]:
 
 
 def _require_non_empty_string_tuple(value: Any, *, field: str) -> tuple[str, ...]:
+    return _require_string_tuple(value, field=field, allow_empty=False)
+
+
+def _require_string_tuple(value: Any, *, field: str, allow_empty: bool) -> tuple[str, ...]:
     values = _require_non_string_sequence(value, field=field)
-    if not values:
+    if not values and not allow_empty:
         raise ThirdPartyContractEntryError(
             "invalid_manifest_public_metadata",
             f"{field} must not be empty",

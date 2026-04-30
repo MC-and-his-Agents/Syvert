@@ -46,13 +46,12 @@
 - guardian review 第四次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界使用任意子串导致误杀，以及 error_mapping fixture 未绑定 manifest 声明；已改为 token / segment 级 key 校验，并要求 error_mapping fixture 通过 `source_error` 与 manifest `error_mapping` 对齐。
 - guardian review 第五次返回 `REQUEST_CHANGES`，阻断项为纯 provider product name 仍可作为 `adapter_key`，以及 manifest 可声明未批准 capability；已显式阻断 `xhs` / `douyin` provider product key，并限制 supported_capabilities 只能使用当前 `content_detail` approved slice 且必须有 resource declaration 覆盖。
 - guardian review 第六次返回 `REQUEST_CHANGES`，阻断项为非 mapping success payload 会触发未处理异常，以及 sequence 字段会误收 dict keys；已改为结构化 contract violation，并让 sequence helper 拒绝 mapping。
+- guardian review 第七次返回 `REQUEST_CHANGES`，阻断项为 `resource_dependency_mode=none` 且 `required_capabilities=()` 的 FR-0027 合法 profile 会被第三方入口误拒绝；已允许 none profile 空能力集合，并补充第三方 manifest / fixture / execute 准入回归。
 
 ## 下一步动作
 
-- 运行新增测试、相关 runtime harness / registry 回归与必需门禁。
-- 修正门禁发现的问题。
-- 提交中文 Conventional Commit。
-- 使用 `scripts/open_pr.py` 受控开 PR，等待 guardian review、checks 与 merge gate。
+- 提交第七轮 guardian 修复并推送 PR `#330` 新 head。
+- 重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -114,11 +113,39 @@
   - 第六次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：非 mapping success payload 会让 harness 抛未处理异常；sequence 字段会误收 mapping keys。
   - 修正：非 mapping success payload 生成可由 validator 归类的 contract violation envelope；sequence helper 显式拒绝 `Mapping` 输入。
+- rebase 到 `origin/main` 后 `python3 -m unittest tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，69 tests。
+- rebase 到 `origin/main` 后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- rebase 到 `origin/main` 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- rebase 到 `origin/main` 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- rebase 到 `origin/main` 后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- rebase 到 `origin/main` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第七次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：第三方入口错误拒绝 FR-0027 `none` profile。
+  - 修正：`required_capabilities` 在 `resource_dependency_mode=none` 时允许空 tuple，proof index 消费 FR-0027 frozen truth 中的 none profile，并补充第三方 contract entry 回归。
+- 第七轮 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，70 tests。
+- 第七轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第七轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第七轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第七轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第七轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 未决风险
 
 - 本事项只实现 Adapter-only contract test entry，不代表 Provider offer 或 compatibility decision 已定义；相关字段继续 fail-closed。
-- 当前第三方样例为了复用 `FR-0027` 已批准 resource profile proof，绑定到既有 `xhs` approved slice；不得据此推断新第三方 adapter key 已被 resource proof 批准。
+- 当前第三方样例只消费 `FR-0027` profile tuple / proof truth，不定义第三方 adapter key 的 provider 兼容性或真实外部资源支持。
 - 若后续 `#314/#319` 并行修改相邻 validator 或 docs，本事项只消费主干合并后的事实，不覆盖其 ownership 文件。
 
 ## 回滚方式
