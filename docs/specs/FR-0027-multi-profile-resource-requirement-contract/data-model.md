@@ -6,7 +6,7 @@
 - 字段：
   - `adapter_key`
     - 类型：`string`
-    - 约束：非空；声明所属 adapter
+    - 约束：非空；声明所属 adapter；每个 profile 引用到的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.reference_adapters` 都必须覆盖该值
   - `capability`
     - 类型：`string`
     - 约束：非空；声明所属 adapter-facing capability
@@ -51,7 +51,7 @@
     - 约束：与被批准 profile 的 canonical tuple 完全一致
   - `reference_adapters`
     - 类型：`string[]`
-    - 约束：当前必须且只能覆盖 `xhs`、`douyin`
+    - 约束：当前必须且只能覆盖 `xhs`、`douyin`；任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
   - `shared_status`
     - 类型：`enum`
     - 允许值：`shared`
@@ -96,6 +96,7 @@
 
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
 - declaration profile 无法映射到 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
+- declaration `adapter_key` 不在被引用 entry 的 `reference_adapters` 中 -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`
 - declaration 合法但全部 profile 未命中 -> `match_status=unmatched`
 - `unmatched` 若向外映射失败 envelope，继续使用 `resource_unavailable`

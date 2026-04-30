@@ -36,6 +36,7 @@
     - `adapter_key`
     - `capability`
     - `resource_requirement_profiles`
+  - `adapter_key` 必须是非空字符串，并且当前 declaration 上每一个 profile 引用到的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 都必须显式批准该 `adapter_key`；未被批准的 adapter 不得借用已批准 tuple 进入 shared contract。
   - `resource_requirement_profiles` 必须是非空数组；数组中的每一项都必须满足 `AdapterResourceRequirementProfile` contract。
   - `AdapterResourceRequirementProfile` 至少必须固定以下字段：
     - `profile_key`
@@ -65,7 +66,7 @@
   - `resource_dependency_mode` 在 `v0.8.0` 只允许 `none` 或 `required`。
   - 当 `resource_dependency_mode=none` 时，`required_capabilities` 必须且只能为空数组。
   - 当 `resource_dependency_mode=required` 时，`required_capabilities` 必须是非空、去重数组，元素只能来自 `FR-0015` 已批准共享能力词汇。`v0.8.0` 当前只允许 `account`、`proxy`。
-  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，不得引用 adapter 私有注释、运行期临时日志或未批准材料。
+  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，并且该 entry 的 `reference_adapters` 必须覆盖 declaration 的 `adapter_key`；不得引用 adapter 私有注释、运行期临时日志或未批准材料。
   - 同一条 declaration 中允许存在多个合法 profile；这些 profile 表达“任一满足即可执行”的共享 contract，而不是“按顺序尝试”的 fallback 列表。
   - `v0.8.0` 当前允许出现在 shared declaration 空间中的 profile 只允许由以下最小共享能力语义组合构成：
     - `none`
@@ -90,6 +91,7 @@
     - `required_capabilities` 形状非法、重复、为空但 mode=`required`，或出现未被 `FR-0015` 批准的能力标识
     - `evidence_refs` 为空、重复，或无法解析到 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
     - declaration 中包含无法与 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 完全对齐的 profile
+    - declaration 的 `adapter_key` 不在任一被引用 `ApprovedSharedResourceRequirementProfileEvidenceEntry.reference_adapters` 中
     - matcher 输入的 `adapter_key` / `capability` 与 declaration 上下文不一致
   - 以下情况不得视为 `invalid_resource_requirement`：
     - declaration 合法，但当前 `available_resource_capabilities` 没有满足任何合法 profile
@@ -123,9 +125,15 @@
 
 ### 场景 1
 
-Given `adapter_key=xhs`、`capability=content_detail` 的 declaration 合法包含两个 profile：`required + [account, proxy]` 与 `required + [account]`，且两者都绑定到与其 tuple 完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
+Given `adapter_key=xhs`、`capability=content_detail` 的 declaration 合法包含两个 profile：`required + [account, proxy]` 与 `required + [account]`，且两者都绑定到与其 tuple 完全对齐、并覆盖 `xhs` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
 When matcher 接收到 `available_resource_capabilities=[account]`  
 Then matcher 必须返回 `matched`，因为当前能力集合命中了其中一个合法 profile
+
+### 场景 1A
+
+Given `adapter_key=external_adapter` 的 declaration 复用了一个只对 `xhs`、`douyin` 批准的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
+When formal review 或 runtime validator 校验该 declaration  
+Then 它必须按 `invalid_resource_requirement` fail-closed，因为 declaration adapter 不在该 approval proof 的 `reference_adapters` 内
 
 ### 场景 2
 

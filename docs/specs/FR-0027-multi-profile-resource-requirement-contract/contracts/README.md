@@ -24,6 +24,7 @@
 
 ### validation rules
 
+- `adapter_key` 必须被每个被引用的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.reference_adapters` 显式批准
 - declaration 至少包含一个 profile
 - profile `profile_key` 在 declaration 内必须唯一
 - `resource_dependency_mode=none` -> `required_capabilities=[]`
@@ -52,6 +53,7 @@
 - `capability` 当前只允许 `content_detail`
 - `resource_dependency_mode` / `required_capabilities` 必须与 declaration profile 的 canonical tuple 完全一致
 - `reference_adapters` 当前必须且只能覆盖 `xhs`、`douyin`
+- 任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
 - `shared_status` 当前只允许 `shared`
 - `decision` 当前只允许 `approve_for_v0_8_0`
 - `evidence_refs` 必须回指 `FR-0015` research / artifact 中更细粒度的双参考证据
