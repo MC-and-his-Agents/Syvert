@@ -4,7 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from syvert.resource_capability_evidence import approved_resource_capability_ids
+from syvert.resource_capability_evidence import (
+    ApprovedSharedResourceRequirementProfileEvidenceEntry,
+    approved_resource_capability_ids,
+    approved_shared_resource_requirement_profile_evidence_entries,
+)
 from syvert.resource_capability_evidence import frozen_dual_reference_resource_capability_evidence_records
 
 
@@ -21,6 +25,21 @@ _DECLARATION_FIELD_NAMES = frozenset(
     {
         "adapter_key",
         "capability",
+        "resource_dependency_mode",
+        "required_capabilities",
+        "evidence_refs",
+    }
+)
+_DECLARATION_V2_FIELD_NAMES = frozenset(
+    {
+        "adapter_key",
+        "capability",
+        "resource_requirement_profiles",
+    }
+)
+_PROFILE_FIELD_NAMES = frozenset(
+    {
+        "profile_key",
         "resource_dependency_mode",
         "required_capabilities",
         "evidence_refs",
@@ -45,6 +64,8 @@ _FORBIDDEN_RESOURCE_REQUIREMENT_KEYS = frozenset(
         "chromium",
         "browser_provider",
         "sign_service",
+        "preferred_profiles",
+        "provider_offer",
     }
 )
 _FROZEN_REQUIRED_CAPABILITY_IDS = ("account", "proxy")
@@ -90,13 +111,36 @@ class AdapterResourceRequirementDeclaration:
 
 
 @dataclass(frozen=True)
+class AdapterResourceRequirementProfile:
+    profile_key: str
+    resource_dependency_mode: str
+    required_capabilities: tuple[str, ...]
+    evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AdapterResourceRequirementDeclarationV2:
+    adapter_key: str
+    capability: str
+    resource_requirement_profiles: tuple[AdapterResourceRequirementProfile, ...]
+
+
+AdapterResourceRequirementDeclarationCarrier = (
+    AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2
+)
+
+
+@dataclass(frozen=True)
 class AdapterDeclaration:
     adapter_key: str
     adapter: Any
     supported_capabilities: frozenset[str]
     supported_targets: frozenset[str]
     supported_collection_modes: frozenset[str]
-    resource_requirement_declarations: tuple[AdapterResourceRequirementDeclaration, ...]
+    resource_requirement_declarations: tuple[
+        AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2,
+        ...
+    ]
 
 
 class AdapterRegistry:
@@ -174,7 +218,7 @@ class AdapterRegistry:
     def discover_resource_requirements(
         self,
         adapter_key: str,
-    ) -> tuple[AdapterResourceRequirementDeclaration, ...] | None:
+    ) -> tuple[AdapterResourceRequirementDeclarationCarrier, ...] | None:
         declaration = self.lookup(adapter_key)
         if declaration is None:
             return None
@@ -184,7 +228,7 @@ class AdapterRegistry:
         self,
         adapter_key: str,
         capability: str,
-    ) -> AdapterResourceRequirementDeclaration | None:
+    ) -> AdapterResourceRequirementDeclarationCarrier | None:
         declaration = self.lookup(adapter_key)
         if declaration is None:
             return None
@@ -310,7 +354,7 @@ def _validate_resource_requirement_declarations(
     raw_declarations: Any,
     *,
     supported_capabilities: frozenset[str],
-) -> tuple[AdapterResourceRequirementDeclaration, ...]:
+) -> tuple[AdapterResourceRequirementDeclarationCarrier, ...]:
     if raw_declarations is MISSING:
         return ()
 
@@ -319,7 +363,7 @@ def _validate_resource_requirement_declarations(
         missing_code="invalid_adapter_resource_requirements",
         message="resource_requirement_declarations 必须为 AdapterResourceRequirementDeclaration 集合",
     )
-    validated: list[AdapterResourceRequirementDeclaration] = []
+    validated: list[AdapterResourceRequirementDeclarationCarrier] = []
     seen_capabilities: set[str] = set()
     for declaration in declarations:
         validated_declaration = _validate_resource_requirement_declaration(
@@ -357,7 +401,7 @@ def _validate_resource_requirement_declaration_collection(
     *,
     missing_code: str,
     message: str,
-) -> tuple[AdapterResourceRequirementDeclaration, ...]:
+) -> tuple[AdapterResourceRequirementDeclarationCarrier, ...]:
     if raw_values is None:
         raise RegistryError(
             missing_code,
@@ -379,7 +423,7 @@ def _validate_resource_requirement_declaration_collection(
             details={"actual_type": type(raw_values).__name__},
         )
 
-    validated: list[AdapterResourceRequirementDeclaration] = []
+    validated: list[AdapterResourceRequirementDeclarationCarrier] = []
     try:
         for value in iterator:
             validated.append(_normalize_resource_requirement_declaration_candidate(value))
@@ -396,8 +440,8 @@ def _validate_resource_requirement_declaration_collection(
 
 def _normalize_resource_requirement_declaration_candidate(
     raw_value: Any,
-) -> AdapterResourceRequirementDeclaration:
-    if isinstance(raw_value, AdapterResourceRequirementDeclaration):
+) -> AdapterResourceRequirementDeclarationCarrier:
+    if isinstance(raw_value, (AdapterResourceRequirementDeclaration, AdapterResourceRequirementDeclarationV2)):
         return raw_value
     if not isinstance(raw_value, Mapping):
         raise RegistryError(
@@ -422,6 +466,27 @@ def _normalize_resource_requirement_declaration_candidate(
             details={"forbidden_fields": forbidden_keys},
         )
 
+    if "resource_requirement_profiles" in raw_keys:
+        missing_fields = tuple(sorted(_DECLARATION_V2_FIELD_NAMES - raw_keys))
+        extra_fields = tuple(sorted(raw_keys - _DECLARATION_V2_FIELD_NAMES))
+        if missing_fields or extra_fields:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementDeclarationV2 必须保持固定字段集合",
+                details={
+                    "missing_fields": missing_fields,
+                    "extra_fields": extra_fields,
+                },
+            )
+        return AdapterResourceRequirementDeclarationV2(
+            adapter_key=raw_value["adapter_key"],
+            capability=raw_value["capability"],
+            resource_requirement_profiles=tuple(
+                _normalize_resource_requirement_profile_candidate(profile)
+                for profile in raw_value["resource_requirement_profiles"]
+            ),
+        )
+
     missing_fields = tuple(sorted(_DECLARATION_FIELD_NAMES - raw_keys))
     extra_fields = tuple(sorted(raw_keys - _DECLARATION_FIELD_NAMES))
     if missing_fields or extra_fields:
@@ -443,11 +508,61 @@ def _normalize_resource_requirement_declaration_candidate(
     )
 
 
+def _normalize_resource_requirement_profile_candidate(raw_value: Any) -> AdapterResourceRequirementProfile:
+    if isinstance(raw_value, AdapterResourceRequirementProfile):
+        return raw_value
+    if not isinstance(raw_value, Mapping):
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementProfile 只能使用 canonical profile carrier",
+            details={"invalid_value_type": type(raw_value).__name__},
+        )
+    raw_keys = {key for key in raw_value}
+    if any(not isinstance(key, str) for key in raw_keys):
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementProfile 字段名必须为字符串",
+            details={"actual_keys": tuple(sorted(str(key) for key in raw_keys))},
+        )
+    forbidden_keys = tuple(sorted(raw_keys & _FORBIDDEN_RESOURCE_REQUIREMENT_KEYS))
+    if forbidden_keys:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementProfile 禁止包含 fallback/priority/provider-selection 等扩张字段",
+            details={"forbidden_fields": forbidden_keys},
+        )
+    missing_fields = tuple(sorted(_PROFILE_FIELD_NAMES - raw_keys))
+    extra_fields = tuple(sorted(raw_keys - _PROFILE_FIELD_NAMES))
+    if missing_fields or extra_fields:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementProfile 必须保持固定字段集合",
+            details={
+                "missing_fields": missing_fields,
+                "extra_fields": extra_fields,
+            },
+        )
+    return AdapterResourceRequirementProfile(
+        profile_key=raw_value["profile_key"],
+        resource_dependency_mode=raw_value["resource_dependency_mode"],
+        required_capabilities=tuple(raw_value["required_capabilities"]),
+        evidence_refs=tuple(raw_value["evidence_refs"]),
+    )
+
+
 def _validate_resource_requirement_declaration(
     *,
     adapter_key: str,
-    declaration: AdapterResourceRequirementDeclaration,
-) -> AdapterResourceRequirementDeclaration:
+    declaration: AdapterResourceRequirementDeclarationCarrier,
+) -> AdapterResourceRequirementDeclarationCarrier:
+    if type(declaration) is AdapterResourceRequirementDeclarationV2:
+        return _validate_resource_requirement_declaration_v2(adapter_key=adapter_key, declaration=declaration)
+    if type(declaration) is not AdapterResourceRequirementDeclaration:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "resource_requirement_declarations 只能包含 canonical declaration carrier",
+            details={"adapter_key": adapter_key, "actual_type": type(declaration).__name__},
+        )
     normalized_adapter_key = _require_non_empty_string(
         declaration.adapter_key,
         code="invalid_adapter_resource_requirements",
@@ -584,6 +699,244 @@ def _validate_resource_requirement_declaration(
         required_capabilities=required_capabilities,
         evidence_refs=evidence_refs,
     )
+
+
+def _validate_resource_requirement_declaration_v2(
+    *,
+    adapter_key: str,
+    declaration: AdapterResourceRequirementDeclarationV2,
+) -> AdapterResourceRequirementDeclarationV2:
+    normalized_adapter_key = _require_non_empty_string(
+        declaration.adapter_key,
+        code="invalid_adapter_resource_requirements",
+        message="AdapterResourceRequirementDeclarationV2.adapter_key 必须为非空字符串",
+        details={"adapter_key": adapter_key},
+    )
+    if normalized_adapter_key != adapter_key:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementDeclarationV2.adapter_key 必须与 adapter_key 一致",
+            details={"adapter_key": adapter_key, "declaration_adapter_key": normalized_adapter_key},
+        )
+    capability = _require_non_empty_string(
+        declaration.capability,
+        code="invalid_adapter_resource_requirements",
+        message="AdapterResourceRequirementDeclarationV2.capability 必须为非空字符串",
+        details={"adapter_key": adapter_key},
+    )
+    if capability not in _ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "AdapterResourceRequirementDeclarationV2.capability 未被共享证据批准",
+            details={"adapter_key": adapter_key, "capability": capability},
+        )
+    profiles = _validate_profile_collection(
+        declaration.resource_requirement_profiles,
+        adapter_key=adapter_key,
+        capability=capability,
+    )
+    return AdapterResourceRequirementDeclarationV2(
+        adapter_key=normalized_adapter_key,
+        capability=capability,
+        resource_requirement_profiles=profiles,
+    )
+
+
+def _validate_profile_collection(
+    raw_profiles: Any,
+    *,
+    adapter_key: str,
+    capability: str,
+) -> tuple[AdapterResourceRequirementProfile, ...]:
+    if raw_profiles is None:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "resource_requirement_profiles 必须为非空 AdapterResourceRequirementProfile 集合",
+            details={"adapter_key": adapter_key, "capability": capability, "actual_type": "NoneType"},
+        )
+    if isinstance(raw_profiles, (str, bytes)):
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "resource_requirement_profiles 必须为非空 AdapterResourceRequirementProfile 集合",
+            details={"adapter_key": adapter_key, "capability": capability, "actual_type": type(raw_profiles).__name__},
+        )
+    try:
+        iterator = iter(raw_profiles)
+    except TypeError:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "resource_requirement_profiles 必须为非空 AdapterResourceRequirementProfile 集合",
+            details={"adapter_key": adapter_key, "capability": capability, "actual_type": type(raw_profiles).__name__},
+        )
+    profiles = tuple(_normalize_resource_requirement_profile_candidate(profile) for profile in iterator)
+    if not profiles:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "resource_requirement_profiles 不得为空",
+            details={"adapter_key": adapter_key, "capability": capability},
+        )
+
+    approved_profile_entries = {
+        entry.profile_ref: entry
+        for entry in approved_shared_resource_requirement_profile_evidence_entries()
+    }
+    validated: list[AdapterResourceRequirementProfile] = []
+    seen_profile_keys: set[str] = set()
+    seen_tuples: set[tuple[str, tuple[str, ...]]] = set()
+    for profile in profiles:
+        profile_key = _require_non_empty_string(
+            profile.profile_key,
+            code="invalid_adapter_resource_requirements",
+            message="AdapterResourceRequirementProfile.profile_key 必须为非空字符串",
+            details={"adapter_key": adapter_key, "capability": capability},
+        )
+        if profile_key in seen_profile_keys:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "resource_requirement_profiles 不得重复 profile_key",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        seen_profile_keys.add(profile_key)
+
+        resource_dependency_mode = _require_non_empty_string(
+            profile.resource_dependency_mode,
+            code="invalid_adapter_resource_requirements",
+            message="AdapterResourceRequirementProfile.resource_dependency_mode 必须为非空字符串",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+        )
+        if resource_dependency_mode not in _ALLOWED_RESOURCE_DEPENDENCY_MODES:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementProfile.resource_dependency_mode 仅允许 none|required",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        required_capabilities = _validate_unique_string_tuple(
+            profile.required_capabilities,
+            code="invalid_adapter_resource_requirements",
+            message="AdapterResourceRequirementProfile.required_capabilities 必须为去重字符串数组",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+        )
+        unknown_required_capabilities = tuple(
+            value for value in required_capabilities if value not in _APPROVED_RESOURCE_CAPABILITY_IDS
+        )
+        if unknown_required_capabilities:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementProfile.required_capabilities 只能使用 FR-0015 已批准 capability ids",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "profile_key": profile_key,
+                    "unknown_required_capabilities": unknown_required_capabilities,
+                },
+            )
+        if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE and required_capabilities:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "resource_dependency_mode=none 时 profile.required_capabilities 必须为空",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        if resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_REQUIRED and not required_capabilities:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "resource_dependency_mode=required 时 profile.required_capabilities 必须非空",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        normalized_required_capabilities = _canonicalize_required_capabilities(required_capabilities)
+        if required_capabilities != normalized_required_capabilities:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementProfile.required_capabilities 必须使用 canonical 顺序",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "profile_key": profile_key,
+                    "expected_required_capabilities": normalized_required_capabilities,
+                    "actual_required_capabilities": required_capabilities,
+                },
+            )
+        semantic_tuple = (resource_dependency_mode, normalized_required_capabilities)
+        if semantic_tuple in seen_tuples:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "resource_requirement_profiles 不得声明语义重复 profile",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        seen_tuples.add(semantic_tuple)
+
+        evidence_refs = _validate_unique_string_tuple(
+            profile.evidence_refs,
+            code="invalid_adapter_resource_requirements",
+            message="AdapterResourceRequirementProfile.evidence_refs 必须为非空去重字符串数组",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+        )
+        if len(evidence_refs) != 1:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementProfile.evidence_refs 当前必须且只能绑定一个 profile proof",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        proof = approved_profile_entries.get(evidence_refs[0])
+        if proof is None:
+            raise RegistryError(
+                "invalid_adapter_resource_requirements",
+                "AdapterResourceRequirementProfile.evidence_refs 必须绑定到 FR-0027 approved shared profile proof",
+                details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+            )
+        _validate_profile_proof_alignment(
+            proof,
+            adapter_key=adapter_key,
+            capability=capability,
+            profile_key=profile_key,
+            resource_dependency_mode=resource_dependency_mode,
+            required_capabilities=normalized_required_capabilities,
+        )
+        validated.append(
+            AdapterResourceRequirementProfile(
+                profile_key=profile_key,
+                resource_dependency_mode=resource_dependency_mode,
+                required_capabilities=normalized_required_capabilities,
+                evidence_refs=evidence_refs,
+            )
+        )
+    return tuple(validated)
+
+
+def _validate_profile_proof_alignment(
+    proof: ApprovedSharedResourceRequirementProfileEvidenceEntry,
+    *,
+    adapter_key: str,
+    capability: str,
+    profile_key: str,
+    resource_dependency_mode: str,
+    required_capabilities: tuple[str, ...],
+) -> None:
+    if proof.capability != capability:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "profile proof capability 必须与 declaration capability 完全一致",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+        )
+    if adapter_key not in proof.reference_adapters:
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "profile proof reference_adapters 必须覆盖 declaration adapter_key",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key},
+        )
+    if (
+        proof.resource_dependency_mode != resource_dependency_mode
+        or proof.required_capabilities != required_capabilities
+    ):
+        raise RegistryError(
+            "invalid_adapter_resource_requirements",
+            "profile proof 必须与 declaration profile tuple 完全一致",
+            details={
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "profile_key": profile_key,
+                "proof_profile_ref": proof.profile_ref,
+            },
+        )
 
 
 def _validate_supported_axis(
@@ -749,6 +1102,14 @@ def _canonical_required_evidence_refs(
             if evidence_ref not in ordered_refs:
                 ordered_refs.append(evidence_ref)
     return tuple(ordered_refs)
+
+
+def _canonicalize_required_capabilities(required_capabilities: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        capability_id
+        for capability_id in _REQUIRED_CAPABILITY_ORDER
+        if capability_id in frozenset(required_capabilities)
+    )
 
 
 def _canonical_declaration_evidence_refs(

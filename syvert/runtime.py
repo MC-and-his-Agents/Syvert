@@ -13,6 +13,8 @@ from uuid import uuid4
 from syvert.registry import (
     AdapterRegistry,
     AdapterResourceRequirementDeclaration,
+    AdapterResourceRequirementDeclarationV2,
+    AdapterResourceRequirementProfile,
     RegistryError,
     RESOURCE_DEPENDENCY_MODE_NONE,
     approved_resource_requirement_evidence_refs_for,
@@ -230,7 +232,7 @@ class ResourceCapabilityMatcherInput:
     task_id: str
     adapter_key: str
     capability: str
-    requirement_declaration: AdapterResourceRequirementDeclaration
+    requirement_declaration: AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2
     available_resource_capabilities: tuple[str, ...]
 
 
@@ -669,7 +671,7 @@ def execute_task_internal(
                         "adapter_key": adapter_key,
                         "capability": capability_family,
                         "match_status": match_result.match_status,
-                        "required_capabilities": list(matcher_input.requirement_declaration.required_capabilities),
+                        **_resource_requirement_unmatched_details(matcher_input.requirement_declaration),
                         "available_resource_capabilities": list(matcher_input.available_resource_capabilities),
                     },
                 ),
@@ -699,6 +701,24 @@ def execute_task_internal(
         preserve_envelope_on_record_error=preserve_envelope_on_record_error,
         task_record_store=store,
     )
+
+
+def _resource_requirement_unmatched_details(
+    declaration: AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2,
+) -> dict[str, Any]:
+    if type(declaration) is AdapterResourceRequirementDeclarationV2:
+        return {
+            "resource_requirement_profiles": [
+                {
+                    "profile_key": profile.profile_key,
+                    "resource_dependency_mode": profile.resource_dependency_mode,
+                    "required_capabilities": list(profile.required_capabilities),
+                    "evidence_refs": list(profile.evidence_refs),
+                }
+                for profile in declaration.resource_requirement_profiles
+            ]
+        }
+    return {"required_capabilities": list(declaration.required_capabilities)}
 
 
 def execute_controlled_adapter_attempts(
@@ -2453,9 +2473,11 @@ def resolve_task_id(task_id_factory: Callable[[], str] | None) -> tuple[str, dic
 
 def match_resource_capabilities(input_value: ResourceCapabilityMatcherInput) -> ResourceCapabilityMatchResult:
     validated_input = validate_resource_capability_matcher_input(input_value)
-    required_capabilities = frozenset(validated_input.requirement_declaration.required_capabilities)
     available_resource_capabilities = frozenset(validated_input.available_resource_capabilities)
-    if required_capabilities.issubset(available_resource_capabilities):
+    if _requirement_declaration_is_satisfied(
+        validated_input.requirement_declaration,
+        available_resource_capabilities=available_resource_capabilities,
+    ):
         match_status = MATCH_STATUS_MATCHED
     else:
         match_status = MATCH_STATUS_UNMATCHED
@@ -2465,6 +2487,33 @@ def match_resource_capabilities(input_value: ResourceCapabilityMatcherInput) -> 
         capability=validated_input.capability,
         match_status=match_status,
     )
+
+
+def _requirement_declaration_is_satisfied(
+    declaration: AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2,
+    *,
+    available_resource_capabilities: frozenset[str],
+) -> bool:
+    if type(declaration) is AdapterResourceRequirementDeclarationV2:
+        return any(
+            _requirement_profile_is_satisfied(
+                profile,
+                available_resource_capabilities=available_resource_capabilities,
+            )
+            for profile in declaration.resource_requirement_profiles
+        )
+    required_capabilities = frozenset(declaration.required_capabilities)
+    return required_capabilities.issubset(available_resource_capabilities)
+
+
+def _requirement_profile_is_satisfied(
+    profile: AdapterResourceRequirementProfile,
+    *,
+    available_resource_capabilities: frozenset[str],
+) -> bool:
+    if profile.resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE:
+        return True
+    return frozenset(profile.required_capabilities).issubset(available_resource_capabilities)
 
 
 def validate_resource_capability_matcher_input(
@@ -3019,10 +3068,10 @@ def _validate_matcher_requirement_declaration(
     expected_adapter_key: str,
     expected_capability: str,
     task_id: str,
-) -> AdapterResourceRequirementDeclaration:
-    if type(raw_value) is not AdapterResourceRequirementDeclaration:
+) -> AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2:
+    if type(raw_value) not in {AdapterResourceRequirementDeclaration, AdapterResourceRequirementDeclarationV2}:
         raise ResourceCapabilityMatcherContractError(
-            "matcher requirement_declaration 必须是 AdapterResourceRequirementDeclaration",
+            "matcher requirement_declaration 必须是 canonical AdapterResourceRequirementDeclaration carrier",
             details={"task_id": task_id, "actual_type": type(raw_value).__name__},
         )
 
@@ -3051,6 +3100,14 @@ def _validate_matcher_requirement_declaration(
                 "expected_capability": expected_capability,
                 "actual_capability": capability,
             },
+        )
+
+    if type(raw_value) is AdapterResourceRequirementDeclarationV2:
+        return _validate_matcher_requirement_declaration_v2(
+            raw_value,
+            expected_adapter_key=expected_adapter_key,
+            expected_capability=expected_capability,
+            task_id=task_id,
         )
 
     resource_dependency_mode = _require_matcher_non_empty_string(
@@ -3129,6 +3186,47 @@ def _validate_matcher_requirement_declaration(
 
     validated_requirement = registry.lookup_resource_requirement(expected_adapter_key, expected_capability)
     if validated_requirement is None:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须与当前 adapter/capability 上下文对齐",
+            details={
+                "task_id": task_id,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
+            },
+        )
+    return validated_requirement
+
+
+def _validate_matcher_requirement_declaration_v2(
+    raw_value: AdapterResourceRequirementDeclarationV2,
+    *,
+    expected_adapter_key: str,
+    expected_capability: str,
+    task_id: str,
+) -> AdapterResourceRequirementDeclarationV2:
+    try:
+        registry = AdapterRegistry.from_mapping(
+            {
+                expected_adapter_key: _MatcherRequirementValidationAdapter(
+                    supported_capability=expected_capability,
+                    requirement_declaration=raw_value,
+                )
+            }
+        )
+    except RegistryError as error:
+        raise ResourceCapabilityMatcherContractError(
+            "matcher requirement_declaration 必须满足 FR-0027 canonical contract",
+            details={
+                "task_id": task_id,
+                "adapter_key": expected_adapter_key,
+                "capability": expected_capability,
+                "registry_error_code": error.code,
+                **error.details,
+            },
+        ) from error
+
+    validated_requirement = registry.lookup_resource_requirement(expected_adapter_key, expected_capability)
+    if type(validated_requirement) is not AdapterResourceRequirementDeclarationV2:
         raise ResourceCapabilityMatcherContractError(
             "matcher requirement_declaration 必须与当前 adapter/capability 上下文对齐",
             details={

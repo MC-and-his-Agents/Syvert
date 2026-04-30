@@ -4,7 +4,13 @@ from collections.abc import Mapping
 import unittest
 from typing import Iterator, Tuple
 
-from syvert.registry import AdapterRegistry, RegistryError, baseline_required_resource_requirement_declaration
+from syvert.registry import (
+    AdapterRegistry,
+    AdapterResourceRequirementDeclarationV2,
+    AdapterResourceRequirementProfile,
+    RegistryError,
+    baseline_required_resource_requirement_declaration,
+)
 
 
 class SuccessfulAdapter:
@@ -68,6 +74,35 @@ class DeclarativeAdapter:
         baseline_required_resource_requirement_declaration(
             adapter_key="xhs",
             capability="content_detail",
+        ),
+    )
+
+    def execute(self) -> None:
+        raise AssertionError("registry tests must not execute adapters")
+
+
+class MultiProfileDeclarativeAdapter:
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        AdapterResourceRequirementDeclarationV2(
+            adapter_key="xhs",
+            capability="content_detail",
+            resource_requirement_profiles=(
+                AdapterResourceRequirementProfile(
+                    profile_key="account_proxy",
+                    resource_dependency_mode="required",
+                    required_capabilities=("account", "proxy"),
+                    evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account-proxy",),
+                ),
+                AdapterResourceRequirementProfile(
+                    profile_key="account",
+                    resource_dependency_mode="required",
+                    required_capabilities=("account",),
+                    evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account",),
+                ),
+            ),
         ),
     )
 
@@ -182,6 +217,47 @@ class RegistryTests(unittest.TestCase):
             registry.discover_resource_requirements("xhs"),
             (declaration,),
         )
+
+    def test_registry_materializes_v2_resource_requirement_declaration(self) -> None:
+        registry = AdapterRegistry.from_mapping({"xhs": MultiProfileDeclarativeAdapter()})
+
+        declaration = registry.lookup_resource_requirement("xhs", "content_detail")
+
+        self.assertIsInstance(declaration, AdapterResourceRequirementDeclarationV2)
+        assert isinstance(declaration, AdapterResourceRequirementDeclarationV2)
+        self.assertEqual(declaration.adapter_key, "xhs")
+        self.assertEqual(
+            [profile.profile_key for profile in declaration.resource_requirement_profiles],
+            ["account_proxy", "account"],
+        )
+
+    def test_registry_rejects_v2_profile_proof_that_does_not_cover_adapter(self) -> None:
+        class ExternalAdapter:
+            supported_capabilities = frozenset({"content_detail"})
+            supported_targets = frozenset({"url"})
+            supported_collection_modes = frozenset({"hybrid"})
+            resource_requirement_declarations = (
+                {
+                    "adapter_key": "external",
+                    "capability": "content_detail",
+                    "resource_requirement_profiles": (
+                        {
+                            "profile_key": "account",
+                            "resource_dependency_mode": "required",
+                            "required_capabilities": ("account",),
+                            "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:account",),
+                        },
+                    ),
+                },
+            )
+
+            def execute(self) -> None:
+                raise AssertionError("registry tests must not execute adapters")
+
+        with self.assertRaises(RegistryError) as context:
+            AdapterRegistry.from_mapping({"external": ExternalAdapter()})
+
+        self.assertEqual(context.exception.code, "invalid_adapter_resource_requirements")
 
     def test_registry_materializes_real_reference_adapters_without_provider_fields(self) -> None:
         from syvert.adapters.douyin import DouyinAdapter

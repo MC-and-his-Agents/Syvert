@@ -12,7 +12,11 @@ from unittest import mock
 import syvert.runtime as runtime_module
 from syvert.adapters.douyin import DouyinAdapter
 from syvert.adapters.xhs import XhsAdapter
-from syvert.registry import baseline_required_resource_requirement_declaration
+from syvert.registry import (
+    AdapterResourceRequirementDeclarationV2,
+    AdapterResourceRequirementProfile,
+    baseline_required_resource_requirement_declaration,
+)
 from syvert.resource_lifecycle import ResourceRecord
 from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
@@ -468,6 +472,36 @@ class NoneModeResourceRequirementDeclarationAdapter:
                 capability="content_detail",
             ).evidence_refs,
         },
+    )
+
+    def execute(self, request: TaskRequest):
+        raise AssertionError("execute should not be called")
+
+
+class MultiProfileResourceRequirementAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_detail"})
+    supported_targets = frozenset({"url"})
+    supported_collection_modes = frozenset({"hybrid"})
+    resource_requirement_declarations = (
+        AdapterResourceRequirementDeclarationV2(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_detail",
+            resource_requirement_profiles=(
+                AdapterResourceRequirementProfile(
+                    profile_key="account_proxy",
+                    resource_dependency_mode="required",
+                    required_capabilities=("account", "proxy"),
+                    evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account-proxy",),
+                ),
+                AdapterResourceRequirementProfile(
+                    profile_key="account",
+                    resource_dependency_mode="required",
+                    required_capabilities=("account",),
+                    evidence_refs=("fr-0027:profile:content-detail-by-url-hybrid:account",),
+                ),
+            ),
+        ),
     )
 
     def execute(self, request: TaskRequest):
@@ -1123,6 +1157,33 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             outcome.task_record.result.envelope["runtime_failure_signal"]["task_record_ref"],
             "task_record:task-unmatched-runtime-capabilities",
         )
+
+    def test_execute_task_maps_v2_unmatched_profiles_to_resource_unavailable(self) -> None:
+        with mock.patch.dict(
+            runtime_module.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE,
+            {(runtime_module.CONTENT_DETAIL_BY_URL, runtime_module.LEGACY_COLLECTION_MODE): ("proxy",)},
+            clear=True,
+        ), mock.patch(
+            "syvert.runtime.acquire_runtime_resource_bundle",
+            side_effect=AssertionError("acquire should not run when matcher is unmatched"),
+        ):
+            outcome = execute_task_with_record(
+                TaskRequest(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="content_detail_by_url",
+                    input=TaskInput(url="https://example.com/posts/unmatched-v2-runtime-capabilities"),
+                ),
+                adapters={TEST_ADAPTER_KEY: MultiProfileResourceRequirementAdapter()},
+                task_id_factory=lambda: "task-unmatched-v2-runtime-capabilities",
+            )
+
+        self.assertEqual(outcome.envelope["status"], "failed")
+        self.assertEqual(outcome.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(outcome.envelope["error"]["code"], "resource_unavailable")
+        self.assertIn("resource_requirement_profiles", outcome.envelope["error"]["details"])
+        self.assertNotIn("required_capabilities", outcome.envelope["error"]["details"])
+        self.assertIsNotNone(outcome.task_record)
+        self.assertEqual(outcome.task_record.result.envelope["error"]["code"], "resource_unavailable")
 
     def test_execute_task_rejects_unsupported_capability(self) -> None:
         request = TaskRequest(
