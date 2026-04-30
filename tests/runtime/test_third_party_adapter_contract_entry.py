@@ -42,6 +42,27 @@ class AdapterWithDriftedErrorMapping(ThirdPartyContractFixtureAdapter):
     }
 
 
+def _none_profile_resource_requirement_declarations() -> tuple[dict[str, object], ...]:
+    return (
+        {
+            "adapter_key": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+            "capability": "content_detail",
+            "resource_requirement_profiles": (
+                {
+                    "profile_key": "none",
+                    "resource_dependency_mode": "none",
+                    "required_capabilities": (),
+                    "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:none",),
+                },
+            ),
+        },
+    )
+
+
+class AdapterWithNoneResourceProfile(ThirdPartyContractFixtureAdapter):
+    resource_requirement_declarations = _none_profile_resource_requirement_declarations()
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
         adapter = ThirdPartyContractFixtureAdapter()
@@ -77,6 +98,24 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             [profile.profile_key for profile in declaration.resource_requirement_profiles],
             ["account_proxy", "account"],
         )
+
+    def test_accepts_fr0027_none_resource_profile_without_required_capabilities(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["resource_requirement_declarations"] = _none_profile_resource_requirement_declarations()
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        for fixture in fixtures:
+            fixture["input"]["resource_profile_key"] = "none"
+        adapter = AdapterWithNoneResourceProfile()
+
+        results = run_third_party_adapter_contract_test(
+            manifest=manifest,
+            fixtures=fixtures,
+            adapter=adapter,
+        )
+
+        self.assertEqual(results[0]["verdict"], "pass")
+        self.assertEqual(results[1]["verdict"], "legal_failure")
+        self.assertEqual(adapter.last_resource_slots, ())
 
     def test_rejects_missing_required_public_metadata_before_execution(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
