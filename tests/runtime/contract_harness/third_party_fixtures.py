@@ -198,6 +198,8 @@ class ThirdPartyContractFixtureAdapter:
                 "capability": "drifted-capability",
                 "status": "success",
             }
+        if self.success_payload_shape == "static_target":
+            return _success_payload("https://contract-host/third-party/static")
         return _success_payload(request.target_value)
 
 

@@ -977,6 +977,8 @@ def _execute_and_validate_fixture(
     result["observed_capability"] = runtime_envelope.get("capability")
     if result["verdict"] == "legal_failure":
         return _validate_error_mapping_observation(fixture, result)
+    if result["verdict"] == "pass":
+        return _validate_success_payload_observation(fixture, runtime_envelope, result)
     return result
 
 
@@ -1386,6 +1388,30 @@ def _validate_error_mapping_observation(
             "reason": {
                 "code": "error_mapping_source_error_mismatch",
                 "message": "observed failed envelope does not match fixture source_error expectation",
+            },
+        }
+    return result
+
+
+def _validate_success_payload_observation(
+    fixture: AdapterContractFixture,
+    runtime_envelope: Mapping[str, Any],
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    expected_target_value = fixture.input["target_value"]
+    raw_payload = runtime_envelope.get("raw")
+    normalized_payload = runtime_envelope.get("normalized")
+    raw_canonical_url = raw_payload.get("canonical_url") if isinstance(raw_payload, Mapping) else None
+    normalized_canonical_url = (
+        normalized_payload.get("canonical_url") if isinstance(normalized_payload, Mapping) else None
+    )
+    if raw_canonical_url != expected_target_value or normalized_canonical_url != expected_target_value:
+        return {
+            **result,
+            "verdict": "contract_violation",
+            "reason": {
+                "code": "success_payload_target_mismatch",
+                "message": "success payload raw and normalized canonical_url must bind to fixture target_value",
             },
         }
     return result

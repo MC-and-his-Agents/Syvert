@@ -57,10 +57,12 @@
 - guardian review 第十五次返回 `REQUEST_CHANGES`，阻断项为 fixture resource profile 可解析性仍在执行循环内校验，无法保证整组 fixture fail-closed 后再调用 Adapter；已将 resource profile / FR-0027 proof path 校验前移到 `validate_third_party_adapter_fixtures`，并补充 adapter execute 调用次数为 0 的准入顺序回归。
 - guardian review 第十六次返回 `REQUEST_CHANGES`，阻断项为 harness 允许真实 runtime 不会保留的 `unsupported` PlatformAdapterError category，且 exec-plan 对 resource declaration 校验路径仍描述为 `AdapterRegistry.from_mapping()`；已将 error mapping category 收窄到 runtime 会保留的 `invalid_input` / `platform`，PlatformAdapterError observation 复用 `classify_adapter_error()`，并校正文档真相。
 - guardian review 第十七次返回 `REQUEST_CHANGES`，阻断项为第三方入口绕过 FR-0027 proof `reference_adapters` 覆盖校验；已恢复与 registry / FR-0027 truth 一致的 `adapter_key in proof.reference_adapters` 校验，最小通过 fixture 使用当前 proof 覆盖的 `xhs` adapter key，非参考 key 借用 proof 时 fail-closed。
+- guardian review 第十八次返回 `REQUEST_CHANGES`，阻断项为 `xhs` 通过样例与 FR-0023 third-party adapter_key 边界冲突，以及 success fixture 未证明 target input 被 payload 绑定；已补强 success payload target binding。剩余 P1 是 formal truth 冲突：FR-0023 要求第三方 key 不携带 provider 产品名，FR-0027 当前 approved proof 又只覆盖 `xhs` / `douyin` 且要求 `adapter_key ∈ reference_adapters`。
 
 ## 下一步动作
 
-- 提交第十七次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 当前阻塞：需要治理决策解决 FR-0023 third-party adapter_key 与 FR-0027 current approved proof coverage 的 formal truth 冲突；在不修改 formal spec / evidence 的 implementation PR 中，无法同时满足“第三方 key 通过 baseline”和“FR-0027 proof 覆盖 adapter_key”。
+- 待决策后再提交 / 推送下一版 PR `#330` head 并重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -383,11 +385,26 @@
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十七次 guardian 修复后 `git diff --check`
   - 结果：通过。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十八次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - 当前通过样例使用 `xhs`，与 FR-0023 third-party adapter_key 不得携带 provider 产品名的边界冲突。
+    - success fixture 只验证 `raw` / `normalized` shape，不能证明 adapter 消费了 fixture target。
+  - 修正：
+    - success observation 现在要求 `raw.canonical_url` 与 `normalized.canonical_url` 均等于 fixture `target_value`，静态 payload 会返回 `success_payload_target_mismatch`。
+  - 未决：
+    - FR-0023 要求 third-party adapter identity 不携带 provider 产品名。
+    - FR-0027 当前 approved proof 只覆盖 `xhs` / `douyin`，且 formal spec 明确 declaration adapter 必须在 proof `reference_adapters` 内。
+    - 本 Work Item 是 implementation PR，不能在同一 PR 中改写 formal spec / evidence 来定义第三方 key 复用 proof 的例外。
+- 第十八次 guardian target-binding 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，92 tests。
+- 第十八次 guardian target-binding 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
 
 ## 未决风险
 
 - 本事项只实现 Adapter-only contract test entry，不代表 Provider offer 或 compatibility decision 已定义；相关字段继续 fail-closed。
-- 当前第三方样例只消费 `FR-0027` profile tuple / proof truth，不定义第三方 adapter key 的 provider 兼容性或真实外部资源支持。
+- 当前 FR-0027 approved proof 只覆盖 `xhs` / `douyin` reference adapters；若第三方 adapter key 需要通过当前 contract entry，必须先有 formal spec / evidence 定义第三方 proof coverage 或复用规则。
 - Registry discovery 的 public metadata 输出面继续由既有 `syvert/registry.py` / `tests/runtime/test_registry.py` 覆盖；本事项只验证第三方 contract entry 不接受 provider-facing metadata。
 - Reference adapter baseline 不在本事项 ownership 内；`#311` 负责 SDK docs / migration 说明，`#312` 负责父 FR closeout 时核对 reference baseline、contract entry 与 GitHub 状态。
 - 若后续 `#314/#319` 并行修改相邻 validator 或 docs，本事项只消费主干合并后的事实，不覆盖其 ownership 文件。

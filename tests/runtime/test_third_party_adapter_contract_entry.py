@@ -683,6 +683,18 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             ("adapter_key", "capability", "status"),
         )
 
+    def test_reports_success_payload_that_ignores_fixture_target_as_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="static_target"),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["reason"]["code"], "success_payload_target_mismatch")
+
     def test_reports_unexpected_adapter_exception_as_structured_contract_violation(self) -> None:
         results = run_third_party_adapter_contract_test(
             manifest=minimal_third_party_adapter_manifest(),
