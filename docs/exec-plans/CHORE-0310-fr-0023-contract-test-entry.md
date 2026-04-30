@@ -27,7 +27,7 @@
   - 本执行计划
 - 本次不纳入：
   - `docs/specs/FR-0023-third-party-adapter-entry-path/**` formal spec 变更
-  - `docs/specs/FR-0024-*`、`docs/specs/FR-0025-*`、`docs/specs/FR-0027-*`
+  - FR-0024、FR-0025、FR-0027 formal spec 套件
   - `adapter-sdk.md`
   - Provider offer、compatibility decision、provider registry / selector / marketplace / fallback / priority / score
   - `#314` 的 AdapterCapabilityRequirement validator
@@ -78,6 +78,17 @@
   - 结果：通过。
 - `git diff --check`
   - 结果：通过。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过，提交 `7f82cbc` 后复跑通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 初次结果：失败，原因是本 exec-plan 的禁止范围中出现通配路径表述，被识别为缺失路径引用。
+  - 修正后结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，提交 `7f82cbc` 后复跑通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-310-fr-0023-adapter-contract-test`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class 为 `implementation`，变更类别为 `docs, implementation`。
 
 ## 未决风险
 
@@ -93,4 +104,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
-- implementation checkpoint：待提交后补充。
+- implementation checkpoint：`7f82cbc71a72ea159d85b03dfdefe0e7286e6e28`
+- docs_guard follow-up checkpoint：待提交后补充。
