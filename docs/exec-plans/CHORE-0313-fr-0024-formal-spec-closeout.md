@@ -41,7 +41,7 @@
 
 - worktree：`/Users/mc/code/worktrees/syvert/issue-313-fr-0024-adapter-capability-requirement-formal-spec`
 - 分支：`issue-313-fr-0024-adapter-capability-requirement-formal-spec`
-- worktree 创建基线：`16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`
+- 原始 worktree 创建基线：`16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`FR-0027` formal spec、`FR-0021` formal spec、`#296` 与 `#313` GitHub truth。
 - 当前 checkpoint：已创建 `FR-0024` formal spec 套件与 active exec-plan；PR `#317` 已通过受控入口创建并绑定 `Fixes #313`，当前回合停点为修正 guardian 审查发现的 exec-plan 状态漂移后等待 review / merge gate 收口。
 
@@ -140,4 +140,4 @@
 - metadata 修正 checkpoint：`08bb25f6000624a12f40db304e2c3ce7cc001f12`
 - validation result follow-up checkpoint：`812edf6788e41bc6facfa21ebb66b2170035d38f`
 - review-sync follow-up checkpoint：`2be4b0c57cf4fac82132438bd4e269b75acab801`
-- worktree 创建基线：`ea44f9cdc863b244b7ceba5a3a70f2e23e41b7a5`
+- 当前 PR merge-base：`ea44f9cdc863b244b7ceba5a3a70f2e23e41b7a5`
