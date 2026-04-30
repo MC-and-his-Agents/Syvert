@@ -68,6 +68,33 @@ class AdapterWithUnexpectedException(ThirdPartyContractFixtureAdapter):
         raise RuntimeError("unexpected adapter bug")
 
 
+class AdapterWithReorderedPublicMetadata(ThirdPartyContractFixtureAdapter):
+    fixture_refs = (
+        THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID,
+        THIRD_PARTY_SUCCESS_FIXTURE_ID,
+    )
+    resource_requirement_declarations = (
+        {
+            "adapter_key": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+            "capability": "content_detail",
+            "resource_requirement_profiles": (
+                {
+                    "profile_key": "account",
+                    "resource_dependency_mode": "required",
+                    "required_capabilities": ("account",),
+                    "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:account",),
+                },
+                {
+                    "profile_key": "account_proxy",
+                    "resource_dependency_mode": "required",
+                    "required_capabilities": ("account", "proxy"),
+                    "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:account-proxy",),
+                },
+            ),
+        },
+    )
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
         adapter = ThirdPartyContractFixtureAdapter()
@@ -125,6 +152,16 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[0]["verdict"], "pass")
         self.assertEqual(results[1]["verdict"], "legal_failure")
         self.assertEqual(adapter.last_resource_slots, ())
+
+    def test_accepts_adapter_metadata_sets_with_different_ordering(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithReorderedPublicMetadata(),
+        )
+
+        self.assertEqual(results[0]["verdict"], "pass")
+        self.assertEqual(results[1]["verdict"], "legal_failure")
 
     def test_rejects_missing_required_public_metadata_before_execution(self) -> None:
         manifest = minimal_third_party_adapter_manifest()

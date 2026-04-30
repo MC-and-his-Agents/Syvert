@@ -367,7 +367,9 @@ def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapt
         mismatches["supported_targets"] = tuple(sorted(actual_targets))
     if tuple(sorted(actual_collection_modes)) != tuple(sorted(manifest.supported_collection_modes)):
         mismatches["supported_collection_modes"] = tuple(sorted(actual_collection_modes))
-    if actual_resource_requirements != manifest.resource_requirement_declarations:
+    if _resource_requirement_declaration_signatures(
+        actual_resource_requirements
+    ) != _resource_requirement_declaration_signatures(manifest.resource_requirement_declarations):
         mismatches["resource_requirement_declarations"] = actual_resource_requirements
     _compare_adapter_public_metadata_attr(
         adapter,
@@ -791,12 +793,39 @@ def _compare_adapter_public_metadata_attr(
             actual = tuple(actual)
         except TypeError:
             pass
+        if isinstance(actual, tuple) and tuple(sorted(actual)) == tuple(sorted(expected)):
+            return
     if actual != expected:
         mismatches[attr_name] = {
             "expected": expected,
             "actual": "missing" if actual is _MISSING else actual,
             "adapter_key": manifest.adapter_key,
         }
+
+
+def _resource_requirement_declaration_signatures(
+    declarations: tuple[AdapterResourceRequirementDeclarationV2, ...],
+) -> tuple[tuple[Any, ...], ...]:
+    return tuple(
+        sorted(
+            (
+                declaration.adapter_key,
+                declaration.capability,
+                tuple(
+                    sorted(
+                        (
+                            profile.profile_key,
+                            profile.resource_dependency_mode,
+                            profile.required_capabilities,
+                            profile.evidence_refs,
+                        )
+                        for profile in declaration.resource_requirement_profiles
+                    )
+                ),
+            )
+            for declaration in declarations
+        )
+    )
 
 
 def _execute_and_validate_fixture(
