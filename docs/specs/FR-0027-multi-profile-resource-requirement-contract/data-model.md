@@ -31,7 +31,7 @@
       - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
   - `evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；每个引用都必须命中 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+    - 约束：非空、去重；每个引用都必须命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
 
 ## ApprovedSharedResourceRequirementProfileEvidenceEntry
 
@@ -95,7 +95,7 @@
 ## 判定规则
 
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
-- declaration profile 无法映射到 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
+- declaration profile 无法映射到在 `capability + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
 - declaration `adapter_key` 不在被引用 entry 的 `reference_adapters` 中 -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`
 - declaration 合法但全部 profile 未命中 -> `match_status=unmatched`

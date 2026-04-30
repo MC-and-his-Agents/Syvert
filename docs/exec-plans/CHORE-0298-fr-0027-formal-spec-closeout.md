@@ -79,6 +79,8 @@
   - 结果：REQUEST_CHANGES。guardian 指出两类阻断：checkpoint SHA 写错，以及 `FR-0027` 要求 profile-level approved evidence 却未冻结最小 approval proof contract。
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 304 --post-review --json-output /tmp/syvert-pr-304-guardian-r2.json`
   - 结果：REQUEST_CHANGES。guardian 进一步指出 approved profile proof 尚未反向约束 declaration `adapter_key`，存在未验证 adapter 借用 `xhs/douyin` 批准 tuple 的风险。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 304 --post-review --json-output /tmp/syvert-pr-304-guardian-r3.json`
+  - 结果：REQUEST_CHANGES。guardian 继续指出 proof 绑定规则仍未闭合：每条 `evidence_ref` 还必须与 declaration 的 `capability + profile tuple` 完全对齐，而不能只做到“可解析 + adapter 覆盖”。
 
 ## 未决风险
 

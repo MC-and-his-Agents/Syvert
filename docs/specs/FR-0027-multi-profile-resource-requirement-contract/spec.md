@@ -66,7 +66,7 @@
   - `resource_dependency_mode` 在 `v0.8.0` 只允许 `none` 或 `required`。
   - 当 `resource_dependency_mode=none` 时，`required_capabilities` 必须且只能为空数组。
   - 当 `resource_dependency_mode=required` 时，`required_capabilities` 必须是非空、去重数组，元素只能来自 `FR-0015` 已批准共享能力词汇。`v0.8.0` 当前只允许 `account`、`proxy`。
-  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，并且该 entry 的 `reference_adapters` 必须覆盖 declaration 的 `adapter_key`；不得引用 adapter 私有注释、运行期临时日志或未批准材料。
+  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，并且该 entry 的 `capability`、`resource_dependency_mode`、`required_capabilities` 必须与 declaration 的 `capability` 和当前 profile tuple 完全一致，同时其 `reference_adapters` 必须覆盖 declaration 的 `adapter_key`；不得引用 adapter 私有注释、运行期临时日志或未批准材料。
   - 同一条 declaration 中允许存在多个合法 profile；这些 profile 表达“任一满足即可执行”的共享 contract，而不是“按顺序尝试”的 fallback 列表。
   - `v0.8.0` 当前允许出现在 shared declaration 空间中的 profile 只允许由以下最小共享能力语义组合构成：
     - `none`
@@ -90,7 +90,7 @@
     - profile 缺少固定字段、`profile_key` 重复，或 `resource_dependency_mode` 取值非法
     - `required_capabilities` 形状非法、重复、为空但 mode=`required`，或出现未被 `FR-0015` 批准的能力标识
     - `evidence_refs` 为空、重复，或无法解析到 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
-    - declaration 中包含无法与 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 完全对齐的 profile
+    - declaration 中包含无法与 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 在 `capability + resource_dependency_mode + required_capabilities` 上完全对齐的 profile
     - declaration 的 `adapter_key` 不在任一被引用 `ApprovedSharedResourceRequirementProfileEvidenceEntry.reference_adapters` 中
     - matcher 输入的 `adapter_key` / `capability` 与 declaration 上下文不一致
   - 以下情况不得视为 `invalid_resource_requirement`：
@@ -155,7 +155,7 @@ Then 它必须按 `invalid_resource_requirement` fail-closed，因为同义 prof
 
 ### 场景 5
 
-Given 某条 declaration 中存在 `required + [account]` profile，但该 profile 的 `evidence_refs` 无法回指与其 tuple 完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
+Given 某条 declaration 中存在 `required + [account]` profile，但该 profile 的 `evidence_refs` 无法回指与 declaration `capability` 和该 profile tuple 完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry`  
 When matcher 或 validator 消费该 declaration  
 Then 该 declaration 必须按 `invalid_resource_requirement` fail-closed，而不是把未经 evidence 批准的 profile 视为合法候选
 

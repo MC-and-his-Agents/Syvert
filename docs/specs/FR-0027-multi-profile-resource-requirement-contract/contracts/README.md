@@ -29,7 +29,7 @@
 - profile `profile_key` 在 declaration 内必须唯一
 - `resource_dependency_mode=none` -> `required_capabilities=[]`
 - `resource_dependency_mode=required` -> `required_capabilities` 非空、去重，且只能来自 `account`、`proxy`
-- `evidence_refs` 非空、去重，并且每个引用都必须命中 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+- `evidence_refs` 非空、去重，并且每个引用都必须命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
 - 同一 declaration 内不得出现语义重复 profile
 
 ## profile approval proof
