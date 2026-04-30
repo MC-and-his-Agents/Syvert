@@ -84,4 +84,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `<pending-checkpoint-sha>`
+- `02e1e54361878fcce34d20e3a0a50b48a27b8b58`
+- 说明：该 checkpoint 首次把 FR-0027 V2 profile evidence carrier、registry V2 declaration validation、matcher `one-of` runtime path、runtime unmatched 映射与测试同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
