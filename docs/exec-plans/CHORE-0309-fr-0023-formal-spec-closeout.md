@@ -73,17 +73,19 @@
   - 结果：通过，确认 `FR-0023` 目标为第三方 Adapter 稳定接入路径，明确不定义 Provider offer、compatibility decision 或真实外部 provider 样本。
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/FR-0021-adapter-provider-port-boundary/`、`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过。
+  - 结果：通过；最新提交 `1a74b9d` 上复跑通过。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：通过；最新提交 `1a74b9d` 上复跑通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：通过；最新提交 `1a74b9d` 上复跑通过。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 初次未提交时结果：失败，脚本提示当前分支相对基线没有变更。
   - 提交 `876ff6c` 后结果：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+  - 最新提交 `1a74b9d` 上复跑通过，PR class 为 `spec`，变更类别为 `docs, spec`。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-309-fr-0023-adapter-formal-spec`
   - 初次未提交时结果：失败，脚本基于 `HEAD` 未看到 formal spec diff，提示绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract。
   - 提交 `876ff6c` 后结果：失败，`关联 decision` 误绑定到 `ADR-CHORE-0291`，导致 Issue / item_key 与当前 exec-plan 不一致；本次修正为上游背景引用，不再作为 `关联 decision` 元数据。
+  - 最新提交 `1a74b9d` 上复跑通过。
 
 ## 未决风险
 
@@ -98,6 +100,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`
+- `1a74b9dcb1fc389fe952637d330836872c9f5b27`
 - worktree 创建基线：`16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`
-- 说明：该 checkpoint 记录 `#309` formal spec closeout 的执行前基线；完成文档与门禁后将以本事项提交 SHA 作为最新语义 checkpoint。
+- 说明：该 checkpoint 记录 `#309` formal spec closeout 文档、exec-plan 绑定修正与本地门禁通过后的语义状态；后续若只补 PR / review / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
