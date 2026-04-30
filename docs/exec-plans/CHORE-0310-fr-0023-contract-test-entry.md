@@ -105,4 +105,4 @@
 
 - worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - implementation checkpoint：`7f82cbc71a72ea159d85b03dfdefe0e7286e6e28`
-- docs_guard follow-up checkpoint：待提交后补充。
+- docs_guard follow-up checkpoint：`7f2f8e6d7f15fc2fa9abcf9e0fa3eefa814a3c13`
