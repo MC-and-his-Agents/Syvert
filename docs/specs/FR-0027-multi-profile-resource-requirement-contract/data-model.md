@@ -31,7 +31,36 @@
       - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
   - `evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；每个引用都必须回指 `FR-0015` 已批准 shared profile evidence
+    - 约束：非空、去重；每个引用都必须命中 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+
+## ApprovedSharedResourceRequirementProfileEvidenceEntry
+
+- 作用：表达一个已被 `FR-0015` 证明为 shared、且可被 declaration / matcher / adapter migration 直接消费的 profile approval proof
+- 字段：
+  - `profile_ref`
+    - 类型：`string`
+    - 约束：非空、稳定；是 declaration `evidence_refs` 的 canonical target
+  - `capability`
+    - 类型：`string`
+    - 约束：当前只允许 `content_detail`
+  - `resource_dependency_mode`
+    - 类型：`enum`
+    - 允许值：`none`、`required`
+  - `required_capabilities`
+    - 类型：`string[]`
+    - 约束：与被批准 profile 的 canonical tuple 完全一致
+  - `reference_adapters`
+    - 类型：`string[]`
+    - 约束：当前必须且只能覆盖 `xhs`、`douyin`
+  - `shared_status`
+    - 类型：`enum`
+    - 允许值：`shared`
+  - `decision`
+    - 类型：`enum`
+    - 允许值：`approve_for_v0_8_0`
+  - `evidence_refs`
+    - 类型：`string[]`
+    - 约束：非空、去重；回指 `FR-0015` 中更细粒度的 research / artifact 证据
 
 ## ResourceCapabilityMatcherInputV2
 
@@ -66,6 +95,7 @@
 ## 判定规则
 
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
+- declaration profile 无法映射到 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`
 - declaration 合法但全部 profile 未命中 -> `match_status=unmatched`
 - `unmatched` 若向外映射失败 envelope，继续使用 `resource_unavailable`

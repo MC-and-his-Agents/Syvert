@@ -18,7 +18,7 @@
 ## 分阶段拆分
 
 - 阶段 1：`#299` 收口 `FR-0027` formal spec 套件，冻结 declaration/profile/matcher/error boundary 与 supersede 边界。
-- 阶段 2：`#300` 基于本 spec 刷新 `FR-0015` 的 profile-level shared / adapter-local / rejected evidence truth。
+- 阶段 2：`#300` 基于本 spec 刷新 `FR-0015` 的 profile-level shared / adapter-local / rejected evidence truth，并产出 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 对应的主干 carrier。
 - 阶段 3：`#301` 与 `#302` 分别按本 spec 落地 matcher/runtime 和 reference adapter declaration migration。
 - 阶段 4：`#303` 汇总 spec、evidence、runtime、adapter baseline 与 GitHub 状态，完成 FR parent closeout。
 

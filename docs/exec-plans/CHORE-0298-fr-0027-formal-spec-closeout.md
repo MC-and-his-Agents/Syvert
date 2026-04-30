@@ -36,7 +36,7 @@
 - `issue-299-fr-0027-formal-spec` 已作为 `#299` 的独立 spec worktree 建立，基线为 `3410c212c3bc2a233892bcb5cf014fe90201fa19`。
 - 已核对 `#294` 与 `#299-#303` 的目标、非目标与依赖关系。
 - 当前 formal spec 回合采用“`FR-0027` 新主套件承接 `v0.8.0` truth，`FR-0013/14/15` 保留 `v0.5.0` 历史语义”的落盘策略，以满足现有 formal spec scope guard。
-- 最新 formal spec 语义 checkpoint `af746a3a855604b96f638fd4fb935814b5357654` 已生成，当前受审 spec PR 为 `#304`；当前停点是把 review / guardian / merge gate 真相持续同步回 exec-plan。
+- 最新 formal spec 语义 checkpoint `af746a3b147ee55990abb6e475fed90dddaf39eb` 已生成，当前受审 spec PR 为 `#304`；当前停点是消费 guardian 已指出的 checkpoint/evidence contract 阻断，并把修复后的 review / merge gate 真相持续同步回 exec-plan。
 
 ## 下一步动作
 
@@ -72,9 +72,11 @@
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过
 - `git commit -m 'docs(spec): 冻结 FR-0027 多 profile 资源依赖契约'`
-  - 结果：已生成最新语义 checkpoint `af746a3a855604b96f638fd4fb935814b5357654`
+  - 结果：已生成最新语义 checkpoint `af746a3b147ee55990abb6e475fed90dddaf39eb`
 - `python3 scripts/open_pr.py --class spec --issue 299 --item-key CHORE-0298-fr-0027-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0027 多 profile 资源依赖 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建当前受审 spec PR `#304 https://github.com/MC-and-his-Agents/Syvert/pull/304`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 304 --post-review --json-output /tmp/syvert-pr-304-guardian.json`
+  - 结果：REQUEST_CHANGES。guardian 指出两类阻断：checkpoint SHA 写错，以及 `FR-0027` 要求 profile-level approved evidence 却未冻结最小 approval proof contract。
 
 ## 未决风险
 
@@ -88,5 +90,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `af746a3a855604b96f638fd4fb935814b5357654`
+- `af746a3b147ee55990abb6e475fed90dddaf39eb`
 - worktree 创建基线：`3410c212c3bc2a233892bcb5cf014fe90201fa19`
