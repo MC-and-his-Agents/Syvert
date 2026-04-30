@@ -8,7 +8,6 @@ from typing import Any, Literal
 from syvert.registry import AdapterResourceRequirementDeclarationV2, AdapterResourceRequirementProfile
 from syvert.resource_capability_evidence import (
     approved_shared_resource_requirement_profile_evidence_entries,
-    frozen_resource_requirement_profile_evidence_records,
 )
 from syvert.runtime import AdapterExecutionContext, AdapterTaskRequest, PlatformAdapterError
 from tests.runtime.contract_harness.validation_tool import (
@@ -71,6 +70,19 @@ _PROFILE_FIELD_NAMES = frozenset(
 _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
     {"invalid_input", "unsupported", "platform"}
 )
+_RESULT_CONTRACT_FIELD_NAMES = frozenset(
+    {
+        "normalized_owner",
+        "success_payload_fields",
+    }
+)
+_ERROR_MAPPING_FIELD_NAMES = frozenset(
+    {
+        "category",
+        "code",
+        "message",
+    }
+)
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
 _RESERVED_RUNTIME_ENVELOPE_FIELDS = frozenset(
     {
@@ -85,13 +97,6 @@ _APPROVED_PROFILE_PROOF_BY_REF = {
     entry.profile_ref: entry
     for entry in approved_shared_resource_requirement_profile_evidence_entries()
 }
-_APPROVED_PROFILE_PROOF_BY_REF.update(
-    {
-        entry.profile_ref: entry
-        for entry in frozen_resource_requirement_profile_evidence_records()
-        if entry.resource_dependency_mode == "none" and not entry.required_capabilities
-    }
-)
 _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
     {
         "account",
@@ -872,16 +877,17 @@ def _execute_and_validate_fixture(
             payload=payload,
         )
     except PlatformAdapterError as error:
+        details = _normalize_platform_adapter_error_details(error)
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
             "capability": fixture_input["capability"],
             "status": "failed",
             "error": {
-                "category": error.category,
-                "code": error.code,
-                "message": error.message,
-                "details": dict(error.details),
+                "category": details["category"],
+                "code": details["code"],
+                "message": details["message"],
+                "details": details["details"],
             },
         }
     except Exception as error:
@@ -934,6 +940,25 @@ def _build_success_runtime_envelope(
     return {
         **envelope,
         "non_mapping_payload_type": type(payload).__name__,
+    }
+
+
+def _normalize_platform_adapter_error_details(error: PlatformAdapterError) -> dict[str, Any]:
+    if not isinstance(error.details, Mapping):
+        return {
+            "category": "runtime_contract",
+            "code": "adapter_platform_error_details_invalid",
+            "message": "adapter PlatformAdapterError.details must be a mapping",
+            "details": {
+                "error_code": error.code,
+                "details_type": type(error.details).__name__,
+            },
+        }
+    return {
+        "category": error.category,
+        "code": error.code,
+        "message": error.message,
+        "details": dict(error.details),
     }
 
 
@@ -1005,6 +1030,12 @@ def _validate_contract_test_profile(profile: str) -> None:
 
 
 def _validate_result_contract(result_contract: Mapping[str, Any]) -> None:
+    _validate_nested_manifest_field_set(
+        result_contract,
+        expected_fields=_RESULT_CONTRACT_FIELD_NAMES,
+        code="invalid_result_contract",
+        field="result_contract",
+    )
     required_payload_fields = _require_non_empty_string_tuple(
         result_contract.get("success_payload_fields"),
         field="result_contract.success_payload_fields",
@@ -1042,6 +1073,12 @@ def _validate_error_mapping(error_mapping: Mapping[str, Any]) -> None:
                 details={"source_error": source_error},
             )
         normalized_mapping = _require_mapping(mapping, field=f"error_mapping.{source_error}")
+        _validate_nested_manifest_field_set(
+            normalized_mapping,
+            expected_fields=_ERROR_MAPPING_FIELD_NAMES,
+            code="invalid_error_mapping",
+            field=f"error_mapping.{source_error}",
+        )
         category = _require_non_empty_string(
             normalized_mapping.get("category"),
             code="invalid_error_mapping",
@@ -1062,6 +1099,37 @@ def _validate_error_mapping(error_mapping: Mapping[str, Any]) -> None:
             normalized_mapping.get("message"),
             code="invalid_error_mapping",
             field=f"error_mapping.{source_error}.message",
+        )
+
+
+def _validate_nested_manifest_field_set(
+    carrier: Mapping[str, Any],
+    *,
+    expected_fields: frozenset[str],
+    code: str,
+    field: str,
+) -> None:
+    raw_keys = {key for key in carrier}
+    if any(not isinstance(key, str) for key in raw_keys):
+        raise ThirdPartyContractEntryError(
+            code,
+            f"{field} field names must be strings",
+            details={"field": field, "actual_keys": tuple(sorted(str(key) for key in raw_keys))},
+        )
+    forbidden_fields = tuple(sorted(raw_keys & _FORBIDDEN_MANIFEST_FIELDS))
+    if forbidden_fields:
+        raise ThirdPartyContractEntryError(
+            code,
+            f"{field} must not carry provider or compatibility fields",
+            details={"field": field, "forbidden_fields": forbidden_fields},
+        )
+    missing_fields = tuple(sorted(expected_fields - raw_keys))
+    extra_fields = tuple(sorted(raw_keys - expected_fields))
+    if missing_fields or extra_fields:
+        raise ThirdPartyContractEntryError(
+            code,
+            f"{field} must keep the fixed field set",
+            details={"field": field, "missing_fields": missing_fields, "extra_fields": extra_fields},
         )
 
 

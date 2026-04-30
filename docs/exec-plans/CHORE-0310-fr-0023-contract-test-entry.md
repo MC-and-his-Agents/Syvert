@@ -50,11 +50,11 @@
 - guardian review 第八次返回 `REQUEST_CHANGES`，阻断项为执行结果和 resource bundle 使用 operation 而不是 adapter capability family，以及 unexpected adapter exception 会中断 contract run；已统一为 fixture capability，并把 unexpected exception 归一为结构化 runtime_contract observation。
 - guardian review 第九次返回 `REQUEST_CHANGES`，阻断项为 adapter-vs-manifest metadata 对齐对 `fixture_refs` 与 resource requirement profile 顺序敏感；已改为顺序无关的语义集合比较，并补充回归。
 - guardian review 第十次返回 `REQUEST_CHANGES`，阻断项为 adapter success payload 可覆盖 harness runtime context；已将 `task_id`、`adapter_key`、`capability`、`status`、`error` 设为保留字段，payload 携带这些字段时归一为 runtime_contract contract violation。
+- guardian review 第十一次返回 `REQUEST_CHANGES`，阻断项为 rejected FR-0027 `none` profile 被误纳入 approved proof、`PlatformAdapterError.details` 非 mapping 会中断 contract run、`result_contract` / `error_mapping` 嵌套 carrier 可走私 provider / compatibility 字段；已移除 rejected `none` profile proof，新增平台错误 details fail-closed 归一化，并让嵌套 carrier 使用固定字段集。
 
 ## 下一步动作
 
-- 提交第七轮 guardian 修复并推送 PR `#330` 新 head。
-- 提交第十轮 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十一次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -213,6 +213,32 @@
   - 结果：通过。
 - 第十轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十一次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - `fr-0027:profile:content-detail-by-url-hybrid:none` 当前 FR-0027 truth 为 rejected，但入口通过 frozen truth 误放行。
+    - `PlatformAdapterError.details` 为 `None` 或非 mapping 时，`dict(error.details)` 会中断 contract run。
+    - `result_contract` 与 `error_mapping` nested carrier 未固定字段集，可夹带 provider / selector / fallback 等字段。
+  - 修正：
+    - approved profile proof index 只消费 approved shared FR-0027 proof，不再消费 rejected frozen `none` profile。
+    - `PlatformAdapterError.details` 非 mapping 时归一为 `runtime_contract + adapter_platform_error_details_invalid` failed envelope。
+    - `result_contract` 与每个 `error_mapping` mapping 均校验固定字段集并拒绝 provider / compatibility 字段。
+- 第十一次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，27 tests。
+- 第十一次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，77 tests。
+- 第十一次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十一次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十一次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十一次 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十一次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 第十一次 guardian 修复后 `git diff --check`
+  - 结果：通过。
 
 ## 未决风险
 
