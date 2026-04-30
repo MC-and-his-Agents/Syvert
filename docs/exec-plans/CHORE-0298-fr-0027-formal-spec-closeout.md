@@ -35,8 +35,8 @@
 
 - `issue-299-fr-0027-formal-spec` 已作为 `#299` 的独立 spec worktree 建立，基线为 `3410c212c3bc2a233892bcb5cf014fe90201fa19`。
 - 已核对 `#294` 与 `#299-#303` 的目标、非目标与依赖关系。
-- 当前 formal spec 回合采用“`FR-0027` 新主套件承接 `v0.8.0` truth，`FR-0013/14/15` 保留 `v0.5.0` 历史语义”的落盘策略，以满足现有 formal spec scope guard。
-- 最新 formal spec 语义 checkpoint `408fb3ed0bc2ecb6937a930e1be2e27feaeea794` 已生成，当前受审 spec PR 为 `#304`；当前停点是等待基于最新 head 的 guardian verdict 回写状态面，并把修复后的 review / merge gate 真相持续同步回 exec-plan。
+- 当前 formal spec 回合采用“`FR-0027` 新主套件承接 `v0.8.0` truth，`FR-0013/14/15` 保留 `v0.5.0` 历史语义”的落盘策略，以满足现有 formal spec scope guard；`#299` 与 `#294` 的 GitHub truth 已同步到这一路径。
+- 最新 formal spec 语义 checkpoint `c4cc7862e61722d113260d6b0802e8461d8a7ea6` 已生成，当前受审 spec PR 为 `#304`；当前停点是等待基于最新 head 的 guardian verdict 回写状态面，并把修复后的 review / merge gate 真相持续同步回 exec-plan。
 
 ## 下一步动作
 
@@ -78,7 +78,23 @@
 - `git commit -m 'docs(spec): 绑定 FR-0027 适配器证据边界'`
   - 结果：已生成语义 checkpoint `c45c80f799d832036b13694a33885014534c0b07`
 - `git commit -m 'docs(spec): 闭合 FR-0027 proof 绑定规则'`
-  - 结果：已生成最新语义 checkpoint `408fb3ed0bc2ecb6937a930e1be2e27feaeea794`
+  - 结果：已生成语义 checkpoint `408fb3ed0bc2ecb6937a930e1be2e27feaeea794`
+- `gh api -X PATCH repos/<repo>/issues/299 -f body=...`
+  - 结果：已把 `#299` 的 formal-spec scope 调整为“建立 `FR-0027` 新套件并明确 `v0.8.0` version boundary”，不再声称在同一 spec PR 并改多个旧 formal spec 套件。
+- `gh api -X PATCH repos/<repo>/issues/294 -f body=...`
+  - 结果：已把 `#294` 的关联 formal spec 调整为 `FR-0027` 主套件，并将 `FR-0013` / `FR-0014` / `FR-0015` 明确标记为历史输入。
+- `git commit -m 'docs(spec): 收紧 FR-0027 规约边界'`
+  - 结果：已生成最新语义 checkpoint `c4cc7862e61722d113260d6b0802e8461d8a7ea6`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-299-fr-0027-formal-spec`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
 - `python3 scripts/open_pr.py --class spec --issue 299 --item-key CHORE-0298-fr-0027-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0027 多 profile 资源依赖 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建当前受审 spec PR `#304 https://github.com/MC-and-his-Agents/Syvert/pull/304`
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 304 --post-review --json-output /tmp/syvert-pr-304-guardian.json`
@@ -100,5 +116,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `408fb3ed0bc2ecb6937a930e1be2e27feaeea794`
+- `c4cc7862e61722d113260d6b0802e8461d8a7ea6`
 - worktree 创建基线：`3410c212c3bc2a233892bcb5cf014fe90201fa19`
