@@ -52,10 +52,11 @@
 - guardian review 第十次返回 `REQUEST_CHANGES`，阻断项为 adapter success payload 可覆盖 harness runtime context；已将 `task_id`、`adapter_key`、`capability`、`status`、`error` 设为保留字段，payload 携带这些字段时归一为 runtime_contract contract violation。
 - guardian review 第十一次返回 `REQUEST_CHANGES`，阻断项为 rejected FR-0027 `none` profile 被误纳入 approved proof、`PlatformAdapterError.details` 非 mapping 会中断 contract run、`result_contract` / `error_mapping` 嵌套 carrier 可走私 provider / compatibility 字段；已移除 rejected `none` profile proof，新增平台错误 details fail-closed 归一化，并让嵌套 carrier 使用固定字段集。
 - guardian review 第十二次返回 `REQUEST_CHANGES`，阻断项为 error_mapping observation 只比较 category / code，未验证 adapter reported `details.source_error` 与 fixture / manifest 绑定一致；已补充 source_error observation 校验与回归。
+- guardian review 第十三次返回 `REQUEST_CHANGES`，阻断项为 manifest 可额外声明 fixtures 未覆盖的 target / collection mode、fixture input / expected nested carrier 可夹带 provider 字段、`sdk_contract_id` provider / compatibility 阻断大小写敏感；已补充 fixture coverage 反向校验、fixture nested fixed field set，并将 sdk contract 语义阻断改为大小写无关。
 
 ## 下一步动作
 
-- 提交第十二次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十三次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -257,6 +258,32 @@
 - 第十二次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十二次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十三次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - manifest / adapter 可声明 fixtures 未覆盖的 `supported_targets` / `supported_collection_modes`。
+    - fixture `input` / `expected` / `expected.error` 可夹带 provider / selector / offer 字段。
+    - `sdk_contract_id` 的 provider / compatibility 语义阻断大小写敏感。
+  - 修正：
+    - fixtures 必须反向覆盖 manifest 声明的每个 supported target 与 collection mode，否则返回 `invalid_fixture_metadata_coverage`。
+    - fixture `input`、success `expected`、error_mapping `expected` 与 `expected.error` 均使用固定字段集并拒绝 provider / compatibility 字段。
+    - `sdk_contract_id` provider / compatibility 检查改为大小写无关。
+- 第十三次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 初次结果：失败，既有缺失 `resource_profile_key` 用例现在先命中 `fixture.input` 固定字段集；已更新断言。
+- 第十三次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，83 tests。
+- 第十三次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十三次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十三次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十三次 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十三次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 第十三次 guardian 修复后 `git diff --check`
   - 结果：通过。
 
 ## 未决风险
