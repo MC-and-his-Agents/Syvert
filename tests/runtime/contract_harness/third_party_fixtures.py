@@ -5,7 +5,7 @@ from typing import Any
 
 from syvert.runtime import AdapterExecutionContext, PlatformAdapterError
 
-THIRD_PARTY_FIXTURE_ADAPTER_KEY = "community_content"
+THIRD_PARTY_FIXTURE_ADAPTER_KEY = "xhs"
 THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID = "syvert-adapter-runtime-v0.8.0"
 THIRD_PARTY_SUCCESS_FIXTURE_ID = "third-party-content-detail-success"
 THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID = "third-party-content-detail-error-mapping"

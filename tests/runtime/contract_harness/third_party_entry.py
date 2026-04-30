@@ -150,7 +150,6 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "account",
         "acct",
         "dev",
-        "douyin",
         "env",
         "fallback",
         "marketplace",
@@ -162,7 +161,6 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "score",
         "selector",
         "staging",
-        "xhs",
     }
 )
 _APPROVED_CONTRACT_CAPABILITIES = frozenset({"content_detail"})
@@ -803,6 +801,19 @@ def _normalize_third_party_resource_requirement_profile(
                 "capability": capability,
                 "profile_key": profile_key,
                 "proof_profile_ref": proof.profile_ref,
+                "source": source,
+            },
+        )
+    if adapter_key not in proof.reference_adapters:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource profile proof reference_adapters must cover declaration adapter_key",
+            details={
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "profile_key": profile_key,
+                "proof_profile_ref": proof.profile_ref,
+                "reference_adapters": proof.reference_adapters,
                 "source": source,
             },
         )

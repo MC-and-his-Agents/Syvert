@@ -314,8 +314,6 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_rejects_adapter_key_with_provider_account_or_runtime_strategy_semantics(self) -> None:
         invalid_adapter_keys = (
             "provider-xhs",
-            "xhs",
-            "douyin",
             "xhs-prod-account-1",
             "xhs-selector-fallback",
         )
@@ -366,13 +364,13 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.details["field"], "supported_capabilities")
         self.assertEqual(context.exception.details["actual_type"], "dict")
 
-    def test_allows_adapter_key_with_non_semantic_forbidden_letter_sequences(self) -> None:
-        allowed_adapter_keys = (
+    def test_rejects_adapter_key_not_covered_by_fr0027_proof(self) -> None:
+        uncovered_adapter_keys = (
             "adventure_feed",
             "product_review",
             "routerless_content",
         )
-        for adapter_key in allowed_adapter_keys:
+        for adapter_key in uncovered_adapter_keys:
             with self.subTest(adapter_key=adapter_key):
                 manifest = minimal_third_party_adapter_manifest()
                 manifest["adapter_key"] = adapter_key
@@ -380,9 +378,12 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
                 declarations[0]["adapter_key"] = adapter_key
                 manifest["resource_requirement_declarations"] = declarations
 
-                normalized = validate_third_party_adapter_manifest(manifest)
+                with self.assertRaises(ThirdPartyContractEntryError) as context:
+                    validate_third_party_adapter_manifest(manifest)
 
-                self.assertEqual(normalized.adapter_key, adapter_key)
+                self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+                self.assertEqual(context.exception.details["adapter_key"], adapter_key)
+                self.assertEqual(context.exception.details["reference_adapters"], ("xhs", "douyin"))
 
     def test_rejects_invalid_fr0027_resource_declaration_via_registry(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
