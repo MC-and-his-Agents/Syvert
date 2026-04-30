@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+import re
 from typing import Any, Literal
 
 from syvert.registry import AdapterResourceRequirementDeclarationV2, AdapterResourceRequirementProfile
@@ -379,9 +380,13 @@ def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapt
 
 
 def _validate_adapter_key_boundary(adapter_key: str) -> None:
-    normalized = adapter_key.lower()
+    normalized_segments = frozenset(
+        segment
+        for segment in re.split(r"[-_.:]+", adapter_key.lower())
+        if segment
+    )
     forbidden_fragments = tuple(
-        sorted(fragment for fragment in _FORBIDDEN_ADAPTER_KEY_FRAGMENTS if fragment in normalized)
+        sorted(fragment for fragment in _FORBIDDEN_ADAPTER_KEY_FRAGMENTS if fragment in normalized_segments)
     )
     if forbidden_fragments:
         raise ThirdPartyContractEntryError(
@@ -855,7 +860,7 @@ def _normalize_fixture(
         input=_require_mapping(fixture["input"], field="input"),
         expected=_require_mapping(fixture["expected"], field="expected"),
     )
-    _validate_fixture_expected_contract(normalized)
+    _validate_fixture_expected_contract(manifest, normalized)
     return normalized
 
 
@@ -929,7 +934,10 @@ def _validate_error_mapping(error_mapping: Mapping[str, Any]) -> None:
         )
 
 
-def _validate_fixture_expected_contract(fixture: AdapterContractFixture) -> None:
+def _validate_fixture_expected_contract(
+    manifest: ThirdPartyAdapterManifest,
+    fixture: AdapterContractFixture,
+) -> None:
     expected_status = _require_non_empty_string(
         fixture.expected.get("status"),
         code="invalid_fixture_expected_contract",
@@ -961,6 +969,11 @@ def _validate_fixture_expected_contract(fixture: AdapterContractFixture) -> None
             details={"fixture_id": fixture.fixture_id, "status": expected_status},
         )
     expected_error = _require_mapping(fixture.expected.get("error"), field="expected.error")
+    source_error = _require_non_empty_string(
+        expected_error.get("source_error"),
+        code="invalid_fixture_expected_contract",
+        field="expected.error.source_error",
+    )
     category = _require_non_empty_string(
         expected_error.get("category"),
         code="invalid_fixture_expected_contract",
@@ -976,6 +989,29 @@ def _validate_fixture_expected_contract(fixture: AdapterContractFixture) -> None
             "invalid_fixture_expected_contract",
             "error_mapping fixture must expect an existing Syvert failed envelope category",
             details={"fixture_id": fixture.fixture_id, "category": category, "code": code},
+        )
+    manifest_error_mapping = manifest.error_mapping.get(source_error)
+    if not isinstance(manifest_error_mapping, Mapping):
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_expected_contract",
+            "error_mapping fixture source_error must exist in manifest error_mapping",
+            details={"fixture_id": fixture.fixture_id, "source_error": source_error},
+        )
+    if (
+        manifest_error_mapping.get("category") != category
+        or manifest_error_mapping.get("code") != code
+    ):
+        raise ThirdPartyContractEntryError(
+            "fixture_error_mapping_manifest_mismatch",
+            "error_mapping fixture expected error must match manifest error_mapping",
+            details={
+                "fixture_id": fixture.fixture_id,
+                "source_error": source_error,
+                "manifest_category": manifest_error_mapping.get("category"),
+                "manifest_code": manifest_error_mapping.get("code"),
+                "fixture_category": category,
+                "fixture_code": code,
+            },
         )
 
 

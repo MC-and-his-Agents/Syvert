@@ -32,6 +32,16 @@ class AdapterWithUserIdTargetMetadata(ThirdPartyContractFixtureAdapter):
     supported_targets = frozenset({"user_id"})
 
 
+class AdapterWithDriftedErrorMapping(ThirdPartyContractFixtureAdapter):
+    error_mapping = {
+        "content_not_found": {
+            "category": "platform",
+            "code": "drifted_content_not_found",
+            "message": "drifted mapping",
+        },
+    }
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
         adapter = ThirdPartyContractFixtureAdapter()
@@ -120,6 +130,24 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, "invalid_adapter_key_boundary")
 
+    def test_allows_adapter_key_with_non_semantic_forbidden_letter_sequences(self) -> None:
+        allowed_adapter_keys = (
+            "adventure_feed",
+            "product_review",
+            "routerless_content",
+        )
+        for adapter_key in allowed_adapter_keys:
+            with self.subTest(adapter_key=adapter_key):
+                manifest = minimal_third_party_adapter_manifest()
+                manifest["adapter_key"] = adapter_key
+                declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
+                declarations[0]["adapter_key"] = adapter_key
+                manifest["resource_requirement_declarations"] = declarations
+
+                normalized = validate_third_party_adapter_manifest(manifest)
+
+                self.assertEqual(normalized.adapter_key, adapter_key)
+
     def test_rejects_invalid_fr0027_resource_declaration_via_registry(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
         declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
@@ -170,6 +198,21 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_fixture_input")
         self.assertEqual(context.exception.details["field"], "input.resource_profile_key")
+
+    def test_rejects_error_mapping_fixture_that_does_not_match_manifest_mapping(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["error_mapping"] = AdapterWithDriftedErrorMapping.error_mapping
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithDriftedErrorMapping(),
+            )
+
+        self.assertEqual(context.exception.code, "fixture_error_mapping_manifest_mismatch")
+        self.assertEqual(context.exception.details["manifest_code"], "drifted_content_not_found")
+        self.assertEqual(context.exception.details["fixture_code"], "content_not_found")
 
     def test_rejects_adapter_public_metadata_with_provider_facing_fields(self) -> None:
         with self.assertRaises(ThirdPartyContractEntryError) as context:
