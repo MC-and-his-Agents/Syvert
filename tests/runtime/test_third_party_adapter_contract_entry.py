@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import copy
+import unittest
+
+from syvert.registry import AdapterResourceRequirementDeclarationV2
+from tests.runtime.contract_harness.third_party_entry import (
+    ThirdPartyContractEntryError,
+    run_third_party_adapter_contract_test,
+    validate_third_party_adapter_manifest,
+)
+from tests.runtime.contract_harness.third_party_fixtures import (
+    THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID,
+    THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+    THIRD_PARTY_SUCCESS_FIXTURE_ID,
+    ThirdPartyContractFixtureAdapter,
+    minimal_third_party_adapter_fixtures,
+    minimal_third_party_adapter_manifest,
+)
+
+
+class AdapterMissingSdkContractMetadata(ThirdPartyContractFixtureAdapter):
+    sdk_contract_id = ""
+
+
+class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
+    def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(),
+        )
+
+        self.assertEqual(
+            [result["sample_id"] for result in results],
+            [THIRD_PARTY_SUCCESS_FIXTURE_ID, THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID],
+        )
+        self.assertEqual(results[0]["verdict"], "pass")
+        self.assertEqual(results[0]["reason"]["code"], "success_envelope_observed")
+        self.assertEqual(results[0]["observed_status"], "success")
+        self.assertEqual(results[1]["verdict"], "legal_failure")
+        self.assertEqual(results[1]["observed_status"], "failed")
+        self.assertEqual(results[1]["observed_error"]["category"], "platform")
+        self.assertEqual(results[1]["observed_error"]["code"], "content_not_found")
+
+    def test_manifest_resource_declarations_are_normalized_through_registry_v2_validator(self) -> None:
+        manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())
+
+        self.assertEqual(manifest.adapter_key, THIRD_PARTY_FIXTURE_ADAPTER_KEY)
+        self.assertEqual(len(manifest.resource_requirement_declarations), 1)
+        declaration = manifest.resource_requirement_declarations[0]
+        self.assertIsInstance(declaration, AdapterResourceRequirementDeclarationV2)
+        assert isinstance(declaration, AdapterResourceRequirementDeclarationV2)
+        self.assertEqual(
+            [profile.profile_key for profile in declaration.resource_requirement_profiles],
+            ["account_proxy", "account"],
+        )
+
+    def test_rejects_missing_required_public_metadata_before_execution(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        del manifest["sdk_contract_id"]
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_manifest_shape")
+        self.assertEqual(context.exception.details["missing_fields"], ("sdk_contract_id",))
+
+    def test_rejects_provider_and_compatibility_manifest_fields_fail_closed(self) -> None:
+        forbidden_fields = (
+            "provider_offer",
+            "compatibility_decision",
+            "provider_key",
+            "selector",
+            "fallback",
+            "priority",
+            "score",
+            "marketplace",
+        )
+        for field in forbidden_fields:
+            with self.subTest(field=field):
+                manifest = minimal_third_party_adapter_manifest()
+                manifest[field] = "must-not-pass"
+
+                with self.assertRaises(ThirdPartyContractEntryError) as context:
+                    validate_third_party_adapter_manifest(manifest)
+
+                self.assertEqual(context.exception.code, "forbidden_adapter_manifest_fields")
+                self.assertEqual(context.exception.details["forbidden_fields"], (field,))
+
+    def test_rejects_invalid_fr0027_resource_declaration_via_registry(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
+        declarations[0]["resource_requirement_profiles"][0]["evidence_refs"] = ("fr-0027:profile:unknown",)
+        manifest["resource_requirement_declarations"] = declarations
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.details["registry_code"], "invalid_adapter_resource_requirements")
+
+    def test_rejects_adapter_public_metadata_that_does_not_match_manifest(self) -> None:
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterMissingSdkContractMetadata(),
+            )
+
+        self.assertEqual(context.exception.code, "adapter_manifest_metadata_mismatch")
+        self.assertIn("sdk_contract_id", context.exception.details["mismatches"])
+
+    def test_rejects_fixture_refs_that_do_not_resolve(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["fixture_refs"] = (
+            THIRD_PARTY_SUCCESS_FIXTURE_ID,
+            "missing-error-mapping-fixture",
+        )
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "unresolvable_fixture_refs")
+        self.assertEqual(context.exception.details["missing_refs"], ("missing-error-mapping-fixture",))
+
+    def test_rejects_fixtures_without_success_and_error_mapping_coverage(self) -> None:
+        fixtures = tuple(
+            fixture
+            for fixture in minimal_third_party_adapter_fixtures()
+            if fixture["case_type"] == "success"
+        )
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["fixture_refs"] = (THIRD_PARTY_SUCCESS_FIXTURE_ID,)
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "missing_fixture_case_coverage")
+        self.assertEqual(context.exception.details["missing_case_types"], ("error_mapping",))
+
+    def test_reports_adapter_success_payload_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="missing_normalized"),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "invalid_adapter_success_payload")
+
+    def test_reports_adapter_error_mapping_mismatch(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(error_code="unexpected_error_code"),
+        )
+
+        error_result = results[1]
+        self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
+        self.assertEqual(error_result["verdict"], "contract_violation")
+        self.assertEqual(error_result["reason"]["code"], "error_mapping_mismatch")
+
+
+if __name__ == "__main__":
+    unittest.main()
