@@ -7,8 +7,7 @@
 - item_type：`CHORE`
 - release：`v0.8.0`
 - sprint：`2026-S21`
-- 关联 spec：`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`
-- 额外关联 specs：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
+- 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
 - 关联 decision：
 - 关联 PR：
 - active 收口事项：`CHORE-0299-fr-0027-dual-reference-profile-evidence`
