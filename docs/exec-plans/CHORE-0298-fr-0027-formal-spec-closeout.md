@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#304`
 - active 收口事项：`CHORE-0298-fr-0027-formal-spec-closeout`
 - 状态：`active`
 
@@ -36,12 +36,13 @@
 - `issue-299-fr-0027-formal-spec` 已作为 `#299` 的独立 spec worktree 建立，基线为 `3410c212c3bc2a233892bcb5cf014fe90201fa19`。
 - 已核对 `#294` 与 `#299-#303` 的目标、非目标与依赖关系。
 - 当前 formal spec 回合采用“`FR-0027` 新主套件承接 `v0.8.0` truth，`FR-0013/14/15` 保留 `v0.5.0` 历史语义”的落盘策略，以满足现有 formal spec scope guard。
+- 最新 formal spec 语义 checkpoint `af746a3a855604b96f638fd4fb935814b5357654` 已生成，当前受审 spec PR 为 `#304`；当前停点是把 review / guardian / merge gate 真相持续同步回 exec-plan。
 
 ## 下一步动作
 
-- 完成 `FR-0027` formal spec 套件与 requirement container。
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard` 与 `governance_gate`。
-- 创建 spec PR，并把 review / guardian / merge gate 真相同步回 exec-plan。
+- 在当前受审 PR `#304` 上消费 spec review、guardian 与 merge gate 反馈。
+- 若后续只追加 PR / checks / checkpoint metadata，则保持 review-sync follow-up 口径，不伪装成新的语义 checkpoint。
+- 合入后在 `#299` 留 closeout comment，并为 `#300/#301/#302` 提供主干 formal input。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -68,6 +69,12 @@
   - 结果：通过
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-299-fr-0027-formal-spec`
   - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过
+- `git commit -m 'docs(spec): 冻结 FR-0027 多 profile 资源依赖契约'`
+  - 结果：已生成最新语义 checkpoint `af746a3a855604b96f638fd4fb935814b5357654`
+- `python3 scripts/open_pr.py --class spec --issue 299 --item-key CHORE-0298-fr-0027-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0027 多 profile 资源依赖 formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#304 https://github.com/MC-and-his-Agents/Syvert/pull/304`
 
 ## 未决风险
 
@@ -81,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3410c212c3bc2a233892bcb5cf014fe90201fa19`
+- `af746a3a855604b96f638fd4fb935814b5357654`
 - worktree 创建基线：`3410c212c3bc2a233892bcb5cf014fe90201fa19`
