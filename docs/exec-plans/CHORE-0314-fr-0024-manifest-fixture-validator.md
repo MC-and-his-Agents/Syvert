@@ -41,12 +41,11 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：已新增独立 validator、fixture 与测试，并通过目标测试、指定 FR-0027 / registry 回归、全 runtime discover 与基础文档/流程门禁；下一步提交后运行基于 HEAD diff 的 governance / PR scope 门禁。
+- 当前 checkpoint：已新增独立 validator、fixture 与测试，并通过目标测试、指定 FR-0027 / registry 回归、全 runtime discover、基础文档/流程门禁、governance gate 与 implementation PR scope gate；下一步使用受控脚本开 PR。
 
 ## 下一步动作
 
-- 提交当前实现 checkpoint，并运行基于 HEAD diff 的 governance / PR scope 门禁。
-- 提交中文 Conventional Commit，使用受控脚本开 PR、等待 guardian、checks 通过后受控合并。
+- 使用受控脚本开 PR、等待 guardian、checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -91,11 +90,19 @@
   - 结果：通过。
 - 提交 `17c8f3d` 后重跑 `python3 scripts/docs_guard.py --mode ci`
   - 结果：首次未通过；原因是 exec-plan 的禁止范围表述引用了尚不存在的 `FR-0025` spec 路径。处理：改为非路径文本表述 `Provider capability offer formal spec 或实现`，避免把未来路径伪装为当前仓内真相。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：提交态重跑通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：提交态重跑通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：提交态重跑通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-314-fr-0024-adapter-requirement-manifest-validator`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- `python3 scripts/governance_gate.py --mode ci --base-sha <base> --head-sha <head> --head-ref issue-314-fr-0024-adapter-requirement-manifest-validator`
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
 - guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
@@ -112,3 +119,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 初始 implementation checkpoint：`589ea1e73ebce464ac16d292c180e08cee302ce5`
+- implementation checkpoint：`17c8f3d`
+- validation follow-up checkpoint：`295f560bb1b21975b30701080b7aa4eb1a2c7774`
