@@ -1,0 +1,71 @@
+# FR-0027 数据模型
+
+## AdapterResourceRequirementDeclarationV2
+
+- 作用：表达某个 `adapter_key + capability` 在 `v0.8.0` 下允许的 shared resource requirement profile 集合
+- 字段：
+  - `adapter_key`
+    - 类型：`string`
+    - 约束：非空；声明所属 adapter
+  - `capability`
+    - 类型：`string`
+    - 约束：非空；声明所属 adapter-facing capability
+  - `resource_requirement_profiles`
+    - 类型：`AdapterResourceRequirementProfile[]`
+    - 约束：非空数组；每一项必须合法；同一 declaration 内不得出现语义重复 profile
+
+## AdapterResourceRequirementProfile
+
+- 作用：表达一个可被 matcher 独立判断的合法 shared profile
+- 字段：
+  - `profile_key`
+    - 类型：`string`
+    - 约束：声明内唯一、非空；只承担稳定标识职责
+  - `resource_dependency_mode`
+    - 类型：`enum`
+    - 允许值：`none`、`required`
+  - `required_capabilities`
+    - 类型：`string[]`
+    - 约束：
+      - 当 mode=`none` 时必须为空数组
+      - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
+  - `evidence_refs`
+    - 类型：`string[]`
+    - 约束：非空、去重；每个引用都必须回指 `FR-0015` 已批准 shared profile evidence
+
+## ResourceCapabilityMatcherInputV2
+
+- 作用：表达 matcher 的 canonical 输入
+- 字段：
+  - `task_id`
+    - 类型：`string`
+    - 约束：非空
+  - `adapter_key`
+    - 类型：`string`
+    - 约束：必须与 declaration 一致
+  - `capability`
+    - 类型：`string`
+    - 约束：必须与 declaration 一致
+  - `requirement_declaration`
+    - 类型：`AdapterResourceRequirementDeclarationV2`
+    - 约束：必须合法
+  - `available_resource_capabilities`
+    - 类型：`string[] | set[string]`
+    - 约束：去重集合；元素只能来自 `FR-0015` 已批准词汇
+
+## ResourceCapabilityMatchResultV2
+
+- 作用：表达 matcher 的 canonical 输出
+- 字段：
+  - `task_id`
+  - `adapter_key`
+  - `capability`
+  - `match_status`
+    - 允许值：`matched`、`unmatched`
+
+## 判定规则
+
+- declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
+- declaration 合法且任一 profile 被满足 -> `match_status=matched`
+- declaration 合法但全部 profile 未命中 -> `match_status=unmatched`
+- `unmatched` 若向外映射失败 envelope，继续使用 `resource_unavailable`
