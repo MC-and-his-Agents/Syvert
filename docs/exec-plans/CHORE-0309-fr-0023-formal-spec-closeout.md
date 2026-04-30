@@ -8,7 +8,7 @@
 - release：`v0.8.0`
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0023-third-party-adapter-entry-path/`
-- 关联 decision：`docs/decisions/ADR-CHORE-0291-open-adapter-provider-boundary.md`
+- 关联 decision：
 - 关联 PR：
 - active 收口事项：`CHORE-0309-fr-0023-formal-spec-closeout`
 - 状态：`active`
@@ -42,6 +42,7 @@
 - `issue-309-fr-0023-adapter-formal-spec` 已作为 `#309` 的独立 worktree 建立，当前基线为 `16c4b8b137f38a1d494f08163fc4ad8a8eb10f68`。
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`#309`、父 FR `#295`、`FR-0021`、`FR-0027` 与 `ADR-CHORE-0291`。
 - 已采用“`FR-0023` 冻结 Adapter-only 接入路径，`FR-0027` 提供 resource requirement 前提，provider offer / compatibility decision 留给独立 FR”的落盘策略。
+- 本事项消费 `docs/decisions/ADR-CHORE-0291-open-adapter-provider-boundary.md` 作为上游开放接入路线背景；该 ADR 不作为 `#309` 自身的 `关联 decision` 元数据。
 
 ## 下一步动作
 
@@ -71,11 +72,18 @@
 - `gh api repos/:owner/:repo/issues/295 --jq '{number,title,state,body,labels:[.labels[].name]}'`
   - 结果：通过，确认 `FR-0023` 目标为第三方 Adapter 稳定接入路径，明确不定义 Provider offer、compatibility decision 或真实外部 provider 样本。
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`spec_review.md`、`docs/specs/FR-0021-adapter-provider-port-boundary/`、`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`。
-- 待运行：`python3 scripts/spec_guard.py --mode ci --all`
-- 待运行：`python3 scripts/docs_guard.py --mode ci`
-- 待运行：`python3 scripts/workflow_guard.py --mode ci`
-- 待运行：`BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-309-fr-0023-adapter-formal-spec`
-- 待运行：`python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 初次未提交时结果：失败，脚本提示当前分支相对基线没有变更。
+  - 提交 `876ff6c` 后结果：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-309-fr-0023-adapter-formal-spec`
+  - 初次未提交时结果：失败，脚本基于 `HEAD` 未看到 formal spec diff，提示绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract。
+  - 提交 `876ff6c` 后结果：失败，`关联 decision` 误绑定到 `ADR-CHORE-0291`，导致 Issue / item_key 与当前 exec-plan 不一致；本次修正为上游背景引用，不再作为 `关联 decision` 元数据。
 
 ## 未决风险
 
