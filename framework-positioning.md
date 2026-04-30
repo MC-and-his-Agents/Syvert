@@ -110,7 +110,7 @@ Syvert Core 不应内置：
 
 ## 产品结构
 
-Syvert 应被拆成三个层次：
+Syvert 应以 Core、Adapter SDK、Adapters 为主结构，并以 Providers 作为 Adapter-bound 执行能力扩展层：
 
 ### 1. Core
 

@@ -82,6 +82,9 @@
 - `python3 scripts/pr_guardian.py review 292 --post-review --json-output /tmp/syvert-pr-292-guardian.json`
   - 结果：`REQUEST_CHANGES`，指出新路线缺少对 `ADR-CHORE-0266` / `FR-0021` 后续时间边界的明确 supersede/amend 关系，并要求 release/sprint 索引回链 `adapter-sdk.md`、`framework-positioning.md`、`vision.md`。
   - 处理：已在 `ADR-CHORE-0291` 与 roadmap 中明确修订的历史时间边界；已补齐 `docs/releases/v0.8.0.md` 与 `docs/sprints/2026-S21.md` 的关联工件入口。
+- `python3 scripts/pr_guardian.py review 292 --post-review --json-output /tmp/syvert-pr-292-guardian-r2.json`
+  - 结果：`REQUEST_CHANGES`，指出 `framework-positioning.md` 的产品结构总述与实际四层内容不一致，且 `vision.md` 保留“聚焦两件事”旧表述。
+  - 处理：已将产品结构总述改为 Core / Adapter SDK / Adapters 主结构加 Providers 扩展层；已将当前阶段重点改为“三件事”。
 
 ## 风险与回滚
 
