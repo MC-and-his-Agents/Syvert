@@ -31,7 +31,7 @@
       - 当 mode=`required` 时必须非空、去重，且值只能来自 `account`、`proxy`
   - `evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；每个引用都必须命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+    - 约束：非空、去重；每个引用都必须唯一命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
 
 ## ApprovedSharedResourceRequirementProfileEvidenceEntry
 
@@ -39,7 +39,7 @@
 - 字段：
   - `profile_ref`
     - 类型：`string`
-    - 约束：非空、稳定；是 declaration `evidence_refs` 的 canonical target
+    - 约束：非空、稳定、在当前 carrier 中唯一；是 declaration `evidence_refs` 的 canonical target
   - `capability`
     - 类型：`string`
     - 约束：当前只允许 `content_detail`
@@ -54,10 +54,10 @@
     - 约束：当前必须且只能覆盖 `xhs`、`douyin`；任何消费该 entry 的 declaration 都必须满足 `adapter_key ∈ reference_adapters`
   - `shared_status`
     - 类型：`enum`
-    - 允许值：`shared`
+    - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `shared`
   - `decision`
     - 类型：`enum`
-    - 允许值：`approve_for_v0_8_0`
+    - 允许值：沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `FR-0015` 的正向批准结论
   - `evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；回指 `FR-0015` 中更细粒度的 research / artifact 证据
@@ -95,7 +95,7 @@
 ## 判定规则
 
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
-- declaration profile 无法映射到在 `capability + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
+- declaration profile 无法唯一映射到在 `capability + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
 - declaration `adapter_key` 不在被引用 entry 的 `reference_adapters` 中 -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`
 - declaration 合法但全部 profile 未命中 -> `match_status=unmatched`

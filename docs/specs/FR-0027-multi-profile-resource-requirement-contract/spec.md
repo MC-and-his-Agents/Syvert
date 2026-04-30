@@ -54,19 +54,19 @@
     - `decision`
     - `evidence_refs`
   - `ApprovedSharedResourceRequirementProfileEvidenceEntry` 的字段语义固定为：
-    - `profile_ref`：非空、稳定字符串；是 declaration `evidence_refs` 允许引用的 canonical target
+    - `profile_ref`：非空、稳定字符串；在当前 approved shared profile carrier 中必须唯一，是 declaration `evidence_refs` 允许引用的 canonical target
     - `capability`：当前只允许 `content_detail`
     - `resource_dependency_mode` / `required_capabilities`：与 declaration profile 的 canonical tuple 完全对齐
     - `reference_adapters`：当前必须且只能覆盖 `xhs` 与 `douyin`
-    - `shared_status`：当前只允许 `shared`
-    - `decision`：当前只允许 `approve_for_v0_8_0`
+    - `shared_status`：沿用 `FR-0015` 已冻结词汇；当前 shared declaration 只接受 `shared`
+    - `decision`：沿用 `FR-0015` 的批准词汇，不在 `FR-0027` 另起新枚举；当前 shared declaration 只接受 `FR-0015` 已定义的正向批准结论
     - `evidence_refs`：非空、去重字符串数组；用于回指 `FR-0015` research / artifact 中更细粒度的双参考证据
   - `#300` 的职责不是替 `FR-0027` 发明新的批准证明 shape，而是把 `FR-0015` 更新到至少能产出上述 `ApprovedSharedResourceRequirementProfileEvidenceEntry`，并补齐 shared / adapter-local / rejected profile truth。
   - `profile_key` 必须是声明内唯一的非空字符串，用于稳定标识一个合法 profile；它只承担声明内追溯与 evidence 对齐职责，不承载优先级或执行顺序语义。
   - `resource_dependency_mode` 在 `v0.8.0` 只允许 `none` 或 `required`。
   - 当 `resource_dependency_mode=none` 时，`required_capabilities` 必须且只能为空数组。
   - 当 `resource_dependency_mode=required` 时，`required_capabilities` 必须是非空、去重数组，元素只能来自 `FR-0015` 已批准共享能力词汇。`v0.8.0` 当前只允许 `account`、`proxy`。
-  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，并且该 entry 的 `capability`、`resource_dependency_mode`、`required_capabilities` 必须与 declaration 的 `capability` 和当前 profile tuple 完全一致，同时其 `reference_adapters` 必须覆盖 declaration 的 `adapter_key`；不得引用 adapter 私有注释、运行期临时日志或未批准材料。
+  - declaration profile 上的 `evidence_refs` 必须是非空、去重字符串数组；每个引用都必须精确且唯一地命中一个 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`，并且该 entry 的 `capability`、`resource_dependency_mode`、`required_capabilities` 必须与 declaration 的 `capability` 和当前 profile tuple 完全一致，同时其 `reference_adapters` 必须覆盖 declaration 的 `adapter_key`；不得引用 adapter 私有注释、运行期临时日志或未批准材料。
   - 同一条 declaration 中允许存在多个合法 profile；这些 profile 表达“任一满足即可执行”的共享 contract，而不是“按顺序尝试”的 fallback 列表。
   - `v0.8.0` 当前允许出现在 shared declaration 空间中的 profile 只允许由以下最小共享能力语义组合构成：
     - `none`
@@ -90,6 +90,7 @@
     - profile 缺少固定字段、`profile_key` 重复，或 `resource_dependency_mode` 取值非法
     - `required_capabilities` 形状非法、重复、为空但 mode=`required`，或出现未被 `FR-0015` 批准的能力标识
     - `evidence_refs` 为空、重复，或无法解析到 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+    - 任一 `evidence_ref` 命中多个 approval proof，或 approval proof 的 `profile_ref` 在 carrier 中不唯一
     - declaration 中包含无法与 `ApprovedSharedResourceRequirementProfileEvidenceEntry` 在 `capability + resource_dependency_mode + required_capabilities` 上完全对齐的 profile
     - declaration 的 `adapter_key` 不在任一被引用 `ApprovedSharedResourceRequirementProfileEvidenceEntry.reference_adapters` 中
     - matcher 输入的 `adapter_key` / `capability` 与 declaration 上下文不一致
@@ -110,6 +111,7 @@
   - contract 必须 fail-closed；任何无法证明 profile 合法、证据有效或输入一致的情况，都不得宽松返回 `matched`。
   - contract 必须保持 Core / Adapter / Provider 实现无关，只回答“哪些 shared profile 合法、当前能力集合是否命中其中之一”。
   - formal spec 必须让 reviewer、guardian 与后续 `#300/#301/#302` 能直接消费，而不依赖会话上下文补足隐藏前提。
+  - formal suite 中 `spec.md`、`data-model.md` 与 `contracts/README.md` 对 matcher 输入违法时的结论必须一致：凡是 proof 不可解析、不唯一、不对齐或不覆盖 declaration adapter 的情况，一律归类为 `runtime_contract + invalid_resource_requirement`。
 
 ## 约束
 
