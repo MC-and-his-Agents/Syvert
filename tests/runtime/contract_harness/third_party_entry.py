@@ -2,20 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from pathlib import Path
-import tempfile
 from typing import Any, Literal
 
-from syvert.registry import AdapterRegistry, RegistryError
-from syvert.resource_lifecycle import ResourceRecord
-from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
-from tests.runtime.contract_harness.host import HarnessExecutionInput, execute_harness_sample
+from syvert.registry import AdapterResourceRequirementDeclarationV2, AdapterResourceRequirementProfile
+from syvert.resource_capability_evidence import approved_shared_resource_requirement_profile_evidence_entries
+from syvert.runtime import AdapterExecutionContext, AdapterTaskRequest, PlatformAdapterError
 from tests.runtime.contract_harness.validation_tool import (
     ContractSampleDefinition,
     HarnessExecutionResult,
     validate_contract_sample,
 )
-from tests.runtime.resource_fixtures import generic_account_material, managed_account_material, proxy_material
 
 ADAPTER_ONLY_CONTENT_DETAIL_PROFILE = "adapter_only_content_detail_v0_8"
 
@@ -52,9 +48,29 @@ _FORBIDDEN_MANIFEST_FIELDS = frozenset(
         "selector",
     }
 )
+_DECLARATION_V2_FIELD_NAMES = frozenset(
+    {
+        "adapter_key",
+        "capability",
+        "resource_requirement_profiles",
+    }
+)
+_PROFILE_FIELD_NAMES = frozenset(
+    {
+        "profile_key",
+        "resource_dependency_mode",
+        "required_capabilities",
+        "evidence_refs",
+    }
+)
 _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
     {"invalid_input", "unsupported", "platform"}
 )
+_ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
+_APPROVED_PROFILE_PROOF_BY_REF = {
+    entry.profile_ref: entry
+    for entry in approved_shared_resource_requirement_profile_evidence_entries()
+}
 _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
     {
         "account",
@@ -105,30 +121,6 @@ class AdapterContractFixture:
     case_type: Literal["success", "error_mapping"]
     input: Mapping[str, Any]
     expected: Mapping[str, Any]
-
-
-@dataclass
-class _ManifestDeclaredAdapter:
-    manifest: ThirdPartyAdapterManifest
-
-    @property
-    def supported_capabilities(self) -> frozenset[str]:
-        return frozenset(self.manifest.supported_capabilities)
-
-    @property
-    def supported_targets(self) -> frozenset[str]:
-        return frozenset(self.manifest.supported_targets)
-
-    @property
-    def supported_collection_modes(self) -> frozenset[str]:
-        return frozenset(self.manifest.supported_collection_modes)
-
-    @property
-    def resource_requirement_declarations(self) -> tuple[Any, ...]:
-        return self.manifest.resource_requirement_declarations
-
-    def execute(self, _request: Any) -> dict[str, Any]:
-        raise AssertionError("manifest declaration validation must not execute adapters")
 
 
 def run_third_party_adapter_contract_test(
@@ -291,50 +283,50 @@ def validate_third_party_adapter_fixtures(
 
 
 def _normalize_manifest_resource_declarations(manifest: ThirdPartyAdapterManifest) -> tuple[Any, ...]:
-    try:
-        registry = AdapterRegistry.from_mapping({manifest.adapter_key: _ManifestDeclaredAdapter(manifest)})
-    except RegistryError as error:
-        raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
-            "manifest resource_requirement_declarations must pass the FR-0027 registry validator",
-            details={"registry_code": error.code, **error.details},
-        ) from error
-    requirements = registry.discover_resource_requirements(manifest.adapter_key)
-    if requirements is None:
-        raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
-            "manifest resource_requirement_declarations could not be discovered after validation",
-            details={"adapter_key": manifest.adapter_key},
-        )
-    return requirements
+    return _normalize_third_party_resource_requirement_declarations(
+        manifest.resource_requirement_declarations,
+        adapter_key=manifest.adapter_key,
+        supported_capabilities=manifest.supported_capabilities,
+        source="manifest",
+    )
 
 
 def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapter: Any) -> None:
     _reject_forbidden_adapter_public_metadata(adapter, manifest.adapter_key)
-    try:
-        registry = AdapterRegistry.from_mapping({manifest.adapter_key: adapter})
-    except RegistryError as error:
+    execute = _safe_get_adapter_attr(adapter, "execute")
+    if not callable(execute):
         raise ThirdPartyContractEntryError(
             "invalid_adapter_public_metadata",
-            "adapter public metadata must pass the registry validator",
-            details={"registry_code": error.code, **error.details},
-        ) from error
-    declaration = registry.lookup(manifest.adapter_key)
-    if declaration is None:
-        raise ThirdPartyContractEntryError(
-            "invalid_adapter_public_metadata",
-            "adapter registry lookup failed after successful materialization",
+            "adapter public metadata must expose callable execute",
             details={"adapter_key": manifest.adapter_key},
         )
+    actual_capabilities = _require_non_empty_string_tuple(
+        _safe_get_adapter_attr(adapter, "supported_capabilities"),
+        field="adapter.supported_capabilities",
+    )
+    actual_targets = _require_non_empty_string_tuple(
+        _safe_get_adapter_attr(adapter, "supported_targets"),
+        field="adapter.supported_targets",
+    )
+    actual_collection_modes = _require_non_empty_string_tuple(
+        _safe_get_adapter_attr(adapter, "supported_collection_modes"),
+        field="adapter.supported_collection_modes",
+    )
+    actual_resource_requirements = _normalize_third_party_resource_requirement_declarations(
+        _safe_get_adapter_attr(adapter, "resource_requirement_declarations"),
+        adapter_key=manifest.adapter_key,
+        supported_capabilities=actual_capabilities,
+        source="adapter",
+    )
     mismatches: dict[str, Any] = {}
-    if tuple(sorted(declaration.supported_capabilities)) != tuple(sorted(manifest.supported_capabilities)):
-        mismatches["supported_capabilities"] = tuple(sorted(declaration.supported_capabilities))
-    if tuple(sorted(declaration.supported_targets)) != tuple(sorted(manifest.supported_targets)):
-        mismatches["supported_targets"] = tuple(sorted(declaration.supported_targets))
-    if tuple(sorted(declaration.supported_collection_modes)) != tuple(sorted(manifest.supported_collection_modes)):
-        mismatches["supported_collection_modes"] = tuple(sorted(declaration.supported_collection_modes))
-    if declaration.resource_requirement_declarations != manifest.resource_requirement_declarations:
-        mismatches["resource_requirement_declarations"] = declaration.resource_requirement_declarations
+    if tuple(sorted(actual_capabilities)) != tuple(sorted(manifest.supported_capabilities)):
+        mismatches["supported_capabilities"] = tuple(sorted(actual_capabilities))
+    if tuple(sorted(actual_targets)) != tuple(sorted(manifest.supported_targets)):
+        mismatches["supported_targets"] = tuple(sorted(actual_targets))
+    if tuple(sorted(actual_collection_modes)) != tuple(sorted(manifest.supported_collection_modes)):
+        mismatches["supported_collection_modes"] = tuple(sorted(actual_collection_modes))
+    if actual_resource_requirements != manifest.resource_requirement_declarations:
+        mismatches["resource_requirement_declarations"] = actual_resource_requirements
     _compare_adapter_public_metadata_attr(
         adapter,
         manifest,
@@ -417,6 +409,318 @@ def _reject_forbidden_adapter_public_metadata(adapter: Any, adapter_key: str) ->
         )
 
 
+def _normalize_third_party_resource_requirement_declarations(
+    raw_declarations: Any,
+    *,
+    adapter_key: str,
+    supported_capabilities: tuple[str, ...],
+    source: str,
+) -> tuple[AdapterResourceRequirementDeclarationV2, ...]:
+    declarations = _require_non_string_sequence(
+        raw_declarations,
+        field=f"{source}.resource_requirement_declarations",
+    )
+    if not declarations:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_requirement_declarations must not be empty",
+            details={"adapter_key": adapter_key, "source": source},
+        )
+
+    normalized: list[AdapterResourceRequirementDeclarationV2] = []
+    seen_capabilities: set[str] = set()
+    for declaration in declarations:
+        normalized_declaration = _normalize_third_party_resource_requirement_declaration(
+            declaration,
+            adapter_key=adapter_key,
+            source=source,
+        )
+        if normalized_declaration.capability in seen_capabilities:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource_requirement_declarations must not repeat capability",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": normalized_declaration.capability,
+                    "source": source,
+                },
+            )
+        seen_capabilities.add(normalized_declaration.capability)
+        normalized.append(normalized_declaration)
+    unexpected_capabilities = tuple(sorted(seen_capabilities - set(supported_capabilities)))
+    if unexpected_capabilities:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_requirement_declarations can only cover supported capabilities",
+            details={
+                "adapter_key": adapter_key,
+                "unexpected_capabilities": unexpected_capabilities,
+                "source": source,
+            },
+        )
+    return tuple(normalized)
+
+
+def _normalize_third_party_resource_requirement_declaration(
+    declaration: Any,
+    *,
+    adapter_key: str,
+    source: str,
+) -> AdapterResourceRequirementDeclarationV2:
+    if isinstance(declaration, AdapterResourceRequirementDeclarationV2):
+        raw_adapter_key = declaration.adapter_key
+        raw_capability = declaration.capability
+        raw_profiles = declaration.resource_requirement_profiles
+    elif isinstance(declaration, Mapping):
+        raw_keys = {key for key in declaration}
+        _reject_forbidden_resource_requirement_fields(raw_keys, adapter_key=adapter_key, source=source)
+        missing_fields = tuple(sorted(_DECLARATION_V2_FIELD_NAMES - raw_keys))
+        extra_fields = tuple(sorted(raw_keys - _DECLARATION_V2_FIELD_NAMES))
+        if missing_fields or extra_fields:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "third-party resource declaration must use the FR-0027 V2 field set",
+                details={
+                    "adapter_key": adapter_key,
+                    "missing_fields": missing_fields,
+                    "extra_fields": extra_fields,
+                    "source": source,
+                },
+            )
+        raw_adapter_key = declaration["adapter_key"]
+        raw_capability = declaration["capability"]
+        raw_profiles = declaration["resource_requirement_profiles"]
+    else:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_requirement_declarations must contain V2 mappings or carriers",
+            details={"adapter_key": adapter_key, "actual_type": type(declaration).__name__, "source": source},
+        )
+
+    declaration_adapter_key = _require_non_empty_string(
+        raw_adapter_key,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_requirement_declarations.adapter_key",
+    )
+    if declaration_adapter_key != adapter_key:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource declaration adapter_key must match manifest adapter_key",
+            details={"adapter_key": adapter_key, "declaration_adapter_key": declaration_adapter_key, "source": source},
+        )
+    capability = _require_non_empty_string(
+        raw_capability,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_requirement_declarations.capability",
+    )
+    profiles = _normalize_third_party_resource_requirement_profiles(
+        raw_profiles,
+        adapter_key=adapter_key,
+        capability=capability,
+        source=source,
+    )
+    return AdapterResourceRequirementDeclarationV2(
+        adapter_key=adapter_key,
+        capability=capability,
+        resource_requirement_profiles=profiles,
+    )
+
+
+def _normalize_third_party_resource_requirement_profiles(
+    raw_profiles: Any,
+    *,
+    adapter_key: str,
+    capability: str,
+    source: str,
+) -> tuple[AdapterResourceRequirementProfile, ...]:
+    profiles = _require_non_string_sequence(
+        raw_profiles,
+        field=f"{source}.resource_requirement_profiles",
+    )
+    if not profiles:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_requirement_profiles must not be empty",
+            details={"adapter_key": adapter_key, "capability": capability, "source": source},
+        )
+
+    normalized: list[AdapterResourceRequirementProfile] = []
+    seen_profile_keys: set[str] = set()
+    seen_tuples: set[tuple[str, tuple[str, ...]]] = set()
+    for profile in profiles:
+        normalized_profile = _normalize_third_party_resource_requirement_profile(
+            profile,
+            adapter_key=adapter_key,
+            capability=capability,
+            source=source,
+        )
+        if normalized_profile.profile_key in seen_profile_keys:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource_requirement_profiles must not repeat profile_key",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "profile_key": normalized_profile.profile_key,
+                    "source": source,
+                },
+            )
+        semantic_tuple = (
+            normalized_profile.resource_dependency_mode,
+            normalized_profile.required_capabilities,
+        )
+        if semantic_tuple in seen_tuples:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource_requirement_profiles must not repeat semantic tuples",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "profile_key": normalized_profile.profile_key,
+                    "source": source,
+                },
+            )
+        seen_profile_keys.add(normalized_profile.profile_key)
+        seen_tuples.add(semantic_tuple)
+        normalized.append(normalized_profile)
+    return tuple(normalized)
+
+
+def _normalize_third_party_resource_requirement_profile(
+    profile: Any,
+    *,
+    adapter_key: str,
+    capability: str,
+    source: str,
+) -> AdapterResourceRequirementProfile:
+    if isinstance(profile, AdapterResourceRequirementProfile):
+        raw_profile_key = profile.profile_key
+        raw_dependency_mode = profile.resource_dependency_mode
+        raw_required_capabilities = profile.required_capabilities
+        raw_evidence_refs = profile.evidence_refs
+    elif isinstance(profile, Mapping):
+        raw_keys = {key for key in profile}
+        _reject_forbidden_resource_requirement_fields(raw_keys, adapter_key=adapter_key, source=source)
+        missing_fields = tuple(sorted(_PROFILE_FIELD_NAMES - raw_keys))
+        extra_fields = tuple(sorted(raw_keys - _PROFILE_FIELD_NAMES))
+        if missing_fields or extra_fields:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "third-party resource profile must use the FR-0027 profile field set",
+                details={
+                    "adapter_key": adapter_key,
+                    "capability": capability,
+                    "missing_fields": missing_fields,
+                    "extra_fields": extra_fields,
+                    "source": source,
+                },
+            )
+        raw_profile_key = profile["profile_key"]
+        raw_dependency_mode = profile["resource_dependency_mode"]
+        raw_required_capabilities = profile["required_capabilities"]
+        raw_evidence_refs = profile["evidence_refs"]
+    else:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_requirement_profiles must contain mappings or carriers",
+            details={"adapter_key": adapter_key, "capability": capability, "actual_type": type(profile).__name__},
+        )
+
+    profile_key = _require_non_empty_string(
+        raw_profile_key,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_requirement_profiles.profile_key",
+    )
+    resource_dependency_mode = _require_non_empty_string(
+        raw_dependency_mode,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_requirement_profiles.resource_dependency_mode",
+    )
+    if resource_dependency_mode not in _ALLOWED_RESOURCE_DEPENDENCY_MODES:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_dependency_mode must be none or required",
+            details={
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "profile_key": profile_key,
+                "resource_dependency_mode": resource_dependency_mode,
+                "source": source,
+            },
+        )
+    required_capabilities = _require_non_empty_string_tuple(
+        raw_required_capabilities,
+        field=f"{source}.resource_requirement_profiles.required_capabilities",
+    )
+    evidence_refs = _require_non_empty_string_tuple(
+        raw_evidence_refs,
+        field=f"{source}.resource_requirement_profiles.evidence_refs",
+    )
+    if len(evidence_refs) != 1:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "third-party resource profile must bind exactly one FR-0027 profile proof",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key, "source": source},
+        )
+    proof = _APPROVED_PROFILE_PROOF_BY_REF.get(evidence_refs[0])
+    if proof is None:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource profile evidence_refs must bind an approved FR-0027 profile proof",
+            details={"adapter_key": adapter_key, "capability": capability, "profile_key": profile_key, "source": source},
+        )
+    if (
+        proof.capability != capability
+        or proof.resource_dependency_mode != resource_dependency_mode
+        or proof.required_capabilities != required_capabilities
+    ):
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource profile tuple must align with the FR-0027 profile proof",
+            details={
+                "adapter_key": adapter_key,
+                "capability": capability,
+                "profile_key": profile_key,
+                "proof_profile_ref": proof.profile_ref,
+                "source": source,
+            },
+        )
+    return AdapterResourceRequirementProfile(
+        profile_key=profile_key,
+        resource_dependency_mode=resource_dependency_mode,
+        required_capabilities=required_capabilities,
+        evidence_refs=evidence_refs,
+    )
+
+
+def _reject_forbidden_resource_requirement_fields(
+    raw_keys: set[Any],
+    *,
+    adapter_key: str,
+    source: str,
+) -> None:
+    if any(not isinstance(key, str) for key in raw_keys):
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource requirement field names must be strings",
+            details={"adapter_key": adapter_key, "actual_keys": tuple(sorted(str(key) for key in raw_keys))},
+        )
+    forbidden_fields = tuple(sorted(raw_keys & _FORBIDDEN_MANIFEST_FIELDS))
+    if forbidden_fields:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource requirements must not carry provider or compatibility fields",
+            details={"adapter_key": adapter_key, "forbidden_fields": forbidden_fields, "source": source},
+        )
+
+
+def _safe_get_adapter_attr(adapter: Any, attr_name: str) -> Any:
+    try:
+        return getattr(adapter, attr_name)
+    except Exception:
+        return _MISSING
+
+
 def _compare_adapter_public_metadata_attr(
     adapter: Any,
     manifest: ThirdPartyAdapterManifest,
@@ -449,34 +753,39 @@ def _execute_and_validate_fixture(
 ) -> dict[str, Any]:
     expected_outcome = "success" if fixture.case_type == "success" else "legal_failure"
     sample = ContractSampleDefinition(sample_id=fixture.fixture_id, expected_outcome=expected_outcome)
-    with tempfile.TemporaryDirectory(prefix=f"syvert-third-party-contract-{fixture.fixture_id}-") as temp_dir:
-        resource_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
-        resource_store.seed_resources(
-            [
-                ResourceRecord(
-                    resource_id="third-party-account-001",
-                    resource_type="account",
-                    status="AVAILABLE",
-                    material=managed_account_material(generic_account_material(), adapter_key=manifest.adapter_key),
+    task_id = f"task-{fixture.fixture_id}"
+    try:
+        payload = adapter.execute(
+            AdapterExecutionContext(
+                request=AdapterTaskRequest(
+                    capability="content_detail",
+                    target_type="url",
+                    target_value=_fixture_url(fixture),
+                    collection_mode="hybrid",
                 ),
-                ResourceRecord(
-                    resource_id="third-party-proxy-001",
-                    resource_type="proxy",
-                    status="AVAILABLE",
-                    material=proxy_material(),
-                ),
-            ]
+                resource_bundle=None,
+            )
         )
-        runtime_envelope = execute_harness_sample(
-            HarnessExecutionInput(
-                sample_id=fixture.fixture_id,
-                url=_fixture_url(fixture),
-                adapter_key=manifest.adapter_key,
-            ),
-            adapters={manifest.adapter_key: adapter},
-            task_id=f"task-{fixture.fixture_id}",
-            resource_lifecycle_store=resource_store,
-        )
+        runtime_envelope = {
+            "task_id": task_id,
+            "adapter_key": manifest.adapter_key,
+            "capability": "content_detail_by_url",
+            "status": "success",
+            **payload,
+        }
+    except PlatformAdapterError as error:
+        runtime_envelope = {
+            "task_id": task_id,
+            "adapter_key": manifest.adapter_key,
+            "capability": "content_detail_by_url",
+            "status": "failed",
+            "error": {
+                "category": error.category,
+                "code": error.code,
+                "message": error.message,
+                "details": dict(error.details),
+            },
+        }
     result = validate_contract_sample(sample, HarnessExecutionResult(runtime_envelope=runtime_envelope))
     if result["verdict"] == "legal_failure":
         return _validate_error_mapping_observation(fixture, result)

@@ -48,7 +48,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[1]["observed_error"]["category"], "platform")
         self.assertEqual(results[1]["observed_error"]["code"], "content_not_found")
 
-    def test_manifest_resource_declarations_are_normalized_through_registry_v2_validator(self) -> None:
+    def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
         manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())
 
         self.assertEqual(manifest.adapter_key, THIRD_PARTY_FIXTURE_ADAPTER_KEY)
@@ -123,7 +123,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             validate_third_party_adapter_manifest(manifest)
 
         self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
-        self.assertEqual(context.exception.details["registry_code"], "invalid_adapter_resource_requirements")
+        self.assertEqual(context.exception.details["profile_key"], "account_proxy")
 
     def test_rejects_adapter_public_metadata_that_does_not_match_manifest(self) -> None:
         with self.assertRaises(ThirdPartyContractEntryError) as context:
@@ -193,8 +193,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         success_result = results[0]
         self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
         self.assertEqual(success_result["verdict"], "contract_violation")
-        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
-        self.assertEqual(success_result["observed_error"]["code"], "invalid_adapter_success_payload")
+        self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
 
     def test_reports_adapter_error_mapping_mismatch(self) -> None:
         results = run_third_party_adapter_contract_test(
