@@ -12,6 +12,7 @@ from tests.runtime.contract_harness.validation_tool import (
     HarnessExecutionResult,
     validate_contract_sample,
 )
+from tests.runtime.resource_fixtures import build_managed_resource_bundle
 
 ADAPTER_ONLY_CONTENT_DETAIL_PROFILE = "adapter_only_content_detail_v0_8"
 
@@ -754,22 +755,30 @@ def _execute_and_validate_fixture(
     expected_outcome = "success" if fixture.case_type == "success" else "legal_failure"
     sample = ContractSampleDefinition(sample_id=fixture.fixture_id, expected_outcome=expected_outcome)
     task_id = f"task-{fixture.fixture_id}"
+    fixture_input = _normalize_fixture_input(manifest, fixture)
+    resource_profile = _resource_profile_for_fixture(manifest, fixture, fixture_input["resource_profile_key"])
+    resource_bundle = build_managed_resource_bundle(
+        adapter_key=manifest.adapter_key,
+        task_id=task_id,
+        capability=fixture_input["operation"],
+        requested_slots=resource_profile.required_capabilities,
+    )
     try:
         payload = adapter.execute(
             AdapterExecutionContext(
                 request=AdapterTaskRequest(
-                    capability="content_detail",
-                    target_type="url",
-                    target_value=_fixture_url(fixture),
-                    collection_mode="hybrid",
+                    capability=fixture_input["capability"],
+                    target_type=fixture_input["target_type"],
+                    target_value=fixture_input["target_value"],
+                    collection_mode=fixture_input["collection_mode"],
                 ),
-                resource_bundle=None,
+                resource_bundle=resource_bundle,
             )
         )
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
-            "capability": "content_detail_by_url",
+            "capability": fixture_input["operation"],
             "status": "success",
             **payload,
         }
@@ -777,7 +786,7 @@ def _execute_and_validate_fixture(
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
-            "capability": "content_detail_by_url",
+            "capability": fixture_input["operation"],
             "status": "failed",
             "error": {
                 "category": error.category,
@@ -999,14 +1008,91 @@ def _validate_error_mapping_observation(
     return result
 
 
-def _fixture_url(fixture: AdapterContractFixture) -> str:
+def _normalize_fixture_input(
+    manifest: ThirdPartyAdapterManifest,
+    fixture: AdapterContractFixture,
+) -> dict[str, str]:
     input_mapping = fixture.input
-    url = _require_non_empty_string(
-        input_mapping.get("url"),
-        code="invalid_fixture_input",
-        field="input.url",
+    fixture_input = {
+        "operation": _require_non_empty_string(
+            input_mapping.get("operation"),
+            code="invalid_fixture_input",
+            field="input.operation",
+        ),
+        "capability": _require_non_empty_string(
+            input_mapping.get("capability"),
+            code="invalid_fixture_input",
+            field="input.capability",
+        ),
+        "target_type": _require_non_empty_string(
+            input_mapping.get("target_type"),
+            code="invalid_fixture_input",
+            field="input.target_type",
+        ),
+        "target_value": _require_non_empty_string(
+            input_mapping.get("target_value"),
+            code="invalid_fixture_input",
+            field="input.target_value",
+        ),
+        "collection_mode": _require_non_empty_string(
+            input_mapping.get("collection_mode"),
+            code="invalid_fixture_input",
+            field="input.collection_mode",
+        ),
+        "resource_profile_key": _require_non_empty_string(
+            input_mapping.get("resource_profile_key"),
+            code="invalid_fixture_input",
+            field="input.resource_profile_key",
+        ),
+    }
+    if fixture_input["capability"] not in manifest.supported_capabilities:
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_input_metadata",
+            "fixture capability must be declared by manifest supported_capabilities",
+            details={"fixture_id": fixture.fixture_id, "capability": fixture_input["capability"]},
+        )
+    if fixture_input["target_type"] not in manifest.supported_targets:
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_input_metadata",
+            "fixture target_type must be declared by manifest supported_targets",
+            details={"fixture_id": fixture.fixture_id, "target_type": fixture_input["target_type"]},
+        )
+    if fixture_input["collection_mode"] not in manifest.supported_collection_modes:
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_input_metadata",
+            "fixture collection_mode must be declared by manifest supported_collection_modes",
+            details={"fixture_id": fixture.fixture_id, "collection_mode": fixture_input["collection_mode"]},
+        )
+    return fixture_input
+
+
+def _resource_profile_for_fixture(
+    manifest: ThirdPartyAdapterManifest,
+    fixture: AdapterContractFixture,
+    profile_key: str,
+) -> AdapterResourceRequirementProfile:
+    for declaration in manifest.resource_requirement_declarations:
+        if declaration.capability != fixture.input.get("capability"):
+            continue
+        for profile in declaration.resource_requirement_profiles:
+            if profile.profile_key == profile_key:
+                proof = _APPROVED_PROFILE_PROOF_BY_REF[profile.evidence_refs[0]]
+                if (
+                    proof.execution_path.operation != fixture.input.get("operation")
+                    or proof.execution_path.target_type != fixture.input.get("target_type")
+                    or proof.execution_path.collection_mode != fixture.input.get("collection_mode")
+                ):
+                    raise ThirdPartyContractEntryError(
+                        "invalid_fixture_resource_profile",
+                        "fixture input must align with the FR-0027 profile proof execution path",
+                        details={"fixture_id": fixture.fixture_id, "resource_profile_key": profile_key},
+                    )
+                return profile
+    raise ThirdPartyContractEntryError(
+        "invalid_fixture_resource_profile",
+        "fixture resource_profile_key must resolve to the manifest resource declaration for its capability",
+        details={"fixture_id": fixture.fixture_id, "resource_profile_key": profile_key},
     )
-    return url
 
 
 def _require_mapping(value: Any, *, field: str) -> Mapping[str, Any]:

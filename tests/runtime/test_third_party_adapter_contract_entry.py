@@ -28,12 +28,18 @@ class AdapterWithProviderFacingMetadata(ThirdPartyContractFixtureAdapter):
     selector = "runtime-selector"
 
 
+class AdapterWithUserIdTargetMetadata(ThirdPartyContractFixtureAdapter):
+    supported_targets = frozenset({"user_id"})
+
+
 class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
     def test_accepts_minimal_manifest_fixtures_and_adapter_execution(self) -> None:
+        adapter = ThirdPartyContractFixtureAdapter()
+
         results = run_third_party_adapter_contract_test(
             manifest=minimal_third_party_adapter_manifest(),
             fixtures=minimal_third_party_adapter_fixtures(),
-            adapter=ThirdPartyContractFixtureAdapter(),
+            adapter=adapter,
         )
 
         self.assertEqual(
@@ -47,6 +53,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[1]["observed_status"], "failed")
         self.assertEqual(results[1]["observed_error"]["category"], "platform")
         self.assertEqual(results[1]["observed_error"]["code"], "content_not_found")
+        self.assertEqual(adapter.last_resource_slots, ("account", "proxy"))
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
         manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())
@@ -135,6 +142,34 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "adapter_manifest_metadata_mismatch")
         self.assertIn("sdk_contract_id", context.exception.details["mismatches"])
+
+    def test_rejects_fixture_input_not_declared_by_manifest_target_metadata(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["supported_targets"] = ("user_id",)
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithUserIdTargetMetadata(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_input_metadata")
+        self.assertEqual(context.exception.details["target_type"], "url")
+
+    def test_rejects_fixture_without_resource_profile_input(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        del fixtures[0]["input"]["resource_profile_key"]
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_input")
+        self.assertEqual(context.exception.details["field"], "input.resource_profile_key")
 
     def test_rejects_adapter_public_metadata_with_provider_facing_fields(self) -> None:
         with self.assertRaises(ThirdPartyContractEntryError) as context:

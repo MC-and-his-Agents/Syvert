@@ -68,7 +68,12 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
             "manifest_ref": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
             "case_type": "success",
             "input": {
-                "url": "https://contract-host/third-party/success",
+                "operation": "content_detail_by_url",
+                "capability": "content_detail",
+                "target_type": "url",
+                "target_value": "https://contract-host/third-party/success",
+                "collection_mode": "hybrid",
+                "resource_profile_key": "account_proxy",
             },
             "expected": {
                 "status": "success",
@@ -80,7 +85,12 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
             "manifest_ref": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
             "case_type": "error_mapping",
             "input": {
-                "url": "https://contract-host/third-party/content-not-found",
+                "operation": "content_detail_by_url",
+                "capability": "content_detail",
+                "target_type": "url",
+                "target_value": "https://contract-host/third-party/content-not-found",
+                "collection_mode": "hybrid",
+                "resource_profile_key": "account_proxy",
             },
             "expected": {
                 "status": "failed",
@@ -131,6 +141,7 @@ def _success_payload(url: str) -> dict[str, Any]:
 class ThirdPartyContractFixtureAdapter:
     success_payload_shape: str = "valid"
     error_code: str = "content_not_found"
+    last_resource_slots: tuple[str, ...] | None = None
 
     adapter_key = THIRD_PARTY_FIXTURE_ADAPTER_KEY
     sdk_contract_id = THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID
@@ -156,6 +167,11 @@ class ThirdPartyContractFixtureAdapter:
     contract_test_profile = "adapter_only_content_detail_v0_8"
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
+        self.last_resource_slots = (
+            request.resource_bundle.requested_slots
+            if request.resource_bundle is not None
+            else None
+        )
         if "content-not-found" in request.target_value:
             raise PlatformAdapterError(
                 code=self.error_code,

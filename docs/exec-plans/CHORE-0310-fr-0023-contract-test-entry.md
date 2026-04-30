@@ -42,6 +42,7 @@
 - 已确认当前 FR-0027 approved profile proof 只覆盖 `xhs` / `douyin` reference slice；本事项不扩张 resource proof，不创建第二套第三方 resource declaration truth。
 - guardian review 初次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界与 adapter public metadata provider-facing 字段未显式 fail-closed；已补充对应校验与回归测试。
 - guardian review 第二次返回 `REQUEST_CHANGES`，阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；已改为 harness 内第三方 profile-proof 校验，保留 FR-0027 profile tuple / evidence proof 对齐，但不要求非参考第三方 `adapter_key` 冒充 reference adapter。
+- guardian review 第三次返回 `REQUEST_CHANGES`，阻断项为执行阶段硬编码 capability / target / mode 且未注入 required resource profile；已将 fixture input 扩展为 operation / capability / target / collection mode / resource profile 驱动，并在执行时构造与 FR-0027 profile 对齐的 resource bundle。
 
 ## 下一步动作
 
@@ -71,11 +72,11 @@
 - `python3 -m pytest tests/runtime/test_third_party_adapter_contract_entry.py -q`
   - 结果：未执行通过；当前环境 `python3` 无 `pytest` 模块，改用 `unittest` 执行同等测试。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
-  - 结果：通过，12 tests。
+  - 结果：通过，14 tests。
 - `python3 -m unittest tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
   - 结果：通过，50 tests。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
-  - 结果：通过，62 tests。
+  - 结果：通过，64 tests。
 - `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
   - 结果：通过。
 - `git diff --check`
@@ -98,6 +99,9 @@
   - 第二次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：第三方 manifest resource declaration 校验仍通过 reference adapter proof 绑定 `xhs/douyin`，非参考第三方 key 无法通过。
   - 修正：将 contract entry 的 resource declaration 校验改为第三方 profile-proof 校验，仍校验 FR-0027 evidence ref、capability、resource dependency mode 与 required capabilities；最小样例改为非参考 key `community_content`。
+  - 第三次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：执行阶段硬编码 `content_detail` / `url` / `hybrid`；required resource profiles 未通过 fixture 输入和 resource bundle 证明。
+  - 修正：fixture input 必须声明 operation、capability、target_type、target_value、collection_mode、resource_profile_key；entry 校验这些输入与 manifest metadata 及 FR-0027 profile proof execution path 一致，并向 adapter execute 注入对应 resource bundle。
 
 ## 未决风险
 
