@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0015-dual-reference-resource-capability-evidence/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#305`
 - active 收口事项：`CHORE-0299-fr-0027-dual-reference-profile-evidence`
 - 状态：`active`
 
@@ -75,6 +75,8 @@
   - 结果：通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-300-fr-0027-profile`
   - 结果：通过。
+- `python3 scripts/open_pr.py --class spec --issue 300 --item-key CHORE-0299-fr-0027-dual-reference-profile-evidence --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title "docs(spec): 收口 FR-0027 双参考 profile evidence" --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#305 https://github.com/MC-and-his-Agents/Syvert/pull/305`。
 
 ## 未决风险
 
