@@ -72,6 +72,15 @@ _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
     {"invalid_input", "unsupported", "platform"}
 )
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
+_RESERVED_RUNTIME_ENVELOPE_FIELDS = frozenset(
+    {
+        "adapter_key",
+        "capability",
+        "error",
+        "status",
+        "task_id",
+    }
+)
 _APPROVED_PROFILE_PROOF_BY_REF = {
     entry.profile_ref: entry
     for entry in approved_shared_resource_requirement_profile_evidence_entries()
@@ -909,6 +918,18 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
+        reserved_fields = tuple(sorted(set(payload) & _RESERVED_RUNTIME_ENVELOPE_FIELDS))
+        if reserved_fields:
+            return {
+                **envelope,
+                "status": "failed",
+                "error": {
+                    "category": "runtime_contract",
+                    "code": "adapter_payload_reserved_runtime_fields",
+                    "message": "adapter success payload must not carry runtime envelope context fields",
+                    "details": {"reserved_fields": reserved_fields},
+                },
+            }
         return {**envelope, **payload}
     return {
         **envelope,

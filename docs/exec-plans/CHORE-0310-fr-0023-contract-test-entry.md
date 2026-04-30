@@ -49,11 +49,12 @@
 - guardian review 第七次返回 `REQUEST_CHANGES`，阻断项为 `resource_dependency_mode=none` 且 `required_capabilities=()` 的 FR-0027 合法 profile 会被第三方入口误拒绝；已允许 none profile 空能力集合，并补充第三方 manifest / fixture / execute 准入回归。
 - guardian review 第八次返回 `REQUEST_CHANGES`，阻断项为执行结果和 resource bundle 使用 operation 而不是 adapter capability family，以及 unexpected adapter exception 会中断 contract run；已统一为 fixture capability，并把 unexpected exception 归一为结构化 runtime_contract observation。
 - guardian review 第九次返回 `REQUEST_CHANGES`，阻断项为 adapter-vs-manifest metadata 对齐对 `fixture_refs` 与 resource requirement profile 顺序敏感；已改为顺序无关的语义集合比较，并补充回归。
+- guardian review 第十次返回 `REQUEST_CHANGES`，阻断项为 adapter success payload 可覆盖 harness runtime context；已将 `task_id`、`adapter_key`、`capability`、`status`、`error` 设为保留字段，payload 携带这些字段时归一为 runtime_contract contract violation。
 
 ## 下一步动作
 
 - 提交第七轮 guardian 修复并推送 PR `#330` 新 head。
-- 提交第九轮 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十轮 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -195,6 +196,22 @@
 - 第九轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
   - 结果：通过。
 - 第九轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：adapter success payload 可以通过 `{**envelope, **payload}` 覆盖 harness 控制的 runtime context 字段，并仍被误判为 pass。
+  - 修正：success payload 若携带 `task_id`、`adapter_key`、`capability`、`status` 或 `error`，入口返回 `runtime_contract + adapter_payload_reserved_runtime_fields` failed envelope，由 sample validator 归类为 contract violation。
+- 第十轮 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，73 tests。
+- 第十轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 未决风险
