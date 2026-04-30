@@ -52,8 +52,7 @@
 ## 下一步动作
 
 - 提交第七轮 guardian 修复并推送 PR `#330` 新 head。
-- 提交第八轮 guardian 修复并推送 PR `#330` 新 head。
-- rebase 到包含 `#314` 的最新 `origin/main` 后重新运行 guardian review、GitHub checks 与 merge gate。
+- 推送已 rebase 到最新 `origin/main` 的 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -165,6 +164,20 @@
 - 第八轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
   - 结果：通过。
 - 第八轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `git rebase origin/main`
+  - 结果：通过；同步到包含 `#314` merge commit `e456547dd4bc8145e7a1c77be1e89164a7d33fc8` 的主干。
+- rebase 后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，71 tests。
+- rebase 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- rebase 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- rebase 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 未决风险
