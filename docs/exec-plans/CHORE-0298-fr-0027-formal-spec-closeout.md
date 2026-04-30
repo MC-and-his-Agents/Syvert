@@ -36,7 +36,7 @@
 - `issue-299-fr-0027-formal-spec` 已作为 `#299` 的独立 spec worktree 建立，基线为 `3410c212c3bc2a233892bcb5cf014fe90201fa19`。
 - 已核对 `#294` 与 `#299-#303` 的目标、非目标与依赖关系。
 - 当前 formal spec 回合采用“`FR-0027` 新主套件承接 `v0.8.0` truth，`FR-0013/14/15` 保留 `v0.5.0` 历史语义”的落盘策略，以满足现有 formal spec scope guard；`#299` 与 `#294` 的 GitHub truth 已同步到这一路径。
-- 最新 formal spec 语义 checkpoint `de2897ff993cf35cc344264d9e1745b204563a53` 已生成，当前受审 spec PR 为 `#304`；当前停点是等待基于最新 head 的 guardian verdict 回写状态面，并把修复后的 review / merge gate 真相持续同步回 exec-plan。
+- 最新 formal spec 语义 checkpoint `ba8b5f5da4c4f034ca8859f3d6db1b8c68d9778c` 已生成，当前受审 spec PR 为 `#304`；当前停点是等待基于最新 head 的 guardian verdict 回写状态面，并把修复后的 review / merge gate 真相持续同步回 exec-plan。
 
 ## 下一步动作
 
@@ -86,6 +86,14 @@
 - `git commit -m 'docs(spec): 收紧 FR-0027 规约边界'`
   - 结果：已生成最新语义 checkpoint `c4cc7862e61722d113260d6b0802e8461d8a7ea6`
 - `git commit -m 'docs(spec): 固定 FR-0027 proof 适用边界'`
+  - 结果：已生成语义 checkpoint `de2897ff993cf35cc344264d9e1745b204563a53`
+- `gh api -X PATCH repos/<repo>/issues/299 -f body=...`
+  - 结果：已把 `#299` 的 scope 进一步收紧为当前双参考 slice 的 formal-spec closeout。
+- `gh api -X PATCH repos/<repo>/issues/294 -f body=...`
+  - 结果：已把 `#294` 的 FR 目标与关闭条件同步收紧为当前双参考 slice 的 profile contract 收口。
+- `git commit -m 'docs(spec): 收紧 FR-0027 双参考 slice 边界'`
+  - 结果：已生成最新语义 checkpoint `ba8b5f5da4c4f034ca8859f3d6db1b8c68d9778c`
+- `git commit -m 'docs(spec): 固定 FR-0027 proof 适用边界'`
   - 结果：已生成最新语义 checkpoint `de2897ff993cf35cc344264d9e1745b204563a53`
 - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过
@@ -118,5 +126,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `de2897ff993cf35cc344264d9e1745b204563a53`
+- `ba8b5f5da4c4f034ca8859f3d6db1b8c68d9778c`
 - worktree 创建基线：`3410c212c3bc2a233892bcb5cf014fe90201fa19`
