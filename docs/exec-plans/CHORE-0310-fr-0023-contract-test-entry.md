@@ -41,6 +41,7 @@
 - 已新增第三方 Adapter manifest / fixture contract entry，并复用 `AdapterRegistry.from_mapping()` 消费现有 `AdapterResourceRequirementDeclarationV2` / FR-0027 校验。
 - 已确认当前 FR-0027 approved profile proof 只覆盖 `xhs` / `douyin` reference slice；本事项不扩张 resource proof，不创建第二套第三方 resource declaration truth。
 - guardian review 初次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界与 adapter public metadata provider-facing 字段未显式 fail-closed；已补充对应校验与回归测试。
+- guardian review 第二次返回 `REQUEST_CHANGES`，阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；已改为 harness 内第三方 profile-proof 校验，保留 FR-0027 profile tuple / evidence proof 对齐，但不要求非参考第三方 `adapter_key` 冒充 reference adapter。
 
 ## 下一步动作
 
@@ -94,6 +95,9 @@
   - 初次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：`adapter_key` 只校验非空；adapter public metadata 可暴露 provider-facing 字段。
   - 修正：新增 `adapter_key` provider / account / environment / routing strategy 语义片段阻断；新增 adapter 对象 provider / compatibility 字段暴露阻断；新增回归测试。
+  - 第二次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：第三方 manifest resource declaration 校验仍通过 reference adapter proof 绑定 `xhs/douyin`，非参考第三方 key 无法通过。
+  - 修正：将 contract entry 的 resource declaration 校验改为第三方 profile-proof 校验，仍校验 FR-0027 evidence ref、capability、resource dependency mode 与 required capabilities；最小样例改为非参考 key `community_content`。
 
 ## 未决风险
 
