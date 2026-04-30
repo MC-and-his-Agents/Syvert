@@ -9,7 +9,12 @@ from syvert.registry import AdapterResourceRequirementDeclarationV2, AdapterReso
 from syvert.resource_capability_evidence import (
     approved_shared_resource_requirement_profile_evidence_entries,
 )
-from syvert.runtime import AdapterExecutionContext, AdapterTaskRequest, PlatformAdapterError
+from syvert.runtime import (
+    AdapterExecutionContext,
+    AdapterTaskRequest,
+    PlatformAdapterError,
+    classify_adapter_error,
+)
 from tests.runtime.contract_harness.validation_tool import (
     ContractSampleDefinition,
     HarnessExecutionResult,
@@ -82,7 +87,7 @@ _PROFILE_FIELD_NAMES = frozenset(
     }
 )
 _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
-    {"invalid_input", "unsupported", "platform"}
+    {"invalid_input", "platform"}
 )
 _RESULT_CONTRACT_FIELD_NAMES = frozenset(
     {
@@ -1009,10 +1014,7 @@ def _normalize_platform_adapter_error_details(error: PlatformAdapterError) -> di
             },
         }
     return {
-        "category": error.category,
-        "code": error.code,
-        "message": error.message,
-        "details": dict(error.details),
+        **classify_adapter_error(error),
     }
 
 

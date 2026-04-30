@@ -101,6 +101,18 @@ class AdapterWithInvalidPlatformErrorDetails(ThirdPartyContractFixtureAdapter):
         )
 
 
+class AdapterWithUnsupportedCategoryPlatformError(ThirdPartyContractFixtureAdapter):
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        if "content-not-found" in request.target_value:
+            raise PlatformAdapterError(
+                code="content_not_found",
+                message="third-party fixture mapped platform error",
+                details={"source_error": "content_not_found"},
+                category="unsupported",
+            )
+        return super().execute(request)
+
+
 class AdapterWithMismatchedSourceErrorDetails(ThirdPartyContractFixtureAdapter):
     def execute(self, request):  # type: ignore[no-untyped-def]
         if "content-not-found" in request.target_value:
@@ -326,6 +338,22 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "unsupported_manifest_capabilities")
         self.assertEqual(context.exception.details["unsupported_capabilities"], ("unapproved_capability",))
+
+    def test_rejects_error_mapping_category_not_preserved_by_runtime(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["error_mapping"] = {
+            "content_not_found": {
+                "category": "unsupported",
+                "code": "content_not_found",
+                "message": "content is unavailable or deleted",
+            },
+        }
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_error_mapping")
+        self.assertEqual(context.exception.details["category"], "unsupported")
 
     def test_rejects_mapping_where_manifest_requires_explicit_sequence(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
@@ -723,6 +751,17 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
         self.assertEqual(error_result["verdict"], "contract_violation")
         self.assertEqual(error_result["reason"]["code"], "error_mapping_source_error_mismatch")
+
+    def test_normalizes_platform_adapter_error_category_through_runtime_classifier(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithUnsupportedCategoryPlatformError(),
+        )
+
+        error_result = results[1]
+        self.assertEqual(error_result["verdict"], "legal_failure")
+        self.assertEqual(error_result["observed_error"]["category"], "platform")
 
 
 if __name__ == "__main__":
