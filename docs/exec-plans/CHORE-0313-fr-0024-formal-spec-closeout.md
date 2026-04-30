@@ -94,6 +94,18 @@
   - 结果：未通过；`关联 decision：无` 被解析为有意义路径，触发“必须绑定到 `docs/decisions/*.md`”；同时 formal spec input 绑定因此未通过 preflight。处理：将 `关联 decision` 留空，对齐既有 formal spec closeout exec-plan 样式。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
+- `git commit -m 'docs(spec): 记录 FR-0024 规约验证结果'`
+  - 结果：已生成 validation follow-up checkpoint `8052738c67fbfa9b1058d41793b7685f1318ca63`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-313-fr-0024-adapter-capability-requirement-formal-spec`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 - `git commit -m 'docs(spec): 校正 FR-0024 执行计划元数据'`
   - 结果：已生成 metadata 修正 checkpoint `f71357e1e425650f05784d34cf2a59360d64e2d7`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -126,4 +138,5 @@
 
 - formal spec 语义 checkpoint：`9bee64898949c3069b9e1c2e7fd44cd7ac9c1de6`
 - metadata / validation follow-up checkpoint：`f71357e1e425650f05784d34cf2a59360d64e2d7`
+- validation result follow-up checkpoint：`8052738c67fbfa9b1058d41793b7685f1318ca63`
 - worktree 创建基线：`16c4b8b6f36e96d1b401b2b513f61f8041c6562f`
