@@ -72,7 +72,9 @@
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
-  - 结果：待当前 scope 修正 commit 后执行。
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-300-fr-0027-profile`
+  - 结果：通过。
 
 ## 未决风险
 
@@ -86,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `0576addca3aa5931eee7df13160cdb898bae99db`
-- 说明：当前 scope 修正 checkpoint 把 `#300` 收窄为 formal evidence truth / docs PR，并把 machine-readable carrier implementation 移交给 `#301`；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
+- `bb602f710279c9df38a66c134f3018a48808935a`
+- 说明：当前 checkpoint 把 `#300` 收窄为 formal evidence truth / docs PR，并把 machine-readable carrier implementation 移交给 `#301`；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
