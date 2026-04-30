@@ -28,7 +28,7 @@
   - `docs/exec-plans/CHORE-0314-fr-0024-manifest-fixture-validator.md`
 - 本次不纳入：
   - `docs/specs/FR-0024-adapter-capability-requirement-contract/**`
-  - `docs/specs/FR-0025-provider-capability-offer-contract/**`
+  - Provider capability offer formal spec 或实现
   - `tests/runtime/contract_harness/**`
   - `syvert/runtime.py` / `syvert/registry.py` 大范围改动
   - Provider offer、compatibility decision、selector、priority、fallback carrier
@@ -89,6 +89,8 @@
   - 结果：通过。
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
+- 提交 `17c8f3d` 后重跑 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：首次未通过；原因是 exec-plan 的禁止范围表述引用了尚不存在的 `FR-0025` spec 路径。处理：改为非路径文本表述 `Provider capability offer formal spec 或实现`，避免把未来路径伪装为当前仓内真相。
 
 ## 待验证项
 
