@@ -41,7 +41,7 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：PR `#329` 首次 guardian review 返回 `REQUEST_CHANGES`，已修复两个阻断项并补充复现测试；修复提交 `01c0bf982bfcfb45af4aa4d603e51c719556af7f` 的目标测试与门禁已通过，下一步推送并重新运行 guardian。
+- 当前 checkpoint：PR `#329` 首次 guardian review 返回 `REQUEST_CHANGES`，已修复两个阻断项并补充复现测试；随后同步 `origin/main` 最新主干 `5cc4a6c4b12bfb74e852472705e8c3fb5d98ed93` 并重跑目标测试与门禁通过，下一步推送并重新运行 guardian。
 
 ## 下一步动作
 
@@ -143,6 +143,26 @@
   - 结果：通过。
 - guardian 修复提交 `01c0bf982bfcfb45af4aa4d603e51c719556af7f` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `git fetch origin main && git rebase origin/main`
+  - 结果：通过；同步主干到 `5cc4a6c4b12bfb74e852472705e8c3fb5d98ed93`，本分支提交已重放到该基线。
+- rebase 后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement`
+  - 结果：通过，15 tests。
+- rebase 后 `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，10 tests。
+- rebase 后 `python3 -m unittest tests.runtime.test_resource_capability_matcher`
+  - 结果：通过，17 tests。
+- rebase 后 `python3 -m unittest tests.runtime.test_registry`
+  - 结果：通过，15 tests。
+- rebase 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- rebase 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- rebase 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
@@ -165,3 +185,4 @@
 - implementation checkpoint：`17c8f3d`
 - validation follow-up checkpoint：`295f560bb1b21975b30701080b7aa4eb1a2c7774`
 - guardian fix checkpoint：`01c0bf982bfcfb45af4aa4d603e51c719556af7f`
+- main-sync checkpoint：`509d6e903b20e9ddd576f9023eda5b1059ce8f69`
