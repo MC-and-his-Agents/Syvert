@@ -83,6 +83,35 @@ _ERROR_MAPPING_FIELD_NAMES = frozenset(
         "message",
     }
 )
+_FIXTURE_INPUT_FIELD_NAMES = frozenset(
+    {
+        "capability",
+        "collection_mode",
+        "operation",
+        "resource_profile_key",
+        "target_type",
+        "target_value",
+    }
+)
+_SUCCESS_FIXTURE_EXPECTED_FIELD_NAMES = frozenset(
+    {
+        "required_payload_fields",
+        "status",
+    }
+)
+_ERROR_FIXTURE_EXPECTED_FIELD_NAMES = frozenset(
+    {
+        "error",
+        "status",
+    }
+)
+_ERROR_FIXTURE_EXPECTED_ERROR_FIELD_NAMES = frozenset(
+    {
+        "category",
+        "code",
+        "source_error",
+    }
+)
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
 _RESERVED_RUNTIME_ENVELOPE_FIELDS = frozenset(
     {
@@ -214,7 +243,8 @@ def validate_third_party_adapter_manifest(manifest: Mapping[str, Any]) -> ThirdP
         code="invalid_manifest_public_metadata",
         field="sdk_contract_id",
     )
-    if "provider" in sdk_contract_id or "compatibility" in sdk_contract_id:
+    normalized_sdk_contract_id = sdk_contract_id.lower()
+    if "provider" in normalized_sdk_contract_id or "compatibility" in normalized_sdk_contract_id:
         raise ThirdPartyContractEntryError(
             "invalid_manifest_public_metadata",
             "sdk_contract_id must describe the Adapter SDK/runtime contract only",
@@ -310,6 +340,8 @@ def validate_third_party_adapter_fixtures(
             "third-party adapter fixtures must cover success and error_mapping cases",
             details={"missing_case_types": missing_case_types},
         )
+    fixture_inputs = tuple(_normalize_fixture_input(manifest, fixture) for fixture in normalized)
+    _validate_fixture_public_metadata_coverage(manifest, fixture_inputs)
     return normalized
 
 
@@ -1016,6 +1048,12 @@ def _normalize_fixture(
         input=_require_mapping(fixture["input"], field="input"),
         expected=_require_mapping(fixture["expected"], field="expected"),
     )
+    _validate_nested_manifest_field_set(
+        normalized.input,
+        expected_fields=_FIXTURE_INPUT_FIELD_NAMES,
+        code="invalid_fixture_input",
+        field="fixture.input",
+    )
     _validate_fixture_expected_contract(manifest, normalized)
     return normalized
 
@@ -1143,6 +1181,12 @@ def _validate_fixture_expected_contract(
         field="expected.status",
     )
     if fixture.case_type == "success":
+        _validate_nested_manifest_field_set(
+            fixture.expected,
+            expected_fields=_SUCCESS_FIXTURE_EXPECTED_FIELD_NAMES,
+            code="invalid_fixture_expected_contract",
+            field="fixture.expected",
+        )
         if expected_status != "success":
             raise ThirdPartyContractEntryError(
                 "invalid_fixture_expected_contract",
@@ -1161,6 +1205,12 @@ def _validate_fixture_expected_contract(
             )
         return
 
+    _validate_nested_manifest_field_set(
+        fixture.expected,
+        expected_fields=_ERROR_FIXTURE_EXPECTED_FIELD_NAMES,
+        code="invalid_fixture_expected_contract",
+        field="fixture.expected",
+    )
     if expected_status != "failed":
         raise ThirdPartyContractEntryError(
             "invalid_fixture_expected_contract",
@@ -1168,6 +1218,12 @@ def _validate_fixture_expected_contract(
             details={"fixture_id": fixture.fixture_id, "status": expected_status},
         )
     expected_error = _require_mapping(fixture.expected.get("error"), field="expected.error")
+    _validate_nested_manifest_field_set(
+        expected_error,
+        expected_fields=_ERROR_FIXTURE_EXPECTED_ERROR_FIELD_NAMES,
+        code="invalid_fixture_expected_contract",
+        field="fixture.expected.error",
+    )
     source_error = _require_non_empty_string(
         expected_error.get("source_error"),
         code="invalid_fixture_expected_contract",
@@ -1210,6 +1266,30 @@ def _validate_fixture_expected_contract(
                 "manifest_code": manifest_error_mapping.get("code"),
                 "fixture_category": category,
                 "fixture_code": code,
+            },
+        )
+
+
+def _validate_fixture_public_metadata_coverage(
+    manifest: ThirdPartyAdapterManifest,
+    fixture_inputs: tuple[dict[str, str], ...],
+) -> None:
+    observed_targets = frozenset(fixture_input["target_type"] for fixture_input in fixture_inputs)
+    observed_collection_modes = frozenset(
+        fixture_input["collection_mode"] for fixture_input in fixture_inputs
+    )
+    missing_targets = tuple(sorted(set(manifest.supported_targets) - observed_targets))
+    missing_collection_modes = tuple(
+        sorted(set(manifest.supported_collection_modes) - observed_collection_modes)
+    )
+    if missing_targets or missing_collection_modes:
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_metadata_coverage",
+            "fixtures must cover every manifest supported target and collection mode",
+            details={
+                "adapter_key": manifest.adapter_key,
+                "missing_targets": missing_targets,
+                "missing_collection_modes": missing_collection_modes,
             },
         )
 

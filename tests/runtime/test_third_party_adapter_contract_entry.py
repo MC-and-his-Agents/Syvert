@@ -33,6 +33,11 @@ class AdapterWithUserIdTargetMetadata(ThirdPartyContractFixtureAdapter):
     supported_targets = frozenset({"user_id"})
 
 
+class AdapterWithOverclaimedTargetAndMode(ThirdPartyContractFixtureAdapter):
+    supported_targets = frozenset({"url", "user_id"})
+    supported_collection_modes = frozenset({"hybrid", "public"})
+
+
 class AdapterWithDriftedErrorMapping(ThirdPartyContractFixtureAdapter):
     error_mapping = {
         "content_not_found": {
@@ -242,6 +247,16 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
                 self.assertEqual(context.exception.code, "forbidden_adapter_manifest_fields")
                 self.assertEqual(context.exception.details["forbidden_fields"], (field,))
 
+    def test_rejects_sdk_contract_id_with_provider_or_compatibility_case_insensitive(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["sdk_contract_id"] = "Syvert-Adapter-Provider-Compatibility-v0.8.0"
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_manifest_public_metadata")
+        self.assertEqual(context.exception.details["field"], "sdk_contract_id")
+
     def test_rejects_adapter_key_with_provider_account_or_runtime_strategy_semantics(self) -> None:
         invalid_adapter_keys = (
             "provider-xhs",
@@ -336,9 +351,25 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_fixture_input_metadata")
         self.assertEqual(context.exception.details["target_type"], "url")
 
-    def test_rejects_fixture_without_resource_profile_input(self) -> None:
+    def test_rejects_manifest_public_metadata_not_covered_by_fixtures(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["supported_targets"] = ("url", "user_id")
+        manifest["supported_collection_modes"] = ("hybrid", "public")
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=AdapterWithOverclaimedTargetAndMode(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_metadata_coverage")
+        self.assertEqual(context.exception.details["missing_targets"], ("user_id",))
+        self.assertEqual(context.exception.details["missing_collection_modes"], ("public",))
+
+    def test_rejects_fixture_input_provider_fields_fail_closed(self) -> None:
         fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
-        del fixtures[0]["input"]["resource_profile_key"]
+        fixtures[0]["input"]["provider_selector"] = "must-not-pass"
 
         with self.assertRaises(ThirdPartyContractEntryError) as context:
             run_third_party_adapter_contract_test(
@@ -348,7 +379,53 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "invalid_fixture_input")
-        self.assertEqual(context.exception.details["field"], "input.resource_profile_key")
+        self.assertEqual(context.exception.details["field"], "fixture.input")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_selector",))
+
+    def test_rejects_fixture_expected_provider_fields_fail_closed(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        fixtures[0]["expected"]["provider_offer"] = "must-not-pass"
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_expected_contract")
+        self.assertEqual(context.exception.details["field"], "fixture.expected")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_offer",))
+
+    def test_rejects_fixture_expected_error_provider_fields_fail_closed(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        fixtures[1]["expected"]["error"]["provider_key"] = "must-not-pass"
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_expected_contract")
+        self.assertEqual(context.exception.details["field"], "fixture.expected.error")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_key",))
+
+    def test_rejects_fixture_without_resource_profile_input(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        del fixtures[0]["input"]["resource_profile_key"]
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+        )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_input")
+        self.assertEqual(context.exception.details["field"], "fixture.input")
+        self.assertEqual(context.exception.details["missing_fields"], ("resource_profile_key",))
 
     def test_rejects_error_mapping_fixture_that_does_not_match_manifest_mapping(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
