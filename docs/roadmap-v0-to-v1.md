@@ -53,6 +53,8 @@
 - Adapter + Provider 不以“某个 provider 覆盖所有能力”为前提，而以 `Adapter capability requirement x Provider capability offer -> compatibility decision` 判断绑定合法性。
 - 至少一个真实外部 provider 验证样本必须在 `v1.0.0` 前证明兼容性判断链路可执行；该样本不构成指定 provider 产品的正式支持承诺。
 
+该路线由 `ADR-CHORE-0291` 修订 `ADR-CHORE-0266` 与 `FR-0021` 中关于后续 provider compatibility / 真实 provider 验证“留到 `v1.0.0` 稳定之后”的时间边界；`v0.7.0` 的批准范围仍保持不变。
+
 
 ## v0.1.0
 

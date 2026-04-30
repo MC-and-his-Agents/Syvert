@@ -79,6 +79,9 @@
   - 结果：通过。
 - `python3 scripts/open_pr.py --class docs --issue 291 --item-key CHORE-0291-open-adapter-provider-boundary --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(roadmap): 校准开放接入与 provider 兼容性路线' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建 PR `#292`。
+- `python3 scripts/pr_guardian.py review 292 --post-review --json-output /tmp/syvert-pr-292-guardian.json`
+  - 结果：`REQUEST_CHANGES`，指出新路线缺少对 `ADR-CHORE-0266` / `FR-0021` 后续时间边界的明确 supersede/amend 关系，并要求 release/sprint 索引回链 `adapter-sdk.md`、`framework-positioning.md`、`vision.md`。
+  - 处理：已在 `ADR-CHORE-0291` 与 roadmap 中明确修订的历史时间边界；已补齐 `docs/releases/v0.8.0.md` 与 `docs/sprints/2026-S21.md` 的关联工件入口。
 
 ## 风险与回滚
 
