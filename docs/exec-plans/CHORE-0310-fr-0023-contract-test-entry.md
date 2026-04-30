@@ -38,7 +38,7 @@
 
 - 已在独立 worktree `/Users/mc/code/worktrees/syvert/issue-310-fr-0023-adapter-contract-test` 执行。
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#310` GitHub issue、`FR-0023` formal spec 与现有 contract harness / registry resource declaration 校验。
-- 已新增第三方 Adapter manifest / fixture contract entry，并复用 `AdapterRegistry.from_mapping()` 消费现有 `AdapterResourceRequirementDeclarationV2` / FR-0027 校验。
+- 已新增第三方 Adapter manifest / fixture contract entry；当前实现直接归一化 `AdapterResourceRequirementDeclarationV2` carrier，并通过 `approved_shared_resource_requirement_profile_evidence_entries()` 构建 FR-0027 approved proof index 校验 profile tuple 与 execution path，不调用 `AdapterRegistry.from_mapping()`。
 - 已确认当前 FR-0027 approved profile proof 只覆盖 `xhs` / `douyin` reference slice；本事项不扩张 resource proof，不创建第二套第三方 resource declaration truth。
 - guardian review 初次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界与 adapter public metadata provider-facing 字段未显式 fail-closed；已补充对应校验与回归测试。
 - guardian review 第二次返回 `REQUEST_CHANGES`，阻断项为第三方入口仍被 `xhs/douyin` reference adapter proof 绑定；已改为 harness 内第三方 profile-proof 校验，保留 FR-0027 profile tuple / evidence proof 对齐，但不要求非参考第三方 `adapter_key` 冒充 reference adapter。
@@ -55,10 +55,11 @@
 - guardian review 第十三次返回 `REQUEST_CHANGES`，阻断项为 manifest 可额外声明 fixtures 未覆盖的 target / collection mode、fixture input / expected nested carrier 可夹带 provider 字段、`sdk_contract_id` provider / compatibility 阻断大小写敏感；已补充 fixture coverage 反向校验、fixture nested fixed field set，并将 sdk contract 语义阻断改为大小写无关。
 - guardian review 第十四次返回 `REQUEST_CHANGES`，阻断项为 provider-facing forbidden 字段集合未覆盖 registry 已禁止变体、adapter `fixture_refs` 非字符串序列会触发未处理异常、fixture 顶层非字符串 key 会触发未处理排序异常；已扩展 forbidden 字段集合，adapter fixture refs 比对前先做字符串序列校验，fixture 顶层 key 先做字符串校验。
 - guardian review 第十五次返回 `REQUEST_CHANGES`，阻断项为 fixture resource profile 可解析性仍在执行循环内校验，无法保证整组 fixture fail-closed 后再调用 Adapter；已将 resource profile / FR-0027 proof path 校验前移到 `validate_third_party_adapter_fixtures`，并补充 adapter execute 调用次数为 0 的准入顺序回归。
+- guardian review 第十六次返回 `REQUEST_CHANGES`，阻断项为 harness 允许真实 runtime 不会保留的 `unsupported` PlatformAdapterError category，且 exec-plan 对 resource declaration 校验路径仍描述为 `AdapterRegistry.from_mapping()`；已将 error mapping category 收窄到 runtime 会保留的 `invalid_input` / `platform`，PlatformAdapterError observation 复用 `classify_adapter_error()`，并校正文档真相。
 
 ## 下一步动作
 
-- 提交第十五次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十六次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -333,6 +334,31 @@
 - 第十五次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十五次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十六次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - harness 允许 `unsupported` error mapping category，但真实 `syvert.runtime.classify_adapter_error()` 只保留 `invalid_input`，其他 `PlatformAdapterError` 均归一为 `platform`。
+    - exec-plan 仍描述为复用 `AdapterRegistry.from_mapping()`，与当前 proof-index 实现路径不一致。
+  - 修正：
+    - `_ALLOWED_ERROR_MAPPING_CATEGORIES` 收窄为 `invalid_input` / `platform`。
+    - `PlatformAdapterError` observation 在 details 为 mapping 时复用 `classify_adapter_error()`，保持与 runtime 真相一致；details 非 mapping 仍 fail-closed 为 `runtime_contract`。
+    - exec-plan 当前停点改为准确描述直接归一化 `AdapterResourceRequirementDeclarationV2` 并消费 `approved_shared_resource_requirement_profile_evidence_entries()` proof index。
+- 第十六次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，91 tests。
+- 第十六次 guardian 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
+- 第十六次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十六次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十六次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十六次 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十六次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 第十六次 guardian 修复后 `git diff --check`
   - 结果：通过。
 
 ## 未决风险
