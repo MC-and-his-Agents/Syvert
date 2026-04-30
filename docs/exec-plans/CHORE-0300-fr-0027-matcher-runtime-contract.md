@@ -71,6 +71,18 @@
   - 结果：通过，27 tests。
 - `python3 -m unittest tests.runtime.test_runtime`
   - 结果：通过，59 tests。
+- `python3 -m unittest tests.runtime.test_resource_capability_matcher tests.runtime.test_resource_capability_evidence tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_runtime tests.runtime.test_task_record`
+  - 结果：通过，151 tests。
+- `python3 -m py_compile syvert/resource_capability_evidence.py syvert/registry.py syvert/runtime.py`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-301-fr-0027-matcher-profile-runtime-contract`
+  - 结果：通过。
 
 ## 未决风险
 
