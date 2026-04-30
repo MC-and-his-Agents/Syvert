@@ -8,7 +8,7 @@
 - release：`v0.8.0`
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0024-adapter-capability-requirement-contract/`
-- 关联 decision：无
+- 关联 decision：
 - 关联 PR：无
 - active 收口事项：`CHORE-0313-fr-0024-formal-spec-closeout`
 - 状态：`active`
@@ -84,6 +84,18 @@
   - 结果：首次尝试未通过；原因是该脚本只消费已提交的 `HEAD` diff，当前新增 formal spec 尚未提交，返回“绑定 Issue 的实现事项缺少 formal spec 或 bootstrap contract”。提交 checkpoint 后必须重跑。
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：首次尝试未通过；原因是该脚本只消费已提交的 `HEAD` diff，当前新增文件尚未提交，返回“当前分支相对基线没有变更，无法创建或校验 PR”。提交 checkpoint 后必须重跑。
+- `git commit -m 'docs(spec): 收口 FR-0024 适配器能力需求规约'`
+  - 结果：已生成语义 checkpoint `9bee64898949c3069b9e1c2e7fd44cd7ac9c1de6`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-313-fr-0024-adapter-capability-requirement-formal-spec`
+  - 结果：未通过；`关联 decision：无` 被解析为有意义路径，触发“必须绑定到 `docs/decisions/*.md`”；同时 formal spec input 绑定因此未通过 preflight。处理：将 `关联 decision` 留空，对齐既有 formal spec closeout exec-plan 样式。
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 
 ## 待验证项
 
