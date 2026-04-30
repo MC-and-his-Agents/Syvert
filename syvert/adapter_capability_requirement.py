@@ -50,13 +50,11 @@ EVIDENCE_FIELDS = frozenset(
         "capability_requirement_evidence_refs",
     }
 )
-APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS = frozenset(
-    {
-        "fr-0024:formal-spec:adapter-capability-requirement-contract",
-        "fr-0024:manifest-fixture-validator:content-detail-by-url-hybrid",
-        "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
-        "fr-0024:parent-closeout:fr-0024",
-    }
+CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES = (
+    "fr-0024:formal-spec:",
+    "fr-0024:manifest-fixture-validator:",
+    "fr-0024:reference-adapter-migration:",
+    "fr-0024:parent-closeout:",
 )
 LIFECYCLE_FIELDS = frozenset(
     {
@@ -690,19 +688,24 @@ def _validate_capability_requirement_evidence_refs(evidence_refs: tuple[str, ...
     unsupported_refs = tuple(
         evidence_ref
         for evidence_ref in evidence_refs
-        if evidence_ref not in APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS
+        if not _is_capability_requirement_evidence_ref(evidence_ref)
     )
     if unsupported_refs:
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
-            "evidence.capability_requirement_evidence_refs must point to approved FR-0024 requirement evidence",
+            "evidence.capability_requirement_evidence_refs must point to FR-0024 requirement evidence",
             details={
                 "unsupported_capability_requirement_evidence_refs": unsupported_refs,
-                "approved_capability_requirement_evidence_refs": tuple(
-                    sorted(APPROVED_CAPABILITY_REQUIREMENT_EVIDENCE_REFS)
-                ),
+                "allowed_capability_requirement_evidence_ref_prefixes": CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES,
             },
         )
+
+
+def _is_capability_requirement_evidence_ref(evidence_ref: str) -> bool:
+    for prefix in CAPABILITY_REQUIREMENT_EVIDENCE_REF_PREFIXES:
+        if evidence_ref.startswith(prefix) and evidence_ref != prefix:
+            return True
+    return False
 
 
 def _reject_observability_leakage(observability: AdapterCapabilityObservabilityExpectation) -> None:

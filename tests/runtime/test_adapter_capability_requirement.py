@@ -117,7 +117,12 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
                 requirement = copy_requirement()
                 requirement["execution_requirement"][field_name] = value
 
-                result = validate_adapter_capability_requirement(requirement)
+                result = validate_adapter_capability_requirement(
+                    AdapterCapabilityRequirementValidationInput(
+                        requirement=requirement,
+                        available_resource_capabilities=("account",),
+                    )
+                )
 
                 self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
 
@@ -198,10 +203,32 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
             ("tmp:runtime-log",),
         )
 
-    def test_validator_rejects_fabricated_requirement_level_evidence_with_approved_prefix(self) -> None:
+    def test_validator_accepts_requirement_level_evidence_categories_without_fixed_allowlist(self) -> None:
+        allowed_refs = (
+            "fr-0024:formal-spec:adapter-capability-requirement-contract",
+            "fr-0024:manifest-fixture-validator:content-detail-by-url-hybrid",
+            "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+            "fr-0024:parent-closeout:fr-0024",
+            "fr-0024:manifest-fixture-validator:future-approved-fixture",
+        )
+        for evidence_ref in allowed_refs:
+            with self.subTest(evidence_ref=evidence_ref):
+                requirement = copy_requirement()
+                requirement["evidence"]["capability_requirement_evidence_refs"] = [evidence_ref]
+
+                result = validate_adapter_capability_requirement(
+                    AdapterCapabilityRequirementValidationInput(
+                        requirement=requirement,
+                        available_resource_capabilities=("account",),
+                    )
+                )
+
+                self.assertEqual(result.status, ADAPTER_REQUIREMENT_STATUS_DECLARED)
+
+    def test_validator_rejects_requirement_level_evidence_outside_fr0024_categories(self) -> None:
         requirement = copy_requirement()
         requirement["evidence"]["capability_requirement_evidence_refs"] = [
-            "fr-0024:manifest-fixture-validator:not-real"
+            "fr-0024:provider-offer:content-detail"
         ]
 
         result = validate_adapter_capability_requirement(requirement)
@@ -209,7 +236,7 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
         self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
         self.assertEqual(
             result.details["unsupported_capability_requirement_evidence_refs"],
-            ("fr-0024:manifest-fixture-validator:not-real",),
+            ("fr-0024:provider-offer:content-detail",),
         )
 
     def test_validator_rejects_mapping_payloads_for_string_array_fields(self) -> None:

@@ -17,7 +17,7 @@
 
 - 基于已合入的 `FR-0024` formal spec，实现 `AdapterCapabilityRequirement` canonical carrier validator 与 manifest fixture 测试入口。
 - validator 必须消费 `FR-0027` 的 `AdapterResourceRequirementDeclarationV2` / approved shared profile proof truth，不复制 resource profile matcher 逻辑。
-- validator 输出稳定区分合法 requirement declared、合法但当前前提未满足的 unmatched、非法 carrier 的 `invalid_contract` / `invalid_resource_requirement`。
+- validator 输出稳定区分合法 requirement declared、合法但当前前提未满足的 unmatched；非法 carrier 统一映射为 `runtime_contract + invalid_resource_requirement`。
 
 ## 范围
 
@@ -41,11 +41,11 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：PR `#329` 第三次 guardian review 返回 `REQUEST_CHANGES`，阻断集中在核心对齐约束和 execution slice 的测试证据不足；已补充对应负向测试并通过目标测试与全 runtime discover，下一步提交、重跑门禁并复审。
+- 当前 checkpoint：PR `#329` 第四次 guardian review 返回 `REQUEST_CHANGES`，阻断集中在 requirement-level evidence ref 校验过度收紧和 exec-plan 状态漂移；已调整 evidence ref 校验为 FR-0024 证据类别边界，同步收敛本执行计划，并通过目标测试、全 runtime discover 与治理门禁。
 
 ## 下一步动作
 
-- 提交测试补充，重跑门禁并推送 PR `#329` 新 head，重新运行 guardian。
+- 提交第四轮 guardian 修复，重跑门禁并推送 PR `#329` 新 head，重新运行 guardian。
 - guardian 与 checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
@@ -225,10 +225,32 @@
   - 结果：通过，15 tests。
 - 第三轮 guardian 测试补充后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，868 tests。
+- `python3 scripts/pr_guardian.py review 329 --post-review`
+  - 结果：第四次返回 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - `capability_requirement_evidence_refs` 被实现收紧为固定字面量集合，和 FR-0024 只约束证据类别的合同边界漂移。
+    - exec-plan 仍保留旧的 `invalid_contract / invalid_resource_requirement` 双口径与过时推进状态。
+- 已处理第四轮 guardian 阻断：
+  - requirement-level evidence refs 改为允许 `FR-0024` formal spec / manifest fixture validator / reference adapter migration / parent closeout 四类证据 ref，避免实现维护固定 evidence truth。
+  - 补充允许未来同类 manifest fixture evidence ref 的回归，并保留 provider offer 类 ref 的 fail-closed 回归。
+  - 收敛 exec-plan 的非法 carrier 口径与当前 checkpoint / 下一步状态。
+- 第四轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_resource_capability_matcher tests.runtime.test_registry`
+  - 结果：通过，65 tests。
+- 第四轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，869 tests。
+- 第四轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- 第三轮 guardian 测试补充提交后的 governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
+- 第四轮 guardian 修复提交后的 tests、governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
 
