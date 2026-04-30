@@ -53,10 +53,11 @@
 - guardian review 第十一次返回 `REQUEST_CHANGES`，阻断项为 rejected FR-0027 `none` profile 被误纳入 approved proof、`PlatformAdapterError.details` 非 mapping 会中断 contract run、`result_contract` / `error_mapping` 嵌套 carrier 可走私 provider / compatibility 字段；已移除 rejected `none` profile proof，新增平台错误 details fail-closed 归一化，并让嵌套 carrier 使用固定字段集。
 - guardian review 第十二次返回 `REQUEST_CHANGES`，阻断项为 error_mapping observation 只比较 category / code，未验证 adapter reported `details.source_error` 与 fixture / manifest 绑定一致；已补充 source_error observation 校验与回归。
 - guardian review 第十三次返回 `REQUEST_CHANGES`，阻断项为 manifest 可额外声明 fixtures 未覆盖的 target / collection mode、fixture input / expected nested carrier 可夹带 provider 字段、`sdk_contract_id` provider / compatibility 阻断大小写敏感；已补充 fixture coverage 反向校验、fixture nested fixed field set，并将 sdk contract 语义阻断改为大小写无关。
+- guardian review 第十四次返回 `REQUEST_CHANGES`，阻断项为 provider-facing forbidden 字段集合未覆盖 registry 已禁止变体、adapter `fixture_refs` 非字符串序列会触发未处理异常、fixture 顶层非字符串 key 会触发未处理排序异常；已扩展 forbidden 字段集合，adapter fixture refs 比对前先做字符串序列校验，fixture 顶层 key 先做字符串校验。
 
 ## 下一步动作
 
-- 提交第十三次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
+- 提交第十四次 guardian 修复并推送 PR `#330` 新 head，重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -284,6 +285,32 @@
 - 第十三次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十三次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第十四次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：
+    - adapter public metadata forbidden 字段集合缺少 `provider_selection`、`provider_capabilities`、`external_provider_ref`、`native_provider`、`browser_provider` 等 registry 已禁止变体。
+    - adapter 暴露非法 `fixture_refs` 时，排序混合类型会触发未处理异常。
+    - fixture 顶层非字符串字段名会触发未处理排序异常。
+  - 修正：
+    - `_FORBIDDEN_MANIFEST_FIELDS` 扩展到 registry provider / resource-provider forbidden 变体，并补 manifest、adapter public metadata、resource declaration、fixture carrier 回归。
+    - adapter `fixture_refs` 比对前复用字符串序列校验，非法值归入 `adapter_manifest_metadata_mismatch`。
+    - fixture 顶层 shape 校验先拒绝非字符串字段名。
+- 第十四次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，87 tests。
+- 第十四次 guardian 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
+- 第十四次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第十四次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第十四次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第十四次 guardian 修复后 `python3 scripts/governance_gate.py --mode ci ...`
+  - 结果：通过。
+- 第十四次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 第十四次 guardian 修复后 `git diff --check`
   - 结果：通过。
 
 ## 未决风险
