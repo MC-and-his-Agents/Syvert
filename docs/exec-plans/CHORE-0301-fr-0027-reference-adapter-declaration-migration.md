@@ -78,6 +78,8 @@
   - 结果：通过。
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-302-fr-0027-adapter`
   - 结果：通过。
 
