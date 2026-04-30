@@ -49,7 +49,7 @@
 - 手动验证：
   - 核对 spec 中是否只有 `none`、`account`、`proxy` 组合空间，没有偷渡新能力词汇
   - 核对 `one-of` 语义是否未退化为排序 / fallback 机制
-  - 核对 `FR-0027` 与 `FR-0015` 的 evidence status / decision 词汇没有漂移，继续使用 `shared / adapter_only / rejected` 与 `approve_for_v0_5_0`
+  - 核对 `FR-0027` 与 `FR-0015` 的 evidence status 词汇没有漂移，继续使用 `shared / adapter_only / rejected`，同时 profile-level `decision` 已明确切换为 `approve_profile_for_v0_8_0`
   - 核对 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref` 的唯一性、proof tuple shape、proof execution path、单 proof 绑定、declaration adapter 覆盖与 `available_resource_capabilities` 的 fail-closed 口径都已明文冻结
   - 核对 version boundary 是否明确：`FR-0027` 只治理 `v0.8.0` multi-profile truth，`FR-0013` / `FR-0014` / `FR-0015` 保留历史语义
 
