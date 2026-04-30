@@ -32,7 +32,7 @@
       - 比较、重复检测与 proof 对齐前，必须先按 `FR-0015` 已批准词汇顺序规范化；当前顺序固定为 `account`、`proxy`
   - `evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；每个引用都必须唯一命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+    - 约束：长度恰为 1、无重复；这唯一一个引用必须唯一命中一个在 `capability + execution_path + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
 
 ## ApprovedSharedResourceRequirementProfileEvidenceEntry
 
@@ -44,6 +44,11 @@
   - `capability`
     - 类型：`string`
     - 约束：当前只允许 `content_detail`
+  - `execution_path`
+    - 类型：`object`
+    - 约束：
+      - 保留与 `FR-0015` `ExecutionPathDescriptor` 等价的路径边界
+      - 当前必须且只能表达 `operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`
   - `resource_dependency_mode`
     - 类型：`enum`
     - 允许值：`none`、`required`
@@ -100,7 +105,7 @@
 ## 判定规则
 
 - declaration 不合法 -> `runtime_contract + invalid_resource_requirement`
-- declaration profile 无法唯一映射到在 `capability + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
+- declaration profile 无法唯一映射到在 `capability + execution_path + tuple + adapter_key` 上完全对齐的 `ApprovedSharedResourceRequirementProfileEvidenceEntry` -> `runtime_contract + invalid_resource_requirement`
 - declaration `adapter_key` 不在被引用 entry 的 `reference_adapters` 中 -> `runtime_contract + invalid_resource_requirement`
 - `available_resource_capabilities` 非法、重复或包含未知词汇 -> `runtime_contract + invalid_resource_requirement`
 - declaration 合法且任一 profile 被满足 -> `match_status=matched`

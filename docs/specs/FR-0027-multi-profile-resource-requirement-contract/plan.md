@@ -43,14 +43,14 @@
   - `python3 scripts/workflow_guard.py --mode ci`
   - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha \"$BASE\" --head-sha \"$HEAD_SHA\" --head-ref issue-299-fr-0027-formal-spec`
 - implementation 阶段：
-  - `#300` 必须验证 evidence artifact / research / registry 能表达 shared / adapter-local / rejected profile
+  - `#300` 必须验证 evidence artifact / research / registry 能表达 shared / adapter_only / rejected profile
   - `#301` 必须补 matcher / runtime tests，覆盖 `matched`、`unmatched`、`invalid_resource_requirement` 与 `resource_unavailable`
   - `#302` 必须补 reference adapter regression / declaration fixtures，证明新 carrier 被 matcher 正确消费
 - 手动验证：
   - 核对 spec 中是否只有 `none`、`account`、`proxy` 组合空间，没有偷渡新能力词汇
   - 核对 `one-of` 语义是否未退化为排序 / fallback 机制
   - 核对 `FR-0027` 与 `FR-0015` 的 evidence status / decision 词汇没有漂移，继续使用 `shared / adapter_only / rejected` 与 `approve_for_v0_5_0`
-  - 核对 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref` 的唯一性、proof tuple shape、declaration adapter 覆盖与 `available_resource_capabilities` 的 fail-closed 口径都已明文冻结
+  - 核对 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref` 的唯一性、proof tuple shape、proof execution path、单 proof 绑定、declaration adapter 覆盖与 `available_resource_capabilities` 的 fail-closed 口径都已明文冻结
   - 核对 version boundary 是否明确：`FR-0027` 只治理 `v0.8.0` multi-profile truth，`FR-0013` / `FR-0014` / `FR-0015` 保留历史语义
 
 ## TDD 范围
@@ -76,5 +76,5 @@
 
 - [ ] `spec review` 已通过
 - [ ] `FR-0027` 已明确 declaration/profile carrier、`one-of` matcher 语义与 evidence 边界
-- [ ] `FR-0027` 已明确 proof carrier 的唯一性、tuple canonicalization、adapter 覆盖与 matcher 输入 fail-closed 口径
+- [ ] `FR-0027` 已明确 proof carrier 的唯一性、approved execution path、单 proof 绑定、tuple canonicalization、adapter 覆盖与 matcher 输入 fail-closed 口径
 - [ ] `#300/#301/#302` 的进入条件均可直接回指 `FR-0027` formal spec

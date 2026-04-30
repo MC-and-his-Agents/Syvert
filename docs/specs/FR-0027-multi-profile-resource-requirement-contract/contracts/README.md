@@ -30,7 +30,7 @@
 - `resource_dependency_mode=none` -> `required_capabilities=[]`
 - `resource_dependency_mode=required` -> `required_capabilities` 非空、去重，且只能来自 `account`、`proxy`
 - `required_capabilities` 在重复检测、proof lookup 和 equality 判断前必须先按 `FR-0015` 已批准词汇顺序规范化；当前顺序固定为 `account`、`proxy`
-- `evidence_refs` 非空、去重，并且每个引用都必须唯一命中一个在 `capability + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
+- `evidence_refs` 长度恰为 1，并且这唯一一个引用都必须唯一命中一个在 `capability + execution_path + resource_dependency_mode + required_capabilities` 上与当前 profile 完全一致、且 `reference_adapters` 覆盖 declaration `adapter_key` 的 `ApprovedSharedResourceRequirementProfileEvidenceEntry.profile_ref`
 - 同一 declaration 内不得出现语义重复 profile
 
 ## profile approval proof
@@ -41,6 +41,7 @@
 
 - `profile_ref`
 - `capability`
+- `execution_path`
 - `resource_dependency_mode`
 - `required_capabilities`
 - `reference_adapters`
@@ -52,6 +53,7 @@
 
 - `profile_ref` 必须稳定、在当前 carrier 中唯一，且可被 declaration `evidence_refs` 精确引用
 - `capability` 当前只允许 `content_detail`
+- `execution_path` 必须保留与 `FR-0015` `ExecutionPathDescriptor` 等价的路径边界；当前只允许 `operation=content_detail_by_url`、`target_type=url`、`collection_mode=hybrid`
 - `resource_dependency_mode=none` -> `required_capabilities=[]`
 - `resource_dependency_mode=required` -> `required_capabilities` 非空、去重，且只能来自 `account`、`proxy`
 - `resource_dependency_mode` / `required_capabilities` 必须与 declaration profile 的 canonical tuple 完全一致；比较前必须先按 `FR-0015` 已批准词汇顺序规范化
@@ -60,7 +62,7 @@
 - `shared_status` 沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `shared`
 - `decision` 沿用 `FR-0015` 既有词汇；当前 shared declaration 只接受 `approve_for_v0_5_0`
 - `evidence_refs` 必须回指 `FR-0015` research / artifact 中更细粒度的双参考证据
-- proof 不可解析、不唯一、不对齐或不覆盖 declaration adapter 时，一律归类为 `runtime_contract + invalid_resource_requirement`
+- proof 不可解析、不唯一、不对齐、不在当前 approved execution path 内，或不覆盖 declaration adapter 时，一律归类为 `runtime_contract + invalid_resource_requirement`
 
 ## matcher contract
 
