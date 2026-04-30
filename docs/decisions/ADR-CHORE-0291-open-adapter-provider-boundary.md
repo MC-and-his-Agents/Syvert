@@ -16,19 +16,21 @@
 
 ## 决策
 
-- 本 ADR 正式修订 `ADR-CHORE-0266` 与 `FR-0021` 中关于后续外部 provider 与 provider compatibility contract “留到 `v1.0.0` 稳定之后”的时间边界。
-- 该修订只影响 `v0.8.0+` roadmap 与后续 Work Item 进入条件；不改写 `v0.7.0` 的 approved scope，也不把外部 provider 接入反向纳入 `FR-0021`。
+- 本 ADR 与 `docs/roadmap-v0-to-v1.md` 是 `v0.8.0+` 开放 Adapter / Provider compatibility 路线的 canonical carrier。
+- `FR-0021` formal spec 继续只约束 `v0.7.0` adapter-owned provider port 与 native provider 拆分范围；它不是 `v0.8.0+` provider compatibility 路线的 canonical carrier。
+- 本 ADR 不改写 `FR-0021` formal spec，不改写 `v0.7.0` 的 approved scope，也不把外部 provider 接入反向纳入 `FR-0021`。
+- `ADR-CHORE-0266` 中关于“外部 provider 接入放到 `v1.0.0` 稳定之后”的表述继续作为 `v0.7.0` scope guard；自本 ADR 起，`v0.8.0+` 后续路线以本 ADR 与 roadmap 为准。
 - `v1.0.0` 前必须具备稳定的第三方 Adapter 接入路径，包括 Adapter public metadata、resource requirement、`execute()`、`raw + normalized`、错误映射与 contract test。
 - `v1.0.0` 前必须冻结 Adapter + Provider 的最小兼容性判断模型：`Adapter capability requirement x Provider capability offer -> compatibility decision`。
 - `v1.0.0` 前必须使用至少一个真实外部 provider 验证样本证明兼容性判断链路可执行；该样本只作为 contract evidence，不代表指定 provider 产品获得正式支持。
 - Syvert 不承诺某一个 provider 覆盖所有 Adapter capability。任何 provider 只能声明自己可服务哪些 Adapter 的哪些 capability，并由兼容性判断与 evidence 决定是否允许绑定。
 - 具体 provider 产品的正式支持、产品化接入、selector、fallback、compatibility matrix 与 provider SDK 扩展均属于 `v1.x` 或后续独立 FR，不进入 `v1.0.0` 主线成功标准。
-- `v0.7.0` 的 release truth、`FR-0021` formal spec 的批准范围与 `ADR-CHORE-0266` 的 `v0.7.0` 决策不回写改写；本决策只校准 `v0.8.0+` 的路线。
+- `v0.7.0` 的 release truth、`FR-0021` formal spec 的批准范围与 `ADR-CHORE-0266` 的 `v0.7.0` 决策不回写改写；本决策只建立 `v0.8.0+` 的后续路线真相。
 
-## 被修订的历史时间边界
+## 历史时间边界解释
 
-- `ADR-CHORE-0266` 中“WebEnvoy、OpenCLI、bb-browser、agent-browser 等外部 provider 接入放到 `v1.0.0` 稳定之后的后续 FR”不再作为 `v0.8.0+` 的路线约束；它只继续说明 `v0.7.0` 不接入外部 provider。
-- `FR-0021` 中“外部 provider 接入、更多站点能力、adapter 独立仓库评估均留到 `v1.0.0` 稳定之后或后续独立 FR”不再约束 provider compatibility contract 与真实 provider 验证样本的时间；它只继续约束 `FR-0021` 自身不批准外部 provider 接入。
+- `ADR-CHORE-0266` 中“WebEnvoy、OpenCLI、bb-browser、agent-browser 等外部 provider 接入放到 `v1.0.0` 稳定之后的后续 FR”继续说明 `v0.7.0` 不接入外部 provider；它不再作为 `v0.8.0+` 的路线 carrier。
+- `FR-0021` 中“外部 provider 接入、更多站点能力、adapter 独立仓库评估均留到 `v1.0.0` 稳定之后或后续独立 FR”继续约束 `FR-0021` 自身不批准外部 provider 接入；它不再作为 provider compatibility contract 与真实 provider 验证样本时间线的后续路线 carrier。
 - 后续如需正式支持某个 provider 产品，仍必须通过新的 FR，而不是复用本 ADR 或 `FR-0021`。
 
 ## 影响

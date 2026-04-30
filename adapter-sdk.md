@@ -113,6 +113,40 @@ Adapter capability requirement
 - Provider 提供的执行能力、资源消费方式、错误 carrier、版本与 evidence 能力
 - 不兼容、缺能力、版本不匹配或资源前提不满足时的 fail-closed 原因
 
+`v0.8.0` 路线中的声明承载面应先保持在 Adapter / Provider 包文档、manifest 或 contract-test fixture 中，不进入 AdapterRegistry discovery。建议最小形态为：
+
+```python
+ADAPTER_PROVIDER_REQUIREMENTS = {
+    "adapter_key": "example",
+    "capability": "content_detail",
+    "requires": {
+        "execution_modes": ("browser.page_state_read",),
+        "resource_capabilities": ("account", "proxy"),
+        "evidence": ("raw_payload", "platform_detail"),
+        "lifecycle": ("execute", "timeout", "close"),
+    },
+}
+
+PROVIDER_CAPABILITY_OFFER = {
+    "provider_key": "example-provider",
+    "contract": "syvert-provider-compat/v0",
+    "offers": {
+        "execution_modes": ("browser.page_state_read",),
+        "resource_consumption": ("adapter_supplied_context",),
+        "evidence": ("raw_payload", "platform_detail"),
+        "error_carrier": "provider_error",
+    },
+}
+```
+
+contract test 入口应消费这些声明并产出 `compatibility decision`：
+
+- `matched`：provider offer 满足该 Adapter capability requirement，可以进入绑定验证。
+- `unmatched`：provider offer 不满足 requirement，必须 fail-closed，并给出缺失能力、版本或资源前提。
+- `invalid_contract`：声明本身不可信，必须 fail-closed，不得继续执行 provider。
+
+这些声明只能用于 Adapter-bound compatibility test 与 evidence artifact。Core registry discovery 仍只暴露 Adapter public metadata；TaskRecord、resource lifecycle 与 runtime envelope 不新增 provider key、provider priority 或 provider selector 字段。
+
 该模型不代表：
 
 - 指定 provider 产品获得正式支持

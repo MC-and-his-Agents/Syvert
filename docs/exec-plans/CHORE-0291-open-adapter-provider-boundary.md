@@ -85,6 +85,9 @@
 - `python3 scripts/pr_guardian.py review 292 --post-review --json-output /tmp/syvert-pr-292-guardian-r2.json`
   - 结果：`REQUEST_CHANGES`，指出 `framework-positioning.md` 的产品结构总述与实际四层内容不一致，且 `vision.md` 保留“聚焦两件事”旧表述。
   - 处理：已将产品结构总述改为 Core / Adapter SDK / Adapters 主结构加 Providers 扩展层；已将当前阶段重点改为“三件事”。
+- `python3 scripts/pr_guardian.py review 292 --post-review --json-output /tmp/syvert-pr-292-guardian-r3.json`
+  - 结果：`REQUEST_CHANGES`，指出 ADR 不能声明“正式修订 FR-0021”却保持 FR-0021 formal spec 不变，并要求 Adapter SDK 补齐 requirement / offer 的声明承载面与 contract-test 入口。
+  - 处理：已将 `ADR-CHORE-0291` 收敛为 `v0.8.0+` 路线 canonical carrier，不再声明修订 `FR-0021` formal spec；已在 `adapter-sdk.md` 中补充 manifest / fixture 承载方式、compatibility decision 结果与 registry 不暴露 provider 字段的边界。
 
 ## 风险与回滚
 
