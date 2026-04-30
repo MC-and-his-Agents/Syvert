@@ -41,11 +41,11 @@
 - 分支：`issue-314-fr-0024-adapter-requirement-manifest-validator`
 - 原始 worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#314` GitHub truth 与 `FR-0024` formal spec。
-- 当前 checkpoint：PR `#329` 第二次 guardian review 返回 `REQUEST_CHANGES`，已继续收紧 string[] 类型、observability 泄漏、requirement evidence truth 与错误码口径，补齐 PR carrier，并通过目标测试、全 runtime discover 与门禁；下一步推送并复审。
+- 当前 checkpoint：PR `#329` 第三次 guardian review 返回 `REQUEST_CHANGES`，阻断集中在核心对齐约束和 execution slice 的测试证据不足；已补充对应负向测试并通过目标测试与全 runtime discover，下一步提交、重跑门禁并复审。
 
 ## 下一步动作
 
-- 推送 PR `#329` 新 head，重新运行 guardian。
+- 提交测试补充，重跑门禁并推送 PR `#329` 新 head，重新运行 guardian。
 - guardian 与 checks 通过后受控合并。
 - 合并后确认 `#314` closeout、更新父 FR `#296` comment、清理 worktree 并退役分支。
 
@@ -206,10 +206,29 @@
   - 结果：通过。
 - 第二轮 guardian 修复提交 `8acf2a70451f69fe23080fa3474944015d4dc8af` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 329 --post-review`
+  - 结果：第三次返回 `REQUEST_CHANGES`，`safe_to_merge=false`。实现无新增阻断，测试证据不足：
+    - 缺少 `evidence.resource_profile_evidence_refs` 与 profile proofs 对齐回归。
+    - 缺少 `observability.profile_keys`、`observability.proof_refs`、`observability.admission_outcome_fields` 对齐 / 冻结回归。
+    - 缺少 `execution_requirement.operation/target_type/collection_mode` approved slice 越界回归。
+- 已处理第三轮 guardian 阻断：
+  - 补充 resource profile evidence refs 与 profile proofs 不一致负向测试。
+  - 补充 observability profile keys、proof refs、admission outcome fields 漂移负向测试。
+  - 补充 execution requirement 三字段越界负向测试。
+- 第三轮 guardian 测试补充后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement`
+  - 结果：通过，22 tests。
+- 第三轮 guardian 测试补充后 `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration`
+  - 结果：通过，10 tests。
+- 第三轮 guardian 测试补充后 `python3 -m unittest tests.runtime.test_resource_capability_matcher`
+  - 结果：通过，17 tests。
+- 第三轮 guardian 测试补充后 `python3 -m unittest tests.runtime.test_registry`
+  - 结果：通过，15 tests。
+- 第三轮 guardian 测试补充后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，868 tests。
 
 ## 待验证项
 
-- PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
+- 第三轮 guardian 测试补充提交后的 governance gates、PR push、guardian review、GitHub checks、受控 merge、closeout reconciliation。
 
 ## 未决风险
 

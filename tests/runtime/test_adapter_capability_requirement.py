@@ -106,6 +106,21 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
         self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
         self.assertEqual(result.details["capability"], "search")
 
+    def test_validator_rejects_execution_requirement_outside_approved_slice(self) -> None:
+        cases = (
+            ("operation", "search_by_keyword"),
+            ("target_type", "keyword"),
+            ("collection_mode", "api_only"),
+        )
+        for field_name, value in cases:
+            with self.subTest(field_name=field_name, value=value):
+                requirement = copy_requirement()
+                requirement["execution_requirement"][field_name] = value
+
+                result = validate_adapter_capability_requirement(requirement)
+
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
     def test_validator_rejects_profile_proof_mismatch_as_invalid_resource_requirement(self) -> None:
         requirement = copy_requirement()
         profile = requirement["resource_requirement"]["resource_requirement_profiles"][0]
@@ -119,6 +134,17 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
         requirement = copy_requirement()
         profile = requirement["resource_requirement"]["resource_requirement_profiles"][0]
         profile["evidence_refs"] = []
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
+    def test_validator_rejects_resource_profile_evidence_refs_that_do_not_match_profile_proofs(self) -> None:
+        requirement = copy_requirement()
+        requirement["evidence"]["resource_profile_evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+        ]
 
         result = validate_adapter_capability_requirement(requirement)
 
@@ -203,6 +229,40 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
 
                 self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
                 self.assertEqual(result.details["actual_type"], "dict")
+
+    def test_validator_rejects_observability_profile_keys_that_do_not_match_resource_profiles(self) -> None:
+        requirement = copy_requirement()
+        requirement["observability"]["profile_keys"] = ["account", "account_proxy"]
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
+    def test_validator_rejects_observability_proof_refs_that_do_not_match_requirement_evidence(self) -> None:
+        requirement = copy_requirement()
+        requirement["observability"]["proof_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+        ]
+
+        result = validate_adapter_capability_requirement(requirement)
+
+        self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+
+    def test_validator_rejects_observability_admission_outcome_field_drift(self) -> None:
+        cases = (
+            ["match_status", "error_code"],
+            ["match_status", "error_code", "failure_category", "provider_key"],
+            ["error_code", "match_status", "failure_category"],
+        )
+        for admission_outcome_fields in cases:
+            with self.subTest(admission_outcome_fields=admission_outcome_fields):
+                requirement = copy_requirement()
+                requirement["observability"]["admission_outcome_fields"] = admission_outcome_fields
+
+                result = validate_adapter_capability_requirement(requirement)
+
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
 
     def test_validator_rejects_lifecycle_boundary_violation(self) -> None:
         requirement = copy_requirement()
