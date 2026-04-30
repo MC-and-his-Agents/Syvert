@@ -54,7 +54,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `d9945f10a74f290e088722f0622f9177d07ecb4b`
+- `ea786d10ed55e92a246cdf65dc9b220e99be71e6`
 
 ## 当前事项在 sprint 中的角色 / 阻塞
 
@@ -73,7 +73,9 @@
 - `python3 scripts/context_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
-  - 结果：提交前无 head diff，需在 checkpoint commit 后重新运行。
+  - 结果：通过，`PR class=docs`。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
 
 ## 风险与回滚
 
