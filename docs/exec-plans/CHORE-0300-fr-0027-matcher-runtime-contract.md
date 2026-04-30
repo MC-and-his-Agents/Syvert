@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0027-multi-profile-resource-requirement-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#306`
 - active 收口事项：`CHORE-0300-fr-0027-matcher-runtime-contract`
 - 状态：`active`
 
@@ -83,6 +83,8 @@
   - 结果：通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-301-fr-0027-matcher-profile-runtime-contract`
   - 结果：通过。
+- `python3 scripts/open_pr.py --class implementation --issue 301 --item-key CHORE-0300-fr-0027-matcher-runtime-contract --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title "feat(runtime): 实现 FR-0027 多 profile matcher" --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 implementation PR `#306 https://github.com/MC-and-his-Agents/Syvert/pull/306`。
 
 ## 未决风险
 
