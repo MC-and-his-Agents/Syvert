@@ -4,6 +4,7 @@ import copy
 import unittest
 
 from syvert.registry import AdapterResourceRequirementDeclarationV2
+from syvert.runtime import PlatformAdapterError
 from tests.runtime.contract_harness.third_party_entry import (
     ThirdPartyContractEntryError,
     run_third_party_adapter_contract_test,
@@ -59,13 +60,22 @@ def _none_profile_resource_requirement_declarations() -> tuple[dict[str, object]
     )
 
 
-class AdapterWithNoneResourceProfile(ThirdPartyContractFixtureAdapter):
-    resource_requirement_declarations = _none_profile_resource_requirement_declarations()
-
-
 class AdapterWithUnexpectedException(ThirdPartyContractFixtureAdapter):
     def execute(self, request):  # type: ignore[no-untyped-def]
         raise RuntimeError("unexpected adapter bug")
+
+
+class AdapterWithInvalidPlatformErrorDetails(ThirdPartyContractFixtureAdapter):
+    def __init__(self, *, details) -> None:  # type: ignore[no-untyped-def]
+        super().__init__()
+        self._details = details
+
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        raise PlatformAdapterError(
+            code="content_not_found",
+            message="third-party fixture mapped platform error",
+            details=self._details,  # type: ignore[arg-type]
+        )
 
 
 class AdapterWithReorderedPublicMetadata(ThirdPartyContractFixtureAdapter):
@@ -135,23 +145,45 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             ["account_proxy", "account"],
         )
 
-    def test_accepts_fr0027_none_resource_profile_without_required_capabilities(self) -> None:
+    def test_rejects_fr0027_none_resource_profile_rejected_by_current_truth(self) -> None:
         manifest = minimal_third_party_adapter_manifest()
         manifest["resource_requirement_declarations"] = _none_profile_resource_requirement_declarations()
-        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
-        for fixture in fixtures:
-            fixture["input"]["resource_profile_key"] = "none"
-        adapter = AdapterWithNoneResourceProfile()
 
-        results = run_third_party_adapter_contract_test(
-            manifest=manifest,
-            fixtures=fixtures,
-            adapter=adapter,
-        )
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
 
-        self.assertEqual(results[0]["verdict"], "pass")
-        self.assertEqual(results[1]["verdict"], "legal_failure")
-        self.assertEqual(adapter.last_resource_slots, ())
+        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.details["profile_key"], "none")
+
+    def test_rejects_nested_provider_fields_in_result_contract(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["result_contract"] = {
+            **manifest["result_contract"],
+            "provider_offer": "must-not-pass",
+        }
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_result_contract")
+        self.assertEqual(context.exception.details["field"], "result_contract")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_offer",))
+
+    def test_rejects_nested_provider_fields_in_error_mapping(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["error_mapping"] = {
+            "content_not_found": {
+                **manifest["error_mapping"]["content_not_found"],
+                "provider_selector": "must-not-pass",
+            },
+        }
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_error_mapping")
+        self.assertEqual(context.exception.details["field"], "error_mapping.content_not_found")
+        self.assertEqual(context.exception.details["forbidden_fields"], ("provider_selector",))
 
     def test_accepts_adapter_metadata_sets_with_different_ordering(self) -> None:
         results = run_third_party_adapter_contract_test(
@@ -424,6 +456,36 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
         self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
         self.assertEqual(success_result["observed_error"]["code"], "adapter_execution_exception")
+
+    def test_reports_platform_adapter_error_with_none_details_as_structured_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithInvalidPlatformErrorDetails(details=None),
+        )
+
+        success_result = results[0]
+        error_result = results[1]
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "adapter_platform_error_details_invalid")
+        self.assertEqual(success_result["observed_error"]["details"]["details_type"], "NoneType")
+        self.assertEqual(error_result["verdict"], "contract_violation")
+        self.assertEqual(error_result["reason"]["code"], "runtime_contract_failure_observed")
+
+    def test_reports_platform_adapter_error_with_non_mapping_details_as_structured_contract_violation(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithInvalidPlatformErrorDetails(details=("not", "mapping")),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["verdict"], "contract_violation")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "adapter_platform_error_details_invalid")
+        self.assertEqual(success_result["observed_error"]["details"]["details_type"], "tuple")
 
     def test_reports_adapter_error_mapping_mismatch(self) -> None:
         results = run_third_party_adapter_contract_test(
