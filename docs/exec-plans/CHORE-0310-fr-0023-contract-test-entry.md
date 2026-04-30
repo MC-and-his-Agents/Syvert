@@ -45,6 +45,7 @@
 - guardian review 第三次返回 `REQUEST_CHANGES`，阻断项为执行阶段硬编码 capability / target / mode 且未注入 required resource profile；已将 fixture input 扩展为 operation / capability / target / collection mode / resource profile 驱动，并在执行时构造与 FR-0027 profile 对齐的 resource bundle。
 - guardian review 第四次返回 `REQUEST_CHANGES`，阻断项为 `adapter_key` 语义边界使用任意子串导致误杀，以及 error_mapping fixture 未绑定 manifest 声明；已改为 token / segment 级 key 校验，并要求 error_mapping fixture 通过 `source_error` 与 manifest `error_mapping` 对齐。
 - guardian review 第五次返回 `REQUEST_CHANGES`，阻断项为纯 provider product name 仍可作为 `adapter_key`，以及 manifest 可声明未批准 capability；已显式阻断 `xhs` / `douyin` provider product key，并限制 supported_capabilities 只能使用当前 `content_detail` approved slice 且必须有 resource declaration 覆盖。
+- guardian review 第六次返回 `REQUEST_CHANGES`，阻断项为非 mapping success payload 会触发未处理异常，以及 sequence 字段会误收 dict keys；已改为结构化 contract violation，并让 sequence helper 拒绝 mapping。
 
 ## 下一步动作
 
@@ -74,11 +75,11 @@
 - `python3 -m pytest tests/runtime/test_third_party_adapter_contract_entry.py -q`
   - 结果：未执行通过；当前环境 `python3` 无 `pytest` 模块，改用 `unittest` 执行同等测试。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
-  - 结果：通过，17 tests。
+  - 结果：通过，19 tests。
 - `python3 -m unittest tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
   - 结果：通过，50 tests。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_registry`
-  - 结果：通过，67 tests。
+  - 结果：通过，69 tests。
 - `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
   - 结果：通过。
 - `git diff --check`
@@ -110,6 +111,9 @@
   - 第五次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：纯 provider product name 如 `xhs` / `douyin` 仍可作为 `adapter_key`；manifest 可声明当前 approved slice 之外的 capability。
   - 修正：将 `xhs` / `douyin` 纳入 token 级 adapter_key 边界阻断；manifest supported_capabilities 限制为当前 approved slice `content_detail`，并要求每个 supported capability 有 resource declaration 覆盖。
+  - 第六次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：非 mapping success payload 会让 harness 抛未处理异常；sequence 字段会误收 mapping keys。
+  - 修正：非 mapping success payload 生成可由 validator 归类的 contract violation envelope；sequence helper 显式拒绝 `Mapping` 输入。
 
 ## 未决风险
 

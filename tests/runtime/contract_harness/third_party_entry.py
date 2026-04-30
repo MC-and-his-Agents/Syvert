@@ -810,13 +810,12 @@ def _execute_and_validate_fixture(
                 resource_bundle=resource_bundle,
             )
         )
-        runtime_envelope = {
-            "task_id": task_id,
-            "adapter_key": manifest.adapter_key,
-            "capability": fixture_input["operation"],
-            "status": "success",
-            **payload,
-        }
+        runtime_envelope = _build_success_runtime_envelope(
+            task_id=task_id,
+            adapter_key=manifest.adapter_key,
+            capability=fixture_input["operation"],
+            payload=payload,
+        )
     except PlatformAdapterError as error:
         runtime_envelope = {
             "task_id": task_id,
@@ -834,6 +833,27 @@ def _execute_and_validate_fixture(
     if result["verdict"] == "legal_failure":
         return _validate_error_mapping_observation(fixture, result)
     return result
+
+
+def _build_success_runtime_envelope(
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    payload: Any,
+) -> dict[str, Any]:
+    envelope = {
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "status": "success",
+    }
+    if isinstance(payload, Mapping):
+        return {**envelope, **payload}
+    return {
+        **envelope,
+        "non_mapping_payload_type": type(payload).__name__,
+    }
 
 
 def _normalize_fixture(
@@ -1182,7 +1202,7 @@ def _require_non_empty_string(value: Any, *, code: str, field: str) -> str:
 
 
 def _require_non_string_sequence(value: Any, *, field: str) -> tuple[Any, ...]:
-    if value is None or isinstance(value, (str, bytes)):
+    if value is None or isinstance(value, (str, bytes, Mapping)):
         raise ThirdPartyContractEntryError(
             "invalid_manifest_public_metadata",
             f"{field} must be a non-string sequence",
