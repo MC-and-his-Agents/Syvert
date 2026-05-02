@@ -101,6 +101,7 @@
 
 - `AdapterProviderCompatibilityDecision` 顶层字段中出现 `provider_key` 或 `offer_id`。
 - `CompatibilityDecisionObservability` 中出现 `provider_key` 或 `offer_id`。
+- `CompatibilityDecisionObservability` 在 `invalid_contract` 冲突场景中复制任一侧 adapter key、capability 或 execution slice 作为已解析事实。
 - Core registry discovery 中出现 provider key、provider capability 或 provider registry entry。
 - Core routing 中出现 selected provider、provider selector、routing policy、priority、score 或 fallback。
 - TaskRecord 中新增 provider-specific public field。
@@ -117,6 +118,7 @@
 - `invalid_contract` 且 adapter key 缺失或不一致时，decision 顶层 `adapter_key` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
 - `invalid_contract` 且 capability 缺失、不一致或越界时，decision 顶层 `capability` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
 - `invalid_contract` 且 execution slice 缺失、不一致或越界时，decision 顶层 `execution_slice` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
+- `invalid_contract` 且 adapter key、capability 或 execution slice 缺失、不一致或越界时，observability 中对应字段必须为 `null` 或省略，不得选择任一侧冲突值。
 - `invalid_contract` 时必须提供 `invalid_contract_evidence`，记录 `source_contract_ref`、`violated_rule` 与原始 `unresolved_refs`。
 - 不得为了满足 evidence shape 伪造 proof ref 占位。
 

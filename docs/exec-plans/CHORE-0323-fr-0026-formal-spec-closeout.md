@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。guardian 前两轮返回 `REQUEST_CHANGES`，当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter mismatch 可构造性与 GWT trailing whitespace，待重跑 gates、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。guardian 前四轮均返回 `REQUEST_CHANGES`，当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、GWT trailing whitespace 与 checkpoint SHA 漂移，待提交本轮修正、重跑 gates、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -113,10 +113,15 @@
   - capability 缺失、不一致或越界时，decision 顶层 `capability=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - execution slice 缺失、不一致或越界时，decision 顶层 `execution_slice=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - rebase 后 checkpoint SHA 已替换为当前历史可解析提交。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：第四次返回 `REQUEST_CHANGES`。阻断项：observability 在 adapter / capability / execution 冲突场景仍缺少 null / omission 语义；exec-plan 当前停点与验证记录未同步到第三轮 guardian-fix 状态。
+- 已修正：
+  - `CompatibilityDecisionObservability` 在 `invalid_contract` 且 adapter key、capability 或 execution slice 缺失、不一致或越界时，对应字段必须为 `null` 或省略，冲突摘要只能进入 `invalid_contract_evidence.observed_values`。
+  - active exec-plan 当前停点与待验证项已同步为第四轮 guardian-fix 后状态。
 
 ## 待验证项
 
-- 提交当前修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 提交当前 observability / exec-plan 修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 

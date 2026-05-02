@@ -207,6 +207,7 @@
 ## CompatibilityDecisionObservability
 
 - 作用：表达 Adapter-bound decision 可追踪最小字段。
+- 通用约束：`matched` / `unmatched` 时必须记录已解析的 `adapter_key`、`capability` 与 `operation`；`invalid_contract` 且这些输入缺失、不一致或越界时，对应字段必须为 `null` 或省略，冲突摘要只能进入 `invalid_contract_evidence.observed_values`。
 - 字段：
   - `decision_id`
   - `adapter_key`
@@ -219,6 +220,7 @@
   - `contract_refs`
   - `proof_refs`
 - 禁止语义：
+  - 在 `invalid_contract` 冲突场景中复制任一侧 adapter / capability / execution value 作为已解析事实
   - Core registry provider field
   - TaskRecord provider field
   - provider selector / routing / priority / fallback outcome
