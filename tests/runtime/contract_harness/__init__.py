@@ -15,6 +15,25 @@ from .samples import (
     FakeAdapterProfile,
     SampleInput,
 )
+from .third_party_entry import (
+    ADAPTER_ONLY_CONTENT_DETAIL_PROFILE,
+    AdapterContractFixture,
+    ThirdPartyAdapterManifest,
+    ThirdPartyContractEntryError,
+    run_third_party_adapter_contract_test,
+    validate_third_party_adapter_fixtures,
+    validate_third_party_adapter_manifest,
+)
+from .third_party_fixtures import (
+    THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID,
+    THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+    THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID,
+    THIRD_PARTY_SUCCESS_FIXTURE_ID,
+    ThirdPartyContractFixtureAdapter,
+    minimal_third_party_adapter_fixtures,
+    minimal_third_party_adapter_manifest,
+    third_party_resource_requirement_declarations,
+)
 from .validation_tool import (
     ContractSampleDefinition,
     HarnessExecutionResult,
@@ -24,7 +43,9 @@ from .validation_tool import (
 
 __all__ = [
     "DEFAULT_HARNESS_ADAPTER_KEY",
+    "ADAPTER_ONLY_CONTENT_DETAIL_PROFILE",
     "CONTRACT_SAMPLES",
+    "AdapterContractFixture",
     "ContractSample",
     "ContractSampleDefinition",
     "ExpectedVerdict",
@@ -34,13 +55,26 @@ __all__ = [
     "HarnessExecutionInput",
     "HarnessExecutionResult",
     "SampleInput",
+    "THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID",
+    "THIRD_PARTY_FIXTURE_ADAPTER_KEY",
+    "THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID",
+    "THIRD_PARTY_SUCCESS_FIXTURE_ID",
+    "ThirdPartyAdapterManifest",
+    "ThirdPartyContractEntryError",
+    "ThirdPartyContractFixtureAdapter",
     "build_contract_sample_definitions",
     "build_expected_verdict_index",
     "build_sample_index",
     "execute_harness_samples",
     "execute_harness_sample",
+    "minimal_third_party_adapter_fixtures",
+    "minimal_third_party_adapter_manifest",
     "run_contract_harness_automation",
+    "run_third_party_adapter_contract_test",
+    "third_party_resource_requirement_declarations",
     "validate_contract_harness_run",
     "validate_contract_sample",
     "validate_contract_samples",
+    "validate_third_party_adapter_fixtures",
+    "validate_third_party_adapter_manifest",
 ]
