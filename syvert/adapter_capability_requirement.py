@@ -203,6 +203,52 @@ class _RequirementValidationAdapter:
         raise AssertionError("requirement validation must not execute adapters")
 
 
+def baseline_adapter_capability_requirement(
+    *,
+    adapter_key: str,
+    resource_requirement: AdapterResourceRequirementDeclarationV2,
+) -> AdapterCapabilityRequirement:
+    profile_keys = tuple(profile.profile_key for profile in resource_requirement.resource_requirement_profiles)
+    resource_profile_evidence_refs = tuple(
+        evidence_ref
+        for profile in resource_requirement.resource_requirement_profiles
+        for evidence_ref in profile.evidence_refs
+    )
+    return AdapterCapabilityRequirement(
+        adapter_key=adapter_key,
+        capability=APPROVED_ADAPTER_CAPABILITY,
+        execution_requirement=AdapterCapabilityExecutionRequirement(
+            operation=APPROVED_EXECUTION_REQUIREMENT["operation"],
+            target_type=APPROVED_EXECUTION_REQUIREMENT["target_type"],
+            collection_mode=APPROVED_EXECUTION_REQUIREMENT["collection_mode"],
+        ),
+        resource_requirement=resource_requirement,
+        evidence=AdapterCapabilityRequirementEvidence(
+            resource_profile_evidence_refs=resource_profile_evidence_refs,
+            capability_requirement_evidence_refs=(
+                "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+            ),
+        ),
+        lifecycle=AdapterCapabilityLifecycleExpectation(
+            requires_core_resource_bundle=True,
+            resource_profiles_drive_admission=True,
+            uses_existing_disposition_hint=True,
+        ),
+        observability=AdapterCapabilityObservabilityExpectation(
+            requirement_id=(
+                f"{adapter_key}:{APPROVED_ADAPTER_CAPABILITY}:"
+                f"{APPROVED_EXECUTION_REQUIREMENT['operation']}:"
+                f"{APPROVED_EXECUTION_REQUIREMENT['target_type']}:"
+                f"{APPROVED_EXECUTION_REQUIREMENT['collection_mode']}"
+            ),
+            profile_keys=profile_keys,
+            proof_refs=resource_profile_evidence_refs,
+            admission_outcome_fields=REQUIRED_ADMISSION_OUTCOME_FIELDS,
+        ),
+        fail_closed=True,
+    )
+
+
 def validate_adapter_capability_requirement(
     input_value: AdapterCapabilityRequirementValidationInput | AdapterCapabilityRequirement | Mapping[str, Any],
 ) -> AdapterCapabilityRequirementValidationResult:
