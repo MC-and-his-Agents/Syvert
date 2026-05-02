@@ -25,6 +25,9 @@
 - `resource_proof_admission_refs`
   - 语义：第三方真实 `adapter_key` 尚未被 `FR-0027` approved proof `reference_adapters` 覆盖时，manifest 用来声明 adapter-specific proof admission 的稳定引用集合。
   - 约束：字段必须存在；当 `resource_requirement_declarations[*].adapter_key` 不在其 profile proof `reference_adapters` 中时必须为非空集合。每个 ref 必须唯一命中一个 `ThirdPartyResourceProofAdmission`，且 admission 的 `adapter_key`、`capability`、`execution_path`、`resource_dependency_mode` 与 `required_capabilities` 必须和 manifest / declaration / fixture 完全一致。
+- `resource_proof_admissions`
+  - 语义：manifest-owned inline admission entries，是 `resource_proof_admission_refs` 的唯一解析来源。
+  - 约束：字段必须存在；contract test entry 只能在当前 manifest 的该字段内解析 admission，不得从全局 registry、fixture side channel、adapter 私有代码或 reviewer 会话上下文补齐。
 - `result_contract`
   - 语义：成功结果形态。
   - 约束：必须声明 `raw` 与 `normalized`，且 normalized result 由 Adapter 生成。
@@ -55,6 +58,8 @@
 
 用途：在不修改 `FR-0027` 双参考 approved proof 本身的前提下，为第三方 contract entry 中的真实 `adapter_key` 提供 adapter-specific resource proof coverage。
 
+解析来源：只能来自当前 `ThirdPartyAdapterManifest.resource_proof_admissions`。`resource_proof_admission_refs` 中的每个 ref 必须在该 manifest-owned carrier 中唯一命中一条 entry；carrier 中不得存在未被当前 uncovered declaration profile 消费的多余 entry。
+
 字段：
 
 - `admission_ref`
@@ -81,7 +86,7 @@
   - 约束：必须与 `base_profile_ref` 命中的 approved tuple 完全一致；当前只允许 `account` 或 `account, proxy` 两类已批准 shared tuple。
 - `admission_evidence_refs`
   - 类型：`string[]`
-  - 约束：非空、去重；必须回指当前第三方 manifest、fixtures、contract test profile 或后续 implementation evidence，证明该真实 Adapter 在同一 execution slice 下可被 contract entry 验证。
+  - 约束：非空、去重；必须回指当前第三方 manifest、fixtures 与 contract test profile 证据，证明该真实 Adapter 在同一 execution slice 下可被当前 contract entry 验证；不得使用泛化的后续 implementation evidence 替代当前准入证明。
 - `decision`
   - 类型：`enum`
   - 允许值：`admit_third_party_profile_for_contract_test_v0_8_0`
@@ -91,6 +96,8 @@
 - `base_profile_ref` 不可解析、不唯一、不是 `shared + approve_profile_for_v0_8_0`，或 tuple / execution path 与 admission 不一致 -> `invalid_resource_requirement`
 - admission `adapter_key` 与 manifest / declaration / fixture 不一致 -> `invalid_resource_requirement`
 - admission 只覆盖 `FR-0027` proof binding 中的 adapter coverage 子条件；profile shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍必须按 `FR-0027` 原规则校验
+- 每个未被 `FR-0027` proof `reference_adapters` 覆盖的 declaration profile 必须有且只能有一个 matching admission，且 `admission.base_profile_ref == profile.evidence_refs[0]`
+- manifest 中存在未被任何 uncovered declaration profile 消费的 admission，或 `resource_proof_admission_refs` 引用缺失 / 重复 / 未命中 entry -> `invalid_resource_requirement`
 - admission 试图批准新共享能力、provider offer、compatibility decision、priority、fallback 或真实 provider 样本 -> contract violation
 - 缺少合法 admission 时，第三方真实 `adapter_key` 不得裸借用 `xhs` / `douyin` reference proof
 
@@ -135,7 +142,7 @@
 2. public metadata required fields。
 3. `resource_requirement_declarations` 与 manifest `adapter_key` 一致性。
 4. `FR-0027` declaration shape、single proof ref、approved shared profile proof lookup、tuple 与 execution path 对齐。
-5. proof adapter coverage 判定：直接命中 `FR-0027` proof `reference_adapters`，或由第三方 `resource_proof_admission_refs` 命中的 `ThirdPartyResourceProofAdmission` 覆盖。
+5. proof adapter coverage 判定：直接命中 `FR-0027` proof `reference_adapters`，或由当前 manifest `resource_proof_admission_refs` 命中的 `ThirdPartyResourceProofAdmission` 逐 profile 覆盖。
 6. fixture refs 与 fixture coverage。
 7. Adapter `execute()` 行为。
 

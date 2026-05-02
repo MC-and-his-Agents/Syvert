@@ -41,6 +41,7 @@
 - 本事项采用 formal/evidence bridge 策略：`FR-0023` 定义第三方 contract entry 的 adapter-specific proof admission carrier；该 carrier 必须绑定真实第三方 `adapter_key`、`FR-0027` approved shared profile proof、同一 execution slice 与 fixture / manifest 证据，不能修改或放宽 `FR-0027` 双参考 proof 本身。
 - PR `#334` 首轮 guardian 结论为 `REQUEST_CHANGES`：指出 admission 被放在完整 `FR-0027` adapter coverage 校验之后，导致真实第三方 `adapter_key` 会先失败、bridge 不可达。已修正为 admission 参与 proof binding 的 adapter coverage 子条件；`FR-0027` shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍原样校验。
 - PR `#334` 第二轮 guardian 结论为 `REQUEST_CHANGES`：指出 governing `spec.md` 最小 public metadata 列表漏写 `resource_proof_admission_refs`，且 `plan.md` governance gate 示例仍使用 `#309` 旧 head-ref。已补齐字段列表并把示例 head-ref 更新为当前 `#331` 分支。
+- PR `#334` 第三轮 guardian 结论为 `REQUEST_CHANGES`：指出 admission refs 缺少 canonical carrier source、未逐 profile 冻结 coverage、`admission_evidence_refs` 允许泛化后续 evidence、exec-plan 未记录第二轮修复后的最终验证。已固定 admission entries 只能来自当前 manifest-owned `resource_proof_admissions`，要求每个 uncovered declaration profile 有且只有一个 matching admission，并收紧 evidence refs 只能绑定当前 contract entry 的 manifest / fixture / profile evidence。
 
 ## 下一步动作
 
@@ -85,6 +86,16 @@
 - `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 334 --post-review --json-output /tmp/syvert-pr-334-guardian-rerun.json`
   - 第二轮结果：`REQUEST_CHANGES`，`safe_to_merge=false`；阻断为 `spec.md` / `contracts` / `data-model` required field 不一致，以及 `plan.md` 旧 head-ref。
   - 修正：已补齐 `resource_proof_admission_refs` 到 `spec.md` 最小 public metadata 列表，并更新 `plan.md` governance gate 示例。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 334 --post-review --json-output /tmp/syvert-pr-334-guardian-third.json`
+  - 第三轮结果：`REQUEST_CHANGES`，`safe_to_merge=false`；阻断为 admission carrier source 未冻结、profile-scoped coverage 不完整、admission evidence boundary 过宽、exec-plan 缺少第二轮修复后的最终验证记录。
+  - 修正：已固定 `resource_proof_admissions` 为 manifest-owned inline carrier，收紧逐 profile coverage 与当前 contract entry evidence boundary，并补齐本验证记录。
+- 第三轮 guardian 修正后复跑：
+  - `git diff --check`：通过，无输出。
+  - `python3 scripts/spec_guard.py --mode ci --all`：通过。
+  - `python3 scripts/docs_guard.py --mode ci`：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`：通过。
 
 ## 未决风险
 
