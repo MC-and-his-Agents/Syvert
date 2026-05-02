@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0026-adapter-provider-compatibility-decision/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#333`
 - active 收口事项：`CHORE-0323-fr-0026-formal-spec-closeout`
 - 状态：`active`
 
@@ -45,11 +45,10 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；本地 gates 已通过，待 push、PR、spec review、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；本地 gates 已通过，PR `#333` 已通过受控入口创建并绑定 `Fixes #323`，待 spec review、guardian、merge 与 closeout。
 
 ## 下一步动作
 
-- 推送分支并使用 `scripts/open_pr.py --class spec` 受控创建 PR。
 - 完成 spec review / guardian review、GitHub checks 与受控 merge。
 - 合入后确认 `#323` closeout，更新父 FR `#298` GitHub comment，清理 worktree 并退役分支。
 
@@ -90,10 +89,14 @@
   - 结果：通过
 - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
+- `git push -u origin issue-323-fr-0026-compatibility-decision-formal-spec`
+  - 结果：首次因 GitHub HTTPS `SSL_ERROR_SYSCALL` 失败，重试通过；远端分支已创建并设置 upstream
+- `python3 scripts/open_pr.py --class spec --issue 323 --item-key CHORE-0323-fr-0026-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0026 compatibility decision formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建当前受审 spec PR `#333 https://github.com/MC-and-his-Agents/Syvert/pull/333`
 
 ## 待验证项
 
-- push、PR、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 
