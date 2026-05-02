@@ -50,6 +50,7 @@
   - `#310` 必须使用真实第三方 `adapter_key` 作为通过样例，并覆盖 adapter-specific `resource_proof_admission_refs`；不得把第三方样例伪装为 `xhs` / `douyin`。
   - `#310` 必须把 `ThirdPartyResourceProofAdmission` 纳入 resource proof binding 判定本身；不得先调用会因 `reference_adapters` 不含第三方 key 而失败的完整 `FR-0027` adapter coverage 校验，再尝试后置补救。
   - `#310` 必须从当前 manifest-owned `resource_proof_admissions` 解析 admission，并逐 profile 校验 uncovered declaration profile 与 admission 的一一对应关系。
+  - `#310` 必须按 `AdmissionEvidenceRef` schema 机器校验 `admission_evidence_refs`，确保 refs 只来自当前 manifest、contract profile 与 fixtures。
   - `#311` 必须补 SDK docs / migration 的可审查示例，展示第三方 Adapter 如何准备 manifest、fixtures 与 contract test profile。
   - `#312` 必须核对主干事实、GitHub issue 状态、release / sprint 语义与 parent closeout comment。
 - 手动验证：
@@ -59,6 +60,7 @@
   - 核对 third-party resource proof admission 是否只桥接 `adapter_key` coverage，不放宽 `FR-0027` approved shared profile proof、tuple 或 execution path。
   - 核对准入顺序是否保证 admission 参与 adapter coverage 子条件，而不是被放在不可达的完整 `FR-0027` 校验之后。
   - 核对 `resource_proof_admission_refs` 是否只解析当前 manifest 的 `resource_proof_admissions`，且每个 uncovered profile 都有且只有一个 matching admission。
+  - 核对 admission evidence refs 是否可从当前 manifest `adapter_key`、`contract_test_profile` 与 fixture `fixture_id` 派生，且覆盖 success / error_mapping fixture。
   - 核对 out of scope 是否明确排除 provider offer、compatibility decision、真实 provider 样本、provider registry / selector / marketplace 与 runtime 实现。
   - 核对 reference adapter 升级约束是否保持小红书、抖音作为第三方 Adapter 接入 baseline。
 

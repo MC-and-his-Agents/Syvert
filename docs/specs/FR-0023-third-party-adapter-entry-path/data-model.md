@@ -86,7 +86,7 @@
   - 约束：必须与 `base_profile_ref` 命中的 approved tuple 完全一致；当前只允许 `account` 或 `account, proxy` 两类已批准 shared tuple。
 - `admission_evidence_refs`
   - 类型：`string[]`
-  - 约束：非空、去重；必须回指当前第三方 manifest、fixtures 与 contract test profile 证据，证明该真实 Adapter 在同一 execution slice 下可被当前 contract entry 验证；不得使用泛化的后续 implementation evidence 替代当前准入证明。
+  - 约束：非空、去重；必须回指当前第三方 manifest、fixtures 与 contract test profile 证据，证明该真实 Adapter 在同一 execution slice 下可被当前 contract entry 验证；所有 ref 必须符合 `AdmissionEvidenceRef` schema，且能从当前 manifest / fixture / profile 字段机器推导；不得使用泛化的后续 implementation evidence 替代当前准入证明。
 - `decision`
   - 类型：`enum`
   - 允许值：`admit_third_party_profile_for_contract_test_v0_8_0`
@@ -98,8 +98,34 @@
 - admission 只覆盖 `FR-0027` proof binding 中的 adapter coverage 子条件；profile shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍必须按 `FR-0027` 原规则校验
 - 每个未被 `FR-0027` proof `reference_adapters` 覆盖的 declaration profile 必须有且只能有一个 matching admission，且 `admission.base_profile_ref == profile.evidence_refs[0]`
 - manifest 中存在未被任何 uncovered declaration profile 消费的 admission，或 `resource_proof_admission_refs` 引用缺失 / 重复 / 未命中 entry -> `invalid_resource_requirement`
+- `admission_evidence_refs` 必须至少包含当前 manifest evidence ref、当前 contract profile evidence ref、至少一个 success fixture evidence ref 与至少一个 error_mapping fixture evidence ref；任一 ref 无法按 `AdmissionEvidenceRef` schema 从当前 contract entry 派生 -> `invalid_resource_requirement`
 - admission 试图批准新共享能力、provider offer、compatibility decision、priority、fallback 或真实 provider 样本 -> contract violation
 - 缺少合法 admission 时，第三方真实 `adapter_key` 不得裸借用 `xhs` / `douyin` reference proof
+
+## AdmissionEvidenceRef
+
+用途：为 `ThirdPartyResourceProofAdmission.admission_evidence_refs` 提供可机器校验的当前 contract entry evidence identity。
+
+允许格式：
+
+- Manifest evidence ref
+  - 格式：`fr-0023:manifest:{adapter_key}:{contract_test_profile}`
+  - 派生来源：当前 `ThirdPartyAdapterManifest.adapter_key` 与 `ThirdPartyAdapterManifest.contract_test_profile`
+- Contract profile evidence ref
+  - 格式：`fr-0023:contract-profile:{adapter_key}:{contract_test_profile}`
+  - 派生来源：当前 `ThirdPartyAdapterManifest.adapter_key` 与 `ContractTestEntryProfile` 名称
+- Fixture evidence ref
+  - 格式：`fr-0023:fixture:{adapter_key}:{fixture_id}`
+  - 派生来源：当前 `ThirdPartyAdapterManifest.adapter_key` 与 `AdapterContractFixture.fixture_id`
+
+验证规则：
+
+- `admission_evidence_refs` 中的所有 ref 必须匹配上述三类格式之一。
+- `adapter_key` segment 必须等于当前 manifest `adapter_key`。
+- manifest / contract profile ref 的 `contract_test_profile` segment 必须等于当前 manifest `contract_test_profile`。
+- fixture ref 的 `fixture_id` 必须来自当前 manifest `fixture_refs` 可解析出的 fixture 集合。
+- 每个 admission 必须至少包含当前 manifest evidence ref、当前 contract profile evidence ref、一个 `case_type=success` 的 fixture evidence ref 与一个 `case_type=error_mapping` 的 fixture evidence ref。
+- 不允许引用 PR 号、commit SHA、外部 provider 样本、运行期临时日志、未来 implementation evidence 或 reviewer 会话上下文作为 admission evidence identity。
 
 ## AdapterContractFixture
 
@@ -109,6 +135,7 @@
 
 - `fixture_id`
   - 语义：fixture 稳定标识。
+  - evidence identity：可与 manifest `adapter_key` 派生 `fr-0023:fixture:{adapter_key}:{fixture_id}`。
 - `manifest_ref`
   - 语义：回指消费该 fixture 的 manifest 或 adapter key。
 - `case_type`
@@ -135,6 +162,10 @@
 当前最小 profile：
 
 - `adapter_only_content_detail_v0_8`
+
+evidence identity：
+
+- 与 manifest `adapter_key` 派生 `fr-0023:contract-profile:{adapter_key}:adapter_only_content_detail_v0_8`。
 
 准入顺序：
 

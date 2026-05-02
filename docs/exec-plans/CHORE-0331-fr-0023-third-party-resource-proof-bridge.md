@@ -42,6 +42,7 @@
 - PR `#334` 首轮 guardian 结论为 `REQUEST_CHANGES`：指出 admission 被放在完整 `FR-0027` adapter coverage 校验之后，导致真实第三方 `adapter_key` 会先失败、bridge 不可达。已修正为 admission 参与 proof binding 的 adapter coverage 子条件；`FR-0027` shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍原样校验。
 - PR `#334` 第二轮 guardian 结论为 `REQUEST_CHANGES`：指出 governing `spec.md` 最小 public metadata 列表漏写 `resource_proof_admission_refs`，且 `plan.md` governance gate 示例仍使用 `#309` 旧 head-ref。已补齐字段列表并把示例 head-ref 更新为当前 `#331` 分支。
 - PR `#334` 第三轮 guardian 结论为 `REQUEST_CHANGES`：指出 admission refs 缺少 canonical carrier source、未逐 profile 冻结 coverage、`admission_evidence_refs` 允许泛化后续 evidence、exec-plan 未记录第二轮修复后的最终验证。已固定 admission entries 只能来自当前 manifest-owned `resource_proof_admissions`，要求每个 uncovered declaration profile 有且只有一个 matching admission，并收紧 evidence refs 只能绑定当前 contract entry 的 manifest / fixture / profile evidence。
+- PR `#334` 第四轮 guardian 结论为 `REQUEST_CHANGES`：指出 `admission_evidence_refs` 缺少可机器校验的 canonical evidence identity。已冻结 `AdmissionEvidenceRef` schema，要求 refs 只能由当前 manifest `adapter_key`、`contract_test_profile` 与 fixture `fixture_id` 派生，并至少覆盖 manifest、contract profile、success fixture 与 error_mapping fixture。
 
 ## 下一步动作
 
@@ -90,6 +91,16 @@
   - 第三轮结果：`REQUEST_CHANGES`，`safe_to_merge=false`；阻断为 admission carrier source 未冻结、profile-scoped coverage 不完整、admission evidence boundary 过宽、exec-plan 缺少第二轮修复后的最终验证记录。
   - 修正：已固定 `resource_proof_admissions` 为 manifest-owned inline carrier，收紧逐 profile coverage 与当前 contract entry evidence boundary，并补齐本验证记录。
 - 第三轮 guardian 修正后复跑：
+  - `git diff --check`：通过，无输出。
+  - `python3 scripts/spec_guard.py --mode ci --all`：通过。
+  - `python3 scripts/docs_guard.py --mode ci`：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`：通过。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 334 --post-review --json-output /tmp/syvert-pr-334-guardian-fourth.json`
+  - 第四轮结果：`REQUEST_CHANGES`，`safe_to_merge=false`；阻断为 `admission_evidence_refs` 缺少 canonical evidence ref schema / 稳定字段。
+  - 修正：已补齐 `AdmissionEvidenceRef` schema 与 manifest / fixture / profile 派生规则。
+- 第四轮 guardian 修正后复跑：
   - `git diff --check`：通过，无输出。
   - `python3 scripts/spec_guard.py --mode ci --all`：通过。
   - `python3 scripts/docs_guard.py --mode ci`：通过。
