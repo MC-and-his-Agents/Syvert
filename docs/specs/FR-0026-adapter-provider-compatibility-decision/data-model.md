@@ -22,7 +22,7 @@
 - 字段：
   - `decision_id`
     - 类型：`string`
-    - 约束：非空、稳定；建议由 `adapter_key + provider_key + requirement_id + offer_id + contract_version` 派生。
+    - 约束：非空、稳定；必须使用不暴露 provider identity 的 opaque id 或 hash，不得由 `provider_key`、`offer_id` 等可逆 provider 标识直接拼接派生。
   - `contract_version`
     - 类型：`string`
     - 允许值：当前固定 `v0.8.0`
@@ -57,9 +57,6 @@
   - `adapter_key`
     - 类型：`string`
     - 约束：必须同时等于 `requirement.adapter_key` 与 `offer.adapter_binding.adapter_key`；不一致时不得产生非错误 decision。
-  - `provider_key`
-    - 类型：`string`
-    - 约束：来自 `offer.provider_key`；只允许在 Adapter-bound decision evidence 中出现，不得进入 Core-facing surface。
   - `capability`
     - 类型：`string`
     - 允许值：当前只允许 `content_detail`
@@ -80,7 +77,7 @@
     - 约束：必须回指 requirement、offer、resource profile proof 与 decision contract evidence。
   - `observability`
     - 类型：`CompatibilityDecisionObservability`
-    - 约束：只表达 Adapter-bound decision 追踪字段；不得进入 Core-facing provider routing 或 persistence surface。
+    - 约束：只表达无 provider identity 的 decision 追踪字段；不得包含 `provider_key`、`offer_id`、provider routing 或 provider persistence surface。
   - `no_leakage`
     - 类型：`CompatibilityNoLeakageAssertion`
     - 约束：必须证明 provider 信息不会进入 Core routing、registry discovery、TaskRecord 或 resource lifecycle。
@@ -162,10 +159,47 @@
     - 约束：非空、去重；必须回指 `FR-0025` offer evidence。
   - `resource_profile_evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；必须与参与 decision 的 requirement / offer profile proof refs 对齐，并满足 `FR-0027`。
+    - 约束：只记录已成功解析且满足 `FR-0027` 的 profile proof refs；`matched` / `unmatched` 时必须非空、去重并与参与 decision 的 requirement / offer profile proof refs 对齐；`invalid_contract` 且 proof refs 为空、重复、不可解析或不唯一时可以为空，不得伪造占位 proof ref。
   - `compatibility_decision_evidence_refs`
     - 类型：`string[]`
     - 约束：非空、去重；回指本 FR formal spec、后续 runtime tests、no-leakage guard、docs / evidence 或 closeout evidence。
+  - `adapter_bound_provider_evidence`
+    - 类型：`AdapterBoundProviderEvidence | null`
+    - 约束：只允许在 Adapter-bound decision evidence 中记录 provider identity；不得复制到 decision 顶层字段、observability 或 Core-facing projection。
+  - `invalid_contract_evidence`
+    - 类型：`InvalidCompatibilityContractEvidence | null`
+    - 约束：当 `decision_status=invalid_contract` 时必须存在；当 `matched` 或 `unmatched` 时必须为空。
+
+## AdapterBoundProviderEvidence
+
+- 作用：在 Adapter-bound evidence 中追溯被比较的 Provider offer。
+- 字段：
+  - `provider_key`
+    - 类型：`string`
+    - 约束：来自 `offer.provider_key`；只允许 Adapter-bound evidence 使用。
+  - `offer_id`
+    - 类型：`string`
+    - 约束：来自 `offer.observability.offer_id` 或等价 Adapter-bound offer evidence；不得成为 Core-facing field。
+- 禁止语义：
+  - decision 顶层 provider field
+  - Core registry / routing / TaskRecord / resource lifecycle provider field
+
+## InvalidCompatibilityContractEvidence
+
+- 作用：在无法解析合法 proof refs 或输入 carrier 违法时，构造可审查的 `invalid_contract` 结果。
+- 字段：
+  - `source_contract_ref`
+    - 类型：`string`
+    - 允许值：`FR-0024`、`FR-0025`、`FR-0027`、`FR-0026`
+  - `violated_rule`
+    - 类型：`string`
+    - 约束：非空，记录被违反的 formal rule id 或简短规则描述。
+  - `unresolved_refs`
+    - 类型：`string[]`
+    - 约束：记录无法解析、不唯一或重复的原始 refs；当输入缺少 refs 时可以为空数组。
+  - `resolved_profile_evidence_refs`
+    - 类型：`string[]`
+    - 约束：只记录已成功解析的 profile proof refs；不得为了满足非空约束而伪造 ref。
 
 ## CompatibilityDecisionObservability
 
@@ -173,9 +207,7 @@
 - 字段：
   - `decision_id`
   - `adapter_key`
-  - `provider_key`
   - `requirement_id`
-  - `offer_id`
   - `capability`
   - `operation`
   - `matched_profile_keys`
@@ -222,3 +254,5 @@
 - 两侧输入合法但无任何 profile 完全满足 -> `decision_status=unmatched`
 - decision 或 Core-facing surface 出现 provider selector、routing、priority、score、fallback、marketplace、provider product support、provider lifecycle 或 provider leakage -> `decision_status=invalid_contract`
 - `matched` 不代表 selected provider、fallback order、Core routing、真实 provider 产品支持或 provider runtime 可用性
+- decision 顶层字段或 observability 出现 `provider_key` / `offer_id` -> `decision_status=invalid_contract` 或 no-leakage guard 阻断
+- Core-facing projection 只能携带无 provider identity 的 status / error 摘要，不得嵌入 `adapter_bound_provider_evidence`

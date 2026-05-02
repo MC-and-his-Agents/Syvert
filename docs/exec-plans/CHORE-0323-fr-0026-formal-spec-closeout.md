@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；本地 gates 已通过，PR `#333` 已通过受控入口创建并绑定 `Fixes #323`，待 spec review、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。首轮 guardian 返回 `REQUEST_CHANGES`，当前已修正 no-leakage carrier 边界、`invalid_contract` evidence 可构造性与 GWT trailing whitespace，待重跑 gates、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -93,10 +93,17 @@
   - 结果：首次因 GitHub HTTPS `SSL_ERROR_SYSCALL` 失败，重试通过；远端分支已创建并设置 upstream
 - `python3 scripts/open_pr.py --class spec --issue 323 --item-key CHORE-0323-fr-0026-formal-spec-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(spec): 收口 FR-0026 compatibility decision formal spec' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：已创建当前受审 spec PR `#333 https://github.com/MC-and-his-Agents/Syvert/pull/333`
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：首次返回 `REQUEST_CHANGES`。阻断项：decision data model 中 `provider_key` 顶层/observability 与 no-leakage 冲突；`invalid_contract` 在 proof refs 为空时无法满足 evidence 非空约束；GWT 行尾空白。
+- 已修正：
+  - `AdapterProviderCompatibilityDecision` 顶层字段与 `CompatibilityDecisionObservability` 不再携带 `provider_key` / `offer_id`。
+  - provider identity 只允许出现在 `CompatibilityDecisionEvidence.adapter_bound_provider_evidence`，并明确 Core-facing projection 不得嵌入完整 Adapter-bound evidence。
+  - `resource_profile_evidence_refs` 只记录已解析 proof refs；`invalid_contract` 可通过 `invalid_contract_evidence` 表达空 refs、重复 refs、不可解析或不唯一 refs。
+  - `git diff --check` 已对当前工作区通过。
 
 ## 待验证项
 
-- guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 

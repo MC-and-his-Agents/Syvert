@@ -99,11 +99,22 @@
 
 ### forbidden
 
+- `AdapterProviderCompatibilityDecision` 顶层字段中出现 `provider_key` 或 `offer_id`。
+- `CompatibilityDecisionObservability` 中出现 `provider_key` 或 `offer_id`。
 - Core registry discovery 中出现 provider key、provider capability 或 provider registry entry。
 - Core routing 中出现 selected provider、provider selector、routing policy、priority、score 或 fallback。
 - TaskRecord 中新增 provider-specific public field。
 - resource lifecycle 中新增 provider-owned lifecycle、resource supply、account pool、proxy pool 或 provider lease field。
 - failed envelope 中新增 Core-facing provider category。
+- Core-facing projection 嵌入完整 Adapter-bound decision evidence。
+
+## invalid evidence contract
+
+- `resource_profile_evidence_refs` 只记录已成功解析且满足 `FR-0027` 的 proof refs。
+- `matched` / `unmatched` 时，`resource_profile_evidence_refs` 必须非空、去重，并与参与 decision 的 profile refs 对齐。
+- `invalid_contract` 且 proof refs 为空、重复、不可解析或不唯一时，`resource_profile_evidence_refs` 可以为空。
+- `invalid_contract` 时必须提供 `invalid_contract_evidence`，记录 `source_contract_ref`、`violated_rule` 与原始 `unresolved_refs`。
+- 不得为了满足 evidence shape 伪造 proof ref 占位。
 
 ## fail-closed contract
 
