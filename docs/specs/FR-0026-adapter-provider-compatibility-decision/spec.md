@@ -35,12 +35,12 @@
 
 - 功能需求：
   - `AdapterProviderCompatibilityDecision` 必须是 `v0.8.0` 及之后 Adapter requirement 与 Adapter-bound Provider offer 兼容性判断的唯一 canonical carrier；不得并行维护 manifest-only、SDK-only、runtime-only 或 provider-private decision 模型。
-  - decision 输入必须包含一条合法 `AdapterCapabilityRequirement` 与一条合法 `ProviderCapabilityOffer`。
-  - requirement 合法性必须完全消费 `FR-0024`；requirement 中 `resource_requirement` 与 profile proof 合法性必须完全消费 `FR-0027`。
-  - offer 合法性必须完全消费 `FR-0025`；offer 中 `resource_support` 与 profile proof 合法性必须完全消费 `FR-0027`。
+  - decision 输入必须包含一条待验证的 `AdapterCapabilityRequirement` carrier 与一条待验证的 `ProviderCapabilityOffer` carrier。待验证 carrier 可以缺字段、字段违法或 proof 不可解析；这些情况仍属于 decision validation 输入域，必须产出 `invalid_contract`，不得在构造 `AdapterProviderCompatibilityDecisionInput` 前被静默丢弃。
+  - requirement validation 必须完全消费 `FR-0024`；requirement 中 `resource_requirement` 与 profile proof validation 必须完全消费 `FR-0027`。只有通过 validation 的 requirement 才能进入 `matched` / `unmatched` 判断。
+  - offer validation 必须完全消费 `FR-0025`；offer 中 `resource_support` 与 profile proof validation 必须完全消费 `FR-0027`。只有通过 validation 的 offer 才能进入 `matched` / `unmatched` 判断。
   - decision 不得扩写 requirement 或 offer 字段，也不得以 decision 结果反向修正 requirement / offer / profile proof。
-  - decision 输入必须处于同一 Adapter 边界：`requirement.adapter_key` 必须等于 `offer.adapter_binding.adapter_key`。
-  - decision 输入必须处于同一 approved capability slice：requirement 的 `capability + operation + target_type + collection_mode` 必须与 offer 的 `capability_offer` 完全一致。当前 approved slice 只允许 `content_detail + content_detail_by_url + url + hybrid`。
+  - 合法 decision 输入必须处于同一 Adapter 边界：`requirement.adapter_key` 必须等于 `offer.adapter_binding.adapter_key`。缺失或不一致时，decision 必须为可构造的 `invalid_contract`。
+  - 合法 decision 输入必须处于同一 approved capability slice：requirement 的 `capability + operation + target_type + collection_mode` 必须与 offer 的 `capability_offer` 完全一致。当前 approved slice 只允许 `content_detail + content_detail_by_url + url + hybrid`。缺失、不一致或越界时，decision 必须为可构造的 `invalid_contract`。
   - decision 必须比较 requirement resource profiles 与 offer supported profiles 的 canonical tuple。只要存在任一合法 requirement profile，其 `resource_dependency_mode + normalized_required_capabilities` 与任一合法 offer supported profile 完全一致，且两侧 proof 都满足 `FR-0027` 对当前 adapter、capability 与 approved execution slice 的要求，decision 必须返回 `matched`。
   - 若 requirement 与 offer 各自合法、Adapter / capability / execution slice 完全一致，但不存在任何 requirement profile 被 offer supported profiles 满足，decision 必须返回 `unmatched`。
   - 若 requirement 或 offer 任一输入不合法、字段不一致、proof 不可解析、不唯一、不覆盖当前 adapter、越过 approved slice、出现禁止字段或违反 no-leakage 约束，decision 必须返回 `invalid_contract`，不得宽松降级为 `unmatched`。

@@ -2,16 +2,17 @@
 
 ## AdapterProviderCompatibilityDecisionInput
 
-- 作用：表达 compatibility decision 的 canonical 输入。
+- 作用：表达 compatibility decision validation 的 canonical 输入域。
+- 输入域：输入是待验证 carrier，而不是预先证明合法的 carrier。缺字段、字段违法、proof 不可解析或不唯一的 requirement / offer 仍必须能进入 decision validation，并由输出 carrier 表达 `invalid_contract`。
 - 字段：
   - `requirement`
     - 类型：`AdapterCapabilityRequirement`
     - 来源：`FR-0024`
-    - 约束：必须合法；其 `resource_requirement` 与 proof binding 必须满足 `FR-0027`。
+    - 约束：待验证 Adapter requirement carrier；合法性由 decision validation 按 `FR-0024` 与 `FR-0027` 判定。非法或不完整时必须产出 `invalid_contract`，不得在输入构造前丢弃。
   - `offer`
     - 类型：`ProviderCapabilityOffer`
     - 来源：`FR-0025`
-    - 约束：必须合法；其 `resource_support` 与 proof binding 必须满足 `FR-0027`。
+    - 约束：待验证 Provider offer carrier；合法性由 decision validation 按 `FR-0025` 与 `FR-0027` 判定。非法或不完整时必须产出 `invalid_contract`，不得在输入构造前丢弃。
   - `decision_context`
     - 类型：`CompatibilityDecisionContext`
     - 约束：只表达 decision 追溯、contract refs 与 fail-closed 配置，不承载 routing、selector、priority、fallback 或 provider product metadata。

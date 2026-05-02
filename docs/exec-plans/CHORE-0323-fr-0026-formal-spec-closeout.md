@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。guardian 前四轮均返回 `REQUEST_CHANGES`，当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、GWT trailing whitespace 与 checkpoint SHA 漂移，待提交本轮修正、重跑 gates、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。远端最新已审 head 为 `407a0ee0765117c0533ccfc9520ea6061610979d`，guardian 前五轮均返回 `REQUEST_CHANGES`。当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、input domain 可达性、GWT trailing whitespace 与 checkpoint SHA 漂移；待提交本轮 input-domain 修正后刷新当前受审 head、重跑 gates、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -118,10 +118,16 @@
 - 已修正：
   - `CompatibilityDecisionObservability` 在 `invalid_contract` 且 adapter key、capability 或 execution slice 缺失、不一致或越界时，对应字段必须为 `null` 或省略，冲突摘要只能进入 `invalid_contract_evidence.observed_values`。
   - active exec-plan 当前停点与待验证项已同步为第四轮 guardian-fix 后状态。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：第五次返回 `REQUEST_CHANGES`。阻断项：formal suite 把 canonical decision input 限定为“合法 requirement + 合法 offer”，但同一 suite 又要求非法 requirement / offer 输出 `invalid_contract`，导致 `invalid_requirement_contract` / `invalid_provider_offer_contract` 在语义上不可达。
+- 已修正：
+  - `AdapterProviderCompatibilityDecisionInput` 改为接收待验证 requirement / offer carrier；缺字段、字段违法、proof 不可解析或不唯一仍属于 decision validation 输入域。
+  - 合法 requirement 与合法 offer 仅作为 `matched` / `unmatched` 前置条件，不再作为 canonical input domain 限制。
+  - `spec.md`、`data-model.md` 与 `contracts/README.md` 均明确非法 requirement / offer 必须由 decision validation fail-closed 为可构造的 `invalid_contract`。
 
 ## 待验证项
 
-- 提交当前 observability / exec-plan 修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 提交当前 input-domain / exec-plan 修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 
