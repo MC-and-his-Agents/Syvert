@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。远端最新已审 head 为 `407a0ee0765117c0533ccfc9520ea6061610979d`，guardian 前五轮均返回 `REQUEST_CHANGES`。当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、input domain 可达性、GWT trailing whitespace 与 checkpoint SHA 漂移；待提交本轮 input-domain 修正后刷新当前受审 head、重跑 gates、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。当前语义 / gate checkpoint head 为 `a94adabe142088759fd4ab3943ce0fe45eda6bd3`；guardian 前五轮均返回 `REQUEST_CHANGES`。当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、input domain 可达性、GWT trailing whitespace 与 checkpoint SHA 漂移；`a94adabe142088759fd4ab3943ce0fe45eda6bd3` 已通过本地 gate 链，待推送、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -124,10 +124,22 @@
   - `AdapterProviderCompatibilityDecisionInput` 改为接收待验证 requirement / offer carrier；缺字段、字段违法、proof 不可解析或不唯一仍属于 decision validation 输入域。
   - 合法 requirement 与合法 offer 仅作为 `matched` / `unmatched` 前置条件，不再作为 canonical input domain 限制。
   - `spec.md`、`data-model.md` 与 `contracts/README.md` 均明确非法 requirement / offer 必须由 decision validation fail-closed 为可构造的 `invalid_contract`。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-323-fr-0026-compatibility-decision-formal-spec`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过，PR class=`spec`，变更类别=`docs, spec`
+- `git diff --check origin/main..HEAD`
+  - 结果：在 head `a94adabe142088759fd4ab3943ce0fe45eda6bd3` 通过
 
 ## 待验证项
 
-- 提交当前 input-domain / exec-plan 修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 推送当前修正后运行 guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 
@@ -144,3 +156,4 @@
 
 - worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - rebase 后 formal spec 语义 checkpoint：`3dac353e5d59d567ebc08224b5baf5468122ae61`
+- latest semantic / gate checkpoint：`a94adabe142088759fd4ab3943ce0fe45eda6bd3`
