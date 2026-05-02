@@ -39,6 +39,7 @@
 - `#310` / PR `#330` guardian 已多次暴露同类阻断：真实第三方 `adapter_key` 不能伪装成 `xhs` / `douyin`，但裸引用 `FR-0027` 当前双参考 proof 又无法满足 `reference_adapters` 覆盖。
 - `FR-0027` 当前 proof truth 自洽：approved shared profile proof 只覆盖 `xhs`、`douyin`，裸借用该 proof 的第三方 declaration 必须 fail-closed。
 - 本事项采用 formal/evidence bridge 策略：`FR-0023` 定义第三方 contract entry 的 adapter-specific proof admission carrier；该 carrier 必须绑定真实第三方 `adapter_key`、`FR-0027` approved shared profile proof、同一 execution slice 与 fixture / manifest 证据，不能修改或放宽 `FR-0027` 双参考 proof 本身。
+- PR `#334` 首轮 guardian 结论为 `REQUEST_CHANGES`：指出 admission 被放在完整 `FR-0027` adapter coverage 校验之后，导致真实第三方 `adapter_key` 会先失败、bridge 不可达。已修正为 admission 参与 proof binding 的 adapter coverage 子条件；`FR-0027` shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍原样校验。
 
 ## 下一步动作
 
@@ -71,6 +72,15 @@
   - 初次提交前结果：通过。
   - 提交 `abd22de2455de000d5295298003b7915bb8bc0fc` 后结果：失败，提示 active exec-plan 缺少可解析的 40 位 checkpoint head SHA。
   - 补齐 checkpoint SHA 后结果：通过。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 334 --post-review --json-output /tmp/syvert-pr-334-guardian.json`
+  - 首轮结果：`REQUEST_CHANGES`，`safe_to_merge=false`；阻断为 admission step 在完整 `FR-0027` adapter coverage 校验之后不可达。
+  - 修正：已将 `ThirdPartyResourceProofAdmission` 调整为 proof binding 判定中的 adapter coverage 子条件。
+- 首轮 guardian 修正后复跑：
+  - `python3 scripts/spec_guard.py --mode ci --all`：通过。
+  - `python3 scripts/docs_guard.py --mode ci`：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`：通过。
+  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`：通过。
 
 ## 未决风险
 
@@ -86,4 +96,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - `abd22de2455de000d5295298003b7915bb8bc0fc`
+- `05759c988297ce688cda50b98609dfa71b285564`
 - 说明：该 checkpoint 首次把第三方真实 `adapter_key` 的 adapter-specific resource proof admission bridge、`FR-0023` formal suite 与 active exec-plan 同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
