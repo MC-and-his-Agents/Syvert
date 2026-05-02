@@ -90,6 +90,7 @@
 
 - `base_profile_ref` 不可解析、不唯一、不是 `shared + approve_profile_for_v0_8_0`，或 tuple / execution path 与 admission 不一致 -> `invalid_resource_requirement`
 - admission `adapter_key` 与 manifest / declaration / fixture 不一致 -> `invalid_resource_requirement`
+- admission 只覆盖 `FR-0027` proof binding 中的 adapter coverage 子条件；profile shape、single proof ref、approved shared proof lookup、tuple 与 execution path 仍必须按 `FR-0027` 原规则校验
 - admission 试图批准新共享能力、provider offer、compatibility decision、priority、fallback 或真实 provider 样本 -> contract violation
 - 缺少合法 admission 时，第三方真实 `adapter_key` 不得裸借用 `xhs` / `douyin` reference proof
 
@@ -133,8 +134,8 @@
 1. manifest shape。
 2. public metadata required fields。
 3. `resource_requirement_declarations` 与 manifest `adapter_key` 一致性。
-4. `FR-0027` resource requirement declaration 与 approved shared profile proof。
-5. 第三方 `resource_proof_admission_refs` 的 adapter-specific proof coverage。
+4. `FR-0027` declaration shape、single proof ref、approved shared profile proof lookup、tuple 与 execution path 对齐。
+5. proof adapter coverage 判定：直接命中 `FR-0027` proof `reference_adapters`，或由第三方 `resource_proof_admission_refs` 命中的 `ThirdPartyResourceProofAdmission` 覆盖。
 6. fixture refs 与 fixture coverage。
 7. Adapter `execute()` 行为。
 

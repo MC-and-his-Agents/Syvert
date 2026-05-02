@@ -70,6 +70,8 @@
 - `admission_evidence_refs` 必须回指当前第三方 manifest、fixture、contract test profile 或后续 implementation evidence；不得引用 provider offer、真实 provider 样本或 adapter 私有注释补足 proof。
 - `decision` 当前只允许 `admit_third_party_profile_for_contract_test_v0_8_0`。
 - 任一 proof 不可解析、不唯一、不对齐、不覆盖当前真实第三方 adapter admission，或缺少 fixture / manifest evidence 时，必须按 `invalid_resource_requirement` fail-closed。
+- admission 参与 proof binding 判定本身；contract entry 不得先执行会因 `reference_adapters` 不含第三方 key 而失败的完整 `FR-0027` adapter coverage 校验，再把 admission 放到后置步骤。
+- `FR-0027` 的 shape、single proof ref、approved shared profile proof lookup、tuple、execution path 与 fail-closed 规则仍必须原样校验；admission 只覆盖 adapter coverage 子条件。
 
 ## Fixture contract
 
@@ -84,8 +86,8 @@
 1. 校验 manifest shape。
 2. 校验 public metadata required fields。
 3. 校验 declaration `adapter_key` 与 manifest `adapter_key` 一致。
-4. 校验 `FR-0027` resource requirement declaration 与 approved shared profile proof。
-5. 若第三方真实 `adapter_key` 未被 `FR-0027` proof `reference_adapters` 覆盖，校验 `ThirdPartyResourceProofAdmission` 提供 adapter-specific proof coverage。
+4. 校验 `FR-0027` declaration shape、single proof ref、approved shared profile proof lookup、tuple 与 execution path 对齐。
+5. 判定 proof adapter coverage：若 declaration `adapter_key` 不在 `FR-0027` proof `reference_adapters` 中，则必须在同一 proof binding 决策中校验 `ThirdPartyResourceProofAdmission` 提供 adapter-specific proof coverage。
 6. 校验 fixture refs 可解析，并覆盖成功 payload、失败映射与 resource profile input。
 7. 校验 Adapter `execute()` 行为与 manifest / fixture 声明一致。
 
