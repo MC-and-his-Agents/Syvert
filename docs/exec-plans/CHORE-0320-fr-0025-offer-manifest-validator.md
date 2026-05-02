@@ -39,7 +39,7 @@
 - 分支：`issue-320-fr-0025-provider-offer-manifest-validator`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#320` GitHub truth 与 `FR-0025` formal spec。
-- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；已 rebase 到最新主干 `3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`。首轮 guardian 指出 `provider_port_ref` 未强制归属当前 `adapter_binding.adapter_key`，已收紧为必须使用当前 `adapter_key:` 前缀并拒绝 core/global/marketplace/registry/routing 端口语义，focused 回归已通过。
+- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；已 rebase 到最新主干 `3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`。首轮 guardian 指出 `provider_port_ref` 未强制归属当前 `adapter_binding.adapter_key`，已在 head `4f30adf9adced8a84ba89153726f434da869f32b` 收紧为必须使用当前 `adapter_key:` 前缀并拒绝 core/global/marketplace/registry/routing 端口语义；focused 回归、全量 runtime discover 与 required gates 均已通过。
 
 ## 下一步动作
 
@@ -112,10 +112,22 @@
   - 结果：通过，21 tests。
 - guardian 修复后 `python3 -m py_compile syvert/provider_capability_offer.py tests/runtime/test_provider_capability_offer.py`
   - 结果：通过。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，894 tests。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-320-fr-0025-provider-offer-manifest-validator`
+  - 结果：通过。
+- guardian 修复提交 `4f30adf9adced8a84ba89153726f434da869f32b` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- guardian 修复后的相关 runtime 回归、全量 runtime discover、required gates、PR push、guardian review、GitHub checks、受控 merge 与 closeout reconciliation。
+- guardian 修复提交后的 PR push、guardian review、GitHub checks、受控 merge 与 closeout reconciliation。
 
 ## 未决风险
 
@@ -133,3 +145,4 @@
 - 初始 implementation checkpoint：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - implementation checkpoint：`2fa77286f2c5bb15da07a172e914e02369b362f7`
 - main-sync validation checkpoint：`54b72473f77d8254365954b15c32321ced2d8715`
+- guardian fix checkpoint：`4f30adf9adced8a84ba89153726f434da869f32b`
