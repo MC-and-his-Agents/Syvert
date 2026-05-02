@@ -58,11 +58,11 @@
     - 类型：`string | null`
     - 约束：`matched` / `unmatched` 时必须同时等于 `requirement.adapter_key` 与 `offer.adapter_binding.adapter_key`；`invalid_contract` 且 adapter key 缺失或不一致时必须为 `null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - `capability`
-    - 类型：`string`
-    - 允许值：当前只允许 `content_detail`
+    - 类型：`string | null`
+    - 约束：`matched` / `unmatched` 时必须同时等于 requirement 与 offer 的 approved capability，当前只允许 `content_detail`；`invalid_contract` 且 capability 缺失、不一致或越界时必须为 `null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - `execution_slice`
-    - 类型：`CompatibilityExecutionSlice`
-    - 约束：当前必须且只能表达 `content_detail_by_url + url + hybrid`。
+    - 类型：`CompatibilityExecutionSlice | null`
+    - 约束：`matched` / `unmatched` 时必须同时等于 requirement 与 offer 的 approved execution slice，当前必须且只能表达 `content_detail_by_url + url + hybrid`；`invalid_contract` 且 operation / target_type / collection_mode 缺失、不一致或越界时必须为 `null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - `decision_status`
     - 类型：`enum`
     - 允许值：`matched`、`unmatched`、`invalid_contract`
@@ -202,7 +202,7 @@
     - 约束：只记录已成功解析的 profile proof refs；不得为了满足非空约束而伪造 ref。
   - `observed_values`
     - 类型：`object`
-    - 约束：仅记录构造 `invalid_contract` 所需的冲突或缺失摘要，例如 `requirement_adapter_key`、`offer_adapter_key`、`requirement_execution_slice`、`offer_execution_slice`；不得包含 provider selector、routing、priority、score 或 fallback。
+    - 约束：仅记录构造 `invalid_contract` 所需的冲突或缺失摘要，例如 `requirement_adapter_key`、`offer_adapter_key`、`requirement_capability`、`offer_capability`、`requirement_execution_slice`、`offer_execution_slice`；不得包含 provider selector、routing、priority、score 或 fallback。
 
 ## CompatibilityDecisionObservability
 
@@ -254,6 +254,8 @@
 - adapter key 缺失或不一致时，decision 顶层 `adapter_key=null`，冲突值进入 `invalid_contract_evidence.observed_values`
 - requirement 与 offer 的 capability / operation / target_type / collection_mode 不一致 -> `decision_status=invalid_contract`
 - 任一侧越过 `content_detail_by_url + url + hybrid` -> `decision_status=invalid_contract`
+- capability 缺失、不一致或越界时，decision 顶层 `capability=null`，冲突值进入 `invalid_contract_evidence.observed_values`
+- execution slice 缺失、不一致或越界时，decision 顶层 `execution_slice=null`，冲突值进入 `invalid_contract_evidence.observed_values`
 - 两侧输入合法且任一 requirement profile 与 offer supported profile 的 canonical tuple 完全一致 -> `decision_status=matched`
 - 两侧输入合法但无任何 profile 完全满足 -> `decision_status=unmatched`
 - decision 或 Core-facing surface 出现 provider selector、routing、priority、score、fallback、marketplace、provider product support、provider lifecycle 或 provider leakage -> `decision_status=invalid_contract`
