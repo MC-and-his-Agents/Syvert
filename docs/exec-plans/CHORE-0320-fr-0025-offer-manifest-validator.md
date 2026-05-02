@@ -39,7 +39,7 @@
 - 分支：`issue-320-fr-0025-provider-offer-manifest-validator`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#320` GitHub truth 与 `FR-0025` formal spec。
-- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；已 rebase 到最新主干 `3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`，目标测试、相关 runtime 回归、全量 runtime discover、语法编译、静态门禁、governance gate 与 implementation scope guard 均已在 rebase 后 head `54b72473f77d8254365954b15c32321ced2d8715` 上通过。
+- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；已 rebase 到最新主干 `3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`。首轮 guardian 指出 `provider_port_ref` 未强制归属当前 `adapter_binding.adapter_key`，已收紧为必须使用当前 `adapter_key:` 前缀并拒绝 core/global/marketplace/registry/routing 端口语义，focused 回归已通过。
 
 ## 下一步动作
 
@@ -100,10 +100,22 @@
   - 结果：通过。
 - rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/open_pr.py --class implementation --issue 320 ...`
+  - 结果：通过，创建 PR `#335`。
+- `python3 scripts/pr_guardian.py review 335 --post-review`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：`adapter_binding.provider_port_ref` 只拒绝 `core` / 连续 `global_provider` token，未强制归属 `adapter_binding.adapter_key`，因此 `xhs` offer 可借用 `douyin:adapter-owned-provider-port` 或 global-looking port ref。
+- 已处理首轮 guardian 阻断：
+  - `adapter_binding.provider_port_ref` 必须以当前 `adapter_binding.adapter_key + ":"` 为前缀，cross-adapter / global ref fail-closed。
+  - `provider_port_ref` 拒绝 core / global / public SDK / marketplace / registry / routing 端口语义。
+  - 新增 cross-adapter、global、core、marketplace、registry port ref focused 回归。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_provider_capability_offer`
+  - 结果：通过，21 tests。
+- guardian 修复后 `python3 -m py_compile syvert/provider_capability_offer.py tests/runtime/test_provider_capability_offer.py`
+  - 结果：通过。
 
 ## 待验证项
 
-- PR 创建、guardian review、GitHub checks、受控 merge 与 closeout reconciliation。
+- guardian 修复后的相关 runtime 回归、全量 runtime discover、required gates、PR push、guardian review、GitHub checks、受控 merge 与 closeout reconciliation。
 
 ## 未决风险
 

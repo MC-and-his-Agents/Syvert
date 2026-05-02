@@ -122,6 +122,26 @@ class ProviderCapabilityOfferTests(unittest.TestCase):
         self.assert_invalid(result)
         self.assertEqual(result.details["binding_scope"], "core_bound")
 
+    def test_validator_rejects_cross_adapter_or_global_provider_port_ref(self) -> None:
+        cases = (
+            ("douyin:adapter-owned-provider-port", "xhs:"),
+            ("global:adapter-owned-provider-port", "xhs:"),
+            ("xhs:core-provider-port", None),
+            ("xhs:marketplace-provider-port", None),
+            ("xhs:provider-registry-port", None),
+        )
+        for provider_port_ref, expected_prefix in cases:
+            with self.subTest(provider_port_ref=provider_port_ref):
+                offer = copy_offer()
+                offer["adapter_binding"]["provider_port_ref"] = provider_port_ref
+
+                result = validate_provider_capability_offer(offer)
+
+                self.assert_invalid(result)
+                self.assertEqual(result.details["provider_port_ref"], provider_port_ref)
+                if expected_prefix is not None:
+                    self.assertEqual(result.details["expected_prefix"], expected_prefix)
+
     def test_validator_rejects_capability_offer_outside_approved_slice(self) -> None:
         cases = (
             ("capability", "search"),

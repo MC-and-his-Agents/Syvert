@@ -809,12 +809,35 @@ def _validate_adapter_binding(adapter_binding: ProviderAdapterBinding) -> None:
             "adapter_binding.binding_scope must be adapter_bound",
             details={"binding_scope": adapter_binding.binding_scope},
         )
+    expected_prefix = f"{adapter_binding.adapter_key}:"
+    if not adapter_binding.provider_port_ref.startswith(expected_prefix):
+        raise ProviderCapabilityOfferContractError(
+            PROVIDER_OFFER_ERROR_INVALID_OFFER,
+            "adapter_binding.provider_port_ref must be owned by adapter_binding.adapter_key",
+            details={
+                "adapter_key": adapter_binding.adapter_key,
+                "provider_port_ref": adapter_binding.provider_port_ref,
+                "expected_prefix": expected_prefix,
+            },
+        )
     normalized_port_ref = _normalize_token_text(adapter_binding.provider_port_ref)
-    if "core" in normalized_port_ref or "global_provider" in normalized_port_ref:
+    forbidden_tokens = (
+        "core",
+        "global",
+        "public_sdk",
+        "marketplace",
+        "registry",
+        "routing",
+    )
+    leaked_tokens = tuple(token for token in forbidden_tokens if token in normalized_port_ref)
+    if leaked_tokens:
         raise ProviderCapabilityOfferContractError(
             PROVIDER_OFFER_ERROR_INVALID_OFFER,
             "adapter_binding.provider_port_ref must not point at Core or global provider surfaces",
-            details={"provider_port_ref": adapter_binding.provider_port_ref},
+            details={
+                "provider_port_ref": adapter_binding.provider_port_ref,
+                "leaked_tokens": leaked_tokens,
+            },
         )
 
 
