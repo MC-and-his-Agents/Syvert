@@ -40,6 +40,7 @@
     - `supported_targets`
     - `supported_collection_modes`
     - `resource_requirement_declarations`
+    - `resource_proof_admission_refs`
     - `result_contract`
     - `error_mapping`
     - `fixture_refs`

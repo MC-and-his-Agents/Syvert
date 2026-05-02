@@ -43,7 +43,7 @@
   - `python3 scripts/spec_guard.py --mode ci --all`
   - `python3 scripts/docs_guard.py --mode ci`
   - `python3 scripts/workflow_guard.py --mode ci`
-  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-309-fr-0023-adapter-formal-spec`
+  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`
   - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
 - implementation 阶段：
   - `#310` 必须补 contract test entry 自动化，覆盖 manifest shape、最小 metadata、`FR-0027` resource declaration、fixture refs、success payload 与 error mapping。
