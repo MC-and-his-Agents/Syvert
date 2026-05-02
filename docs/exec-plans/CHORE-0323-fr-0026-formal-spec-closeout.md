@@ -45,12 +45,10 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件草案、active exec-plan 与 release/sprint 索引入口，待本地 gates、提交、PR、spec review、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；本地 gates 已通过，待 push、PR、spec review、guardian、merge 与 closeout。
 
 ## 下一步动作
 
-- 跑 `spec_guard --all`、`docs_guard`、`workflow_guard`、`governance_gate` 与 `pr_scope_guard --class spec`。
-- 使用中文 Conventional Commit 提交 formal spec checkpoint。
 - 推送分支并使用 `scripts/open_pr.py --class spec` 受控创建 PR。
 - 完成 spec review / guardian review、GitHub checks 与受控 merge。
 - 合入后确认 `#323` closeout，更新父 FR `#298` GitHub comment，清理 worktree 并退役分支。
@@ -80,10 +78,22 @@
 - 已核对 `FR-0024`：`AdapterCapabilityRequirement` 是 Adapter-side decision input，合法 requirement 不等于 compatibility approved。
 - 已核对 `FR-0025`：`ProviderCapabilityOffer` 是 Provider-side decision input，合法 offer 不等于 compatibility approved，Provider offer 不进入 Core discovery / routing。
 - 已核对 `FR-0027`：resource profile tuple、matcher `one-of`、proof binding 与 adapter coverage 是 resource profile truth，本 FR 只消费。
+- `git commit -m 'docs(spec): 收口 FR-0026 兼容性判断规约'`
+  - 结果：已生成 formal spec 语义 checkpoint `23e8eb810dbbcfe71411036fcc29ab8cf3804dcf`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-323-fr-0026-compatibility-decision-formal-spec`
+  - 结果：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`spec`，变更类别=`docs, spec`
 
 ## 待验证项
 
-- 本地 gates、commit、push、PR、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- push、PR、guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 
@@ -99,3 +109,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
+- formal spec 语义 checkpoint：`23e8eb810dbbcfe71411036fcc29ab8cf3804dcf`
