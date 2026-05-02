@@ -137,5 +137,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
-- rebase 后 formal spec 语义 checkpoint：`a7f28de753f86b9b705d01778c8acb96ae90f43e`
-- rebase 后 latest validation / guardian-fix checkpoint：`04f4c6c0e2887720e111305c6b29c0f2229f7bde`
+- rebase 后 formal spec 语义 checkpoint：`3dac353e5d59d567ebc08224b5baf5468122ae61`
