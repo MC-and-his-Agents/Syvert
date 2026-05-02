@@ -39,7 +39,7 @@
 - 分支：`issue-315-fr-0024-adapter-requirement`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#315` GitHub truth、`FR-0024` formal spec 与现有 `#314` validator 实现。
-- 当前 checkpoint：已实现 xhs / douyin reference adapter requirement baseline，复用同一 `FR-0027` resource declaration truth，并通过专用 baseline、validator、registry/resource 与完整 runtime regression；尚未提交、推送或进入 PR review。
+- 当前 checkpoint：已实现 xhs / douyin reference adapter requirement baseline，复用同一 `FR-0027` resource declaration truth，并通过专用 baseline、validator、registry/resource、完整 runtime regression 与本地治理门禁；尚未推送或进入 PR review。
 
 ## 下一步动作
 
@@ -83,10 +83,21 @@
   - 结果：通过。
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
+- 提交 `932775ef206346319b0c7907006b854fbbdd213d`
+  - 结果：已生成实现 checkpoint，提交信息 `feat(runtime): 迁移 FR-0024 参考适配器需求基线`。
+- 提交态 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 提交态 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 提交态 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 提交态 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-315-fr-0024-adapter-requirement`
+  - 结果：通过。
+- 提交态 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- 提交后的 `governance_gate` 与 `pr_scope_guard --class implementation`。
 - PR guardian、GitHub checks、受控 merge、issue closeout 与 worktree retirement。
 
 ## 未决风险
@@ -101,4 +112,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 尚未提交；首个实现 checkpoint 提交后回填。
+- implementation checkpoint：`932775ef206346319b0c7907006b854fbbdd213d`
