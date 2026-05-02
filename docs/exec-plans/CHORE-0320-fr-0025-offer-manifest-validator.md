@@ -39,7 +39,7 @@
 - 分支：`issue-320-fr-0025-provider-offer-manifest-validator`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#320` GitHub truth 与 `FR-0025` formal spec。
-- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；目标测试、相关 runtime 回归、全量 runtime discover、语法编译、静态门禁、governance gate 与 implementation scope guard 均已在提交 head `91955aaa70ad661361b16ea90341ad16634d5e70` 上通过。
+- 当前 checkpoint：已新增 Provider capability offer validator、fixtures 与 runtime tests；已 rebase 到最新主干 `3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`，目标测试、相关 runtime 回归、全量 runtime discover、语法编译、静态门禁、governance gate 与 implementation scope guard 均已在 rebase 后 head `54b72473f77d8254365954b15c32321ced2d8715` 上通过。
 
 ## 下一步动作
 
@@ -88,17 +88,17 @@
   - 结果：通过，20 tests。
 - 补充边界回归后 `python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_resource_capability_matcher tests.runtime.test_registry`
   - 结果：通过，65 tests。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `python3 -m unittest discover tests/runtime`
-  - 结果：通过，889 tests。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `python3 scripts/spec_guard.py --mode ci --all`
+- rebase 到 `origin/main=3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e` 后，提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，893 tests。
+- rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `python3 scripts/docs_guard.py --mode ci`
+- rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `python3 scripts/workflow_guard.py --mode ci`
+- rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-320-fr-0025-provider-offer-manifest-validator`
+- rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-320-fr-0025-provider-offer-manifest-validator`
   - 结果：通过。
-- 提交 `91955aaa70ad661361b16ea90341ad16634d5e70` 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+- rebase 后提交 `54b72473f77d8254365954b15c32321ced2d8715` 上 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
@@ -119,4 +119,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 初始 implementation checkpoint：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
-- implementation checkpoint：`91955aaa70ad661361b16ea90341ad16634d5e70`
+- implementation checkpoint：`2fa77286f2c5bb15da07a172e914e02369b362f7`
+- main-sync validation checkpoint：`54b72473f77d8254365954b15c32321ced2d8715`
