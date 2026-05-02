@@ -49,6 +49,7 @@
   - `invalid_contract` 必须携带最小错误口径，区分 `invalid_requirement_contract`、`invalid_provider_offer_contract`、`invalid_compatibility_contract` 与 `provider_leakage_detected`，并继续映射到既有 Adapter / runtime failed envelope，不新增 Core-facing provider failed envelope category。
   - decision 顶层字段与 observability 不得携带 `provider_key` 或 `offer_id`；provider identity 只允许出现在 Adapter-bound `CompatibilityDecisionEvidence.adapter_bound_provider_evidence`，且该 evidence 不得被复制到 Core-facing registry、TaskRecord、routing 或 resource lifecycle surface。
   - `invalid_contract` 必须可在 proof refs 为空、重复、不可解析或不唯一时构造；此时 `resource_profile_evidence_refs` 只记录已成功解析的 proof refs，违法原因必须进入 `invalid_contract_evidence`，不得伪造 proof ref 占位。
+  - `invalid_contract` 必须可在 adapter key 不一致、execution slice 不一致或 requirement / offer evidence 缺失时构造；此时 canonical decision 的共同 `adapter_key` 或 resolved evidence refs 可以为空，实际冲突值与缺失原因必须进入 `invalid_contract_evidence`。
   - `fail_closed` 必须固定为显式 `true`。任何无法证明输入、profile、proof、adapter binding、capability slice 或 no-leakage 一致的情况，都不得返回 `matched`。
 - 契约需求：
   - 以下情况必须归类为 `invalid_contract`：

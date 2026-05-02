@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。首轮 guardian 返回 `REQUEST_CHANGES`，当前已修正 no-leakage carrier 边界、`invalid_contract` evidence 可构造性与 GWT trailing whitespace，待重跑 gates、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。guardian 前两轮返回 `REQUEST_CHANGES`，当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter mismatch 可构造性与 GWT trailing whitespace，待重跑 gates、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -100,10 +100,17 @@
   - provider identity 只允许出现在 `CompatibilityDecisionEvidence.adapter_bound_provider_evidence`，并明确 Core-facing projection 不得嵌入完整 Adapter-bound evidence。
   - `resource_profile_evidence_refs` 只记录已解析 proof refs；`invalid_contract` 可通过 `invalid_contract_evidence` 表达空 refs、重复 refs、不可解析或不唯一 refs。
   - `git diff --check` 已对当前工作区通过。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：第二次返回 `REQUEST_CHANGES`。阻断项：当前分支未包含最新 `origin/main`，导致两点 diff 误显示删除 `#315` implementation truth；adapter mismatch 时 `adapter_key` 字段不可构造；requirement / offer evidence 缺失时 `invalid_contract` evidence 不可构造。
+- 已修正：
+  - `git fetch origin main` 后 `git rebase origin/main` 成功，`origin/main..HEAD` 与 `origin/main...HEAD` 均只包含 #323 ownership 文件。
+  - adapter key 缺失或不一致时，decision 顶层 `adapter_key=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
+  - requirement / offer evidence refs 在 `invalid_contract` 且缺失、不可解析或不唯一时可以为空，不得伪造占位 ref。
+  - 当前工作区 `spec_guard`、`docs_guard` 与 `git diff --check` 已通过。
 
 ## 待验证项
 
-- 复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 提交当前修正后复跑本地 gates、guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 

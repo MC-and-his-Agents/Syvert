@@ -55,8 +55,8 @@
     - 类型：`string`
     - 约束：必须与 `decision_context.decision_id` 对齐。
   - `adapter_key`
-    - 类型：`string`
-    - 约束：必须同时等于 `requirement.adapter_key` 与 `offer.adapter_binding.adapter_key`；不一致时不得产生非错误 decision。
+    - 类型：`string | null`
+    - 约束：`matched` / `unmatched` 时必须同时等于 `requirement.adapter_key` 与 `offer.adapter_binding.adapter_key`；`invalid_contract` 且 adapter key 缺失或不一致时必须为 `null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - `capability`
     - 类型：`string`
     - 允许值：当前只允许 `content_detail`
@@ -153,10 +153,10 @@
 - 字段：
   - `requirement_evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；必须回指 `FR-0024` requirement evidence。
+    - 约束：`matched` / `unmatched` 时必须非空、去重并回指 `FR-0024` requirement evidence；`invalid_contract` 且 requirement evidence 缺失、不可解析或不唯一时可以为空，不得伪造占位 ref。
   - `offer_evidence_refs`
     - 类型：`string[]`
-    - 约束：非空、去重；必须回指 `FR-0025` offer evidence。
+    - 约束：`matched` / `unmatched` 时必须非空、去重并回指 `FR-0025` offer evidence；`invalid_contract` 且 offer evidence 缺失、不可解析或不唯一时可以为空，不得伪造占位 ref。
   - `resource_profile_evidence_refs`
     - 类型：`string[]`
     - 约束：只记录已成功解析且满足 `FR-0027` 的 profile proof refs；`matched` / `unmatched` 时必须非空、去重并与参与 decision 的 requirement / offer profile proof refs 对齐；`invalid_contract` 且 proof refs 为空、重复、不可解析或不唯一时可以为空，不得伪造占位 proof ref。
@@ -200,6 +200,9 @@
   - `resolved_profile_evidence_refs`
     - 类型：`string[]`
     - 约束：只记录已成功解析的 profile proof refs；不得为了满足非空约束而伪造 ref。
+  - `observed_values`
+    - 类型：`object`
+    - 约束：仅记录构造 `invalid_contract` 所需的冲突或缺失摘要，例如 `requirement_adapter_key`、`offer_adapter_key`、`requirement_execution_slice`、`offer_execution_slice`；不得包含 provider selector、routing、priority、score 或 fallback。
 
 ## CompatibilityDecisionObservability
 
@@ -248,6 +251,7 @@
 - offer 不满足 `FR-0025` -> `decision_status=invalid_contract`，`error_code=invalid_provider_offer_contract`
 - 任一 resource profile / proof 不满足 `FR-0027` -> `decision_status=invalid_contract`
 - `requirement.adapter_key != offer.adapter_binding.adapter_key` -> `decision_status=invalid_contract`
+- adapter key 缺失或不一致时，decision 顶层 `adapter_key=null`，冲突值进入 `invalid_contract_evidence.observed_values`
 - requirement 与 offer 的 capability / operation / target_type / collection_mode 不一致 -> `decision_status=invalid_contract`
 - 任一侧越过 `content_detail_by_url + url + hybrid` -> `decision_status=invalid_contract`
 - 两侧输入合法且任一 requirement profile 与 offer supported profile 的 canonical tuple 完全一致 -> `decision_status=matched`
