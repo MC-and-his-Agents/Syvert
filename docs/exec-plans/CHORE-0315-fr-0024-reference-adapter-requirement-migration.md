@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0024-adapter-capability-requirement-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#332`
 - active 收口事项：`CHORE-0315-fr-0024-reference-adapter-requirement-migration`
 - 状态：`active`
 
@@ -39,13 +39,10 @@
 - 分支：`issue-315-fr-0024-adapter-requirement`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`#315` GitHub truth、`FR-0024` formal spec 与现有 `#314` validator 实现。
-- 当前 checkpoint：已实现 xhs / douyin reference adapter requirement baseline，复用同一 `FR-0027` resource declaration truth，并通过专用 baseline、validator、registry/resource、完整 runtime regression 与本地治理门禁；尚未推送或进入 PR review。
+- 当前 checkpoint：已实现 xhs / douyin reference adapter requirement baseline，复用同一 `FR-0027` resource declaration truth，并通过专用 baseline、validator、registry/resource、完整 runtime regression 与本地治理门禁；PR `#332` 已创建，等待 guardian review、GitHub checks 与受控 merge。
 
 ## 下一步动作
 
-- 运行 reference adapter baseline tests、FR-0024 validator tests 与相关 runtime regression。
-- 运行 `spec_guard`、`docs_guard`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class implementation`。
-- 提交中文 Conventional Commit，推送并通过 `scripts/open_pr.py --class implementation` 创建 PR。
 - guardian review、GitHub checks 与受控 merge 通过后，完成 issue closeout/comment 并退役分支/worktree。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -95,6 +92,10 @@
   - 结果：通过。
 - 提交态 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `git push -u origin issue-315-fr-0024-adapter-requirement`
+  - 结果：通过，远端分支已创建并跟踪。
+- `python3 scripts/open_pr.py --class implementation --issue 315 ...`
+  - 结果：通过，创建 PR `#332`。
 
 ## 待验证项
 
