@@ -43,8 +43,7 @@
 ## 下一步动作
 
 - 更新 `FR-0023` formal suite，冻结 `ThirdPartyResourceProofAdmission` 语义。
-- 运行 `spec_guard --all`、`docs_guard`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class spec`。
-- 提交、推送、开 spec PR。
+- 提交 checkpoint follow-up、推送、开 spec PR。
 - 运行 guardian review；若 guardian 继续指出系统性冲突，先复盘 bridge 语义再修正。
 - checks 与 guardian 通过后受控合并，并回写 `#310` / PR `#330` unblock comment。
 
@@ -60,12 +59,17 @@
 
 ## 已验证项
 
-- 待运行：
-  - `python3 scripts/spec_guard.py --mode ci --all`
-  - `python3 scripts/docs_guard.py --mode ci`
-  - `python3 scripts/workflow_guard.py --mode ci`
-  - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`
-  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class 为 `spec`，变更类别为 `docs, spec`。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-331-fr-0023-adapter-resource-proof-admission`
+  - 初次提交前结果：通过。
+  - 提交 `abd22de2455de000d5295298003b7915bb8bc0fc` 后结果：失败，提示 active exec-plan 缺少可解析的 40 位 checkpoint head SHA；本 follow-up 补齐 checkpoint SHA 后需复跑。
 
 ## 未决风险
 
@@ -80,4 +84,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 待首次验证 checkpoint 后更新。
+- `abd22de2455de000d5295298003b7915bb8bc0fc`
+- 说明：该 checkpoint 首次把第三方真实 `adapter_key` 的 adapter-specific resource proof admission bridge、`FR-0023` formal suite 与 active exec-plan 同步落盘；后续若只补 PR / guardian / merge gate 元数据，则作为 review-sync follow-up，不把版本化 exec-plan 退化为 live head 状态面。
