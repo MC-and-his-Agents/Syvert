@@ -115,6 +115,8 @@
 - `invalid_contract` 且 proof refs 为空、重复、不可解析或不唯一时，`resource_profile_evidence_refs` 可以为空。
 - `invalid_contract` 且 requirement / offer evidence refs 缺失、不可解析或不唯一时，`requirement_evidence_refs` 或 `offer_evidence_refs` 可以为空。
 - `invalid_contract` 且 adapter key 缺失或不一致时，decision 顶层 `adapter_key` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
+- `invalid_contract` 且 capability 缺失、不一致或越界时，decision 顶层 `capability` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
+- `invalid_contract` 且 execution slice 缺失、不一致或越界时，decision 顶层 `execution_slice` 必须为 `null`，冲突值必须记录到 `invalid_contract_evidence.observed_values`。
 - `invalid_contract` 时必须提供 `invalid_contract_evidence`，记录 `source_contract_ref`、`violated_rule` 与原始 `unresolved_refs`。
 - 不得为了满足 evidence shape 伪造 proof ref 占位。
 

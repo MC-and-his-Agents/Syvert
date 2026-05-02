@@ -107,6 +107,12 @@
   - adapter key 缺失或不一致时，decision 顶层 `adapter_key=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
   - requirement / offer evidence refs 在 `invalid_contract` 且缺失、不可解析或不唯一时可以为空，不得伪造占位 ref。
   - 当前工作区 `spec_guard`、`docs_guard` 与 `git diff --check` 已通过。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：第三次返回 `REQUEST_CHANGES`。阻断项：capability / execution slice mismatch、missing fixed fields 或 approved slice 越界时，`capability` 与 `execution_slice` 字段不可构造；rebase 后 exec-plan 仍记录旧不可解析 semantic checkpoint SHA。
+- 已修正：
+  - capability 缺失、不一致或越界时，decision 顶层 `capability=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
+  - execution slice 缺失、不一致或越界时，decision 顶层 `execution_slice=null`，冲突值进入 `invalid_contract_evidence.observed_values`。
+  - rebase 后 checkpoint SHA 已替换为当前历史可解析提交。
 
 ## 待验证项
 
@@ -126,4 +132,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
-- formal spec 语义 checkpoint：`23e8eb810dbbcfe71411036fcc29ab8cf3804dcf`
+- rebase 后 formal spec 语义 checkpoint：`a7f28de753f86b9b705d01778c8acb96ae90f43e`
+- rebase 后 latest validation / guardian-fix checkpoint：`04f4c6c0e2887720e111305c6b29c0f2229f7bde`
