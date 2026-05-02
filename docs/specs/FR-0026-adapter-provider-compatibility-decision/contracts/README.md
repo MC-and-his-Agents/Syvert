@@ -9,18 +9,19 @@
 
 ### required inputs
 
-- `requirement`：来自 `FR-0024` 的合法 `AdapterCapabilityRequirement`
-- `offer`：来自 `FR-0025` 的合法 `ProviderCapabilityOffer`
+- `requirement`：来自 `FR-0024` 形状的待验证 `AdapterCapabilityRequirement` carrier
+- `offer`：来自 `FR-0025` 形状的待验证 `ProviderCapabilityOffer` carrier
 - `decision_context`：只包含 contract refs、decision id、contract version 与 `fail_closed`
 
 ### validation rules
 
-- `requirement` 必须先满足 `FR-0024`。
-- `requirement.resource_requirement` 与 proof binding 必须先满足 `FR-0027`。
-- `offer` 必须先满足 `FR-0025`。
-- `offer.resource_support` 与 proof binding 必须先满足 `FR-0027`。
+- `requirement` 合法性必须由 decision validation 按 `FR-0024` 判定；不合法时输出 `invalid_contract + invalid_requirement_contract`。
+- `requirement.resource_requirement` 与 proof binding 必须由 decision validation 按 `FR-0027` 判定；不合法时输出 `invalid_contract`。
+- `offer` 合法性必须由 decision validation 按 `FR-0025` 判定；不合法时输出 `invalid_contract + invalid_provider_offer_contract`。
+- `offer.resource_support` 与 proof binding 必须由 decision validation 按 `FR-0027` 判定；不合法时输出 `invalid_contract`。
 - 本 contract 不定义、复制或改写 requirement / offer / resource profile carrier 本体。
-- 任一输入不合法时，decision 必须 fail-closed 为 `invalid_contract`。
+- 合法 requirement 与合法 offer 是 `matched` / `unmatched` 的前置条件，不是 `AdapterProviderCompatibilityDecisionInput` 的输入域限制。
+- 任一待验证输入不合法、缺失或不可解析时，decision 必须 fail-closed 为可构造的 `invalid_contract`。
 
 ## adapter and execution binding
 
