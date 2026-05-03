@@ -90,10 +90,23 @@
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：未通过；当前新增文件尚未纳入 Git 索引，guard 基于 `HEAD` 看不到变更。待提交后按真实 head 重新运行。
+- rebase 到 `origin/main=bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，950 tests。
+- rebase 后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- rebase 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- rebase 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- rebase 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-324-fr-0026-compatibility-decision-runtime`
+  - 结果：通过。
+- rebase 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
-- 提交后重新运行 governance gate 与 `pr_scope_guard`。
 - PR guardian、GitHub checks、受控 merge 与 closeout reconciliation。
 
 ## 未决风险
