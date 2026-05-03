@@ -100,13 +100,19 @@
   - 结果：通过；`merged=true`，`merged_at=2026-04-30T13:37:18Z`，`merge_commit_sha=e456547dd4bc8145e7a1c77be1e89164a7d33fc8`。
 - `gh api repos/:owner/:repo/pulls/332 --jq ...`
   - 结果：通过；`merged=true`，`merged_at=2026-05-02T06:04:04Z`，`merge_commit_sha=3ce34ee3a5e54945b6bb9a3128d4fc61ae346e4e`。
+- `git commit -m 'docs(closeout): 收口 FR-0024 父事项'`
+  - 结果：已生成 closeout checkpoint `367c31f133e41681559a3004e1474a29aa89658b`。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-316-fr-0024`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
-- `python3 scripts/docs_guard.py --mode ci`
-- `python3 scripts/workflow_guard.py --mode ci`
-- `python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-316-fr-0024`
-- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
 - 受控 `open_pr`、GitHub checks、guardian review、受控 merge、GitHub closeout reconciliation。
 
 ## 未决风险
@@ -123,4 +129,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 当前主干基线：`4e90953447e20b1fffaee0f8104f989bd043202e`。
+- closeout checkpoint：`367c31f133e41681559a3004e1474a29aa89658b`。
 - 本 exec-plan 是 `#316` 的首个版本化恢复工件；后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
