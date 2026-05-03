@@ -73,7 +73,7 @@
 - 已核对 PR `#328` 已合入：`FR-0025` formal spec / data model / contracts 已作为 Provider offer carrier truth 进入主干。
 - 已核对 PR `#335` 已合入：`syvert/provider_capability_offer.py`、`tests/runtime/provider_capability_offer_fixtures.py` 与 `tests/runtime/test_provider_capability_offer.py` 已作为 validator / fixture truth 进入主干。
 - `git commit -m 'docs(sdk): 补齐 FR-0025 provider offer 证据'`
-  - 结果：已生成 docs checkpoint `91f1d18dfc9b9bc5d5c765ca9e8ea848c5b8a823`。
+  - 结果：已生成 docs checkpoint `4ac5ca0341e9b9ef85c631492869d24d6a8e0bb3`。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过，`docs-guard 通过。`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -138,7 +138,7 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- docs checkpoint：`91f1d18dfc9b9bc5d5c765ca9e8ea848c5b8a823`
-- validation result follow-up checkpoint：`a4a77ddd70309fe970f9db17e4cd8612f2582036`
+- docs checkpoint：`4ac5ca0341e9b9ef85c631492869d24d6a8e0bb3`
+- validation result follow-up checkpoint：`00df63031fb9ba827469bfb5192acbf7f564f952`
 - 说明：后续若仅补 PR / guardian / merge gate / closeout metadata，不自动推进上述语义 checkpoint；当前 live review head 由 PR head 与 guardian state 绑定。
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
