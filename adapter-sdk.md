@@ -113,33 +113,124 @@ Adapter capability requirement
 - Provider 提供的执行能力、资源消费方式、错误 carrier、版本与 evidence 能力
 - 不兼容、缺能力、版本不匹配或资源前提不满足时的 fail-closed 原因
 
-`v0.8.0` 路线中的声明承载面应先保持在 Adapter / Provider 包文档、manifest 或 contract-test fixture 中，不进入 AdapterRegistry discovery。建议最小形态为：
+`v0.8.0` 的 Provider offer 声明承载面固定为 `ProviderCapabilityOffer`。它可以出现在 Adapter / Provider 包文档、manifest 或 contract-test fixture 中，但不进入 AdapterRegistry discovery、Core routing、TaskRecord 或 resource lifecycle surface。
+
+Adapter 作者需要同时准备两类输入：
+
+- `AdapterCapabilityRequirement`：由 Adapter 声明自己需要什么能力、资源 profile 与 evidence，作为 `FR-0024` requirement-side input。
+- `ProviderCapabilityOffer`：由 Adapter-bound provider 声明自己在某个 Adapter-owned provider port 下能提供什么能力、资源 profile 支持、错误映射、版本与 evidence，作为 `FR-0025` offer-side input。
+
+`ProviderCapabilityOffer` 的合法声明必须满足：
+
+- `adapter_binding.binding_scope` 固定为 `adapter_bound`。
+- `adapter_binding.provider_port_ref` 必须以当前 `adapter_key:` 为前缀，例如 `xhs:adapter-owned-provider-port`；不得借用其它 Adapter、Core、global、marketplace、registry 或 routing port。
+- 当前 approved slice 只允许 `content_detail + content_detail_by_url + url + hybrid`。
+- `resource_support.supported_profiles[*].evidence_refs` 必须唯一命中 `FR-0027` approved profile proof，且该 proof 的 `reference_adapters` 覆盖当前 `adapter_key`。
+- `error_carrier` 必须要求 Adapter 映射 provider 错误，不新增 Core-facing provider failed envelope。
+- `version.contract_version` 固定为 `v0.8.0`，并回指 `FR-0024`、`FR-0027` 与 `FR-0021`。
+- `lifecycle.core_discovery_allowed=false`、`lifecycle.invoked_by_adapter_only=true`、`fail_closed=true`。
+
+Requirement-side 示例必须直接消费 `FR-0024` 的 canonical `AdapterCapabilityRequirement`，例如 `tests/runtime/adapter_capability_requirement_fixtures.py::valid_adapter_capability_requirement()`；本文不维护第二套 requirement-side carrier。
+
+Provider-side 最小 manifest / fixture 形态应与 `tests/runtime/provider_capability_offer_fixtures.py::valid_provider_capability_offer()` 对齐：
 
 ```python
-ADAPTER_PROVIDER_REQUIREMENTS = {
-    "adapter_key": "example",
-    "capability": "content_detail",
-    "requires": {
-        "execution_modes": ("browser.page_state_read",),
-        "resource_capabilities": ("account", "proxy"),
-        "evidence": ("raw_payload", "platform_detail"),
-        "lifecycle": ("execute", "timeout", "close"),
-    },
-}
-
 PROVIDER_CAPABILITY_OFFER = {
-    "provider_key": "example-provider",
-    "contract": "syvert-provider-compat/v0",
-    "offers": {
-        "execution_modes": ("browser.page_state_read",),
-        "resource_consumption": ("adapter_supplied_context",),
-        "evidence": ("raw_payload", "platform_detail"),
-        "error_carrier": "provider_error",
+    "provider_key": "native_xhs_detail",
+    "adapter_binding": {
+        "adapter_key": "xhs",
+        "binding_scope": "adapter_bound",
+        "provider_port_ref": "xhs:adapter-owned-provider-port",
     },
+    "capability_offer": {
+        "capability": "content_detail",
+        "operation": "content_detail_by_url",
+        "target_type": "url",
+        "collection_mode": "hybrid",
+    },
+    "resource_support": {
+        "supported_profiles": [
+            {
+                "profile_key": "account_proxy",
+                "resource_dependency_mode": "required",
+                "required_capabilities": ["account", "proxy"],
+                "evidence_refs": [
+                    "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+                ],
+            },
+            {
+                "profile_key": "account",
+                "resource_dependency_mode": "required",
+                "required_capabilities": ["account"],
+                "evidence_refs": [
+                    "fr-0027:profile:content-detail-by-url-hybrid:account"
+                ],
+            },
+        ],
+        "resource_profile_contract_ref": "FR-0027",
+    },
+    "error_carrier": {
+        "invalid_offer_code": "invalid_provider_offer",
+        "provider_unavailable_code": "provider_unavailable",
+        "contract_violation_code": "provider_contract_violation",
+        "adapter_mapping_required": True,
+    },
+    "version": {
+        "contract_version": "v0.8.0",
+        "requirement_contract_ref": "FR-0024",
+        "resource_profile_contract_ref": "FR-0027",
+        "provider_port_boundary_ref": "FR-0021",
+    },
+    "evidence": {
+        "provider_offer_evidence_refs": [
+            "fr-0025:offer-manifest-fixture-validator:content-detail-by-url-hybrid"
+        ],
+        "resource_profile_evidence_refs": [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
+        ],
+        "adapter_binding_evidence_refs": [
+            "fr-0021:adapter-provider-port-boundary:adapter-owned-provider-port"
+        ],
+    },
+    "lifecycle": {
+        "invoked_by_adapter_only": True,
+        "core_discovery_allowed": False,
+        "consumes_adapter_execution_context": True,
+        "uses_existing_resource_bundle_view": True,
+        "adapter_error_mapping_required": True,
+    },
+    "observability": {
+        "offer_id": (
+            "xhs:native_xhs_detail:content_detail:"
+            "content_detail_by_url:url:hybrid:v0.8.0"
+        ),
+        "provider_key": "native_xhs_detail",
+        "adapter_key": "xhs",
+        "capability": "content_detail",
+        "operation": "content_detail_by_url",
+        "profile_keys": ["account_proxy", "account"],
+        "proof_refs": [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
+        ],
+        "contract_version": "v0.8.0",
+        "validation_outcome_fields": [
+            "validation_status",
+            "error_code",
+            "failure_category",
+        ],
+    },
+    "fail_closed": True,
 }
 ```
 
-contract test 入口应消费这些声明并产出 `compatibility decision`：
+Provider offer manifest validator 只回答 offer carrier 是否可信：
+
+- `declared`：offer 合法，只代表 Provider offer declared。
+- `invalid`：offer 不可信，必须 fail-closed，并映射为 `runtime_contract + invalid_provider_offer`。
+
+后续 `FR-0026` contract test / decision 入口才允许同时消费 requirement 与 offer，并产出 `compatibility decision`：
 
 - `matched`：provider offer 满足该 Adapter capability requirement，可以进入绑定验证。
 - `unmatched`：provider offer 不满足 requirement，必须 fail-closed，并给出缺失能力、版本或资源前提。
@@ -153,6 +244,7 @@ contract test 入口应消费这些声明并产出 `compatibility decision`：
 - Core 可以发现、选择或排序 provider
 - provider 可以绕过 Adapter 生成 Syvert normalized result
 - provider 可以绕过 Core 注入资源包自行获取账号、代理或会话资源
+- `declared` offer 已经等同于 `matched`、selected provider、fallback candidate 或真实 provider 产品支持
 
 
 ## v0.8.0 Third-party Adapter Contract Entry
