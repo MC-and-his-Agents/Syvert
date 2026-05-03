@@ -28,9 +28,9 @@
 - 本次不纳入：
   - `syvert/adapter_capability_requirement.py`
   - `syvert/provider_capability_offer.py`
-  - `docs/specs/FR-0024-*`
-  - `docs/specs/FR-0025-*`
-  - `docs/specs/FR-0026-*`
+  - `docs/specs/FR-0024-adapter-capability-requirement-contract/`
+  - `docs/specs/FR-0025-provider-capability-offer-contract/`
+  - `docs/specs/FR-0026-adapter-provider-compatibility-decision/`
   - provider selector、router、priority、score、fallback、marketplace 或真实 provider 产品支持
   - Core provider discovery / routing、TaskRecord provider field 或 resource lifecycle provider field
   - 父 FR `#298` closeout
