@@ -167,6 +167,14 @@ PROVIDER_CAPABILITY_OFFER = {
                     "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
                 ],
             },
+            {
+                "profile_key": "account",
+                "resource_dependency_mode": "required",
+                "required_capabilities": ["account"],
+                "evidence_refs": [
+                    "fr-0027:profile:content-detail-by-url-hybrid:account"
+                ],
+            },
         ],
         "resource_profile_contract_ref": "FR-0027",
     },
@@ -187,7 +195,8 @@ PROVIDER_CAPABILITY_OFFER = {
             "fr-0025:offer-manifest-fixture-validator:content-detail-by-url-hybrid"
         ],
         "resource_profile_evidence_refs": [
-            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
         ],
         "adapter_binding_evidence_refs": [
             "fr-0021:adapter-provider-port-boundary:adapter-owned-provider-port"
@@ -209,9 +218,10 @@ PROVIDER_CAPABILITY_OFFER = {
         "adapter_key": "xhs",
         "capability": "content_detail",
         "operation": "content_detail_by_url",
-        "profile_keys": ["account_proxy"],
+        "profile_keys": ["account_proxy", "account"],
         "proof_refs": [
-            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fr-0027:profile:content-detail-by-url-hybrid:account",
         ],
         "contract_version": "v0.8.0",
         "validation_outcome_fields": [

@@ -40,7 +40,7 @@
 - 分支：`issue-321-fr-0025-provider-offer-sdk`
 - 原始 worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`#321`、父 FR `#297`、`#319` / PR `#328` 与 `#320` / PR `#335` 的主干事实。
-- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系；PR `#338` 已通过受控入口创建并绑定 `Fixes #321`。
+- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系；PR `#338` 已通过受控入口创建并绑定 `Fixes #321`。首轮 guardian 指出 SDK 示例声称对齐 validator fixture 但漏掉 `account` profile，已补齐 `account_proxy` 与 `account` 双 profile、resource evidence refs 与 observability refs。
 
 ## 下一步动作
 
@@ -86,10 +86,16 @@
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
 - `python3 scripts/open_pr.py --class docs --issue 321 --item-key CHORE-0321-fr-0025-sdk-docs-evidence --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(sdk): 补齐 FR-0025 Provider offer 文档证据' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：通过，创建 PR `#338`。
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 338 --post-review --json-output /tmp/syvert-pr-338-guardian.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：`adapter-sdk.md` 的 ProviderCapabilityOffer 示例声明与 `tests/runtime/provider_capability_offer_fixtures.py::valid_provider_capability_offer()` 对齐，但只包含 `account_proxy`，漏掉 fixture 中的 `account` profile。
+- 已处理首轮 guardian 阻断：
+  - `adapter-sdk.md` 示例补齐 `account` supported profile。
+  - `evidence.resource_profile_evidence_refs` 补齐 `account` proof ref。
+  - `observability.profile_keys` 与 `observability.proof_refs` 补齐 `account`。
 
 ## 待验证项
 
-- PR guardian review、GitHub checks、受控 merge 与 closeout reconciliation
+- guardian 修复后的 `docs_guard`、`spec_guard`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class docs`、PR guardian review、GitHub checks、受控 merge 与 closeout reconciliation
 
 ## 未决风险
 
