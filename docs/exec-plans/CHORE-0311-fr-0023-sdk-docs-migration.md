@@ -71,17 +71,20 @@
 - 已核对 `#310` merge commit `4e90953447e20b1fffaee0f8104f989bd043202e`，确认 third-party contract entry 与 fixture truth 已在主干。
 - 已核对 `tests/runtime/contract_harness/third_party_entry.py` 的入口函数名与 `tests/runtime/contract_harness/third_party_fixtures.py` 的 manifest / admission / fixture 字段。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-311-fr-0023-adapter-sdk`
-  - 结果：通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
-  - 结果：未执行通过；提交前 `HEAD` 相对 `origin/main` 尚无已提交 diff，脚本报告“当前分支相对基线没有变更”。提交后需复跑。
+  - 提交前结果：未执行通过；提交前 `HEAD` 相对 `origin/main` 尚无已提交 diff，脚本报告“当前分支相对基线没有变更”。
+  - 提交 `3f5f0ab` 后结果：通过，PR class=`docs`，变更类别=`docs`。
 - `git diff --check`
   - 结果：通过。
+- 提交 `3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
+  - 结果：已生成 docs checkpoint，提交信息 `docs(adapter): 补齐 FR-0023 SDK 接入指引`。
 
 ## 待验证项
 
@@ -100,4 +103,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- docs checkpoint：待提交后记录。
+- docs checkpoint：`3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
+- 说明：后续若仅补 PR / guardian / merge gate / closeout 元数据，作为 review-sync follow-up，不把版本化 checkpoint SHA 退化为必须穷尽当前 PR head 的状态面。
