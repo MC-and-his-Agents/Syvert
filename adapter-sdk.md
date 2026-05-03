@@ -130,20 +130,11 @@ Adapter 作者需要同时准备两类输入：
 - `version.contract_version` 固定为 `v0.8.0`，并回指 `FR-0024`、`FR-0027` 与 `FR-0021`。
 - `lifecycle.core_discovery_allowed=false`、`lifecycle.invoked_by_adapter_only=true`、`fail_closed=true`。
 
-最小 manifest / fixture 形态应与 `tests/runtime/provider_capability_offer_fixtures.py::valid_provider_capability_offer()` 对齐：
+Requirement-side 示例必须直接消费 `FR-0024` 的 canonical `AdapterCapabilityRequirement`，例如 `tests/runtime/adapter_capability_requirement_fixtures.py::valid_adapter_capability_requirement()`；本文不维护第二套 requirement-side carrier。
+
+Provider-side 最小 manifest / fixture 形态应与 `tests/runtime/provider_capability_offer_fixtures.py::valid_provider_capability_offer()` 对齐：
 
 ```python
-ADAPTER_PROVIDER_REQUIREMENTS = {
-    "adapter_key": "example",
-    "capability": "content_detail",
-    "requires": {
-        "execution_modes": ("browser.page_state_read",),
-        "resource_capabilities": ("account", "proxy"),
-        "evidence": ("raw_payload", "platform_detail"),
-        "lifecycle": ("execute", "timeout", "close"),
-    },
-}
-
 PROVIDER_CAPABILITY_OFFER = {
     "provider_key": "native_xhs_detail",
     "adapter_binding": {

@@ -40,7 +40,7 @@
 - 分支：`issue-321-fr-0025-provider-offer-sdk`
 - 原始 worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`#321`、父 FR `#297`、`#319` / PR `#328` 与 `#320` / PR `#335` 的主干事实。
-- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系；PR `#338` 已通过受控入口创建并绑定 `Fixes #321`。首轮 guardian 指出 SDK 示例声称对齐 validator fixture 但漏掉 `account` profile，已补齐 `account_proxy` 与 `account` 双 profile、resource evidence refs 与 observability refs。
+- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系；PR `#338` 已通过受控入口创建并绑定 `Fixes #321`。首轮 guardian 指出 SDK 示例声称对齐 validator fixture 但漏掉 `account` profile，已补齐 `account_proxy` 与 `account` 双 profile、resource evidence refs 与 observability refs。第二轮 guardian 指出旧 `ADAPTER_PROVIDER_REQUIREMENTS` 示例形成非 canonical `FR-0024` requirement-side shape，已删除该旧示例并改为引用 `FR-0024` canonical fixture；同时复核 release / sprint 索引仅新增 `#320/#321` 入口，未删除 `FR-0024` 主干事实。
 
 ## 下一步动作
 
@@ -92,10 +92,38 @@
   - `adapter-sdk.md` 示例补齐 `account` supported profile。
   - `evidence.resource_profile_evidence_refs` 补齐 `account` proof ref。
   - `observability.profile_keys` 与 `observability.proof_refs` 补齐 `account`。
+- guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过，`docs-guard 通过。`
+- guardian 修复后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过，`spec-guard 通过。`
+- guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，`workflow-guard 通过。`
+- guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-321-fr-0025-provider-offer-sdk`
+  - 结果：通过，`governance-gate 通过。`
+- guardian 修复后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- 第二轮 `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 338 --post-review --json-output /tmp/syvert-pr-338-guardian.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：旧 `ADAPTER_PROVIDER_REQUIREMENTS` 示例不是 `FR-0024` canonical `AdapterCapabilityRequirement`；guardian 同时要求确认 release / sprint 索引未倒退 `FR-0024` 主干事实，并补齐修复后验证证据。
+- 已处理第二轮 guardian 阻断：
+  - 删除旧 `ADAPTER_PROVIDER_REQUIREMENTS` 示例，避免维护第二套 requirement-side carrier。
+  - 在 `adapter-sdk.md` 中明确 requirement-side 示例必须消费 `FR-0024` canonical fixture。
+  - 复核 `docs/releases/v0.8.0.md` 与 `docs/sprints/2026-S21.md` diff：当前 PR 只新增 `#320/#321` 与 `CHORE-0320/0321` evidence 入口，未删除 `FR-0024`、`#313/#314/#315/#316/#317/#329/#332` 或 `CHORE-0313/0314/0315/0316` 主干事实；`docs/sprints/2026-S21.md` 保留 origin/main 的相关 Issue / PR 行，并用独立补充行新增 `#320/#321`。
+- 第二轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过，`docs-guard 通过。`
+- 第二轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过，`spec-guard 通过。`
+- 第二轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，`workflow-guard 通过。`
+- 第二轮 guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-321-fr-0025-provider-offer-sdk`
+  - 结果：通过，`governance-gate 通过。`
+- 第二轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- 第二轮 guardian 修复后 `git diff origin/main -- docs/releases/v0.8.0.md docs/sprints/2026-S21.md | rg '^-.*FR-0024|^-.*CHORE-031|^-.*#31|^-.*#329|^-.*#332' || true`
+  - 结果：无输出，确认 release / sprint diff 不删除 `FR-0024` 主干索引事实。
 
 ## 待验证项
 
-- guardian 修复后的 `docs_guard`、`spec_guard`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class docs`、PR guardian review、GitHub checks、受控 merge 与 closeout reconciliation
+- 第二轮 guardian 修复后的 PR guardian review、GitHub checks、受控 merge 与 closeout reconciliation
 
 ## 未决风险
 
