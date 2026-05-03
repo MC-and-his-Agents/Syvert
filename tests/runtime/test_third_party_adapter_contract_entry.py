@@ -330,6 +330,8 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             "xhsadapter",
             "douyinadapter",
             "xiaohongshu_adapter",
+            "communityxhscontent",
+            "communitydouyincontent",
         )
         for adapter_key in invalid_adapter_keys:
             with self.subTest(adapter_key=adapter_key):

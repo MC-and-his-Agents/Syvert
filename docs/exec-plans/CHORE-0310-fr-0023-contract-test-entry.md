@@ -62,6 +62,7 @@
 - 已新增 / 补齐 `resource_proof_admission_refs`、`resource_proof_admissions`、`AdmissionEvidenceRef` 机器校验：admission 只能来自当前 manifest，必须绑定当前 manifest、contract profile、success fixture 与 error_mapping fixture，不得依赖 reviewer 会话、外部 provider 样本或未来 implementation evidence。
 - guardian review 第十九次返回 `REQUEST_CHANGES`，阻断项为 manifest 声明 `account_proxy` 与 `account` 两个 resource profiles，但 fixtures 只执行 `account_proxy`，导致 declared / admitted profile coverage 不完整；已补充每个声明 profile 必须被 fixture 执行覆盖的准入校验，并要求 admission evidence 至少绑定一个实际执行该 admitted profile 的 fixture。当前 fixture success 覆盖 `account_proxy`，error_mapping 覆盖 `account`。
 - guardian review 第二十次返回 `REQUEST_CHANGES`，阻断项为 adapter_key provider 产品名无分隔符变体（如 `xhsadapter`、`douyinadapter`、`xiaohongshu_adapter`）可绕过，以及 `error_mapping.message` 未被执行观测校验；已补充 provider 产品别名的 segment 前缀 / 后缀阻断，并将 manifest `error_mapping.message` 纳入 failed envelope observation。
+- guardian review 第二十一次返回 `REQUEST_CHANGES`，阻断项为 provider 产品别名仍可作为同一 segment 中缀伪装（如 `communityxhscontent` / `communitydouyincontent`）；已将产品别名检测限定扩展为 segment 内任意位置匹配，仅覆盖 `xhs` / `douyin` / `xiaohongshu` provider identity alias。
 
 ## 下一步动作
 
@@ -411,6 +412,10 @@
   - 结果：通过，44 tests。新增回归覆盖声明 resource profile 未被任何 fixture 执行时 fail-closed。
 - 第二十次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
   - 结果：通过，45 tests。新增回归覆盖 provider 产品名无分隔符 adapter_key 变体 fail-closed 与 error_mapping message mismatch。
+- 第二十一次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，45 tests。新增回归覆盖 provider 产品名中缀 adapter_key 变体 fail-closed。
+- 第二十一次 guardian 修复后相关 runtime / gate 链
+  - 结果：`python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer` 通过，139 tests；`py_compile`、`spec_guard`、`docs_guard`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class implementation` 与 `git diff --check` 均通过。
 
 ## 未决风险
 

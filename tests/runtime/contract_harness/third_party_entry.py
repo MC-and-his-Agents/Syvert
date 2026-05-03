@@ -575,7 +575,7 @@ def _validate_adapter_key_boundary(adapter_key: str) -> None:
     )
     for segment in normalized_segments:
         for alias in _FORBIDDEN_PROVIDER_PRODUCT_ALIASES:
-            if segment == alias or segment.startswith(alias) or segment.endswith(alias):
+            if alias in segment:
                 forbidden_fragments.add(alias)
     normalized_forbidden_fragments = tuple(sorted(forbidden_fragments))
     if normalized_forbidden_fragments:
