@@ -45,7 +45,7 @@
 - 分支：`issue-323-fr-0026-compatibility-decision-formal-spec`
 - 原始 worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`docs/process/delivery-funnel.md`、`spec_review.md`、`FR-0024`、`FR-0025`、`FR-0027`、父 FR `#298` 与 Work Item `#323` GitHub truth。
-- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。当前语义 / gate checkpoint head 为 `ed0163a112a0202a4cf90813370b2f3256e96f3d`；guardian 前五轮均返回 `REQUEST_CHANGES`。当前已 rebase 到最新 `origin/main` 消除 stale-base implementation diff，并修正 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、input domain 可达性、GWT trailing whitespace 与 checkpoint SHA 漂移；`ed0163a112a0202a4cf90813370b2f3256e96f3d` 已通过本地 gate 链，待推送、guardian、merge 与 closeout。
+- 当前 checkpoint：已创建 `FR-0026` formal spec 套件、active exec-plan 与 release/sprint 索引入口；PR `#333` 已通过受控入口创建并绑定 `Fixes #323`。guardian 前六轮均返回 `REQUEST_CHANGES`；前五轮已收敛 no-leakage carrier 边界、`invalid_contract` evidence / adapter / capability / execution mismatch 可构造性、observability 冲突值语义、input domain 可达性、GWT trailing whitespace 与 checkpoint SHA 漂移。第六轮阻断不是 FR-0026 语义问题，而是 PR 分支未包含 `#331/#334` 后的最新 `origin/main`，导致 diff 误显示回退 FR-0023 truth；当前本地分支已同步到 `origin/main=15b135d3b8ded5ad0a8433639ce1df6b2f9b8da6`，`origin/main..HEAD` 与 `origin/main...HEAD` 均只包含 #323 ownership 文件，待重新跑 gate、推送、guardian、merge 与 closeout。
 
 ## 下一步动作
 
@@ -136,10 +136,16 @@
   - 结果：在 head `ed0163a112a0202a4cf90813370b2f3256e96f3d` 通过，PR class=`spec`，变更类别=`docs, spec`
 - `git diff --check origin/main..HEAD`
   - 结果：在 head `ed0163a112a0202a4cf90813370b2f3256e96f3d` 通过
+- `env -u GH_TOKEN -u GITHUB_TOKEN python3 scripts/pr_guardian.py review 333 --post-review --json-output /tmp/syvert-pr-333-guardian.json`
+  - 结果：第六次返回 `REQUEST_CHANGES`。阻断项：远端受审 head `0766cb7a0b43525d7ec7e482808bd4ce090f1599` 的 merge-base 仍落后于 `origin/main=15b135d3b8ded5ad0a8433639ce1df6b2f9b8da6`，导致 diff 误显示删除 `#331/#334` 的 FR-0023 formal bridge truth；另有 exec-plan checkpoint 仍引用旧 head。
+- 已修正：
+  - 本地分支已同步到 `origin/main=15b135d3b8ded5ad0a8433639ce1df6b2f9b8da6`。
+  - `git diff --name-status origin/main..HEAD` 与 `git diff --name-status origin/main...HEAD` 均只包含 `CHORE-0323` exec-plan、`FR-0026` formal suite、release / sprint 索引。
+  - active exec-plan 停点已改为记录 stale-base guardian finding 与当前主干同步状态，不再声称旧 head 是最新受审 head。
 
 ## 待验证项
 
-- 推送当前修正后运行 guardian review、GitHub checks、受控 merge 与 issue closeout。
+- 重新运行本地 gate 链，推送当前修正后运行 guardian review、GitHub checks、受控 merge 与 issue closeout。
 
 ## 未决风险
 
@@ -156,4 +162,5 @@
 
 - worktree 创建基线：`e456547dd4bc8145e7a1c77be1e89164a7d33fc8`
 - rebase 后 formal spec 语义 checkpoint：`4bf78b3561b768a44360de19c0339312abb0a1e8`
-- latest semantic / gate checkpoint：`ed0163a112a0202a4cf90813370b2f3256e96f3d`
+- latest semantic / gate checkpoint：`ccc9251fda1a7f0337f2a430bc919a51ada9e1b3`
+- latest synced main：`15b135d3b8ded5ad0a8433639ce1df6b2f9b8da6`
