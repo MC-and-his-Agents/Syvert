@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0025-provider-capability-offer-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#338`
 - active 收口事项：`CHORE-0321-fr-0025-sdk-docs-evidence`
 - 状态：`active`
 
@@ -40,7 +40,7 @@
 - 分支：`issue-321-fr-0025-provider-offer-sdk`
 - 原始 worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`#321`、父 FR `#297`、`#319` / PR `#328` 与 `#320` / PR `#335` 的主干事实。
-- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系。
+- 当前 checkpoint：已将 Adapter SDK 中的 Provider offer 示例更新为 `ProviderCapabilityOffer` canonical carrier，并新增 evidence artifact 解释 fixture refs、validator 结论、Adapter-bound 边界与后续 `FR-0026` 消费关系；PR `#338` 已通过受控入口创建并绑定 `Fixes #321`。
 
 ## 下一步动作
 
@@ -84,6 +84,8 @@
   - 结果：通过，`governance-gate 通过。`
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/open_pr.py --class docs --issue 321 --item-key CHORE-0321-fr-0025-sdk-docs-evidence --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(sdk): 补齐 FR-0025 Provider offer 文档证据' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：通过，创建 PR `#338`。
 
 ## 待验证项
 
