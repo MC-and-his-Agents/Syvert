@@ -9,7 +9,7 @@
 - sprint：`2026-S21`
 - 关联 spec：`docs/specs/FR-0026-adapter-provider-compatibility-decision/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#339`
 - active 收口事项：`CHORE-0324-fr-0026-compatibility-decision-runtime`
 - 状态：`active`
 
