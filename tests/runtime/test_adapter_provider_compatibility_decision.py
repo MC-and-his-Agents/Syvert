@@ -183,6 +183,92 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
                 self.assertEqual(decision.error.source_contract_ref, "FR-0026")
                 self.assert_no_provider_leakage(decision)
 
+    def test_decision_returns_provider_leakage_for_top_level_input_drift(self) -> None:
+        cases = (
+            ("priority", 1),
+            ("routing_policy", "try-provider"),
+            ("selected_provider", "native_xhs_detail"),
+            ("fallback_order", ["native_xhs_detail"]),
+        )
+        for field_name, value in cases:
+            with self.subTest(field_name=field_name):
+                input_value = copy_decision_input()
+                input_value[field_name] = value
+
+                decision = decide_adapter_provider_compatibility(input_value)
+
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+                self.assertEqual(
+                    decision.evidence.invalid_contract_evidence.observed_values["extra_fields"],
+                    (field_name,),
+                )
+                self.assert_no_provider_leakage(decision)
+
+    def test_decision_rejects_provider_derived_decision_id_before_core_projection(self) -> None:
+        input_value = copy_decision_input()
+        input_value["decision_context"]["decision_id"] = (
+            "xhs:native_xhs_detail:content_detail:content_detail_by_url:url:hybrid:v0.8.0"
+        )
+
+        decision = decide_adapter_provider_compatibility(input_value)
+        projection = project_compatibility_decision_for_core(decision)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(projection["adapter_key"], None)
+        self.assert_no_provider_leakage(decision)
+
+    def test_invalid_unknown_profile_proof_is_unresolved_not_resolved(self) -> None:
+        input_value = copy_decision_input()
+        unknown_ref = "fr-0027:profile:content-detail-by-url-hybrid:unknown"
+        input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"][0][
+            "evidence_refs"
+        ] = [unknown_ref]
+        input_value["requirement"]["evidence"]["resource_profile_evidence_refs"][0] = unknown_ref
+        input_value["requirement"]["observability"]["proof_refs"][0] = unknown_ref
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertIn(unknown_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_invalid_duplicate_profile_proof_is_unresolved_not_resolved(self) -> None:
+        input_value = copy_decision_input()
+        duplicate_ref = "fr-0027:profile:content-detail-by-url-hybrid:account"
+        input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"][0][
+            "evidence_refs"
+        ] = [duplicate_ref]
+        input_value["requirement"]["evidence"]["resource_profile_evidence_refs"] = [
+            duplicate_ref,
+            duplicate_ref,
+        ]
+        input_value["requirement"]["observability"]["proof_refs"] = [
+            duplicate_ref,
+            duplicate_ref,
+        ]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertIn(duplicate_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(duplicate_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_context_drift_is_attributed_to_fr0026(self) -> None:
+        input_value = copy_decision_input()
+        input_value["decision_context"]["contract_version"] = "v0.9.0"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assert_no_provider_leakage(decision)
+
     def test_core_projection_is_fail_closed_and_does_not_leak_provider_routing_fields(self) -> None:
         decision = decide_adapter_provider_compatibility(valid_compatibility_decision_input())
 

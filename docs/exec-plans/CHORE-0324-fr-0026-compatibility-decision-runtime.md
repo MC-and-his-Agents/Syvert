@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`。首轮 guardian 返回 `REQUEST_CHANGES`，指出 top-level input drift、provider-derived `decision_id`、invalid proof evidence 解析与 context drift source attribution 四个 fail-closed 阻断；当前已收敛为 top-level drift fail-closed、opaque decision id、approved FR-0027 proof ref 解析与 FR-0026 context attribution，并补充 focused regression。
 
 ## 下一步动作
 
@@ -103,6 +103,35 @@
 - rebase 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-324-fr-0026-compatibility-decision-runtime`
   - 结果：通过。
 - rebase 后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian.json`
+  - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - top-level decision input drift 可以被丢弃后返回 `matched`。
+    - `decision_id` 可由 provider identity / offer id 直接派生并进入 Core projection。
+    - invalid proof evidence 仅按 `fr-0027:profile:` 前缀视为 resolved，未填充 `unresolved_refs`。
+    - `decision_context` violation 被错误归因到 `FR-0024`。
+- 已处理首轮 guardian 阻断：
+  - `AdapterProviderCompatibilityDecisionInput` mapping 顶层缺字段、额外字段与 provider routing / priority / fallback drift 均 fail-closed。
+  - `decision_context.decision_id` 限定为 opaque lowercase/digit/hyphen id，拒绝冒号、下划线、路径或 provider-derived offer id 形态。
+  - invalid profile proof evidence 只把 approved `FR-0027` proof refs 记为 resolved；unknown / duplicate refs 进入 `invalid_contract_evidence.unresolved_refs`。
+  - `decision_context` drift 统一归因 `FR-0026`。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，15 tests。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，59 tests。
+- guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，955 tests。
+- guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- guardian 修复后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-324-fr-0026-compatibility-decision-runtime`
+  - 结果：通过。
+- guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项

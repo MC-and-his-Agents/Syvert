@@ -17,6 +17,7 @@ from syvert.provider_capability_offer import (
     validate_provider_capability_offer,
     _normalize_offer,
 )
+from syvert.resource_capability_evidence import approved_shared_resource_requirement_profile_evidence_entries
 
 
 COMPATIBILITY_DECISION_STATUS_MATCHED = "matched"
@@ -221,7 +222,18 @@ def baseline_compatibility_decision_context(*, decision_id: str = "compatibility
 def decide_adapter_provider_compatibility(
     input_value: AdapterProviderCompatibilityDecisionInput | Mapping[str, Any],
 ) -> AdapterProviderCompatibilityDecision:
+    input_error = _validate_input_surface(input_value)
     raw_requirement, raw_offer, raw_context, context = _normalize_input(input_value)
+    if input_error is not None:
+        return _invalid_decision(
+            context=context,
+            raw_requirement=raw_requirement,
+            raw_offer=raw_offer,
+            source_contract_ref="FR-0026",
+            error_code=input_error[0],
+            violated_rule=input_error[1],
+            observed_values=input_error[2],
+        )
     context_leakage = _detect_provider_leakage(raw_context)
     if context_leakage:
         return _invalid_decision(
@@ -239,7 +251,7 @@ def decide_adapter_provider_compatibility(
             context=context,
             raw_requirement=raw_requirement,
             raw_offer=raw_offer,
-            source_contract_ref=APPROVED_REQUIREMENT_CONTRACT_REF,
+            source_contract_ref="FR-0026",
             error_code=context_error[0],
             violated_rule=context_error[1],
             observed_values=context_error[2],
@@ -454,6 +466,34 @@ def _normalize_input(
     )
 
 
+def _validate_input_surface(
+    input_value: AdapterProviderCompatibilityDecisionInput | Mapping[str, Any],
+) -> tuple[str, str, Mapping[str, Any]] | None:
+    if type(input_value) is AdapterProviderCompatibilityDecisionInput:
+        return None
+    if not isinstance(input_value, Mapping):
+        return (
+            COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT,
+            "AdapterProviderCompatibilityDecisionInput must be a mapping or canonical dataclass",
+            {"actual_type": type(input_value).__name__},
+        )
+    raw_keys = _require_string_keys(input_value)
+    missing_fields = tuple(sorted(REQUIRED_INPUT_FIELDS - raw_keys))
+    extra_fields = tuple(sorted(raw_keys - REQUIRED_INPUT_FIELDS))
+    if missing_fields or extra_fields:
+        error_code = (
+            COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED
+            if _detect_provider_leakage({field_name: input_value.get(field_name) for field_name in extra_fields})
+            else COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT
+        )
+        return (
+            error_code,
+            "AdapterProviderCompatibilityDecisionInput must keep the canonical field set",
+            {"missing_fields": missing_fields, "extra_fields": extra_fields},
+        )
+    return None
+
+
 def _normalize_context(raw_value: CompatibilityDecisionContext | Mapping[str, Any]) -> CompatibilityDecisionContext:
     if type(raw_value) is CompatibilityDecisionContext:
         return raw_value
@@ -489,6 +529,12 @@ def _validate_context(
         return (
             COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT,
             "decision_context.decision_id must be non-empty",
+            {"decision_id": context.decision_id},
+        )
+    if not _is_opaque_decision_id(context.decision_id):
+        return (
+            COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
+            "decision_context.decision_id must be an opaque non-provider identifier",
             {"decision_id": context.decision_id},
         )
     if context != expected:
@@ -547,6 +593,7 @@ def _invalid_decision(
     observed_values: Mapping[str, Any],
 ) -> AdapterProviderCompatibilityDecision:
     resolved_proofs = _resolved_profile_evidence_refs(raw_requirement, raw_offer)
+    unresolved_proofs = _unresolved_profile_evidence_refs(raw_requirement, raw_offer)
     error = CompatibilityDecisionError(
         failure_category="runtime_contract",
         error_code=error_code,
@@ -570,7 +617,7 @@ def _invalid_decision(
             invalid_contract_evidence=InvalidCompatibilityContractEvidence(
                 source_contract_ref=source_contract_ref,
                 violated_rule=violated_rule,
-                unresolved_refs=(),
+                unresolved_refs=unresolved_proofs,
                 resolved_profile_evidence_refs=resolved_proofs,
                 observed_values=dict(observed_values),
             ),
@@ -651,7 +698,19 @@ def _resolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tup
         *_best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
         *_best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
     )
-    return _dedupe(ref for ref in refs if ref.startswith("fr-0027:profile:"))
+    approved_refs = _approved_profile_evidence_refs()
+    duplicate_refs = _duplicate_values(refs)
+    return _dedupe(ref for ref in refs if ref in approved_refs and ref not in duplicate_refs)
+
+
+def _unresolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tuple[str, ...]:
+    refs = (
+        *_best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
+        *_best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
+    )
+    approved_refs = _approved_profile_evidence_refs()
+    duplicate_refs = _duplicate_values(refs)
+    return _dedupe(ref for ref in refs if ref not in approved_refs or ref in duplicate_refs)
 
 
 def _best_effort_provider_evidence(raw_offer: Any) -> AdapterBoundProviderEvidence | None:
@@ -699,6 +758,26 @@ def _best_effort_string(raw_value: Any, field_name: str) -> str | None:
 def _normalize_required_capabilities(raw_values: Iterable[str]) -> tuple[str, ...]:
     values = frozenset(raw_values)
     return tuple(value for value in APPROVED_RESOURCE_CAPABILITY_ORDER if value in values)
+
+
+def _is_opaque_decision_id(decision_id: str) -> bool:
+    if ":" in decision_id or "/" in decision_id or "_" in decision_id:
+        return False
+    return all(char.islower() or char.isdigit() or char == "-" for char in decision_id)
+
+
+def _approved_profile_evidence_refs() -> frozenset[str]:
+    return frozenset(entry.profile_ref for entry in approved_shared_resource_requirement_profile_evidence_entries())
+
+
+def _duplicate_values(raw_values: Iterable[str]) -> frozenset[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for raw_value in raw_values:
+        if raw_value in seen:
+            duplicates.add(raw_value)
+        seen.add(raw_value)
+    return frozenset(duplicates)
 
 
 def _detect_provider_leakage(value: Any) -> tuple[str, ...]:
