@@ -74,25 +74,30 @@
   - 初次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：SDK docs 手写 `resource_proof_admission_refs` 示例 prefix，与 `FR-0023` formal spec 中的 scenario 示例命名不一致，容易形成第二套 admission ref 命名。
   - 修正：不修改 `FR-0023` formal spec；SDK docs 改为引用 `tests/runtime/contract_harness/third_party_fixtures.py` 中的 admission ref constants，并明确 SDK 文档不重新定义 admission ref 字符串命名。
+  - 第二次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：分支基于旧 `origin/main`，会回滚 PR `#336` / commit `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 已合入的 `FR-0024` closeout exec-plan 与 release / sprint 索引事实。
+  - 修正：已 rebase 到 `origin/main@bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`，手动合并 `docs/sprints/2026-S21.md` 冲突，保留 FR-0024 与 FR-0023 两组索引。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-311-fr-0023-adapter-sdk`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 提交前结果：未执行通过；提交前 `HEAD` 相对 `origin/main` 尚无已提交 diff，脚本报告“当前分支相对基线没有变更”。
   - 提交 `3f5f0ab` 后结果：通过，PR class=`docs`，变更类别=`docs`。
+  - rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后结果：通过，PR class=`docs`，变更类别=`docs`。
 - `git diff --check`
   - 结果：通过。
 - 提交 `3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
   - 结果：已生成 docs checkpoint，提交信息 `docs(adapter): 补齐 FR-0023 SDK 接入指引`。
+- rebase 后提交 `a453ce762e9ef9434df999d9dd394c2634c0e53f`
+  - 结果：保留同一 docs checkpoint 内容并同步到当前主干；提交信息 `docs(adapter): 补齐 FR-0023 SDK 接入指引`。
 
 ## 待验证项
 
-- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
 - guardian review、GitHub checks、受控 merge、issue closeout、父 FR comment 与 worktree retirement。
 
 ## 未决风险
@@ -107,5 +112,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- docs checkpoint：`3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
+- docs checkpoint：`a453ce762e9ef9434df999d9dd394c2634c0e53f`
 - 说明：后续若仅补 PR / guardian / merge gate / closeout 元数据，作为 review-sync follow-up，不把版本化 checkpoint SHA 退化为必须穷尽当前 PR head 的状态面。
