@@ -155,6 +155,136 @@ contract test 入口应消费这些声明并产出 `compatibility decision`：
 - provider 可以绕过 Core 注入资源包自行获取账号、代理或会话资源
 
 
+## v0.8.0 Third-party Adapter Contract Entry
+
+`FR-0023` 与 `#310` 已把第三方 Adapter 的 Adapter-only contract test entry 落到 `tests/runtime/contract_harness/third_party_entry.py`，主要入口是 `run_third_party_adapter_contract_test()`、`validate_third_party_adapter_manifest()` 与 `validate_third_party_adapter_fixtures()`，可复用样例放在 `tests/runtime/contract_harness/third_party_fixtures.py`。第三方作者不需要修改 Core；需要提交一个 Adapter manifest、一组 deterministic fixtures，并让 Adapter 对象的 public metadata 与 manifest 完全一致。
+
+当前 contract entry 只验证 Adapter-only 的 `content_detail_by_url -> content_detail` slice：
+
+- manifest `adapter_key` 必须是真实第三方 Adapter identity，例如 `community_detail`；不得使用 `xhs`、`douyin`、provider 产品名、账号、环境、租户或 routing strategy。
+- manifest 与 Adapter public metadata 必须同时声明 `sdk_contract_id`、`supported_capabilities`、`supported_targets`、`supported_collection_modes`、`resource_requirement_declarations`、`resource_proof_admission_refs`、`resource_proof_admissions`、`result_contract`、`error_mapping`、`fixture_refs` 与 `contract_test_profile`。
+- `supported_capabilities` 当前只允许 `content_detail`；`supported_targets` 当前只允许 `url`；`supported_collection_modes` 当前只允许 `hybrid`。
+- success payload 必须返回 mapping，并只把 Adapter 业务结果放在 `raw` 与 `normalized` 内；不得覆盖 runtime envelope 字段，例如 `task_id`、`adapter_key`、`capability`、`status` 或 `error`。
+- error mapping 必须把平台错误映射成 runtime 会保留的 `invalid_input` 或 `platform` 分类，并绑定 fixture 中的 `source_error`。
+- Adapter public metadata、manifest、fixture nested carrier 与 result contract 均不得携带 provider、selector、fallback、priority、compatibility decision 或 marketplace 字段。
+
+最小 manifest 形状如下；字段名与当前 contract fixture 保持一致：
+
+```python
+THIRD_PARTY_ADAPTER_MANIFEST = {
+    "adapter_key": "community_detail",
+    "sdk_contract_id": "syvert-adapter-runtime-v0.8.0",
+    "supported_capabilities": ("content_detail",),
+    "supported_targets": ("url",),
+    "supported_collection_modes": ("hybrid",),
+    "resource_requirement_declarations": (
+        {
+            "adapter_key": "community_detail",
+            "capability": "content_detail",
+            "resource_requirement_profiles": (
+                {
+                    "profile_key": "account_proxy",
+                    "resource_dependency_mode": "required",
+                    "required_capabilities": ("account", "proxy"),
+                    "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:account-proxy",),
+                },
+                {
+                    "profile_key": "account",
+                    "resource_dependency_mode": "required",
+                    "required_capabilities": ("account",),
+                    "evidence_refs": ("fr-0027:profile:content-detail-by-url-hybrid:account",),
+                },
+            ),
+        },
+    ),
+    "resource_proof_admission_refs": (
+        "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account-proxy",
+        "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account",
+    ),
+    "resource_proof_admissions": (...,),
+    "result_contract": {
+        "success_payload_fields": ("raw", "normalized"),
+        "normalized_owner": "adapter",
+    },
+    "error_mapping": {
+        "content_not_found": {
+            "category": "platform",
+            "code": "content_not_found",
+            "message": "content is unavailable or deleted",
+        },
+    },
+    "fixture_refs": (
+        "third-party-content-detail-success",
+        "third-party-content-detail-error-mapping",
+    ),
+    "contract_test_profile": "adapter_only_content_detail_v0_8",
+}
+```
+
+`resource_proof_admissions` 是 `FR-0023` 为真实第三方 `adapter_key` 提供的 manifest-owned proof bridge。它不改写 `FR-0027` approved shared profile proof；它只证明当前第三方 Adapter 在同一 execution slice 下，可以用当前 manifest、contract profile 与 fixtures 覆盖 `FR-0027` 已批准的 profile tuple。
+
+每条 admission 必须满足：
+
+- `admission_ref` 必须被 manifest `resource_proof_admission_refs` 唯一引用。
+- `adapter_key` 必须等于 manifest、resource declaration 与 fixture `manifest_ref`。
+- `base_profile_ref` 必须指向当前 `FR-0027` approved shared profile proof。
+- `capability`、`execution_path`、`resource_dependency_mode` 与 `required_capabilities` 必须和 manifest / declaration / fixture 完全一致。
+- `admission_evidence_refs` 必须至少覆盖当前 manifest、当前 contract profile、一个 success fixture 与一个 error_mapping fixture，格式分别为 `fr-0023:manifest:{adapter_key}:{contract_test_profile}`、`fr-0023:contract-profile:{adapter_key}:{contract_test_profile}` 与 `fr-0023:fixture:{adapter_key}:{fixture_id}`。
+- `decision` 当前固定为 `admit_third_party_profile_for_contract_test_v0_8_0`。
+
+最小 fixture 组合必须同时覆盖 success 与 error_mapping，并且每个声明的 resource profile 都必须被至少一个 fixture 实际执行覆盖：
+
+```python
+THIRD_PARTY_ADAPTER_FIXTURES = (
+    {
+        "fixture_id": "third-party-content-detail-success",
+        "manifest_ref": "community_detail",
+        "case_type": "success",
+        "input": {
+            "operation": "content_detail_by_url",
+            "capability": "content_detail",
+            "target_type": "url",
+            "target_value": "https://contract-host/third-party/success",
+            "collection_mode": "hybrid",
+            "resource_profile_key": "account_proxy",
+        },
+        "expected": {
+            "status": "success",
+            "required_payload_fields": ("raw", "normalized"),
+        },
+    },
+    {
+        "fixture_id": "third-party-content-detail-error-mapping",
+        "manifest_ref": "community_detail",
+        "case_type": "error_mapping",
+        "input": {
+            "operation": "content_detail_by_url",
+            "capability": "content_detail",
+            "target_type": "url",
+            "target_value": "https://contract-host/third-party/content-not-found",
+            "collection_mode": "hybrid",
+            "resource_profile_key": "account",
+        },
+        "expected": {
+            "status": "failed",
+            "error": {
+                "source_error": "content_not_found",
+                "category": "platform",
+                "code": "content_not_found",
+            },
+        },
+    },
+)
+```
+
+作者侧验证顺序建议固定为：
+
+1. 先让 Adapter object 的 public metadata 与 manifest 完全对齐。
+2. 用 deterministic fixtures 覆盖 success payload、error mapping 与每个 resource profile。
+3. 运行 third-party contract entry，确认 manifest shape、public metadata、resource declarations、resource proof admissions、fixture coverage 与 `execute()` 行为都 fail-closed。
+4. 再接入真实平台回归；真实平台回归不得替代 deterministic contract fixtures。
+
+
 ## 最小能力面
 
 一个适配器最少必须声明：
@@ -435,9 +565,9 @@ ADAPTER_COMPATIBILITY = {
 - 不把平台专有字段扩散到共享模型中
 
 
-## v0.7.0 最小迁移说明
+## v0.7.0 到 v0.8.0 最小迁移说明
 
-第三方 adapter 从旧草案迁移到当前 `v0.7.0` 表面时，至少需要完成：
+第三方 adapter 从旧草案迁移到当前 `v0.7.0` Core-facing 表面时，至少需要完成：
 
 1. 将 `adapter_id` / `platform_name` 收敛为单一 `adapter_key`。
 2. 将 `collect(request, context)` 改为 `execute(request: AdapterExecutionContext) -> dict`。
@@ -447,18 +577,30 @@ ADAPTER_COMPATIBILITY = {
 6. 如果 adapter 内部拆出 provider port，只能作为 adapter-owned 内部边界；Core / registry / TaskRecord / resource lifecycle 不得发现或选择 provider。
 7. 保留 legacy transport hooks 的测试注入能力；新增 provider test seam 时必须标注为 internal test seam，不得作为外部 provider 接入文档发布。
 
+进入 `v0.8.0` 的 Adapter-only contract entry 时，还需要补齐：
+
+1. 把 `sdk_contract_id` 升级为 `syvert-adapter-runtime-v0.8.0`，并声明 `contract_test_profile="adapter_only_content_detail_v0_8"`。
+2. 新增 manifest-owned `resource_proof_admission_refs` 与 `resource_proof_admissions`；第三方真实 `adapter_key` 不应伪装为 `xhs` 或 `douyin` 来复用 reference adapter proof。
+3. 为每个 `resource_requirement_profiles[*]` 提供 fixture coverage，并让 admission evidence refs 覆盖 manifest、contract profile、success fixture 与 error_mapping fixture。
+4. 将 success fixture 绑定真实 target input，确保 `normalized.canonical_url` 或等价字段来自 fixture input，而不是静态样本。
+5. 将 error_mapping fixture 的 `expected.error.source_error` 与 manifest `error_mapping` 绑定，并在 Adapter 抛出的 `PlatformAdapterError.details.source_error` 中保留同一值。
+6. 删除 manifest、public metadata、fixture expected/result contract 中的 provider-facing 字段；Adapter-only 文档不得出现 provider selector、fallback、priority、offer、compatibility decision 或 marketplace。
+
+参考适配器升级时保持相反边界：`xhs` 与 `douyin` 继续作为 reference adapter proof 的 approved sample，不能被第三方 Adapter manifest 借用为真实 identity。参考适配器可以继续拥有 adapter-owned provider port / native provider 内部实现，但这些内部 provider 细节不得进入 Adapter public metadata、registry discovery、TaskRecord、resource lifecycle、第三方 manifest 或 contract test profile。
+
 
 ## 推荐开发流程
 
 接入一个新平台的建议路径：
 
-1. 定义 capability 与 target 支持范围
-2. 定义平台原始结果到当前 `normalized` shape 的映射
-3. 实现 `execute()`
-4. 实现错误映射
-5. 补齐适配器测试
-6. 注册到 Core
-7. 用 API/CLI 跑通任务
+1. 定义 capability 与 target 支持范围，并确认是否属于当前 approved slice。
+2. 定义 manifest、resource requirement profiles、resource proof admissions 与 deterministic fixtures。
+3. 定义平台原始结果到当前 `normalized` shape 的映射。
+4. 实现 `execute()`，只返回 `{"raw": ..., "normalized": ...}`。
+5. 实现错误映射，并把平台 source error 映射到受批准的 runtime category / code。
+6. 运行 third-party contract entry，先通过 deterministic Adapter-only contract。
+7. 注册到 Core 并用 API/CLI 跑通任务。
+8. 补充真实平台回归；真实平台回归只作为下游 evidence，不替代 contract entry。
 
 如果接入方已有 provider 产品：
 
