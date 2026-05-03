@@ -1096,8 +1096,21 @@ def _validate_resource_proof_admission_evidence_refs(
     fixtures: tuple[AdapterContractFixture, ...],
 ) -> None:
     fixture_ids_by_case_type: dict[str, set[str]] = {"success": set(), "error_mapping": set()}
+    fixture_refs_by_profile_ref: dict[str, set[str]] = {}
     for fixture in fixtures:
         fixture_ids_by_case_type.setdefault(fixture.case_type, set()).add(fixture.fixture_id)
+        profile = _resource_profile_for_fixture(
+            manifest,
+            fixture,
+            _require_non_empty_string(
+                fixture.input.get("resource_profile_key"),
+                code="invalid_fixture_input",
+                field="input.resource_profile_key",
+            ),
+        )
+        fixture_refs_by_profile_ref.setdefault(profile.evidence_refs[0], set()).add(
+            f"fr-0023:fixture:{manifest.adapter_key}:{fixture.fixture_id}"
+        )
     manifest_ref = f"fr-0023:manifest:{manifest.adapter_key}:{manifest.contract_test_profile}"
     contract_profile_ref = f"fr-0023:contract-profile:{manifest.adapter_key}:{manifest.contract_test_profile}"
     fixture_refs = {
@@ -1125,6 +1138,17 @@ def _validate_resource_proof_admission_evidence_refs(
                 "invalid_manifest_resource_requirement_declarations",
                 "resource proof admission evidence must bind success and error_mapping fixtures",
                 details={"adapter_key": manifest.adapter_key, "admission_ref": admission.admission_ref},
+            )
+        profile_fixture_refs = fixture_refs_by_profile_ref.get(admission.base_profile_ref, set())
+        if not refs & profile_fixture_refs:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource proof admission evidence must bind a fixture that exercises the admitted profile",
+                details={
+                    "adapter_key": manifest.adapter_key,
+                    "admission_ref": admission.admission_ref,
+                    "base_profile_ref": admission.base_profile_ref,
+                },
             )
         for evidence_ref in refs:
             if evidence_ref in {manifest_ref, contract_profile_ref} or evidence_ref in fixture_refs:
@@ -1678,11 +1702,25 @@ def _validate_fixture_resource_profiles(
     fixtures: tuple[AdapterContractFixture, ...],
     fixture_inputs: tuple[dict[str, str], ...],
 ) -> None:
+    exercised_profiles: set[tuple[str, str]] = set()
     for fixture, fixture_input in zip(fixtures, fixture_inputs):
-        _resource_profile_for_fixture(
+        profile = _resource_profile_for_fixture(
             manifest,
             fixture,
             fixture_input["resource_profile_key"],
+        )
+        exercised_profiles.add((fixture_input["capability"], profile.profile_key))
+    declared_profiles = {
+        (declaration.capability, profile.profile_key)
+        for declaration in manifest.resource_requirement_declarations
+        for profile in declaration.resource_requirement_profiles
+    }
+    missing_profiles = tuple(sorted(declared_profiles - exercised_profiles))
+    if missing_profiles:
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_resource_profile",
+            "fixtures must exercise every declared resource requirement profile",
+            details={"adapter_key": manifest.adapter_key, "missing_profiles": missing_profiles},
         )
 
 

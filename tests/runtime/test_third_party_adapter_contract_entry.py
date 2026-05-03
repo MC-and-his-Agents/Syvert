@@ -183,7 +183,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[1]["observed_capability"], "content_detail")
         self.assertEqual(adapter.last_request_capability, "content_detail")
         self.assertEqual(adapter.last_resource_bundle_capability, "content_detail")
-        self.assertEqual(adapter.last_resource_slots, ("account", "proxy"))
+        self.assertEqual(adapter.last_resource_slots, ("account",))
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
         manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())
@@ -527,6 +527,20 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_fixture_resource_profile")
         self.assertEqual(context.exception.details["fixture_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
         self.assertEqual(adapter.execute_calls, 0)
+
+    def test_rejects_declared_resource_profile_not_exercised_by_fixtures(self) -> None:
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        fixtures[1]["input"]["resource_profile_key"] = "account_proxy"
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=minimal_third_party_adapter_manifest(),
+                fixtures=fixtures,
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_fixture_resource_profile")
+        self.assertEqual(context.exception.details["missing_profiles"], (("content_detail", "account"),))
 
     def test_rejects_resource_profile_proof_path_mismatch_before_adapter_execute(self) -> None:
         manifest = minimal_third_party_adapter_manifest()

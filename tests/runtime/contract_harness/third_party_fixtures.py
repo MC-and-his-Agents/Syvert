@@ -110,7 +110,7 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
                 "target_type": "url",
                 "target_value": "https://contract-host/third-party/content-not-found",
                 "collection_mode": "hybrid",
-                "resource_profile_key": "account_proxy",
+                "resource_profile_key": "account",
             },
             "expected": {
                 "status": "failed",
