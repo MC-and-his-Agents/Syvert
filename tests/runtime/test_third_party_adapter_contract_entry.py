@@ -364,26 +364,40 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(context.exception.details["field"], "supported_capabilities")
         self.assertEqual(context.exception.details["actual_type"], "dict")
 
-    def test_rejects_adapter_key_not_covered_by_fr0027_proof(self) -> None:
-        uncovered_adapter_keys = (
-            "adventure_feed",
-            "product_review",
-            "routerless_content",
+    def test_rejects_third_party_adapter_key_without_matching_resource_proof_admission(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        manifest["resource_proof_admission_refs"] = ()
+        manifest["resource_proof_admissions"] = ()
+
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            validate_third_party_adapter_manifest(manifest)
+
+        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.details["adapter_key"], THIRD_PARTY_FIXTURE_ADAPTER_KEY)
+        self.assertEqual(context.exception.details["reference_adapters"], ("xhs", "douyin"))
+        self.assertEqual(context.exception.details["matching_admission_count"], 0)
+
+    def test_rejects_resource_proof_admission_evidence_outside_current_contract_entry(self) -> None:
+        manifest = minimal_third_party_adapter_manifest()
+        admissions = copy.deepcopy(manifest["resource_proof_admissions"])
+        admissions[0]["admission_evidence_refs"] = (
+            *admissions[0]["admission_evidence_refs"],
+            "fr-0023:fixture:other_adapter:third-party-content-detail-success",
         )
-        for adapter_key in uncovered_adapter_keys:
-            with self.subTest(adapter_key=adapter_key):
-                manifest = minimal_third_party_adapter_manifest()
-                manifest["adapter_key"] = adapter_key
-                declarations = copy.deepcopy(manifest["resource_requirement_declarations"])
-                declarations[0]["adapter_key"] = adapter_key
-                manifest["resource_requirement_declarations"] = declarations
+        manifest["resource_proof_admissions"] = admissions
 
-                with self.assertRaises(ThirdPartyContractEntryError) as context:
-                    validate_third_party_adapter_manifest(manifest)
+        with self.assertRaises(ThirdPartyContractEntryError) as context:
+            run_third_party_adapter_contract_test(
+                manifest=manifest,
+                fixtures=minimal_third_party_adapter_fixtures(),
+                adapter=ThirdPartyContractFixtureAdapter(),
+            )
 
-                self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
-                self.assertEqual(context.exception.details["adapter_key"], adapter_key)
-                self.assertEqual(context.exception.details["reference_adapters"], ("xhs", "douyin"))
+        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(
+            context.exception.details["evidence_ref"],
+            "fr-0023:fixture:other_adapter:third-party-content-detail-success",
+        )
 
     def test_rejects_invalid_fr0027_resource_declaration_via_registry(self) -> None:
         manifest = minimal_third_party_adapter_manifest()

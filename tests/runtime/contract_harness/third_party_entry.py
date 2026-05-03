@@ -32,6 +32,8 @@ _REQUIRED_MANIFEST_FIELDS = frozenset(
         "supported_targets",
         "supported_collection_modes",
         "resource_requirement_declarations",
+        "resource_proof_admission_refs",
+        "resource_proof_admissions",
         "result_contract",
         "error_mapping",
         "fixture_refs",
@@ -84,6 +86,26 @@ _PROFILE_FIELD_NAMES = frozenset(
         "resource_dependency_mode",
         "required_capabilities",
         "evidence_refs",
+    }
+)
+_RESOURCE_PROOF_ADMISSION_FIELD_NAMES = frozenset(
+    {
+        "admission_ref",
+        "adapter_key",
+        "base_profile_ref",
+        "capability",
+        "execution_path",
+        "resource_dependency_mode",
+        "required_capabilities",
+        "admission_evidence_refs",
+        "decision",
+    }
+)
+_EXECUTION_PATH_FIELD_NAMES = frozenset(
+    {
+        "operation",
+        "target_type",
+        "collection_mode",
     }
 )
 _ALLOWED_ERROR_MAPPING_CATEGORIES = frozenset(
@@ -161,9 +183,12 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "score",
         "selector",
         "staging",
+        "xhs",
+        "douyin",
     }
 )
 _APPROVED_CONTRACT_CAPABILITIES = frozenset({"content_detail"})
+_RESOURCE_PROOF_ADMISSION_DECISION = "admit_third_party_profile_for_contract_test_v0_8_0"
 _MISSING = object()
 
 
@@ -176,6 +201,19 @@ class ThirdPartyContractEntryError(ValueError):
 
 
 @dataclass(frozen=True)
+class ThirdPartyResourceProofAdmission:
+    admission_ref: str
+    adapter_key: str
+    base_profile_ref: str
+    capability: str
+    execution_path: Mapping[str, str]
+    resource_dependency_mode: str
+    required_capabilities: tuple[str, ...]
+    admission_evidence_refs: tuple[str, ...]
+    decision: str
+
+
+@dataclass(frozen=True)
 class ThirdPartyAdapterManifest:
     adapter_key: str
     sdk_contract_id: str
@@ -183,6 +221,8 @@ class ThirdPartyAdapterManifest:
     supported_targets: tuple[str, ...]
     supported_collection_modes: tuple[str, ...]
     resource_requirement_declarations: tuple[Any, ...]
+    resource_proof_admission_refs: tuple[str, ...]
+    resource_proof_admissions: tuple[Any, ...]
     result_contract: Mapping[str, Any]
     error_mapping: Mapping[str, Any]
     fixture_refs: tuple[str, ...]
@@ -287,6 +327,15 @@ def validate_third_party_adapter_manifest(manifest: Mapping[str, Any]) -> ThirdP
             manifest["resource_requirement_declarations"],
             field="resource_requirement_declarations",
         ),
+        resource_proof_admission_refs=_require_string_tuple(
+            manifest["resource_proof_admission_refs"],
+            field="resource_proof_admission_refs",
+            allow_empty=True,
+        ),
+        resource_proof_admissions=_require_non_string_sequence(
+            manifest["resource_proof_admissions"],
+            field="resource_proof_admissions",
+        ),
         result_contract=_require_mapping(manifest["result_contract"], field="result_contract"),
         error_mapping=_require_mapping(manifest["error_mapping"], field="error_mapping"),
         fixture_refs=_require_non_empty_string_tuple(
@@ -302,11 +351,22 @@ def validate_third_party_adapter_manifest(manifest: Mapping[str, Any]) -> ThirdP
     _validate_contract_test_profile(normalized_manifest.contract_test_profile)
     _validate_result_contract(normalized_manifest.result_contract)
     _validate_error_mapping(normalized_manifest.error_mapping)
+    resource_proof_admissions = _normalize_third_party_resource_proof_admissions(
+        adapter_key=normalized_manifest.adapter_key,
+        resource_proof_admission_refs=normalized_manifest.resource_proof_admission_refs,
+        raw_admissions=normalized_manifest.resource_proof_admissions,
+        source="manifest",
+    )
+    normalized_manifest = replace(
+        normalized_manifest,
+        resource_proof_admissions=resource_proof_admissions,
+    )
     resource_declarations = _normalize_manifest_resource_declarations(normalized_manifest)
     normalized_manifest = replace(
         normalized_manifest,
         resource_requirement_declarations=resource_declarations,
     )
+    _validate_resource_proof_admission_profile_coverage(normalized_manifest)
     _validate_manifest_capability_coverage(normalized_manifest)
     return normalized_manifest
 
@@ -360,6 +420,7 @@ def validate_third_party_adapter_fixtures(
     fixture_inputs = tuple(_normalize_fixture_input(manifest, fixture) for fixture in normalized)
     _validate_fixture_public_metadata_coverage(manifest, fixture_inputs)
     _validate_fixture_resource_profiles(manifest, normalized, fixture_inputs)
+    _validate_resource_proof_admission_evidence_refs(manifest, normalized)
     return normalized
 
 
@@ -418,6 +479,17 @@ def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapt
         _safe_get_adapter_attr(adapter, "supported_collection_modes"),
         field="adapter.supported_collection_modes",
     )
+    actual_resource_proof_admission_refs = _require_string_tuple(
+        _safe_get_adapter_attr(adapter, "resource_proof_admission_refs"),
+        field="adapter.resource_proof_admission_refs",
+        allow_empty=True,
+    )
+    actual_resource_proof_admissions = _normalize_third_party_resource_proof_admissions(
+        adapter_key=manifest.adapter_key,
+        resource_proof_admission_refs=actual_resource_proof_admission_refs,
+        raw_admissions=_safe_get_adapter_attr(adapter, "resource_proof_admissions"),
+        source="adapter",
+    )
     actual_resource_requirements = _normalize_third_party_resource_requirement_declarations(
         _safe_get_adapter_attr(adapter, "resource_requirement_declarations"),
         adapter_key=manifest.adapter_key,
@@ -435,6 +507,12 @@ def _validate_adapter_public_metadata(manifest: ThirdPartyAdapterManifest, adapt
         actual_resource_requirements
     ) != _resource_requirement_declaration_signatures(manifest.resource_requirement_declarations):
         mismatches["resource_requirement_declarations"] = actual_resource_requirements
+    if tuple(sorted(actual_resource_proof_admission_refs)) != tuple(sorted(manifest.resource_proof_admission_refs)):
+        mismatches["resource_proof_admission_refs"] = actual_resource_proof_admission_refs
+    if _resource_proof_admission_signatures(actual_resource_proof_admissions) != _resource_proof_admission_signatures(
+        manifest.resource_proof_admissions
+    ):
+        mismatches["resource_proof_admissions"] = actual_resource_proof_admissions
     _compare_adapter_public_metadata_attr(
         adapter,
         manifest,
@@ -804,24 +882,282 @@ def _normalize_third_party_resource_requirement_profile(
                 "source": source,
             },
         )
-    if adapter_key not in proof.reference_adapters:
-        raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
-            "resource profile proof reference_adapters must cover declaration adapter_key",
-            details={
-                "adapter_key": adapter_key,
-                "capability": capability,
-                "profile_key": profile_key,
-                "proof_profile_ref": proof.profile_ref,
-                "reference_adapters": proof.reference_adapters,
-                "source": source,
-            },
-        )
     return AdapterResourceRequirementProfile(
         profile_key=profile_key,
         resource_dependency_mode=resource_dependency_mode,
         required_capabilities=required_capabilities,
         evidence_refs=evidence_refs,
+    )
+
+
+def _normalize_third_party_resource_proof_admissions(
+    *,
+    adapter_key: str,
+    resource_proof_admission_refs: tuple[str, ...],
+    raw_admissions: Any,
+    source: str,
+) -> tuple[ThirdPartyResourceProofAdmission, ...]:
+    raw_sequence = _require_non_string_sequence(raw_admissions, field=f"{source}.resource_proof_admissions")
+    normalized = tuple(
+        _normalize_third_party_resource_proof_admission(adapter_key, raw_admission, source=source)
+        for raw_admission in raw_sequence
+    )
+    admission_refs = tuple(admission.admission_ref for admission in normalized)
+    if tuple(sorted(admission_refs)) != tuple(sorted(resource_proof_admission_refs)):
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource_proof_admission_refs must exactly match manifest-owned admission entries",
+            details={
+                "adapter_key": adapter_key,
+                "source": source,
+                "resource_proof_admission_refs": resource_proof_admission_refs,
+                "admission_refs": admission_refs,
+            },
+        )
+    if len(set(admission_refs)) != len(admission_refs):
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admission refs must be unique",
+            details={"adapter_key": adapter_key, "source": source, "admission_refs": admission_refs},
+        )
+    return normalized
+
+
+def _normalize_third_party_resource_proof_admission(
+    adapter_key: str,
+    raw_admission: Any,
+    *,
+    source: str,
+) -> ThirdPartyResourceProofAdmission:
+    admission = _require_mapping(raw_admission, field=f"{source}.resource_proof_admissions")
+    _validate_nested_manifest_field_set(
+        admission,
+        expected_fields=_RESOURCE_PROOF_ADMISSION_FIELD_NAMES,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions",
+    )
+    admission_ref = _require_non_empty_string(
+        admission.get("admission_ref"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.admission_ref",
+    )
+    admission_adapter_key = _require_non_empty_string(
+        admission.get("adapter_key"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.adapter_key",
+    )
+    if admission_adapter_key != adapter_key:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admission adapter_key must match manifest adapter_key",
+            details={"adapter_key": adapter_key, "admission_adapter_key": admission_adapter_key, "source": source},
+        )
+    base_profile_ref = _require_non_empty_string(
+        admission.get("base_profile_ref"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.base_profile_ref",
+    )
+    proof = _APPROVED_PROFILE_PROOF_BY_REF.get(base_profile_ref)
+    if proof is None:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admission base_profile_ref must resolve to an approved FR-0027 proof",
+            details={"adapter_key": adapter_key, "admission_ref": admission_ref, "base_profile_ref": base_profile_ref},
+        )
+    capability = _require_non_empty_string(
+        admission.get("capability"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.capability",
+    )
+    execution_path = _require_mapping(admission.get("execution_path"), field=f"{source}.resource_proof_admissions.execution_path")
+    _validate_nested_manifest_field_set(
+        execution_path,
+        expected_fields=_EXECUTION_PATH_FIELD_NAMES,
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.execution_path",
+    )
+    normalized_execution_path = {
+        "operation": _require_non_empty_string(
+            execution_path.get("operation"),
+            code="invalid_manifest_resource_requirement_declarations",
+            field=f"{source}.resource_proof_admissions.execution_path.operation",
+        ),
+        "target_type": _require_non_empty_string(
+            execution_path.get("target_type"),
+            code="invalid_manifest_resource_requirement_declarations",
+            field=f"{source}.resource_proof_admissions.execution_path.target_type",
+        ),
+        "collection_mode": _require_non_empty_string(
+            execution_path.get("collection_mode"),
+            code="invalid_manifest_resource_requirement_declarations",
+            field=f"{source}.resource_proof_admissions.execution_path.collection_mode",
+        ),
+    }
+    resource_dependency_mode = _require_non_empty_string(
+        admission.get("resource_dependency_mode"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.resource_dependency_mode",
+    )
+    required_capabilities = _require_string_tuple(
+        admission.get("required_capabilities"),
+        field=f"{source}.resource_proof_admissions.required_capabilities",
+        allow_empty=True,
+    )
+    admission_evidence_refs = _require_non_empty_string_tuple(
+        admission.get("admission_evidence_refs"),
+        field=f"{source}.resource_proof_admissions.admission_evidence_refs",
+    )
+    decision = _require_non_empty_string(
+        admission.get("decision"),
+        code="invalid_manifest_resource_requirement_declarations",
+        field=f"{source}.resource_proof_admissions.decision",
+    )
+    if decision != _RESOURCE_PROOF_ADMISSION_DECISION:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admission decision is not approved for FR-0023 contract test",
+            details={"adapter_key": adapter_key, "admission_ref": admission_ref, "decision": decision},
+        )
+    if (
+        proof.capability != capability
+        or proof.resource_dependency_mode != resource_dependency_mode
+        or proof.required_capabilities != required_capabilities
+        or proof.execution_path.operation != normalized_execution_path["operation"]
+        or proof.execution_path.target_type != normalized_execution_path["target_type"]
+        or proof.execution_path.collection_mode != normalized_execution_path["collection_mode"]
+        or proof.shared_status != "shared"
+        or proof.decision != "approve_profile_for_v0_8_0"
+    ):
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admission must align with approved FR-0027 shared proof tuple",
+            details={"adapter_key": adapter_key, "admission_ref": admission_ref, "base_profile_ref": base_profile_ref},
+        )
+    return ThirdPartyResourceProofAdmission(
+        admission_ref=admission_ref,
+        adapter_key=admission_adapter_key,
+        base_profile_ref=base_profile_ref,
+        capability=capability,
+        execution_path=normalized_execution_path,
+        resource_dependency_mode=resource_dependency_mode,
+        required_capabilities=required_capabilities,
+        admission_evidence_refs=admission_evidence_refs,
+        decision=decision,
+    )
+
+
+def _validate_resource_proof_admission_profile_coverage(manifest: ThirdPartyAdapterManifest) -> None:
+    consumed_admissions: set[str] = set()
+    for declaration in manifest.resource_requirement_declarations:
+        for profile in declaration.resource_requirement_profiles:
+            proof = _APPROVED_PROFILE_PROOF_BY_REF[profile.evidence_refs[0]]
+            if manifest.adapter_key in proof.reference_adapters:
+                continue
+            matching_admissions = tuple(
+                admission for admission in manifest.resource_proof_admissions
+                if (
+                    admission.adapter_key == manifest.adapter_key
+                    and admission.base_profile_ref == profile.evidence_refs[0]
+                    and admission.capability == declaration.capability
+                    and admission.resource_dependency_mode == profile.resource_dependency_mode
+                    and admission.required_capabilities == profile.required_capabilities
+                    and admission.execution_path["operation"] == proof.execution_path.operation
+                    and admission.execution_path["target_type"] == proof.execution_path.target_type
+                    and admission.execution_path["collection_mode"] == proof.execution_path.collection_mode
+                )
+            )
+            if len(matching_admissions) != 1:
+                raise ThirdPartyContractEntryError(
+                    "invalid_manifest_resource_requirement_declarations",
+                    "resource proof admission must cover each declaration profile not covered by FR-0027 reference_adapters",
+                    details={
+                        "adapter_key": manifest.adapter_key,
+                        "capability": declaration.capability,
+                        "profile_key": profile.profile_key,
+                        "proof_profile_ref": proof.profile_ref,
+                        "reference_adapters": proof.reference_adapters,
+                        "matching_admission_count": len(matching_admissions),
+                    },
+                )
+            consumed_admissions.add(matching_admissions[0].admission_ref)
+    unused_admissions = tuple(
+        sorted(admission.admission_ref for admission in manifest.resource_proof_admissions if admission.admission_ref not in consumed_admissions)
+    )
+    if unused_admissions:
+        raise ThirdPartyContractEntryError(
+            "invalid_manifest_resource_requirement_declarations",
+            "resource proof admissions must be consumed by current declaration profiles",
+            details={"adapter_key": manifest.adapter_key, "unused_admissions": unused_admissions},
+        )
+
+
+def _validate_resource_proof_admission_evidence_refs(
+    manifest: ThirdPartyAdapterManifest,
+    fixtures: tuple[AdapterContractFixture, ...],
+) -> None:
+    fixture_ids_by_case_type: dict[str, set[str]] = {"success": set(), "error_mapping": set()}
+    for fixture in fixtures:
+        fixture_ids_by_case_type.setdefault(fixture.case_type, set()).add(fixture.fixture_id)
+    manifest_ref = f"fr-0023:manifest:{manifest.adapter_key}:{manifest.contract_test_profile}"
+    contract_profile_ref = f"fr-0023:contract-profile:{manifest.adapter_key}:{manifest.contract_test_profile}"
+    fixture_refs = {
+        f"fr-0023:fixture:{manifest.adapter_key}:{fixture.fixture_id}": fixture
+        for fixture in fixtures
+    }
+    for admission in manifest.resource_proof_admissions:
+        refs = set(admission.admission_evidence_refs)
+        if manifest_ref not in refs or contract_profile_ref not in refs:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource proof admission evidence must bind current manifest and contract profile",
+                details={"adapter_key": manifest.adapter_key, "admission_ref": admission.admission_ref},
+            )
+        success_refs = {
+            f"fr-0023:fixture:{manifest.adapter_key}:{fixture_id}"
+            for fixture_id in fixture_ids_by_case_type.get("success", set())
+        }
+        error_refs = {
+            f"fr-0023:fixture:{manifest.adapter_key}:{fixture_id}"
+            for fixture_id in fixture_ids_by_case_type.get("error_mapping", set())
+        }
+        if not refs & success_refs or not refs & error_refs:
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource proof admission evidence must bind success and error_mapping fixtures",
+                details={"adapter_key": manifest.adapter_key, "admission_ref": admission.admission_ref},
+            )
+        for evidence_ref in refs:
+            if evidence_ref in {manifest_ref, contract_profile_ref} or evidence_ref in fixture_refs:
+                continue
+            raise ThirdPartyContractEntryError(
+                "invalid_manifest_resource_requirement_declarations",
+                "resource proof admission evidence refs must resolve inside the current contract entry",
+                details={
+                    "adapter_key": manifest.adapter_key,
+                    "admission_ref": admission.admission_ref,
+                    "evidence_ref": evidence_ref,
+                },
+            )
+
+
+def _resource_proof_admission_signatures(
+    admissions: tuple[ThirdPartyResourceProofAdmission, ...],
+) -> tuple[tuple[Any, ...], ...]:
+    return tuple(
+        sorted(
+            (
+                admission.admission_ref,
+                admission.adapter_key,
+                admission.base_profile_ref,
+                admission.capability,
+                tuple(sorted(admission.execution_path.items())),
+                admission.resource_dependency_mode,
+                admission.required_capabilities,
+                admission.admission_evidence_refs,
+                admission.decision,
+            )
+            for admission in admissions
+        )
     )
 
 

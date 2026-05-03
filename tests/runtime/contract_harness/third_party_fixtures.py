@@ -5,10 +5,25 @@ from typing import Any
 
 from syvert.runtime import AdapterExecutionContext, PlatformAdapterError
 
-THIRD_PARTY_FIXTURE_ADAPTER_KEY = "xhs"
+THIRD_PARTY_FIXTURE_ADAPTER_KEY = "community_detail"
 THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID = "syvert-adapter-runtime-v0.8.0"
 THIRD_PARTY_SUCCESS_FIXTURE_ID = "third-party-content-detail-success"
 THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID = "third-party-content-detail-error-mapping"
+THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF = (
+    "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account-proxy"
+)
+THIRD_PARTY_ACCOUNT_ADMISSION_REF = (
+    "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account"
+)
+
+
+def third_party_admission_evidence_refs() -> tuple[str, ...]:
+    return (
+        "fr-0023:manifest:community_detail:adapter_only_content_detail_v0_8",
+        "fr-0023:contract-profile:community_detail:adapter_only_content_detail_v0_8",
+        f"fr-0023:fixture:community_detail:{THIRD_PARTY_SUCCESS_FIXTURE_ID}",
+        f"fr-0023:fixture:community_detail:{THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID}",
+    )
 
 
 def third_party_resource_requirement_declarations() -> tuple[dict[str, Any], ...]:
@@ -42,6 +57,11 @@ def minimal_third_party_adapter_manifest() -> dict[str, Any]:
         "supported_targets": ("url",),
         "supported_collection_modes": ("hybrid",),
         "resource_requirement_declarations": third_party_resource_requirement_declarations(),
+        "resource_proof_admission_refs": (
+            THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF,
+            THIRD_PARTY_ACCOUNT_ADMISSION_REF,
+        ),
+        "resource_proof_admissions": third_party_resource_proof_admissions(),
         "result_contract": {
             "success_payload_fields": ("raw", "normalized"),
             "normalized_owner": "adapter",
@@ -104,6 +124,39 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
     )
 
 
+def third_party_resource_proof_admissions() -> tuple[dict[str, Any], ...]:
+    evidence_refs = third_party_admission_evidence_refs()
+    execution_path = {
+        "operation": "content_detail_by_url",
+        "target_type": "url",
+        "collection_mode": "hybrid",
+    }
+    return (
+        {
+            "admission_ref": THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF,
+            "adapter_key": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+            "base_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "capability": "content_detail",
+            "execution_path": execution_path,
+            "resource_dependency_mode": "required",
+            "required_capabilities": ("account", "proxy"),
+            "admission_evidence_refs": evidence_refs,
+            "decision": "admit_third_party_profile_for_contract_test_v0_8_0",
+        },
+        {
+            "admission_ref": THIRD_PARTY_ACCOUNT_ADMISSION_REF,
+            "adapter_key": THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+            "base_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account",
+            "capability": "content_detail",
+            "execution_path": execution_path,
+            "resource_dependency_mode": "required",
+            "required_capabilities": ("account",),
+            "admission_evidence_refs": evidence_refs,
+            "decision": "admit_third_party_profile_for_contract_test_v0_8_0",
+        },
+    )
+
+
 def _success_payload(url: str) -> dict[str, Any]:
     return {
         "raw": {
@@ -152,6 +205,11 @@ class ThirdPartyContractFixtureAdapter:
     supported_targets = frozenset({"url"})
     supported_collection_modes = frozenset({"hybrid"})
     resource_requirement_declarations = third_party_resource_requirement_declarations()
+    resource_proof_admission_refs = (
+        THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF,
+        THIRD_PARTY_ACCOUNT_ADMISSION_REF,
+    )
+    resource_proof_admissions = third_party_resource_proof_admissions()
     result_contract = {
         "success_payload_fields": ("raw", "normalized"),
         "normalized_owner": "adapter",
@@ -205,11 +263,15 @@ class ThirdPartyContractFixtureAdapter:
 
 __all__ = [
     "THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID",
+    "THIRD_PARTY_ACCOUNT_ADMISSION_REF",
+    "THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF",
     "THIRD_PARTY_FIXTURE_ADAPTER_KEY",
     "THIRD_PARTY_FIXTURE_SDK_CONTRACT_ID",
     "THIRD_PARTY_SUCCESS_FIXTURE_ID",
     "ThirdPartyContractFixtureAdapter",
     "minimal_third_party_adapter_fixtures",
     "minimal_third_party_adapter_manifest",
+    "third_party_admission_evidence_refs",
     "third_party_resource_requirement_declarations",
+    "third_party_resource_proof_admissions",
 ]

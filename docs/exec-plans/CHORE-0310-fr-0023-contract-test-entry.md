@@ -58,11 +58,12 @@
 - guardian review 第十六次返回 `REQUEST_CHANGES`，阻断项为 harness 允许真实 runtime 不会保留的 `unsupported` PlatformAdapterError category，且 exec-plan 对 resource declaration 校验路径仍描述为 `AdapterRegistry.from_mapping()`；已将 error mapping category 收窄到 runtime 会保留的 `invalid_input` / `platform`，PlatformAdapterError observation 复用 `classify_adapter_error()`，并校正文档真相。
 - guardian review 第十七次返回 `REQUEST_CHANGES`，阻断项为第三方入口绕过 FR-0027 proof `reference_adapters` 覆盖校验；已恢复与 registry / FR-0027 truth 一致的 `adapter_key in proof.reference_adapters` 校验，最小通过 fixture 使用当前 proof 覆盖的 `xhs` adapter key，非参考 key 借用 proof 时 fail-closed。
 - guardian review 第十八次返回 `REQUEST_CHANGES`，阻断项为 `xhs` 通过样例与 FR-0023 third-party adapter_key 边界冲突，以及 success fixture 未证明 target input 被 payload 绑定；已补强 success payload target binding。剩余 P1 是 formal truth 冲突：FR-0023 要求第三方 key 不携带 provider 产品名，FR-0027 当前 approved proof 又只覆盖 `xhs` / `douyin` 且要求 `adapter_key ∈ reference_adapters`。
+- `#331` / PR `#334` 已合入主干，新增 FR-0023 third-party resource proof admission formal bridge。当前实现已按新 truth 恢复真实第三方 `adapter_key=community_detail`，不再用 `xhs` / `douyin` 冒充第三方；entry 仍校验 FR-0027 shape、single proof ref、approved shared proof lookup、tuple 与 execution path，只有 adapter coverage 子条件可由 manifest-owned `ThirdPartyResourceProofAdmission` 逐 profile 覆盖。
+- 已新增 / 补齐 `resource_proof_admission_refs`、`resource_proof_admissions`、`AdmissionEvidenceRef` 机器校验：admission 只能来自当前 manifest，必须绑定当前 manifest、contract profile、success fixture 与 error_mapping fixture，不得依赖 reviewer 会话、外部 provider 样本或未来 implementation evidence。
 
 ## 下一步动作
 
-- 当前阻塞：需要治理决策解决 FR-0023 third-party adapter_key 与 FR-0027 current approved proof coverage 的 formal truth 冲突；在不修改 formal spec / evidence 的 implementation PR 中，无法同时满足“第三方 key 通过 baseline”和“FR-0027 proof 覆盖 adapter_key”。
-- 待决策后再提交 / 推送下一版 PR `#330` head 并重新运行 guardian review、GitHub checks 与 merge gate。
+- 运行完整本地 gate 链，提交 / 推送下一版 PR `#330` head 并重新运行 guardian review、GitHub checks 与 merge gate。
 - 使用 `scripts/merge_pr.py` 受控合并后执行 issue closeout、父 FR `#295` comment、worktree 清理与分支退役。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -400,11 +401,15 @@
   - 结果：通过，92 tests。
 - 第十八次 guardian target-binding 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
   - 结果：通过。
+- `#331` formal bridge 合入后 `git fetch origin main && git rebase origin/main`
+  - 结果：通过，当前分支基于 `origin/main=22aae087cbf7fba790d85485259d0af278f22375`。
+- `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，43 tests。覆盖真实第三方 `adapter_key`、manifest-owned resource proof admission、admission evidence refs 当前 contract entry 绑定、success target binding、error mapping 与 provider / selector / fallback / priority fail-closed。
 
 ## 未决风险
 
 - 本事项只实现 Adapter-only contract test entry，不代表 Provider offer 或 compatibility decision 已定义；相关字段继续 fail-closed。
-- 当前 FR-0027 approved proof 只覆盖 `xhs` / `douyin` reference adapters；若第三方 adapter key 需要通过当前 contract entry，必须先有 formal spec / evidence 定义第三方 proof coverage 或复用规则。
+- FR-0027 approved proof 仍只覆盖 `xhs` / `douyin` reference adapters；第三方 adapter coverage 只在 FR-0023 contract test entry 中通过 `#331` 定义的 manifest-owned resource proof admission bridge 参与判定，不改写 FR-0027 proof 本体或 registry truth。
 - Registry discovery 的 public metadata 输出面继续由既有 `syvert/registry.py` / `tests/runtime/test_registry.py` 覆盖；本事项只验证第三方 contract entry 不接受 provider-facing metadata。
 - Reference adapter baseline 不在本事项 ownership 内；`#311` 负责 SDK docs / migration 说明，`#312` 负责父 FR closeout 时核对 reference baseline、contract entry 与 GitHub 状态。
 - 若后续 `#314/#319` 并行修改相邻 validator 或 docs，本事项只消费主干合并后的事实，不覆盖其 ownership 文件。
@@ -419,3 +424,4 @@
 - worktree 创建基线：`589ea1e73ebce464ac16d292c180e08cee302ce5`
 - implementation checkpoint：`7f82cbc71a72ea159d85b03dfdefe0e7286e6e28`
 - docs_guard follow-up checkpoint：`7f2f8e6d7f15fc2fa9abcf9e0fa3eefa814a3c13`
+- post-#331 admission implementation checkpoint：待本轮 commit 生成
