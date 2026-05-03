@@ -103,5 +103,6 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - docs checkpoint：`91f1d18dfc9b9bc5d5c765ca9e8ea848c5b8a823`
-- validation result follow-up checkpoint：待提交
+- validation result follow-up checkpoint：`a4a77ddd70309fe970f9db17e4cd8612f2582036`
+- 说明：后续若仅补 PR / guardian / merge gate / closeout metadata，不自动推进上述语义 checkpoint；当前 live review head 由 PR head 与 guardian state 绑定。
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
