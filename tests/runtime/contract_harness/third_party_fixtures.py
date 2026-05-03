@@ -242,7 +242,7 @@ class ThirdPartyContractFixtureAdapter:
         if "content-not-found" in request.target_value:
             raise PlatformAdapterError(
                 code=self.error_code,
-                message="third-party fixture mapped platform error",
+                message="content is unavailable or deleted",
                 details={"source_error": "content_not_found"},
             )
         if self.success_payload_shape == "non_mapping":

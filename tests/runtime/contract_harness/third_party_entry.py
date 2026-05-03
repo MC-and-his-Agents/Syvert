@@ -187,6 +187,7 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
         "douyin",
     }
 )
+_FORBIDDEN_PROVIDER_PRODUCT_ALIASES = frozenset({"douyin", "xiaohongshu", "xhs"})
 _APPROVED_CONTRACT_CAPABILITIES = frozenset({"content_detail"})
 _RESOURCE_PROOF_ADMISSION_DECISION = "admit_third_party_profile_for_contract_test_v0_8_0"
 _MISSING = object()
@@ -569,14 +570,19 @@ def _validate_adapter_key_boundary(adapter_key: str) -> None:
         for segment in re.split(r"[-_.:]+", adapter_key.lower())
         if segment
     )
-    forbidden_fragments = tuple(
-        sorted(fragment for fragment in _FORBIDDEN_ADAPTER_KEY_FRAGMENTS if fragment in normalized_segments)
+    forbidden_fragments = set(
+        fragment for fragment in _FORBIDDEN_ADAPTER_KEY_FRAGMENTS if fragment in normalized_segments
     )
-    if forbidden_fragments:
+    for segment in normalized_segments:
+        for alias in _FORBIDDEN_PROVIDER_PRODUCT_ALIASES:
+            if segment == alias or segment.startswith(alias) or segment.endswith(alias):
+                forbidden_fragments.add(alias)
+    normalized_forbidden_fragments = tuple(sorted(forbidden_fragments))
+    if normalized_forbidden_fragments:
         raise ThirdPartyContractEntryError(
             "invalid_adapter_key_boundary",
             "adapter_key must not carry provider, account, environment, or routing strategy semantics",
-            details={"adapter_key": adapter_key, "forbidden_fragments": forbidden_fragments},
+            details={"adapter_key": adapter_key, "forbidden_fragments": normalized_forbidden_fragments},
         )
 
 
@@ -1336,7 +1342,7 @@ def _execute_and_validate_fixture(
     result = validate_contract_sample(sample, HarnessExecutionResult(runtime_envelope=runtime_envelope))
     result["observed_capability"] = runtime_envelope.get("capability")
     if result["verdict"] == "legal_failure":
-        return _validate_error_mapping_observation(fixture, result)
+        return _validate_error_mapping_observation(manifest, fixture, result)
     if result["verdict"] == "pass":
         return _validate_success_payload_observation(fixture, runtime_envelope, result)
     return result
@@ -1725,6 +1731,7 @@ def _validate_fixture_resource_profiles(
 
 
 def _validate_error_mapping_observation(
+    manifest: ThirdPartyAdapterManifest,
     fixture: AdapterContractFixture,
     result: dict[str, Any],
 ) -> dict[str, Any]:
@@ -1741,7 +1748,17 @@ def _validate_error_mapping_observation(
         }
     expected_category = expected_error["category"]
     expected_code = expected_error["code"]
-    if observed_error.get("category") != expected_category or observed_error.get("code") != expected_code:
+    expected_source_error = expected_error["source_error"]
+    manifest_error_mapping = _require_mapping(
+        manifest.error_mapping.get(expected_source_error),
+        field=f"error_mapping.{expected_source_error}",
+    )
+    expected_message = manifest_error_mapping.get("message")
+    if (
+        observed_error.get("category") != expected_category
+        or observed_error.get("code") != expected_code
+        or observed_error.get("message") != expected_message
+    ):
         return {
             **result,
             "verdict": "contract_violation",
@@ -1751,7 +1768,6 @@ def _validate_error_mapping_observation(
             },
         }
     observed_details = observed_error.get("details")
-    expected_source_error = expected_error["source_error"]
     if (
         not isinstance(observed_details, Mapping)
         or observed_details.get("source_error") != expected_source_error

@@ -96,7 +96,7 @@ class AdapterWithInvalidPlatformErrorDetails(ThirdPartyContractFixtureAdapter):
     def execute(self, request):  # type: ignore[no-untyped-def]
         raise PlatformAdapterError(
             code="content_not_found",
-            message="third-party fixture mapped platform error",
+            message="content is unavailable or deleted",
             details=self._details,  # type: ignore[arg-type]
         )
 
@@ -106,7 +106,7 @@ class AdapterWithUnsupportedCategoryPlatformError(ThirdPartyContractFixtureAdapt
         if "content-not-found" in request.target_value:
             raise PlatformAdapterError(
                 code="content_not_found",
-                message="third-party fixture mapped platform error",
+                message="content is unavailable or deleted",
                 details={"source_error": "content_not_found"},
                 category="unsupported",
             )
@@ -118,8 +118,19 @@ class AdapterWithMismatchedSourceErrorDetails(ThirdPartyContractFixtureAdapter):
         if "content-not-found" in request.target_value:
             raise PlatformAdapterError(
                 code="content_not_found",
-                message="third-party fixture mapped platform error",
+                message="content is unavailable or deleted",
                 details={"source_error": "different_source_error"},
+            )
+        return super().execute(request)
+
+
+class AdapterWithMismatchedErrorMessage(ThirdPartyContractFixtureAdapter):
+    def execute(self, request):  # type: ignore[no-untyped-def]
+        if "content-not-found" in request.target_value:
+            raise PlatformAdapterError(
+                code="content_not_found",
+                message="different error message",
+                details={"source_error": "content_not_found"},
             )
         return super().execute(request)
 
@@ -316,6 +327,9 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             "provider-xhs",
             "xhs-prod-account-1",
             "xhs-selector-fallback",
+            "xhsadapter",
+            "douyinadapter",
+            "xiaohongshu_adapter",
         )
         for adapter_key in invalid_adapter_keys:
             with self.subTest(adapter_key=adapter_key):
@@ -792,6 +806,18 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
         self.assertEqual(error_result["verdict"], "contract_violation")
         self.assertEqual(error_result["reason"]["code"], "error_mapping_source_error_mismatch")
+
+    def test_reports_adapter_error_mapping_message_mismatch(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=AdapterWithMismatchedErrorMessage(),
+        )
+
+        error_result = results[1]
+        self.assertEqual(error_result["sample_id"], THIRD_PARTY_ERROR_MAPPING_FIXTURE_ID)
+        self.assertEqual(error_result["verdict"], "contract_violation")
+        self.assertEqual(error_result["reason"]["code"], "error_mapping_mismatch")
 
     def test_normalizes_platform_adapter_error_category_through_runtime_classifier(self) -> None:
         results = run_third_party_adapter_contract_test(

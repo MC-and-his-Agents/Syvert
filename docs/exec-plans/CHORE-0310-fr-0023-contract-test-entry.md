@@ -61,6 +61,7 @@
 - `#331` / PR `#334` 已合入主干，新增 FR-0023 third-party resource proof admission formal bridge。当前实现已按新 truth 恢复真实第三方 `adapter_key=community_detail`，不再用 `xhs` / `douyin` 冒充第三方；entry 仍校验 FR-0027 shape、single proof ref、approved shared proof lookup、tuple 与 execution path，只有 adapter coverage 子条件可由 manifest-owned `ThirdPartyResourceProofAdmission` 逐 profile 覆盖。
 - 已新增 / 补齐 `resource_proof_admission_refs`、`resource_proof_admissions`、`AdmissionEvidenceRef` 机器校验：admission 只能来自当前 manifest，必须绑定当前 manifest、contract profile、success fixture 与 error_mapping fixture，不得依赖 reviewer 会话、外部 provider 样本或未来 implementation evidence。
 - guardian review 第十九次返回 `REQUEST_CHANGES`，阻断项为 manifest 声明 `account_proxy` 与 `account` 两个 resource profiles，但 fixtures 只执行 `account_proxy`，导致 declared / admitted profile coverage 不完整；已补充每个声明 profile 必须被 fixture 执行覆盖的准入校验，并要求 admission evidence 至少绑定一个实际执行该 admitted profile 的 fixture。当前 fixture success 覆盖 `account_proxy`，error_mapping 覆盖 `account`。
+- guardian review 第二十次返回 `REQUEST_CHANGES`，阻断项为 adapter_key provider 产品名无分隔符变体（如 `xhsadapter`、`douyinadapter`、`xiaohongshu_adapter`）可绕过，以及 `error_mapping.message` 未被执行观测校验；已补充 provider 产品别名的 segment 前缀 / 后缀阻断，并将 manifest `error_mapping.message` 纳入 failed envelope observation。
 
 ## 下一步动作
 
@@ -408,6 +409,8 @@
   - 结果：通过，43 tests。覆盖真实第三方 `adapter_key`、manifest-owned resource proof admission、admission evidence refs 当前 contract entry 绑定、success target binding、error mapping 与 provider / selector / fallback / priority fail-closed。
 - 第十九次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
   - 结果：通过，44 tests。新增回归覆盖声明 resource profile 未被任何 fixture 执行时 fail-closed。
+- 第二十次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，45 tests。新增回归覆盖 provider 产品名无分隔符 adapter_key 变体 fail-closed 与 error_mapping message mismatch。
 
 ## 未决风险
 
