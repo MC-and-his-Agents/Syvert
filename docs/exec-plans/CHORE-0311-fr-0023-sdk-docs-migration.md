@@ -70,6 +70,10 @@
   - 结果：通过；确认 `#311` open，item_key=`CHORE-0311-fr-0023-sdk-docs-migration`，item_type=`CHORE`，release=`v0.8.0`，sprint=`2026-S21`，父 FR=`#295`。
 - 已核对 `#310` merge commit `4e90953447e20b1fffaee0f8104f989bd043202e`，确认 third-party contract entry 与 fixture truth 已在主干。
 - 已核对 `tests/runtime/contract_harness/third_party_entry.py` 的入口函数名与 `tests/runtime/contract_harness/third_party_fixtures.py` 的 manifest / admission / fixture 字段。
+- `python3 scripts/pr_guardian.py review 337 --post-review`
+  - 初次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：SDK docs 手写 `resource_proof_admission_refs` 示例 prefix，与 `FR-0023` formal spec 中的 scenario 示例命名不一致，容易形成第二套 admission ref 命名。
+  - 修正：不修改 `FR-0023` formal spec；SDK docs 改为引用 `tests/runtime/contract_harness/third_party_fixtures.py` 中的 admission ref constants，并明确 SDK 文档不重新定义 admission ref 字符串命名。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过；提交 `3f5f0ab` 后复跑通过。
 - `python3 scripts/spec_guard.py --mode ci --all`

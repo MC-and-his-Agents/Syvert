@@ -171,6 +171,11 @@ contract test 入口应消费这些声明并产出 `compatibility decision`：
 最小 manifest 形状如下；字段名与当前 contract fixture 保持一致：
 
 ```python
+from tests.runtime.contract_harness.third_party_fixtures import (
+    THIRD_PARTY_ACCOUNT_ADMISSION_REF,
+    THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF,
+)
+
 THIRD_PARTY_ADAPTER_MANIFEST = {
     "adapter_key": "community_detail",
     "sdk_contract_id": "syvert-adapter-runtime-v0.8.0",
@@ -198,8 +203,8 @@ THIRD_PARTY_ADAPTER_MANIFEST = {
         },
     ),
     "resource_proof_admission_refs": (
-        "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account-proxy",
-        "fr-0023:resource-proof-admission:community_detail:content-detail-by-url-hybrid:account",
+        THIRD_PARTY_ACCOUNT_PROXY_ADMISSION_REF,
+        THIRD_PARTY_ACCOUNT_ADMISSION_REF,
     ),
     "resource_proof_admissions": (...,),
     "result_contract": {
@@ -226,6 +231,7 @@ THIRD_PARTY_ADAPTER_MANIFEST = {
 每条 admission 必须满足：
 
 - `admission_ref` 必须被 manifest `resource_proof_admission_refs` 唯一引用。
+- SDK 文档不重新定义 admission ref 字符串命名；作者应使用当前 manifest-owned admission entry 的稳定 `admission_ref`，并保持它与 fixture / contract entry 常量一致。
 - `adapter_key` 必须等于 manifest、resource declaration 与 fixture `manifest_ref`。
 - `base_profile_ref` 必须指向当前 `FR-0027` approved shared profile proof。
 - `capability`、`execution_path`、`resource_dependency_mode` 与 `required_capabilities` 必须和 manifest / declaration / fixture 完全一致。
