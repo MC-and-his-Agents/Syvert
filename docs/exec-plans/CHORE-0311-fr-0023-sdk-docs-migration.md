@@ -77,18 +77,22 @@
   - 第二次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
   - 阻断项：分支基于旧 `origin/main`，会回滚 PR `#336` / commit `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 已合入的 `FR-0024` closeout exec-plan 与 release / sprint 索引事实。
   - 修正：已 rebase 到 `origin/main@bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`，手动合并 `docs/sprints/2026-S21.md` 冲突，保留 FR-0024 与 FR-0023 两组索引。
+  - 第三次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：exec-plan 未记录 `adapter-sdk.md` 修复后的 final-head validation evidence，且 sprint `相关 Issue / PR` 缺少 `#331` resource proof bridge。
+  - 修正：补充 `#331` 到 sprint GitHub 回链，并在本执行计划记录 PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 的本地门禁结果。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过；PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 复跑通过。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过；PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 复跑通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过；PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 复跑通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-311-fr-0023-adapter-sdk`
-  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过。
+  - 结果：通过；提交 `3f5f0ab` 后复跑通过；rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后复跑通过；PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 复跑通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 提交前结果：未执行通过；提交前 `HEAD` 相对 `origin/main` 尚无已提交 diff，脚本报告“当前分支相对基线没有变更”。
   - 提交 `3f5f0ab` 后结果：通过，PR class=`docs`，变更类别=`docs`。
   - rebase 到 `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` 后结果：通过，PR class=`docs`，变更类别=`docs`。
+  - PR head `4081dc959bb8cb52200f9ed83c2450fbabee81e6` 结果：通过，PR class=`docs`，变更类别=`docs`。
 - `git diff --check`
   - 结果：通过。
 - 提交 `3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
