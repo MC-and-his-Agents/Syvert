@@ -44,7 +44,7 @@
 
 ## 下一步动作
 
-- 运行 docs/spec/workflow/governance/pr_scope docs class 门禁。
+- 运行 `docs_guard`、`spec_guard`、`workflow_guard`、`governance_gate` 与 `pr_scope_guard --class docs` 门禁。
 - 使用中文 Conventional Commit 提交 docs checkpoint。
 - 使用 `scripts/open_pr.py --class docs` 受控创建 PR，并绑定 `Fixes #321`。
 - 运行 guardian review；guardian 不设置超时。
@@ -72,10 +72,21 @@
 - 已核对父 FR `#297`：本事项不得关闭父 FR，不得引入 Core provider registry、provider selector、fallback priority、marketplace、真实 provider 产品支持或 compatibility decision。
 - 已核对 PR `#328` 已合入：`FR-0025` formal spec / data model / contracts 已作为 Provider offer carrier truth 进入主干。
 - 已核对 PR `#335` 已合入：`syvert/provider_capability_offer.py`、`tests/runtime/provider_capability_offer_fixtures.py` 与 `tests/runtime/test_provider_capability_offer.py` 已作为 validator / fixture truth 进入主干。
+- `git commit -m 'docs(sdk): 补齐 FR-0025 provider offer 证据'`
+  - 结果：已生成 docs checkpoint `91f1d18dfc9b9bc5d5c765ca9e8ea848c5b8a823`。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过，`docs-guard 通过。`
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过，`spec-guard 通过。`
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过，`workflow-guard 通过。`
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-321-fr-0025-provider-offer-sdk`
+  - 结果：通过，`governance-gate 通过。`
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
-- docs/spec/workflow/governance/pr_scope docs class 门禁
 - PR guardian review、GitHub checks、受控 merge 与 closeout reconciliation
 
 ## 未决风险
@@ -91,5 +102,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- docs checkpoint：待提交
+- docs checkpoint：`91f1d18dfc9b9bc5d5c765ca9e8ea848c5b8a823`
+- validation result follow-up checkpoint：待提交
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
