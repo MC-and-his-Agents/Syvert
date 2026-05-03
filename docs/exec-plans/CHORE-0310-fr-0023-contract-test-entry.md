@@ -63,6 +63,7 @@
 - guardian review 第十九次返回 `REQUEST_CHANGES`，阻断项为 manifest 声明 `account_proxy` 与 `account` 两个 resource profiles，但 fixtures 只执行 `account_proxy`，导致 declared / admitted profile coverage 不完整；已补充每个声明 profile 必须被 fixture 执行覆盖的准入校验，并要求 admission evidence 至少绑定一个实际执行该 admitted profile 的 fixture。当前 fixture success 覆盖 `account_proxy`，error_mapping 覆盖 `account`。
 - guardian review 第二十次返回 `REQUEST_CHANGES`，阻断项为 adapter_key provider 产品名无分隔符变体（如 `xhsadapter`、`douyinadapter`、`xiaohongshu_adapter`）可绕过，以及 `error_mapping.message` 未被执行观测校验；已补充 provider 产品别名的 segment 前缀 / 后缀阻断，并将 manifest `error_mapping.message` 纳入 failed envelope observation。
 - guardian review 第二十一次返回 `REQUEST_CHANGES`，阻断项为 provider 产品别名仍可作为同一 segment 中缀伪装（如 `communityxhscontent` / `communitydouyincontent`）；已将产品别名检测限定扩展为 segment 内任意位置匹配，仅覆盖 `xhs` / `douyin` / `xiaohongshu` provider identity alias。
+- guardian review 第二十二次返回 `REQUEST_CHANGES`，阻断项为第三方 harness 折叠 Core operation capability 与 Adapter family capability，且 success payload 被合并进 runtime envelope 导致额外 adapter 字段泄漏；已按真实 runtime 语义区分 `operation=content_detail_by_url` 与 `capability=content_detail`，resource bundle / runtime envelope 使用 Core operation，Adapter request 使用 family capability，并将 success payload 投影为仅包含 `task_id`、`adapter_key`、`capability`、`status`、`raw`、`normalized` 的 runtime envelope。
 
 ## 下一步动作
 
@@ -258,6 +259,24 @@
   - 修正：error_mapping observation 现在要求 observed failed envelope 的 `error.details.source_error` 与 fixture expected source_error 完全一致，否则返回 `error_mapping_source_error_mismatch` contract violation。
 - 第十二次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration`
   - 结果：通过，78 tests。
+- 第二十二次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，46 tests。
+- 第二十二次 guardian 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，140 tests。
+- 第二十二次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-310-fr-0023-adapter-contract-test`
+  - 结果：通过。
+- 第二十二次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十二次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过。
 - 第十二次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`

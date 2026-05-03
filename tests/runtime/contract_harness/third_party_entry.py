@@ -14,6 +14,7 @@ from syvert.runtime import (
     AdapterTaskRequest,
     PlatformAdapterError,
     classify_adapter_error,
+    validate_success_payload,
 )
 from tests.runtime.contract_harness.validation_tool import (
     ContractSampleDefinition,
@@ -154,15 +155,6 @@ _ERROR_FIXTURE_EXPECTED_ERROR_FIELD_NAMES = frozenset(
     }
 )
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
-_RESERVED_RUNTIME_ENVELOPE_FIELDS = frozenset(
-    {
-        "adapter_key",
-        "capability",
-        "error",
-        "status",
-        "task_id",
-    }
-)
 _APPROVED_PROFILE_PROOF_BY_REF = {
     entry.profile_ref: entry
     for entry in approved_shared_resource_requirement_profile_evidence_entries()
@@ -1287,18 +1279,20 @@ def _execute_and_validate_fixture(
     sample = ContractSampleDefinition(sample_id=fixture.fixture_id, expected_outcome=expected_outcome)
     task_id = f"task-{fixture.fixture_id}"
     fixture_input = _normalize_fixture_input(manifest, fixture)
+    core_operation = fixture_input["operation"]
+    adapter_capability = fixture_input["capability"]
     resource_profile = _resource_profile_for_fixture(manifest, fixture, fixture_input["resource_profile_key"])
     resource_bundle = build_managed_resource_bundle(
         adapter_key=manifest.adapter_key,
         task_id=task_id,
-        capability=fixture_input["capability"],
+        capability=core_operation,
         requested_slots=resource_profile.required_capabilities,
     )
     try:
         payload = adapter.execute(
             AdapterExecutionContext(
                 request=AdapterTaskRequest(
-                    capability=fixture_input["capability"],
+                    capability=adapter_capability,
                     target_type=fixture_input["target_type"],
                     target_value=fixture_input["target_value"],
                     collection_mode=fixture_input["collection_mode"],
@@ -1309,7 +1303,7 @@ def _execute_and_validate_fixture(
         runtime_envelope = _build_success_runtime_envelope(
             task_id=task_id,
             adapter_key=manifest.adapter_key,
-            capability=fixture_input["capability"],
+            capability=core_operation,
             payload=payload,
         )
     except PlatformAdapterError as error:
@@ -1317,7 +1311,7 @@ def _execute_and_validate_fixture(
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
-            "capability": fixture_input["capability"],
+            "capability": core_operation,
             "status": "failed",
             "error": {
                 "category": details["category"],
@@ -1330,7 +1324,7 @@ def _execute_and_validate_fixture(
         runtime_envelope = {
             "task_id": task_id,
             "adapter_key": manifest.adapter_key,
-            "capability": fixture_input["capability"],
+            "capability": core_operation,
             "status": "failed",
             "error": {
                 "category": "runtime_contract",
@@ -1341,6 +1335,8 @@ def _execute_and_validate_fixture(
         }
     result = validate_contract_sample(sample, HarnessExecutionResult(runtime_envelope=runtime_envelope))
     result["observed_capability"] = runtime_envelope.get("capability")
+    if result["verdict"] == "pass":
+        result["observed_success_fields"] = tuple(sorted(runtime_envelope))
     if result["verdict"] == "legal_failure":
         return _validate_error_mapping_observation(manifest, fixture, result)
     if result["verdict"] == "pass":
@@ -1362,19 +1358,18 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
-        reserved_fields = tuple(sorted(set(payload) & _RESERVED_RUNTIME_ENVELOPE_FIELDS))
-        if reserved_fields:
+        payload_error = validate_success_payload(payload)
+        if payload_error is not None:
             return {
                 **envelope,
                 "status": "failed",
-                "error": {
-                    "category": "runtime_contract",
-                    "code": "adapter_payload_reserved_runtime_fields",
-                    "message": "adapter success payload must not carry runtime envelope context fields",
-                    "details": {"reserved_fields": reserved_fields},
-                },
+                "error": payload_error,
             }
-        return {**envelope, **payload}
+        return {
+            **envelope,
+            "raw": payload["raw"],
+            "normalized": payload["normalized"],
+        }
     return {
         **envelope,
         "non_mapping_payload_type": type(payload).__name__,

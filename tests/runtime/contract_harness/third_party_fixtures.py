@@ -256,6 +256,11 @@ class ThirdPartyContractFixtureAdapter:
                 "capability": "drifted-capability",
                 "status": "success",
             }
+        if self.success_payload_shape == "extra_adapter_fields":
+            return {
+                **_success_payload(request.target_value),
+                "adapter_debug_trace": "must-not-leak-to-runtime-envelope",
+            }
         if self.success_payload_shape == "static_target":
             return _success_payload("https://contract-host/third-party/static")
         return _success_payload(request.target_value)

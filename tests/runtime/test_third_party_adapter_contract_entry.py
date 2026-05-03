@@ -190,10 +190,14 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(results[1]["observed_status"], "failed")
         self.assertEqual(results[1]["observed_error"]["category"], "platform")
         self.assertEqual(results[1]["observed_error"]["code"], "content_not_found")
-        self.assertEqual(results[0]["observed_capability"], "content_detail")
-        self.assertEqual(results[1]["observed_capability"], "content_detail")
+        self.assertEqual(results[0]["observed_capability"], "content_detail_by_url")
+        self.assertEqual(results[1]["observed_capability"], "content_detail_by_url")
+        self.assertEqual(
+            results[0]["observed_success_fields"],
+            ("adapter_key", "capability", "normalized", "raw", "status", "task_id"),
+        )
         self.assertEqual(adapter.last_request_capability, "content_detail")
-        self.assertEqual(adapter.last_resource_bundle_capability, "content_detail")
+        self.assertEqual(adapter.last_resource_bundle_capability, "content_detail_by_url")
         self.assertEqual(adapter.last_resource_slots, ("account",))
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
@@ -695,7 +699,9 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         success_result = results[0]
         self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
         self.assertEqual(success_result["verdict"], "contract_violation")
-        self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
+        self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
+        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
+        self.assertEqual(success_result["observed_error"]["code"], "invalid_adapter_success_payload")
 
     def test_reports_non_mapping_adapter_success_payload_as_contract_violation(self) -> None:
         results = run_third_party_adapter_contract_test(
@@ -709,7 +715,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         self.assertEqual(success_result["verdict"], "contract_violation")
         self.assertEqual(success_result["reason"]["code"], "invalid_adapter_success_payload")
 
-    def test_reports_reserved_runtime_fields_in_success_payload_as_contract_violation(self) -> None:
+    def test_projects_success_payload_to_runtime_envelope_without_leaking_adapter_fields(self) -> None:
         results = run_third_party_adapter_contract_test(
             manifest=minimal_third_party_adapter_manifest(),
             fixtures=minimal_third_party_adapter_fixtures(),
@@ -718,13 +724,25 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
 
         success_result = results[0]
         self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
-        self.assertEqual(success_result["verdict"], "contract_violation")
-        self.assertEqual(success_result["reason"]["code"], "unexpected_failed_envelope")
-        self.assertEqual(success_result["observed_error"]["category"], "runtime_contract")
-        self.assertEqual(success_result["observed_error"]["code"], "adapter_payload_reserved_runtime_fields")
+        self.assertEqual(success_result["verdict"], "pass")
         self.assertEqual(
-            success_result["observed_error"]["details"]["reserved_fields"],
-            ("adapter_key", "capability", "status"),
+            success_result["observed_success_fields"],
+            ("adapter_key", "capability", "normalized", "raw", "status", "task_id"),
+        )
+
+    def test_projects_success_payload_without_leaking_extra_adapter_fields(self) -> None:
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=minimal_third_party_adapter_fixtures(),
+            adapter=ThirdPartyContractFixtureAdapter(success_payload_shape="extra_adapter_fields"),
+        )
+
+        success_result = results[0]
+        self.assertEqual(success_result["sample_id"], THIRD_PARTY_SUCCESS_FIXTURE_ID)
+        self.assertEqual(success_result["verdict"], "pass")
+        self.assertEqual(
+            success_result["observed_success_fields"],
+            ("adapter_key", "capability", "normalized", "raw", "status", "task_id"),
         )
 
     def test_reports_success_payload_that_ignores_fixture_target_as_contract_violation(self) -> None:
