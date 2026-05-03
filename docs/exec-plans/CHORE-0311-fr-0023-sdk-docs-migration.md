@@ -97,7 +97,7 @@
   - 结果：通过。
 - 提交 `3f5f0abf85a4def80ddd1e23c3dd21f52738fbd0`
   - 结果：已生成 docs checkpoint，提交信息 `docs(adapter): 补齐 FR-0023 SDK 接入指引`。
-- rebase 后提交 `a453ce762e9ef9434df999d9dd394c2634c0e53f`
+- rebase 后提交 `a453ce7893c0de413e6ddb5eba864fd4129ebb0f`
   - 结果：保留同一 docs checkpoint 内容并同步到当前主干；提交信息 `docs(adapter): 补齐 FR-0023 SDK 接入指引`。
 
 ## 待验证项
