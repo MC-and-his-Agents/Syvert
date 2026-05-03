@@ -64,6 +64,7 @@
 - guardian review 第二十次返回 `REQUEST_CHANGES`，阻断项为 adapter_key provider 产品名无分隔符变体（如 `xhsadapter`、`douyinadapter`、`xiaohongshu_adapter`）可绕过，以及 `error_mapping.message` 未被执行观测校验；已补充 provider 产品别名的 segment 前缀 / 后缀阻断，并将 manifest `error_mapping.message` 纳入 failed envelope observation。
 - guardian review 第二十一次返回 `REQUEST_CHANGES`，阻断项为 provider 产品别名仍可作为同一 segment 中缀伪装（如 `communityxhscontent` / `communitydouyincontent`）；已将产品别名检测限定扩展为 segment 内任意位置匹配，仅覆盖 `xhs` / `douyin` / `xiaohongshu` provider identity alias。
 - guardian review 第二十二次返回 `REQUEST_CHANGES`，阻断项为第三方 harness 折叠 Core operation capability 与 Adapter family capability，且 success payload 被合并进 runtime envelope 导致额外 adapter 字段泄漏；已按真实 runtime 语义区分 `operation=content_detail_by_url` 与 `capability=content_detail`，resource bundle / runtime envelope 使用 Core operation，Adapter request 使用 family capability，并将 success payload 投影为仅包含 `task_id`、`adapter_key`、`capability`、`status`、`raw`、`normalized` 的 runtime envelope。
+- guardian review 第二十三次返回 `REQUEST_CHANGES`，阻断项为 resource proof admission 缺失 / 无效路径使用了实现内部错误码 `invalid_manifest_resource_requirement_declarations`，与 FR-0023 data-model 要求的 `invalid_resource_requirement` 不一致；已将 `ThirdPartyResourceProofAdmission` 解析、refs 唯一命中、approved proof lookup、tuple / execution path 对齐、profile coverage 与 evidence refs 校验统一收敛到 `invalid_resource_requirement`，普通 FR-0027 resource declaration shape 错误仍保留既有错误码。
 
 ## 下一步动作
 
@@ -276,6 +277,28 @@
 - 第二十二次 guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-310-fr-0023-adapter-contract-test`
   - 结果：通过。
 - 第二十二次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 330 --post-review`
+  - 第二十三次结果：`REQUEST_CHANGES`，`safe_to_merge=false`。
+  - 阻断项：resource proof admission failures 使用了错误的 contract error code；FR-0023 data-model 要求 admission 缺失、重复、无法解析、tuple 不一致、coverage 缺失或 evidence refs 不合法时按 `invalid_resource_requirement` fail-closed。
+  - 修正：新增 admission 专用错误码常量并贯穿 `resource_proof_admission_refs` / `resource_proof_admissions` / `ThirdPartyResourceProofAdmission` / coverage / evidence refs 校验路径，补正测试预期。
+- 第二十三次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry`
+  - 结果：通过，46 tests。
+- 第二十三次 guardian 修复后 `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_contract_harness_host tests.runtime.test_contract_harness_validation_tool tests.runtime.test_contract_harness_automation tests.runtime.test_registry tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，140 tests。
+- 第二十三次 guardian 修复后 `python3 -m py_compile tests/runtime/contract_harness/third_party_entry.py tests/runtime/contract_harness/third_party_fixtures.py tests/runtime/test_third_party_adapter_contract_entry.py`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-310-fr-0023-adapter-contract-test`
+  - 结果：通过。
+- 第二十三次 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 - 第十二次 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过。

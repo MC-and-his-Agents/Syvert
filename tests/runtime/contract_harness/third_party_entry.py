@@ -182,6 +182,7 @@ _FORBIDDEN_ADAPTER_KEY_FRAGMENTS = frozenset(
 _FORBIDDEN_PROVIDER_PRODUCT_ALIASES = frozenset({"douyin", "xiaohongshu", "xhs"})
 _APPROVED_CONTRACT_CAPABILITIES = frozenset({"content_detail"})
 _RESOURCE_PROOF_ADMISSION_DECISION = "admit_third_party_profile_for_contract_test_v0_8_0"
+_RESOURCE_REQUIREMENT_ERROR_CODE = "invalid_resource_requirement"
 _MISSING = object()
 
 
@@ -895,7 +896,11 @@ def _normalize_third_party_resource_proof_admissions(
     raw_admissions: Any,
     source: str,
 ) -> tuple[ThirdPartyResourceProofAdmission, ...]:
-    raw_sequence = _require_non_string_sequence(raw_admissions, field=f"{source}.resource_proof_admissions")
+    raw_sequence = _require_non_string_sequence(
+        raw_admissions,
+        field=f"{source}.resource_proof_admissions",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
+    )
     normalized = tuple(
         _normalize_third_party_resource_proof_admission(adapter_key, raw_admission, source=source)
         for raw_admission in raw_sequence
@@ -903,7 +908,7 @@ def _normalize_third_party_resource_proof_admissions(
     admission_refs = tuple(admission.admission_ref for admission in normalized)
     if tuple(sorted(admission_refs)) != tuple(sorted(resource_proof_admission_refs)):
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource_proof_admission_refs must exactly match manifest-owned admission entries",
             details={
                 "adapter_key": adapter_key,
@@ -914,7 +919,7 @@ def _normalize_third_party_resource_proof_admissions(
         )
     if len(set(admission_refs)) != len(admission_refs):
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admission refs must be unique",
             details={"adapter_key": adapter_key, "source": source, "admission_refs": admission_refs},
         )
@@ -927,92 +932,102 @@ def _normalize_third_party_resource_proof_admission(
     *,
     source: str,
 ) -> ThirdPartyResourceProofAdmission:
-    admission = _require_mapping(raw_admission, field=f"{source}.resource_proof_admissions")
+    admission = _require_mapping(
+        raw_admission,
+        field=f"{source}.resource_proof_admissions",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
+    )
     _validate_nested_manifest_field_set(
         admission,
         expected_fields=_RESOURCE_PROOF_ADMISSION_FIELD_NAMES,
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions",
     )
     admission_ref = _require_non_empty_string(
         admission.get("admission_ref"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.admission_ref",
     )
     admission_adapter_key = _require_non_empty_string(
         admission.get("adapter_key"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.adapter_key",
     )
     if admission_adapter_key != adapter_key:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admission adapter_key must match manifest adapter_key",
             details={"adapter_key": adapter_key, "admission_adapter_key": admission_adapter_key, "source": source},
         )
     base_profile_ref = _require_non_empty_string(
         admission.get("base_profile_ref"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.base_profile_ref",
     )
     proof = _APPROVED_PROFILE_PROOF_BY_REF.get(base_profile_ref)
     if proof is None:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admission base_profile_ref must resolve to an approved FR-0027 proof",
             details={"adapter_key": adapter_key, "admission_ref": admission_ref, "base_profile_ref": base_profile_ref},
         )
     capability = _require_non_empty_string(
         admission.get("capability"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.capability",
     )
-    execution_path = _require_mapping(admission.get("execution_path"), field=f"{source}.resource_proof_admissions.execution_path")
+    execution_path = _require_mapping(
+        admission.get("execution_path"),
+        field=f"{source}.resource_proof_admissions.execution_path",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
+    )
     _validate_nested_manifest_field_set(
         execution_path,
         expected_fields=_EXECUTION_PATH_FIELD_NAMES,
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.execution_path",
     )
     normalized_execution_path = {
         "operation": _require_non_empty_string(
             execution_path.get("operation"),
-            code="invalid_manifest_resource_requirement_declarations",
+            code=_RESOURCE_REQUIREMENT_ERROR_CODE,
             field=f"{source}.resource_proof_admissions.execution_path.operation",
         ),
         "target_type": _require_non_empty_string(
             execution_path.get("target_type"),
-            code="invalid_manifest_resource_requirement_declarations",
+            code=_RESOURCE_REQUIREMENT_ERROR_CODE,
             field=f"{source}.resource_proof_admissions.execution_path.target_type",
         ),
         "collection_mode": _require_non_empty_string(
             execution_path.get("collection_mode"),
-            code="invalid_manifest_resource_requirement_declarations",
+            code=_RESOURCE_REQUIREMENT_ERROR_CODE,
             field=f"{source}.resource_proof_admissions.execution_path.collection_mode",
         ),
     }
     resource_dependency_mode = _require_non_empty_string(
         admission.get("resource_dependency_mode"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.resource_dependency_mode",
     )
     required_capabilities = _require_string_tuple(
         admission.get("required_capabilities"),
         field=f"{source}.resource_proof_admissions.required_capabilities",
         allow_empty=True,
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
     )
     admission_evidence_refs = _require_non_empty_string_tuple(
         admission.get("admission_evidence_refs"),
         field=f"{source}.resource_proof_admissions.admission_evidence_refs",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
     )
     decision = _require_non_empty_string(
         admission.get("decision"),
-        code="invalid_manifest_resource_requirement_declarations",
+        code=_RESOURCE_REQUIREMENT_ERROR_CODE,
         field=f"{source}.resource_proof_admissions.decision",
     )
     if decision != _RESOURCE_PROOF_ADMISSION_DECISION:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admission decision is not approved for FR-0023 contract test",
             details={"adapter_key": adapter_key, "admission_ref": admission_ref, "decision": decision},
         )
@@ -1027,7 +1042,7 @@ def _normalize_third_party_resource_proof_admission(
         or proof.decision != "approve_profile_for_v0_8_0"
     ):
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admission must align with approved FR-0027 shared proof tuple",
             details={"adapter_key": adapter_key, "admission_ref": admission_ref, "base_profile_ref": base_profile_ref},
         )
@@ -1066,7 +1081,7 @@ def _validate_resource_proof_admission_profile_coverage(manifest: ThirdPartyAdap
             )
             if len(matching_admissions) != 1:
                 raise ThirdPartyContractEntryError(
-                    "invalid_manifest_resource_requirement_declarations",
+                    _RESOURCE_REQUIREMENT_ERROR_CODE,
                     "resource proof admission must cover each declaration profile not covered by FR-0027 reference_adapters",
                     details={
                         "adapter_key": manifest.adapter_key,
@@ -1083,7 +1098,7 @@ def _validate_resource_proof_admission_profile_coverage(manifest: ThirdPartyAdap
     )
     if unused_admissions:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_resource_requirement_declarations",
+            _RESOURCE_REQUIREMENT_ERROR_CODE,
             "resource proof admissions must be consumed by current declaration profiles",
             details={"adapter_key": manifest.adapter_key, "unused_admissions": unused_admissions},
         )
@@ -1119,7 +1134,7 @@ def _validate_resource_proof_admission_evidence_refs(
         refs = set(admission.admission_evidence_refs)
         if manifest_ref not in refs or contract_profile_ref not in refs:
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_resource_requirement_declarations",
+                _RESOURCE_REQUIREMENT_ERROR_CODE,
                 "resource proof admission evidence must bind current manifest and contract profile",
                 details={"adapter_key": manifest.adapter_key, "admission_ref": admission.admission_ref},
             )
@@ -1133,14 +1148,14 @@ def _validate_resource_proof_admission_evidence_refs(
         }
         if not refs & success_refs or not refs & error_refs:
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_resource_requirement_declarations",
+                _RESOURCE_REQUIREMENT_ERROR_CODE,
                 "resource proof admission evidence must bind success and error_mapping fixtures",
                 details={"adapter_key": manifest.adapter_key, "admission_ref": admission.admission_ref},
             )
         profile_fixture_refs = fixture_refs_by_profile_ref.get(admission.base_profile_ref, set())
         if not refs & profile_fixture_refs:
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_resource_requirement_declarations",
+                _RESOURCE_REQUIREMENT_ERROR_CODE,
                 "resource proof admission evidence must bind a fixture that exercises the admitted profile",
                 details={
                     "adapter_key": manifest.adapter_key,
@@ -1152,7 +1167,7 @@ def _validate_resource_proof_admission_evidence_refs(
             if evidence_ref in {manifest_ref, contract_profile_ref} or evidence_ref in fixture_refs:
                 continue
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_resource_requirement_declarations",
+                _RESOURCE_REQUIREMENT_ERROR_CODE,
                 "resource proof admission evidence refs must resolve inside the current contract entry",
                 details={
                     "adapter_key": manifest.adapter_key,
@@ -1889,10 +1904,15 @@ def _resource_profile_for_fixture(
     )
 
 
-def _require_mapping(value: Any, *, field: str) -> Mapping[str, Any]:
+def _require_mapping(
+    value: Any,
+    *,
+    field: str,
+    code: str = "invalid_manifest_public_metadata",
+) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_public_metadata",
+            code,
             f"{field} must be a mapping",
             details={"field": field, "actual_type": type(value).__name__},
         )
@@ -1909,10 +1929,15 @@ def _require_non_empty_string(value: Any, *, code: str, field: str) -> str:
     return value
 
 
-def _require_non_string_sequence(value: Any, *, field: str) -> tuple[Any, ...]:
+def _require_non_string_sequence(
+    value: Any,
+    *,
+    field: str,
+    code: str = "invalid_manifest_public_metadata",
+) -> tuple[Any, ...]:
     if value is None or isinstance(value, (str, bytes, Mapping)):
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_public_metadata",
+            code,
             f"{field} must be a non-string sequence",
             details={"field": field, "actual_type": type(value).__name__},
         )
@@ -1920,21 +1945,32 @@ def _require_non_string_sequence(value: Any, *, field: str) -> tuple[Any, ...]:
         return tuple(value)
     except TypeError as error:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_public_metadata",
+            code,
             f"{field} must be a non-string sequence",
             details={"field": field, "actual_type": type(value).__name__},
         ) from error
 
 
-def _require_non_empty_string_tuple(value: Any, *, field: str) -> tuple[str, ...]:
-    return _require_string_tuple(value, field=field, allow_empty=False)
+def _require_non_empty_string_tuple(
+    value: Any,
+    *,
+    field: str,
+    code: str = "invalid_manifest_public_metadata",
+) -> tuple[str, ...]:
+    return _require_string_tuple(value, field=field, allow_empty=False, code=code)
 
 
-def _require_string_tuple(value: Any, *, field: str, allow_empty: bool) -> tuple[str, ...]:
-    values = _require_non_string_sequence(value, field=field)
+def _require_string_tuple(
+    value: Any,
+    *,
+    field: str,
+    allow_empty: bool,
+    code: str = "invalid_manifest_public_metadata",
+) -> tuple[str, ...]:
+    values = _require_non_string_sequence(value, field=field, code=code)
     if not values and not allow_empty:
         raise ThirdPartyContractEntryError(
-            "invalid_manifest_public_metadata",
+            code,
             f"{field} must not be empty",
             details={"field": field},
         )
@@ -1943,13 +1979,13 @@ def _require_string_tuple(value: Any, *, field: str, allow_empty: bool) -> tuple
     for item in values:
         if not isinstance(item, str) or not item:
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_public_metadata",
+                code,
                 f"{field} must contain only non-empty strings",
                 details={"field": field, "actual_type": type(item).__name__},
             )
         if item in seen:
             raise ThirdPartyContractEntryError(
-                "invalid_manifest_public_metadata",
+                code,
                 f"{field} must not contain duplicate strings",
                 details={"field": field, "duplicate_value": item},
             )

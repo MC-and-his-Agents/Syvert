@@ -392,7 +392,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
         with self.assertRaises(ThirdPartyContractEntryError) as context:
             validate_third_party_adapter_manifest(manifest)
 
-        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
         self.assertEqual(context.exception.details["adapter_key"], THIRD_PARTY_FIXTURE_ADAPTER_KEY)
         self.assertEqual(context.exception.details["reference_adapters"], ("xhs", "douyin"))
         self.assertEqual(context.exception.details["matching_admission_count"], 0)
@@ -413,7 +413,7 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
                 adapter=ThirdPartyContractFixtureAdapter(),
             )
 
-        self.assertEqual(context.exception.code, "invalid_manifest_resource_requirement_declarations")
+        self.assertEqual(context.exception.code, "invalid_resource_requirement")
         self.assertEqual(
             context.exception.details["evidence_ref"],
             "fr-0023:fixture:other_adapter:third-party-content-detail-success",
