@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 head `299179430fca79c2e47462b91dcf12db89650b08` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`。
 
 ## 下一步动作
 
@@ -109,4 +109,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
-- implementation checkpoint：`299179430fca79c2e47462b91dcf12db89650b08`
+- implementation checkpoint：`f2fd8aa52fa3b74cee189170d66004e5c7be1741`
+- latest synced main：`bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`
