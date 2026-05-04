@@ -637,7 +637,7 @@ def _validate_context(
         return (
             COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT,
             "decision_context must stay frozen to FR-0026 v0.8.0 fail-closed boundaries",
-            {"expected_context": expected.__dict__, "actual_context": context.__dict__},
+            _context_drift_observed_values(expected=expected, actual=context),
         )
     leakage = _detect_provider_leakage(context)
     if leakage:
@@ -662,13 +662,22 @@ def _validate_context_provider_identity(
         if raw_identity is None:
             continue
         identity_slug = _identity_slug(raw_identity)
-        if identity_slug and decision_id_slug == identity_slug:
+        if identity_slug and _decision_id_contains_provider_identity(decision_id_slug, identity_slug):
             return (
                 COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
                 "decision_context.decision_id must not be derived from provider identity",
                 {"surface": "decision_context", "decision_id_provider_derived": True},
             )
     return None
+
+
+def _decision_id_contains_provider_identity(decision_id_slug: str, identity_slug: str) -> bool:
+    return (
+        decision_id_slug == identity_slug
+        or decision_id_slug.startswith(f"{identity_slug}-")
+        or decision_id_slug.endswith(f"-{identity_slug}")
+        or f"-{identity_slug}-" in decision_id_slug
+    )
 
 
 def _identity_slug(raw_value: str) -> str:
@@ -682,6 +691,24 @@ def _identity_slug(raw_value: str) -> str:
             chars.append("-")
             previous_was_separator = True
     return "".join(chars).strip("-")
+
+
+def _context_drift_observed_values(
+    *,
+    expected: CompatibilityDecisionContext,
+    actual: CompatibilityDecisionContext,
+) -> Mapping[str, Any]:
+    expected_values = expected.__dict__
+    actual_values = actual.__dict__
+    mismatched_fields = tuple(
+        field_name
+        for field_name in REQUIRED_CONTEXT_FIELDS
+        if expected_values.get(field_name) != actual_values.get(field_name)
+    )
+    return {
+        "surface": "decision_context",
+        "mismatched_field_count": len(mismatched_fields),
+    }
 
 
 def _surface_drift_observed_values(

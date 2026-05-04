@@ -507,6 +507,19 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(projection["adapter_key"], None)
         self.assert_no_provider_leakage(decision)
 
+    def test_decision_rejects_decision_id_prefixed_with_current_provider_key(self) -> None:
+        input_value = valid_compatibility_decision_input(provider_key="acme")
+        input_value["decision_context"]["decision_id"] = "acme-decision-001"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+        projection = project_compatibility_decision_for_core(decision)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(projection["adapter_key"], None)
+        self.assert_no_provider_leakage(decision)
+
     def test_malformed_decision_context_fails_closed(self) -> None:
         cases = (None, "invalid-context")
         for raw_context in cases:
@@ -658,6 +671,20 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
 
         self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
         self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_context_drift_evidence_does_not_copy_raw_provider_identity(self) -> None:
+        input_value = valid_compatibility_decision_input(provider_key="acme")
+        input_value["decision_context"]["contract_version"] = "acme"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assertEqual(observed_values["surface"], "decision_context")
+        self.assertEqual(observed_values["mismatched_field_count"], 1)
+        self.assertNotIn("acme", str(observed_values))
         self.assert_no_provider_leakage(decision)
 
     def test_core_projection_is_fail_closed_and_does_not_leak_provider_routing_fields(self) -> None:
