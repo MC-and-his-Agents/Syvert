@@ -303,13 +303,16 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         observed_values = decision.evidence.invalid_contract_evidence.observed_values
         self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="requirement")
         self.assertEqual(
-            decision.evidence.resource_profile_evidence_refs,
+            decision.evidence.invalid_contract_evidence.unresolved_refs,
             (
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
         )
-        self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (),
+        )
         self.assertEqual(
             decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs,
             decision.evidence.resource_profile_evidence_refs,
@@ -335,7 +338,7 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="offer")
         self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
         self.assertEqual(
-            decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs,
+            decision.evidence.invalid_contract_evidence.unresolved_refs,
             (
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
@@ -343,12 +346,9 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         )
         self.assertEqual(
             decision.evidence.resource_profile_evidence_refs,
-            (
-                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
-                "fr-0027:profile:content-detail-by-url-hybrid:account",
-            ),
+            (),
         )
-        self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
+        self.assertEqual(decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs, ())
         self.assert_no_provider_leakage(decision)
 
     def test_invalid_requirement_evidence_does_not_copy_upstream_forbidden_details(self) -> None:
