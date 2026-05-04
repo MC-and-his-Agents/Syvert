@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第十轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage、fixture independence、非字符串 key surface drift、unknown required capability tuple drift、dataclass context field type 与动态 provider key equality 等阻断。第十一轮 guardian 针对 `fcb3883` 返回 `REQUEST_CHANGES`，指出 `decision_id=acme-decision-001` 仍可从 `provider_key=acme` prefix 派生并进入 Core projection，且 context drift evidence 仍复制 raw expected/actual context，可能泄漏动态 provider identity。当前已在 `582c31ab16688e1b2133a7dfd1bcee1ad783f225` 将动态 identity 检查扩展为 exact / prefix / suffix / subtoken slug 匹配，并把 frozen context drift observed values 改为只暴露 `surface` 与 mismatch count，不复制 raw context。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第十一轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage、fixture independence、非字符串 key surface drift、unknown required capability tuple drift、dataclass context field type、动态 provider key equality / subtoken 与 context drift evidence 脱敏等阻断。第十二轮 guardian 针对 `1c01878` 返回 `REQUEST_CHANGES`，指出 context drift 分支会先于动态 provider identity 校验返回 invalid_contract，从而掩盖 provider-derived decision_id，且 malformed offer 可通过 `offer.observability.provider_key` 泄漏。当前已在 `1ec081a1cf1eb53281d631f0be634f74c0338427` 将动态 provider identity 校验移动到 context surface / frozen drift 之前，并把 identity 来源扩展到 `offer.observability.provider_key`。
 
 ## 下一步动作
 
@@ -310,6 +310,22 @@
   - 结果：通过。
 - 第十一轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，973 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-eleventh-followup.json`
+  - 结果：第十二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - context drift 先返回 `invalid_compatibility_contract`，会掩盖 provider-derived `decision_id`，Core projection 仍暴露该 id。
+    - malformed offer 缺少顶层 `provider_key` 时，`offer.observability.provider_key` 未纳入动态 identity 来源。
+- 已处理第十二轮 guardian 阻断：
+  - 动态 provider identity 校验前移到 context surface / frozen drift 校验之前，provider-derived `decision_id` 优先 fail-closed 为 `provider_leakage_detected`。
+  - 动态 provider identity 来源增加 `offer.observability.provider_key`。
+  - 补充 `provider_key=acme` / `decision_id=acme` 同时 context drift 的优先级回归，以及删除顶层 `offer.provider_key` 但保留 `offer.observability.provider_key=acme` 的 malformed offer 回归。
+- 第十二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，79 tests。
+- 第十二轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第十二轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第十二轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，975 tests。
 
 ## 待验证项
 
@@ -338,3 +354,4 @@
 - ninth guardian checkpoint：`206523985a096e97404395bde9a7c7834db1c155`
 - tenth guardian checkpoint：`63d4472f3fed4dd9cd51eebe740087e59af3da0a`
 - eleventh guardian checkpoint：`582c31ab16688e1b2133a7dfd1bcee1ad783f225`
+- twelfth guardian checkpoint：`1ec081a1cf1eb53281d631f0be634f74c0338427`
