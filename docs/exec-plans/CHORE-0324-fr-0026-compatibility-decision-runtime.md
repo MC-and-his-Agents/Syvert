@@ -41,13 +41,12 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`。首轮 guardian 返回 `REQUEST_CHANGES`，指出 top-level input drift、provider-derived `decision_id`、invalid proof evidence 解析与 context drift source attribution 四个 fail-closed 阻断；当前已收敛为 top-level drift fail-closed、opaque decision id、approved FR-0027 proof ref 解析与 FR-0026 context attribution，并补充 focused regression。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第三轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context 与 hyphenated provider identity 等阻断。第四轮 guardian 针对 `6a96545c63f3392abf230e26b00bb2c0a1da1102` 返回 `REQUEST_CHANGES`，指出 `decision_context` 额外字段可被静默丢弃、`rank` / `preferred_profile` forbidden token 缺口，以及 invalid contract evidence 泄漏 provider selector / routing / priority / fallback 原始字段和值；当前已在 `c80ee5c24f637ae55e9d02ebe436611125428334` 系统性收敛为 context surface fail-closed、扩展 forbidden token set、结构化 observed_values 仅保留 surface / count 摘要，并补充 no-leakage 回归。
 
 ## 下一步动作
 
-- 运行全量 runtime tests、`py_compile` 与 spec/docs/workflow/governance/pr_scope implementation gate。
-- 通过 gate 后提交中文 Conventional Commit，推送分支并用 `scripts/open_pr.py --class implementation` 创建 PR。
-- 运行 guardian review，不设置超时；如有阻断，按同类阻断收敛后重跑相关验证。
+- 运行 spec/docs/workflow/governance/pr_scope implementation gate，确认最终 head 通过。
+- 推送分支并运行 guardian review，不设置超时；如有阻断，按同类阻断收敛后重跑相关验证。
 - guardian、GitHub checks 与 merge gate 通过后使用受控 `scripts/merge_pr.py` 合并，完成 #324 closeout、父 FR #298 comment、分支与 worktree 清理。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -177,6 +176,26 @@
   - unrelated adapter mismatch 保留 approved proof refs 为 resolved，`unresolved_refs=()`。
 - 第三轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
   - 结果：通过，20 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review`
+  - 结果：第四轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - `decision_context` 额外字段会被 synthetic dataclass 归一后静默丢弃，可能返回 `matched`。
+    - `rank` 与 `preferred_profile` 未纳入 FR-0026 forbidden decision tokens。
+    - `invalid_contract_evidence.observed_values` 复制 forbidden field names / values，违反 FR-0026 error evidence no-leakage 语义。
+- 已处理第四轮 guardian 阻断：
+  - 新增 `_validate_context_surface`，对非 canonical `decision_context` mapping 的缺字段、额外字段、provider leakage 先 fail-closed，不允许 normalization 丢弃 drift。
+  - 扩展 `FORBIDDEN_DECISION_TOKENS`，覆盖 `rank`、`preferred_profile`、`preferred_profiles`。
+  - 将 top-level / context surface drift 与 provider leakage 的 `observed_values` 改为结构化摘要，只暴露 `surface`、缺失字段数、额外字段数与 forbidden semantics count，不复制 forbidden field name 或 raw provider / routing / priority / fallback value。
+  - 补充 context extra non-forbidden field、`rank`、`preferred_profile` 与 sanitized observed values 回归。
+- 第四轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，21 tests。
+- 第四轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，65 tests。
+- 第四轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，961 tests。
 
 ## 待验证项
 
@@ -197,3 +216,4 @@
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - implementation checkpoint：`f2fd8aa52fa3b74cee189170d66004e5c7be1741`
 - latest synced main：`bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`
+- fourth guardian checkpoint：`c80ee5c24f637ae55e9d02ebe436611125428334`
