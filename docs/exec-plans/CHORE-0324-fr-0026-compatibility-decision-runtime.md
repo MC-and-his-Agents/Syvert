@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第四轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift 与 error evidence no-leakage 等阻断。第五轮 guardian 针对 `ce3c3372240c679dfc02d887948ba5d1e1a049e4` 返回 `REQUEST_CHANGES`，指出 invalid requirement / offer 分支仍复制上游 validator `details`，可能经 `requirement_details` / `offer_details` 泄漏 provider selector、routing、priority、fallback 或 provider identity。当前已在 `2fa8e26494453a2ff40cb3095b898426d75c576c` 将上游 validator `details/message` 统一视为非 FR-0026 evidence truth，decision evidence 只记录 bounded validation summary，不复制 raw detail key/value，并补充 requirement / offer 内嵌 forbidden field 回归。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第五轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage 与上游 validator evidence 脱敏等阻断。第六轮 guardian 针对 `7ee9f94a850886daf6ca997f41915d2e14a58c18` 返回 `REQUEST_CHANGES`，指出 invalid proof drift evidence 只看顶层 evidence refs，profile-level `evidence_refs` 漂移时会把旧顶层 ref 误报为 resolved，且不记录真正漂移的原始 ref。当前已在 `681b7906026440d2c3bc02b1f872296de1abef88` 将 invalid proof evidence 收集改为同时审计 profile-level、top-level evidence 与 observability 三个 surface，只有三者对齐且 approved、非重复的 proof ref 才进入 resolved，其余 unknown / duplicate / non-unique / mismatch 原始 ref 进入 unresolved。
 
 ## 下一步动作
 
@@ -211,6 +211,24 @@
   - 结果：通过。
 - 第五轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，963 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-fifth-followup.json`
+  - 结果：第六轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - invalid proof evidence 只从顶层 `evidence.resource_profile_evidence_refs` 推导 resolved / unresolved；profile-level proof ref 漂移但顶层 evidence 保持旧合法值时，旧顶层 ref 被误报为 resolved，真正漂移的 profile ref 没进入 `unresolved_refs`。
+- 已处理第六轮 guardian 阻断：
+  - 新增 profile evidence report，按 source contract 选择 requirement / offer / compatibility carrier surface。
+  - 同时消费 profile-level `evidence_refs`、顶层 `evidence.resource_profile_evidence_refs` 与 `observability.proof_refs`；只有 approved、非重复且三层 surface 对齐的 ref 进入 resolved。
+  - unknown、duplicate、non-unique 或 surface mismatch 的原始 refs 进入 `invalid_contract_evidence.unresolved_refs`。
+  - 补充 requirement / offer profile-level only drift 回归，顶层 evidence 仍保留旧合法值时，unknown ref 与 stale ref 均 unresolved 且不进入 resolved evidence refs。
+- 第六轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，25 tests。
+- 第六轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，69 tests。
+- 第六轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第六轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第六轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，965 tests。
 
 ## 待验证项
 
@@ -233,3 +251,4 @@
 - latest synced main：`bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`
 - fourth guardian checkpoint：`c80ee5c24f637ae55e9d02ebe436611125428334`
 - fifth guardian checkpoint：`2fa8e26494453a2ff40cb3095b898426d75c576c`
+- sixth guardian checkpoint：`681b7906026440d2c3bc02b1f872296de1abef88`
