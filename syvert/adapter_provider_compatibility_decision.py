@@ -69,8 +69,11 @@ FORBIDDEN_DECISION_TOKENS = frozenset(
         "core_provider_registry",
         "core_provider_discovery",
         "priority",
+        "rank",
         "score",
         "ranking",
+        "preferred_profile",
+        "preferred_profiles",
         "fallback",
         "fallback_order",
         "marketplace",
@@ -239,6 +242,17 @@ def decide_adapter_provider_compatibility(
             violated_rule=input_error[1],
             observed_values=input_error[2],
         )
+    context_surface_error = _validate_context_surface(raw_context)
+    if context_surface_error is not None:
+        return _invalid_decision(
+            context=context,
+            raw_requirement=raw_requirement,
+            raw_offer=raw_offer,
+            source_contract_ref="FR-0026",
+            error_code=context_surface_error[0],
+            violated_rule=context_surface_error[1],
+            observed_values=context_surface_error[2],
+        )
     context_leakage = _detect_provider_leakage(raw_context)
     if context_leakage:
         return _invalid_decision(
@@ -248,7 +262,7 @@ def decide_adapter_provider_compatibility(
             source_contract_ref="FR-0026",
             error_code=COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
             violated_rule="decision context must not contain provider routing or provider identity fields",
-            observed_values={"forbidden_fields": context_leakage},
+            observed_values=_forbidden_semantics_observed_values(context_leakage),
         )
     context_error = _validate_context(context)
     if context_error is not None:
@@ -313,7 +327,7 @@ def decide_adapter_provider_compatibility(
             source_contract_ref="FR-0026",
             error_code=COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
             violated_rule="decision context must not contain provider routing or provider identity fields",
-            observed_values={"forbidden_fields": leakage_error},
+            observed_values=_forbidden_semantics_observed_values(leakage_error),
         )
 
     if requirement.adapter_key != offer.adapter_binding.adapter_key:
@@ -486,15 +500,53 @@ def _validate_input_surface(
     missing_fields = tuple(sorted(REQUIRED_INPUT_FIELDS - raw_keys))
     extra_fields = tuple(sorted(raw_keys - REQUIRED_INPUT_FIELDS))
     if missing_fields or extra_fields:
+        leakage = _detect_provider_leakage({field_name: input_value.get(field_name) for field_name in extra_fields})
         error_code = (
             COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED
-            if _detect_provider_leakage({field_name: input_value.get(field_name) for field_name in extra_fields})
+            if leakage
             else COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT
         )
         return (
             error_code,
             "AdapterProviderCompatibilityDecisionInput must keep the canonical field set",
-            {"missing_fields": missing_fields, "extra_fields": extra_fields},
+            _surface_drift_observed_values(
+                surface="decision_input",
+                missing_count=len(missing_fields),
+                extra_count=len(extra_fields),
+                forbidden_semantics_count=len(leakage),
+            ),
+        )
+    return None
+
+
+def _validate_context_surface(raw_context: Any) -> tuple[str, str, Mapping[str, Any]] | None:
+    if type(raw_context) is CompatibilityDecisionContext:
+        return None
+    if not isinstance(raw_context, Mapping):
+        return (
+            COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT,
+            "decision_context must be a mapping or canonical dataclass",
+            {"surface": "decision_context", "actual_type": type(raw_context).__name__},
+        )
+    raw_keys = _require_string_keys(raw_context)
+    missing_fields = tuple(sorted(REQUIRED_CONTEXT_FIELDS - raw_keys))
+    extra_fields = tuple(sorted(raw_keys - REQUIRED_CONTEXT_FIELDS))
+    if missing_fields or extra_fields:
+        leakage = _detect_provider_leakage({field_name: raw_context.get(field_name) for field_name in extra_fields})
+        error_code = (
+            COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED
+            if leakage
+            else COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT
+        )
+        return (
+            error_code,
+            "decision_context must keep the canonical field set",
+            _surface_drift_observed_values(
+                surface="decision_context",
+                missing_count=len(missing_fields),
+                extra_count=len(extra_fields),
+                forbidden_semantics_count=len(leakage),
+            ),
         )
     return None
 
@@ -548,7 +600,7 @@ def _validate_context(
         return (
             COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
             "decision_context.decision_id must be an opaque non-provider identifier",
-            {"decision_id": context.decision_id},
+            {"surface": "decision_context", "decision_id_opaque": False},
         )
     if context != expected:
         return (
@@ -561,9 +613,31 @@ def _validate_context(
         return (
             COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
             "decision_context must not carry provider identity, routing, priority, score, or fallback",
-            {"forbidden_values": leakage},
+            _forbidden_semantics_observed_values(leakage),
         )
     return None
+
+
+def _surface_drift_observed_values(
+    *,
+    surface: str,
+    missing_count: int,
+    extra_count: int,
+    forbidden_semantics_count: int,
+) -> Mapping[str, Any]:
+    return {
+        "surface": surface,
+        "missing_field_count": missing_count,
+        "extra_field_count": extra_count,
+        "forbidden_semantics_count": forbidden_semantics_count,
+    }
+
+
+def _forbidden_semantics_observed_values(leakage: tuple[str, ...]) -> Mapping[str, Any]:
+    return {
+        "surface": "decision_context",
+        "forbidden_semantics_count": len(leakage),
+    }
 
 
 def _match_profiles(

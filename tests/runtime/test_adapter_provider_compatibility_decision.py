@@ -352,6 +352,8 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         cases = (
             ("provider_selector", "native_xhs_detail"),
             ("priority", 1),
+            ("rank", 1),
+            ("preferred_profile", "account_proxy"),
             ("fallback_order", ["native_xhs_detail"]),
             ("routing_policy", "try-provider"),
         )
@@ -364,11 +366,19 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
 
                 self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
                 self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+                observed_values = decision.evidence.invalid_contract_evidence.observed_values
+                self.assertEqual(observed_values["surface"], "decision_context")
+                self.assertEqual(observed_values["extra_field_count"], 1)
+                self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
+                self.assertNotIn(field_name, str(observed_values))
+                self.assert_provider_terms_not_observed(observed_values)
                 self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_provider_leakage_for_top_level_input_drift(self) -> None:
         cases = (
             ("priority", 1),
+            ("rank", 1),
+            ("preferred_profile", "account_proxy"),
             ("routing_policy", "try-provider"),
             ("selected_provider", "native_xhs_detail"),
             ("fallback_order", ["native_xhs_detail"]),
@@ -382,11 +392,28 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
 
                 self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
                 self.assertEqual(decision.error.source_contract_ref, "FR-0026")
-                self.assertEqual(
-                    decision.evidence.invalid_contract_evidence.observed_values["extra_fields"],
-                    (field_name,),
-                )
+                observed_values = decision.evidence.invalid_contract_evidence.observed_values
+                self.assertEqual(observed_values["surface"], "decision_input")
+                self.assertEqual(observed_values["extra_field_count"], 1)
+                self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
+                self.assertNotIn(field_name, str(observed_values))
+                self.assert_provider_terms_not_observed(observed_values)
                 self.assert_no_provider_leakage(decision)
+
+    def test_decision_context_extra_non_forbidden_field_fails_closed(self) -> None:
+        input_value = copy_decision_input()
+        input_value["decision_context"]["trace_id"] = "trace-001"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assertEqual(observed_values["surface"], "decision_context")
+        self.assertEqual(observed_values["extra_field_count"], 1)
+        self.assertEqual(observed_values["forbidden_semantics_count"], 0)
+        self.assertNotIn("trace_id", str(observed_values))
+        self.assert_no_provider_leakage(decision)
 
     def test_decision_rejects_provider_derived_decision_id_before_core_projection(self) -> None:
         cases = (
@@ -512,6 +539,25 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertFalse(hasattr(decision, "offer_id"))
         self.assertFalse(hasattr(decision.observability, "provider_key"))
         self.assertFalse(hasattr(decision.observability, "offer_id"))
+
+    def assert_provider_terms_not_observed(self, observed_values) -> None:
+        observed_text = str(observed_values)
+        forbidden_terms = (
+            "provider_selector",
+            "selected_provider",
+            "routing_policy",
+            "fallback_order",
+            "priority",
+            "rank",
+            "preferred_profile",
+            "native_xhs_detail",
+            "native_douyin_detail",
+            "try-provider",
+            "account_proxy",
+        )
+        for forbidden_term in forbidden_terms:
+            with self.subTest(forbidden_term=forbidden_term):
+                self.assertNotIn(forbidden_term, observed_text)
 
 
 if __name__ == "__main__":
