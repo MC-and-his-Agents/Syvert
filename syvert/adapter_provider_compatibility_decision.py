@@ -289,13 +289,12 @@ def decide_adapter_provider_compatibility(
             raw_offer=raw_offer,
             source_contract_ref=APPROVED_REQUIREMENT_CONTRACT_REF,
             error_code=COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT,
-            violated_rule=requirement_result.message or "requirement carrier failed FR-0024 validation",
-            observed_values={
-                "requirement_adapter_key": requirement_result.adapter_key,
-                "requirement_capability": requirement_result.capability,
-                "requirement_error_code": requirement_result.error_code,
-                "requirement_details": requirement_result.details,
-            },
+            violated_rule="requirement carrier failed FR-0024 validation",
+            observed_values=_upstream_validation_observed_values(
+                surface="requirement",
+                error_code=requirement_result.error_code,
+                details=requirement_result.details,
+            ),
         )
 
     offer_result = validate_provider_capability_offer(raw_offer)
@@ -306,13 +305,12 @@ def decide_adapter_provider_compatibility(
             raw_offer=raw_offer,
             source_contract_ref=APPROVED_OFFER_CONTRACT_REF,
             error_code=COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT,
-            violated_rule=offer_result.message or "provider offer carrier failed FR-0025 validation",
-            observed_values={
-                "offer_adapter_key": offer_result.adapter_key,
-                "offer_capability": offer_result.capability,
-                "offer_error_code": offer_result.error_code,
-                "offer_details": offer_result.details,
-            },
+            violated_rule="provider offer carrier failed FR-0025 validation",
+            observed_values=_upstream_validation_observed_values(
+                surface="offer",
+                error_code=offer_result.error_code,
+                details=offer_result.details,
+            ),
         )
 
     requirement = _normalize_requirement(raw_requirement)
@@ -637,6 +635,20 @@ def _forbidden_semantics_observed_values(leakage: tuple[str, ...]) -> Mapping[st
     return {
         "surface": "decision_context",
         "forbidden_semantics_count": len(leakage),
+    }
+
+
+def _upstream_validation_observed_values(
+    *,
+    surface: str,
+    error_code: str | None,
+    details: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    return {
+        "surface": surface,
+        "validation_error_code": error_code,
+        "detail_count": len(details),
+        "forbidden_semantics_count": len(_detect_provider_leakage(details)),
     }
 
 

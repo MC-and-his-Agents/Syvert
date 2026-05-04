@@ -179,6 +179,8 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
         self.assertEqual(decision.error.source_contract_ref, "FR-0024")
         self.assertEqual(decision.evidence.adapter_bound_provider_evidence.provider_key, "native_xhs_detail")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="requirement")
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_invalid_contract_for_invalid_offer_without_routing(self) -> None:
@@ -189,6 +191,8 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
 
         self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
         self.assertEqual(decision.error.source_contract_ref, "FR-0025")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="offer")
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_invalid_contract_for_cross_adapter_offer(self) -> None:
@@ -296,9 +300,8 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
         self.assertEqual(decision.error.error_code, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
         self.assertEqual(decision.error.source_contract_ref, "FR-0024")
-        requirement_details = decision.evidence.invalid_contract_evidence.observed_values["requirement_details"]
-        self.assertEqual(requirement_details["adapter_key"], "external_adapter")
-        self.assertEqual(requirement_details["profile_key"], "account_proxy")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="requirement")
         self.assertEqual(
             decision.evidence.resource_profile_evidence_refs,
             (
@@ -328,9 +331,9 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
 
         self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
         self.assertEqual(decision.error.source_contract_ref, "FR-0025")
-        offer_details = decision.evidence.invalid_contract_evidence.observed_values["offer_details"]
-        self.assertEqual(offer_details["adapter_key"], "external_adapter")
-        self.assertEqual(offer_details["reference_adapters"], ("xhs", "douyin"))
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="offer")
+        self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
         self.assertEqual(
             decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs,
             (
@@ -346,6 +349,34 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
             ),
         )
         self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
+        self.assert_no_provider_leakage(decision)
+
+    def test_invalid_requirement_evidence_does_not_copy_upstream_forbidden_details(self) -> None:
+        input_value = copy_decision_input()
+        input_value["requirement"]["provider_selector"] = "native_xhs_detail"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0024")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="requirement")
+        self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
+        self.assert_provider_terms_not_observed(observed_values)
+        self.assert_no_provider_leakage(decision)
+
+    def test_invalid_offer_evidence_does_not_copy_upstream_forbidden_details(self) -> None:
+        input_value = copy_decision_input()
+        input_value["offer"]["fallback_order"] = ["native_xhs_detail"]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0025")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assert_sanitized_upstream_validation_observed_values(observed_values, surface="offer")
+        self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
+        self.assert_provider_terms_not_observed(observed_values)
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_provider_leakage_for_decision_context_selector_or_priority(self) -> None:
@@ -558,6 +589,17 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         for forbidden_term in forbidden_terms:
             with self.subTest(forbidden_term=forbidden_term):
                 self.assertNotIn(forbidden_term, observed_text)
+
+    def assert_sanitized_upstream_validation_observed_values(self, observed_values, *, surface: str) -> None:
+        self.assertEqual(
+            set(observed_values),
+            {"surface", "validation_error_code", "detail_count", "forbidden_semantics_count"},
+        )
+        self.assertEqual(observed_values["surface"], surface)
+        self.assertIsInstance(observed_values["validation_error_code"], str)
+        self.assertGreaterEqual(observed_values["detail_count"], 1)
+        self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 0)
+        self.assert_provider_terms_not_observed(observed_values)
 
 
 if __name__ == "__main__":
