@@ -75,6 +75,11 @@ FORBIDDEN_DECISION_TOKENS = frozenset(
         "fallback_order",
         "marketplace",
         "provider_product_support",
+        "native_xhs",
+        "native_douyin",
+        "xiaohongshu",
+        "douyin",
+        "xhs",
         "sla",
         "resource_supply",
         "resource_pool",
@@ -498,7 +503,15 @@ def _normalize_context(raw_value: CompatibilityDecisionContext | Mapping[str, An
     if type(raw_value) is CompatibilityDecisionContext:
         return raw_value
     if not isinstance(raw_value, Mapping):
-        return baseline_compatibility_decision_context(decision_id="invalid-context")
+        return CompatibilityDecisionContext(
+            decision_id="invalid-context",
+            contract_version="",
+            requirement_contract_ref="",
+            offer_contract_ref="",
+            resource_profile_contract_ref="",
+            provider_port_boundary_ref="",
+            fail_closed=False,
+        )
     raw_keys = _require_string_keys(raw_value)
     if raw_keys != REQUIRED_CONTEXT_FIELDS:
         return CompatibilityDecisionContext(
@@ -694,23 +707,26 @@ def _best_effort_offer_evidence_refs(raw_offer: Any) -> tuple[str, ...]:
 
 
 def _resolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tuple[str, ...]:
-    refs = (
-        *_best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
-        *_best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
-    )
+    requirement_refs, offer_refs = _profile_evidence_ref_collections(raw_requirement, raw_offer)
+    refs = (*requirement_refs, *offer_refs)
     approved_refs = _approved_profile_evidence_refs()
-    duplicate_refs = _duplicate_values(refs)
+    duplicate_refs = _duplicate_values(requirement_refs) | _duplicate_values(offer_refs)
     return _dedupe(ref for ref in refs if ref in approved_refs and ref not in duplicate_refs)
 
 
 def _unresolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tuple[str, ...]:
-    refs = (
-        *_best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
-        *_best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
-    )
+    requirement_refs, offer_refs = _profile_evidence_ref_collections(raw_requirement, raw_offer)
+    refs = (*requirement_refs, *offer_refs)
     approved_refs = _approved_profile_evidence_refs()
-    duplicate_refs = _duplicate_values(refs)
+    duplicate_refs = _duplicate_values(requirement_refs) | _duplicate_values(offer_refs)
     return _dedupe(ref for ref in refs if ref not in approved_refs or ref in duplicate_refs)
+
+
+def _profile_evidence_ref_collections(raw_requirement: Any, raw_offer: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    return (
+        _best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
+        _best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
+    )
 
 
 def _best_effort_provider_evidence(raw_offer: Any) -> AdapterBoundProviderEvidence | None:
@@ -762,6 +778,8 @@ def _normalize_required_capabilities(raw_values: Iterable[str]) -> tuple[str, ..
 
 def _is_opaque_decision_id(decision_id: str) -> bool:
     if ":" in decision_id or "/" in decision_id or "_" in decision_id:
+        return False
+    if _contains_forbidden_token(decision_id):
         return False
     return all(char.islower() or char.isdigit() or char == "-" for char in decision_id)
 

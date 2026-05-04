@@ -210,6 +210,14 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
             decision.evidence.invalid_contract_evidence.observed_values["offer_adapter_key"],
             "douyin",
         )
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
+        self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_invalid_contract_for_offer_execution_slice_mismatch(self) -> None:
@@ -291,15 +299,18 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         requirement_details = decision.evidence.invalid_contract_evidence.observed_values["requirement_details"]
         self.assertEqual(requirement_details["adapter_key"], "external_adapter")
         self.assertEqual(requirement_details["profile_key"], "account_proxy")
-        self.assertEqual(decision.evidence.resource_profile_evidence_refs, ())
         self.assertEqual(
-            decision.evidence.invalid_contract_evidence.unresolved_refs,
+            decision.evidence.resource_profile_evidence_refs,
             (
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
         )
-        self.assertEqual(decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs, ())
+        self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
+        self.assertEqual(
+            decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs,
+            decision.evidence.resource_profile_evidence_refs,
+        )
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_invalid_contract_for_offer_profile_proof_not_covering_adapter(self) -> None:
@@ -320,14 +331,21 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         offer_details = decision.evidence.invalid_contract_evidence.observed_values["offer_details"]
         self.assertEqual(offer_details["adapter_key"], "external_adapter")
         self.assertEqual(offer_details["reference_adapters"], ("xhs", "douyin"))
-        self.assertEqual(decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs, ())
         self.assertEqual(
-            decision.evidence.invalid_contract_evidence.unresolved_refs,
+            decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs,
             (
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
         )
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
+        self.assertEqual(decision.evidence.invalid_contract_evidence.unresolved_refs, ())
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_provider_leakage_for_decision_context_selector_or_priority(self) -> None:
@@ -371,19 +389,37 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
                 self.assert_no_provider_leakage(decision)
 
     def test_decision_rejects_provider_derived_decision_id_before_core_projection(self) -> None:
-        input_value = copy_decision_input()
-        input_value["decision_context"]["decision_id"] = (
-            "xhs:native_xhs_detail:content_detail:content_detail_by_url:url:hybrid:v0.8.0"
+        cases = (
+            "xhs:native_xhs_detail:content_detail:content_detail_by_url:url:hybrid:v0.8.0",
+            "native-xhs-detail",
         )
+        for decision_id in cases:
+            with self.subTest(decision_id=decision_id):
+                input_value = copy_decision_input()
+                input_value["decision_context"]["decision_id"] = decision_id
 
-        decision = decide_adapter_provider_compatibility(input_value)
-        projection = project_compatibility_decision_for_core(decision)
+                decision = decide_adapter_provider_compatibility(input_value)
+                projection = project_compatibility_decision_for_core(decision)
 
-        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
-        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
-        self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
-        self.assertEqual(projection["adapter_key"], None)
-        self.assert_no_provider_leakage(decision)
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+                self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+                self.assertEqual(projection["adapter_key"], None)
+                self.assert_no_provider_leakage(decision)
+
+    def test_malformed_decision_context_fails_closed(self) -> None:
+        cases = (None, "invalid-context")
+        for raw_context in cases:
+            with self.subTest(raw_context=raw_context):
+                input_value = copy_decision_input()
+                input_value["decision_context"] = raw_context
+
+                decision = decide_adapter_provider_compatibility(input_value)
+
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+                self.assertEqual(decision.adapter_key, None)
+                self.assert_no_provider_leakage(decision)
 
     def test_invalid_unknown_profile_proof_is_unresolved_not_resolved(self) -> None:
         input_value = copy_decision_input()

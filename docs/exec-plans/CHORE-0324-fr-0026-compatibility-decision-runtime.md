@@ -162,6 +162,21 @@
   - 结果：通过。
 - 第二轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 339 --post-review`
+  - 结果：第三轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - malformed / non-canonical `decision_context` 可被 synthetic baseline 归一后返回 `matched`。
+    - requirement / offer 两侧正常共享的 approved FR-0027 proof refs 在 unrelated invalid decision 中被误判为 duplicate unresolved。
+    - 小写连字符 provider identity（如 `native-xhs-detail`）可作为 opaque `decision_id` 泄漏到 Core projection。
+- 已处理第三轮 guardian 阻断：
+  - 非 mapping / 非 dataclass `decision_context` 归一为不可通过 frozen context 校验的 invalid carrier，按 `FR-0026` `invalid_compatibility_contract` fail-closed。
+  - proof evidence duplicate 判定改为 requirement / offer 各自集合内部判定，不把两侧正常共享的 approved proof refs 视为 unresolved。
+  - `decision_id` opacity 检查复用 provider leakage token，拒绝 hyphenated provider identity。
+- 第三轮 guardian 修复后 targeted probe：
+  - `decision_context=None` -> `invalid_contract / invalid_compatibility_contract / FR-0026`。
+  - `decision_id=native-xhs-detail` -> `invalid_contract / provider_leakage_detected / FR-0026`。
+  - unrelated adapter mismatch 保留 approved proof refs 为 resolved，`unresolved_refs=()`。
+- 第三轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，20 tests。
 
 ## 待验证项
 
