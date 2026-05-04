@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第三轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context 与 hyphenated provider identity 等阻断。第四轮 guardian 针对 `6a96545c63f3392abf230e26b00bb2c0a1da1102` 返回 `REQUEST_CHANGES`，指出 `decision_context` 额外字段可被静默丢弃、`rank` / `preferred_profile` forbidden token 缺口，以及 invalid contract evidence 泄漏 provider selector / routing / priority / fallback 原始字段和值；当前已在 `c80ee5c24f637ae55e9d02ebe436611125428334` 系统性收敛为 context surface fail-closed、扩展 forbidden token set、结构化 observed_values 仅保留 surface / count 摘要，并补充 no-leakage 回归。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第四轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift 与 error evidence no-leakage 等阻断。第五轮 guardian 针对 `ce3c3372240c679dfc02d887948ba5d1e1a049e4` 返回 `REQUEST_CHANGES`，指出 invalid requirement / offer 分支仍复制上游 validator `details`，可能经 `requirement_details` / `offer_details` 泄漏 provider selector、routing、priority、fallback 或 provider identity。当前已在 `2fa8e26494453a2ff40cb3095b898426d75c576c` 将上游 validator `details/message` 统一视为非 FR-0026 evidence truth，decision evidence 只记录 bounded validation summary，不复制 raw detail key/value，并补充 requirement / offer 内嵌 forbidden field 回归。
 
 ## 下一步动作
 
@@ -196,6 +196,21 @@
   - 结果：通过。
 - 第四轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，961 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-fourth-followup.json`
+  - 结果：第五轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - invalid requirement / offer 分支把上游 validator `details` 原样放入 `invalid_contract_evidence.observed_values`，可泄漏 provider selector、routing、priority、fallback 或 provider identity。
+- 已处理第五轮 guardian 阻断：
+  - invalid requirement / offer 分支不再复制上游 validator `message` 或 `details`，避免把 FR-0024 / FR-0025 的 raw failure evidence 当作 FR-0026 decision evidence。
+  - 新增 `_upstream_validation_observed_values`，只暴露 `surface`、`validation_error_code`、`detail_count` 与 `forbidden_semantics_count`。
+  - 补充 requirement / offer 内嵌 `provider_selector` / `fallback_order` 的 targeted 回归，证明 fail-closed 且 observed values 不包含 forbidden field name / raw provider value。
+- 第五轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，67 tests。
+- 第五轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第五轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第五轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，963 tests。
 
 ## 待验证项
 
@@ -217,3 +232,4 @@
 - implementation checkpoint：`f2fd8aa52fa3b74cee189170d66004e5c7be1741`
 - latest synced main：`bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c`
 - fourth guardian checkpoint：`c80ee5c24f637ae55e9d02ebe436611125428334`
+- fifth guardian checkpoint：`2fa8e26494453a2ff40cb3095b898426d75c576c`
