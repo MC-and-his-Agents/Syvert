@@ -36,7 +36,7 @@
 - 分支：`issue-325-fr-0026-provider-no-leakage-guards`
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - 已确认 `#324` / PR `#339` 合入主干并关闭，父 FR `#298` 仍 open。
-- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload 均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。
+- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload 均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。首轮 guardian 指出 forbidden token set 未覆盖 `provider_offer`、`compatibility_decision`、泛化 `selector` 与 `marketplace_listing`，当前已补齐并增加回归。
 
 ## 下一步动作
 
@@ -77,6 +77,17 @@
   - 结果：通过。
 - 提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-325-fr-0026-provider-no-leakage-guards`
   - 结果：通过。
+- `python3 scripts/pr_guardian.py review 340 --post-review --json-output /tmp/syvert-pr-340-guardian.json`
+  - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - no-leakage guard 漏掉 FR-0026 明确禁止的 provider / decision synonyms：`provider_offer`、`compatibility_decision`、泛化 `selector`、`marketplace_listing`。
+- guardian 修复后 `python3 -m unittest tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，43 tests。
+- guardian 修复后 `python3 -m py_compile syvert/provider_no_leakage_guard.py tests/runtime/test_provider_no_leakage_guard.py`
+  - 结果：通过。
+- guardian 修复后 `git diff --check`
+  - 结果：通过。
+- guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，983 tests。
 
 ## 待验证项
 
@@ -96,3 +107,4 @@
 
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - implementation checkpoint：`bbc19ea1b5d9a48cf80def857e14d5b440dc277b`
+- guardian follow-up checkpoint：待提交

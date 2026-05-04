@@ -163,6 +163,26 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
         self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
         self.assertEqual(result.evidence.forbidden_field_paths, ("core_routing.selected_provider",))
 
+    def test_guard_fails_closed_for_forbidden_provider_decision_synonyms(self) -> None:
+        decision = matched_decision()
+        cases = (
+            "provider_offer",
+            "compatibility_decision",
+            "selector",
+            "marketplace_listing",
+        )
+        for field_name in cases:
+            with self.subTest(field_name=field_name):
+                result = guard_core_provider_no_leakage(
+                    surface_name="core_surface",
+                    surface={field_name: "x"},
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+                self.assertEqual(result.evidence.forbidden_field_paths, (f"core_surface.{field_name}",))
+
     def test_guard_fails_closed_for_provider_identity_value_on_core_surface(self) -> None:
         decision = matched_decision()
 
