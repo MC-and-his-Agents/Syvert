@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第七轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage 与 fixture independence 等阻断。第八轮 guardian 针对 `9d00f17` 返回 `REQUEST_CHANGES`，指出非字符串 extra key 会被 surface 校验过滤而可能返回 matched，且 invalid proof evidence 的 best-effort required capabilities 归一会丢弃 unknown capability。当前已在 `a03d8cc9b66f2f4440329233b83729622e0bfc0e` 把非字符串 key 计入 canonical surface drift 并 fail-closed，同时 required capabilities best-effort 只有在原始值全集可被 approved vocabulary 覆盖时才 canonicalize，否则保留原始 tuple 使 proof mismatch 进入 unresolved。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第八轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage、fixture independence、非字符串 key surface drift 与 unknown required capability tuple drift 等阻断。第九轮 guardian 针对 `b6bfe70` 返回 `REQUEST_CHANGES`，指出非法 `CompatibilityDecisionContext` dataclass 字段类型会绕过 mapping normalizer 并在 `_is_opaque_decision_id` 抛 `TypeError`。当前已在 `206523985a096e97404395bde9a7c7834db1c155` 将 dataclass context 字段同样经过 non-empty string / bool 归一，不合法字段 fail-closed 为 `invalid_contract`，并补充 dataclass `decision_id=123` 回归。
 
 ## 下一步动作
 
@@ -265,6 +265,20 @@
   - 结果：通过。
 - 第八轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，969 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-eighth-followup.json`
+  - 结果：第九轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - 非法 `CompatibilityDecisionContext` dataclass 输入会被 `_normalize_context` 原样返回，非字符串 `decision_id` 进入 `_is_opaque_decision_id` 后抛 `TypeError`，未返回 fail-closed invalid_contract carrier。
+- 已处理第九轮 guardian 阻断：
+  - dataclass context 路径与 mapping context 路径一样执行 non-empty string / bool 归一，非法字段收敛为空值或 `False`，由 `_validate_context` 返回 `invalid_compatibility_contract`。
+  - 补充 `AdapterProviderCompatibilityDecisionInput` + `CompatibilityDecisionContext(decision_id=123, ...)` 回归，证明不抛异常、返回 FR-0026 invalid_contract。
+- 第九轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，74 tests。
+- 第九轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第九轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第九轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，970 tests。
 
 ## 待验证项
 
@@ -290,3 +304,4 @@
 - sixth guardian checkpoint：`681b7906026440d2c3bc02b1f872296de1abef88`
 - seventh guardian checkpoint：`a4da8087fa8c6ac6f39bd21368a2b82f1dc70282`
 - eighth guardian checkpoint：`a03d8cc9b66f2f4440329233b83729622e0bfc0e`
+- ninth guardian checkpoint：`206523985a096e97404395bde9a7c7834db1c155`
