@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第八轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage、fixture independence、非字符串 key surface drift 与 unknown required capability tuple drift 等阻断。第九轮 guardian 针对 `b6bfe70` 返回 `REQUEST_CHANGES`，指出非法 `CompatibilityDecisionContext` dataclass 字段类型会绕过 mapping normalizer 并在 `_is_opaque_decision_id` 抛 `TypeError`。当前已在 `206523985a096e97404395bde9a7c7834db1c155` 将 dataclass context 字段同样经过 non-empty string / bool 归一，不合法字段 fail-closed 为 `invalid_contract`，并补充 dataclass `decision_id=123` 回归。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第九轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage、fixture independence、非字符串 key surface drift、unknown required capability tuple drift 与 dataclass context field type 等阻断。第十轮 guardian 针对 `50c4e0f` 返回 `REQUEST_CHANGES`，指出静态 forbidden token 无法覆盖任意合法 provider key，例如 `provider_key=acme` 且 `decision_id=acme` 会进入 matched/Core projection。当前已在 `63d4472f3fed4dd9cd51eebe740087e59af3da0a` 将 decision_id opacity 校验动态绑定当前 offer 的 `provider_key` 与 `observability.offer_id`，禁止 decision_id 等于或可逆 slug 派生自 provider identity，并补充 `acme` 回归。
 
 ## 下一步动作
 
@@ -279,6 +279,21 @@
   - 结果：通过。
 - 第九轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，970 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-ninth-followup.json`
+  - 结果：第十轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - 静态 forbidden token 只覆盖已知 provider 命名，合法 offer 使用任意 `provider_key=acme` 且 `decision_id=acme` 时会返回 matched，并把 provider-derived decision_id 暴露到 Core projection。
+- 已处理第十轮 guardian 阻断：
+  - 新增 `_validate_context_provider_identity`，在 context frozen 校验后、requirement / offer validator 前，基于当前 raw offer 的 `provider_key` 与 `observability.offer_id` 做动态 identity slug 校验。
+  - 若 decision_id 等于或可逆 slug 派生自当前 provider identity，则 fail-closed 为 `provider_leakage_detected`，observed values 只暴露布尔摘要。
+  - 补充 `provider_key=acme` / `decision_id=acme` 回归，断言返回 FR-0026 provider leakage 且 Core projection fail-closed。
+- 第十轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，75 tests。
+- 第十轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第十轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，971 tests。
 
 ## 待验证项
 
@@ -305,3 +320,4 @@
 - seventh guardian checkpoint：`a4da8087fa8c6ac6f39bd21368a2b82f1dc70282`
 - eighth guardian checkpoint：`a03d8cc9b66f2f4440329233b83729622e0bfc0e`
 - ninth guardian checkpoint：`206523985a096e97404395bde9a7c7834db1c155`
+- tenth guardian checkpoint：`63d4472f3fed4dd9cd51eebe740087e59af3da0a`
