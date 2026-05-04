@@ -107,4 +107,4 @@
 
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - implementation checkpoint：`bbc19ea1b5d9a48cf80def857e14d5b440dc277b`
-- guardian follow-up checkpoint：待提交
+- guardian follow-up checkpoint：`35c73cd4ac1fe7eddd8dc4c96ed8abcf18ec452b`
