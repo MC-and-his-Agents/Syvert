@@ -509,8 +509,9 @@ def _validate_input_surface(
     raw_keys = _require_string_keys(input_value)
     missing_fields = tuple(sorted(REQUIRED_INPUT_FIELDS - raw_keys))
     extra_fields = tuple(sorted(raw_keys - REQUIRED_INPUT_FIELDS))
-    if missing_fields or extra_fields:
-        leakage = _detect_provider_leakage({field_name: input_value.get(field_name) for field_name in extra_fields})
+    non_string_extra_count = _non_string_key_count(input_value)
+    if missing_fields or extra_fields or non_string_extra_count:
+        leakage = _detect_provider_leakage(_surface_extra_values(input_value, extra_fields))
         error_code = (
             COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED
             if leakage
@@ -522,7 +523,7 @@ def _validate_input_surface(
             _surface_drift_observed_values(
                 surface="decision_input",
                 missing_count=len(missing_fields),
-                extra_count=len(extra_fields),
+                extra_count=len(extra_fields) + non_string_extra_count,
                 forbidden_semantics_count=len(leakage),
             ),
         )
@@ -541,8 +542,9 @@ def _validate_context_surface(raw_context: Any) -> tuple[str, str, Mapping[str, 
     raw_keys = _require_string_keys(raw_context)
     missing_fields = tuple(sorted(REQUIRED_CONTEXT_FIELDS - raw_keys))
     extra_fields = tuple(sorted(raw_keys - REQUIRED_CONTEXT_FIELDS))
-    if missing_fields or extra_fields:
-        leakage = _detect_provider_leakage({field_name: raw_context.get(field_name) for field_name in extra_fields})
+    non_string_extra_count = _non_string_key_count(raw_context)
+    if missing_fields or extra_fields or non_string_extra_count:
+        leakage = _detect_provider_leakage(_surface_extra_values(raw_context, extra_fields))
         error_code = (
             COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED
             if leakage
@@ -554,7 +556,7 @@ def _validate_context_surface(raw_context: Any) -> tuple[str, str, Mapping[str, 
             _surface_drift_observed_values(
                 surface="decision_context",
                 missing_count=len(missing_fields),
-                extra_count=len(extra_fields),
+                extra_count=len(extra_fields) + non_string_extra_count,
                 forbidden_semantics_count=len(leakage),
             ),
         )
@@ -648,6 +650,24 @@ def _forbidden_semantics_observed_values(leakage: tuple[str, ...]) -> Mapping[st
         "surface": "decision_context",
         "forbidden_semantics_count": len(leakage),
     }
+
+
+def _surface_extra_values(raw_value: Mapping[Any, Any], extra_fields: tuple[str, ...]) -> Mapping[str, Any]:
+    extra_values: dict[str, Any] = {
+        field_name: raw_value.get(field_name)
+        for field_name in extra_fields
+    }
+    non_string_index = 0
+    for key, value in raw_value.items():
+        if isinstance(key, str):
+            continue
+        extra_values[f"non_string_extra_key_{non_string_index}"] = value
+        non_string_index += 1
+    return extra_values
+
+
+def _non_string_key_count(raw_value: Mapping[Any, Any]) -> int:
+    return sum(1 for key in raw_value if not isinstance(key, str))
 
 
 def _upstream_validation_observed_values(
@@ -994,9 +1014,7 @@ def _best_effort_profile_evidence_carrier_refs(
             raw_ref_iterator: Iterable[Any] = iter(raw_refs)
         except TypeError:
             continue
-        normalized_required_capabilities = _normalize_required_capabilities(
-            _best_effort_string_tuple(required_capabilities)
-        )
+        normalized_required_capabilities = _best_effort_canonical_required_capabilities(required_capabilities)
         refs.extend(
             ProfileEvidenceCarrierRef(
                 ref=ref,
@@ -1040,6 +1058,16 @@ def _best_effort_string_tuple(raw_value: Any) -> tuple[str, ...]:
     except TypeError:
         return ()
     return tuple(value for value in iterator if isinstance(value, str) and value)
+
+
+def _best_effort_canonical_required_capabilities(raw_value: Any) -> tuple[str, ...]:
+    raw_capabilities = _best_effort_string_tuple(raw_value)
+    normalized_capabilities = _normalize_required_capabilities(raw_capabilities)
+    if len(normalized_capabilities) != len(raw_capabilities):
+        return raw_capabilities
+    if set(normalized_capabilities) != set(raw_capabilities):
+        return raw_capabilities
+    return normalized_capabilities
 
 
 def _best_effort_nested_string(raw_value: Any, section: str, field_name: str) -> str | None:

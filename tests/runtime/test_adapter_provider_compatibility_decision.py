@@ -431,6 +431,20 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
                 self.assert_provider_terms_not_observed(observed_values)
                 self.assert_no_provider_leakage(decision)
 
+    def test_non_string_top_level_extra_key_fails_closed(self) -> None:
+        input_value = copy_decision_input()
+        input_value[("trace", "id")] = "trace-001"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assertEqual(observed_values["surface"], "decision_input")
+        self.assertEqual(observed_values["extra_field_count"], 1)
+        self.assertEqual(observed_values["forbidden_semantics_count"], 0)
+        self.assert_no_provider_leakage(decision)
+
     def test_decision_context_extra_non_forbidden_field_fails_closed(self) -> None:
         input_value = copy_decision_input()
         input_value["decision_context"]["trace_id"] = "trace-001"
@@ -444,6 +458,20 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(observed_values["extra_field_count"], 1)
         self.assertEqual(observed_values["forbidden_semantics_count"], 0)
         self.assertNotIn("trace_id", str(observed_values))
+        self.assert_no_provider_leakage(decision)
+
+    def test_non_string_decision_context_extra_key_fails_closed(self) -> None:
+        input_value = copy_decision_input()
+        input_value["decision_context"][("trace", "id")] = "trace-001"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        observed_values = decision.evidence.invalid_contract_evidence.observed_values
+        self.assertEqual(observed_values["surface"], "decision_context")
+        self.assertEqual(observed_values["extra_field_count"], 1)
+        self.assertEqual(observed_values["forbidden_semantics_count"], 0)
         self.assert_no_provider_leakage(decision)
 
     def test_decision_rejects_provider_derived_decision_id_before_core_projection(self) -> None:
@@ -530,6 +558,37 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertNotIn(stale_ref, decision.evidence.resource_profile_evidence_refs)
         self.assertNotIn(unknown_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
         self.assertNotIn(stale_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_requirement_unknown_required_capability_keeps_profile_proof_unresolved(self) -> None:
+        input_value = copy_decision_input()
+        profile_ref = "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"][0][
+            "required_capabilities"
+        ] = ["account", "unknown"]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertIn(profile_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(profile_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(profile_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_offer_unknown_required_capability_keeps_profile_proof_unresolved(self) -> None:
+        input_value = copy_decision_input()
+        profile_ref = "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        input_value["offer"]["resource_support"]["supported_profiles"][0]["required_capabilities"] = [
+            "account",
+            "unknown",
+        ]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+        self.assertIn(profile_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(profile_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(profile_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
         self.assert_no_provider_leakage(decision)
 
     def test_invalid_duplicate_profile_proof_is_unresolved_not_resolved(self) -> None:
