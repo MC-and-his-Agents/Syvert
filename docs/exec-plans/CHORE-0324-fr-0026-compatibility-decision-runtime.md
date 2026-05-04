@@ -41,7 +41,7 @@
 - 分支：`issue-324-fr-0026-compatibility-decision-runtime`
 - worktree 创建基线：`4e90953447e20b1fffaee0f8104f989bd043202e`
 - 已核对 `AGENTS.md`、`WORKFLOW.md`、`docs/AGENTS.md`、`code_review.md`、`#324` GitHub truth 与 `FR-0026` formal spec。
-- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第六轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏与 proof surface drift 等阻断。第七轮 guardian 针对 `65b3a71` 返回 `REQUEST_CHANGES`，指出 resolved proof refs 仍未校验 FR-0027 adapter coverage、capability / execution slice 与 canonical tuple，且 fixture 的 decision_context 依赖 SUT baseline helper。当前已在 `a4da8087fa8c6ac6f39bd21368a2b82f1dc70282` 将 resolved 判定提升为 approved ref、profile/top-level/observability 三层对齐、非重复、当前 adapter 在 FR-0027 `reference_adapters` 内、capability/execution slice 对齐且 profile tuple 对齐；未覆盖当前 adapter 或 tuple drift 的 refs 进入 unresolved。同时将 compatibility decision fixture 的 context 固定为显式 v0.8.0 / FR-0024 / FR-0025 / FR-0027 / FR-0021 / fail_closed=True 字面量。
+- 当前 checkpoint：已在 rebase 后 head `f2fd8aa52fa3b74cee189170d66004e5c7be1741` 新增 compatibility decision runtime、专属 fixtures 与 tests。runtime 复用既有 requirement / offer validator，合法后只比较 Adapter boundary、approved execution slice 与 resource profile canonical tuple；invalid requirement、invalid offer、compatibility mismatch、proof drift 与 decision-context provider leakage 均 fail-closed 为 `invalid_contract`，并提供无 provider identity 的 Core projection。当前分支已同步到 `origin/main=107a9fb3b93864ee01ef5ea21ad4d782761fc61e`。首轮到第七轮 guardian 已收敛 top-level drift、provider-derived `decision_id`、proof evidence 解析、context drift source attribution、coverage 证据、malformed context、hyphenated provider identity、context surface drift、error evidence no-leakage、上游 validator evidence 脱敏、proof surface drift、FR-0027 adapter/tuple coverage 与 fixture independence 等阻断。第八轮 guardian 针对 `9d00f17` 返回 `REQUEST_CHANGES`，指出非字符串 extra key 会被 surface 校验过滤而可能返回 matched，且 invalid proof evidence 的 best-effort required capabilities 归一会丢弃 unknown capability。当前已在 `a03d8cc9b66f2f4440329233b83729622e0bfc0e` 把非字符串 key 计入 canonical surface drift 并 fail-closed，同时 required capabilities best-effort 只有在原始值全集可被 approved vocabulary 覆盖时才 canonicalize，否则保留原始 tuple 使 proof mismatch 进入 unresolved。
 
 ## 下一步动作
 
@@ -247,6 +247,24 @@
   - 结果：通过。
 - 第七轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，965 tests。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-seventh-followup.json`
+  - 结果：第八轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - 非字符串 extra key 被 `_require_string_keys()` 过滤，顶层 input / `decision_context` 可能绕过 canonical surface drift 校验并返回 `matched`。
+    - invalid proof evidence 中 `_normalize_required_capabilities()` 会丢弃 unknown capability，导致 tuple mismatch 的 proof 被误判 resolved。
+- 已处理第八轮 guardian 阻断：
+  - surface drift 校验新增非字符串 key 计数，顶层 input 与 decision_context 只要存在非字符串 extra key 即 fail-closed，并通过 sanitized observed values 只暴露计数。
+  - proof evidence best-effort required capabilities 改为“可完整 canonicalize 才归一”；若存在 unknown / duplicate / 不可覆盖值，则保留原始 tuple，使 FR-0027 tuple comparison 失败并进入 unresolved。
+  - 补充顶层 input / decision_context 非字符串 extra key 回归，以及 requirement / offer unknown required capability 绑定 approved proof ref 的 unresolved 回归。
+- 第八轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，29 tests。
+- 第八轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，73 tests。
+- 第八轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第八轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，969 tests。
 
 ## 待验证项
 
@@ -271,3 +289,4 @@
 - fifth guardian checkpoint：`2fa8e26494453a2ff40cb3095b898426d75c576c`
 - sixth guardian checkpoint：`681b7906026440d2c3bc02b1f872296de1abef88`
 - seventh guardian checkpoint：`a4da8087fa8c6ac6f39bd21368a2b82f1dc70282`
+- eighth guardian checkpoint：`a03d8cc9b66f2f4440329233b83729622e0bfc0e`
