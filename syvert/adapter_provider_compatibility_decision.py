@@ -565,7 +565,15 @@ def _validate_context_surface(raw_context: Any) -> tuple[str, str, Mapping[str, 
 
 def _normalize_context(raw_value: CompatibilityDecisionContext | Mapping[str, Any]) -> CompatibilityDecisionContext:
     if type(raw_value) is CompatibilityDecisionContext:
-        return raw_value
+        return CompatibilityDecisionContext(
+            decision_id=_require_non_empty_string(raw_value.decision_id),
+            contract_version=_require_non_empty_string(raw_value.contract_version),
+            requirement_contract_ref=_require_non_empty_string(raw_value.requirement_contract_ref),
+            offer_contract_ref=_require_non_empty_string(raw_value.offer_contract_ref),
+            resource_profile_contract_ref=_require_non_empty_string(raw_value.resource_profile_contract_ref),
+            provider_port_boundary_ref=_require_non_empty_string(raw_value.provider_port_boundary_ref),
+            fail_closed=raw_value.fail_closed if type(raw_value.fail_closed) is bool else False,
+        )
     if not isinstance(raw_value, Mapping):
         return CompatibilityDecisionContext(
             decision_id="invalid-context",

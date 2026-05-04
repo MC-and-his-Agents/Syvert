@@ -11,6 +11,7 @@ from syvert.adapter_provider_compatibility_decision import (
     COMPATIBILITY_DECISION_STATUS_MATCHED,
     COMPATIBILITY_DECISION_STATUS_UNMATCHED,
     AdapterProviderCompatibilityDecisionInput,
+    CompatibilityDecisionContext,
     baseline_compatibility_decision_context,
     decide_adapter_provider_compatibility,
     project_compatibility_decision_for_core,
@@ -506,6 +507,29 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
                 self.assertEqual(decision.error.source_contract_ref, "FR-0026")
                 self.assertEqual(decision.adapter_key, None)
                 self.assert_no_provider_leakage(decision)
+
+    def test_invalid_decision_context_dataclass_field_type_fails_closed(self) -> None:
+        input_value = copy_decision_input()
+        decision_input = AdapterProviderCompatibilityDecisionInput(
+            requirement=input_value["requirement"],
+            offer=input_value["offer"],
+            decision_context=CompatibilityDecisionContext(
+                decision_id=123,
+                contract_version="v0.8.0",
+                requirement_contract_ref="FR-0024",
+                offer_contract_ref="FR-0025",
+                resource_profile_contract_ref="FR-0027",
+                provider_port_boundary_ref="FR-0021",
+                fail_closed=True,
+            ),
+        )
+
+        decision = decide_adapter_provider_compatibility(decision_input)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_COMPATIBILITY_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assertEqual(decision.adapter_key, None)
+        self.assert_no_provider_leakage(decision)
 
     def test_invalid_unknown_profile_proof_is_unresolved_not_resolved(self) -> None:
         input_value = copy_decision_input()
