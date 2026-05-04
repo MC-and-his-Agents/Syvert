@@ -496,6 +496,42 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertNotIn(unknown_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
         self.assert_no_provider_leakage(decision)
 
+    def test_requirement_profile_level_proof_drift_is_unresolved_even_when_top_level_refs_are_stale(self) -> None:
+        input_value = copy_decision_input()
+        stale_ref = "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        unknown_ref = "fr-0027:profile:content-detail-by-url-hybrid:unknown"
+        input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"][0][
+            "evidence_refs"
+        ] = [unknown_ref]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertIn(unknown_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertIn(stale_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(stale_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assertNotIn(stale_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_offer_profile_level_proof_drift_is_unresolved_even_when_top_level_refs_are_stale(self) -> None:
+        input_value = copy_decision_input()
+        stale_ref = "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        unknown_ref = "fr-0027:profile:content-detail-by-url-hybrid:unknown"
+        input_value["offer"]["resource_support"]["supported_profiles"][0]["evidence_refs"] = [unknown_ref]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+        self.assertIn(unknown_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertIn(stale_ref, decision.evidence.invalid_contract_evidence.unresolved_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(stale_ref, decision.evidence.resource_profile_evidence_refs)
+        self.assertNotIn(unknown_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assertNotIn(stale_ref, decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
     def test_invalid_duplicate_profile_proof_is_unresolved_not_resolved(self) -> None:
         input_value = copy_decision_input()
         duplicate_ref = "fr-0027:profile:content-detail-by-url-hybrid:account"

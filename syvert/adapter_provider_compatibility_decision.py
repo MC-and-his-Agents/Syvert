@@ -691,8 +691,11 @@ def _invalid_decision(
     violated_rule: str,
     observed_values: Mapping[str, Any],
 ) -> AdapterProviderCompatibilityDecision:
-    resolved_proofs = _resolved_profile_evidence_refs(raw_requirement, raw_offer)
-    unresolved_proofs = _unresolved_profile_evidence_refs(raw_requirement, raw_offer)
+    resolved_proofs, unresolved_proofs = _profile_evidence_ref_report(
+        raw_requirement,
+        raw_offer,
+        source_contract_ref=source_contract_ref,
+    )
     error = CompatibilityDecisionError(
         failure_category="runtime_contract",
         error_code=error_code,
@@ -792,27 +795,82 @@ def _best_effort_offer_evidence_refs(raw_offer: Any) -> tuple[str, ...]:
     return _dedupe(refs)
 
 
-def _resolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tuple[str, ...]:
-    requirement_refs, offer_refs = _profile_evidence_ref_collections(raw_requirement, raw_offer)
-    refs = (*requirement_refs, *offer_refs)
-    approved_refs = _approved_profile_evidence_refs()
-    duplicate_refs = _duplicate_values(requirement_refs) | _duplicate_values(offer_refs)
-    return _dedupe(ref for ref in refs if ref in approved_refs and ref not in duplicate_refs)
+def _profile_evidence_ref_report(
+    raw_requirement: Any,
+    raw_offer: Any,
+    *,
+    source_contract_ref: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    carriers: tuple[tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...]
+    requirement_carrier = _requirement_profile_evidence_surfaces(raw_requirement)
+    offer_carrier = _offer_profile_evidence_surfaces(raw_offer)
+    if source_contract_ref == APPROVED_REQUIREMENT_CONTRACT_REF:
+        carriers = (requirement_carrier,)
+    elif source_contract_ref == APPROVED_OFFER_CONTRACT_REF:
+        carriers = (offer_carrier,)
+    else:
+        carriers = (requirement_carrier, offer_carrier)
+
+    resolved_refs: list[str] = []
+    unresolved_refs: list[str] = []
+    for _, profile_refs, evidence_refs, observability_refs in carriers:
+        carrier_resolved, carrier_unresolved = _classify_profile_evidence_refs(
+            profile_refs=profile_refs,
+            evidence_refs=evidence_refs,
+            observability_refs=observability_refs,
+        )
+        resolved_refs.extend(carrier_resolved)
+        unresolved_refs.extend(carrier_unresolved)
+    return _dedupe(resolved_refs), _dedupe(unresolved_refs)
 
 
-def _unresolved_profile_evidence_refs(raw_requirement: Any, raw_offer: Any) -> tuple[str, ...]:
-    requirement_refs, offer_refs = _profile_evidence_ref_collections(raw_requirement, raw_offer)
-    refs = (*requirement_refs, *offer_refs)
-    approved_refs = _approved_profile_evidence_refs()
-    duplicate_refs = _duplicate_values(requirement_refs) | _duplicate_values(offer_refs)
-    return _dedupe(ref for ref in refs if ref not in approved_refs or ref in duplicate_refs)
-
-
-def _profile_evidence_ref_collections(raw_requirement: Any, raw_offer: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _requirement_profile_evidence_surfaces(raw_requirement: Any) -> tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     return (
+        "requirement",
+        _best_effort_profile_evidence_refs(
+            raw_requirement,
+            "resource_requirement",
+            "resource_requirement_profiles",
+        ),
         _best_effort_nested_string_collection(raw_requirement, "evidence", "resource_profile_evidence_refs"),
-        _best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
+        _best_effort_nested_string_collection(raw_requirement, "observability", "proof_refs"),
     )
+
+
+def _offer_profile_evidence_surfaces(raw_offer: Any) -> tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    return (
+        "offer",
+        _best_effort_profile_evidence_refs(
+            raw_offer,
+            "resource_support",
+            "supported_profiles",
+        ),
+        _best_effort_nested_string_collection(raw_offer, "evidence", "resource_profile_evidence_refs"),
+        _best_effort_nested_string_collection(raw_offer, "observability", "proof_refs"),
+    )
+
+
+def _classify_profile_evidence_refs(
+    *,
+    profile_refs: tuple[str, ...],
+    evidence_refs: tuple[str, ...],
+    observability_refs: tuple[str, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    approved_refs = _approved_profile_evidence_refs()
+    duplicate_refs = (
+        _duplicate_values(profile_refs)
+        | _duplicate_values(evidence_refs)
+        | _duplicate_values(observability_refs)
+    )
+    aligned_refs = set(profile_refs) & set(evidence_refs) & set(observability_refs)
+    refs = (*profile_refs, *evidence_refs, *observability_refs)
+    resolved_refs = tuple(
+        ref for ref in refs if ref in approved_refs and ref in aligned_refs and ref not in duplicate_refs
+    )
+    unresolved_refs = tuple(
+        ref for ref in refs if ref not in approved_refs or ref not in aligned_refs or ref in duplicate_refs
+    )
+    return _dedupe(resolved_refs), _dedupe(unresolved_refs)
 
 
 def _best_effort_provider_evidence(raw_offer: Any) -> AdapterBoundProviderEvidence | None:
@@ -821,6 +879,36 @@ def _best_effort_provider_evidence(raw_offer: Any) -> AdapterBoundProviderEviden
     if provider_key is None or offer_id is None:
         return None
     return AdapterBoundProviderEvidence(provider_key=provider_key, offer_id=offer_id)
+
+
+def _best_effort_profile_evidence_refs(raw_value: Any, section: str, profiles_field: str) -> tuple[str, ...]:
+    if isinstance(raw_value, Mapping):
+        section_value = raw_value.get(section)
+        profiles = section_value.get(profiles_field) if isinstance(section_value, Mapping) else None
+    else:
+        section_value = getattr(raw_value, section, None)
+        profiles = getattr(section_value, profiles_field, None)
+    if isinstance(profiles, (str, bytes, Mapping)) or profiles is None:
+        return ()
+    try:
+        iterator: Iterable[Any] = iter(profiles)
+    except TypeError:
+        return ()
+
+    refs: list[str] = []
+    for profile in iterator:
+        if isinstance(profile, Mapping):
+            raw_refs = profile.get("evidence_refs")
+        else:
+            raw_refs = getattr(profile, "evidence_refs", None)
+        if isinstance(raw_refs, (str, bytes, Mapping)) or raw_refs is None:
+            continue
+        try:
+            raw_ref_iterator: Iterable[Any] = iter(raw_refs)
+        except TypeError:
+            continue
+        refs.extend(ref for ref in raw_ref_iterator if isinstance(ref, str) and ref)
+    return tuple(refs)
 
 
 def _best_effort_nested_string_collection(raw_value: Any, section: str, field_name: str) -> tuple[str, ...]:
