@@ -61,14 +61,26 @@
   - 结果：通过。
 - `python3 -m unittest discover tests/runtime`
   - 结果：通过，982 tests。
+- 提交后 `python3 -m unittest tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，42 tests。
+- 提交后 `python3 -m py_compile syvert/provider_no_leakage_guard.py tests/runtime/test_provider_no_leakage_guard.py`
+  - 结果：通过。
+- 提交后 `git diff --check HEAD~2..HEAD`
+  - 结果：通过。
+- 提交后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- 提交后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 提交后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 提交后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-325-fr-0026-provider-no-leakage-guards`
+  - 结果：通过。
 
 ## 待验证项
 
-- `python3 scripts/spec_guard.py --mode ci --all`
-- `python3 scripts/docs_guard.py --mode ci`
-- `python3 scripts/workflow_guard.py --mode ci`
-- `python3 scripts/governance_gate.py --mode ci ...`
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+- PR guardian、GitHub checks、受控 merge 与 closeout reconciliation。
 
 ## 风险
 
