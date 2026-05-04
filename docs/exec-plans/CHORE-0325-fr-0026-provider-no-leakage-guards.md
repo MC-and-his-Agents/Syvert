@@ -83,4 +83,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
-- implementation checkpoint：待提交
+- implementation checkpoint：`bbc19ea1b5d9a48cf80def857e14d5b440dc277b`
