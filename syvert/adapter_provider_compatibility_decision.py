@@ -287,6 +287,17 @@ def decide_adapter_provider_compatibility(
             violated_rule=context_error[1],
             observed_values=context_error[2],
         )
+    context_provider_identity_error = _validate_context_provider_identity(context, raw_offer)
+    if context_provider_identity_error is not None:
+        return _invalid_decision(
+            context=context,
+            raw_requirement=raw_requirement,
+            raw_offer=raw_offer,
+            source_contract_ref="FR-0026",
+            error_code=context_provider_identity_error[0],
+            violated_rule=context_provider_identity_error[1],
+            observed_values=context_provider_identity_error[2],
+        )
 
     requirement_result = validate_adapter_capability_requirement(
         AdapterCapabilityRequirementValidationInput(
@@ -636,6 +647,41 @@ def _validate_context(
             _forbidden_semantics_observed_values(leakage),
         )
     return None
+
+
+def _validate_context_provider_identity(
+    context: CompatibilityDecisionContext,
+    raw_offer: Any,
+) -> tuple[str, str, Mapping[str, Any]] | None:
+    decision_id_slug = _identity_slug(context.decision_id)
+    provider_identity_values = (
+        _best_effort_string(raw_offer, "provider_key"),
+        _best_effort_nested_string(raw_offer, "observability", "offer_id"),
+    )
+    for raw_identity in provider_identity_values:
+        if raw_identity is None:
+            continue
+        identity_slug = _identity_slug(raw_identity)
+        if identity_slug and decision_id_slug == identity_slug:
+            return (
+                COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED,
+                "decision_context.decision_id must not be derived from provider identity",
+                {"surface": "decision_context", "decision_id_provider_derived": True},
+            )
+    return None
+
+
+def _identity_slug(raw_value: str) -> str:
+    chars: list[str] = []
+    previous_was_separator = False
+    for char in raw_value.lower():
+        if char.isalnum():
+            chars.append(char)
+            previous_was_separator = False
+        elif not previous_was_separator:
+            chars.append("-")
+            previous_was_separator = True
+    return "".join(chars).strip("-")
 
 
 def _surface_drift_observed_values(
