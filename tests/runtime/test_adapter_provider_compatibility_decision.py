@@ -39,6 +39,40 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
             ("account_proxy", "account"),
         )
         self.assertEqual(
+            tuple(
+                (
+                    profile.resource_dependency_mode,
+                    profile.required_capabilities,
+                    profile.requirement_profile_evidence_ref,
+                    profile.offer_profile_evidence_ref,
+                )
+                for profile in decision.matched_profiles
+            ),
+            (
+                (
+                    "required",
+                    ("account", "proxy"),
+                    "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                    "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                ),
+                (
+                    "required",
+                    ("account",),
+                    "fr-0027:profile:content-detail-by-url-hybrid:account",
+                    "fr-0027:profile:content-detail-by-url-hybrid:account",
+                ),
+            ),
+        )
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
+        self.assertEqual(decision.observability.proof_refs, decision.evidence.resource_profile_evidence_refs)
+        self.assertEqual(decision.observability.matched_profile_keys, ("account_proxy", "account"))
+        self.assertEqual(
             decision.evidence.adapter_bound_provider_evidence.provider_key,
             "native_xhs_detail",
         )
@@ -85,6 +119,55 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_UNMATCHED)
         self.assertEqual(decision.error, None)
         self.assertEqual(decision.matched_profiles, ())
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
+        self.assertEqual(decision.observability.proof_refs, decision.evidence.resource_profile_evidence_refs)
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_uses_canonical_tuple_not_profile_key_for_unmatched(self) -> None:
+        input_value = copy_decision_input()
+        requirement = input_value["requirement"]
+        requirement["resource_requirement"]["resource_requirement_profiles"] = [
+            requirement["resource_requirement"]["resource_requirement_profiles"][0]
+        ]
+        requirement["evidence"]["resource_profile_evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        ]
+        requirement["observability"]["profile_keys"] = ["account_proxy"]
+        requirement["observability"]["proof_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        ]
+        offer = input_value["offer"]
+        offer["resource_support"]["supported_profiles"] = [
+            {
+                "profile_key": "account_proxy",
+                "resource_dependency_mode": "required",
+                "required_capabilities": ["account"],
+                "evidence_refs": ["fr-0027:profile:content-detail-by-url-hybrid:account"],
+            }
+        ]
+        offer["evidence"]["resource_profile_evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account"
+        ]
+        offer["observability"]["profile_keys"] = ["account_proxy"]
+        offer["observability"]["proof_refs"] = ["fr-0027:profile:content-detail-by-url-hybrid:account"]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_UNMATCHED)
+        self.assertEqual(decision.matched_profiles, ())
+        self.assertEqual(
+            decision.evidence.resource_profile_evidence_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
         self.assert_no_provider_leakage(decision)
 
     def test_decision_returns_invalid_contract_for_invalid_requirement_without_routing(self) -> None:
@@ -139,6 +222,53 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(decision.error.source_contract_ref, "FR-0025")
         self.assert_no_provider_leakage(decision)
 
+    def test_requirement_slice_and_capability_drift_fail_closed(self) -> None:
+        cases = (
+            ("capability", "search"),
+            ("operation", "search_by_keyword"),
+            ("target_type", "keyword"),
+            ("collection_mode", "api_only"),
+        )
+        for field_name, value in cases:
+            with self.subTest(field_name=field_name):
+                input_value = copy_decision_input()
+                if field_name == "capability":
+                    input_value["requirement"]["capability"] = value
+                else:
+                    input_value["requirement"]["execution_requirement"][field_name] = value
+
+                decision = decide_adapter_provider_compatibility(input_value)
+
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0024")
+                self.assertEqual(decision.adapter_key, None)
+                self.assertEqual(decision.capability, None)
+                self.assertEqual(decision.execution_slice, None)
+                self.assert_no_provider_leakage(decision)
+
+    def test_offer_capability_slice_version_and_error_carrier_drift_fail_closed(self) -> None:
+        cases = (
+            ("capability_offer", "capability", "search"),
+            ("capability_offer", "operation", "search_by_keyword"),
+            ("capability_offer", "target_type", "keyword"),
+            ("capability_offer", "collection_mode", "api_only"),
+            ("version", "contract_version", "v0.9.0"),
+            ("error_carrier", "adapter_mapping_required", False),
+        )
+        for section, field_name, value in cases:
+            with self.subTest(section=section, field_name=field_name):
+                input_value = copy_decision_input()
+                input_value["offer"][section][field_name] = value
+
+                decision = decide_adapter_provider_compatibility(input_value)
+
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0025")
+                self.assertEqual(decision.adapter_key, None)
+                self.assertEqual(decision.capability, None)
+                self.assertEqual(decision.execution_slice, None)
+                self.assert_no_provider_leakage(decision)
+
     def test_decision_returns_invalid_contract_for_profile_proof_not_covering_adapter(self) -> None:
         input_value = copy_decision_input()
         input_value["requirement"] = valid_compatibility_decision_input(adapter_key="external_adapter")[
@@ -156,11 +286,46 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         decision = decide_adapter_provider_compatibility(input_value)
 
         self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
-        self.assertIn(
-            decision.error.error_code,
+        self.assertEqual(decision.error.error_code, COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0024")
+        requirement_details = decision.evidence.invalid_contract_evidence.observed_values["requirement_details"]
+        self.assertEqual(requirement_details["adapter_key"], "external_adapter")
+        self.assertEqual(requirement_details["profile_key"], "account_proxy")
+        self.assertEqual(decision.evidence.resource_profile_evidence_refs, ())
+        self.assertEqual(
+            decision.evidence.invalid_contract_evidence.unresolved_refs,
             (
-                COMPATIBILITY_DECISION_ERROR_INVALID_REQUIREMENT_CONTRACT,
-                COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT,
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
+        self.assertEqual(decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs, ())
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_returns_invalid_contract_for_offer_profile_proof_not_covering_adapter(self) -> None:
+        input_value = copy_decision_input()
+        input_value["offer"] = valid_compatibility_decision_input(adapter_key="external_adapter")["offer"]
+        input_value["offer"]["adapter_binding"]["provider_port_ref"] = (
+            "external_adapter:adapter-owned-provider-port"
+        )
+        input_value["offer"]["observability"]["offer_id"] = (
+            "external_adapter:native_xhs_detail:content_detail:content_detail_by_url:url:hybrid:v0.8.0"
+        )
+        input_value["offer"]["observability"]["adapter_key"] = "external_adapter"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0025")
+        offer_details = decision.evidence.invalid_contract_evidence.observed_values["offer_details"]
+        self.assertEqual(offer_details["adapter_key"], "external_adapter")
+        self.assertEqual(offer_details["reference_adapters"], ("xhs", "douyin"))
+        self.assertEqual(decision.evidence.invalid_contract_evidence.resolved_profile_evidence_refs, ())
+        self.assertEqual(
+            decision.evidence.invalid_contract_evidence.unresolved_refs,
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
         )
         self.assert_no_provider_leakage(decision)

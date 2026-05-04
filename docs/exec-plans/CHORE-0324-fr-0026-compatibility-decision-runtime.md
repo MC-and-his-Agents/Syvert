@@ -133,6 +133,35 @@
   - 结果：通过。
 - guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
+- `python3 scripts/pr_guardian.py review 339 --post-review --json-output /tmp/syvert-pr-339-guardian-rerun.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项不是新 runtime 行为失败，而是验证证据不足：
+    - capability / operation / target_type / collection_mode、version / error carrier fail-closed 分支缺少覆盖。
+    - `matched` / `unmatched` 测试未强断言 canonical tuple、required capabilities 与 profile proof binding。
+    - profile proof coverage 用例断言过宽，未证明 FR-0027 proof coverage 失败口径。
+- 已处理第二轮 guardian 阻断：
+  - 新增 requirement-side capability / operation / target_type / collection_mode drift fail-closed 回归。
+  - 新增 offer-side capability / operation / target_type / collection_mode、version、error_carrier drift fail-closed 回归。
+  - `matched` 测试断言 `resource_dependency_mode + normalized_required_capabilities`、requirement / offer proof refs、decision evidence 与 observability proof refs。
+  - 新增同名 `profile_key` 但 canonical tuple 不同的 `unmatched` 回归，防止退化为 profile_key 匹配。
+  - proof coverage 测试分别断言 requirement / offer source contract、observed details、resolved / unresolved proof evidence。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，19 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer`
+  - 结果：通过，63 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，959 tests。
+- 第二轮 guardian 修复后 `python3 -m py_compile syvert/adapter_provider_compatibility_decision.py tests/runtime/adapter_provider_compatibility_decision_fixtures.py tests/runtime/test_adapter_provider_compatibility_decision.py`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-324-fr-0026-compatibility-decision-runtime`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`implementation`，变更类别=`docs, implementation`。
 
 ## 待验证项
 
