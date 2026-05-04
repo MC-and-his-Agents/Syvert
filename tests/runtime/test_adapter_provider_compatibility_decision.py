@@ -520,6 +520,34 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(projection["adapter_key"], None)
         self.assert_no_provider_leakage(decision)
 
+    def test_provider_derived_decision_id_takes_precedence_over_context_drift(self) -> None:
+        input_value = valid_compatibility_decision_input(provider_key="acme")
+        input_value["decision_context"]["decision_id"] = "acme"
+        input_value["decision_context"]["contract_version"] = "v0.9.0"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+        projection = project_compatibility_decision_for_core(decision)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(projection["adapter_key"], None)
+        self.assert_no_provider_leakage(decision)
+
+    def test_provider_derived_decision_id_uses_offer_observability_provider_key(self) -> None:
+        input_value = valid_compatibility_decision_input(provider_key="acme")
+        del input_value["offer"]["provider_key"]
+        input_value["decision_context"]["decision_id"] = "acme"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+        projection = project_compatibility_decision_for_core(decision)
+
+        self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+        self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+        self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(projection["adapter_key"], None)
+        self.assert_no_provider_leakage(decision)
+
     def test_malformed_decision_context_fails_closed(self) -> None:
         cases = (None, "invalid-context")
         for raw_context in cases:
