@@ -36,7 +36,7 @@
 - 分支：`issue-325-fr-0026-provider-no-leakage-guards`
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - 已确认 `#324` / PR `#339` 合入主干并关闭，父 FR `#298` 仍 open。
-- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload 均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。首轮 guardian 指出 forbidden token set 未覆盖 `provider_offer`、`compatibility_decision`、泛化 `selector` 与 `marketplace_listing`，当前已补齐并增加回归。
+- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。首轮 guardian 指出 forbidden token set 未覆盖 `provider_offer`、`compatibility_decision`、泛化 `selector` 与 `marketplace_listing`，当前已补齐并增加回归。第二轮 guardian 指出 provider identity 嵌入字符串、`provider_profile` 字段与真实 runtime path coverage 缺口，当前已补强 slug/subtoken 检测、补齐 token，并用 `execute_task_with_record` 覆盖真实 runtime envelope、TaskRecord 与 resource lifecycle snapshot。
 
 ## 下一步动作
 
@@ -88,6 +88,21 @@
   - 结果：通过。
 - guardian 修复后 `python3 -m unittest discover tests/runtime`
   - 结果：通过，983 tests。
+- `python3 scripts/pr_guardian.py review 340 --post-review --json-output /tmp/syvert-pr-340-guardian-followup.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - provider identity 嵌入组合字符串时会漏检，例如 `route:native_xhs_detail`、`offer:native-xhs-detail-001`。
+    - forbidden token set 未覆盖 FR-0026 场景 7 明确禁止的 `provider_profile`。
+    - 正向测试主要是手工干净 payload，未证明真实 Core routing / TaskRecord / resource lifecycle 生成路径 no-leakage。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_provider_no_leakage_guard`
+  - 结果：通过，10 tests。
+- 第二轮 guardian 修复后 `python3 -m unittest tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，45 tests。
+- 第二轮 guardian 修复后 `python3 -m py_compile syvert/provider_no_leakage_guard.py tests/runtime/test_provider_no_leakage_guard.py`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
+- 第二轮 guardian 修复后 `python3 -m unittest discover tests/runtime`
+  - 结果：通过，985 tests。
 
 ## 待验证项
 
@@ -108,3 +123,4 @@
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - implementation checkpoint：`bbc19ea1b5d9a48cf80def857e14d5b440dc277b`
 - guardian follow-up checkpoint：`35c73cd4ac1fe7eddd8dc4c96ed8abcf18ec452b`
+- second guardian follow-up checkpoint：待提交

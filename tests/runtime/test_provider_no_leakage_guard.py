@@ -22,7 +22,8 @@ from syvert.resource_lifecycle import (
     resource_bundle_to_dict,
     snapshot_to_dict,
 )
-from syvert.runtime import failure_envelope, runtime_contract_error
+from syvert.resource_lifecycle_store import default_resource_lifecycle_store
+from syvert.runtime import TaskInput, TaskRequest, execute_task_with_record, failure_envelope, runtime_contract_error
 from syvert.task_record import (
     TaskRequestSnapshot,
     create_task_record,
@@ -32,6 +33,7 @@ from syvert.task_record import (
 )
 from tests.runtime.adapter_provider_compatibility_decision_fixtures import valid_compatibility_decision_input
 from tests.runtime.test_registry import DeclarativeAdapter
+from tests.runtime.test_runtime import TEST_ADAPTER_KEY, SuccessfulAdapter, TaskRecordStoreEnvMixin
 
 
 class ProviderNoLeakageGuardTests(unittest.TestCase):
@@ -167,6 +169,7 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
         decision = matched_decision()
         cases = (
             "provider_offer",
+            "provider_profile",
             "compatibility_decision",
             "selector",
             "marketplace_listing",
@@ -196,6 +199,23 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
         self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
         self.assertEqual(result.evidence.forbidden_value_paths, ("task_record.routing_summary.chosen",))
 
+    def test_guard_fails_closed_for_embedded_provider_identity_value(self) -> None:
+        decision = matched_decision()
+        cases = (
+            ("core_routing", {"route_ref": "route:native_xhs_detail"}),
+            ("task_record", {"offer_ref": "offer:native-xhs-detail-001"}),
+        )
+        for surface_name, surface in cases:
+            with self.subTest(surface_name=surface_name):
+                result = guard_core_provider_no_leakage(
+                    surface_name=surface_name,
+                    surface=surface,
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
     def test_assert_guard_raises_for_provider_lifecycle_field(self) -> None:
         decision = matched_decision()
 
@@ -205,6 +225,38 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
                 surface={"provider_lifecycle": {"lease": "provider-lease-001"}},
                 decision=decision,
             )
+
+
+class ProviderNoLeakageRealRuntimePathTests(TaskRecordStoreEnvMixin, unittest.TestCase):
+    def test_real_runtime_task_record_and_resource_lifecycle_surfaces_exclude_provider_identity(self) -> None:
+        decision = matched_decision()
+
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_detail_by_url",
+                input=TaskInput(url="https://example.com/posts/no-provider-leakage"),
+            ),
+            adapters={TEST_ADAPTER_KEY: SuccessfulAdapter()},
+            task_id_factory=lambda: "task-real-no-provider-leakage",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertIsNotNone(outcome.task_record)
+        surfaces = {
+            "runtime_envelope": outcome.envelope,
+            "task_record": task_record_to_dict(outcome.task_record),
+            "resource_lifecycle_snapshot": snapshot_to_dict(default_resource_lifecycle_store().load_snapshot()),
+        }
+        for surface_name, surface in surfaces.items():
+            with self.subTest(surface_name=surface_name):
+                result = guard_core_provider_no_leakage(
+                    surface_name=surface_name,
+                    surface=surface,
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_PASSED)
 
 
 def matched_decision():

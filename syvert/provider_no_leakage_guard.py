@@ -20,6 +20,7 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
         "provider_selection",
         "provider_routing",
         "provider_offer",
+        "provider_profile",
         "compatibility_decision",
         "selector",
         "routing_policy",
@@ -161,7 +162,7 @@ def _scan_surface(
             )
         return
     if isinstance(value, (str, bytes)):
-        if isinstance(value, str) and value in provider_identity_values:
+        if isinstance(value, str) and _contains_provider_identity_value(value, provider_identity_values):
             forbidden_value_paths.append(path)
         return
     if isinstance(value, Iterable):
@@ -178,6 +179,35 @@ def _scan_surface(
 def _contains_forbidden_provider_field_token(field_name: str) -> bool:
     normalized = field_name.lower().replace("-", "_").replace(" ", "_")
     return any(token in normalized for token in FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS)
+
+
+def _contains_provider_identity_value(value: str, provider_identity_values: tuple[str, ...]) -> bool:
+    normalized_value = _identity_slug(value)
+    for identity_value in provider_identity_values:
+        if value == identity_value:
+            return True
+        normalized_identity = _identity_slug(identity_value)
+        if normalized_identity and (
+            normalized_value == normalized_identity
+            or normalized_value.startswith(f"{normalized_identity}-")
+            or normalized_value.endswith(f"-{normalized_identity}")
+            or f"-{normalized_identity}-" in normalized_value
+        ):
+            return True
+    return False
+
+
+def _identity_slug(value: str) -> str:
+    chars: list[str] = []
+    previous_was_separator = False
+    for char in value.lower():
+        if char.isalnum():
+            chars.append(char)
+            previous_was_separator = False
+        elif not previous_was_separator:
+            chars.append("-")
+            previous_was_separator = True
+    return "".join(chars).strip("-")
 
 
 def _dedupe(raw_values: Iterable[str]) -> tuple[str, ...]:
