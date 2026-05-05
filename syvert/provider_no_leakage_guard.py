@@ -14,7 +14,9 @@ PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED = "provider_leakage_detected
 
 FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
     {
+        "provider",
         "provider_capability",
+        "provider_id",
         "provider_key",
         "provider_registry",
         "provider_registry_entry",
@@ -51,6 +53,8 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
 
 FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
     {
+        "provider",
+        "provider_failure",
         "provider_unavailable",
         "provider_contract_violation",
         "invalid_provider_offer",

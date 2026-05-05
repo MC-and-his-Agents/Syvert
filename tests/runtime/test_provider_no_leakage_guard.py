@@ -168,6 +168,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
     def test_guard_fails_closed_for_forbidden_provider_decision_synonyms(self) -> None:
         decision = matched_decision()
         cases = (
+            "provider",
+            "providerId",
             "provider_capability",
             "provider_offer",
             "provider_profile",
@@ -265,6 +267,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"error": {"code": "provider_unavailable"}},
             {"error": {"code": "provider_contract_violation"}},
             {"error": {"code": "invalid_provider_offer"}},
+            {"error": {"failure_category": "provider"}},
+            {"error": {"failure_category": "provider_failure"}},
         )
         for surface in cases:
             with self.subTest(surface=surface):
