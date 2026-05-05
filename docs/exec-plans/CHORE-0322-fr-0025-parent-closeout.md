@@ -95,7 +95,7 @@
 - `python3 scripts/create_worktree.py --issue 322 --class docs`
   - 结果：通过；创建 worktree `/Users/mc/code/worktrees/syvert/issue-322-fr-0025`，分支 `issue-322-fr-0025`，基线 `24ae582447165596a54edacb35568ab4c73a55cb`。
 - `git merge --ff-only origin/main`
-  - 结果：通过；快进到 `c0dc5bcbcf7d7bca50144c293289b25ef4d90c9f`，消费已合入的 #327 主干索引，不覆盖其 worktree。
+  - 结果：通过；快进到 `c0dc5bc77bca97a738549ef43f6fab6d560c9653`，消费已合入的 #327 主干索引，不覆盖其 worktree。
 - GitHub issue status：
   - `#319/#320/#321`：closed completed。
   - `#322`：open，当前执行入口。
@@ -123,10 +123,12 @@
   - 结果：已生成 closeout semantic checkpoint `317f7a66fbf1f2d6ef5ea08946af52504f83586b`。
 - 提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian.json`
+  - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 closeout exec-plan 中一处 main-sync 验证记录保留了不存在的 SHA；当前 follow-up 修正为真实 `origin/main=c0dc5bc77bca97a738549ef43f6fab6d560c9653`，并复核 evidence artifact 与 checkpoint 区域 SHA 一致。
 
 ## 待验证项
 
-- 受控 `open_pr`、GitHub checks、guardian review、受控 merge。
+- guardian follow-up 后 docs class gates、GitHub checks、guardian review、受控 merge。
 - `#297` closeout comment / close issue。
 - Phase `#293` progress comment。
 - worktree cleanup 与 branch retirement。
