@@ -16,7 +16,7 @@
 - Phase `#293` 为 `closed completed`。
 - 父 FR `#294/#295/#296/#297/#298` 均为 `closed completed`。
 - 阶段 A 前主干基线为 `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到新的 merge commit，并由阶段 B 回写 published truth。
-- 当前 open PR 为空。
+- 阶段 A 前 open PR 为空；当前 PR `#346` 是本事项的阶段 A carrier。
 - `#312/#322/#327` closeout worktree 已清理，分支已退役。
 
 仓内 release / sprint 索引和父项 closeout evidence 已能覆盖开放 Adapter 接入、Provider 兼容性收敛、runtime validator / decision、SDK docs、evidence 与父项 closeout；剩余缺口是没有一个版本化 artifact 明确记录 Phase `#293` / release `v0.8.0` 的最终 closeout 已完成，且 `#327` 的 post-merge REST closeout comment 记录粒度弱于 `#312/#322`。

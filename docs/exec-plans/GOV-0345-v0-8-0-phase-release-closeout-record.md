@@ -11,7 +11,7 @@
 - 关联 spec：无（治理 / closeout record 事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0345-v0-8-0-phase-release-closeout-record.md`
 - active 收口事项：`GOV-0345-v0-8-0-phase-release-closeout-record`
-- 阶段 A PR：待创建
+- 阶段 A PR：`#346`
 - 阶段 B published truth PR：待创建
 - 状态：`active`
 
@@ -29,6 +29,7 @@
   - `docs/decisions/ADR-GOV-0345-v0-8-0-phase-release-closeout-record.md`
   - `docs/releases/v0.8.0.md`
   - `docs/sprints/2026-S21.md`
+  - `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`
 - 本次不纳入：
   - runtime / adapter / test 实现
   - formal spec 语义变更
@@ -53,7 +54,7 @@
 
 ## 下一步动作
 
-- 阶段 A：提交并推送本 closeout record carrier，运行 docs / spec / workflow / governance / scope guard，创建 docs PR，运行 guardian review。
+- 阶段 A：提交并推送本 closeout record carrier，运行 docs / spec / workflow / governance / scope guard，创建 docs PR `#346`，运行 guardian review。
 - 阶段 A guardian `APPROVE` 且 `safe_to_merge=true`、GitHub checks 全绿后受控合并。
 - 阶段 A 合入后，在阶段 A merge commit 上创建并推送 `v0.8.0` annotated tag。
 - 创建 GitHub Release `v0.8.0`。
@@ -126,6 +127,9 @@
 - `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r3.json`
   - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 `#327` 补录未落回 `CHORE-0327` evidence，且 release 索引仍有“最终主干”残留。
   - 处理：当前 follow-up 只更新 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`，不改写 `#327` exec-plan；同时把 release / ADR 中的“最终主干”残留改成阶段 A 前基线。
+- `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r4.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 active exec-plan scope 漏掉 `CHORE-0327` evidence、阶段 A PR 状态仍写待创建、ADR 仍把阶段 A 前 open PR 快照写成当前事实。
+  - 处理：当前 follow-up 将 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md` 纳入本事项 scope，记录阶段 A PR `#346`，并把 ADR 的 open PR 叙述改成阶段 A 前快照 / 当前 PR `#346` carrier。
 
 ## 待验证项
 
