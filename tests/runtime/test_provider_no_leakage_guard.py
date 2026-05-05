@@ -238,6 +238,23 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
                 self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
                 self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
 
+    def test_guard_fails_closed_for_provider_identity_in_mapping_keys(self) -> None:
+        decision = matched_decision()
+        cases = (
+            ("core_routing", {"routes": {"native_xhs_detail": "enabled"}}),
+            ("task_record", {"offers": {"native-xhs-detail-001": {"status": "seen"}}}),
+        )
+        for surface_name, surface in cases:
+            with self.subTest(surface_name=surface_name):
+                result = guard_core_provider_no_leakage(
+                    surface_name=surface_name,
+                    surface=surface,
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
     def test_assert_guard_raises_for_provider_lifecycle_field(self) -> None:
         decision = matched_decision()
 

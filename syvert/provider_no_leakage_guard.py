@@ -155,6 +155,8 @@ def _scan_surface(
             child_path = f"{path}.{key!s}"
             if isinstance(key, str) and _contains_forbidden_provider_field_token(key):
                 forbidden_field_paths.append(child_path)
+            if isinstance(key, str) and _contains_provider_identity_value(key, provider_identity_values):
+                forbidden_value_paths.append(child_path)
             _scan_surface(
                 child_value,
                 path=child_path,
