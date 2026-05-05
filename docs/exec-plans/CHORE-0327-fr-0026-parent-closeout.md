@@ -47,9 +47,9 @@
 
 ## 下一步动作
 
-- 运行 docs class gates：`docs_guard`、`spec_guard --all`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class docs`。
-- 提交中文 Conventional Commit，使用 `scripts/open_pr.py` 受控开 PR。
-- guardian review 通过且 checks 全绿后使用受控 merge。
+- 提交并推送 guardian follow-up 文档对账修订。
+- 重新运行 guardian review。
+- guardian review 通过且 GitHub checks 全绿后使用受控 merge。
 - 合并后关闭 `#298`，更新 Phase `#293` comment，清理 worktree 并退役分支。
 
 ## 已验证项
@@ -76,10 +76,28 @@
   - 结果：通过。
 - 提交前 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”；提交后复跑。
+- 提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 342 --post-review --json-output /tmp/syvert-pr-342-guardian.json`
+  - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - 最近一次 checkpoint head 未在文末落盘。
+    - `pr_scope_guard --class docs` 成功复跑证据未记录，`docs class gates` 仍在待验证项中。
+    - 父 FR closeout evidence 缺少 merged PR / commit、review / guardian、`#298/#293` GitHub 状态对账证据。
+- guardian follow-up 后 `git diff --check`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- guardian follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-327-fr-0026`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
-- docs class gates。
 - PR guardian、GitHub checks、受控 merge。
 - `#298` closeout comment / close issue。
 - Phase `#293` progress comment。
@@ -99,3 +117,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`24ae582447165596a54edacb35568ab4c73a55cb`
+- closeout evidence checkpoint：`331683266399038aa818d1c8ab51a30e593c2c0d`
+- latest reviewed checkpoint：`818f4d75d75f681b15295b34d849ff62a71045a7`
