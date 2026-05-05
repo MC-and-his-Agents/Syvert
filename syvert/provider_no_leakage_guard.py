@@ -14,9 +14,7 @@ PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED = "provider_leakage_detected
 
 FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
     {
-        "provider",
         "provider_capability",
-        "provider_id",
         "provider_key",
         "provider_registry",
         "provider_registry_entry",
@@ -51,9 +49,15 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
     }
 )
 
-FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
+EXACT_FORBIDDEN_CORE_PROVIDER_FIELD_NAMES = frozenset(
     {
         "provider",
+        "provider_id",
+    }
+)
+
+FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
+    {
         "provider_failure",
         "provider_unavailable",
         "provider_contract_violation",
@@ -75,14 +79,16 @@ FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = frozenset(
         "fallback_order",
         "preferred_profile",
         "provider_offer",
-        "compatibility_decision",
         "provider_profile",
         "provider_capability",
         "provider_registry_entry",
         "core_provider_registry",
         "core_provider_discovery",
         "marketplace_listing",
+        "marketplace",
+        "provider_product_support",
         "resource_supply",
+        "sla",
     }
 )
 
@@ -209,8 +215,10 @@ def _scan_surface(
         return
     if isinstance(value, (str, bytes)):
         if isinstance(value, str):
-            if _contains_provider_identity_value(value, provider_identity_values) or _contains_forbidden_provider_value_semantics(
-                value
+            if (
+                _contains_provider_identity_value(value, provider_identity_values)
+                or _contains_forbidden_provider_value_semantics(value)
+                or _contains_forbidden_provider_failure_value(path, value)
             ):
                 forbidden_value_paths.append(path)
         return
@@ -227,6 +235,8 @@ def _scan_surface(
 
 def _contains_forbidden_provider_field_token(field_name: str) -> bool:
     normalized = _normalize_field_name(field_name)
+    if normalized in EXACT_FORBIDDEN_CORE_PROVIDER_FIELD_NAMES:
+        return True
     return any(token in normalized for token in FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS)
 
 
@@ -243,14 +253,40 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
             or f"-{normalized_identity}-" in normalized_value
         ):
             return True
-    if any(_identity_slug(token) == normalized_value for token in FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS):
-        return True
+    for token in FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS:
+        normalized_token = _identity_slug(token)
+        if (
+            normalized_value == normalized_token
+            or normalized_value.startswith(f"{normalized_token}-")
+            or normalized_value.endswith(f"-{normalized_token}")
+            or f"-{normalized_token}-" in normalized_value
+            or normalized_value.startswith(f"{normalized_token}_")
+            or normalized_value.endswith(f"_{normalized_token}")
+            or f"_{normalized_token}_" in normalized_value
+        ):
+            return True
+    return False
+
+
+def _contains_forbidden_provider_failure_value(path: str, value: str) -> bool:
+    normalized_value = _identity_slug(value)
+    if path.endswith(".failure_category"):
+        return normalized_value in {"provider", "provider-failure"}
     return False
 
 
 def _contains_forbidden_provider_value_semantics(value: str) -> bool:
     normalized_value = _normalize_field_name(value)
-    return any(_normalize_field_name(token) == normalized_value for token in FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS)
+    for token in FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS:
+        normalized_token = _normalize_field_name(token)
+        if (
+            normalized_value == normalized_token
+            or normalized_value.startswith(f"{normalized_token}_")
+            or normalized_value.endswith(f"_{normalized_token}")
+            or f"_{normalized_token}_" in normalized_value
+        ):
+            return True
+    return False
 
 
 def _identity_slug(value: str) -> str:
