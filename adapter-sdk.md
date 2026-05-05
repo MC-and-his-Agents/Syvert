@@ -246,6 +246,81 @@ Provider offer manifest validator 只回答 offer carrier 是否可信：
 - provider 可以绕过 Core 注入资源包自行获取账号、代理或会话资源
 - `declared` offer 已经等同于 `matched`、selected provider、fallback candidate 或真实 provider 产品支持
 
+## v0.8.0 FR-0026 AdapterProviderCompatibilityDecision
+
+`FR-0026` 把 `AdapterCapabilityRequirement x ProviderCapabilityOffer` 的兼容性判断落到 `AdapterProviderCompatibilityDecision`。它只消费 `FR-0024` requirement、`FR-0025` offer 与 `FR-0027` resource profile proof；不定义新的 provider carrier，不改写 resource requirement / offer manifest，也不引入 Core provider discovery 或 routing。
+
+作者侧应按以下顺序理解：
+
+1. Adapter 声明 `AdapterCapabilityRequirement`。
+2. Adapter-bound provider 声明 `ProviderCapabilityOffer`，validator 只给出 `declared` / `invalid`。
+3. `AdapterProviderCompatibilityDecision` 同时验证两侧 carrier、adapter binding、approved execution slice 与 `FR-0027` proof。
+4. Decision 输出 `matched`、`unmatched` 或 `invalid_contract`，并始终 `fail_closed=true`。
+
+### matched
+
+`matched` 只表示合法 requirement 与合法 Adapter-bound offer 在同一 Adapter、同一 approved execution slice 下，至少一个 resource profile canonical tuple 完全一致。
+
+```text
+requirement.profile=account_proxy
+offer.supported_profile=account_proxy
+proof=fr-0027:profile:content-detail-by-url-hybrid:account-proxy
+decision_status=matched
+```
+
+`matched` 不表示 selected provider、Core routing、priority、score、fallback、marketplace listing、SLA 或真实 provider 产品支持。
+
+### unmatched
+
+`unmatched` 表示 requirement 与 offer 都合法，但 offer 没有满足任何 requirement profile。它必须 fail-closed，不得自动尝试其它 provider。
+
+```text
+requirement.profile=account_proxy
+offer.supported_profile=account
+decision_status=unmatched
+error=null
+fail_closed=true
+```
+
+`unmatched` 不表示 requirement 或 offer 违法，也不触发 provider fallback。
+
+### invalid_contract
+
+`invalid_contract` 表示输入、proof、adapter binding、execution slice、decision context 或 no-leakage 任一 contract violation。常见来源包括：
+
+- requirement 不满足 `FR-0024` 或其 profile 不满足 `FR-0027`。
+- offer 不满足 `FR-0025` 或其 supported profile 不满足 `FR-0027`。
+- requirement 与 offer 的 `adapter_key`、capability、operation、target type 或 collection mode 不一致。
+- 任一 side 越过当前 approved slice：`content_detail + content_detail_by_url + url + hybrid`。
+- decision 或 Core-facing surface 出现 provider selector、routing、priority、score、fallback、marketplace、provider lifecycle、resource supply 或 runtime technical 字段。
+
+`invalid_contract` 必须映射为 runtime contract 口径，例如：
+
+```text
+decision_status=invalid_contract
+error.failure_category=runtime_contract
+error.error_code=invalid_requirement_contract | invalid_provider_offer_contract | invalid_compatibility_contract | provider_leakage_detected
+fail_closed=true
+```
+
+### No-leakage
+
+Provider identity 只允许留在 Adapter-bound decision evidence 中，用于审查当前 offer 来源。以下 Core-facing surface 不得携带 provider 信息：
+
+- Core projection / routing surface
+- AdapterRegistry discovery
+- TaskRecord
+- resource lifecycle snapshot / bundle
+- runtime failed envelope category
+
+`#325` 的 no-leakage guard 已覆盖 provider identity、provider metadata、decision carrier、selector / routing / fallback / priority、marketplace / product support、resource lifecycle / supply、runtime technical 字段与 provider-specific failure value。文档证据见 `docs/exec-plans/artifacts/CHORE-0326-fr-0026-compatibility-decision-evidence.md`。
+
+### 迁移提示
+
+从 `ProviderCapabilityOffer` 迁移到 compatibility decision 时，不要把 `declared` 直接写成 `matched`。`declared` 只说明 offer carrier 合法；是否满足某个 Adapter requirement，必须交给 `AdapterProviderCompatibilityDecision` 判定。
+
+真实 provider 样本、provider 产品支持、SLA、marketplace 文案与 runtime 技术细节不属于 `v0.8.0` 的 SDK 承诺范围，留到后续版本以独立 Work Item 验证。
+
 
 ## v0.8.0 Third-party Adapter Contract Entry
 
