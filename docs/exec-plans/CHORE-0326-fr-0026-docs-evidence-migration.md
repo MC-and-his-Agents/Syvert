@@ -86,10 +86,19 @@
   - 结果：通过。
 - 最终提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- metadata-only 状态修正 head `7048208b7f9d6c7b085cdd16a99feaa38338da55` 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- metadata-only 状态修正 head `7048208b7f9d6c7b085cdd16a99feaa38338da55` 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- metadata-only 状态修正 head `7048208b7f9d6c7b085cdd16a99feaa38338da55` 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- metadata-only 状态修正 head `7048208b7f9d6c7b085cdd16a99feaa38338da55` 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-326-fr-0026-compatibility-decision`
+  - 结果：通过。
+- metadata-only 状态修正 head `7048208b7f9d6c7b085cdd16a99feaa38338da55` 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
-- 当前 metadata-only 修正后的 docs class gate 复跑。
 - 当前 head 的 guardian `APPROVE`。
 - 受控 merge、`#326` closeout、父 FR `#298` comment、worktree cleanup 与 branch retirement。
 
