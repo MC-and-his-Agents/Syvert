@@ -221,6 +221,11 @@
   - 结果：通过。
 - main-branch-bound closeout protocol follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 后 `gh api repos/:owner/:repo/commits/45b3bbb9e75ad7591ef4adc736799d34372c839e/check-runs --jq '{total_count,check_runs:[.check_runs[] | {name,status,conclusion}]}'`
+  - 结果：4 个 check runs 全部 `success`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-45b3bbb.json`
+  - 结果：第七轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项仅为 head-bound review evidence 停在 `2e344e20910683615ac048341ea07918f6264248`，未记录 live PR head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 gates / checks / guardian evidence。
+  - 当前 follow-up 只记录 head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 checks / guardian evidence，并声明该提交是 carrier-only metadata drift：不再修改 post-merge closeout protocol、release / sprint 索引、FR-0025 closeout truth 或 GitHub closeout 执行动作。
 
 ## 待验证项
 
@@ -247,4 +252,5 @@
 - main sync 基线：`c0dc5bc77bca97a738549ef43f6fab6d560c9653`
 - closeout semantic checkpoint：`317f7a66fbf1f2d6ef5ea08946af52504f83586b`
 - checkpoint record follow-up：当前后续提交只回填 checkpoint SHA，不改变 `FR-0025` semantic checkpoint；受审 head 以 PR head SHA 与 guardian / merge gate 绑定。
+- live-head evidence follow-up：记录 head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 checks / guardian 证据；后续若仅补充本段 review metadata，不改变 closeout protocol 或索引 truth，按 carrier-only metadata drift 处理，由 PR head、GitHub checks 与 guardian state 绑定当前 live head。
 - 本 exec-plan 是 `#322` 的首个版本化恢复工件；后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
