@@ -87,7 +87,12 @@ FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = frozenset(
         "marketplace_listing",
         "marketplace",
         "provider_product_support",
+        "provider_lifecycle",
+        "provider_lease",
         "resource_supply",
+        "resource_pool",
+        "account_pool",
+        "proxy_pool",
         "sla",
     }
 )
@@ -290,16 +295,7 @@ def _contains_forbidden_provider_value_semantics(value: str) -> bool:
 
 
 def _identity_slug(value: str) -> str:
-    chars: list[str] = []
-    previous_was_separator = False
-    for char in value.lower():
-        if char.isalnum():
-            chars.append(char)
-            previous_was_separator = False
-        elif not previous_was_separator:
-            chars.append("-")
-            previous_was_separator = True
-    return "".join(chars).strip("-")
+    return _normalize_field_name(value).replace("_", "-")
 
 
 def _normalize_field_name(field_name: str) -> str:

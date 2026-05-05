@@ -234,6 +234,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
         cases = (
             ("core_routing", {"route_ref": "route:native_xhs_detail"}),
             ("task_record", {"offer_ref": "offer:native-xhs-detail-001"}),
+            ("core_routing", {"chosen": "nativeXhsDetail"}),
+            ("core_routing", {"chosen": "NativeXhsDetail"}),
         )
         for surface_name, surface in cases:
             with self.subTest(surface_name=surface_name):
@@ -294,6 +296,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"mode": "mode:selected_provider"},
             {"policy": "policy/routing_policy"},
             {"classification": "provider_product_support"},
+            {"classification": "provider_lifecycle"},
+            {"classification": "provider_lease"},
+            {"classification": "resource_pool"},
+            {"classification": "account_pool"},
+            {"classification": "proxy_pool"},
             {"source": "marketplace_listing"},
             {"service_level": "sla"},
         )
