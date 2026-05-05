@@ -12,7 +12,7 @@
 - 关联 decision：`docs/decisions/ADR-GOV-0345-v0-8-0-phase-release-closeout-record.md`
 - active 收口事项：`GOV-0345-v0-8-0-phase-release-closeout-record`
 - 阶段 A PR：`#346`
-- 阶段 B published truth PR：待创建（当前分支）
+- 阶段 B published truth PR：`#347`
 - 状态：`active`
 
 ## 目标
@@ -140,6 +140,8 @@
   - 结果：已创建并推送 `v0.8.0` annotated tag，tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`。
 - `gh api repos/MC-and-his-Agents/Syvert/releases -X POST ...`
   - 结果：已创建 GitHub Release `v0.8.0`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`，`published_at=2026-05-05T14:42:01Z`，`target_commitish=741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- `python3 scripts/open_pr.py --class docs --issue 345 --item-key GOV-0345-v0-8-0-phase-release-closeout-record --item-type GOV --release v0.8.0 --sprint 2026-S21 --title 'docs(release): 回写 v0.8.0 发布真相' --closing none --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建阶段 B PR `#347`。
 
 ## 待验证项
 
