@@ -70,8 +70,8 @@
   - 结果：通过。
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-326-fr-0026-compatibility-decision`
   - 结果：通过。
-- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
-  - 结果：待提交后复跑；首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”。
+- 提交前 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”；提交后复跑。
 
 ## 待验证项
 
@@ -92,4 +92,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`d1577d6e620a43010c40e81f3a8c05b413dbc04f`
-- docs / evidence checkpoint：待提交后刷新
+- docs / evidence checkpoint：`d967c323b381c55814ee0ecb792d6077e0f78f46`
