@@ -234,6 +234,9 @@
     - evidence artifact 缺少当前 Work Item `#322 / PR #343` 的对账行。
     - evidence artifact 目的声明包含验证 / 风险 / 回滚，但正文未承载对应摘要。
   - 当前 follow-up 只修正恢复工件 carrier：绑定 `#343`，更新当前 live PR 阶段，补 `#322 / #343` 对账行，并在 evidence artifact 增加当前 PR 验证摘要与风险 / 回滚摘要；不改变 post-merge closeout protocol、Provider offer 语义、release / sprint truth 或 GitHub closeout 执行动作。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-4e7dd1b.json`
+  - 结果：第九轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 evidence artifact / exec-plan 把 live PR head 硬编码为旧 SHA，导致 metadata-only follow-up 后继续形成 stale head truth。
+  - 当前 follow-up 移除 evidence artifact 中对 live PR head / latest guardian 的硬编码，改为记录可复验 REST 查询入口；当前 live head、checks 与 guardian state 由 PR API、GitHub checks 与 guardian merge gate 绑定，版本化工件不再把旧 SHA 声明为当前 truth。
 - recovery carrier follow-up 后 `git diff --check`
   - 结果：通过。
 - recovery carrier follow-up 后 `python3 scripts/docs_guard.py --mode ci`
@@ -272,5 +275,5 @@
 - main sync 基线：`c0dc5bc77bca97a738549ef43f6fab6d560c9653`
 - closeout semantic checkpoint：`317f7a66fbf1f2d6ef5ea08946af52504f83586b`
 - checkpoint record follow-up：当前后续提交只回填 checkpoint SHA，不改变 `FR-0025` semantic checkpoint；受审 head 以 PR head SHA 与 guardian / merge gate 绑定。
-- live-head evidence follow-up：记录 head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 checks / guardian 证据；后续若仅补充本段 review metadata，不改变 closeout protocol 或索引 truth，按 carrier-only metadata drift 处理，由 PR head、GitHub checks 与 guardian state 绑定当前 live head。
+- live-head evidence policy：版本化工件记录历史 review 证据与可复验 REST 查询入口，不硬编码“当前 live head”；当前 live head、checks 与 guardian state 由 PR `#343`、GitHub checks 与 guardian merge gate 绑定。后续若仅补充本段 review metadata，不改变 closeout protocol 或索引 truth，按 carrier-only metadata drift 处理。
 - 本 exec-plan 是 `#322` 的首个版本化恢复工件；后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。

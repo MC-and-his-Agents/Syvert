@@ -35,7 +35,7 @@
 | `#319` | `#328` | `2a6f725fd02aef1bc2f101d63f569de937cdd3cf` | `5cc4a6c4b12bfb74e852472705e8c3fb5d98ed93` | `2026-04-30T11:17:25Z` |
 | `#320` | `#335` | `22b5338715225555090b3d9fcc296fe71958a8ca` | `22a3db23be36b702c6d0aed358ede7cf90a68d93` | `2026-05-02T06:26:23Z` |
 | `#321` | `#338` | `0ec777f7a1fbda820028ea85b7292fba62f88500` | `107a9fb3b93864ee01ef5ea21ad4d782761fc61e` | `2026-05-03T13:39:27Z` |
-| `#322` | `#343` | `5e3de15a907e3041f5224221dcae9d2b0c50895d` | pending merge gate | pending merge gate |
+| `#322` | `#343` | live PR head from `gh api repos/:owner/:repo/pulls/343 --jq '.head.sha'` | pending merge gate | pending merge gate |
 
 对账结论：
 
@@ -46,10 +46,10 @@
 
 ## 当前 PR 验证摘要
 
-- Live PR：`#343`，head `5e3de15a907e3041f5224221dcae9d2b0c50895d`。
-- GitHub checks：`Validate Docs And Guard Scripts`、`Validate Commit Messages`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 均为 `success`。
-- 最新 guardian：`/tmp/syvert-pr-343-guardian-5e3de15.json` 返回 `REQUEST_CHANGES`，阻断项为 exec-plan / evidence carrier 自洽性；当前 follow-up 只补齐 PR mapping、当前 Work Item 对账行与 artifact scope，不改变 Provider offer、post-merge closeout protocol、release / sprint truth。
-- Merge gate：仍需当前 live head 的 guardian `APPROVE`、`safe_to_merge=true` 与 GitHub checks 全绿。
+- Live PR：`#343`；live head 不在本 artifact 中硬编码，避免 metadata-only follow-up commit 反复制造旧 head truth。恢复时使用 `gh api repos/:owner/:repo/pulls/343 --jq '{state,merged,draft,head:.head.sha,mergeable}'` 读取当前 head。
+- GitHub checks：恢复时使用 `gh api repos/:owner/:repo/commits/<live-head>/check-runs --jq '{total_count,check_runs:[.check_runs[] | {name,status,conclusion}]}'` 读取当前 head 的 checks。
+- Guardian：恢复时以当前 live head 对应的 latest guardian state 为准；merge gate 要求 guardian `APPROVE`、`safe_to_merge=true`、checks 全绿、PR 非 Draft 且 head 一致。
+- 当前 follow-up 只修正 closeout recovery carrier，不改变 Provider offer、post-merge closeout protocol、release / sprint truth 或 GitHub closeout 执行动作。
 
 ## 风险 / 回滚摘要
 
