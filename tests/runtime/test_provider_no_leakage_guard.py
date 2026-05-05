@@ -213,6 +213,12 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "nativeProvider",
             "browserProvider",
             "resourceProvider",
+            "browserProfile",
+            "networkTier",
+            "transport",
+            "playwright",
+            "cdp",
+            "chromium",
         )
         for field_name in cases:
             with self.subTest(field_name=field_name):
@@ -281,6 +287,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"error": {"code": "provider_unavailable"}},
             {"error": {"code": "provider_contract_violation"}},
             {"error": {"code": "invalid_provider_offer"}},
+            {"error": {"category": "provider"}},
+            {"error": {"category": "provider_failure"}},
             {"error": {"failure_category": "provider"}},
             {"error": {"failure_category": "provider_failure"}},
             {"error": {"failureCategory": "provider"}},
@@ -321,6 +329,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"metadata": "native_provider"},
             {"metadata": "browser_provider"},
             {"metadata": "resource_provider"},
+            {"runtime": "playwright"},
+            {"transport": "transport:cdp"},
+            {"browser": "browser_profile"},
+            {"network": "network_tier"},
+            {"engine": "chromium"},
         )
         for surface in cases:
             with self.subTest(surface=surface):

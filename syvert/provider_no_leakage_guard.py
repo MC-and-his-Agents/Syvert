@@ -45,6 +45,12 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
         "provider_product_support",
         "provider_lifecycle",
         "provider_lease",
+        "playwright",
+        "cdp",
+        "chromium",
+        "browser_profile",
+        "network_tier",
+        "transport",
         "resource_supply",
         "resource_pool",
         "account_pool",
@@ -99,6 +105,12 @@ FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = frozenset(
         "provider_product_support",
         "provider_lifecycle",
         "provider_lease",
+        "playwright",
+        "cdp",
+        "chromium",
+        "browser_profile",
+        "network_tier",
+        "transport",
         "resource_supply",
         "resource_pool",
         "account_pool",
@@ -285,7 +297,7 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
 
 def _contains_forbidden_provider_failure_value(path: str, value: str) -> bool:
     normalized_value = _identity_slug(value)
-    if _normalize_path_field_name(path) == "failure_category":
+    if _normalize_path_field_name(path) in {"category", "failure_category"}:
         return normalized_value in {"provider", "provider-failure"}
     return False
 
