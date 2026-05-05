@@ -95,6 +95,37 @@
   - 结果：通过。
 - guardian follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- guardian follow-up 后 GitHub provenance 对账：
+  - `gh api repos/:owner/:repo/pulls/333 --jq '{number,merged,merged_at,merge_commit_sha,head:.head.sha,state}'`
+    - 结果：`merged=true`，`state=closed`，`head=068a0de4198b4c223da14425f71f9da46cc23087`，`merge_commit_sha=22aae087cbf7fba790d85485259d0af278f22375`，`merged_at=2026-05-03T10:38:00Z`。
+  - `gh api repos/:owner/:repo/pulls/339 --jq '{number,merged,merged_at,merge_commit_sha,head:.head.sha,state}'`
+    - 结果：`merged=true`，`state=closed`，`head=d39a94fa46b4f34fcfa4987657dc3e602049f49a`，`merge_commit_sha=b3850cd588d557d2a97ce7d1526863eccbb1ac4e`，`merged_at=2026-05-04T11:34:43Z`。
+  - `gh api repos/:owner/:repo/pulls/340 --jq '{number,merged,merged_at,merge_commit_sha,head:.head.sha,state}'`
+    - 结果：`merged=true`，`state=closed`，`head=65c95969d2702df32155a5037a07da80fb3556db`，`merge_commit_sha=d1577d6e620a43010c40e81f3a8c05b413dbc04f`，`merged_at=2026-05-05T03:27:37Z`。
+  - `gh api repos/:owner/:repo/pulls/341 --jq '{number,merged,merged_at,merge_commit_sha,head:.head.sha,state}'`
+    - 结果：`merged=true`，`state=closed`，`head=1c6d9bff9e4c696ad623aa989ee25d5f6bb3ba17`，`merge_commit_sha=24ae582447165596a54edacb35568ab4c73a55cb`，`merged_at=2026-05-05T07:15:42Z`。
+  - `for n in 323 324 325 326 327 298 293; do gh api repos/:owner/:repo/issues/$n --jq '{number,state,state_reason,closed_at,title}'; done`
+    - 结果：`#323/#324/#325/#326` 为 `closed completed`；`#327/#298/#293` 仍为 `open`。
+  - `git rev-parse origin/main`
+    - 结果：`24ae582447165596a54edacb35568ab4c73a55cb`。
+  - `git merge-base --is-ancestor <merge_commit_sha> origin/main`
+    - 结果：`#333/#339/#340/#341` 的 `merge_commit_sha` 均为 `origin/main` ancestor。
+  - `git cat-file -e origin/main:<path>`
+    - 结果：`docs/specs/FR-0026-adapter-provider-compatibility-decision/spec.md`、`syvert/adapter_provider_compatibility_decision.py`、`tests/runtime/test_adapter_provider_compatibility_decision.py`、`syvert/provider_no_leakage_guard.py`、`tests/runtime/test_provider_no_leakage_guard.py`、`adapter-sdk.md`、`docs/exec-plans/artifacts/CHORE-0326-fr-0026-compatibility-decision-evidence.md` 均存在于 `origin/main`。
+- `python3 scripts/pr_guardian.py review 342 --post-review --json-output /tmp/syvert-pr-342-guardian-followup.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 closeout truth 缺少可复验 GitHub provenance；当前 follow-up 改为在 exec-plan / evidence 中保存 REST 查询入口、关键返回值与主干路径证明，并收窄未直接保存的 guardian/check 主张。
+- guardian provenance follow-up 后 `git diff --check`
+  - 结果：通过。
+- guardian provenance follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- guardian provenance follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- guardian provenance follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- guardian provenance follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-327-fr-0026`
+  - 结果：通过。
+- guardian provenance follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
@@ -119,3 +150,4 @@
 - worktree 创建基线：`24ae582447165596a54edacb35568ab4c73a55cb`
 - closeout evidence checkpoint：`331683266399038aa818d1c8ab51a30e593c2c0d`
 - latest reviewed checkpoint：`818f4d75d75f681b15295b34d849ff62a71045a7`
+- review metadata follow-up：第二轮 guardian 后仅补充可复验 GitHub provenance 与门禁记录，不改变 `FR-0026` semantic checkpoint；当前受审 head 以 PR `#342` head SHA 与 guardian / merge gate 绑定。

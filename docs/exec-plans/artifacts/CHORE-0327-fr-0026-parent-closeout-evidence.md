@@ -24,6 +24,13 @@
 
 ## PR / Main 对账
 
+可复验入口：
+
+- PR truth：`gh api repos/:owner/:repo/pulls/<pr> --jq '{number,merged,merged_at,merge_commit_sha,head:.head.sha,state}'`
+- Issue truth：`gh api repos/:owner/:repo/issues/<issue> --jq '{number,state,state_reason,closed_at,title}'`
+- Main truth：`git rev-parse origin/main` 与 `git merge-base --is-ancestor <merge_commit_sha> origin/main`
+- Path truth：`git cat-file -e origin/main:<path>`
+
 | Work Item | PR | PR head | main merge commit | merged_at |
 | --- | --- | --- | --- | --- |
 | `#323` | `#333` | `068a0de4198b4c223da14425f71f9da46cc23087` | `22aae087cbf7fba790d85485259d0af278f22375` | `2026-05-03T10:38:00Z` |
@@ -35,15 +42,14 @@
 
 - `#323/#324/#325/#326` 的 PR 均已 merged，且对应 Work Item 均为 `closed completed`。
 - 当前 worktree 基线为 `24ae582447165596a54edacb35568ab4c73a55cb`，已包含 `#323/#324/#325/#326` 的 main truth。
+- `origin/main` 当前为 `24ae582447165596a54edacb35568ab4c73a55cb`；上表四个 merge commit 均为 `origin/main` ancestor。
 - `#327` 是唯一剩余的 `FR-0026` closeout Work Item，合入后即可关闭父 FR `#298`。
 
-## Review / Guardian 对账
+## Merge Gate 边界
 
-- `#333`：formal spec PR，经 guardian / checks 后合入，主干包含 `docs/specs/FR-0026-adapter-provider-compatibility-decision/`。
-- `#339`：runtime PR，经 guardian / checks 后合入，主干包含 `syvert/adapter_provider_compatibility_decision.py` 与 runtime tests。
-- `#340`：no-leakage PR，经 guardian `APPROVE` / checks 后合入，主干包含 `syvert/provider_no_leakage_guard.py` 与 no-leakage tests。
-- `#341`：docs / evidence PR，经 guardian `APPROVE` / checks 后合入，主干包含 SDK docs 与 `CHORE-0326` evidence。
-- `#342`：当前 parent closeout PR，合入前必须取得 guardian `APPROVE` 与 GitHub checks 全绿。
+- `#333/#339/#340/#341` 的可复验 closeout 输入是 GitHub PR 已合入、对应 Work Item 已关闭、merge commit 已进入 `origin/main`、主干包含对应路径。
+- 本 artifact 不把未保存的历史 guardian/check 详情重新声明为 closeout truth；它只消费已合入 PR 与主干路径事实。
+- `#342` 是当前 parent closeout PR，合入前仍必须以当前 head 取得 guardian `APPROVE`、`safe_to_merge=true` 与 GitHub checks 全绿。
 
 ## GitHub 状态对账
 
