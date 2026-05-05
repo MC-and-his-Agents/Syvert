@@ -54,7 +54,8 @@
 本节固定 `#343` 合入后的 GitHub 状态对账动作。合入前不得执行 `#297` close / Phase closeout，以免 GitHub truth 早于主干 truth。
 
 1. 快进本地主干并确认 PR truth：
-   - `git fetch origin main --prune && git merge --ff-only origin/main`
+   - `git -C /Users/mc/dev/Syvert fetch origin main --prune`
+   - `git -C /Users/mc/dev/Syvert merge --ff-only origin/main`
    - `gh api repos/:owner/:repo/pulls/343 --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`
    - 期望：`merged=true`，`state=closed`，`merge_commit_sha` 为新的 `origin/main` ancestor。
 2. 确认 Work Item truth：

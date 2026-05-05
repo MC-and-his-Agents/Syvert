@@ -187,6 +187,21 @@
   - 结果：通过。
 - release / sprint 索引 follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-c46f496.json`
+  - 结果：第五轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 post-merge closeout 协议在 issue worktree 上使用 `git merge --ff-only origin/main`，与 squash merge 后的提交图谱不兼容。
+  - 当前 follow-up 将 post-merge 主干同步改为显式在主仓 `/Users/mc/dev/Syvert` 执行 `git -C /Users/mc/dev/Syvert fetch origin main --prune` 与 `git -C /Users/mc/dev/Syvert merge --ff-only origin/main`；issue worktree 只用于后续 remove / branch retirement，retirement 保持 `superseded` 策略。
+- squash-merge closeout protocol follow-up 后 `git diff --check`
+  - 结果：通过。
+- squash-merge closeout protocol follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- squash-merge closeout protocol follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- squash-merge closeout protocol follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- squash-merge closeout protocol follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-322-fr-0025`
+  - 结果：通过。
+- squash-merge closeout protocol follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
