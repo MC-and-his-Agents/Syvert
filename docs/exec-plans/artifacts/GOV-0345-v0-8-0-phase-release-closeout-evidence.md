@@ -48,8 +48,8 @@
 
 对账结论：
 
-- `HEAD == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`。
-- 当前 open PR 为 `[]`。
+- 阶段 A 前 `HEAD == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到 PR merge commit，阶段 B 再回写 published truth。
+- 阶段 A 前 open PR 为 `[]`；当前 PR `#346` 是本事项的阶段 A carrier。
 - `issue-312-fr-0023`、`issue-322-fr-0025`、`issue-327-fr-0026` 远端分支查询无输出；REST branch lookup 为 404。
 - `git fetch --prune origin` 后本地 remote-tracking refs 已清理。
 - 当前尚未创建 `v0.8.0` tag 或 GitHub Release；阶段 A carrier PR 合入后创建发布锚点，并由阶段 B 回写 published truth。

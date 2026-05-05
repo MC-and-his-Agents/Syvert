@@ -41,12 +41,12 @@
 
 - worktree：`/Users/mc/code/worktrees/syvert/issue-345-v0-8-0-phase-release-closeout`
 - 分支：`issue-345-v0-8-0-phase-release-closeout`
-- worktree 创建基线：`594231b9f18a459bc64b771c486b73808ecaf764`
-- `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`。
+- worktree 创建基线 / 阶段 A 前基线：`594231b9f18a459bc64b771c486b73808ecaf764`
+- 阶段 A 前 `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到 PR merge commit，阶段 B 再回写 published truth。
 - Phase `#293` 已关闭为 `closed completed`，`closed_at=2026-05-05T10:22:32Z`。
 - 父 FR `#294/#295/#296/#297/#298` 均已关闭为 `closed completed`。
 - Work Item `#312/#322/#327` 均已关闭为 `closed completed`，对应 PR `#344/#343/#342` 已合入。
-- 当前 open PR 为空。
+- 阶段 A 前 open PR 为空；当前 PR `#346` 是本事项的阶段 A carrier。
 - `issue-312-fr-0023`、`issue-322-fr-0025`、`issue-327-fr-0026` 远端分支已删除；主仓 `git fetch --prune origin` 后本地 remote-tracking refs 已清理。
 - `git tag --list 'v0.8.0*'` 当前无输出。
 - `gh release view v0.8.0 --repo MC-and-his-Agents/Syvert` 当前无输出。
@@ -120,6 +120,9 @@
 - `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian.json`
   - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 `#327` post-merge closeout 协议与 closeout comment body 未达到 `#312/#322` evidence 粒度。
   - 处理：当前 follow-up 在 `docs/exec-plans/artifacts/GOV-0345-v0-8-0-phase-release-closeout-evidence.md` 新增 `FR-0026 Post-Merge GitHub Closeout 协议补录`，保存可复验 REST 步骤、comment body、`#327/#298/#293` 状态对账和不回写历史 carrier 的 ownership 说明。
+- `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r2.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 release / sprint 索引把阶段 A 前 SHA 和状态提前写成最终 closeout truth。
+  - 处理：当前 follow-up 将 release / sprint 的相关章节改为 `阶段 A closeout carrier truth`，把 `594231b9f18a459bc64b771c486b73808ecaf764` 标注为阶段 A 前基线，并把 final main / tag / GitHub Release URL 留给阶段 B published truth 回写。
 
 ## 待验证项
 
