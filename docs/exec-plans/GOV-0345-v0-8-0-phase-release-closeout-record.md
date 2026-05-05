@@ -117,9 +117,14 @@
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
 - 提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-345-v0-8-0-phase-release-closeout`
   - 结果：通过。
+- `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 `#327` post-merge closeout 协议与 closeout comment body 未达到 `#312/#322` evidence 粒度。
+  - 处理：当前 follow-up 在 `docs/exec-plans/artifacts/GOV-0345-v0-8-0-phase-release-closeout-evidence.md` 新增 `FR-0026 Post-Merge GitHub Closeout 协议补录`，保存可复验 REST 步骤、comment body、`#327/#298/#293` 状态对账和不回写历史 carrier 的 ownership 说明。
 
 ## 待验证项
 
+- guardian follow-up 后 docs / spec / workflow / governance / scope guard。
+- guardian follow-up 后重新运行 guardian。
 - PR guardian、GitHub checks、受控 merge。
 - 阶段 A merge commit 上创建并推送 `v0.8.0` annotated tag。
 - 创建 GitHub Release `v0.8.0`。

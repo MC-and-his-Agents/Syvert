@@ -70,6 +70,62 @@ Phase `#293` 已有 final closeout comment，创建时间 `2026-05-05T10:20:23Z`
 
 Phase `#293` 随后于 `2026-05-05T10:22:32Z` 关闭为 `completed`。
 
+## FR-0026 Post-Merge GitHub Closeout 协议补录
+
+本节补录 `#327 / PR #342` 合入后的 GitHub 状态对账动作，作为 `CHORE-0327` historical closeout carrier 的补充证据。`GOV-0345` 不回写 `docs/exec-plans/CHORE-0327-fr-0026-parent-closeout.md` 或其 historical evidence，因为当前执行回合绑定 `#345`；跨 Work Item 改写 `#327` exec-plan 会违反事项 ownership。以下协议与实际结果在本 artifact 中版本化。
+
+1. 快进本地主干并确认 PR truth：
+   - `git -C /Users/mc/dev/Syvert status --short --branch`
+   - 期望：主仓 worktree 干净；若存在无关本地改动，先停止并人工确认，不得覆盖。
+   - `git -C /Users/mc/dev/Syvert switch main`
+   - `git -C /Users/mc/dev/Syvert fetch origin main --prune`
+   - `git -C /Users/mc/dev/Syvert merge --ff-only origin/main`
+   - `gh api repos/MC-and-his-Agents/Syvert/pulls/342 --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`
+   - 实际结果：`merged=true`，`state=closed`，`merge_commit_sha=c0dc5bc77bca97a738549ef43f6fab6d560c9653`，`merged_at=2026-05-05T08:04:23Z`。
+2. 确认 Work Item truth：
+   - `gh api repos/MC-and-his-Agents/Syvert/issues/327 --jq '{number,state,state_reason,closed_at,title}'`
+   - 实际结果：`state=closed`，`state_reason=completed`，`closed_at=2026-05-05T08:04:24Z`。
+3. 在父 FR `#298` 写入 closeout comment：
+   - `gh api repos/MC-and-his-Agents/Syvert/issues/298/comments -f body='<FR-0026 closeout comment>'`
+   - 实际写入时间：`2026-05-05T08:05:15Z`
+   - Comment body：
+
+```text
+FR-0026 closeout 已完成。
+
+对账范围：
+- #323 / PR #333：formal spec 已合入主干。
+- #324 / PR #339：compatibility decision runtime 已合入主干。
+- #325 / PR #340：provider no-leakage guards 已合入主干。
+- #326 / PR #341：SDK docs / evidence 已合入主干。
+- #327 / PR #342：父事项 closeout evidence 已合入主干。
+
+主干 truth：origin/main 已快进到 c0dc5bc77bca97a738549ef43f6fab6d560c9653，包含 FR-0026 formal spec、runtime decision、no-leakage guard、SDK docs 与 evidence，以及 parent closeout artifact。
+
+本 FR 不关闭 Phase #293；Phase closeout 仍等待 FR-0023 / FR-0025 等父项最终对账完成。
+```
+
+4. 关闭父 FR `#298`：
+   - `gh api repos/MC-and-his-Agents/Syvert/issues/298 -X PATCH -f state=closed -f state_reason=completed --jq '{number,state,state_reason,closed_at}'`
+   - 实际结果：`state=closed`，`state_reason=completed`，`closed_at=2026-05-05T08:05:29Z`。
+5. 在 Phase `#293` 写入 progress comment：
+   - `gh api repos/MC-and-his-Agents/Syvert/issues/293/comments -f body='<FR-0026 phase progress comment>'`
+   - 实际写入时间：`2026-05-05T08:05:49Z`
+   - Comment body：
+
+```text
+v0.8.0 Phase progress：FR-0026 / #298 已完成并关闭。
+
+已完成链路：#323/#324/#325/#326/#327 均为 closed completed；对应 PR #333/#339/#340/#341/#342 已合入主干。当前 main truth 为 c0dc5bc77bca97a738549ef43f6fab6d560c9653。
+
+Phase #293 继续保持 open，后续还需收口 FR-0023 / #295（#312）与 FR-0025 / #297（#322）等剩余父项对账。
+```
+
+6. 清理执行现场：
+   - `git worktree remove /Users/mc/code/worktrees/syvert/issue-327-fr-0026`
+   - `python3 scripts/retire_branch.py --branch issue-327-fr-0026 --strategy superseded --replaced-by origin/main --reason "PR #342 squash merged into main"`
+   - 实际结果：当前 `git worktree list --porcelain` 只剩主仓 `main` worktree；`git ls-remote --heads origin 'issue-327*'` 无输出，REST branch lookup 为 404。
+
 ## 主干路径证明
 
 `origin/main` 包含以下 v0.8.0 关键路径：
