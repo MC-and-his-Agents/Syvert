@@ -11,7 +11,7 @@
 - Parent FR：`#297`
 - 关联 spec：`docs/specs/FR-0025-provider-capability-offer-contract/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#343`
 - active 收口事项：`CHORE-0322-fr-0025-parent-closeout`
 - 状态：`active`
 
@@ -53,9 +53,8 @@
 
 ## 下一步动作
 
-- 运行 docs class 的 scope / governance 门禁。
-- 提交并通过受控入口创建 docs PR。
-- 等待 GitHub checks，运行 guardian review；guardian 不设置超时限制。
+- 当前 live PR：`#343`。
+- 等待 / 核对 GitHub checks，运行 guardian review；guardian 不设置超时限制。
 - guardian `APPROVE` 且 `safe_to_merge=true` 后，使用受控 merge 入口合入。
 - 合入后使用 GitHub REST 在 `#297` 写入 closeout comment 并关闭为 `completed`；确认 `#322` 自动关闭，必要时使用 REST 补关闭。
 - 在 Phase `#293` comment 记录 `FR-0025` closeout 事实，不关闭 Phase。
@@ -226,6 +225,27 @@
 - `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-45b3bbb.json`
   - 结果：第七轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项仅为 head-bound review evidence 停在 `2e344e20910683615ac048341ea07918f6264248`，未记录 live PR head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 gates / checks / guardian evidence。
   - 当前 follow-up 只记录 head `45b3bbb9e75ad7591ef4adc736799d34372c839e` 的 checks / guardian evidence，并声明该提交是 carrier-only metadata drift：不再修改 post-merge closeout protocol、release / sprint 索引、FR-0025 closeout truth 或 GitHub closeout 执行动作。
+- head `5e3de15a907e3041f5224221dcae9d2b0c50895d` 后 `gh api repos/:owner/:repo/commits/5e3de15a907e3041f5224221dcae9d2b0c50895d/check-runs --jq '{total_count,check_runs:[.check_runs[] | {name,status,conclusion}]}'`
+  - 结果：4 个 check runs 全部 `success`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-5e3de15.json`
+  - 结果：第八轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 closeout recovery carrier 不自洽：
+    - 顶层 `关联 PR` 未绑定 `#343`。
+    - `下一步动作` 仍停在 PR 创建前状态。
+    - evidence artifact 缺少当前 Work Item `#322 / PR #343` 的对账行。
+    - evidence artifact 目的声明包含验证 / 风险 / 回滚，但正文未承载对应摘要。
+  - 当前 follow-up 只修正恢复工件 carrier：绑定 `#343`，更新当前 live PR 阶段，补 `#322 / #343` 对账行，并在 evidence artifact 增加当前 PR 验证摘要与风险 / 回滚摘要；不改变 post-merge closeout protocol、Provider offer 语义、release / sprint truth 或 GitHub closeout 执行动作。
+- recovery carrier follow-up 后 `git diff --check`
+  - 结果：通过。
+- recovery carrier follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- recovery carrier follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- recovery carrier follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- recovery carrier follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-322-fr-0025`
+  - 结果：通过。
+- recovery carrier follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 

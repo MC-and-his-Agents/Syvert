@@ -2,7 +2,7 @@
 
 ## 目的
 
-本文档汇总 `FR-0025` 父事项 closeout 所需的 GitHub provenance、主干事实、子 Work Item 状态、验证证据、风险和后续消费边界。它不定义新的 Provider offer 字段，不实现 `FR-0026`，也不把 Provider offer 的 `declared` 语义改写为 `matched`。
+本文档汇总 `FR-0025` 父事项 closeout 所需的 GitHub provenance、主干事实、子 Work Item 状态、当前 PR 验证摘要、风险 / 回滚摘要和后续消费边界。它不定义新的 Provider offer 字段，不实现 `FR-0026`，也不把 Provider offer 的 `declared` 语义改写为 `matched`。
 
 ## 父 FR
 
@@ -35,13 +35,28 @@
 | `#319` | `#328` | `2a6f725fd02aef1bc2f101d63f569de937cdd3cf` | `5cc4a6c4b12bfb74e852472705e8c3fb5d98ed93` | `2026-04-30T11:17:25Z` |
 | `#320` | `#335` | `22b5338715225555090b3d9fcc296fe71958a8ca` | `22a3db23be36b702c6d0aed358ede7cf90a68d93` | `2026-05-02T06:26:23Z` |
 | `#321` | `#338` | `0ec777f7a1fbda820028ea85b7292fba62f88500` | `107a9fb3b93864ee01ef5ea21ad4d782761fc61e` | `2026-05-03T13:39:27Z` |
+| `#322` | `#343` | `5e3de15a907e3041f5224221dcae9d2b0c50895d` | pending merge gate | pending merge gate |
 
 对账结论：
 
 - `#319/#320/#321` 的 PR 均已 merged，且对应 Work Item 均为 `closed completed`。
 - 当前 worktree 已快进到 `origin/main=c0dc5bc77bca97a738549ef43f6fab6d560c9653`，已包含 `#319/#320/#321` 与后续 `#327` 的 main truth。
 - `#328/#335/#338` 的 merge commit 均为 `origin/main` ancestor。
-- `#322` 是唯一剩余的 `FR-0025` closeout Work Item，合入后即可关闭父 FR `#297`。
+- `#322 / #343` 是当前 `FR-0025` closeout Work Item / PR，合入后即可关闭父 FR `#297`。
+
+## 当前 PR 验证摘要
+
+- Live PR：`#343`，head `5e3de15a907e3041f5224221dcae9d2b0c50895d`。
+- GitHub checks：`Validate Docs And Guard Scripts`、`Validate Commit Messages`、`Validate Governance Tooling`、`Validate Spec Review Boundaries` 均为 `success`。
+- 最新 guardian：`/tmp/syvert-pr-343-guardian-5e3de15.json` 返回 `REQUEST_CHANGES`，阻断项为 exec-plan / evidence carrier 自洽性；当前 follow-up 只补齐 PR mapping、当前 Work Item 对账行与 artifact scope，不改变 Provider offer、post-merge closeout protocol、release / sprint truth。
+- Merge gate：仍需当前 live head 的 guardian `APPROVE`、`safe_to_merge=true` 与 GitHub checks 全绿。
+
+## 风险 / 回滚摘要
+
+- 风险：合入前关闭 `#297` 会让 GitHub truth 早于主干 truth。
+- 风险：把 `declared` offer 写成 `matched` 或 compatibility approved 会越过 `FR-0025` 边界。
+- 回滚：若 closeout 文档事实有误，使用独立 revert PR 撤销本 closeout artifact 与 release / sprint 索引增量。
+- GitHub 侧回滚：若 `#297` 关闭后发现事实不一致，使用 REST PATCH 重新打开并追加纠正 comment，再通过新的 Work Item 修正仓内事实。
 
 ## GitHub 状态对账
 
