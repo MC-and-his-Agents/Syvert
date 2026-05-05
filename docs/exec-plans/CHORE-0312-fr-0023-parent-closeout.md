@@ -118,10 +118,24 @@
   - 结果：通过。
 - 提交前 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”；提交后复跑。
+- `git commit -m 'docs(closeout): 收口 FR-0023 父事项'`
+  - 结果：已生成 closeout semantic checkpoint `bbc9af6623d8972243bda4cb6305d232ffd6384f`。
+- 提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- 提交后 `git diff --check`
+  - 结果：通过。
+- 提交后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 提交后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 提交后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-312-fr-0023`
+  - 结果：通过。
 
 ## 待验证项
 
-- 提交后 `pr_scope_guard --class docs`、GitHub checks、guardian review、受控 merge。
+- GitHub checks、guardian review、受控 merge。
 - 按 evidence artifact 的 post-merge closeout 协议执行 `#295` closeout comment / close issue。
 - 按 evidence artifact 的 post-merge closeout 协议执行 Phase `#293` progress comment。
 - worktree cleanup 与 branch retirement。
@@ -141,5 +155,5 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - worktree 创建基线：`c154f414428cc4a198b24e9c79fa32131d88b3d9`
-- closeout semantic checkpoint：待本轮 commit 生成。
+- closeout semantic checkpoint：`bbc9af6623d8972243bda4cb6305d232ffd6384f`
 - live-head evidence policy：版本化工件记录历史 review 证据与可复验 REST 查询入口，不硬编码“当前 live head”；当前 live head、checks 与 guardian state 由当前 PR、GitHub checks 与 guardian merge gate 绑定。
