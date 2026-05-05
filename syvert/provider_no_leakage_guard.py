@@ -23,6 +23,7 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
         "provider_profile",
         "compatibility_decision",
         "selector",
+        "routing",
         "routing_policy",
         "priority",
         "rank",

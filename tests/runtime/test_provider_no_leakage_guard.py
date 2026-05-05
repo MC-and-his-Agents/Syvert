@@ -172,6 +172,7 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "provider_profile",
             "compatibility_decision",
             "selector",
+            "routing",
             "marketplace_listing",
         )
         for field_name in cases:
