@@ -54,6 +54,9 @@
 本节固定 `#343` 合入后的 GitHub 状态对账动作。合入前不得执行 `#297` close / Phase closeout，以免 GitHub truth 早于主干 truth。
 
 1. 快进本地主干并确认 PR truth：
+   - `git -C /Users/mc/dev/Syvert status --short --branch`
+   - 期望：主仓 worktree 干净；若存在无关本地改动，先停止并人工确认，不得覆盖。
+   - `git -C /Users/mc/dev/Syvert switch main`
    - `git -C /Users/mc/dev/Syvert fetch origin main --prune`
    - `git -C /Users/mc/dev/Syvert merge --ff-only origin/main`
    - `gh api repos/:owner/:repo/pulls/343 --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`

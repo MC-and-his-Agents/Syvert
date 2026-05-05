@@ -202,6 +202,25 @@
   - 结果：通过。
 - squash-merge closeout protocol follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- head `2e344e20910683615ac048341ea07918f6264248` 后 `gh api repos/:owner/:repo/commits/2e344e20910683615ac048341ea07918f6264248/check-runs --jq '{total_count,check_runs:[.check_runs[] | {name,status,conclusion}]}'`
+  - 结果：4 个 check runs 全部 `success`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-2e344e2.json`
+  - 结果：第六轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - post-merge closeout 协议没有显式在主仓 `/Users/mc/dev/Syvert` 的 `main` 分支上同步 `origin/main`。
+    - 当前 head `2e344e20910683615ac048341ea07918f6264248` 的验证证据未随 squash-merge 协议修正一起落盘。
+  - 当前 follow-up 为 post-merge 协议增加主仓 clean check 与 `git -C /Users/mc/dev/Syvert switch main`，再执行 `fetch` / `ff-only`；同时落盘上述 head 的 checks / guardian 证据。
+- main-branch-bound closeout protocol follow-up 后 `git diff --check`
+  - 结果：通过。
+- main-branch-bound closeout protocol follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- main-branch-bound closeout protocol follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- main-branch-bound closeout protocol follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- main-branch-bound closeout protocol follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-322-fr-0025`
+  - 结果：通过。
+- main-branch-bound closeout protocol follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
