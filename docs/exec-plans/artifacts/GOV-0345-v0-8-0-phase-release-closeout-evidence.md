@@ -34,6 +34,8 @@
 | `#296` | `FR-0024` | closed completed | `2026-05-03T13:02:59Z` |
 | `#297` | `FR-0025` | closed completed | `2026-05-05T09:10:50Z` |
 | `#298` | `FR-0026` | closed completed | `2026-05-05T08:05:29Z` |
+| `#303` | `FR-0027` parent closeout | closed completed | `2026-04-30T09:05:06Z` |
+| `#316` | `FR-0024` parent closeout | closed completed | `2026-05-03T12:59:30Z` |
 | `#312` | `FR-0023` parent closeout | closed completed | `2026-05-05T10:05:15Z` |
 | `#322` | `FR-0025` parent closeout | closed completed | `2026-05-05T09:07:54Z` |
 | `#327` | `FR-0026` parent closeout | closed completed | `2026-05-05T08:04:24Z` |
@@ -42,6 +44,8 @@
 
 | PR | Work Item | Head branch | Merge commit | Merged at |
 | --- | --- | --- | --- | --- |
+| `#308` | `#303` | `issue-303-fr-0027` | `16c4b8b137f38a1d494f08163fc4ad8a8eb10f68` | `2026-04-30T09:05:05Z` |
+| `#336` | `#316` | `issue-316-fr-0024` | `bf004b6c6877cdbee4a1c8e69dbdbf1ea764431c` | `2026-05-03T12:59:29Z` |
 | `#342` | `#327` | `issue-327-fr-0026` | `c0dc5bc77bca97a738549ef43f6fab6d560c9653` | `2026-05-05T08:04:23Z` |
 | `#343` | `#322` | `issue-322-fr-0025` | `c154f414428cc4a198b24e9c79fa32131d88b3d9` | `2026-05-05T09:07:53Z` |
 | `#344` | `#312` | `issue-312-fr-0023` | `594231b9f18a459bc64b771c486b73808ecaf764` | `2026-05-05T10:05:14Z` |
