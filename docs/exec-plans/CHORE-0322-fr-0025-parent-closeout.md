@@ -120,7 +120,7 @@
 - 提交前 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”；提交后复跑。
 - `git commit -m 'docs(closeout): 收口 FR-0025 父事项'`
-  - 结果：已生成 closeout checkpoint `97314ec3ea4b7a380ae64cfb897120e6729873e8`。
+  - 结果：已生成 closeout semantic checkpoint `317f7a66fbf1f2d6ef5ea08946af52504f83586b`。
 - 提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
@@ -147,5 +147,6 @@
 
 - worktree 创建基线：`24ae582447165596a54edacb35568ab4c73a55cb`
 - main sync 基线：`c0dc5bc77bca97a738549ef43f6fab6d560c9653`
-- closeout evidence checkpoint：`97314ec3ea4b7a380ae64cfb897120e6729873e8`
+- closeout semantic checkpoint：`317f7a66fbf1f2d6ef5ea08946af52504f83586b`
+- checkpoint record follow-up：当前后续提交只回填 checkpoint SHA，不改变 `FR-0025` semantic checkpoint；受审 head 以 PR head SHA 与 guardian / merge gate 绑定。
 - 本 exec-plan 是 `#322` 的首个版本化恢复工件；后续 review-sync 若只更新验证记录或 GitHub 状态，不推进新的 formal spec / runtime 语义。
