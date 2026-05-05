@@ -14,7 +14,10 @@ PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED = "provider_leakage_detected
 
 FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
     {
+        "provider_capability",
         "provider_key",
+        "provider_registry",
+        "provider_registry_entry",
         "offer_id",
         "selected_provider",
         "provider_selector",
@@ -41,6 +44,16 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
         "resource_pool",
         "account_pool",
         "proxy_pool",
+        "core_provider_registry",
+        "core_provider_discovery",
+    }
+)
+
+FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
+    {
+        "provider_unavailable",
+        "provider_contract_violation",
+        "invalid_provider_offer",
     }
 )
 
@@ -198,6 +211,8 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
             or f"-{normalized_identity}-" in normalized_value
         ):
             return True
+    if any(_identity_slug(token) == normalized_value for token in FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS):
+        return True
     return False
 
 

@@ -168,9 +168,13 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
     def test_guard_fails_closed_for_forbidden_provider_decision_synonyms(self) -> None:
         decision = matched_decision()
         cases = (
+            "provider_capability",
             "provider_offer",
             "provider_profile",
+            "provider_registry_entry",
             "compatibility_decision",
+            "core_provider_registry",
+            "core_provider_discovery",
             "selector",
             "routing",
             "marketplace_listing",
@@ -248,6 +252,24 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             with self.subTest(surface_name=surface_name):
                 result = guard_core_provider_no_leakage(
                     surface_name=surface_name,
+                    surface=surface,
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
+    def test_guard_fails_closed_for_provider_specific_failed_envelope_values(self) -> None:
+        decision = matched_decision()
+        cases = (
+            {"error": {"code": "provider_unavailable"}},
+            {"error": {"code": "provider_contract_violation"}},
+            {"error": {"code": "invalid_provider_offer"}},
+        )
+        for surface in cases:
+            with self.subTest(surface=surface):
+                result = guard_core_provider_no_leakage(
+                    surface_name="runtime_envelope",
                     surface=surface,
                     decision=decision,
                 )
