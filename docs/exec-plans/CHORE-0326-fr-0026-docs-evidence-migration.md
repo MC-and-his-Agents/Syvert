@@ -75,7 +75,7 @@
 
 ## 待验证项
 
-- docs/spec/workflow/governance/pr_scope docs gates。
+- docs、spec、workflow、governance 与 `pr_scope` docs gates。
 - `tests.runtime.test_adapter_provider_compatibility_decision` 与 `tests.runtime.test_provider_no_leakage_guard`。
 - PR guardian、GitHub checks、受控 merge 与 closeout reconciliation。
 
