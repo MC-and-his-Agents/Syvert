@@ -61,6 +61,31 @@ FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
     }
 )
 
+FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = frozenset(
+    {
+        "selected_provider",
+        "provider_selector",
+        "provider_selection",
+        "provider_routing",
+        "routing_policy",
+        "priority",
+        "rank",
+        "score",
+        "fallback",
+        "fallback_order",
+        "preferred_profile",
+        "provider_offer",
+        "compatibility_decision",
+        "provider_profile",
+        "provider_capability",
+        "provider_registry_entry",
+        "core_provider_registry",
+        "core_provider_discovery",
+        "marketplace_listing",
+        "resource_supply",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ProviderNoLeakageEvidence:
@@ -183,8 +208,11 @@ def _scan_surface(
             )
         return
     if isinstance(value, (str, bytes)):
-        if isinstance(value, str) and _contains_provider_identity_value(value, provider_identity_values):
-            forbidden_value_paths.append(path)
+        if isinstance(value, str):
+            if _contains_provider_identity_value(value, provider_identity_values) or _contains_forbidden_provider_value_semantics(
+                value
+            ):
+                forbidden_value_paths.append(path)
         return
     if isinstance(value, Iterable):
         for index, child_value in enumerate(value):
@@ -220,6 +248,11 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
     return False
 
 
+def _contains_forbidden_provider_value_semantics(value: str) -> bool:
+    normalized_value = _normalize_field_name(value)
+    return any(_normalize_field_name(token) == normalized_value for token in FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS)
+
+
 def _identity_slug(value: str) -> str:
     chars: list[str] = []
     previous_was_separator = False
@@ -234,7 +267,8 @@ def _identity_slug(value: str) -> str:
 
 
 def _normalize_field_name(field_name: str) -> str:
-    with_word_boundaries = re.sub(r"(?<!^)(?=[A-Z])", "_", field_name)
+    with_word_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", field_name)
+    with_word_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_boundaries)
     return with_word_boundaries.lower().replace("-", "_").replace(" ", "_")
 
 
