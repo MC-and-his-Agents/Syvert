@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
+import re
 from typing import Any
 
 from syvert.adapter_provider_compatibility_decision import AdapterProviderCompatibilityDecision
@@ -178,7 +179,7 @@ def _scan_surface(
 
 
 def _contains_forbidden_provider_field_token(field_name: str) -> bool:
-    normalized = field_name.lower().replace("-", "_").replace(" ", "_")
+    normalized = _normalize_field_name(field_name)
     return any(token in normalized for token in FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS)
 
 
@@ -209,6 +210,11 @@ def _identity_slug(value: str) -> str:
             chars.append("-")
             previous_was_separator = True
     return "".join(chars).strip("-")
+
+
+def _normalize_field_name(field_name: str) -> str:
+    with_word_boundaries = re.sub(r"(?<!^)(?=[A-Z])", "_", field_name)
+    return with_word_boundaries.lower().replace("-", "_").replace(" ", "_")
 
 
 def _dedupe(raw_values: Iterable[str]) -> tuple[str, ...]:
