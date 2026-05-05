@@ -49,6 +49,52 @@
 - Phase `#293` 当前仍 open；本 closeout 只为 Phase closeout 提供 `FR-0025` 完成输入，不关闭 Phase。
 - `#319/#320/#321` 已关闭；`#322` 当前 open，作为本轮唯一执行入口。
 
+## Post-Merge GitHub Closeout 协议
+
+本节固定 `#343` 合入后的 GitHub 状态对账动作。合入前不得执行 `#297` close / Phase closeout，以免 GitHub truth 早于主干 truth。
+
+1. 快进本地主干并确认 PR truth：
+   - `git fetch origin main --prune && git merge --ff-only origin/main`
+   - `gh api repos/:owner/:repo/pulls/343 --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`
+   - 期望：`merged=true`，`state=closed`，`merge_commit_sha` 为新的 `origin/main` ancestor。
+2. 确认 Work Item truth：
+   - `gh api repos/:owner/:repo/issues/322 --jq '{number,state,state_reason,closed_at}'`
+   - 期望：`state=closed`，`state_reason=completed`。若未自动关闭，使用 `gh api repos/:owner/:repo/issues/322 -X PATCH -f state=closed -f state_reason=completed` 补齐。
+3. 在父 FR `#297` 写入 closeout comment：
+   - `gh api repos/:owner/:repo/issues/297/comments -f body='<FR-0025 closeout comment>'`
+   - Comment body：
+
+```text
+FR-0025 closeout 已完成。
+
+对账范围：
+- #319 / PR #328：Provider capability offer formal spec 已合入主干。
+- #320 / PR #335：Provider offer manifest / validator 已合入主干。
+- #321 / PR #338：SDK docs / evidence 已合入主干。
+- #322 / PR #343：父事项 closeout evidence 已合入主干。
+
+主干 truth：origin/main 已包含 FR-0025 formal spec、Provider offer validator、runtime tests、SDK docs 与 evidence，以及 parent closeout artifact。
+
+本 FR 只冻结 ProviderCapabilityOffer 的 declared offer truth；是否 matched / compatible 由 FR-0026 decision contract 判定。本 FR 不关闭 Phase #293，Phase closeout 仍等待剩余父项最终对账完成。
+```
+
+4. 关闭父 FR `#297`：
+   - `gh api repos/:owner/:repo/issues/297 -X PATCH -f state=closed -f state_reason=completed --jq '{number,state,state_reason,closed_at}'`
+5. 在 Phase `#293` 写入 progress comment：
+   - `gh api repos/:owner/:repo/issues/293/comments -f body='<FR-0025 phase progress comment>'`
+   - Comment body：
+
+```text
+v0.8.0 Phase progress：FR-0025 / #297 已完成并关闭。
+
+已完成链路：#319/#320/#321/#322 均为 closed completed；对应 PR #328/#335/#338/#343 已合入主干。
+
+Phase #293 继续保持 open，后续还需收口 FR-0023 / #295（#312）等剩余父项对账。
+```
+6. 清理执行现场：
+   - `git worktree remove /Users/mc/code/worktrees/syvert/issue-322-fr-0025`
+   - `python3 scripts/retire_branch.py --branch issue-322-fr-0025 --strategy superseded --replaced-by origin/main --reason "PR #343 squash merged into main"`
+
 ## 主干事实
 
 - Formal spec：`docs/specs/FR-0025-provider-capability-offer-contract/`
