@@ -125,10 +125,24 @@
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
 - `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian.json`
   - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 closeout exec-plan 中一处 main-sync 验证记录保留了不存在的 SHA；当前 follow-up 修正为真实 `origin/main=c0dc5bc77bca97a738549ef43f6fab6d560c9653`，并复核 evidence artifact 与 checkpoint 区域 SHA 一致。
+- guardian follow-up 后 `git diff --check`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- guardian follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-322-fr-0025`
+  - 结果：通过。
+- guardian follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-db97557.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是当前受审 head `db9755728c85c008b264d009e88d83e8953ff11e` 的 follow-up 后 docs class gates 未落盘；当前 follow-up 只补充上述门禁记录，不改变 `FR-0025` semantic checkpoint。
 
 ## 待验证项
 
-- guardian follow-up 后 docs class gates、GitHub checks、guardian review、受控 merge。
+- guardian review、GitHub checks、受控 merge。
 - `#297` closeout comment / close issue。
 - Phase `#293` progress comment。
 - worktree cleanup 与 branch retirement。
