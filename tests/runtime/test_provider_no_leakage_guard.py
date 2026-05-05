@@ -171,9 +171,14 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "provider",
             "providerId",
             "provider_capability",
+            "provider_capabilities",
             "provider_offer",
             "provider_profile",
             "provider_registry_entry",
+            "external_provider_ref",
+            "native_provider",
+            "browser_provider",
+            "resource_provider",
             "compatibility_decision",
             "core_provider_registry",
             "core_provider_discovery",
@@ -203,6 +208,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "selectedProvider",
             "compatibilityDecision",
             "resourceSupply",
+            "providerCapabilities",
+            "externalProviderRef",
+            "nativeProvider",
+            "browserProvider",
+            "resourceProvider",
         )
         for field_name in cases:
             with self.subTest(field_name=field_name):
@@ -303,6 +313,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"classification": "proxy_pool"},
             {"source": "marketplace_listing"},
             {"service_level": "sla"},
+            {"field_names": ["provider_capabilities"]},
+            {"metadata": "external_provider_ref"},
+            {"metadata": "native_provider"},
+            {"metadata": "browser_provider"},
+            {"metadata": "resource_provider"},
         )
         for surface in cases:
             with self.subTest(surface=surface):
