@@ -72,7 +72,7 @@ Phase `#293` 随后于 `2026-05-05T10:22:32Z` 关闭为 `completed`。
 
 ## FR-0026 Post-Merge GitHub Closeout 协议补录
 
-本节补录 `#327 / PR #342` 合入后的 GitHub 状态对账动作，作为 `CHORE-0327` historical closeout carrier 的补充证据。`GOV-0345` 不回写 `docs/exec-plans/CHORE-0327-fr-0026-parent-closeout.md` 或其 historical evidence，因为当前执行回合绑定 `#345`；跨 Work Item 改写 `#327` exec-plan 会违反事项 ownership。以下协议与实际结果在本 artifact 中版本化。
+本节补录 `#327 / PR #342` 合入后的 GitHub 状态对账动作，作为 `CHORE-0327` historical closeout carrier 的补充证据。同一协议已同步补入 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`；`GOV-0345` 不回写 `docs/exec-plans/CHORE-0327-fr-0026-parent-closeout.md`，因为当前执行回合绑定 `#345`，跨 Work Item 改写 `#327` exec-plan 会违反事项 ownership。
 
 1. 快进本地主干并确认 PR truth：
    - `git -C /Users/mc/dev/Syvert status --short --branch`

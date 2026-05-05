@@ -15,7 +15,7 @@
 
 - Phase `#293` 为 `closed completed`。
 - 父 FR `#294/#295/#296/#297/#298` 均为 `closed completed`。
-- 最终主干为 `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`。
+- 阶段 A 前主干基线为 `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到新的 merge commit，并由阶段 B 回写 published truth。
 - 当前 open PR 为空。
 - `#312/#322/#327` closeout worktree 已清理，分支已退役。
 

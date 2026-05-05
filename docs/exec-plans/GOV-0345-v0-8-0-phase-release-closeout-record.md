@@ -119,10 +119,13 @@
   - 结果：通过。
 - `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian.json`
   - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 `#327` post-merge closeout 协议与 closeout comment body 未达到 `#312/#322` evidence 粒度。
-  - 处理：当前 follow-up 在 `docs/exec-plans/artifacts/GOV-0345-v0-8-0-phase-release-closeout-evidence.md` 新增 `FR-0026 Post-Merge GitHub Closeout 协议补录`，保存可复验 REST 步骤、comment body、`#327/#298/#293` 状态对账和不回写历史 carrier 的 ownership 说明。
+  - 处理：当前 follow-up 在 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md` 与 `docs/exec-plans/artifacts/GOV-0345-v0-8-0-phase-release-closeout-evidence.md` 中新增 `FR-0026 Post-Merge GitHub Closeout 协议补录`，保存可复验 REST 步骤、comment body 与 `#327/#298/#293` 状态对账；不改写 `#327` exec-plan。
 - `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r2.json`
   - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 release / sprint 索引把阶段 A 前 SHA 和状态提前写成最终 closeout truth。
   - 处理：当前 follow-up 将 release / sprint 的相关章节改为 `阶段 A closeout carrier truth`，把 `594231b9f18a459bc64b771c486b73808ecaf764` 标注为阶段 A 前基线，并把 final main / tag / GitHub Release URL 留给阶段 B published truth 回写。
+- `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r3.json`
+  - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 `#327` 补录未落回 `CHORE-0327` evidence，且 release 索引仍有“最终主干”残留。
+  - 处理：当前 follow-up 只更新 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`，不改写 `#327` exec-plan；同时把 release / ADR 中的“最终主干”残留改成阶段 A 前基线。
 
 ## 待验证项
 
@@ -142,7 +145,7 @@
 - Sprint index：`docs/sprints/2026-S21.md`。
 - `#327` parent closeout record：
   - `docs/exec-plans/CHORE-0327-fr-0026-parent-closeout.md`（历史输入，不在本回合改写）
-  - `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`（历史输入，不在本回合改写）
+  - `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md`
 
 ## 风险
 
