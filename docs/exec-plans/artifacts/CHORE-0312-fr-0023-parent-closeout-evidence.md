@@ -37,7 +37,7 @@
 | `#331` | `#334` | `674ff8b50feebc051da0e23001d237aaa7b7e31f` | `15b135d3b8ded5ad0a8433639ce1df6b2f9b8da6` | `2026-05-02T06:33:53Z` |
 | `#310` | `#330` | `c26e29b6abc67672ac3063ad71f0133fde150295` | `4e90953447e20b1fffaee0f8104f989bd043202e` | `2026-05-03T12:36:14Z` |
 | `#311` | `#337` | `702d090484daa32ce6dbd2a6c3a1e79272dd8038` | `76926cd5fabe720681d401ea3d593c9d6290a431` | `2026-05-03T13:25:09Z` |
-| `#312` | pending PR | live PR head from `gh api repos/:owner/:repo/pulls/<pr> --jq '.head.sha'` | pending merge gate | pending merge gate |
+| `#312` | `#344` | live PR head from `gh api repos/:owner/:repo/pulls/344 --jq '.head.sha'` | pending merge gate | pending merge gate |
 
 对账结论：
 
@@ -48,7 +48,7 @@
 
 ## 当前 PR 验证入口
 
-- Live PR：本 artifact 不硬编码 live PR head。PR 创建后，恢复时使用 `gh api repos/:owner/:repo/pulls/<pr> --jq '{state,merged,draft,head:.head.sha,mergeable}'` 读取当前 head。
+- Live PR：`#344`；本 artifact 不硬编码 live PR head。恢复时使用 `gh api repos/:owner/:repo/pulls/344 --jq '{state,merged,draft,head:.head.sha,mergeable}'` 读取当前 head。
 - GitHub checks：恢复时使用 `gh api repos/:owner/:repo/commits/<live-head>/check-runs --jq '{total_count,check_runs:[.check_runs[] | {name,status,conclusion}]}'` 读取当前 head 的 checks。
 - Guardian：恢复时以当前 live head 对应的 latest guardian state 为准；merge gate 要求 guardian `APPROVE`、`safe_to_merge=true`、checks 全绿、PR 非 Draft 且 head 一致。
 
@@ -76,7 +76,7 @@
    - `git -C /Users/mc/dev/Syvert switch main`
    - `git -C /Users/mc/dev/Syvert fetch origin main --prune`
    - `git -C /Users/mc/dev/Syvert merge --ff-only origin/main`
-   - `gh api repos/:owner/:repo/pulls/<pr> --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`
+   - `gh api repos/:owner/:repo/pulls/344 --jq '{number,state,merged,merged_at,merge_commit_sha,head:.head.sha}'`
    - 期望：`merged=true`，`state=closed`，`merge_commit_sha` 为新的 `origin/main` ancestor。
 2. 确认 Work Item truth：
    - `gh api repos/:owner/:repo/issues/312 --jq '{number,state,state_reason,closed_at}'`
@@ -93,7 +93,7 @@ FR-0023 closeout 已完成。
 - #331 / PR #334：第三方 Adapter resource proof admission bridge 已合入主干。
 - #310 / PR #330：第三方 Adapter contract test entry 已合入主干。
 - #311 / PR #337：Adapter SDK 接入文档与升级指引已合入主干。
-- #312 / <PR>：父事项 closeout evidence 已合入主干。
+- #312 / PR #344：父事项 closeout evidence 已合入主干。
 
 主干 truth：origin/main 已包含 FR-0023 formal spec、resource proof admission bridge、third-party contract entry、runtime tests、SDK docs 与 parent closeout artifact。
 
@@ -109,13 +109,13 @@ FR-0023 closeout 已完成。
 ```text
 v0.8.0 Phase progress：FR-0023 / #295 已完成并关闭。
 
-已完成链路：#309/#331/#310/#311/#312 均为 closed completed；对应 PR #318/#334/#330/#337/<PR> 已合入主干。
+已完成链路：#309/#331/#310/#311/#312 均为 closed completed；对应 PR #318/#334/#330/#337/#344 已合入主干。
 
 Phase #293 继续保持 open，后续按剩余父项状态执行最终 Phase closeout。
 ```
 6. 清理执行现场：
    - `git worktree remove /Users/mc/code/worktrees/syvert/issue-312-fr-0023`
-   - `python3 scripts/retire_branch.py --branch issue-312-fr-0023 --strategy superseded --replaced-by origin/main --reason "PR <PR> squash merged into main"`
+   - `python3 scripts/retire_branch.py --branch issue-312-fr-0023 --strategy superseded --replaced-by origin/main --reason "PR #344 squash merged into main"`
 
 ## 主干事实
 

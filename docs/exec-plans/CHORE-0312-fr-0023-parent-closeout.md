@@ -148,6 +148,21 @@
   - 结果：通过。
 - `CHORE-0312` 索引 follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 344 --post-review --json-output /tmp/syvert-pr-344-guardian-1bd0081.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 evidence artifact 仍保留 `pending PR` 与 `<pr>` / `<PR>` 模板，占位符未绑定实际 PR `#344`。
+  - 当前 follow-up 将 `#312` 对账行、live PR 查询、post-merge PR truth 查询、closeout comment 模板和 branch retirement reason 绑定到 PR `#344`；live head SHA 仍保持动态读取，不硬编码为当前 head。
+- PR `#344` 绑定 follow-up 后 `git diff --check`
+  - 结果：通过。
+- PR `#344` 绑定 follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- PR `#344` 绑定 follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- PR `#344` 绑定 follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- PR `#344` 绑定 follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-312-fr-0023`
+  - 结果：通过。
+- PR `#344` 绑定 follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
