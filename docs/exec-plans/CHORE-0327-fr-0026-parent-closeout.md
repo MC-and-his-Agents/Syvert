@@ -37,6 +37,7 @@
 - worktree：`/Users/mc/code/worktrees/syvert/issue-327-fr-0026`
 - 分支：`issue-327-fr-0026`
 - worktree 创建基线：`24ae582447165596a54edacb35568ab4c73a55cb`
+- closeout evidence checkpoint：`331683266399038aa818d1c8ab51a30e593c2c0d`
 - 已确认子 Work Item 状态：
   - `#323` closed completed，formal spec closeout 已合入。
   - `#324` closed completed，decision runtime 已合入。
