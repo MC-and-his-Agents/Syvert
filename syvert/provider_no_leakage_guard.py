@@ -285,7 +285,7 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
 
 def _contains_forbidden_provider_failure_value(path: str, value: str) -> bool:
     normalized_value = _identity_slug(value)
-    if path.endswith(".failure_category"):
+    if _normalize_path_field_name(path) == "failure_category":
         return normalized_value in {"provider", "provider-failure"}
     return False
 
@@ -306,6 +306,11 @@ def _contains_forbidden_provider_value_semantics(value: str) -> bool:
 
 def _identity_slug(value: str) -> str:
     return _normalize_field_name(value).replace("_", "-")
+
+
+def _normalize_path_field_name(path: str) -> str:
+    last_segment = path.rsplit(".", maxsplit=1)[-1]
+    return _normalize_field_name(re.sub(r"\[\d+\]$", "", last_segment))
 
 
 def _normalize_field_name(field_name: str) -> str:

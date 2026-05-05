@@ -283,6 +283,9 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"error": {"code": "invalid_provider_offer"}},
             {"error": {"failure_category": "provider"}},
             {"error": {"failure_category": "provider_failure"}},
+            {"error": {"failureCategory": "provider"}},
+            {"error": {"FailureCategory": "provider_failure"}},
+            {"error": {"failure-category": "provider"}},
             {"error": {"message": "provider_unavailable in downstream"}},
         )
         for surface in cases:
