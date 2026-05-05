@@ -133,6 +133,21 @@
   - 结果：通过。
 - `python3 scripts/open_pr.py --class docs --issue 312 --item-key CHORE-0312-fr-0023-parent-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(closeout): 收口 FR-0023 父事项' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
   - 结果：通过；创建 PR `#344`。
+- `python3 scripts/pr_guardian.py review 344 --post-review --json-output /tmp/syvert-pr-344-guardian-0e0bbfe.json`
+  - 结果：首轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 release / sprint 的 exec-plan 索引遗漏本 PR 新增的 `CHORE-0312` closeout 工件。
+  - 当前 follow-up 在 `docs/releases/v0.8.0.md` 与 `docs/sprints/2026-S21.md` 的 exec-plan 列表中补入 `docs/exec-plans/CHORE-0312-fr-0023-parent-closeout.md` 与 `docs/exec-plans/artifacts/CHORE-0312-fr-0023-parent-closeout-evidence.md`。
+- `CHORE-0312` 索引 follow-up 后 `git diff --check`
+  - 结果：通过。
+- `CHORE-0312` 索引 follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `CHORE-0312` 索引 follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `CHORE-0312` 索引 follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `CHORE-0312` 索引 follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-312-fr-0023`
+  - 结果：通过。
+- `CHORE-0312` 索引 follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
