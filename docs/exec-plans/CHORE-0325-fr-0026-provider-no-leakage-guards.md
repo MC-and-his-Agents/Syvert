@@ -36,7 +36,7 @@
 - 分支：`issue-325-fr-0026-provider-no-leakage-guards`
 - worktree 创建基线：`b3850cd588d557d2a97ce7d1526863eccbb1ac4e`
 - 已确认 `#324` / PR `#339` 合入主干并关闭，父 FR `#298` 仍 open。
-- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。首轮 guardian 指出 forbidden token set 未覆盖 `provider_offer`、`compatibility_decision`、泛化 `selector` 与 `marketplace_listing`，当前已补齐并增加回归。第二轮 guardian 指出 provider identity 嵌入字符串、`provider_profile` 字段与真实 runtime path coverage 缺口，当前已补强 slug/subtoken 检测、补齐 token，并用 `execute_task_with_record` 覆盖真实 runtime envelope、TaskRecord 与 resource lifecycle snapshot。第三轮 guardian 指出 FR-0026 禁止语义还缺裸 `routing` 字段，当前已在 `2fb4ecb460835e3b458248bda71711709619be7a` 补齐并增加回归。
+- 当前 checkpoint：已新增 `syvert.provider_no_leakage_guard` 与 focused runtime tests。guard 消费 `AdapterProviderCompatibilityDecision.evidence.adapter_bound_provider_evidence` 与 Core-facing surface payload，递归扫描 forbidden provider field token 与 adapter-bound provider identity value；合法 Core projection、registry discovery、TaskRecord payload 与 resource lifecycle payload均通过，注入 provider selector / identity / lifecycle 字段时 fail-closed。首轮 guardian 指出 forbidden token set 未覆盖 `provider_offer`、`compatibility_decision`、泛化 `selector` 与 `marketplace_listing`，当前已补齐并增加回归。第二轮 guardian 指出 provider identity 嵌入字符串、`provider_profile` 字段与真实 runtime path coverage 缺口，当前已补强 slug/subtoken 检测、补齐 token，并用 `execute_task_with_record` 覆盖真实 runtime envelope、TaskRecord 与 resource lifecycle snapshot。第三轮 guardian 指出 FR-0026 禁止语义还缺裸 `routing` 字段，当前已在 `2fb4ecb460835e3b458248bda71711709619be7a` 补齐并增加回归。第四轮 guardian 指出 camelCase/PascalCase Core payload 会绕过 forbidden field 检测，当前已在 `38c033be81dba190ee47104063f5a7a0a4583924` 新增统一 field-name 归一并补 `providerKey`、`offerId`、`selectedProvider`、`compatibilityDecision`、`resourceSupply` 回归。
 
 ## 下一步动作
 
@@ -112,6 +112,15 @@
   - 结果：通过。
 - 第三轮 guardian 修复后 `git diff --check`
   - 结果：通过。
+- `python3 scripts/pr_guardian.py review 340 --post-review --json-output /tmp/syvert-pr-340-guardian-followup-3.json`
+  - 结果：第四轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项：
+    - no-leakage field detection 漏掉 camelCase/PascalCase provider fields，例如 `providerKey`、`offerId`、`selectedProvider`、`compatibilityDecision`、`resourceSupply`。
+- 第四轮 guardian 修复后 `python3 -m unittest tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，46 tests。
+- 第四轮 guardian 修复后 `python3 -m py_compile syvert/provider_no_leakage_guard.py tests/runtime/test_provider_no_leakage_guard.py`
+  - 结果：通过。
+- 第四轮 guardian 修复后 `git diff --check`
+  - 结果：通过。
 
 ## 待验证项
 
@@ -134,3 +143,4 @@
 - guardian follow-up checkpoint：`35c73cd4ac1fe7eddd8dc4c96ed8abcf18ec452b`
 - second guardian follow-up checkpoint：`ee73d8fb45432cf34dcc5a8e71cce008f03c7dde`
 - third guardian follow-up checkpoint：`2fb4ecb460835e3b458248bda71711709619be7a`
+- fourth guardian follow-up checkpoint：`38c033be81dba190ee47104063f5a7a0a4583924`
