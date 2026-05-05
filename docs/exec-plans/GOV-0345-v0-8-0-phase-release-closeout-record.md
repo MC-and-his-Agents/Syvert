@@ -12,7 +12,7 @@
 - 关联 decision：`docs/decisions/ADR-GOV-0345-v0-8-0-phase-release-closeout-record.md`
 - active 收口事项：`GOV-0345-v0-8-0-phase-release-closeout-record`
 - 阶段 A PR：`#346`
-- 阶段 B published truth PR：待创建
+- 阶段 B published truth PR：`#347`
 - 状态：`active`
 
 ## 目标
@@ -41,24 +41,24 @@
 ## 当前停点
 
 - worktree：`/Users/mc/code/worktrees/syvert/issue-345-v0-8-0-phase-release-closeout`
-- 分支：`issue-345-v0-8-0-phase-release-closeout`
+- 阶段 A 分支：`issue-345-v0-8-0-phase-release-closeout`
+- 阶段 B 分支：`issue-345-v0-8-0-phase-release-closeout`
 - worktree 创建基线 / 阶段 A 前基线：`594231b9f18a459bc64b771c486b73808ecaf764`
-- 阶段 A 前 `main == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到 PR merge commit，阶段 B 再回写 published truth。
+- 阶段 A PR `#346` 已合入，merge commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- `main == origin/main == 741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
 - Phase `#293` 已关闭为 `closed completed`，`closed_at=2026-05-05T10:22:32Z`。
 - 父 FR `#294/#295/#296/#297/#298` 均已关闭为 `closed completed`。
 - Work Item `#312/#322/#327` 均已关闭为 `closed completed`，对应 PR `#344/#343/#342` 已合入。
-- 阶段 A 前 open PR 为空；当前 PR `#346` 是本事项的阶段 A carrier。
+- 阶段 A 前 open PR 为空；PR `#346` 已完成阶段 A carrier 合入。
 - `issue-312-fr-0023`、`issue-322-fr-0025`、`issue-327-fr-0026` 远端分支已删除；主仓 `git fetch --prune origin` 后本地 remote-tracking refs 已清理。
-- `git tag --list 'v0.8.0*'` 当前无输出。
-- `gh release view v0.8.0 --repo MC-and-his-Agents/Syvert` 当前无输出。
+- `v0.8.0` annotated tag 已创建并推送，tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`，target commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- GitHub Release `v0.8.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`。
 
 ## 下一步动作
 
-- 阶段 A：继续处理 PR `#346` guardian finding，保持 docs / spec / workflow / governance / scope guard 通过。
-- 阶段 A guardian `APPROVE` 且 `safe_to_merge=true`、GitHub checks 全绿后受控合并。
-- 阶段 A 合入后，在阶段 A merge commit 上创建并推送 `v0.8.0` annotated tag。
-- 创建 GitHub Release `v0.8.0`。
-- 阶段 B：通过 metadata-only/docs follow-up 回写 tag / GitHub Release published truth。
+- 阶段 A：已完成；PR `#346` guardian `APPROVE`、checks 全绿并合入。
+- 发布锚点：已完成；`v0.8.0` annotated tag 与 GitHub Release 已创建。
+- 阶段 B：通过当前 metadata-only/docs follow-up 回写 tag / GitHub Release published truth。
 - 阶段 B 合入后关闭 Work Item `#345`，清理 worktree 并退役分支。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -73,12 +73,14 @@
 
 ## 已验证项
 
+### 阶段 A 前历史快照
+
 - `gh api user --jq .login`
   - 结果：`mcontheway`。
 - `git status --short --branch`
   - 结果：主仓为 `## main...origin/main`，无未提交改动。
 - `git rev-parse HEAD && git rev-parse origin/main`
-  - 结果：均为 `594231b9f18a459bc64b771c486b73808ecaf764`。
+  - 阶段 A 前结果：均为 `594231b9f18a459bc64b771c486b73808ecaf764`。
 - `git worktree list --porcelain`
   - 结果：只剩主仓 `main` worktree。
 - Phase / FR GitHub 状态：
@@ -99,7 +101,7 @@
 - `git tag --list 'v0.8.0*'`
   - 结果：无输出。
 - `gh release view v0.8.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
-  - 结果：当前无 GitHub Release `v0.8.0`。
+  - 阶段 A 前结果：无 GitHub Release `v0.8.0`。
 - `python3 -m unittest tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_adapter_capability_requirement tests.runtime.test_reference_adapter_capability_requirement_baseline tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard`
   - 结果：通过，`Ran 145 tests`。
 - `python3 scripts/docs_guard.py --mode ci`
@@ -131,14 +133,36 @@
   - 结果：`REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 active exec-plan scope 漏掉 `CHORE-0327` evidence、阶段 A PR 状态仍写待创建、ADR 仍把阶段 A 前 open PR 快照写成当前事实。
   - 处理：当前 follow-up 将 `docs/exec-plans/artifacts/CHORE-0327-fr-0026-parent-closeout-evidence.md` 纳入本事项 scope，记录阶段 A PR `#346`，并把 ADR 的 open PR 叙述改成阶段 A 前快照 / 当前 PR `#346` carrier。
 
+### Published truth 回写验证
+
+- `python3 scripts/pr_guardian.py review 346 --post-review --json-output /tmp/syvert-pr-346-guardian-r6.json`
+  - 结果：`APPROVE`，`safe_to_merge=true`。
+- `python3 scripts/merge_pr.py 346 --delete-branch`
+  - 结果：GitHub PR `#346` 已合入，merge commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0`；四个 GitHub checks 均为 success。
+- `git -C /Users/mc/dev/Syvert fetch origin main --prune && git -C /Users/mc/dev/Syvert merge --ff-only origin/main`
+  - 结果：主仓 main 快进到 `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- `git -C /Users/mc/dev/Syvert tag -a v0.8.0 -m 'v0.8.0' 741dd02e51940a80bdc8bc298422296bd5c4d4d0 && git -C /Users/mc/dev/Syvert push origin v0.8.0`
+  - 结果：已创建并推送 `v0.8.0` annotated tag，tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`。
+- `gh api repos/MC-and-his-Agents/Syvert/releases -X POST ...`
+  - 结果：已创建 GitHub Release `v0.8.0`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`，`published_at=2026-05-05T14:42:01Z`，`target_commitish=741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- `python3 scripts/open_pr.py --class docs --issue 345 --item-key GOV-0345-v0-8-0-phase-release-closeout-record --item-type GOV --release v0.8.0 --sprint 2026-S21 --title 'docs(release): 回写 v0.8.0 发布真相' --closing none --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：已创建阶段 B PR `#347`。
+- 阶段 B follow-up 后 `git diff --check`
+  - 结果：通过。
+- 阶段 B follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 阶段 B follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 阶段 B follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 阶段 B follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-345-v0-8-0-phase-release-closeout`
+  - 结果：通过。
+- 阶段 B follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
+
 ## 待验证项
 
-- guardian follow-up 后 docs / spec / workflow / governance / scope guard。
-- guardian follow-up 后重新运行 guardian。
-- PR guardian、GitHub checks、受控 merge。
-- 阶段 A merge commit 上创建并推送 `v0.8.0` annotated tag。
-- 创建 GitHub Release `v0.8.0`。
-- 阶段 B 回写 published truth PR。
+- 阶段 B guardian、GitHub checks、受控 merge。
 - `#345` closeout comment / close issue。
 - worktree cleanup 与 branch retirement。
 
@@ -167,5 +191,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 阶段 A 前基线：`594231b9f18a459bc64b771c486b73808ecaf764`
-- 说明：该 checkpoint 对应 `v0.8.0` phase closeout 已完成后的阶段 A carrier 基线。PR `#346` 合入后 main 会前进到新的 merge commit；tag / GitHub Release 与 final published truth 由阶段 B / 阶段 C 回写。当前事项不推进 runtime 或 formal spec checkpoint。
+- 最近一次语义 checkpoint：`594231b9f18a459bc64b771c486b73808ecaf764`
+- 发布锚点：`741dd02e51940a80bdc8bc298422296bd5c4d4d0`
+- 说明：最近一次语义 checkpoint 对应 `v0.8.0` Phase closeout 已完成后的阶段 A 前基线；阶段 A merge commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0` 只是 tag / GitHub Release 的 published anchor，不替代 checkpoint head。当前阶段 B 只回写发布锚点 metadata，不推进 runtime 或 formal spec checkpoint。
