@@ -7,6 +7,7 @@ from syvert.adapter_provider_compatibility_decision import (
     project_compatibility_decision_for_core,
 )
 from syvert.provider_no_leakage_guard import (
+    FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS,
     PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED,
     PROVIDER_NO_LEAKAGE_STATUS_FAILED,
     PROVIDER_NO_LEAKAGE_STATUS_PASSED,
@@ -173,6 +174,9 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "offer",
             "provider_capability",
             "provider_capabilities",
+            "provider_public_field",
+            "provider_status",
+            "provider_category",
             "provider_offer",
             "provider_profile",
             "provider_registry_entry",
@@ -212,6 +216,9 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "compatibilityDecision",
             "resourceSupply",
             "providerCapabilities",
+            "providerPublicField",
+            "providerStatus",
+            "providerCategory",
             "externalProviderRef",
             "nativeProvider",
             "browserProvider",
@@ -238,6 +245,53 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
                 self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
                 self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
                 self.assertEqual(result.evidence.forbidden_field_paths, (f"core_surface.{field_name}",))
+
+    def test_all_canonical_no_leakage_tokens_fail_closed_as_fields_and_field_name_values(self) -> None:
+        decision = matched_decision()
+        for token in sorted(FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS):
+            with self.subTest(token=token, carrier="field"):
+                result = guard_core_provider_no_leakage(
+                    surface_name="core_surface",
+                    surface={token: "neutral"},
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
+            with self.subTest(token=token, carrier="field_name_value"):
+                result = guard_core_provider_no_leakage(
+                    surface_name="core_surface",
+                    surface={"field_names": [token]},
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
+    def test_guard_allows_legal_core_identity_and_trace_values(self) -> None:
+        decision = matched_decision()
+        surface = {
+            "adapter_key": "xhs",
+            "capability": "content_detail_by_url",
+            "decision_id": "decision-content-detail",
+            "task_id": "task-real-no-provider-leakage",
+            "task_record_ref": "task-record-no-provider-leakage",
+            "event_id": "task-real-no-provider-leakage-started",
+            "metric_id": "task-real-no-provider-leakage-duration",
+            "error": {
+                "category": "runtime_contract",
+                "message": "compatibility decision unmatched",
+            },
+        }
+
+        result = guard_core_provider_no_leakage(
+            surface_name="core_surface",
+            surface=surface,
+            decision=decision,
+        )
+
+        self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_PASSED)
 
     def test_guard_fails_closed_for_provider_identity_value_on_core_surface(self) -> None:
         decision = matched_decision()
@@ -334,6 +388,9 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"field_names": ["provider_capabilities"]},
             {"field_names": ["provider_key"]},
             {"field_names": ["provider_id"]},
+            {"field_names": ["provider_public_field"]},
+            {"field_names": ["provider_status"]},
+            {"field_names": ["provider_category"]},
             {"field_names": ["offer"]},
             {"field_names": ["offer_id"]},
             {"field_names": ["decision_detail"]},
@@ -349,6 +406,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"runtime": "browser"},
             {"runtime": "network"},
             {"engine": "chromium"},
+            {"status": "compatibility_status"},
+            {"profile": "selected_profile"},
+            {"capabilities": "optional_capabilities"},
+            {"capabilities": "preferred_capabilities"},
+            {"transport": "sign_service"},
         )
         for surface in cases:
             with self.subTest(surface=surface):

@@ -12,43 +12,85 @@ PROVIDER_NO_LEAKAGE_STATUS_PASSED = "passed"
 PROVIDER_NO_LEAKAGE_STATUS_FAILED = "failed"
 PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED = "provider_leakage_detected"
 
-FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
+PROVIDER_IDENTITY_CARRIER_TOKENS = frozenset(
+    {"provider", "provider_id", "provider_key", "offer", "offer_id"}
+)
+
+PROVIDER_METADATA_CARRIER_TOKENS = frozenset(
     {
         "provider_capability",
         "provider_capabilities",
-        "provider_id",
-        "provider_key",
-        "offer",
+        "provider_profile",
         "provider_registry",
         "provider_registry_entry",
-        "decision_detail",
-        "decision_details",
         "external_provider_ref",
         "native_provider",
         "browser_provider",
         "resource_provider",
-        "offer_id",
+        "core_provider_registry",
+        "core_provider_discovery",
+    }
+)
+
+PROVIDER_DECISION_CARRIER_TOKENS = frozenset(
+    {
+        "compatibility_decision",
+        "compatibility_status",
+        "decision_detail",
+        "decision_details",
+        "provider_offer",
+    }
+)
+
+PROVIDER_SELECTION_ROUTING_TOKENS = frozenset(
+    {
         "selected_provider",
+        "selected_profile",
         "provider_selector",
         "provider_selection",
         "provider_routing",
-        "provider_offer",
-        "provider_profile",
-        "compatibility_decision",
         "selector",
         "routing",
         "routing_policy",
         "priority",
         "rank",
+        "ranking",
         "score",
         "fallback",
         "fallback_order",
+        "fallback_outcome",
+        "optional_capabilities",
         "preferred_profile",
+        "preferred_profiles",
+        "preferred_capabilities",
+    }
+)
+
+PROVIDER_MARKETPLACE_PRODUCT_TOKENS = frozenset(
+    {
         "marketplace",
         "marketplace_listing",
+        "provider_product_allowlist",
         "provider_product_support",
+        "sla",
+        "availability_sla",
+    }
+)
+
+PROVIDER_RESOURCE_LIFECYCLE_TOKENS = frozenset(
+    {
         "provider_lifecycle",
         "provider_lease",
+        "resource_supply",
+        "resource_pool",
+        "account_pool",
+        "proxy_pool",
+        "task_record_provider_field",
+    }
+)
+
+RUNTIME_TECHNICAL_TOKENS = frozenset(
+    {
         "playwright",
         "cdp",
         "chromium",
@@ -57,78 +99,60 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset(
         "network",
         "network_tier",
         "transport",
-        "resource_supply",
-        "resource_pool",
-        "account_pool",
-        "proxy_pool",
-        "core_provider_registry",
-        "core_provider_discovery",
+        "sign_service",
     }
 )
 
-EXACT_FORBIDDEN_CORE_PROVIDER_FIELD_NAMES = frozenset(
-    {
-        "provider",
-        "provider_id",
-    }
+PROVIDER_FAILURE_VALUE_TOKENS = frozenset(
+    {"provider_failure", "provider_unavailable", "provider_contract_violation", "invalid_provider_offer"}
 )
 
-FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS = frozenset(
-    {
-        "provider_failure",
-        "provider_unavailable",
-        "provider_contract_violation",
-        "invalid_provider_offer",
-    }
+FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset().union(
+    PROVIDER_IDENTITY_CARRIER_TOKENS,
+    PROVIDER_METADATA_CARRIER_TOKENS,
+    PROVIDER_DECISION_CARRIER_TOKENS,
+    PROVIDER_SELECTION_ROUTING_TOKENS,
+    PROVIDER_MARKETPLACE_PRODUCT_TOKENS,
+    PROVIDER_RESOURCE_LIFECYCLE_TOKENS,
+    RUNTIME_TECHNICAL_TOKENS,
 )
 
-FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = frozenset(
+FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS
+
+FORBIDDEN_CORE_PROVIDER_VALUE_EXACT_TOKENS = PROVIDER_IDENTITY_CARRIER_TOKENS.union(
+    PROVIDER_DECISION_CARRIER_TOKENS,
     {
-        "selected_provider",
-        "provider_selector",
-        "provider_selection",
-        "provider_routing",
-        "routing_policy",
-        "priority",
-        "rank",
-        "score",
-        "fallback",
-        "fallback_order",
-        "preferred_profile",
-        "provider_offer",
-        "provider_profile",
-        "provider_capability",
-        "provider_capabilities",
-        "provider_id",
-        "provider_key",
-        "offer",
-        "offer_id",
+        "availability_sla",
+        "browser",
+        "cdp",
+        "chromium",
         "decision_detail",
         "decision_details",
-        "external_provider_ref",
-        "native_provider",
-        "browser_provider",
-        "resource_provider",
-        "provider_registry_entry",
-        "core_provider_registry",
-        "core_provider_discovery",
-        "marketplace_listing",
+        "fallback",
         "marketplace",
-        "provider_product_support",
-        "provider_lifecycle",
-        "provider_lease",
-        "playwright",
-        "cdp",
-        "chromium",
-        "browser",
-        "browser_profile",
         "network",
-        "network_tier",
+        "offer",
+        "playwright",
+        "priority",
+        "rank",
+        "ranking",
+        "routing",
+        "score",
+        "selector",
+        "sla",
         "transport",
-        "resource_supply",
-        "resource_pool",
-        "account_pool",
-        "proxy_pool",
+    },
+)
+
+FORBIDDEN_CORE_PROVIDER_VALUE_EMBEDDED_TOKENS = FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS.difference(
+    {
+        "provider",
+        "offer",
+        "decision_detail",
+        "decision_details",
+        "compatibility_decision",
+        "browser",
+        "network",
         "sla",
     }
 )
@@ -276,9 +300,14 @@ def _scan_surface(
 
 def _contains_forbidden_provider_field_token(field_name: str) -> bool:
     normalized = _normalize_field_name(field_name)
-    if normalized in EXACT_FORBIDDEN_CORE_PROVIDER_FIELD_NAMES:
+    if normalized == "provider":
         return True
-    return any(token in normalized for token in FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS)
+    if normalized.startswith("provider_"):
+        return True
+    return any(
+        _contains_normalized_semantic_token(normalized, _normalize_field_name(token))
+        for token in FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS
+    )
 
 
 def _contains_provider_identity_value(value: str, provider_identity_values: tuple[str, ...]) -> bool:
@@ -294,7 +323,7 @@ def _contains_provider_identity_value(value: str, provider_identity_values: tupl
             or f"-{normalized_identity}-" in normalized_value
         ):
             return True
-    for token in FORBIDDEN_CORE_PROVIDER_VALUE_TOKENS:
+    for token in PROVIDER_FAILURE_VALUE_TOKENS:
         normalized_token = _identity_slug(token)
         if (
             normalized_value == normalized_token
@@ -318,16 +347,25 @@ def _contains_forbidden_provider_failure_value(path: str, value: str) -> bool:
 
 def _contains_forbidden_provider_value_semantics(value: str) -> bool:
     normalized_value = _normalize_field_name(value)
-    for token in FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS:
+    if normalized_value.startswith("provider_"):
+        return True
+    for token in FORBIDDEN_CORE_PROVIDER_VALUE_EXACT_TOKENS:
+        if normalized_value == _normalize_field_name(token):
+            return True
+    for token in FORBIDDEN_CORE_PROVIDER_VALUE_EMBEDDED_TOKENS:
         normalized_token = _normalize_field_name(token)
-        if (
-            normalized_value == normalized_token
-            or normalized_value.startswith(f"{normalized_token}_")
-            or normalized_value.endswith(f"_{normalized_token}")
-            or f"_{normalized_token}_" in normalized_value
-        ):
+        if _contains_normalized_semantic_token(normalized_value, normalized_token):
             return True
     return False
+
+
+def _contains_normalized_semantic_token(normalized_value: str, normalized_token: str) -> bool:
+    return (
+        normalized_value == normalized_token
+        or normalized_value.startswith(f"{normalized_token}_")
+        or normalized_value.endswith(f"_{normalized_token}")
+        or f"_{normalized_token}_" in normalized_value
+    )
 
 
 def _identity_slug(value: str) -> str:
