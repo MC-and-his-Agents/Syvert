@@ -170,6 +170,23 @@
   - 结果：通过。
 - post-merge closeout protocol follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `python3 scripts/pr_guardian.py review 343 --post-review --json-output /tmp/syvert-pr-343-guardian-b897bac.json`
+  - 结果：第四轮 `REQUEST_CHANGES`，`safe_to_merge=false`。阻断项是 release / sprint 索引与 closeout evidence 发生事实漂移：
+    - `docs/releases/v0.8.0.md` 仍把 `#319` 写成负责 formal spec closeout，而不是已完成并合入主干。
+    - `docs/sprints/2026-S21.md` 把 `#320` 误归类为 docs / evidence / parent closeout，而不是 offer manifest / validator。
+  - 当前 follow-up 同步 release / sprint 索引，使 `#319/#320/#321/#322` 职责与本 closeout evidence 一致。
+- release / sprint 索引 follow-up 后 `git diff --check`
+  - 结果：通过。
+- release / sprint 索引 follow-up 后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- release / sprint 索引 follow-up 后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- release / sprint 索引 follow-up 后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- release / sprint 索引 follow-up 后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-322-fr-0025`
+  - 结果：通过。
+- release / sprint 索引 follow-up 后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
