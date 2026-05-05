@@ -21,7 +21,7 @@
 - Main truth：`git rev-parse HEAD && git rev-parse origin/main`
 - Remote branch truth：`git ls-remote --heads origin 'issue-312*' 'issue-322*' 'issue-327*'`
 - Worktree truth：`git worktree list --porcelain`
-- Tag truth：`git tag --list 'v0.8.0*'` and `git ls-remote --tags origin 'v0.8.0*'`
+- Tag truth：`git tag --list 'v0.8.0*'`、`git rev-parse v0.8.0`、`git rev-parse v0.8.0^{}` and `git ls-remote --tags origin 'v0.8.0*'`
 - GitHub Release truth：`gh release view v0.8.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
 
 ## GitHub issue 状态
@@ -48,11 +48,13 @@
 
 对账结论：
 
-- 阶段 A 前 `HEAD == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`；阶段 A 合入后 main 会前进到 PR merge commit，阶段 B 再回写 published truth。
-- 阶段 A 前 open PR 为 `[]`；当前 PR `#346` 是本事项的阶段 A carrier。
+- 阶段 A 前 `HEAD == origin/main == 594231b9f18a459bc64b771c486b73808ecaf764`。
+- 阶段 A PR `#346` 已合入，merge commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- 当前 published anchor 为 `v0.8.0` tag target `741dd02e51940a80bdc8bc298422296bd5c4d4d0`；阶段 B 回写本 published truth。
 - `issue-312-fr-0023`、`issue-322-fr-0025`、`issue-327-fr-0026` 远端分支查询无输出；REST branch lookup 为 404。
 - `git fetch --prune origin` 后本地 remote-tracking refs 已清理。
-- 当前尚未创建 `v0.8.0` tag 或 GitHub Release；阶段 A carrier PR 合入后创建发布锚点，并由阶段 B 回写 published truth。
+- `v0.8.0` annotated tag 已创建并推送，tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`，tag target `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- GitHub Release `v0.8.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`。
 - `git worktree list --porcelain` 只剩主仓 `main` worktree。
 
 ## Phase closeout comment
@@ -156,9 +158,13 @@ Phase #293 继续保持 open，后续还需收口 FR-0023 / #295（#312）与 FR
 - `python3 scripts/workflow_guard.py --mode ci`
   - 结果：通过。
 - `git tag --list 'v0.8.0*'`
-  - 结果：无输出。
+  - 阶段 A 前结果：无输出。
 - `gh release view v0.8.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
-  - 结果：当前无 GitHub Release `v0.8.0`。
+  - 阶段 A 前结果：无 GitHub Release `v0.8.0`。
+- `git rev-parse v0.8.0 && git rev-parse v0.8.0^{}`
+  - 结果：tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`，target commit `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
+- `gh release view v0.8.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
+  - 结果：`tagName=v0.8.0`，`isDraft=false`，`isPrerelease=false`，`publishedAt=2026-05-05T14:42:01Z`，`targetCommitish=741dd02e51940a80bdc8bc298422296bd5c4d4d0`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`。
 
 ## 完成语义
 
@@ -169,7 +175,7 @@ Phase #293 继续保持 open，后续还需收口 FR-0023 / #295（#312）与 FR
 - Adapter requirement x Provider offer 的 compatibility decision、runtime decision、fail-closed、no-leakage guard、SDK docs 与 evidence。
 - multi-profile resource requirement contract、双参考 profile evidence、matcher runtime 与 reference adapter declaration migration。
 - 父项 closeout 与 Phase closeout GitHub 状态对账。
-- 阶段 A carrier 合入后建立 `v0.8.0` tag / GitHub Release，并通过阶段 B 回写 published truth。
+- 阶段 A carrier 已合入，`v0.8.0` tag / GitHub Release 已建立；阶段 B 回写 published truth。
 
 ## 明确不完成
 
