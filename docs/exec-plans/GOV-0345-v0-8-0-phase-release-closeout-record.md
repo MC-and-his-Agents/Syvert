@@ -54,7 +54,7 @@
 
 ## 下一步动作
 
-- 阶段 A：提交并推送本 closeout record carrier，运行 docs / spec / workflow / governance / scope guard，创建 docs PR `#346`，运行 guardian review。
+- 阶段 A：继续处理 PR `#346` guardian finding，保持 docs / spec / workflow / governance / scope guard 通过。
 - 阶段 A guardian `APPROVE` 且 `safe_to_merge=true`、GitHub checks 全绿后受控合并。
 - 阶段 A 合入后，在阶段 A merge commit 上创建并推送 `v0.8.0` annotated tag。
 - 创建 GitHub Release `v0.8.0`。
@@ -153,10 +153,10 @@
 
 ## 风险
 
-- 若 final closeout artifact 只重复 release 索引而不保存可复验 GitHub / Git 查询入口，会再次形成“口头完成但仓内不可复验”的缺口。
+- 若 phase closeout artifact 只重复 release 索引而不保存可复验 GitHub / Git 查询入口，会再次形成“口头完成但仓内不可复验”的缺口。
 - 若 tag / GitHub Release 指向未经过阶段 A review / guardian / merge gate 的提交，会破坏 release closeout 的可审计性。
 - 若 release / sprint 索引提前声明 published truth，会造成 tag / GitHub Release 与仓内文档分叉。
-- 若 `#327` post-merge 记录补充被写回 `#327` 历史 exec-plan，会破坏 Work Item ownership；本事项只在 `GOV-0345` evidence 中补齐最终对账。
+- 若 `#327` post-merge 记录补充被写回 `#327` 历史 exec-plan，会破坏 Work Item ownership；本事项只补充 `CHORE-0327` evidence artifact 与 `GOV-0345` evidence，不改写 `#327` exec-plan。
 - 若本事项声明真实 provider 产品支持，会越过 `v0.8.0` 明确不在范围。
 
 ## 回滚方式
@@ -167,5 +167,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `594231b9f18a459bc64b771c486b73808ecaf764`
-- 说明：该 checkpoint 对应 `v0.8.0` final main truth。当前事项只补齐 closeout record，不推进 runtime 或 formal spec checkpoint。
+- 阶段 A 前基线：`594231b9f18a459bc64b771c486b73808ecaf764`
+- 说明：该 checkpoint 对应 `v0.8.0` phase closeout 已完成后的阶段 A carrier 基线。PR `#346` 合入后 main 会前进到新的 merge commit；tag / GitHub Release 与 final published truth 由阶段 B / 阶段 C 回写。当前事项不推进 runtime 或 formal spec checkpoint。
