@@ -170,6 +170,7 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
         cases = (
             "provider",
             "providerId",
+            "offer",
             "provider_capability",
             "provider_capabilities",
             "provider_offer",
@@ -179,6 +180,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "native_provider",
             "browser_provider",
             "resource_provider",
+            "decision_detail",
+            "decision_details",
             "compatibility_decision",
             "core_provider_registry",
             "core_provider_discovery",
@@ -213,6 +216,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "nativeProvider",
             "browserProvider",
             "resourceProvider",
+            "decisionDetail",
+            "decisionDetails",
             "browserProfile",
             "networkTier",
             "browser",
@@ -329,7 +334,10 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"field_names": ["provider_capabilities"]},
             {"field_names": ["provider_key"]},
             {"field_names": ["provider_id"]},
+            {"field_names": ["offer"]},
             {"field_names": ["offer_id"]},
+            {"field_names": ["decision_detail"]},
+            {"field_names": ["decision_details"]},
             {"metadata": "external_provider_ref"},
             {"metadata": "native_provider"},
             {"metadata": "browser_provider"},
@@ -381,6 +389,7 @@ class ProviderNoLeakageRealRuntimePathTests(TaskRecordStoreEnvMixin, unittest.Te
         self.assertEqual(outcome.envelope["status"], "success")
         self.assertIsNotNone(outcome.task_record)
         surfaces = {
+            "core_routing_projection": project_compatibility_decision_for_core(decision),
             "runtime_envelope": outcome.envelope,
             "task_record": task_record_to_dict(outcome.task_record),
             "resource_lifecycle_snapshot": snapshot_to_dict(default_resource_lifecycle_store().load_snapshot()),
