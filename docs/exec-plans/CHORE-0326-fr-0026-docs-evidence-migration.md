@@ -41,14 +41,14 @@
 - 分支：`issue-326-fr-0026-compatibility-decision`
 - worktree 创建基线：`d1577d6e620a43010c40e81f3a8c05b413dbc04f`
 - 已确认 `#324` runtime decision 与 `#325` no-leakage guard 已合入主干，父 FR `#298` 仍 open。
-- 当前 checkpoint：已补齐 active exec-plan、FR-0026 docs evidence artifact、Adapter SDK compatibility decision 作者路径，以及 release/sprint 索引入口。文档只消费已合入 runtime / guard truth，不定义新的 carrier，不修改 formal spec，不声明真实 provider 产品支持。
+- 当前 checkpoint：PR `#341` 已创建，head `740698e13245708cc3c527e5e2a6a5c45c5a144a` 已通过本地 docs class gates、相关 runtime 对齐测试与 GitHub checks。首轮 guardian 因外部 `429 Too Many Requests` 未产出 verdict；第二轮 guardian 返回 `REQUEST_CHANGES`，指出本 exec-plan 的下一步 / 待验证状态未与当前 PR 状态对齐。当前已修正为 merge gate 前状态。
 
 ## 下一步动作
 
-- 运行 docs class 门禁：`docs_guard`、`spec_guard --all`、`workflow_guard`、`governance_gate`、`pr_scope_guard --class docs`。
-- 运行语义对齐测试：`tests.runtime.test_adapter_provider_compatibility_decision` 与 `tests.runtime.test_provider_no_leakage_guard`。
-- 提交中文 Conventional Commit，使用 `scripts/open_pr.py` 受控开 PR。
-- guardian review 通过且 checks 全绿后使用受控 merge，完成 `#326` closeout 并更新父 FR `#298` comment。
+- 复跑 docs class 必要门禁以验证本 metadata-only 修正。
+- 在当前 head 上重新运行 guardian review。
+- guardian `APPROVE` 且同一 head 的 GitHub checks 全绿后使用受控 merge。
+- 合并后确认 `#326` closeout，更新父 FR `#298` comment，清理 worktree 并退役分支。
 
 ## 已验证项
 
@@ -89,9 +89,9 @@
 
 ## 待验证项
 
-- docs、spec、workflow、governance 与 `pr_scope` docs gates。
-- `tests.runtime.test_adapter_provider_compatibility_decision` 与 `tests.runtime.test_provider_no_leakage_guard`。
-- PR guardian、GitHub checks、受控 merge 与 closeout reconciliation。
+- 当前 metadata-only 修正后的 docs class gate 复跑。
+- 当前 head 的 guardian `APPROVE`。
+- 受控 merge、`#326` closeout、父 FR `#298` comment、worktree cleanup 与 branch retirement。
 
 ## 风险
 
