@@ -72,6 +72,20 @@
   - 结果：通过。
 - 提交前 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：首次运行因新增文件尚未进入 Git diff，返回“当前分支相对基线没有变更”；提交后复跑。
+- 最终提交后 `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard`
+  - 结果：通过，51 tests。
+- 最终提交后 `git diff --check`
+  - 结果：通过。
+- 最终提交后 `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- 最终提交后 `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- 最终提交后 `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- 最终提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-326-fr-0026-compatibility-decision`
+  - 结果：通过。
+- 最终提交后 `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 待验证项
 
@@ -93,3 +107,4 @@
 
 - worktree 创建基线：`d1577d6e620a43010c40e81f3a8c05b413dbc04f`
 - docs / evidence checkpoint：`d967c323b381c55814ee0ecb792d6077e0f78f46`
+- final gate checkpoint：`d41329aabde3a62f0e984b6a7827d1d28198a732`
