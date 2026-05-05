@@ -215,6 +215,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "resourceProvider",
             "browserProfile",
             "networkTier",
+            "browser",
+            "network",
             "transport",
             "playwright",
             "cdp",
@@ -325,6 +327,9 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"source": "marketplace_listing"},
             {"service_level": "sla"},
             {"field_names": ["provider_capabilities"]},
+            {"field_names": ["provider_key"]},
+            {"field_names": ["provider_id"]},
+            {"field_names": ["offer_id"]},
             {"metadata": "external_provider_ref"},
             {"metadata": "native_provider"},
             {"metadata": "browser_provider"},
@@ -333,6 +338,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"transport": "transport:cdp"},
             {"browser": "browser_profile"},
             {"network": "network_tier"},
+            {"runtime": "browser"},
+            {"runtime": "network"},
             {"engine": "chromium"},
         )
         for surface in cases:
