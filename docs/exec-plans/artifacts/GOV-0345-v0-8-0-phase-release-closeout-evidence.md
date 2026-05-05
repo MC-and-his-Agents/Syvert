@@ -59,7 +59,7 @@
 - `git fetch --prune origin` 后本地 remote-tracking refs 已清理。
 - `v0.8.0` annotated tag 已创建并推送，tag object `8e58f12d371a97c0d75deeba6f3e403a067ba08e`，tag target `741dd02e51940a80bdc8bc298422296bd5c4d4d0`。
 - GitHub Release `v0.8.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.8.0`。
-- `git worktree list --porcelain` 只剩主仓 `main` worktree。
+- 阶段 A 前 `git worktree list --porcelain` 只剩主仓 `main` worktree；当前阶段 B 仍使用 `#345` worktree 执行 published truth 回写，待 PR `#347` 合入后清理。
 
 ## Phase closeout comment
 

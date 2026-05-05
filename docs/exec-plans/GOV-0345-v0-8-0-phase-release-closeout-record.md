@@ -162,8 +162,7 @@
 
 ## 待验证项
 
-- 阶段 B docs / spec / workflow / governance / scope guard。
-- 阶段 B PR 创建、guardian、GitHub checks、受控 merge。
+- 阶段 B guardian、GitHub checks、受控 merge。
 - `#345` closeout comment / close issue。
 - worktree cleanup 与 branch retirement。
 
