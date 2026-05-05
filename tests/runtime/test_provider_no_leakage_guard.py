@@ -180,6 +180,8 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "selector",
             "routing",
             "marketplace_listing",
+            "offerID",
+            "OfferID",
         )
         for field_name in cases:
             with self.subTest(field_name=field_name):
@@ -269,11 +271,36 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"error": {"code": "invalid_provider_offer"}},
             {"error": {"failure_category": "provider"}},
             {"error": {"failure_category": "provider_failure"}},
+            {"error": {"message": "provider_unavailable in downstream"}},
         )
         for surface in cases:
             with self.subTest(surface=surface):
                 result = guard_core_provider_no_leakage(
                     surface_name="runtime_envelope",
+                    surface=surface,
+                    decision=decision,
+                )
+
+                self.assertEqual(result.status, PROVIDER_NO_LEAKAGE_STATUS_FAILED)
+                self.assertEqual(result.error_code, PROVIDER_NO_LEAKAGE_ERROR_PROVIDER_LEAKAGE_DETECTED)
+
+    def test_guard_fails_closed_for_forbidden_provider_semantics_in_string_values(self) -> None:
+        decision = matched_decision()
+        cases = (
+            {"decision_detail": "provider_selector"},
+            {"field_names": ["selected_provider"]},
+            {"routing_summary": "routing_policy"},
+            {"mode": "route:provider_selector"},
+            {"mode": "mode:selected_provider"},
+            {"policy": "policy/routing_policy"},
+            {"classification": "provider_product_support"},
+            {"source": "marketplace_listing"},
+            {"service_level": "sla"},
+        )
+        for surface in cases:
+            with self.subTest(surface=surface):
+                result = guard_core_provider_no_leakage(
+                    surface_name="core_surface",
                     surface=surface,
                     decision=decision,
                 )

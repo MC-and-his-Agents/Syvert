@@ -305,7 +305,7 @@ def _identity_slug(value: str) -> str:
 def _normalize_field_name(field_name: str) -> str:
     with_word_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", field_name)
     with_word_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_boundaries)
-    return with_word_boundaries.lower().replace("-", "_").replace(" ", "_")
+    return re.sub(r"[^a-z0-9]+", "_", with_word_boundaries.lower()).strip("_")
 
 
 def _dedupe(raw_values: Iterable[str]) -> tuple[str, ...]:
