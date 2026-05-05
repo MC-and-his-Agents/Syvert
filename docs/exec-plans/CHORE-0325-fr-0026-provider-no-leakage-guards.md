@@ -227,3 +227,4 @@
 - ninth guardian follow-up checkpoint：`dd135377062cf8bab098ce73e44e19a0ad036127`
 - tenth guardian follow-up checkpoint：`4154ab427dff07ea9475d9210f81402b40b521d3`
 - eleventh guardian follow-up checkpoint：`778471d5d7f95ca5e8b94f5545694c24fedf00ad`
+- twelfth guardian follow-up checkpoint：`a1404921df1f7cfb302660870555975be6f7f0d4`
