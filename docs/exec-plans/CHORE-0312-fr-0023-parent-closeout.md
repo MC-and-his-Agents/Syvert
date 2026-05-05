@@ -11,7 +11,7 @@
 - Parent FR：`#295`
 - 关联 spec：`docs/specs/FR-0023-third-party-adapter-entry-path/`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#344`
 - active 收口事项：`CHORE-0312-fr-0023-parent-closeout`
 - 状态：`active`
 
@@ -52,8 +52,7 @@
 
 ## 下一步动作
 
-- 运行 docs class 的 scope / governance 门禁。
-- 提交并通过受控入口创建 docs PR。
+- 当前 live PR：`#344`。
 - 等待 / 核对 GitHub checks，运行 guardian review；guardian 不设置超时限制。
 - guardian `APPROVE` 且 `safe_to_merge=true` 后，使用受控 merge 入口合入。
 - 合入后使用 GitHub REST 在 `#295` 写入 closeout comment 并关闭为 `completed`；确认 `#312` 自动关闭，必要时使用 REST 补关闭。
@@ -132,6 +131,8 @@
   - 结果：通过。
 - 提交后 `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-312-fr-0023`
   - 结果：通过。
+- `python3 scripts/open_pr.py --class docs --issue 312 --item-key CHORE-0312-fr-0023-parent-closeout --item-type CHORE --release v0.8.0 --sprint 2026-S21 --title 'docs(closeout): 收口 FR-0023 父事项' --closing fixes --integration-touchpoint none --shared-contract-changed no --integration-ref none --external-dependency none --merge-gate local_only --contract-surface none --joint-acceptance-needed no --integration-status-checked-before-pr no --integration-status-checked-before-merge no`
+  - 结果：通过；创建 PR `#344`。
 
 ## 待验证项
 
