@@ -452,6 +452,7 @@ Syvert 主仓继续聚焦：
 
 ### 必须同时满足
 
+- `v2.0.0` 声明的是扩展 runtime capability contract 框架稳定，不表示所有能力族都已 stable。
 - Operation taxonomy 已稳定，新增 capability 的准入流程不再依赖临时例外。
 - Resource governance 能支持读侧、批量、定时与写侧能力。
 - 至少一组读侧 capability 达到 stable。

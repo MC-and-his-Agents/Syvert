@@ -77,7 +77,7 @@ version-management.md
 
 - 版本类型：major / minor / patch
 - 是否改变公共 contract：是 / 否
-- 是否需要 tag / GitHub Release：是 / 否
+- tag / GitHub Release：正式 release closeout 必须创建 annotated tag 与 GitHub Release；非发布 planning 草稿不得声明发布完成。
 - published truth carrier
 - 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 - docs/process/version-management.md
@@ -100,8 +100,15 @@ version-management.md
 on:
   pull_request:
     paths:
+      - "vision.md"
+      - "AGENTS.md"
+      - "docs/roadmap-*.md"
+      - "docs/process/version-management.md"
       - "docs/releases/**"
       - "docs/process/python-packaging.md"
+      - "docs/process/delivery-funnel.md"
+      - "scripts/version_guard.py"
+      - ".github/workflows/version-guard.yml"
 
 jobs:
   version-guard:
@@ -143,6 +150,18 @@ class VersionGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
 
         self.assertTrue(any("docs/process/python-packaging.md" in error for error in errors))
+
+    def test_workflow_must_watch_version_management_doc(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            workflow = (repo / ".github/workflows/version-guard.yml").read_text(encoding="utf-8")
+            workflow = workflow.replace('      - "docs/process/version-management.md"\n', "")
+            (repo / ".github/workflows/version-guard.yml").write_text(workflow, encoding="utf-8")
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("docs/process/version-management.md" in error for error in errors))
 
     def test_version_management_must_reference_packaging_doc(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -224,6 +243,24 @@ class VersionGuardTests(unittest.TestCase):
 ## 当前状态
 
 - `v1.1.0` tag 已创建并推送。
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("published truth carrier" in error for error in errors))
+
+    def test_tag_anchor_claim_requires_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- 已发布为 tag `v1.1.0`，正式发布锚点已经建立。
 """,
             )
 

@@ -26,7 +26,7 @@
 
 - 版本类型：major / minor / patch
 - 是否改变公共 contract：是 / 否
-- 是否需要 tag / GitHub Release：是 / 否
+- tag / GitHub Release：正式 release closeout 必须创建 annotated tag 与 GitHub Release；非发布 planning 草稿不得声明发布完成。
 - 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 
 ## Published truth carrier

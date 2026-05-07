@@ -26,7 +26,8 @@ GITHUB_RELEASE_FACT_RE = re.compile(
 )
 TAG_PUBLICATION_FACT_RE = re.compile(
     r"((?:^|`|\s)v\d+\.\d+\.\d+`?\s+(?:annotated\s+)?tag.*(已创建|已推送|created|pushed)|"
-    r"(?:^|`|\s)tag\s+`?v\d+\.\d+\.\d+`?.*(已创建|已推送|created|pushed))",
+    r"(?:^|`|\s)tag\s+`?v\d+\.\d+\.\d+`?.*(已创建|已推送|created|pushed)|"
+    r"(已发布为\s+tag|tag\s+锚点|tag\s+发布锚点|正式发布锚点|tag\s+已(?:经)?建立))",
     re.IGNORECASE,
 )
 FORBIDDEN_POSITIONING_PHRASES = (
@@ -115,7 +116,7 @@ def validate_release_docs(repo_root: Path) -> list[str]:
                 "## 版本管理",
                 "版本类型：major / minor / patch",
                 "是否改变公共 contract：是 / 否",
-                "是否需要 tag / GitHub Release：是 / 否",
+                "tag / GitHub Release：正式 release closeout 必须创建 annotated tag 与 GitHub Release",
                 "published truth carrier",
                 "## Closeout evidence",
                 "GitHub Phase / FR / Work Item closeout",
@@ -218,7 +219,18 @@ def validate_workflow(repo_root: Path) -> list[str]:
     content = read_text(workflow)
     missing = contains_all(
         content,
-        ("scripts/version_guard.py", "pull_request", "docs/releases/**", "docs/process/python-packaging.md"),
+        (
+            "pull_request",
+            "vision.md",
+            "AGENTS.md",
+            "docs/roadmap-*.md",
+            "docs/process/version-management.md",
+            "docs/process/python-packaging.md",
+            "docs/process/delivery-funnel.md",
+            "docs/releases/**",
+            "scripts/version_guard.py",
+            ".github/workflows/version-guard.yml",
+        ),
     )
     return [f"`.github/workflows/version-guard.yml` 缺少：`{item}`" for item in missing]
 
