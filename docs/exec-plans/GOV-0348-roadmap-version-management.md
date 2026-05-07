@@ -49,7 +49,7 @@
 
 - 标准 worktree `issue-348-task` 已创建。
 - 当前路线图、版本管理、version guard、Python packaging 规划和 policy 修正已迁移到标准 worktree 分支。
-- PR `#349` 已创建；第二轮 guardian review 返回 `REQUEST_CHANGES`，当前正在处理 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断。
+- PR `#349` 已创建；第二轮 guardian review 的 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断已修复并推送，等待下一轮 guardian 与 checks 复核。
 
 ## 下一步动作
 
@@ -88,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9002fcc7bc3931d13e270970c0f3a6777653b65c`
+- `adebaf055dad163a0a1961f74f5f9819b4dada5f`
 - 当前 PR head 由 guardian state / GitHub checks 绑定，不把本字段作为 merge gate 的 live head 替代来源。
