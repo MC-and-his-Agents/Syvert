@@ -146,6 +146,52 @@ class VersionGuardTests(unittest.TestCase):
 
         self.assertTrue(any("docs/process/python-packaging.md" in error for error in errors))
 
+    def test_template_style_release_index_does_not_require_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 版本管理
+
+- 是否需要 tag / GitHub Release：是 / 否
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertEqual(errors, [])
+
+    def test_misnamed_release_index_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(repo / "docs/releases/release-v1.1.0.md", "# Release v1.1.0\n")
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("release-v1.1.0.md" in error for error in errors))
+
+    def test_published_release_claim_requires_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- tag target：`abc`
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("published truth carrier" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -61,7 +61,9 @@ Git tag 与 GitHub Release 是发布锚点。
 - Tag 必须锚定已合入 `main` 的发布提交。
 - 正式 release tag 应使用 annotated tag。
 - GitHub Release 必须指向同名 tag。
-- Release index 的 published truth carrier 应记录 tag target、GitHub Release URL 与发布时间。
+- 新增或重写的 Release index published truth carrier 应记录 tag target、GitHub Release URL 与发布时间。
+- 既有 `v0.1.0` 到 `v0.7.0` release index 允许保留历史 closeout / 发布状态表达，直到独立 legacy migration Work Item 统一回写。
+- `v0.8.0` 及后续新增 release index 应使用 published truth carrier 三元组作为发布真相表达。
 
 ### Runtime / Schema / SDK Version
 

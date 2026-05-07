@@ -17,12 +17,10 @@ TRUTH_HEADING_RE = re.compile(
     r"^## (Published truth carrier|当前发布完成真相|当前发布与 closeout 状态|当前发布状态|当前收口事实|完成依据)$",
     re.MULTILINE,
 )
-PUBLICATION_MARKERS = (
-    "GitHub Release",
-    "tag target",
-    "annotated tag",
-    "published at",
-    "发布完成",
+PUBLICATION_CLAIM_RE = re.compile(
+    r"(tag target\s*[:：]|annotated tag(?: object)?\s*[:：]|published at\s+`?\d{4}-|"
+    r"GitHub Release\s*[:：].*https://github\.com/.+/releases/tag/v|发布完成)",
+    re.IGNORECASE | re.DOTALL,
 )
 FORBIDDEN_POSITIONING_PHRASES = (
     "Application Capability Expansion",
@@ -65,7 +63,7 @@ def validate_release_filename_and_title(release_file: Path, repo_root: Path) -> 
 def validate_release_truth_carrier(release_file: Path, repo_root: Path) -> list[str]:
     content = read_text(release_file)
     relative_path = release_file.relative_to(repo_root)
-    has_publication_claim = any(marker in content for marker in PUBLICATION_MARKERS)
+    has_publication_claim = bool(PUBLICATION_CLAIM_RE.search(content))
     if has_publication_claim and not TRUTH_HEADING_RE.search(content):
         return [f"`{relative_path}` 声明发布 / tag / GitHub Release 事实时必须有 published truth carrier 类章节"]
     return []
@@ -103,7 +101,11 @@ def validate_release_docs(repo_root: Path) -> list[str]:
     elif "version-management.md" not in read_text(readme):
         errors.append("`docs/releases/README.md` 必须引用 `docs/process/version-management.md`")
 
-    release_files = sorted(path for path in releases_dir.glob("v*.md") if path.is_file())
+    release_files = sorted(
+        path
+        for path in releases_dir.glob("*.md")
+        if path.is_file() and path.name not in {"README.md", "_template.md"}
+    )
     if not release_files:
         errors.append("`docs/releases/` 至少应包含一个 `vMAJOR.MINOR.PATCH.md` release 索引")
     for release_file in release_files:
