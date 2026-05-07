@@ -11,7 +11,7 @@
   "source_sha256": {
     "WORKFLOW.md": "fbe5787e913d2844cdb30c1e79bcc759568ab34bdb68feaf2602d40ca62fbb4c",
     "docs/exec-plans/GOV-0038-loom-official-adoption.md": "8ae08b8791942383f54dc1b4bfdf382a490e0b44d1bac94204f43025bfdfc74a",
-    "docs/process/delivery-funnel.md": "398f9242f00bfdd2be5c418f854de3527d262e2440cc13d6cabbed4ad03ad8e3"
+    "docs/process/delivery-funnel.md": "50df775c96610a07c536b433e7662a4b57c9443b8ade88d843492d61f684f65f"
   },
   "source_semantics": "Closeout parity requires merged delivery state, reconciled status or progress truth, and parent closeout evidence after execution completes.",
   "evidence_body": {
