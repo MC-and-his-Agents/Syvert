@@ -88,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `fd1128818d8ba059c170c1e8d1e3045d6f5d9fa5`
+- `9002fcc7bc3931d13e270970c0f3a6777653b65c`
 - 当前 PR head 由 guardian state / GitHub checks 绑定，不把本字段作为 merge gate 的 live head 替代来源。
