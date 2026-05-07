@@ -24,6 +24,11 @@ GITHUB_RELEASE_FACT_RE = re.compile(
     r"GitHub Release.*(https://github\.com/.+/releases/tag/v|已创建|已发布|published)",
     re.IGNORECASE,
 )
+TAG_PUBLICATION_FACT_RE = re.compile(
+    r"((?:^|`|\s)v\d+\.\d+\.\d+`?\s+(?:annotated\s+)?tag.*(已创建|已推送|created|pushed)|"
+    r"(?:^|`|\s)tag\s+`?v\d+\.\d+\.\d+`?.*(已创建|已推送|created|pushed))",
+    re.IGNORECASE,
+)
 FORBIDDEN_POSITIONING_PHRASES = (
     "Application Capability Expansion",
     "Syvert Application Platform GA",
@@ -84,6 +89,8 @@ def has_release_publication_claim(content: str) -> bool:
             return True
         if GITHUB_RELEASE_FACT_RE.search(line):
             return True
+        if TAG_PUBLICATION_FACT_RE.search(line):
+            return True
         if line.startswith(("- 发布完成", "* 发布完成", "发布完成")):
             return True
     return False
@@ -110,6 +117,9 @@ def validate_release_docs(repo_root: Path) -> list[str]:
                 "是否改变公共 contract：是 / 否",
                 "是否需要 tag / GitHub Release：是 / 否",
                 "published truth carrier",
+                "## Closeout evidence",
+                "GitHub Phase / FR / Work Item closeout",
+                "reconciliation status",
                 "docs/process/version-management.md",
             ),
         )

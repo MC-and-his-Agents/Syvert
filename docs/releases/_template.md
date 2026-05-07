@@ -13,6 +13,15 @@
 - 判据 1
 - 判据 2
 
+## Closeout evidence
+
+- release gate / contract test / evidence：
+- GitHub Phase / FR / Work Item closeout：
+- closeout Issue / Work Item：
+- closeout PR：
+- main merge commit：
+- reconciliation status：
+
 ## 版本管理
 
 - 版本类型：major / minor / patch

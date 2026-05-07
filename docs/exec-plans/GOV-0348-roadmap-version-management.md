@@ -49,14 +49,13 @@
 
 - 标准 worktree `issue-348-task` 已创建。
 - 当前路线图、版本管理、version guard、Python packaging 规划和 policy 修正已迁移到标准 worktree 分支。
-- PR `#349` 已创建；第二轮 guardian review 的 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断已修复并推送，等待下一轮 guardian 与 checks 复核。
+- PR `#349` 已创建；guardian 已指出的 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断均已修复，等待最终 checks 与 guardian merge-gate 复核。
 
 ## 下一步动作
 
-- 提交本 exec-plan / ADR 增量。
-- 运行 version guard、docs guard、workflow guard、governance tests 与 diff check。
-- 使用 `scripts/open_pr.py` 创建受控 PR。
-- 运行 `scripts/pr_guardian.py review <PR> --post-review`。
+- 提交并推送第三轮 guardian 阻断修复。
+- 确认本地门禁与 GitHub checks 均通过。
+- 运行 `scripts/pr_guardian.py review 349 --post-review` 作为最终 merge gate 复核。
 - guardian 与 GitHub checks 通过后使用受控合并入口。
 
 ## 当前 checkpoint 推进的 release 目标

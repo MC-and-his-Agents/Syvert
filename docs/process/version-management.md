@@ -140,7 +140,7 @@ Patch release 不得引入新的公共 operation、资源词汇、Adapter contra
 `scripts/version_guard.py` 负责可机械校验的版本一致性：
 
 - release 索引文件必须放在 `docs/releases/` 下，使用 `vMAJOR.MINOR.PATCH.md` 命名，并以同名 `# Release vMAJOR.MINOR.PATCH` 标题开头。
-- release 模板必须包含版本类型、公共 contract 变更、tag / GitHub Release 与 published truth carrier 字段。
+- release 模板必须包含版本类型、公共 contract 变更、tag / GitHub Release、closeout evidence、reconciliation status 与 published truth carrier 字段。
 - Python packaging 规划文档必须存在，并被版本管理规则引用。
 - roadmap 必须引用版本管理规则，`v1.x -> v2.0.0` 路线必须保留 `Stabilization Gate` 与 `v1.10.0` 语义。
 - 声明 tag / GitHub Release / 发布完成事实的 release 文档必须有 published truth carrier 类章节。

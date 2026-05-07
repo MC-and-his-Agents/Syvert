@@ -81,6 +81,15 @@ version-management.md
 - published truth carrier
 - 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 - docs/process/version-management.md
+
+## Closeout evidence
+
+- GitHub Phase / FR / Work Item closeout：
+- reconciliation status
+
+## Published truth carrier
+
+- 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 """,
     )
     write(repo / "docs/releases/v1.0.0.md", "# Release v1.0.0\n\n## 目标\n")
@@ -197,6 +206,24 @@ class VersionGuardTests(unittest.TestCase):
 ## 当前状态
 
 - GitHub Release `v1.1.0` 已创建：https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.1.0
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("published truth carrier" in error for error in errors))
+
+    def test_tag_created_claim_requires_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- `v1.1.0` tag 已创建并推送。
 """,
             )
 
