@@ -19,7 +19,7 @@ TRUTH_HEADING_RE = re.compile(
 )
 TAG_TARGET_RE = re.compile(r"tag target\s*[:：]", re.IGNORECASE)
 ANNOTATED_TAG_RE = re.compile(r"annotated tag(?: object)?\s*[:：]", re.IGNORECASE)
-PUBLISHED_AT_RE = re.compile(r"published at\s+`?\d{4}-", re.IGNORECASE)
+PUBLISHED_AT_RE = re.compile(r"published at\s*[:：]?\s*`?\d{4}-", re.IGNORECASE)
 SECTION_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 GITHUB_RELEASE_FACT_RE = re.compile(
     r"GitHub Release.*(https://github\.com/.+/releases/tag/v|已创建|已发布|published)",

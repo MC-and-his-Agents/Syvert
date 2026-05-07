@@ -351,6 +351,24 @@ class VersionGuardTests(unittest.TestCase):
 
         self.assertTrue(any("published truth carrier" in error for error in errors))
 
+    def test_colon_style_published_at_claim_requires_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- published at：2026-05-07T12:00:00Z
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("published truth carrier" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
