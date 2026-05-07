@@ -14,6 +14,7 @@ Syvert 同时存在多个版本层次，它们不能互相替代：
 | Release index | `docs/releases/v0.8.0.md` | 聚合某个 release 要证明什么、纳入哪些事项、完成依据 | `docs/releases/` |
 | Git tag | `v0.8.0` | 锚定发布提交 | Git annotated tag |
 | GitHub Release | `releases/tag/v0.8.0` | 对外发布记录 | GitHub Release |
+| Python package artifact | `.whl`、`.tar.gz` | 可安装分发物 | `docs/process/python-packaging.md` 与 GitHub Release artifact |
 | Runtime / schema version | `v0.4.0` resource lifecycle schema | 描述某个内部 contract / schema 的冻结版本 | 对应 formal spec、代码常量与测试 |
 | SDK / contract version | `v0.8.0` provider offer contract | 描述 Adapter / Provider contract 的兼容边界 | formal spec、SDK 文档、validator |
 
@@ -72,6 +73,15 @@ Git tag 与 GitHub Release 是发布锚点。
 - 有测试证明旧行为的兼容 / 拒绝边界。
 - 不把局部 schema version 当作全仓版本 truth。
 
+### Python Package Artifact
+
+Python package 是可选分发物，不是默认 release truth source。
+
+- 引入 Python packaging 的边界、版本来源、CI 与发布渠道见 `docs/process/python-packaging.md`。
+- Python package version 必须从 Git tag 派生，不维护独立手写版本号。
+- Package artifact 只有在对应 release 明确声明时，才成为 release closeout 的必需交付物。
+- PyPI / GitHub Packages publish 必须由独立 FR 批准，不得在普通 release closeout 中顺手加入。
+
 ## Release 类型
 
 ### Major Release
@@ -129,6 +139,7 @@ Patch release 不得引入新的公共 operation、资源词汇、Adapter contra
 
 - release 索引文件必须放在 `docs/releases/` 下，使用 `vMAJOR.MINOR.PATCH.md` 命名，并以同名 `# Release vMAJOR.MINOR.PATCH` 标题开头。
 - release 模板必须包含版本类型、公共 contract 变更、tag / GitHub Release 与 published truth carrier 字段。
+- Python packaging 规划文档必须存在，并被版本管理规则引用。
 - roadmap 必须引用版本管理规则，`v1.x -> v2.0.0` 路线必须保留 `Stabilization Gate` 与 `v1.10.0` 语义。
 - 声明 tag / GitHub Release / 发布完成事实的 release 文档必须有 published truth carrier 类章节。
 - 顶层定位文档不得重新引入含混应用化定位短语。
@@ -168,6 +179,7 @@ CI 不能替代人工判断以下事项：
 - `vision.md` 定义长期定位与边界。
 - `docs/roadmap-v0-to-v1.md` 定义 `v0.x -> v1.0.0` Core stable 路线。
 - `docs/roadmap-v1-to-v2.md` 定义 `v1.x -> v2.0.0` runtime capability contract 扩展路线。
+- `docs/process/python-packaging.md` 定义 Python package distribution artifact 的引入边界。
 - `docs/releases/` 承载 release 索引与 published truth carrier。
 - `docs/sprints/` 承载 sprint 执行轮次索引。
 - `docs/process/delivery-funnel.md` 定义交付漏斗。
