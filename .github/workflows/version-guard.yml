@@ -9,6 +9,7 @@ on:
       - "AGENTS.md"
       - "docs/roadmap-*.md"
       - "docs/process/version-management.md"
+      - "docs/process/python-packaging.md"
       - "docs/process/delivery-funnel.md"
       - "docs/releases/**"
       - "scripts/version_guard.py"

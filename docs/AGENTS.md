@@ -14,6 +14,7 @@ Syvert 的通用治理 runtime 由 Loom 承接；`.loom/companion/` 记录 Loom 
 - `docs/roadmap-v0-to-v1.md`：阶段目标与版本边界
 - `docs/roadmap-v1-to-v2.md`：`v1.0.0` 之后的 runtime capability contract、资源治理与 Adapter / Provider 执行表面扩展路线
 - `docs/process/version-management.md`：版本语义、release closeout、tag 与 GitHub Release 管理规则
+- `docs/process/python-packaging.md`：Python package 分发物的引入边界、版本来源与发布渠道规则
 - `docs/releases/`：release 聚合索引与模板
 - `docs/sprints/`：sprint 聚合索引与模板
 - `docs/process/delivery-funnel.md`：唯一交付漏斗

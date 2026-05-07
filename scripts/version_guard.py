@@ -130,9 +130,32 @@ def validate_version_management_doc(repo_root: Path) -> list[str]:
         "runtime schema version",
         "v2.0.0",
         "docs/roadmap-v1-to-v2.md",
+        "docs/process/python-packaging.md",
+        "Python package",
     )
     for item in contains_all(content, required):
         errors.append(f"`docs/process/version-management.md` 缺少关键版本语义：`{item}`")
+    return errors
+
+
+def validate_python_packaging_doc(repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    path = require_file(repo_root, "docs/process/python-packaging.md", errors)
+    if not path.exists():
+        return errors
+
+    content = read_text(path)
+    required = (
+        "package publish 不是 release 完成的默认条件",
+        "Python package version 必须从 Git tag 派生",
+        "禁止在 `syvert/__init__.py` 手写",
+        "pyproject.toml",
+        "python -m build",
+        "GitHub Release",
+        "PyPI / GitHub Packages 发布必须作为独立 FR 批准",
+    )
+    for item in contains_all(content, required):
+        errors.append(f"`docs/process/python-packaging.md` 缺少 Python packaging 关键语义：`{item}`")
     return errors
 
 
@@ -161,7 +184,10 @@ def validate_workflow(repo_root: Path) -> list[str]:
     if not workflow.exists():
         return ["缺少 CI 门禁：`.github/workflows/version-guard.yml`"]
     content = read_text(workflow)
-    missing = contains_all(content, ("scripts/version_guard.py", "pull_request", "docs/releases/**"))
+    missing = contains_all(
+        content,
+        ("scripts/version_guard.py", "pull_request", "docs/releases/**", "docs/process/python-packaging.md"),
+    )
     return [f"`.github/workflows/version-guard.yml` 缺少：`{item}`" for item in missing]
 
 
@@ -187,6 +213,7 @@ def validate_forbidden_positioning(repo_root: Path) -> list[str]:
 def validate_repository(repo_root: Path) -> list[str]:
     errors: list[str] = []
     errors.extend(validate_version_management_doc(repo_root))
+    errors.extend(validate_python_packaging_doc(repo_root))
     errors.extend(validate_roadmap_refs(repo_root))
     errors.extend(validate_release_docs(repo_root))
     errors.extend(validate_workflow(repo_root))
