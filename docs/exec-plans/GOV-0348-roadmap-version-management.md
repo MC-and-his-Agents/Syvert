@@ -17,7 +17,7 @@
 
 - 规范 Syvert `v0.x -> v1.0.0` 与 `v1.x -> v2.0.0` 路线边界。
 - 明确 `v1.0.0` 是 Core stable，不是上层应用完成版。
-- 明确 `v2.0.0` 由 runtime capability contract 稳定门禁触发，不由 `v1.9` 自动触发。
+- 明确 `v2.0.0` 由 runtime capability contract 稳定门禁触发，不由 `v1.9.0` 自动触发。
 - 建立版本管理规则、version guard CI、Python packaging 防遗忘规划与 PR class policy 修正。
 
 ## 范围
