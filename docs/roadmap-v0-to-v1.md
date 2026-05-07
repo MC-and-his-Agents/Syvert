@@ -420,7 +420,7 @@ Syvert Adapter
 - 扩展账号凭据、会话健康、资源租约、资源证据与资源治理边界
 - 扩展批量执行、定时执行、dataset sink 等底座运行时能力
 - 评估 adapter 是否从主仓拆出独立仓库
-- 扩展 provider SDK、compatibility matrix、selector / fallback 策略；这些都必须通过独立 FR 批准
+- 扩展 provider SDK 与 compatibility matrix；Core 级 provider selector / fallback / marketplace 继续不属于 Syvert 主仓 v1.x 路线
 
 详细路线见 `docs/roadmap-v1-to-v2.md`。该路线只规划 Syvert 底座能力扩展，不规划上层应用或产品仓库。
 

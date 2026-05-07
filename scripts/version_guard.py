@@ -72,9 +72,29 @@ def validate_release_truth_carrier(release_file: Path, repo_root: Path) -> list[
     content = read_text(release_file)
     relative_path = release_file.relative_to(repo_root)
     has_publication_claim = has_release_publication_claim(content)
-    if has_publication_claim and not TRUTH_HEADING_RE.search(content):
+    if not has_publication_claim:
+        return []
+    if not TRUTH_HEADING_RE.search(content):
         return [f"`{relative_path}` 声明发布 / tag / GitHub Release 事实时必须有 published truth carrier 类章节"]
-    return []
+    if is_legacy_release_index(release_file):
+        return []
+
+    errors: list[str] = []
+    if "tag target" not in content:
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `tag target`")
+    if "GitHub Release URL" not in content and "/releases/tag/" not in content:
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `GitHub Release URL`")
+    if "published at" not in content:
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `published at`")
+    return errors
+
+
+def is_legacy_release_index(release_file: Path) -> bool:
+    match = RELEASE_FILE_RE.match(release_file.name)
+    if not match:
+        return False
+    version = tuple(int(part) for part in match.groups())
+    return version < (0, 8, 0)
 
 
 def has_release_publication_claim(content: str) -> bool:
@@ -205,7 +225,7 @@ def validate_roadmap_refs(repo_root: Path) -> list[str]:
 
     if roadmap_v1.exists():
         content = read_text(roadmap_v1)
-        for item in ("docs/process/version-management.md", "Stabilization Gate", "v1.10", "runtime capability contract"):
+        for item in ("docs/process/version-management.md", "Stabilization Gate", "v1.10.0", "runtime capability contract"):
             if item not in content:
                 errors.append(f"`docs/roadmap-v1-to-v2.md` 缺少 v1.x 到 v2.0.0 关键语义：`{item}`")
 

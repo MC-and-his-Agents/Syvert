@@ -58,7 +58,7 @@ v1.0.0
 
 docs/process/version-management.md
 Stabilization Gate
-v1.10
+v1.10.0
 runtime capability contract
 """,
     )
@@ -213,6 +213,43 @@ class VersionGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
 
         self.assertTrue(any("published truth carrier" in error for error in errors))
+
+    def test_published_truth_carrier_requires_truth_triple(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## Published truth carrier
+
+- tag target：`abc`
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("GitHub Release URL" in error for error in errors))
+        self.assertTrue(any("published at" in error for error in errors))
+
+    def test_legacy_release_index_truth_triple_is_deferred(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v0.7.0.md",
+                """# Release v0.7.0
+
+## 当前发布状态
+
+- GitHub Release `v0.7.0` 已创建：https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.7.0
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertEqual(errors, [])
 
     def test_github_release_created_claim_requires_truth_carrier(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
