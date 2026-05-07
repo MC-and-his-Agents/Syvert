@@ -79,6 +79,7 @@ version-management.md
 - 是否改变公共 contract：是 / 否
 - 是否需要 tag / GitHub Release：是 / 否
 - published truth carrier
+- 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 - docs/process/version-management.md
 """,
     )
@@ -150,15 +151,8 @@ class VersionGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
             write_valid_version_fixture(repo)
-            write(
-                repo / "docs/releases/v1.1.0.md",
-                """# Release v1.1.0
-
-## 版本管理
-
-- 是否需要 tag / GitHub Release：是 / 否
-""",
-            )
+            template = (repo / "docs/releases/_template.md").read_text(encoding="utf-8")
+            write(repo / "docs/releases/v1.1.0.md", template.replace("vX.Y.Z", "v1.1.0"))
 
             errors = validate_repository(repo)
 
@@ -185,6 +179,24 @@ class VersionGuardTests(unittest.TestCase):
 ## 当前状态
 
 - tag target：`abc`
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("published truth carrier" in error for error in errors))
+
+    def test_github_release_created_claim_requires_truth_carrier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- GitHub Release `v1.1.0` 已创建：https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.1.0
 """,
             )
 

@@ -20,6 +20,12 @@
 - 是否需要 tag / GitHub Release：是 / 否
 - 发布完成后必须回写 published truth carrier；规则见 `docs/process/version-management.md`
 
+## Published truth carrier
+
+- tag target：
+- GitHub Release URL：
+- published at：
+
 ## 纳入事项
 
 - `ITEM-KEY`：关联 Issue / PR / spec / exec-plan

@@ -50,11 +50,12 @@ Syvert 继续保留 repo-owned residue：产品使命、roadmap、release / spri
 2. [vision.md](./vision.md)
 3. [docs/roadmap-v0-to-v1.md](./docs/roadmap-v0-to-v1.md)
 4. [docs/roadmap-v1-to-v2.md](./docs/roadmap-v1-to-v2.md)
-5. [WORKFLOW.md](./WORKFLOW.md)
-6. [docs/AGENTS.md](./docs/AGENTS.md)
-7. [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
-8. [spec_review.md](./spec_review.md)
-9. [code_review.md](./code_review.md)
+5. [docs/process/version-management.md](./docs/process/version-management.md)
+6. [WORKFLOW.md](./WORKFLOW.md)
+7. [docs/AGENTS.md](./docs/AGENTS.md)
+8. [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
+9. [spec_review.md](./spec_review.md)
+10. [code_review.md](./code_review.md)
 
 ## 读取顺序
 
@@ -64,6 +65,7 @@ Syvert 继续保留 repo-owned residue：产品使命、roadmap、release / spri
 2. [vision.md](./vision.md)
 3. [docs/roadmap-v0-to-v1.md](./docs/roadmap-v0-to-v1.md)
 4. [docs/roadmap-v1-to-v2.md](./docs/roadmap-v1-to-v2.md)
+5. [docs/process/version-management.md](./docs/process/version-management.md)
 
 讨论流程、审查与合入时：
 

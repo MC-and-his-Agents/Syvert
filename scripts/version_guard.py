@@ -17,10 +17,12 @@ TRUTH_HEADING_RE = re.compile(
     r"^## (Published truth carrier|当前发布完成真相|当前发布与 closeout 状态|当前发布状态|当前收口事实|完成依据)$",
     re.MULTILINE,
 )
-PUBLICATION_CLAIM_RE = re.compile(
-    r"(tag target\s*[:：]|annotated tag(?: object)?\s*[:：]|published at\s+`?\d{4}-|"
-    r"GitHub Release\s*[:：].*https://github\.com/.+/releases/tag/v|发布完成)",
-    re.IGNORECASE | re.DOTALL,
+TAG_TARGET_RE = re.compile(r"tag target\s*[:：]", re.IGNORECASE)
+ANNOTATED_TAG_RE = re.compile(r"annotated tag(?: object)?\s*[:：]", re.IGNORECASE)
+PUBLISHED_AT_RE = re.compile(r"published at\s+`?\d{4}-", re.IGNORECASE)
+GITHUB_RELEASE_FACT_RE = re.compile(
+    r"GitHub Release.*(https://github\.com/.+/releases/tag/v|已创建|已发布|published)",
+    re.IGNORECASE,
 )
 FORBIDDEN_POSITIONING_PHRASES = (
     "Application Capability Expansion",
@@ -63,10 +65,28 @@ def validate_release_filename_and_title(release_file: Path, repo_root: Path) -> 
 def validate_release_truth_carrier(release_file: Path, repo_root: Path) -> list[str]:
     content = read_text(release_file)
     relative_path = release_file.relative_to(repo_root)
-    has_publication_claim = bool(PUBLICATION_CLAIM_RE.search(content))
+    has_publication_claim = has_release_publication_claim(content)
     if has_publication_claim and not TRUTH_HEADING_RE.search(content):
         return [f"`{relative_path}` 声明发布 / tag / GitHub Release 事实时必须有 published truth carrier 类章节"]
     return []
+
+
+def has_release_publication_claim(content: str) -> bool:
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or "发布完成后" in line:
+            continue
+        if TAG_TARGET_RE.search(line):
+            return True
+        if ANNOTATED_TAG_RE.search(line):
+            return True
+        if PUBLISHED_AT_RE.search(line):
+            return True
+        if GITHUB_RELEASE_FACT_RE.search(line):
+            return True
+        if line.startswith(("- 发布完成", "* 发布完成", "发布完成")):
+            return True
+    return False
 
 
 def validate_release_docs(repo_root: Path) -> list[str]:

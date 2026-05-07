@@ -49,7 +49,7 @@
 
 - 标准 worktree `issue-348-task` 已创建。
 - 当前路线图、版本管理、version guard、Python packaging 规划和 policy 修正已迁移到标准 worktree 分支。
-- 等待创建 PR、运行 guardian，并在 checks 通过后执行受控合并。
+- PR `#349` 已创建；第二轮 guardian review 返回 `REQUEST_CHANGES`，当前正在处理 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断。
 
 ## 下一步动作
 
