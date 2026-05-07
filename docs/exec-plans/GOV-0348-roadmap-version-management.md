@@ -49,8 +49,9 @@
 
 - 标准 worktree `issue-348-task` 已创建。
 - 当前路线图、版本管理、version guard、Python packaging 规划和 policy 修正已迁移到标准 worktree 分支。
-- PR `#349` 已创建；guardian 已指出的 version guard、roadmap version 格式、release template、AGENTS 权威顺序、release published truth carrier 空占位校验与 exec-plan 状态一致性阻断均已修复。
-- 最新已推送自动化修复 head `1a3c044` 的本地门禁与 GitHub checks 已通过；本 checkpoint 仅更新 active recovery carrier，使恢复事实与当前 merge-gate 状态一致。
+- PR `#349` 已创建；guardian 已指出的 version guard、roadmap version 格式、release template、AGENTS 权威顺序、release published truth carrier 空占位校验、colon-style `published at` 识别、`v0.8.0` release closeout truth 与 exec-plan 状态一致性阻断均已修复。
+- 最新已验证非 metadata-only head 为 `fb58958cd3fbbaa9d740f740917c6bf1cba9f7e4`；该 head 修改 `docs/releases/v0.8.0.md`、`scripts/version_guard.py` 与 `tests/governance/test_version_guard.py`，本地门禁与 GitHub checks 均已通过。
+- 本 checkpoint 之后只允许 active recovery carrier 对齐更新；最终 merge gate 仍以 GitHub checks 与 guardian review 绑定的 live PR head 为真相。
 
 ## 下一步动作
 
@@ -69,6 +70,8 @@
 
 ## 已验证项
 
+覆盖 head：`fb58958cd3fbbaa9d740f740917c6bf1cba9f7e4`
+
 - `python3 -m unittest tests.governance.test_version_guard`
 - `python3 scripts/version_guard.py --mode ci`
 - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
@@ -78,6 +81,12 @@
 - `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
 - `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
 - `git diff --check`
+- GitHub checks for PR `#349` at `fb58958cd3fbbaa9d740f740917c6bf1cba9f7e4`：
+  - `Validate Commit Messages`
+  - `Validate Docs And Guard Scripts`
+  - `Validate Governance Tooling`
+  - `Validate Spec Review Boundaries`
+  - `Validate Version Management`
 
 ## 未决风险
 
@@ -90,6 +99,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 已验证自动化修复 head：`1a3c044621d5a53481821a73734c578131241fdb`
-- 本 recovery carrier 更新提交后，以 GitHub checks 与 guardian review 绑定的 live PR head 作为最终 merge gate 真相。
+- 已验证非 metadata-only head：`fb58958cd3fbbaa9d740f740917c6bf1cba9f7e4`
+- 本 recovery carrier 更新提交后，若 PR head 仅包含 exec-plan carrier 对齐，则继续以 `fb58958cd3fbbaa9d740f740917c6bf1cba9f7e4` 作为实现 / 文档自动化变更的验证覆盖点。
 - 当前 PR head 由 guardian state / GitHub checks 绑定，不把本字段作为 merge gate 的 live head 替代来源。
