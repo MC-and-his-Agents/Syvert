@@ -10,7 +10,7 @@
 - 关联 spec：无（治理 / roadmap / version-management bootstrap 事项）
 - 关联 decision：`docs/decisions/ADR-GOV-0348-roadmap-version-management.md`
 - active 收口事项：`GOV-0348-roadmap-version-management`
-- 关联 PR：待创建
+- 关联 PR：`#349`
 - 状态：`active`
 
 ## 目标
@@ -88,5 +88,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `9c2846a7138d8ebcbbced796c4df437c5af0ec27`
+- `fd1128818d8ba059c170c1e8d1e3045d6f5d9fa5`
 - 当前 PR head 由 guardian state / GitHub checks 绑定，不把本字段作为 merge gate 的 live head 替代来源。
