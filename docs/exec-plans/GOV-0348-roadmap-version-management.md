@@ -49,12 +49,12 @@
 
 - 标准 worktree `issue-348-task` 已创建。
 - 当前路线图、版本管理、version guard、Python packaging 规划和 policy 修正已迁移到标准 worktree 分支。
-- PR `#349` 已创建；guardian 已指出的 version guard、roadmap version 格式、release template、AGENTS 权威顺序与 exec-plan 状态一致性阻断均已修复，等待最终 checks 与 guardian merge-gate 复核。
+- PR `#349` 已创建；guardian 已指出的 version guard、roadmap version 格式、release template、AGENTS 权威顺序、release published truth carrier 空占位校验与 exec-plan 状态一致性阻断均已修复。
+- 最新已推送自动化修复 head `1a3c044` 的本地门禁与 GitHub checks 已通过；本 checkpoint 仅更新 active recovery carrier，使恢复事实与当前 merge-gate 状态一致。
 
 ## 下一步动作
 
-- 提交并推送第三轮 guardian 阻断修复。
-- 确认本地门禁与 GitHub checks 均通过。
+- 等待最新 PR head 的 GitHub checks 全部通过。
 - 运行 `scripts/pr_guardian.py review 349 --post-review` 作为最终 merge gate 复核。
 - guardian 与 GitHub checks 通过后使用受控合并入口。
 
@@ -71,14 +71,17 @@
 
 - `python3 -m unittest tests.governance.test_version_guard`
 - `python3 scripts/version_guard.py --mode ci`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
 - `python3 -m unittest discover -s tests/governance -p 'test_*.py'`
 - `git diff --check`
 
 ## 未决风险
 
-- GitHub checks 与 guardian 仍需在 PR head 上重新执行。
+- 本 recovery carrier 更新推送后，GitHub checks 与 guardian 仍需在最新 PR head 上重新执行。
 - 本事项不会创建 Python package；后续若需要真实 packaging，必须进入独立 FR。
 
 ## 回滚方式
@@ -87,5 +90,6 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `adebaf055dad163a0a1961f74f5f9819b4dada5f`
+- 已验证自动化修复 head：`1a3c044621d5a53481821a73734c578131241fdb`
+- 本 recovery carrier 更新提交后，以 GitHub checks 与 guardian review 绑定的 live PR head 作为最终 merge gate 真相。
 - 当前 PR head 由 guardian state / GitHub checks 绑定，不把本字段作为 merge gate 的 live head 替代来源。
