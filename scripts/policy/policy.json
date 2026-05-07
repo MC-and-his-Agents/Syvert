@@ -70,6 +70,7 @@
         "framework-positioning.md",
         "adapter-sdk.md",
         "docs/roadmap-v0-to-v1.md",
+        "docs/roadmap-v1-to-v2.md",
         "docs/**/*.md"
       ]
     },
