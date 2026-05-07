@@ -4,6 +4,8 @@
 
 这份路线图定义了 Syvert 从第一个可运行的 Core 里程碑到稳定 `v1.0.0` 的预期演进路径。
 
+版本命名、release closeout、tag、GitHub Release、runtime schema version 与 SDK / contract version 的统一规则见 `docs/process/version-management.md`。
+
 它基于当前的方向决策：
 
 - Syvert 是一个承载互联网操作任务与资源的 Core 框架，而不是围绕单一采集切片堆叠实现的仓库。
@@ -35,7 +37,7 @@
 - `v0.8.0`：清理边界，稳定第三方 Adapter 接入路径与 Adapter / Provider 兼容性判断模型
 - `v0.9.0`：在真实外部 provider 验证样本上压测兼容性判断，并完成 SDK / 文档稳定化
 - `v1.0.0`：宣布 Core 稳定
-- `v1.x`：在稳定契约之后产品化扩展 provider 接入、更多能力与 adapter 仓库边界
+- `v1.x`：在稳定 Core 之上扩展 runtime capability contract、资源治理、Adapter / Provider 执行表面与 adapter 仓库边界，详见 `docs/roadmap-v1-to-v2.md`
 
 ## 跨版本强制 gate（自 v0.2.0 起）
 
@@ -373,6 +375,8 @@ Syvert Adapter
 
 宣布 Syvert Core 稳定。
 
+`v1.0.0` 是 Core stable 里程碑，不是上层应用完成版。Syvert 主仓继续聚焦 `Core + Adapter SDK + 参考适配器 + 探索/验证工具`；账号管理控制台、内容工作台、自动运营或其他产品形态应在独立上层仓库消费 Syvert，而不是进入本路线图的 `v1.0.0` 完成条件。
+
 ### v1.0.0 的要求
 
 - Core 边界稳定
@@ -396,6 +400,7 @@ Syvert Adapter
 - OpenCLI、bb-browser、agent-browser 或任何指定 provider 产品已被正式支持
 - 某一个 provider 可以覆盖所有 Adapter capability
 - 已具备 provider marketplace、自动 provider selector 或跨 provider fallback 策略
+- 已具备账号矩阵、内容库、发布中心、自动运营等上层应用
 
 它代表：
 
@@ -406,14 +411,18 @@ Syvert Adapter
 
 ### 目标
 
-在 `v1.0.0` 稳定契约之后扩展生态接入，而不是把指定 provider 产品支持写成 Core 稳定化主线目标。
+在 `v1.0.0` 稳定契约之后扩展底座能力，而不是把指定 provider 产品支持或上层应用功能写成 Core 稳定化主线目标。
 
 ### 候选方向
 
-- 基于 `v1.0.0` 已稳定的兼容性判断，产品化接入具体外部 provider
-- 为小红书、抖音新增搜索结果采集、评论采集、账号信息、发布、通知、浏览/点赞/收藏/评论等能力
+- 基于 `v1.0.0` 已稳定的兼容性判断，接入具体外部 provider 验证样本与 adapter-bound provider offer
+- 扩展公共 operation / adapter capability contract，例如搜索、列表、评论、媒体资产、发布等可治理运行时能力
+- 扩展账号凭据、会话健康、资源租约、资源证据与资源治理边界
+- 扩展批量执行、定时执行、dataset sink 等底座运行时能力
 - 评估 adapter 是否从主仓拆出独立仓库
 - 扩展 provider SDK、compatibility matrix、selector / fallback 策略；这些都必须通过独立 FR 批准
+
+详细路线见 `docs/roadmap-v1-to-v2.md`。该路线只规划 Syvert 底座能力扩展，不规划上层应用或产品仓库。
 
 ### 成功标准
 
@@ -421,6 +430,7 @@ Syvert Adapter
 - 新能力通过独立 FR 批准，不反向污染 `content_detail_by_url` 基线
 - adapter 仓库边界只在主仓 contract 稳定后调整
 - 任一 provider 产品的正式支持都绑定到明确的 Adapter capability、compatibility decision 与 evidence，而不是成为全局支持承诺
+- 上层应用继续作为独立仓库消费 Syvert，不反向进入 Core / Adapter SDK 路线
 
 
 ## 所有 v0.x 版本的开发规则
@@ -444,6 +454,8 @@ Syvert Adapter
 - 企业级 RBAC / 组织层级语义
 - 尚未被双参考适配器真实压力验证的高级资源抽象
 - 指定 provider 产品的官方支持清单与 provider marketplace
+- 搜索、评论、发布、批量执行、定时执行与 dataset sink 等新增 runtime capability contract
+- 账号矩阵、内容库、运营工作流或其他上层应用产品
 
 
 ## 总结
