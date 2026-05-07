@@ -20,6 +20,7 @@ TRUTH_HEADING_RE = re.compile(
 TAG_TARGET_RE = re.compile(r"tag target\s*[:：]", re.IGNORECASE)
 ANNOTATED_TAG_RE = re.compile(r"annotated tag(?: object)?\s*[:：]", re.IGNORECASE)
 PUBLISHED_AT_RE = re.compile(r"published at\s+`?\d{4}-", re.IGNORECASE)
+SECTION_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 GITHUB_RELEASE_FACT_RE = re.compile(
     r"GitHub Release.*(https://github\.com/.+/releases/tag/v|已创建|已发布|published)",
     re.IGNORECASE,
@@ -74,19 +75,57 @@ def validate_release_truth_carrier(release_file: Path, repo_root: Path) -> list[
     has_publication_claim = has_release_publication_claim(content)
     if not has_publication_claim:
         return []
-    if not TRUTH_HEADING_RE.search(content):
+    truth_section = extract_truth_section(content)
+    if truth_section is None:
         return [f"`{relative_path}` 声明发布 / tag / GitHub Release 事实时必须有 published truth carrier 类章节"]
     if is_legacy_release_index(release_file):
         return []
 
     errors: list[str] = []
-    if "tag target" not in content:
-        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `tag target`")
-    if "GitHub Release URL" not in content and "/releases/tag/" not in content:
-        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `GitHub Release URL`")
-    if "published at" not in content:
-        errors.append(f"`{relative_path}` 的 published truth carrier 缺少 `published at`")
+    tag_target = extract_field_value(truth_section, "tag target")
+    if not is_non_placeholder_value(tag_target) or release_file.stem not in tag_target:
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少有效 `tag target`")
+
+    release_url = extract_field_value(truth_section, "GitHub Release URL")
+    expected_release_path = f"/releases/tag/{release_file.stem}"
+    if not is_non_placeholder_value(release_url) or expected_release_path not in release_url:
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少有效 `GitHub Release URL`")
+
+    published_at = extract_field_value(truth_section, "published at")
+    if not is_non_placeholder_value(published_at) or not re.search(r"\d{4}-\d{2}-\d{2}", published_at):
+        errors.append(f"`{relative_path}` 的 published truth carrier 缺少有效 `published at`")
     return errors
+
+
+def extract_truth_section(content: str) -> str | None:
+    match = TRUTH_HEADING_RE.search(content)
+    if not match:
+        return None
+    next_heading = SECTION_HEADING_RE.search(content, match.end())
+    end = next_heading.start() if next_heading else len(content)
+    return content[match.end() : end]
+
+
+def extract_field_value(section: str, field_name: str) -> str:
+    field_re = re.compile(rf"^\s*[-*]?\s*{re.escape(field_name)}\s*[:：]\s*(.*?)\s*$", re.IGNORECASE)
+    for line in section.splitlines():
+        match = field_re.match(line)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def extract_colon_value(line: str) -> str:
+    if "：" in line:
+        return line.split("：", 1)[1].strip()
+    if ":" in line:
+        return line.split(":", 1)[1].strip()
+    return ""
+
+
+def is_non_placeholder_value(value: str) -> bool:
+    normalized = value.strip().strip("`").strip()
+    return normalized not in {"", "-", "—", "N/A", "n/a", "TBD", "TODO", "待补充"}
 
 
 def is_legacy_release_index(release_file: Path) -> bool:
@@ -102,9 +141,9 @@ def has_release_publication_claim(content: str) -> bool:
         line = raw_line.strip()
         if not line or "发布完成后" in line:
             continue
-        if TAG_TARGET_RE.search(line):
+        if TAG_TARGET_RE.search(line) and is_non_placeholder_value(extract_field_value(line, "tag target")):
             return True
-        if ANNOTATED_TAG_RE.search(line):
+        if ANNOTATED_TAG_RE.search(line) and is_non_placeholder_value(extract_colon_value(line)):
             return True
         if PUBLISHED_AT_RE.search(line):
             return True

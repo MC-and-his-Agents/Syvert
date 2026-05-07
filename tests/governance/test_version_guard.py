@@ -233,6 +233,52 @@ class VersionGuardTests(unittest.TestCase):
         self.assertTrue(any("GitHub Release URL" in error for error in errors))
         self.assertTrue(any("published at" in error for error in errors))
 
+    def test_published_truth_carrier_rejects_empty_placeholders(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## 当前状态
+
+- GitHub Release `v1.1.0` 已创建：https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.1.0
+
+## Published truth carrier
+
+- tag target：
+- GitHub Release URL：
+- published at：
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("tag target" in error for error in errors))
+        self.assertTrue(any("GitHub Release URL" in error for error in errors))
+        self.assertTrue(any("published at" in error for error in errors))
+
+    def test_published_truth_carrier_accepts_filled_truth_triple(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            write(
+                repo / "docs/releases/v1.1.0.md",
+                """# Release v1.1.0
+
+## Published truth carrier
+
+- tag target：`v1.1.0`
+- GitHub Release URL：https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.1.0
+- published at：2026-05-07T12:00:00Z
+""",
+            )
+
+            errors = validate_repository(repo)
+
+        self.assertEqual(errors, [])
+
     def test_legacy_release_index_truth_triple_is_deferred(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir)
