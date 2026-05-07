@@ -49,11 +49,12 @@ Syvert 继续保留 repo-owned residue：产品使命、roadmap、release / spri
 1. [AGENTS.md](./AGENTS.md)
 2. [vision.md](./vision.md)
 3. [docs/roadmap-v0-to-v1.md](./docs/roadmap-v0-to-v1.md)
-4. [WORKFLOW.md](./WORKFLOW.md)
-5. [docs/AGENTS.md](./docs/AGENTS.md)
-6. [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
-7. [spec_review.md](./spec_review.md)
-8. [code_review.md](./code_review.md)
+4. [docs/roadmap-v1-to-v2.md](./docs/roadmap-v1-to-v2.md)
+5. [WORKFLOW.md](./WORKFLOW.md)
+6. [docs/AGENTS.md](./docs/AGENTS.md)
+7. [docs/process/delivery-funnel.md](./docs/process/delivery-funnel.md)
+8. [spec_review.md](./spec_review.md)
+9. [code_review.md](./code_review.md)
 
 ## 读取顺序
 
@@ -62,6 +63,7 @@ Syvert 继续保留 repo-owned residue：产品使命、roadmap、release / spri
 1. [AGENTS.md](./AGENTS.md)
 2. [vision.md](./vision.md)
 3. [docs/roadmap-v0-to-v1.md](./docs/roadmap-v0-to-v1.md)
+4. [docs/roadmap-v1-to-v2.md](./docs/roadmap-v1-to-v2.md)
 
 讨论流程、审查与合入时：
 
@@ -82,6 +84,9 @@ Syvert 继续保留 repo-owned residue：产品使命、roadmap、release / spri
 
 - [WORKFLOW.md](./WORKFLOW.md)：agent 运行契约唯一来源
 - [.loom/companion/README.md](./.loom/companion/README.md)：Loom 读取 Syvert repo-specific residue 的入口
+- [docs/roadmap-v0-to-v1.md](./docs/roadmap-v0-to-v1.md)：`v0.x -> v1.0.0` Core stable 路线
+- [docs/roadmap-v1-to-v2.md](./docs/roadmap-v1-to-v2.md)：`v1.x -> v2.0.0` runtime capability contract 扩展路线
+- [docs/process/version-management.md](./docs/process/version-management.md)：版本语义、release closeout、tag 与 GitHub Release 管理规则
 - [docs/process/agent-loop.md](./docs/process/agent-loop.md)：checkpoint / resume / compact 协议
 - [docs/process/worktree-lifecycle.md](./docs/process/worktree-lifecycle.md)：workspace/worktree 生命周期协议
 - [docs/process/branch-retirement.md](./docs/process/branch-retirement.md)：分支归档与退役协议
