@@ -19,3 +19,7 @@
 ## 模板
 
 - 新 release 索引优先从 [./_template.md](./_template.md) 复制。
+
+## 自动化门禁
+
+- release 索引、模板与版本管理引用由 `scripts/version_guard.py` 校验，并通过 `.github/workflows/version-guard.yml` 在 PR 上执行。

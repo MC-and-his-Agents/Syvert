@@ -10,7 +10,7 @@ Syvert 同时存在多个版本层次，它们不能互相替代：
 
 | 层次 | 示例 | 职责 | 事实源 |
 |---|---|---|---|
-| Roadmap milestone | `v1.0.0`、`v2.0.0` | 描述阶段目标与稳定性声明 | `docs/roadmap-*.md` |
+| Roadmap milestone | `v1.0.0`、`v2.0.0` | 描述阶段目标与稳定性声明 | roadmap 系列文件 |
 | Release index | `docs/releases/v0.8.0.md` | 聚合某个 release 要证明什么、纳入哪些事项、完成依据 | `docs/releases/` |
 | Git tag | `v0.8.0` | 锚定发布提交 | Git annotated tag |
 | GitHub Release | `releases/tag/v0.8.0` | 对外发布记录 | GitHub Release |
@@ -112,7 +112,7 @@ Patch release 不得引入新的公共 operation、资源词汇、Adapter contra
 
 1. GitHub Phase / FR / Work Item closeout 已完成或有明确 pending 边界。
 2. 所有 release gate、contract test、双参考或等价真实证据已通过。
-3. `docs/releases/vX.Y.Z.md` 已记录目标判据、纳入事项、关联工件与 closeout evidence。
+3. `docs/releases/` 下的 `vX.Y.Z.md` release 索引已记录目标判据、纳入事项、关联工件与 closeout evidence。
 4. 发布提交已合入 `main`。
 5. `vX.Y.Z` annotated tag 已创建并推送。
 6. GitHub Release 已创建并指向同名 tag。
@@ -120,6 +120,27 @@ Patch release 不得引入新的公共 operation、资源词汇、Adapter contra
 8. 对应 closeout Issue / Work Item 与 PR 状态已经对账。
 
 若 tag / GitHub Release 已创建，但 release index 尚未回写 published truth，该 release 仍处于发布真相待对齐状态。
+
+## 自动化门禁
+
+版本管理规则同时由文档和 CI 共同约束。
+
+`scripts/version_guard.py` 负责可机械校验的版本一致性：
+
+- release 索引文件必须放在 `docs/releases/` 下，使用 `vMAJOR.MINOR.PATCH.md` 命名，并以同名 `# Release vMAJOR.MINOR.PATCH` 标题开头。
+- release 模板必须包含版本类型、公共 contract 变更、tag / GitHub Release 与 published truth carrier 字段。
+- roadmap 必须引用版本管理规则，`v1.x -> v2.0.0` 路线必须保留 `Stabilization Gate` 与 `v1.10.0` 语义。
+- 声明 tag / GitHub Release / 发布完成事实的 release 文档必须有 published truth carrier 类章节。
+- 顶层定位文档不得重新引入含混应用化定位短语。
+
+`.github/workflows/version-guard.yml` 在 PR 中执行该门禁。
+
+CI 不能替代人工判断以下事项：
+
+- 某个 major gate 是否已经实质满足。
+- 某个能力是否应进入 Core public contract，还是留在 Adapter / Provider 私有表面。
+- GitHub Phase / FR / Work Item 是否已经完成语义 closeout。
+- tag 与 GitHub Release 是否应在当前提交创建。
 
 ## v1.x 到 v2.0.0 规则
 
