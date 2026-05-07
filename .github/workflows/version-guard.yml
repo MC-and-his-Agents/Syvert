@@ -1,0 +1,37 @@
+name: Version Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "vision.md"
+      - "AGENTS.md"
+      - "docs/roadmap-*.md"
+      - "docs/process/version-management.md"
+      - "docs/process/delivery-funnel.md"
+      - "docs/releases/**"
+      - "scripts/version_guard.py"
+      - ".github/workflows/version-guard.yml"
+
+jobs:
+  version-guard:
+    name: Validate Version Management
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run version guard
+        run: |
+          set -euo pipefail
+          python3 scripts/version_guard.py --mode ci
