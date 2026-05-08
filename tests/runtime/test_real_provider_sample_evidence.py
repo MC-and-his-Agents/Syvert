@@ -81,6 +81,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
+        self.assertEqual(evidence["resource_lifecycle_disposition_hint"], "release")
         self.assertTrue(evidence["observability_carrier_checked"])
         self.assertNotIn("provider_key", evidence["core_surface_projection"])
 

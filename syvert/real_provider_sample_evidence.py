@@ -34,6 +34,21 @@ EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF = (
 FR0355_EVIDENCE_REF = "fr-0355:external-provider-sample-evidence:v0-9"
 FR0351_GATE_REF = "FR-0351:provider_compatibility_sample"
 FR0026_DECISION_EVIDENCE_REF = "fr-0026:runtime-tests:adapter-provider-compatibility-decision"
+EVIDENCE_ARTIFACT_PATH = (
+    "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
+)
+EVIDENCE_ARTIFACT_REQUIRED_ANCHORS = (
+    "## Decision Matrix",
+    "## Adapter-Bound Execution Evidence",
+    "## No-Leakage Evidence",
+    "## Validation Evidence",
+)
+VALIDATION_MODULE_PATHS = {
+    "tests.runtime.test_real_provider_sample_evidence": "tests/runtime/test_real_provider_sample_evidence.py",
+    "tests.runtime.test_real_adapter_regression": "tests/runtime/test_real_adapter_regression.py",
+    "tests.runtime.test_third_party_adapter_contract_entry": "tests/runtime/test_third_party_adapter_contract_entry.py",
+    "tests.runtime.test_cli_http_same_path": "tests/runtime/test_cli_http_same_path.py",
+}
 APPROVED_SLICE = {
     "capability": "content_detail",
     "operation": "content_detail_by_url",
@@ -68,6 +83,7 @@ def build_real_provider_sample_evidence_report(
         no_leakage=no_leakage,
         manifest=manifest,
     )
+    fail_closed_reasons = (*fail_closed_reasons, *_evidence_ref_fail_closed_reasons())
     status = "pass" if not fail_closed_reasons else "fail"
     report = {
         "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
@@ -381,6 +397,7 @@ def build_adapter_bound_execution_evidence(
         "provider_error_mapping_checked": True,
         "resource_profile_consumption_checked": True,
         "resource_lifecycle_disposition_checked": True,
+        "resource_lifecycle_disposition_hint": "release",
         "observability_carrier_checked": True,
         "observability": {
             "adapter_key": decision.adapter_key,
@@ -530,4 +547,24 @@ def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...
         reasons.append("manifest_approved_slice_drift")
     if manifest.get("provider_key") != EXTERNAL_PROVIDER_KEY:
         reasons.append("manifest_provider_key_drift")
+    return tuple(reasons)
+
+
+def _evidence_ref_fail_closed_reasons() -> tuple[str, ...]:
+    repo_root = Path(__file__).parents[1]
+    reasons: list[str] = []
+    artifact_path = repo_root / EVIDENCE_ARTIFACT_PATH
+    if not artifact_path.exists():
+        reasons.append("evidence_artifact_missing")
+    else:
+        artifact_text = artifact_path.read_text(encoding="utf-8")
+        for anchor in EVIDENCE_ARTIFACT_REQUIRED_ANCHORS:
+            if anchor not in artifact_text:
+                reasons.append(f"evidence_artifact_anchor_missing:{anchor}")
+    manifest_path = repo_root / "syvert/fixtures/v0_9_external_provider_sample_manifest.json"
+    if not manifest_path.exists():
+        reasons.append("external_provider_sample_manifest_missing")
+    for module_path in VALIDATION_MODULE_PATHS.values():
+        if not (repo_root / module_path).exists():
+            reasons.append(f"validation_module_missing:{module_path}")
     return tuple(reasons)
