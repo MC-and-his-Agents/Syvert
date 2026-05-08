@@ -40,6 +40,7 @@
   - gate 必须要求 provider 信息不得进入 Core routing、registry discovery、TaskRecord、resource lifecycle、release gate source report 或 Core-facing failed envelope category。
   - gate 必须要求 CLI / HTTP API / release gate 仍消费同一 Core runtime path，不允许绕过 TaskRecord、resource lease、result envelope 或 observability carrier。
   - gate 必须要求 `docs/releases/` 下的 `v1.0.0` release index、annotated tag `v1.0.0`、GitHub Release、closeout Issue / PR 与 published truth carrier 对齐。
+  - `release_truth_alignment` 是发布产物创建后的最终完成 gate；创建 release index、annotated tag 与 GitHub Release 前，必须先通过除 `release_truth_alignment` 外的所有 required gate item。
 - 契约需求：
   - 每个 gate item 必须声明 `status`，允许值为 `pass`、`fail`、`not_applicable`。
   - `not_applicable` 必须携带理由和引用证据；不得用于跳过本 FR 标记为 required 的 gate item。
@@ -109,6 +110,13 @@ Given `v1.0.0` tag 与 GitHub Release 已创建
 When `docs/releases/` 下的 `v1.0.0` release index 尚未回写 tag target、GitHub Release URL 与 published at
 Then `release_truth_alignment` 必须为 `fail`
 
+### 场景 8：release truth artifact 创建前只允许通过发布前 gate
+
+Given 除 `release_truth_alignment` 外所有 required gate item 均为 `pass`
+When `v1.0.0` release index、annotated tag 与 GitHub Release 尚未创建
+Then release closeout 可以进入 artifact creation step
+But `v1.0.0` release gate 仍不得返回最终 `pass`
+
 ## 异常与边界场景
 
 - 如果某 gate item 只有会话描述、未入库证据或未绑定 GitHub / Git / release artifact，应视为缺少证据。
@@ -128,7 +136,7 @@ Then `release_truth_alignment` 必须为 `fail`
 - [ ] formal spec 明确 API / CLI same Core path 是 release gate 条件。
 - [ ] formal spec 明确 release index、tag、GitHub Release 与 closeout truth 必须对齐。
 - [ ] formal spec 明确上层应用与 Python package publish 不属于 `v1.0.0` 默认完成条件。
-- [ ] roadmap 与 version-management 已引用本 gate。
+- [ ] roadmap 已引用本 gate。
 - [ ] 本事项不修改 runtime、Adapter、Provider 或 CI 代码。
 
 ## 依赖与外部前提

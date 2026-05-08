@@ -27,8 +27,8 @@
   - `docs/decisions/ADR-CHORE-0352-v1-core-stable-release-gate-spec.md`
   - `docs/exec-plans/CHORE-0352-v1-core-stable-release-gate-spec.md`
   - `docs/roadmap-v0-to-v1.md`
-  - `docs/process/version-management.md`
 - 本次不纳入：
+  - `docs/process/version-management.md` governance 文档
   - runtime、Adapter、Provider、tests、scripts 或 CI 代码
   - `v0.9.0` provider sample implementation
   - `v1.0.0` release closeout
@@ -38,14 +38,15 @@
 
 - GitHub Phase `#350`、FR `#351`、Work Item `#352` 已创建。
 - 标准 worktree `issue-352-v1-0-0-release-gate-formal-spec` 已创建。
-- `FR-0351` formal spec suite、ADR、exec-plan 与 roadmap / version-management 引用已落地。
-- 本地 spec / docs / workflow / governance 门禁已通过；提交后仍需重跑 PR scope guard。
+- `FR-0351` formal spec suite、ADR、exec-plan 与 roadmap 引用已落地。
+- 本地 spec / docs / workflow / governance / scope / whitespace 门禁已通过。
+- PR `#353` 已创建，GitHub checks 是当前 head 的 live verification entry。
 
 ## 下一步动作
 
-- 提交并推送分支。
-- 通过受控入口创建 PR。
-- 等待 GitHub checks 后运行 guardian merge gate。
+- 更新 PR 后等待 GitHub checks。
+- GitHub checks 全部通过后运行 guardian merge gate。
+- guardian 通过后执行受控合并与 closeout。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -58,12 +59,16 @@
 
 ## 已验证项
 
-- `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
-- `python3 scripts/docs_guard.py --mode ci`
-- `python3 scripts/workflow_guard.py --mode ci`
-- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
-- `git diff --check`
-- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD` 尚需在提交后执行；当前未提交时 `origin/main..HEAD` 为空，scope guard 无可校验 diff。
+- 本地验证入口：
+  - `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
+  - `python3 scripts/docs_guard.py --mode ci`：通过
+  - `python3 scripts/workflow_guard.py --mode ci`：通过
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
+  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`：通过，变更类别为 `docs, spec`
+  - `git diff --check origin/main..HEAD`：通过
+- GitHub verification entry：
+  - PR `#353` GitHub Checks 是当前 PR head 的 live evidence。
+  - guardian review packet 以 PR `#353` current head 为准；本文件不替代 guardian state 或 GitHub checks。
 
 ## 未决风险
 
@@ -72,7 +77,7 @@
 
 ## 回滚方式
 
-- 使用独立 revert PR 撤销本事项新增的 `FR-0351` formal spec、ADR、exec-plan 与 roadmap / version-management 引用。
+- 使用独立 revert PR 撤销本事项新增的 `FR-0351` formal spec、ADR、exec-plan 与 roadmap 引用。
 
 ## 最近一次 checkpoint 对应的 head SHA
 

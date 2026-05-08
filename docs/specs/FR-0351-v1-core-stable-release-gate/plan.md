@@ -15,14 +15,15 @@
 
 ## 分阶段拆分
 
-- 阶段 1：`#352` 收口本 formal spec suite，并更新 roadmap / version-management 引用。
+- 阶段 1：`#352` 收口本 formal spec suite，并更新 roadmap 引用。
 - 阶段 2：`v0.9.0` Phase / FR / Work Item 消费本 gate 中的 `provider_compatibility_sample` 要求，交付真实 provider 样本 evidence。
-- 阶段 3：`v1.0.0` release closeout Work Item 汇总本 gate 的所有 required evidence。
-- 阶段 4：如果所有 gate item 通过，创建 `v1.0.0` release index、annotated tag 与 GitHub Release，并回写 published truth carrier。
+- 阶段 3：`v1.0.0` release closeout Work Item 汇总除 `release_truth_alignment` 外的所有 required evidence，并准备 release index 草稿。
+- 阶段 4：如果发布前 required gate item 全部通过，创建 `v1.0.0` release index、annotated tag 与 GitHub Release，并回写 published truth carrier。
+- 阶段 5：最终验证 `release_truth_alignment`；只有 release index、tag、GitHub Release、closeout Issue / PR 与 published truth carrier 对齐后，才允许声明 `v1.0.0` 发布完成。
 
 ## 实现约束
 
-- `#352` 只修改 formal spec、roadmap、version-management、ADR 与 exec-plan。
+- `#352` 只修改 formal spec、roadmap、ADR 与 exec-plan。
 - `#352` 不修改 runtime、Adapter、Provider、tests、scripts 或 CI。
 - 本 FR 不批准 `v0.9.0` provider sample 的具体实现方案；该样本必须由独立 Phase / FR / Work Item 承接。
 - 本 FR 不批准 provider selector、fallback、marketplace、provider 产品白名单或上层应用能力。
@@ -56,6 +57,6 @@
 ## 进入实现前条件
 
 - [ ] 本 formal spec 已通过 spec review。
-- [ ] roadmap / version-management 已引用本 gate。
+- [ ] roadmap 已引用本 gate。
 - [ ] `v0.9.0` 真实 provider 样本进入执行前可以直接消费本 gate。
 - [ ] `v1.0.0` release closeout 可以直接引用本 gate checklist。
