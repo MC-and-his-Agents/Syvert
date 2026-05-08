@@ -13,6 +13,13 @@
 - approved slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
 - sample origin：`external_provider_sample`
 - provider support claim：`false`
+- status：`pass`
+- decision_matrix_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix`
+- adapter_bound_execution_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence`
+- no_leakage_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#no-leakage-evidence`
+- dual_reference_ref：`tests.runtime.test_real_adapter_regression`
+- third_party_adapter_entry_ref：`tests.runtime.test_third_party_adapter_contract_entry`
+- api_cli_same_core_path_ref：`tests.runtime.test_cli_http_same_path`
 
 ## Decision Matrix
 
@@ -38,7 +45,8 @@
   - resource lifecycle disposition hint：`release`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
-  - provider 错误必须经 Adapter 映射为 Core-facing `platform` failed envelope。
+  - provider failure input：`source_error=external_provider_timeout`
+  - Adapter-mapped failed envelope：`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。
 
 ## No-Leakage Evidence
@@ -51,6 +59,20 @@
 - TaskRecord
 - resource lifecycle
 - Core-facing failed envelope
+
+结果：
+
+| surface | status | forbidden_field_paths | forbidden_value_paths |
+|---|---|---|---|
+| `core_projection` | `passed` | `()` | `()` |
+| `registry_discovery` | `passed` | `()` | `()` |
+| `core_routing` | `passed` | `()` | `()` |
+| `task_record` | `passed` | `()` | `()` |
+| `resource_lifecycle` | `passed` | `()` | `()` |
+| `core_facing_failed_envelope` | `passed` | `()` | `()` |
+
+- provider_identity_in_core_surface：`false`
+- all_forbidden_paths_empty：`true`
 
 这些 surfaces 均不得出现 `provider_key`、`offer_id`、provider selector、fallback、routing、marketplace、provider lifecycle 或 resource supply 字段。
 

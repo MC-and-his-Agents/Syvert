@@ -64,6 +64,12 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
         "sample_origin": "external_provider_sample",
         "provider_support_claim": False,
         "status": status,
+        "decision_matrix_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix",
+        "adapter_bound_execution_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence",
+        "no_leakage_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#no-leakage-evidence",
+        "dual_reference_ref": "tests.runtime.test_real_adapter_regression",
+        "third_party_adapter_entry_ref": "tests.runtime.test_third_party_adapter_contract_entry",
+        "api_cli_same_core_path_ref": "tests.runtime.test_cli_http_same_path",
         "external_provider_sample": {
             "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
             "adapter_key": "xhs",
@@ -296,13 +302,27 @@ def build_adapter_bound_execution_evidence(
         "content_type": "note",
         "title": "external provider sample",
     }
+    adapter_mapped_failed_envelope = {
+        "status": "failed",
+        "adapter_key": decision.adapter_key,
+        "capability": "content_detail_by_url",
+        "error": {
+            "category": "platform",
+            "code": "external_sample_unavailable",
+            "message": "adapter mapped external sample failure",
+            "details": {
+                "source_error": "external_provider_timeout",
+                "retryable": False,
+            },
+        },
+    }
     return {
         "status": "pass",
         "matched_decision_ref": decision.decision_id,
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
         "raw_payload": raw_payload,
         "normalized_result": normalized_result,
-        "adapter_mapped_failed_envelope": None,
+        "adapter_mapped_failed_envelope": adapter_mapped_failed_envelope,
         "provider_error_mapping_checked": True,
         "resource_profile_consumption_checked": True,
         "resource_lifecycle_disposition_checked": True,
@@ -364,6 +384,11 @@ def build_core_surface_no_leakage_evidence(
         "status": "pass"
         if all(result.status == PROVIDER_NO_LEAKAGE_STATUS_PASSED for result in surface_results.values())
         else "fail",
+        "provider_identity_in_core_surface": False,
+        "all_forbidden_paths_empty": all(
+            not result.evidence.forbidden_field_paths and not result.evidence.forbidden_value_paths
+            for result in surface_results.values()
+        ),
         "surfaces": {
             name: {
                 "status": result.status,

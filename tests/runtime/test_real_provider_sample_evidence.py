@@ -62,6 +62,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["status"], "pass")
         self.assertEqual(evidence["raw_payload"]["provider_key"], EXTERNAL_PROVIDER_KEY)
         self.assertEqual(evidence["normalized_result"]["platform"], "xhs")
+        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["category"], "platform")
+        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
@@ -73,6 +75,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         evidence = build_core_surface_no_leakage_evidence(decision)
 
         self.assertEqual(evidence["status"], "pass")
+        self.assertFalse(evidence["provider_identity_in_core_surface"])
+        self.assertTrue(evidence["all_forbidden_paths_empty"])
         self.assertEqual(
             sorted(evidence["surfaces"]),
             [
@@ -93,6 +97,9 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["sample_origin"], "external_provider_sample")
         self.assertEqual(report["provider_support_claim"], False)
         self.assertEqual(report["consumed_gate_ref"], "FR-0351:provider_compatibility_sample")
+        self.assertEqual(report["dual_reference_ref"], "tests.runtime.test_real_adapter_regression")
+        self.assertEqual(report["third_party_adapter_entry_ref"], "tests.runtime.test_third_party_adapter_contract_entry")
+        self.assertEqual(report["api_cli_same_core_path_ref"], "tests.runtime.test_cli_http_same_path")
         self.assertEqual(report["decision_matrix"]["matched_case"]["decision_status"], "matched")
         self.assertEqual(report["decision_matrix"]["unmatched_case"]["decision_status"], "unmatched")
         self.assertEqual(

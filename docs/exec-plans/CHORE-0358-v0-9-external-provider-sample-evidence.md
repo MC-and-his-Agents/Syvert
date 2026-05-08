@@ -37,15 +37,14 @@
 
 - GitHub Work Item `#358` 已创建。
 - 标准 worktree `issue-358-v0-9-0-external-provider-sample-evidence` 已创建。
-- external provider sample evidence helper、tests、artifact 与 exec-plan 正在落地。
+- external provider sample evidence helper、tests、artifact 与 exec-plan 已落地。
+- PR `#359` 已创建；当前 head 的 live CI / guardian 状态以 GitHub checks 与 guardian state 为准。
 
 ## 下一步动作
 
-- 执行 targeted runtime tests。
-- 执行 dual reference、third-party entry、API / CLI same Core path 与 no-leakage 回归。
-- 执行 docs / governance / scope / whitespace gates。
-- 提交、推送、创建 PR。
-- GitHub checks 通过后运行 guardian。
+- 更新 PR 后等待 GitHub checks。
+- GitHub checks 全部通过后运行 guardian。
+- guardian 通过后执行受控合并。
 
 ## 当前 checkpoint 推进的 release 目标
 
