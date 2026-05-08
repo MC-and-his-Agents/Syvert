@@ -80,7 +80,8 @@
   - observability_carrier_checked：`true`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
-  - external sample failure input：`source_error=external_sample_timeout`
+  - provider-side failure input：`provider_side_error_code=provider_unavailable`、`source_error=external_sample_timeout`
+  - Adapter-owned mapping：`provider_unavailable -> external_sample_unavailable`
   - adapter_mapped_failed_envelope_ref：`external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope`
   - Adapter-mapped failed envelope：由 `execute_task_with_record()` 产出，`operation=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。

@@ -78,6 +78,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["category"], "platform")
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["capability"], "content_detail_by_url")
+        self.assertEqual(evidence["provider_error_mapping"]["provider_side_error_code"], "provider_unavailable")
+        self.assertEqual(evidence["provider_error_mapping"]["adapter_mapped_error_code"], "external_sample_unavailable")
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])

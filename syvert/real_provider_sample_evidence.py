@@ -434,6 +434,7 @@ def build_adapter_bound_execution_evidence(
             "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
         ),
         "adapter_mapped_failed_envelope": deepcopy(failed_envelope),
+        "provider_error_mapping": deepcopy(execution["failure"].get("provider_error_mapping", {})),
         "provider_error_mapping_checked": checks["provider_error_mapping_checked"],
         "resource_profile_consumption_checked": checks["resource_profile_consumption_checked"],
         "resource_lifecycle_disposition_checked": checks["resource_lifecycle_disposition_checked"],
@@ -519,6 +520,9 @@ def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, b
     failure = execution.get("failure") if isinstance(execution.get("failure"), Mapping) else {}
     success_envelope = success.get("envelope") if isinstance(success.get("envelope"), Mapping) else {}
     failed_envelope = failure.get("envelope") if isinstance(failure.get("envelope"), Mapping) else {}
+    provider_error_mapping = (
+        failure.get("provider_error_mapping") if isinstance(failure.get("provider_error_mapping"), Mapping) else {}
+    )
     failed_error = failed_envelope.get("error") if isinstance(failed_envelope.get("error"), Mapping) else {}
     failed_details = failed_error.get("details") if isinstance(failed_error.get("details"), Mapping) else {}
     success_trace_events = tuple(
@@ -531,6 +535,10 @@ def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, b
     failure_task_record = failure.get("task_record") if isinstance(failure.get("task_record"), Mapping) else {}
     return {
         "provider_error_mapping_checked": (
+            provider_error_mapping.get("provider_side_error_code") == "provider_unavailable"
+            and provider_error_mapping.get("adapter_mapped_error_code") == "external_sample_unavailable"
+            and provider_error_mapping.get("source_error") == "external_sample_timeout"
+            and
             failed_envelope.get("status") == "failed"
             and failed_envelope.get("capability") == "content_detail_by_url"
             and failed_error.get("category") == "platform"
@@ -569,6 +577,39 @@ def _trace_events_released_to_available(events: tuple[Mapping[str, Any], ...]) -
     return {"account", "proxy"}.issubset(released_resource_types)
 
 
+class ExternalProviderSampleError(Exception):
+    def __init__(self, *, code: str, message: str, details: Mapping[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.details = dict(details or {})
+
+
+class ExternalProviderSampleXhsAdapter(XhsAdapter):
+    def __init__(self, *, provider: Any) -> None:
+        super().__init__(provider=provider)
+        self.provider_error_mappings: list[dict[str, Any]] = []
+
+    def execute(self, request: Any) -> dict[str, Any]:
+        try:
+            return super().execute(request)
+        except ExternalProviderSampleError as error:
+            mapped = {
+                "provider_side_error_code": error.code,
+                "adapter_mapped_error_code": "external_sample_unavailable",
+                "source_error": error.details.get("source_error"),
+            }
+            self.provider_error_mappings.append(mapped)
+            raise PlatformAdapterError(
+                code="external_sample_unavailable",
+                message="adapter mapped external sample failure",
+                details={
+                    "source_error": "external_sample_timeout",
+                    "retryable": False,
+                },
+            ) from error
+
+
 class ExternalFixtureXhsProvider:
     def __init__(self, *, mode: str) -> None:
         self.mode = mode
@@ -584,9 +625,9 @@ class ExternalFixtureXhsProvider:
             }
         )
         if self.mode == "failure":
-            raise PlatformAdapterError(
-                code="external_sample_unavailable",
-                message="adapter mapped external sample failure",
+            raise ExternalProviderSampleError(
+                code="provider_unavailable",
+                message="external provider sample timed out",
                 details={"source_error": "external_sample_timeout", "retryable": False},
             )
         return XhsProviderResult(
@@ -627,8 +668,8 @@ def _cached_external_provider_sample_runtime_execution() -> dict[str, Any]:
         _seed_external_provider_sample_resources(resource_store)
         success_provider = ExternalFixtureXhsProvider(mode="success")
         failure_provider = ExternalFixtureXhsProvider(mode="failure")
-        success_adapter = XhsAdapter(provider=success_provider)
-        failure_adapter = XhsAdapter(provider=failure_provider)
+        success_adapter = ExternalProviderSampleXhsAdapter(provider=success_provider)
+        failure_adapter = ExternalProviderSampleXhsAdapter(provider=failure_provider)
         success = _execute_external_provider_sample(
             adapter=success_adapter,
             task_id="task-v0-9-sample-success",
@@ -653,6 +694,9 @@ def _cached_external_provider_sample_runtime_execution() -> dict[str, Any]:
             "failure": {
                 **failure,
                 "provider_calls": tuple(failure_provider.calls),
+                "provider_error_mapping": deepcopy(failure_adapter.provider_error_mappings[-1])
+                if failure_adapter.provider_error_mappings
+                else {},
             },
             "core_runtime_surfaces": {
                 "registry_discovery": {
