@@ -74,6 +74,9 @@
 - Guardian review on PR #389 at head `04746f5`
   - 结果：`REQUEST_CHANGES`。
   - 处理：把 FR-0387 formal spec suite 元数据绑定回 FR #387，并明确 malformed / unredacted / context-mismatched evidence 是 `invalid_contract`，不得作为 session invalidation 依据。
+- Guardian review on PR #389 at head `fae8b10`
+  - 结果：`REQUEST_CHANGES`。
+  - 处理：将 `evaluated_at` 移到 `ResourceAdmissionDecision`，并把 `unknown` 限定为 admission-time projection，不作为持久化 `ResourceHealthEvidence.status`。
 
 ## PR 计划
 

@@ -38,7 +38,7 @@
   - Core 可以保存、校验、脱敏、注入和基于证据判定 `CredentialMaterial`，但不得把 cookie、token、header、session object、sign request 参数或平台私有字段提升为共享 routing metadata。
   - `SessionHealth` 必须至少能区分可继续执行、过期或疑似过期、已失效、未知四类健康状态；未知状态不得被当作新鲜健康证明。
   - `ResourceHealthEvidence` 必须记录 evidence provenance、observed_at、resource binding、lease / task binding、adapter / capability context、health status、reason 与 redaction boundary。
-  - `healthy` evidence 必须带有可机器判定的 freshness boundary：`observed_at`、`expires_at` 与 `freshness_policy_ref`。在 admission evaluation time 已经达到或超过 `expires_at` 时，Core 必须把该 evidence 投影为 `stale`，不得继续当作 `healthy`。
+  - `healthy` evidence 必须带有可机器判定的 freshness boundary：`observed_at`、`expires_at` 与 `freshness_policy_ref`。Core 必须在 `ResourceAdmissionDecision.evaluated_at` 判定 freshness；若 `evaluated_at` 已经达到或超过 `expires_at`，必须把该 evidence 投影为 `stale`，不得继续当作 `healthy`。
   - Core 在资源 admission 前必须能消费最近有效的 health evidence；无法证明健康足够时必须 fail-closed 或拒绝把该资源注入需要健康凭据的执行路径。
   - Adapter 只能消费 Core 注入的 credential material，并通过标准诊断或资源处置提示反馈健康问题；最终 invalidation 与状态推进仍由 Core 执行。
   - health evidence 只能解释资源健康，不得被解释为 provider 产品支持、成功率、SLA 或 routing 优先级。
@@ -94,7 +94,7 @@ Then Core 必须拒绝 admission，但不得调用 `release(target_status_after_
 
 ### 场景 5：过期 healthy evidence 必须投影为 stale
 
-Given 某条 `ResourceHealthEvidence(status=healthy)` 带有 `expires_at`  
+Given 某条 `ResourceHealthEvidence(status=healthy)` 带有 `expires_at`，且 admission decision 带有 `evaluated_at`  
 When admission evaluation time 已经达到或超过 `expires_at`  
 Then Core 必须把该 evidence 投影为 `stale` 并拒绝需要 fresh credential 的 admission
 
@@ -119,7 +119,7 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
   - evidence payload 含 raw secret、cookie、token、header value 或 session dump 时必须 `invalid_contract`，不得触发 session invalidation。
   - Provider offer 或 Adapter requirement 暴露 credential/session 私有字段时必须 invalid。
 - 边界场景：
-  - `SessionHealth=unknown` 可以作为“需要进一步证明”的状态存在，但不得提升为健康证明。
+  - `SessionHealth=unknown` 可以作为“需要进一步证明”的 admission-time projection 存在，但不得写成持久化 `ResourceHealthEvidence.status`，也不得提升为健康证明。
   - `stale` 或 `expired` 不自动要求本 FR 定义刷新机制，也不自动等同于 `INVALID`；恢复、刷新、重新登录与人工修复属于后续 FR。
   - `CredentialMaterial` 是 account material 的治理边界，不改变 `proxy` material 的最小 contract。
   - 本 FR 不定义新的 public operation，也不改变 `content_detail_by_url` stable baseline。

@@ -19,6 +19,7 @@
   - `unknown`：没有可验证 evidence，或 evidence 无法绑定到当前 resource / lease / task context。
 - 约束：
   - `unknown` 不等于 `healthy`。
+  - `unknown` 是 admission-time projection，不是持久化 `ResourceHealthEvidence.status`。
   - `stale` / `invalid` 不定义自动刷新、重新登录或修复流程。
   - `SessionHealth` 不得写入 `ResourceRecord.status`，也不得扩张 `AVAILABLE / IN_USE / INVALID` 状态集合。
 
@@ -29,11 +30,10 @@
   - `evidence_id`：稳定非空标识。
   - `resource_id`：绑定的 resource。
   - `resource_type`：当前只允许 `account`。
-  - `status`：`healthy`、`stale`、`invalid`、`unknown`。
+  - `status`：`healthy`、`stale`、`invalid`。
   - `observed_at`：RFC3339 UTC 时间戳。
   - `expires_at`：RFC3339 UTC 时间戳；`status=healthy` 时必须存在。
   - `freshness_policy_ref`：非空 policy 标识，用于说明 `expires_at` 如何被计算；本 FR 不定义自动刷新。
-  - `evaluated_at`：admission evaluation time；用于把 evidence 投影为 admission-time health。
   - `provenance`：`core_validation`、`adapter_diagnostic`、`provider_response_projection`、`operator_assertion` 等来源分类。
   - `task_id`、`lease_id`、`bundle_id`：有执行上下文时必须绑定；库存前置检查可显式为空。
   - `adapter_key`、`capability`、`operation`：用于证明 evidence 适用的 execution slice。
@@ -43,7 +43,7 @@
 - 约束：
   - 缺少 provenance、observed_at、resource binding 或 redaction status 时必须 `invalid_contract`。
   - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明，且必须按 evidence contract invalid fail-closed。
-  - 当 `evaluated_at >= expires_at` 时，admission 必须把该 evidence 投影为 `stale`。
+  - evidence truth 不得携带 `evaluated_at`；`evaluated_at` 属于 admission decision。
   - evidence 不得包含 raw credential material；未脱敏 evidence 必须 `invalid_contract`。
   - evidence 可以引用 `ResourceLease` / `ResourceTraceEvent`，但不得替代它们。
   - `invalid_contract` evidence 不是 `SessionHealth=invalid`，不得作为 session invalidation 依据。
@@ -60,12 +60,16 @@
   - `requested_slots`
   - `resource_ids`
   - `health_evidence_refs`
+  - `evaluated_at`：RFC3339 UTC admission evaluation time。
+  - `projected_session_health`：`healthy`、`stale`、`invalid`、`unknown`。
   - `decision_status`：`admitted`、`rejected`、`invalid_contract`。
   - `failure_reason`
   - `fail_closed`
 - 约束：
   - 所有要求健康 credential 的 admission 都必须能追溯到有效 evidence 或显式 fail-closed。
   - `rejected` 表示资源或健康前提不足；`invalid_contract` 表示 evidence、metadata 或上下文违反契约。
+  - 当 `evaluated_at >= evidence.expires_at` 时，admission 必须把 `healthy` evidence 投影为 `projected_session_health=stale`。
+  - 没有可验证 evidence 时，admission 必须投影为 `projected_session_health=unknown` 并 fail-closed。
   - pre-admission `invalid` evidence 没有 active lease 时只能产生 `rejected` / `invalid_contract` admission result，不得直接推进 `ResourceRecord.status`。
   - malformed、unredacted 或 context-mismatched evidence 必须产生 `invalid_contract`，不得映射为 `credential_session_invalid`。
   - admission failure reasons 可以包括 `credential_session_stale`、`credential_session_unknown`、`pre_admission_session_invalid`、`credential_material_contract_invalid`、`health_evidence_contract_invalid`、`health_context_mismatch`。
