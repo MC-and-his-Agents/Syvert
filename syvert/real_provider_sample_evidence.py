@@ -86,6 +86,13 @@ REQUIRED_VALIDATION_COMMANDS = (
     ),
 )
 NESTED_VALIDATION_ENV = "SYVERT_REAL_PROVIDER_SAMPLE_NESTED_VALIDATION"
+REQUIRED_CORE_NO_LEAKAGE_SURFACES = (
+    "registry_discovery",
+    "core_routing",
+    "task_record",
+    "resource_lifecycle",
+    "core_facing_failed_envelope",
+)
 APPROVED_SLICE = {
     "capability": "content_detail",
     "operation": "content_detail_by_url",
@@ -402,6 +409,7 @@ def build_adapter_bound_execution_evidence(
     execution = run_external_provider_sample_runtime_execution()
     success_envelope = execution["success"]["envelope"]
     failed_envelope = execution["failure"]["envelope"]
+    checks = _adapter_bound_execution_checks(execution)
     evidence_status = (
         "pass"
         if (
@@ -409,6 +417,7 @@ def build_adapter_bound_execution_evidence(
             and failed_envelope.get("status") == "failed"
             and execution["success"]["provider_calls"]
             and execution["failure"]["provider_calls"]
+            and all(checks.values())
         )
         else "fail"
     )
@@ -418,18 +427,18 @@ def build_adapter_bound_execution_evidence(
         "matched_decision_id": decision.decision_id,
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
         "raw_payload_ref": "external-fixture://content-detail/success#raw",
-        "raw_payload": success_envelope.get("raw"),
+        "raw_payload": deepcopy(success_envelope.get("raw")),
         "normalized_result_ref": "external-fixture://content-detail/success#normalized",
-        "normalized_result": success_envelope.get("normalized"),
+        "normalized_result": deepcopy(success_envelope.get("normalized")),
         "adapter_mapped_failed_envelope_ref": (
             "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
         ),
-        "adapter_mapped_failed_envelope": failed_envelope,
-        "provider_error_mapping_checked": True,
-        "resource_profile_consumption_checked": bool(execution["success"]["resource_trace_events"]),
-        "resource_lifecycle_disposition_checked": True,
+        "adapter_mapped_failed_envelope": deepcopy(failed_envelope),
+        "provider_error_mapping_checked": checks["provider_error_mapping_checked"],
+        "resource_profile_consumption_checked": checks["resource_profile_consumption_checked"],
+        "resource_lifecycle_disposition_checked": checks["resource_lifecycle_disposition_checked"],
         "resource_lifecycle_disposition_hint": "release",
-        "observability_carrier_checked": bool(execution["success"]["task_record"]),
+        "observability_carrier_checked": checks["observability_carrier_checked"],
         "runtime_execution_ref": execution["runtime_execution_ref"],
         "success_task_record_ref": execution["success"]["task_record_ref"],
         "failure_task_record_ref": execution["failure"]["task_record_ref"],
@@ -445,7 +454,7 @@ def build_adapter_bound_execution_evidence(
             "#core-surface-projection"
         ),
         "core_surface_projection": _core_surface_status_projection(decision),
-        "core_runtime_surfaces": execution["core_runtime_surfaces"],
+        "core_runtime_surfaces": deepcopy(execution["core_runtime_surfaces"]),
     }
 
 
@@ -455,54 +464,21 @@ def build_core_surface_no_leakage_evidence(
     surface_overrides: Mapping[str, Any] | None = None,
     adapter_bound_execution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if adapter_bound_execution is None:
+        adapter_bound_execution = build_adapter_bound_execution_evidence(decision)
     execution = (
         adapter_bound_execution.get("core_runtime_surfaces")
         if isinstance(adapter_bound_execution, Mapping)
         else None
     )
     if isinstance(execution, Mapping):
-        surfaces = dict(execution)
+        surfaces = deepcopy(dict(execution))
         surfaces["core_projection"] = _core_surface_status_projection(decision)
     else:
-        surfaces = {
-        "core_projection": _core_surface_status_projection(decision),
-        "registry_discovery": {
-            "adapter_key": "xhs",
-            "capabilities": ("content_detail",),
-            "operations": ("content_detail_by_url",),
-            "targets": ("url",),
-            "collection_modes": ("hybrid",),
-        },
-        "core_routing": {
-            "adapter_key": "xhs",
-            "operation": "content_detail_by_url",
-            "dispatch_status": "adapter_selected",
-        },
-        "task_record": {
-            "task_id": "task-v0-9-external-provider-sample",
-            "adapter_key": "xhs",
-            "capability": "content_detail",
-            "operation": "content_detail_by_url",
-            "status": "success",
-        },
-        "resource_lifecycle": {
-            "bundle_id": "bundle-v0-9-external-provider-sample",
-            "adapter_key": "xhs",
-            "capability": "content_detail",
-            "operation": "content_detail_by_url",
-            "requested_slots": ("account", "proxy"),
-            "disposition_hint": "release",
-        },
-        "core_facing_failed_envelope": {
-            "error": {
-                "category": "platform",
-                "code": "external_sample_unavailable",
-                "message": "adapter mapped external sample failure",
-            }
-        },
-        }
+        surfaces = {"core_projection": _core_surface_status_projection(decision)}
     if surface_overrides:
         surfaces.update(surface_overrides)
+    missing_surfaces = tuple(surface for surface in REQUIRED_CORE_NO_LEAKAGE_SURFACES if surface not in surfaces)
     surface_results = {
         name: guard_core_provider_no_leakage(surface_name=name, surface=surface, decision=decision)
         for name, surface in surfaces.items()
@@ -513,14 +489,16 @@ def build_core_surface_no_leakage_evidence(
     )
     return {
         "status": "pass"
-        if all(result.status == PROVIDER_NO_LEAKAGE_STATUS_PASSED for result in surface_results.values())
+        if not missing_surfaces
+        and all(result.status == PROVIDER_NO_LEAKAGE_STATUS_PASSED for result in surface_results.values())
         else "fail",
         "provider_identity_in_core_surface": provider_identity_in_core_surface,
-        "registry_discovery_checked": True,
-        "core_routing_checked": True,
-        "task_record_checked": True,
-        "resource_lifecycle_checked": True,
-        "failed_envelope_checked": True,
+        "registry_discovery_checked": "registry_discovery" in surfaces,
+        "core_routing_checked": "core_routing" in surfaces,
+        "task_record_checked": "task_record" in surfaces,
+        "resource_lifecycle_checked": "resource_lifecycle" in surfaces,
+        "failed_envelope_checked": "core_facing_failed_envelope" in surfaces,
+        "missing_required_surfaces": missing_surfaces,
         "all_forbidden_paths_empty": all(
             not result.evidence.forbidden_field_paths and not result.evidence.forbidden_value_paths
             for result in surface_results.values()
@@ -534,6 +512,61 @@ def build_core_surface_no_leakage_evidence(
             for name, result in surface_results.items()
         },
     }
+
+
+def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, bool]:
+    success = execution.get("success") if isinstance(execution.get("success"), Mapping) else {}
+    failure = execution.get("failure") if isinstance(execution.get("failure"), Mapping) else {}
+    success_envelope = success.get("envelope") if isinstance(success.get("envelope"), Mapping) else {}
+    failed_envelope = failure.get("envelope") if isinstance(failure.get("envelope"), Mapping) else {}
+    failed_error = failed_envelope.get("error") if isinstance(failed_envelope.get("error"), Mapping) else {}
+    failed_details = failed_error.get("details") if isinstance(failed_error.get("details"), Mapping) else {}
+    success_trace_events = tuple(
+        event for event in success.get("resource_trace_events", ()) if isinstance(event, Mapping)
+    )
+    failure_trace_events = tuple(
+        event for event in failure.get("resource_trace_events", ()) if isinstance(event, Mapping)
+    )
+    success_task_record = success.get("task_record") if isinstance(success.get("task_record"), Mapping) else {}
+    failure_task_record = failure.get("task_record") if isinstance(failure.get("task_record"), Mapping) else {}
+    return {
+        "provider_error_mapping_checked": (
+            failed_envelope.get("status") == "failed"
+            and failed_envelope.get("capability") == "content_detail_by_url"
+            and failed_error.get("category") == "platform"
+            and failed_error.get("code") == "external_sample_unavailable"
+            and failed_details.get("source_error") == "external_sample_timeout"
+        ),
+        "resource_profile_consumption_checked": _trace_events_cover_account_proxy_profile(success_trace_events),
+        "resource_lifecycle_disposition_checked": (
+            _trace_events_released_to_available(success_trace_events)
+            and _trace_events_released_to_available(failure_trace_events)
+        ),
+        "observability_carrier_checked": (
+            success_task_record.get("status") == "succeeded"
+            and failure_task_record.get("status") == "failed"
+            and isinstance(success_task_record.get("result"), Mapping)
+            and isinstance(failure_task_record.get("result"), Mapping)
+        ),
+    }
+
+
+def _trace_events_cover_account_proxy_profile(events: tuple[Mapping[str, Any], ...]) -> bool:
+    acquired_resource_types = {
+        event.get("resource_type")
+        for event in events
+        if event.get("event_type") == "acquired" and event.get("to_status") == "IN_USE"
+    }
+    return {"account", "proxy"}.issubset(acquired_resource_types)
+
+
+def _trace_events_released_to_available(events: tuple[Mapping[str, Any], ...]) -> bool:
+    released_resource_types = {
+        event.get("resource_type")
+        for event in events
+        if event.get("event_type") == "released" and event.get("to_status") == "AVAILABLE"
+    }
+    return {"account", "proxy"}.issubset(released_resource_types)
 
 
 class ExternalFixtureXhsProvider:
@@ -580,8 +613,12 @@ class ExternalFixtureXhsProvider:
         )
 
 
-@lru_cache(maxsize=1)
 def run_external_provider_sample_runtime_execution() -> dict[str, Any]:
+    return deepcopy(_cached_external_provider_sample_runtime_execution())
+
+
+@lru_cache(maxsize=1)
+def _cached_external_provider_sample_runtime_execution() -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="syvert-v0-9-provider-sample-") as temp_dir:
         temp_path = Path(temp_dir)
         task_store = LocalTaskRecordStore(temp_path / "task-records")

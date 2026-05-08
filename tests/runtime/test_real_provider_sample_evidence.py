@@ -108,9 +108,26 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
                 "core_routing",
                 "registry_discovery",
                 "resource_lifecycle",
+                "resource_trace",
                 "task_record",
             ],
         )
+
+    def test_no_leakage_fails_closed_when_required_surfaces_are_missing(self) -> None:
+        decision = decide_adapter_provider_compatibility(external_provider_decision_input())
+        evidence = build_core_surface_no_leakage_evidence(
+            decision,
+            adapter_bound_execution={"core_runtime_surfaces": {"registry_discovery": {"adapter_key": "xhs"}}},
+        )
+
+        self.assertEqual(evidence["status"], "fail")
+        self.assertTrue(evidence["registry_discovery_checked"])
+        self.assertFalse(evidence["task_record_checked"])
+        self.assertFalse(evidence["resource_lifecycle_checked"])
+        self.assertFalse(evidence["failed_envelope_checked"])
+        self.assertIn("task_record", evidence["missing_required_surfaces"])
+        self.assertIn("resource_lifecycle", evidence["missing_required_surfaces"])
+        self.assertIn("core_facing_failed_envelope", evidence["missing_required_surfaces"])
 
     def test_report_can_feed_fr0351_provider_compatibility_sample_gate(self) -> None:
         report = build_real_provider_sample_evidence_report()
@@ -186,6 +203,17 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         report["approved_slice"]["capability"] = "mutated"
 
         self.assertEqual(build_real_provider_sample_evidence_report()["approved_slice"]["capability"], "content_detail")
+
+    def test_adapter_bound_execution_evidence_is_not_global_mutable_state(self) -> None:
+        decision = decide_adapter_provider_compatibility(external_provider_decision_input())
+        evidence = build_adapter_bound_execution_evidence(decision)
+        evidence["raw_payload"]["mutated"] = True
+        evidence["adapter_mapped_failed_envelope"]["error"]["code"] = "mutated"
+
+        fresh = build_adapter_bound_execution_evidence(decision)
+
+        self.assertNotIn("mutated", fresh["raw_payload"])
+        self.assertEqual(fresh["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
 
     def test_report_fail_shape_includes_fail_closed_reason(self) -> None:
         report = build_real_provider_sample_evidence_report(
