@@ -60,6 +60,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         evidence = build_adapter_bound_execution_evidence(decision)
 
         self.assertEqual(evidence["status"], "pass")
+        self.assertEqual(evidence["matched_decision_ref"], "fr-0355:decision-matrix:matched")
+        self.assertEqual(evidence["matched_decision_id"], "v0-9-external-provider-sample-matched")
         self.assertEqual(evidence["raw_payload"]["provider_key"], EXTERNAL_PROVIDER_KEY)
         self.assertEqual(evidence["raw_payload_ref"], "external-fixture://content-detail/success#raw")
         self.assertEqual(evidence["normalized_result"]["platform"], "xhs")

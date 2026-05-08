@@ -12,7 +12,12 @@
 - consumed gate：`FR-0351:provider_compatibility_sample`
 - approved slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
 - sample origin：`external_provider_sample`
+- sample_id：`v0.9.0-external-provider-sample-content-detail`
+- adapter_key：`xhs`
+- provider_identity_scope：`adapter_bound`
+- provider_key_redaction：`stable fixture provider key; not a product support claim`
 - provider support claim：`false`
+- forbidden_claims：`()`
 - requirement_ref：`fr-0024:reference-adapter-migration:xhs-douyin-content-detail`
 - offer_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample`
 - decision_ref：`v0-9-external-provider-sample-matched`
@@ -44,6 +49,8 @@
 
 ## Adapter-Bound Execution Evidence
 
+- matched_decision_ref：`fr-0355:decision-matrix:matched`
+- matched_decision_id：`v0-9-external-provider-sample-matched`
 - matched decision 后进入 Adapter-owned provider seam：`xhs:adapter-owned-provider-port:external-fixture`。
 - success evidence 覆盖：
   - raw_payload_ref：`external-fixture://content-detail/success#raw`

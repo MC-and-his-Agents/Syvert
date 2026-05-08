@@ -334,7 +334,8 @@ def build_adapter_bound_execution_evidence(
     }
     return {
         "status": "pass",
-        "matched_decision_ref": decision.decision_id,
+        "matched_decision_ref": "fr-0355:decision-matrix:matched",
+        "matched_decision_id": decision.decision_id,
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
         "raw_payload_ref": "external-fixture://content-detail/success#raw",
         "raw_payload": raw_payload,
