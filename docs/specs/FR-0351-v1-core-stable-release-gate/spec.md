@@ -39,7 +39,7 @@
   - gate 必须要求 Adapter + Provider compatibility decision 已有真实外部 provider 样本 evidence，证明 `ProviderCapabilityOffer -> AdapterProviderCompatibilityDecision -> Adapter-bound execution evidence` 可执行、可审计、可 fail-closed。
   - gate 必须要求 provider 信息不得进入 Core routing、registry discovery、TaskRecord、resource lifecycle、release gate source report 或 Core-facing failed envelope category。
   - gate 必须要求 CLI / HTTP API / release gate 仍消费同一 Core runtime path，不允许绕过 TaskRecord、resource lease、result envelope 或 observability carrier。
-  - gate 必须要求 `docs/releases/v1.0.0.md`、annotated tag `v1.0.0`、GitHub Release、closeout Issue / PR 与 published truth carrier 对齐。
+  - gate 必须要求 `docs/releases/` 下的 `v1.0.0` release index、annotated tag `v1.0.0`、GitHub Release、closeout Issue / PR 与 published truth carrier 对齐。
 - 契约需求：
   - 每个 gate item 必须声明 `status`，允许值为 `pass`、`fail`、`not_applicable`。
   - `not_applicable` 必须携带理由和引用证据；不得用于跳过本 FR 标记为 required 的 gate item。
@@ -61,7 +61,7 @@
 | `provider_compatibility_sample` | yes | 真实 provider 样本证明 compatibility decision 链路可执行 | v0.9.0 provider sample evidence |
 | `provider_no_leakage` | yes | provider 字段不进入 Core-facing surface | no-leakage guard evidence |
 | `api_cli_same_core_path` | yes | API / CLI 共享 Core path | same-path tests / release gate evidence |
-| `release_truth_alignment` | yes | release index、tag、GitHub Release、closeout 对齐 | `docs/releases/v1.0.0.md` published truth carrier |
+| `release_truth_alignment` | yes | release index、tag、GitHub Release、closeout 对齐 | `docs/releases/` 下的 `v1.0.0` published truth carrier |
 | `application_boundary` | yes | 上层应用不进入 v1.0.0 完成条件 | roadmap / vision / release notes |
 | `packaging_boundary` | yes | Python package publish 不是默认 gate | `docs/process/python-packaging.md` |
 
@@ -106,7 +106,7 @@ Then `packaging_boundary` 可以为 `pass`，前提是 release notes 明确 pack
 ### 场景 7：release truth 未回写时不得声明发布完成
 
 Given `v1.0.0` tag 与 GitHub Release 已创建
-When `docs/releases/v1.0.0.md` 尚未回写 tag target、GitHub Release URL 与 published at
+When `docs/releases/` 下的 `v1.0.0` release index 尚未回写 tag target、GitHub Release URL 与 published at
 Then `release_truth_alignment` 必须为 `fail`
 
 ## 异常与边界场景
@@ -136,4 +136,3 @@ Then `release_truth_alignment` 必须为 `fail`
 - `v0.8.0` 已完成第三方 Adapter 接入、Provider offer、compatibility decision 与 no-leakage guard 的 contract foundation。
 - `v0.9.0` 必须提供真实 provider 样本 evidence，供 `provider_compatibility_sample` 消费。
 - `v1.0.0` release closeout Work Item 必须消费本 FR，而不是重新解释 Core stable。
-

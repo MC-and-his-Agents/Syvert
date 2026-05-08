@@ -12,4 +12,3 @@
 - 如本 gate 被证明过宽或过窄，使用独立 spec PR 修改 `FR-0351` formal spec。
 - 不通过 runtime PR 隐式改写本 gate。
 - 不通过 release closeout PR 临时降低 required gate item。
-

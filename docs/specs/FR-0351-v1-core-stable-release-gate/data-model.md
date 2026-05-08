@@ -44,4 +44,3 @@
 - 任一 required gate item 为 `fail` 时，`overall_status=fail`。
 - 任一 required gate item 缺少 evidence refs 时，`overall_status=fail`。
 - `provider_compatibility_sample` 的 evidence 必须来自 `v0.9.0` 或之后的真实 provider sample Work Item，不得只引用 `FR-0026` fixture。
-

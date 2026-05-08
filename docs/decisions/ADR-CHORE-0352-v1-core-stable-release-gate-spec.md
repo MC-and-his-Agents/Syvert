@@ -25,4 +25,3 @@
 - `v0.9.0` 的推进目标更明确：交付真实 provider 样本 evidence，而不是重新定义 v1.0 标准。
 - `v1.0.0` 发布 closeout 可以按 checklist 审查，不再依赖会话上下文。
 - Python packaging 仍保持可选 distribution artifact，不成为默认 release gate。
-

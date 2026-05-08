@@ -12,7 +12,7 @@
 - `provider_compatibility_sample`：必须引用真实外部 provider sample evidence。
 - `provider_no_leakage`：必须引用 Core-facing surface no-leakage evidence。
 - `api_cli_same_core_path`：必须引用 CLI / API same Core path evidence。
-- `release_truth_alignment`：必须引用 `docs/releases/v1.0.0.md`、tag target、GitHub Release URL 与 closeout Issue / PR。
+- `release_truth_alignment`：必须引用 `docs/releases/` 下的 `v1.0.0` release index、tag target、GitHub Release URL 与 closeout Issue / PR。
 - `application_boundary`：必须引用 roadmap / vision，证明上层应用不属于 `v1.0.0` gate。
 - `packaging_boundary`：必须引用 `docs/process/python-packaging.md`，证明 package publish 不是默认 gate。
 
@@ -22,4 +22,3 @@
 - 真实 provider sample evidence 不得把 provider 产品写成 Syvert 全局支持对象。
 - 上层应用可运行不得替代 Core stable release gate。
 - Python package publish 不得替代 Git tag / GitHub Release / release index truth。
-

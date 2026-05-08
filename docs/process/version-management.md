@@ -92,12 +92,10 @@ Major release 是底座契约成熟度声明。
 
 进入新的 major 前必须有明确 gate，例如：
 
-- `v1.0.0`：Core stable，gate 由 `docs/specs/FR-0351-v1-core-stable-release-gate/` 冻结。
+- `v1.0.0`：Core stable。
 - `v2.0.0`：扩展 runtime capability contract stable。
 
 Major release 不因 minor 序列耗尽自动发生。
-
-Major release gate 必须进入 GitHub Phase / FR / Work Item 与 formal spec；不能只停留在 roadmap 文案、release note 或会话判断中。
 
 ### Minor Release
 

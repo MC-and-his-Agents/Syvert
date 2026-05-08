@@ -59,4 +59,3 @@
 - [ ] roadmap / version-management 已引用本 gate。
 - [ ] `v0.9.0` 真实 provider 样本进入执行前可以直接消费本 gate。
 - [ ] `v1.0.0` release closeout 可以直接引用本 gate checklist。
-
