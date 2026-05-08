@@ -258,6 +258,39 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
         self.assertEqual(decision.failure_reason, "health_evidence_contract_invalid")
 
+    def test_malformed_timestamps_fail_closed_as_invalid_contract(self) -> None:
+        cases = (
+            {"observed_at": "not-a-time"},
+            {"expires_at": "not-a-time"},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                decision = decide_resource_health_admission(
+                    decision_id="decision-malformed-timestamp",
+                    task_id="task-001",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    operation="content_detail_by_url",
+                    requested_slots=("account",),
+                    resources=(self.account_record(),),
+                    evidence=(self.healthy_evidence(**override),),
+                    evaluated_at="2026-05-08T12:05:00.000000Z",
+                )
+                self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+
+        evaluated_at_decision = decide_resource_health_admission(
+            decision_id="decision-malformed-evaluated-at",
+            task_id="task-001",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            operation="content_detail_by_url",
+            requested_slots=("account",),
+            resources=(self.account_record(),),
+            evidence=(self.healthy_evidence(),),
+            evaluated_at="not-a-time",
+        )
+        self.assertEqual(evaluated_at_decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+
     def test_non_health_gated_admission_does_not_consume_unrelated_malformed_evidence(self) -> None:
         malformed_evidence = {"cookies": "a=1; b=2"}
 
@@ -639,6 +672,31 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
         assert isinstance(result, dict)
         self.assertEqual(result["error"]["category"], "runtime_contract")
         self.assertEqual(result["error"]["code"], "resource_state_conflict")
+
+    def test_active_lease_invalidation_malformed_timestamp_is_invalid_contract(self) -> None:
+        evidence = self.healthy_evidence(
+            evidence_id="evidence-invalid-malformed-time",
+            status=SESSION_HEALTH_INVALID,
+            observed_at="not-a-time",
+            expires_at=None,
+            freshness_policy_ref=None,
+            provenance="adapter_diagnostic",
+            lease_id="lease-001",
+            bundle_id="bundle-001",
+            reason="platform reported credential expired",
+        )
+
+        result = invalidate_active_lease_from_health_evidence(
+            evidence=evidence,
+            store=self.make_store(),
+            task_context_task_id="task-001",
+            operation="content_detail_by_url",
+            resource_trace_store=self.make_trace_store(),
+        )
+
+        self.assertIsInstance(result, ResourceAdmissionDecision)
+        assert isinstance(result, ResourceAdmissionDecision)
+        self.assertEqual(result.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
 
     def test_active_lease_invalidation_normalizes_unexpected_store_read_failure(self) -> None:
         class BrokenStore:

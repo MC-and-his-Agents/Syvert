@@ -238,10 +238,10 @@ def validate_resource_health_evidence(evidence: ResourceHealthEvidence) -> None:
         raise ResourceHealthContractError("ResourceHealthEvidence.resource_type 当前只允许 account")
     if evidence.status not in RESOURCE_HEALTH_EVIDENCE_STATUSES:
         raise ResourceHealthContractError("ResourceHealthEvidence.status 不在允许值范围内")
-    parse_rfc3339_utc_datetime(evidence.observed_at, field="observed_at")
+    _parse_resource_health_datetime(evidence.observed_at, field="observed_at")
     if evidence.expires_at is not None:
-        expires_at = parse_rfc3339_utc_datetime(evidence.expires_at, field="expires_at")
-        observed_at = parse_rfc3339_utc_datetime(evidence.observed_at, field="observed_at")
+        expires_at = _parse_resource_health_datetime(evidence.expires_at, field="expires_at")
+        observed_at = _parse_resource_health_datetime(evidence.observed_at, field="observed_at")
         if expires_at <= observed_at:
             raise ResourceHealthContractError("ResourceHealthEvidence.expires_at 必须晚于 observed_at")
     if evidence.status == SESSION_HEALTH_HEALTHY:
@@ -291,7 +291,7 @@ def decide_resource_health_admission(
     fail_closed = False
 
     try:
-        evaluated_at_dt = parse_rfc3339_utc_datetime(evaluated_at, field="evaluated_at")
+        evaluated_at_dt = _parse_resource_health_datetime(evaluated_at, field="evaluated_at")
         if health_gated:
             normalized_evidence = tuple(_coerce_evidence(item) for item in evidence)
             evidence_refs = [item.evidence_id for item in normalized_evidence]
@@ -360,7 +360,7 @@ def resource_admission_decision_to_dict(decision: ResourceAdmissionDecision) -> 
         RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT,
     }:
         raise ResourceHealthContractError("ResourceAdmissionDecision.decision_status 不合法")
-    parse_rfc3339_utc_datetime(decision.evaluated_at, field="evaluated_at")
+    _parse_resource_health_datetime(decision.evaluated_at, field="evaluated_at")
     return {
         "decision_id": decision.decision_id,
         "task_id": decision.task_id,
@@ -386,7 +386,10 @@ def invalidate_active_lease_from_health_evidence(
     operation: str | None = None,
     resource_trace_store=None,
 ) -> ResourceReleaseResult | ResourceAdmissionDecision:
-    normalized_evidence = _coerce_evidence(evidence)
+    try:
+        normalized_evidence = _coerce_evidence(evidence)
+    except ResourceHealthContractError:
+        return _invalid_contract_decision_from_context(task_context_task_id=task_context_task_id, operation=operation)
     if normalized_evidence.status != SESSION_HEALTH_INVALID:
         raise ResourceHealthContractError("只有 invalid health evidence 可以触发 resource invalidation")
     if _missing_active_context_binding(normalized_evidence):
@@ -461,7 +464,7 @@ def _project_account_resources_health(
         latest = max(
             account_evidence,
             key=lambda item: (
-                parse_rfc3339_utc_datetime(item.observed_at, field="observed_at"),
+                _parse_resource_health_datetime(item.observed_at, field="observed_at"),
                 _session_health_severity(item.status),
             ),
         )
@@ -472,7 +475,7 @@ def _project_account_resources_health(
             continue
         if latest.expires_at is None:
             raise ResourceHealthContractError("healthy evidence 缺少 expires_at")
-        expires_at = parse_rfc3339_utc_datetime(latest.expires_at, field="expires_at")
+        expires_at = _parse_resource_health_datetime(latest.expires_at, field="expires_at")
         if evaluated_at >= expires_at:
             projected = SESSION_HEALTH_STALE
     return projected
@@ -567,6 +570,28 @@ def _invalid_contract_decision(
     )
 
 
+def _invalid_contract_decision_from_context(
+    *,
+    task_context_task_id: str,
+    operation: str | None,
+) -> ResourceAdmissionDecision:
+    return ResourceAdmissionDecision(
+        decision_id="resource-invalidation:invalid-contract",
+        task_id=task_context_task_id,
+        adapter_key="",
+        capability="",
+        operation=operation,
+        requested_slots=("account",),
+        resource_ids=(),
+        health_evidence_refs=(),
+        evaluated_at=now_rfc3339_utc(),
+        projected_session_health=SESSION_HEALTH_UNKNOWN,
+        decision_status=RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT,
+        failure_reason=RESOURCE_HEALTH_CONTRACT_INVALID_REASON,
+        fail_closed=True,
+    )
+
+
 def _find_active_lease(leases: Sequence[ResourceLease], *, lease_id: str) -> ResourceLease | None:
     for lease in leases:
         if lease.lease_id == lease_id and lease.released_at is None:
@@ -626,6 +651,13 @@ def _normalize_json_mapping(value: Mapping[str, Any], *, field: str) -> Mapping[
     if not isinstance(normalized, Mapping):
         raise ResourceHealthContractError(f"{field} 必须是对象")
     return normalized
+
+
+def _parse_resource_health_datetime(value: str, *, field: str) -> datetime:
+    try:
+        return parse_rfc3339_utc_datetime(value, field=field)
+    except ResourceLifecycleContractError as error:
+        raise ResourceHealthContractError(str(error)) from error
 
 
 def _require_non_empty_string(value: Any, *, field: str) -> str:

@@ -53,7 +53,7 @@
 
 ## 已验证项
 
-- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：241 tests passed。
+- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：243 tests passed。
 - `python3 -m py_compile syvert/resource_health.py tests/runtime/test_resource_health.py`：通过。
 - `python3 scripts/spec_guard.py --mode ci --all`：通过。
 - `python3 scripts/docs_guard.py --mode ci`：通过。
@@ -100,6 +100,8 @@
   - P2：checkpoint 记录未追溯 live review head。处理：将验证记录更新为当前代码 checkpoint，并用 metadata-only follow-up 记录该 checkpoint。
 - Final merge gate follow-up 2：
   - P1：admission 未把 evidence `resource_id` 纳入当前选中 account context。处理：health-gated admission 中所有 evidence 必须绑定当前选中 account resource；foreign-resource evidence 单独出现或混入合法 evidence 均返回 `invalid_contract`，并补回归。
+- Final merge gate follow-up 3：
+  - P1：malformed `observed_at` / `expires_at` / `evaluated_at` 泄漏 lifecycle exception。处理：resource health 边界统一把 RFC3339 解析错误收敛为 `ResourceHealthContractError`；admission 与 active invalidation 均返回 `invalid_contract`，并补回归。
 
 ## 未决风险
 
@@ -113,5 +115,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `3d3dd1c05fad3a40e8dfb8275eb4e1d5935a8b36`
+- `57500559033c638861d4b766ab56ef4ce2df47b1`
 - Current HEAD may include a metadata-only checkpoint follow-up that records this verified implementation checkpoint.
