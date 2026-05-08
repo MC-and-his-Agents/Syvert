@@ -58,13 +58,12 @@
 
 ## 已验证项
 
-- 待执行：
-  - `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`
-  - `python3 scripts/docs_guard.py --mode ci`
-  - `python3 scripts/workflow_guard.py --mode ci`
-  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
-  - `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`
-  - `git diff --check origin/main..HEAD`
+- `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
+- `python3 scripts/docs_guard.py --mode ci`：通过
+- `python3 scripts/workflow_guard.py --mode ci`：通过
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
+- `python3 scripts/pr_scope_guard.py --class spec --base-ref origin/main --head-ref HEAD`：通过，变更类别为 `docs, spec`
+- `git diff --check origin/main..HEAD`：通过
 
 ## 未决风险
 
