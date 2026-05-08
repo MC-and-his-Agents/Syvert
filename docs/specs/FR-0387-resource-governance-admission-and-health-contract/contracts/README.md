@@ -14,6 +14,7 @@
 - Core 只能基于已脱敏、可追溯、上下文匹配的 `ResourceHealthEvidence` 放行需要 credential/session health 的资源。
 - Core 必须在 admission evaluation time 使用 `observed_at`、`expires_at` 与 `freshness_policy_ref` 判定 evidence freshness；过期 healthy evidence 必须投影为 `stale`。
 - Core 不得在没有 active lease 的 pre-admission 场景中调用 `release(target_status_after_release=INVALID)`；这类 invalid evidence 在本 FR 内只能拒绝 admission。
+- Core 必须把 malformed、unredacted 或 context-mismatched evidence 判定为 `invalid_contract`；这类 evidence 不是 `SessionHealth=invalid`，不得触发 resource invalidation。
 - Core 不得把 `SessionHealth` 写成第二套 resource lifecycle status。
 - Core-facing public envelope、TaskRecord public fields、registry discovery 与 routing metadata 不得暴露 raw credential/session material。
 

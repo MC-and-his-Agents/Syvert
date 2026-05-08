@@ -71,6 +71,9 @@
 - Guardian review on PR #389 at head `ce2fa92`
   - 结果：`REQUEST_CHANGES`。
   - 处理：补齐 pre-admission invalid evidence 不得绕过 active lease 的边界，并冻结 `observed_at / expires_at / freshness_policy_ref` freshness 判定规则。
+- Guardian review on PR #389 at head `04746f5`
+  - 结果：`REQUEST_CHANGES`。
+  - 处理：把 FR-0387 formal spec suite 元数据绑定回 FR #387，并明确 malformed / unredacted / context-mismatched evidence 是 `invalid_contract`，不得作为 session invalidation 依据。
 
 ## PR 计划
 

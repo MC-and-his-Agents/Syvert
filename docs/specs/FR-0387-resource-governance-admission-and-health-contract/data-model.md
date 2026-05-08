@@ -41,11 +41,12 @@
   - `redaction_status`：证明 payload 已脱敏。
   - `diagnostic_ref`：可选，只能引用脱敏诊断或 trace，不得内嵌 secret。
 - 约束：
-  - 缺少 provenance、observed_at、resource binding 或 redaction status 时必须 invalid。
-  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明。
+  - 缺少 provenance、observed_at、resource binding 或 redaction status 时必须 `invalid_contract`。
+  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明，且必须按 evidence contract invalid fail-closed。
   - 当 `evaluated_at >= expires_at` 时，admission 必须把该 evidence 投影为 `stale`。
-  - evidence 不得包含 raw credential material。
+  - evidence 不得包含 raw credential material；未脱敏 evidence 必须 `invalid_contract`。
   - evidence 可以引用 `ResourceLease` / `ResourceTraceEvent`，但不得替代它们。
+  - `invalid_contract` evidence 不是 `SessionHealth=invalid`，不得作为 session invalidation 依据。
 
 ## ResourceAdmissionDecision
 
@@ -66,20 +67,20 @@
   - 所有要求健康 credential 的 admission 都必须能追溯到有效 evidence 或显式 fail-closed。
   - `rejected` 表示资源或健康前提不足；`invalid_contract` 表示 evidence、metadata 或上下文违反契约。
   - pre-admission `invalid` evidence 没有 active lease 时只能产生 `rejected` / `invalid_contract` admission result，不得直接推进 `ResourceRecord.status`。
+  - malformed、unredacted 或 context-mismatched evidence 必须产生 `invalid_contract`，不得映射为 `credential_session_invalid`。
+  - admission failure reasons 可以包括 `credential_session_stale`、`credential_session_unknown`、`pre_admission_session_invalid`、`credential_material_contract_invalid`、`health_evidence_contract_invalid`、`health_context_mismatch`。
 
 ## ResourceInvalidationReason
 
 - 用途：把 health evidence 映射到 Core-owned invalidation reason。
 - 最小 reason：
   - `credential_session_invalid`
-  - `credential_material_contract_invalid`
-  - `health_evidence_contract_invalid`
-  - `health_context_mismatch`
 - 约束：
   - reason 必须非空、平台中立、可脱敏记录。
   - 只有 active lease 持有的 resource 可以通过既有 `release(target_status_after_release=INVALID)` 进入 `INVALID`。
   - 没有 active lease 的 pre-admission invalid evidence 在本 FR 内只拒绝 admission；直接库存 invalidation carrier 需要后续 Work Item 批准。
   - `stale` 不属于最小 invalidation reason；它只能拒绝 admission，除非后续 evidence 明确升级为 `invalid`。
+  - contract-invalid evidence 不属于 invalidation reason；它只能导致 admission `invalid_contract` 或 fail-closed。
 
 ## 生命周期
 

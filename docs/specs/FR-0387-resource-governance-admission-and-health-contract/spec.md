@@ -2,13 +2,14 @@
 
 ## 关联信息
 
-- item_key：`CHORE-0388-v1-2-resource-governance-spec`
-- Issue：`#388`
-- item_type：`CHORE`
+- item_key：`FR-0387-resource-governance-admission-and-health-contract`
+- Issue：`#387`
+- item_type：`FR`
 - release：`v1.2.0`
 - sprint：`2026-S24`
 - Parent Phase：`#380`
 - Parent FR：`#387`
+- 执行 Work Item：`#388 / CHORE-0388-v1-2-resource-governance-spec`
 
 ## 背景与目标
 
@@ -112,10 +113,10 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
 ## 异常与边界场景
 
 - 异常场景：
-  - evidence 缺少 `resource_id`、`observed_at`、`status`、`provenance` 或脱敏边界时必须 invalid。
-  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明。
-  - evidence 引用的 `lease_id / task_id / adapter_key / capability` 与当前执行上下文不一致时必须 fail-closed。
-  - evidence payload 含 raw secret、cookie、token、header value 或 session dump 时必须 invalid。
+  - evidence 缺少 `resource_id`、`observed_at`、`status`、`provenance` 或脱敏边界时必须 `invalid_contract`，不得被当作 `SessionHealth=invalid`。
+  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明，且必须按 evidence contract invalid fail-closed。
+  - evidence 引用的 `lease_id / task_id / adapter_key / capability` 与当前执行上下文不一致时必须 `invalid_contract` fail-closed。
+  - evidence payload 含 raw secret、cookie、token、header value 或 session dump 时必须 `invalid_contract`，不得触发 session invalidation。
   - Provider offer 或 Adapter requirement 暴露 credential/session 私有字段时必须 invalid。
 - 边界场景：
   - `SessionHealth=unknown` 可以作为“需要进一步证明”的状态存在，但不得提升为健康证明。
@@ -130,6 +131,7 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
 - [ ] formal spec 明确冻结 `ResourceHealthEvidence` 的 provenance、时间、绑定、诊断与脱敏要求。
 - [ ] formal spec 明确冻结 freshness / expiry 的机器判定规则。
 - [ ] formal spec 明确 pre-admission invalid evidence 只能拒绝 admission，不能绕过 active lease 直接 release。
+- [ ] formal spec 明确 malformed / unredacted / context-mismatched evidence 是 contract-invalid，不是 `SessionHealth=invalid`。
 - [ ] formal spec 明确 health evidence 与 `ResourceRecord`、`ResourceLease`、`ResourceTraceEvent` 的关系。
 - [ ] formal spec 明确 Adapter / Provider metadata 不得声明 credential/session 私有字段。
 - [ ] formal spec 明确本 Work Item 不实现 runtime、不迁移 consumer、不补 evidence、不做 release closeout。

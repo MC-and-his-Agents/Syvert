@@ -2,12 +2,13 @@
 
 ## 关联信息
 
-- item_key：`CHORE-0388-v1-2-resource-governance-spec`
-- Issue：`#388`
-- item_type：`CHORE`
+- item_key：`FR-0387-resource-governance-admission-and-health-contract`
+- Issue：`#387`
+- item_type：`FR`
 - release：`v1.2.0`
 - sprint：`2026-S24`
 - 关联 exec-plan：`docs/exec-plans/CHORE-0388-v1-2-resource-governance-spec.md`
+- 执行 Work Item：`#388 / CHORE-0388-v1-2-resource-governance-spec`
 
 ## 实施目标
 
@@ -16,7 +17,7 @@
 
 ## 分阶段拆分
 
-- 阶段 1：`#388` 冻结 resource governance admission and health formal spec。
+- 阶段 1：由 Work Item `#388` 执行并冻结 FR `#387` 的 resource governance admission and health formal spec。
 - 阶段 2：如果 spec review 后明确需要 runtime carrier，再创建 runtime Work Item。
 - 阶段 3：如果 runtime carrier 影响 AdapterRequirement、ProviderOffer 或 compatibility decision，再创建 consumer migration Work Item。
 - 阶段 4：如果需要 fake/reference/real evidence 证明边界，再创建 evidence Work Item。
