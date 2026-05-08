@@ -42,7 +42,10 @@ APPROVED_SLICE = {
 }
 
 
-def build_real_provider_sample_evidence_report() -> dict[str, Any]:
+def build_real_provider_sample_evidence_report(
+    *,
+    no_leakage_override: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     manifest = external_provider_sample_manifest()
     matched_decision = decide_adapter_provider_compatibility(external_provider_decision_input())
     unmatched_decision = decide_adapter_provider_compatibility(external_provider_unmatched_decision_input())
@@ -50,16 +53,21 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
         external_provider_invalid_contract_decision_input()
     )
     adapter_bound_execution = build_adapter_bound_execution_evidence(matched_decision)
-    no_leakage = build_core_surface_no_leakage_evidence(matched_decision)
+    no_leakage = (
+        dict(no_leakage_override)
+        if no_leakage_override is not None
+        else build_core_surface_no_leakage_evidence(matched_decision)
+    )
 
-    status = "pass" if (
-        matched_decision.decision_status == COMPATIBILITY_DECISION_STATUS_MATCHED
-        and unmatched_decision.decision_status == COMPATIBILITY_DECISION_STATUS_UNMATCHED
-        and invalid_contract_decision.decision_status == COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT
-        and adapter_bound_execution["status"] == "pass"
-        and no_leakage["status"] == "pass"
-    ) else "fail"
-    return {
+    fail_closed_reasons = _fail_closed_reasons(
+        matched_decision=matched_decision,
+        unmatched_decision=unmatched_decision,
+        invalid_contract_decision=invalid_contract_decision,
+        adapter_bound_execution=adapter_bound_execution,
+        no_leakage=no_leakage,
+    )
+    status = "pass" if not fail_closed_reasons else "fail"
+    report = {
         "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
         "release": "v0.9.0",
         "fr_ref": "FR-0355",
@@ -122,6 +130,9 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
         ),
         "not_provider_product_support": True,
     }
+    if fail_closed_reasons:
+        report["decision_matrix"]["fail_closed_reason"] = fail_closed_reasons
+    return report
 
 
 def external_provider_sample_manifest() -> dict[str, Any]:
@@ -462,3 +473,25 @@ def _decision_summary(decision: AdapterProviderCompatibilityDecision) -> dict[st
         "adapter_bound_provider_evidence_present": decision.evidence.adapter_bound_provider_evidence is not None,
         "core_projection": project_compatibility_decision_for_core(decision),
     }
+
+
+def _fail_closed_reasons(
+    *,
+    matched_decision: AdapterProviderCompatibilityDecision,
+    unmatched_decision: AdapterProviderCompatibilityDecision,
+    invalid_contract_decision: AdapterProviderCompatibilityDecision,
+    adapter_bound_execution: Mapping[str, Any],
+    no_leakage: Mapping[str, Any],
+) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if matched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_MATCHED:
+        reasons.append("matched_case_not_matched")
+    if unmatched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_UNMATCHED:
+        reasons.append("unmatched_case_not_unmatched")
+    if invalid_contract_decision.decision_status != COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT:
+        reasons.append("invalid_contract_case_not_invalid_contract")
+    if adapter_bound_execution.get("status") != "pass":
+        reasons.append("adapter_bound_execution_not_pass")
+    if no_leakage.get("status") != "pass":
+        reasons.append("core_surface_no_leakage_not_pass")
+    return tuple(reasons)

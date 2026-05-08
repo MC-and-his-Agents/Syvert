@@ -161,9 +161,22 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["adapter_bound_execution"]["status"], "pass")
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
         self.assertTrue(report["not_provider_product_support"])
+        self.assertNotIn("fail_closed_reason", report["decision_matrix"])
 
     def test_report_approved_slice_is_not_global_mutable_state(self) -> None:
         report = build_real_provider_sample_evidence_report()
         report["approved_slice"]["capability"] = "mutated"
 
         self.assertEqual(build_real_provider_sample_evidence_report()["approved_slice"]["capability"], "content_detail")
+
+    def test_report_fail_shape_includes_fail_closed_reason(self) -> None:
+        report = build_real_provider_sample_evidence_report(
+            no_leakage_override={
+                "status": "fail",
+                "provider_identity_in_core_surface": True,
+                "surfaces": {},
+            }
+        )
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["decision_matrix"]["fail_closed_reason"], ("core_surface_no_leakage_not_pass",))
