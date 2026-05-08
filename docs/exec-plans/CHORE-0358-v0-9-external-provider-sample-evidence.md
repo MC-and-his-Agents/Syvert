@@ -10,7 +10,7 @@
 - 上位 Phase：`#354`
 - 上位 FR：`#355`
 - 关联 spec：`docs/specs/FR-0355-v0-9-real-provider-compatibility-evidence/`
-- 关联 decision：`docs/decisions/ADR-CHORE-0356-v0-9-provider-compatibility-spec.md`
+- 关联 decision：
 - active 收口事项：`CHORE-0358-v0-9-external-provider-sample-evidence`
 - 状态：`active`
 
