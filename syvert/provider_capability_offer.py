@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from syvert.operation_taxonomy import stable_operation_entry
 from syvert.resource_capability_evidence import approved_shared_resource_requirement_profile_evidence_entries
 
 
@@ -12,12 +13,17 @@ PROVIDER_OFFER_STATUS_INVALID = "invalid"
 
 PROVIDER_OFFER_ERROR_INVALID_OFFER = "invalid_provider_offer"
 
-APPROVED_PROVIDER_CAPABILITY = "content_detail"
+APPROVED_OPERATION_TAXONOMY_ENTRY = stable_operation_entry(
+    operation="content_detail_by_url",
+    target_type="url",
+    collection_mode="hybrid",
+)
+APPROVED_PROVIDER_CAPABILITY = APPROVED_OPERATION_TAXONOMY_ENTRY.capability_family
 APPROVED_CAPABILITY_OFFER = {
     "capability": APPROVED_PROVIDER_CAPABILITY,
-    "operation": "content_detail_by_url",
-    "target_type": "url",
-    "collection_mode": "hybrid",
+    "operation": APPROVED_OPERATION_TAXONOMY_ENTRY.operation,
+    "target_type": APPROVED_OPERATION_TAXONOMY_ENTRY.target_type,
+    "collection_mode": APPROVED_OPERATION_TAXONOMY_ENTRY.collection_mode,
 }
 APPROVED_CONTRACT_VERSION = "v0.8.0"
 REQUIRED_VALIDATION_OUTCOME_FIELDS = (

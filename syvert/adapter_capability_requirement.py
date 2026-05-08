@@ -16,6 +16,7 @@ from syvert.runtime import (
     ResourceCapabilityMatcherInput,
     match_resource_capabilities,
 )
+from syvert.operation_taxonomy import stable_operation_entry
 
 
 ADAPTER_REQUIREMENT_STATUS_DECLARED = "declared"
@@ -25,11 +26,16 @@ ADAPTER_REQUIREMENT_STATUS_INVALID = "invalid"
 ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT = "invalid_resource_requirement"
 ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT = ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT
 
-APPROVED_ADAPTER_CAPABILITY = "content_detail"
+APPROVED_OPERATION_TAXONOMY_ENTRY = stable_operation_entry(
+    operation="content_detail_by_url",
+    target_type="url",
+    collection_mode="hybrid",
+)
+APPROVED_ADAPTER_CAPABILITY = APPROVED_OPERATION_TAXONOMY_ENTRY.capability_family
 APPROVED_EXECUTION_REQUIREMENT = {
-    "operation": "content_detail_by_url",
-    "target_type": "url",
-    "collection_mode": "hybrid",
+    "operation": APPROVED_OPERATION_TAXONOMY_ENTRY.operation,
+    "target_type": APPROVED_OPERATION_TAXONOMY_ENTRY.target_type,
+    "collection_mode": APPROVED_OPERATION_TAXONOMY_ENTRY.collection_mode,
 }
 REQUIRED_REQUIREMENT_FIELDS = frozenset(
     {
