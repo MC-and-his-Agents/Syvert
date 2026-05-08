@@ -55,6 +55,11 @@ APPROVED_SLICE = {
     "target_type": "url",
     "collection_mode": "hybrid",
 }
+REQUIRED_MANIFEST_FIELDS = (
+    "manifest_id",
+    "provenance_ref",
+    "author_path",
+)
 
 
 def build_real_provider_sample_evidence_report(
@@ -102,11 +107,11 @@ def build_real_provider_sample_evidence_report(
         "api_cli_same_core_path_ref": "tests.runtime.test_cli_http_same_path",
         "external_provider_sample": {
             "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
-            "manifest_id": manifest["manifest_id"],
-            "provenance_ref": manifest["provenance_ref"],
+            "manifest_id": manifest.get("manifest_id"),
+            "provenance_ref": manifest.get("provenance_ref"),
             "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
-            "controlled_record_ref": manifest["provenance_ref"],
-            "author_path": manifest["author_path"],
+            "controlled_record_ref": manifest.get("provenance_ref"),
+            "author_path": manifest.get("author_path"),
             "adapter_key": manifest.get("adapter_key"),
             "provider_identity_scope": manifest.get("provider_identity_scope"),
             "provider_key_redaction": manifest.get("provider_key_redaction"),
@@ -533,6 +538,9 @@ def _fail_closed_reasons(
 
 def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...]:
     reasons: list[str] = []
+    for field_name in REQUIRED_MANIFEST_FIELDS:
+        if not manifest.get(field_name):
+            reasons.append(f"manifest_required_field_missing:{field_name}")
     if manifest.get("sample_origin") != "external_provider_sample":
         reasons.append("manifest_sample_origin_not_external_provider_sample")
     if manifest.get("provider_support_claim") is not False:

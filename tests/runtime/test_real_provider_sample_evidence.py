@@ -208,6 +208,31 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("manifest_provider_support_claim_not_false", report["decision_matrix"]["fail_closed_reason"])
         self.assertIn("manifest_approved_slice_drift", report["decision_matrix"]["fail_closed_reason"])
 
+    def test_report_fails_closed_for_missing_required_manifest_fields(self) -> None:
+        manifest = external_provider_sample_manifest()
+        manifest.pop("manifest_id")
+        manifest.pop("provenance_ref")
+        manifest.pop("author_path")
+
+        report = build_real_provider_sample_evidence_report(manifest_override=manifest)
+
+        self.assertEqual(report["status"], "fail")
+        self.assertIsNone(report["external_provider_sample"]["manifest_id"])
+        self.assertIsNone(report["external_provider_sample"]["provenance_ref"])
+        self.assertIsNone(report["external_provider_sample"]["author_path"])
+        self.assertIn(
+            "manifest_required_field_missing:manifest_id",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+        self.assertIn(
+            "manifest_required_field_missing:provenance_ref",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+        self.assertIn(
+            "manifest_required_field_missing:author_path",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+
     def test_no_leakage_evidence_reports_identity_presence_when_surface_leaks(self) -> None:
         decision = decide_adapter_provider_compatibility(external_provider_decision_input())
         evidence = build_core_surface_no_leakage_evidence(

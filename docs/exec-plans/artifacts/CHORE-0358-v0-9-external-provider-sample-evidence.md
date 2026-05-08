@@ -64,8 +64,12 @@
   - raw_payload_ref：`external-fixture://content-detail/success#raw`
   - normalized_result_ref：`external-fixture://content-detail/success#normalized`
   - normalized result：`platform=xhs`、`content_id=external-fixture-content-001`
+  - provider_error_mapping_checked：`true`
+  - resource_profile_consumption_checked：`true`
   - resource profile consumption：`account_proxy`
+  - resource_lifecycle_disposition_checked：`true`
   - resource lifecycle disposition hint：`release`
+  - observability_carrier_checked：`true`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
   - provider failure input：`source_error=external_provider_timeout`
