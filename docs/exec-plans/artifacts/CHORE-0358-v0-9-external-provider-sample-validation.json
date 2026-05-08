@@ -4,22 +4,42 @@
   "fr_ref": "FR-0355",
   "consumed_gate_ref": "FR-0351:provider_compatibility_sample",
   "report_snapshot_sha256": "31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76",
+  "run_id": "local-CHORE-0358-v0-9-external-provider-sample-evidence",
+  "executed_at": "2026-05-08T06:24:53Z",
+  "validated_source_sha256": "cdae81bf4cb09550b7476b4e7f86e75fc206a995c519612f3d2575f4c9b3fff7",
+  "source_binding_paths": [
+    "syvert/real_provider_sample_evidence.py",
+    "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+    "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
+    "tests/runtime/test_real_provider_sample_evidence.py",
+    "tests/runtime/test_adapter_provider_compatibility_decision.py",
+    "tests/runtime/test_provider_no_leakage_guard.py",
+    "tests/runtime/test_real_adapter_regression.py",
+    "tests/runtime/test_third_party_adapter_contract_entry.py",
+    "tests/runtime/test_cli_http_same_path.py"
+  ],
   "status": "pass",
   "commands": [
     {
       "validation": "external provider sample evidence",
       "command": "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
-      "status": "pass"
+      "status": "pass",
+      "returncode": 0,
+      "output_sha256": "127ea55a5b3aa7def5057b25292c0794ece7049f3b85ac6fedaa5158c520bd6a"
     },
     {
       "validation": "compatibility decision / no-leakage / sample",
       "command": "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence",
-      "status": "pass"
+      "status": "pass",
+      "returncode": 0,
+      "output_sha256": "3ba52beedd96f90a21599d76bb6c2248bda6732d73e3e2abd79f8a29864d70ad"
     },
     {
       "validation": "dual reference / third-party entry / API CLI same path",
       "command": "python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path",
-      "status": "pass"
+      "status": "pass",
+      "returncode": 0,
+      "output_sha256": "41b2b4d03434d3b69f3b5fdc8dda5fbde5b436084ac1b9ca8515fa869237660a"
     }
   ]
 }

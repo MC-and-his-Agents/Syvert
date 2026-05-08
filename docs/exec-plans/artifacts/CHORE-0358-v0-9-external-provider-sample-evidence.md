@@ -263,7 +263,11 @@
 
 ## Validation Evidence
 
-机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76`。
+机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定：
+
+- `report_snapshot_sha256=31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76`
+- `validated_source_sha256=cdae81bf4cb09550b7476b4e7f86e75fc206a995c519612f3d2575f4c9b3fff7`
+- `run_id=local-CHORE-0358-v0-9-external-provider-sample-evidence`
 
 | validation | command | result |
 |---|---|---|

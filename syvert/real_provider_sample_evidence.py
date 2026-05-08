@@ -68,6 +68,17 @@ VALIDATION_MODULE_PATHS = {
     "tests.runtime.test_third_party_adapter_contract_entry": "tests/runtime/test_third_party_adapter_contract_entry.py",
     "tests.runtime.test_cli_http_same_path": "tests/runtime/test_cli_http_same_path.py",
 }
+VALIDATION_SOURCE_BINDING_PATHS = (
+    "syvert/real_provider_sample_evidence.py",
+    "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+    "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
+    "tests/runtime/test_real_provider_sample_evidence.py",
+    "tests/runtime/test_adapter_provider_compatibility_decision.py",
+    "tests/runtime/test_provider_no_leakage_guard.py",
+    "tests/runtime/test_real_adapter_regression.py",
+    "tests/runtime/test_third_party_adapter_contract_entry.py",
+    "tests/runtime/test_cli_http_same_path.py",
+)
 REQUIRED_VALIDATION_COMMANDS = (
     (
         "external provider sample evidence",
@@ -433,21 +444,28 @@ def build_adapter_bound_execution_evidence(
         if execution_override is not None
         else run_external_provider_sample_runtime_execution()
     )
-    success_envelope = execution["success"]["envelope"]
-    failed_envelope = execution["failure"]["envelope"]
+    success = execution.get("success") if isinstance(execution.get("success"), Mapping) else {}
+    failure = execution.get("failure") if isinstance(execution.get("failure"), Mapping) else {}
+    success_envelope = success.get("envelope") if isinstance(success.get("envelope"), Mapping) else {}
+    failed_envelope = failure.get("envelope") if isinstance(failure.get("envelope"), Mapping) else {}
     checks = _adapter_bound_execution_checks(execution, decision)
+    fail_closed_reasons = (
+        *_adapter_bound_execution_shape_reasons(execution),
+        *_adapter_bound_execution_check_reasons(checks),
+    )
     evidence_status = (
         "pass"
         if (
             success_envelope.get("status") == "success"
             and failed_envelope.get("status") == "failed"
-            and execution["success"]["provider_calls"]
-            and execution["failure"]["provider_calls"]
+            and success.get("provider_calls")
+            and failure.get("provider_calls")
             and all(checks.values())
+            and not fail_closed_reasons
         )
         else "fail"
     )
-    return {
+    evidence = {
         "status": evidence_status,
         "matched_decision_ref": "fr-0355:decision-matrix:matched",
         "matched_decision_id": decision.decision_id,
@@ -462,7 +480,7 @@ def build_adapter_bound_execution_evidence(
             "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
         ),
         "adapter_mapped_failed_envelope": deepcopy(failed_envelope),
-        "provider_error_mapping": deepcopy(execution["failure"].get("provider_error_mapping", {})),
+        "provider_error_mapping": deepcopy(failure.get("provider_error_mapping", {})),
         "provider_error_mapping_checked": checks["provider_error_mapping_checked"],
         "resource_profile_consumption_checked": checks["resource_profile_consumption_checked"],
         "resource_lifecycle_disposition_checked": checks["resource_lifecycle_disposition_checked"],
@@ -470,17 +488,20 @@ def build_adapter_bound_execution_evidence(
         "resource_lifecycle_release_reason": checks["success_release_reason"],
         "resource_lifecycle_failure_release_reason": checks["failure_release_reason"],
         "observability_carrier_checked": checks["observability_carrier_checked"],
-        "runtime_execution_ref": execution["runtime_execution_ref"],
-        "success_task_record_ref": execution["success"]["task_record_ref"],
-        "failure_task_record_ref": execution["failure"]["task_record_ref"],
+        "runtime_execution_ref": execution.get("runtime_execution_ref"),
+        "success_task_record_ref": success.get("task_record_ref"),
+        "failure_task_record_ref": failure.get("task_record_ref"),
         "observability": _adapter_bound_observability_carrier(decision),
         "core_surface_projection_ref": (
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
             "#core-surface-projection"
         ),
         "core_surface_projection": _core_surface_status_projection(decision),
-        "core_runtime_surfaces": deepcopy(execution["core_runtime_surfaces"]),
+        "core_runtime_surfaces": deepcopy(execution.get("core_runtime_surfaces", {})),
     }
+    if fail_closed_reasons:
+        evidence["fail_closed_reason"] = fail_closed_reasons
+    return evidence
 
 
 def build_core_surface_no_leakage_evidence(
@@ -608,6 +629,35 @@ def _adapter_bound_execution_checks(
             and bool(observability_carrier["proof_refs"])
         ),
     }
+
+
+def _adapter_bound_execution_shape_reasons(execution: Mapping[str, Any]) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if not execution.get("runtime_execution_ref"):
+        reasons.append("runtime_execution_ref_missing")
+    success = execution.get("success")
+    failure = execution.get("failure")
+    if not isinstance(success, Mapping):
+        reasons.append("success_execution_missing")
+    elif not isinstance(success.get("envelope"), Mapping):
+        reasons.append("success_envelope_missing")
+    if not isinstance(failure, Mapping):
+        reasons.append("failure_execution_missing")
+    elif not isinstance(failure.get("envelope"), Mapping):
+        reasons.append("failure_envelope_missing")
+    return tuple(reasons)
+
+
+def _adapter_bound_execution_check_reasons(checks: Mapping[str, Any]) -> tuple[str, ...]:
+    boolean_checks = {
+        "raw_payload_present",
+        "normalized_result_present",
+        "provider_error_mapping_checked",
+        "resource_profile_consumption_checked",
+        "resource_lifecycle_disposition_checked",
+        "observability_carrier_checked",
+    }
+    return tuple(f"{check_name}_failed" for check_name in sorted(boolean_checks) if checks.get(check_name) is not True)
 
 
 def _adapter_bound_observability_carrier(
@@ -918,6 +968,8 @@ def build_required_validation_evidence(
     return {
         "status": status,
         "artifact_ref": VALIDATION_EVIDENCE_ARTIFACT_PATH,
+        "run_id": payload.get("run_id"),
+        "validated_source_sha256": payload.get("validated_source_sha256"),
         "report_snapshot_sha256": payload.get("report_snapshot_sha256"),
         "commands": normalized_commands,
     }
@@ -931,10 +983,25 @@ def _validation_artifact_is_pass(
 ) -> bool:
     expected_commands = tuple(_validation_command_text(modules) for _, modules in REQUIRED_VALIDATION_COMMANDS)
     artifact_snapshot_sha256 = payload.get("report_snapshot_sha256")
+    expected_source_sha256 = _validation_source_binding_sha256()
     snapshot_binding_checked = (
         artifact_snapshot_sha256 == report_snapshot_sha256
         if report_snapshot_sha256 is not None
         else isinstance(artifact_snapshot_sha256, str) and len(artifact_snapshot_sha256) == 64
+    )
+    execution_binding_checked = (
+        isinstance(payload.get("run_id"), str)
+        and bool(str(payload.get("run_id")).strip())
+        and isinstance(payload.get("executed_at"), str)
+        and bool(str(payload.get("executed_at")).strip())
+        and payload.get("validated_source_sha256") == expected_source_sha256
+        and tuple(payload.get("source_binding_paths", ())) == VALIDATION_SOURCE_BINDING_PATHS
+        and all(
+            command.get("returncode") == 0
+            and isinstance(command.get("output_sha256"), str)
+            and len(command.get("output_sha256")) == 64
+            for command in commands
+        )
     )
     return (
         payload.get("report_id") == "CHORE-0358-v0-9-external-provider-sample-evidence"
@@ -942,6 +1009,7 @@ def _validation_artifact_is_pass(
         and payload.get("fr_ref") == "FR-0355"
         and payload.get("consumed_gate_ref") == FR0351_GATE_REF
         and snapshot_binding_checked
+        and execution_binding_checked
         and payload.get("status") == "pass"
         and tuple(command.get("command") for command in commands) == expected_commands
         and all(command.get("status") == "pass" for command in commands)
@@ -959,6 +1027,20 @@ def _expected_validation_evidence_stub() -> dict[str, Any]:
             for validation_name, modules in REQUIRED_VALIDATION_COMMANDS
         ),
     }
+
+
+def _validation_source_binding_sha256() -> str:
+    repo_root = Path(__file__).parents[1]
+    digest = hashlib.sha256()
+    for relative_path in VALIDATION_SOURCE_BINDING_PATHS:
+        path = repo_root / relative_path
+        if not path.exists():
+            return "missing-validation-source-binding-path"
+        digest.update(relative_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _validation_command_text(modules: tuple[str, ...]) -> str:

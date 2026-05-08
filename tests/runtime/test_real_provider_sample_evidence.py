@@ -172,6 +172,16 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertFalse(evidence["raw_payload_present"])
         self.assertFalse(evidence["normalized_result_present"])
 
+    def test_adapter_bound_execution_evidence_fails_closed_for_bad_execution_shape(self) -> None:
+        decision = decide_adapter_provider_compatibility(external_provider_decision_input())
+
+        evidence = build_adapter_bound_execution_evidence(decision, execution_override={"success": {}})
+
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("runtime_execution_ref_missing", evidence["fail_closed_reason"])
+        self.assertIn("success_envelope_missing", evidence["fail_closed_reason"])
+        self.assertIn("failure_execution_missing", evidence["fail_closed_reason"])
+
     def test_report_can_feed_fr0351_provider_compatibility_sample_gate(self) -> None:
         report = build_real_provider_sample_evidence_report()
 
@@ -261,6 +271,11 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(
             evidence["artifact_ref"],
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
+        )
+        self.assertEqual(evidence["run_id"], "local-CHORE-0358-v0-9-external-provider-sample-evidence")
+        self.assertEqual(
+            evidence["validated_source_sha256"],
+            evidence_module._validation_source_binding_sha256(),
         )
         self.assertEqual(
             evidence["report_snapshot_sha256"],
