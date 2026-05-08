@@ -29,9 +29,9 @@
 
 当前 gate 汇总结论：
 
-- `v1.0.0` annotated tag 与 GitHub Release 已建立，published truth carrier 已在当前分支回写。
-- 当前剩余收口项是 Phase `#363` 与 Work Item `#364` 的 final GitHub closeout，以及阶段 B PR 合入 main。
-- `overall_status=pass` 将在阶段 B 合入并完成 GitHub closeout 对账后最终固定。
+- `v1.0.0` annotated tag、GitHub Release 与 published truth carrier 已建立。
+- Phase `#363` 与 Work Item `#364` 已完成 final GitHub closeout。
+- `overall_status=pass`；当前剩余动作仅为阶段 B PR `#366` 把这些 final truth 合入 main。
 
 ## Gate item matrix
 
@@ -51,9 +51,9 @@
 
 | Issue | Role | State | Closed at |
 | --- | --- | --- | --- |
-| `#363` | Phase `v1.0.0 release closeout` | open | pending |
+| `#363` | Phase `v1.0.0 release closeout` | closed completed | `2026-05-08T09:05:37Z` |
 | `#351` | `FR-0351` gate truth | closed completed | `2026-05-08T01:41:32Z` |
-| `#364` | `v1.0.0` release closeout Work Item | open | pending |
+| `#364` | `v1.0.0` release closeout Work Item | closed completed | `2026-05-08T09:05:36Z` |
 
 ## PR / main 对账
 
@@ -62,6 +62,7 @@
 - 阶段 A 前 `HEAD == origin/main == 21b30c347c11fc3e576db444cfc073108f512a35`。
 - 阶段 A 前 open PR 为空。
 - 阶段 A PR `#365` 已合入，merge commit `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`。
+- 阶段 B PR `#366` 已创建，承接 published truth 与 final closeout 对账。
 - `v1.0.0` annotated tag 已创建并推送，tag object `b8e9dc14d01599c3faad17c02392a4a8a3a19a98`，tag target `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`。
 - GitHub Release `v1.0.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.0.0`。
 - `FR-0351` 与 `v0.9.0` provider sample evidence 都已在 main 上，可被 `#364` 直接消费。
@@ -115,7 +116,6 @@
 
 当前，`v1.0.0` 尚未完成：
 
-- Phase `#363` 与 Work Item `#364` 的 final closeout。
 - 阶段 B truth follow-up 合入 main。
 
 ## 后续消费
