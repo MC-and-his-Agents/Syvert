@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from functools import lru_cache
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -51,6 +52,8 @@ EVIDENCE_ARTIFACT_PATH = (
 VALIDATION_EVIDENCE_ARTIFACT_PATH = (
     "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json"
 )
+EVIDENCE_ARTIFACT_JSON_START = "<!-- syvert:evidence-report-json:start -->"
+EVIDENCE_ARTIFACT_JSON_END = "<!-- syvert:evidence-report-json:end -->"
 VALIDATION_MODULE_PATHS = {
     "tests.runtime.test_real_provider_sample_evidence": "tests/runtime/test_real_provider_sample_evidence.py",
     "tests.runtime.test_real_adapter_regression": "tests/runtime/test_real_adapter_regression.py",
@@ -128,18 +131,7 @@ def build_real_provider_sample_evidence_report(
         matched_decision,
         adapter_bound_execution=adapter_bound_execution,
     )
-    validation_evidence = build_required_validation_evidence()
-
-    fail_closed_reasons = _fail_closed_reasons(
-        matched_decision=matched_decision,
-        unmatched_decision=unmatched_decision,
-        invalid_contract_decision=invalid_contract_decision,
-        adapter_bound_execution=adapter_bound_execution,
-        no_leakage=no_leakage,
-        manifest=manifest,
-        validation_evidence=validation_evidence,
-    )
-    status = "pass" if not fail_closed_reasons else "fail"
+    validation_evidence = _expected_validation_evidence_stub()
     report = {
         "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
         "release": "v0.9.0",
@@ -148,7 +140,7 @@ def build_real_provider_sample_evidence_report(
         "approved_slice": dict(manifest.get("approved_slice", {})),
         "sample_origin": manifest.get("sample_origin"),
         "provider_support_claim": manifest.get("provider_support_claim"),
-        "status": status,
+        "status": "pending",
         "decision_matrix_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix",
         "adapter_bound_execution_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence",
         "no_leakage_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#no-leakage-evidence",
@@ -203,6 +195,20 @@ def build_real_provider_sample_evidence_report(
         ),
         "not_provider_product_support": manifest.get("not_provider_product_support"),
     }
+    snapshot_sha256 = _evidence_report_snapshot_sha256(report)
+    validation_evidence = build_required_validation_evidence(report_snapshot_sha256=snapshot_sha256)
+    fail_closed_reasons = _fail_closed_reasons(
+        matched_decision=matched_decision,
+        unmatched_decision=unmatched_decision,
+        invalid_contract_decision=invalid_contract_decision,
+        adapter_bound_execution=adapter_bound_execution,
+        no_leakage=no_leakage,
+        manifest=manifest,
+        validation_evidence=validation_evidence,
+    )
+    report["status"] = "pass" if not fail_closed_reasons else "fail"
+    report["validation_evidence"] = validation_evidence
+    report["evidence_snapshot_sha256"] = snapshot_sha256
     if fail_closed_reasons:
         report["decision_matrix"]["fail_closed_reason"] = fail_closed_reasons
     artifact_reasons = _evidence_ref_fail_closed_reasons(report)
@@ -836,7 +842,10 @@ def _resource_requirements_summary(declarations: tuple[Any, ...]) -> tuple[dict[
     )
 
 
-def build_required_validation_evidence() -> dict[str, Any]:
+def build_required_validation_evidence(
+    *,
+    report_snapshot_sha256: str | None = None,
+) -> dict[str, Any]:
     repo_root = Path(__file__).parents[1]
     artifact_path = repo_root / VALIDATION_EVIDENCE_ARTIFACT_PATH
     if not artifact_path.exists():
@@ -858,10 +867,19 @@ def build_required_validation_evidence() -> dict[str, Any]:
         if isinstance(commands, list)
         else ()
     )
-    status = "pass" if _validation_artifact_is_pass(payload, normalized_commands) else "fail"
+    status = (
+        "pass"
+        if _validation_artifact_is_pass(
+            payload,
+            normalized_commands,
+            report_snapshot_sha256=report_snapshot_sha256,
+        )
+        else "fail"
+    )
     return {
         "status": status,
         "artifact_ref": VALIDATION_EVIDENCE_ARTIFACT_PATH,
+        "report_snapshot_sha256": payload.get("report_snapshot_sha256"),
         "commands": normalized_commands,
     }
 
@@ -869,17 +887,39 @@ def build_required_validation_evidence() -> dict[str, Any]:
 def _validation_artifact_is_pass(
     payload: Mapping[str, Any],
     commands: tuple[Mapping[str, Any], ...],
+    *,
+    report_snapshot_sha256: str | None = None,
 ) -> bool:
     expected_commands = tuple(_validation_command_text(modules) for _, modules in REQUIRED_VALIDATION_COMMANDS)
+    artifact_snapshot_sha256 = payload.get("report_snapshot_sha256")
+    snapshot_binding_checked = (
+        artifact_snapshot_sha256 == report_snapshot_sha256
+        if report_snapshot_sha256 is not None
+        else isinstance(artifact_snapshot_sha256, str) and len(artifact_snapshot_sha256) == 64
+    )
     return (
         payload.get("report_id") == "CHORE-0358-v0-9-external-provider-sample-evidence"
         and payload.get("release") == "v0.9.0"
         and payload.get("fr_ref") == "FR-0355"
         and payload.get("consumed_gate_ref") == FR0351_GATE_REF
+        and snapshot_binding_checked
         and payload.get("status") == "pass"
         and tuple(command.get("command") for command in commands) == expected_commands
         and all(command.get("status") == "pass" for command in commands)
     )
+
+
+def _expected_validation_evidence_stub() -> dict[str, Any]:
+    return {
+        "artifact_ref": VALIDATION_EVIDENCE_ARTIFACT_PATH,
+        "commands": tuple(
+            {
+                "validation": validation_name,
+                "command": _validation_command_text(modules),
+            }
+            for validation_name, modules in REQUIRED_VALIDATION_COMMANDS
+        ),
+    }
 
 
 def _validation_command_text(modules: tuple[str, ...]) -> str:
@@ -991,12 +1031,128 @@ def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...
     return tuple(reasons)
 
 
+def _evidence_report_snapshot_sha256(report: Mapping[str, Any]) -> str:
+    return hashlib.sha256(_canonical_json_bytes(_evidence_report_snapshot(report))).hexdigest()
+
+
+def _evidence_report_snapshot(report: Mapping[str, Any]) -> dict[str, Any]:
+    decision_matrix = report.get("decision_matrix", {})
+    adapter_bound_execution = report.get("adapter_bound_execution", {})
+    no_leakage = report.get("core_surface_no_leakage", {})
+    external_provider_sample = report.get("external_provider_sample", {})
+    provider_error_mapping = adapter_bound_execution.get("provider_error_mapping", {})
+    snapshot = {
+        "report_id": report.get("report_id"),
+        "release": report.get("release"),
+        "fr_ref": report.get("fr_ref"),
+        "consumed_gate_ref": report.get("consumed_gate_ref"),
+        "approved_slice": report.get("approved_slice"),
+        "sample_origin": report.get("sample_origin"),
+        "provider_support_claim": report.get("provider_support_claim"),
+        "external_provider_sample": {
+            "sample_id": external_provider_sample.get("sample_id"),
+            "manifest_id": external_provider_sample.get("manifest_id"),
+            "manifest_ref": external_provider_sample.get("manifest_ref"),
+            "provenance_ref": external_provider_sample.get("provenance_ref"),
+            "author_path": external_provider_sample.get("author_path"),
+            "adapter_key": external_provider_sample.get("adapter_key"),
+            "provider_identity_scope": external_provider_sample.get("provider_identity_scope"),
+            "provider_key_redaction": external_provider_sample.get("provider_key_redaction"),
+            "requirement_ref": external_provider_sample.get("requirement_ref"),
+            "offer_ref": external_provider_sample.get("offer_ref"),
+            "adapter_binding_ref": external_provider_sample.get("adapter_binding_ref"),
+            "decision_ref": external_provider_sample.get("decision_ref"),
+            "decision_contract_ref": external_provider_sample.get("decision_contract_ref"),
+            "profile_proof_refs": external_provider_sample.get("profile_proof_refs"),
+            "not_native_provider_self_evidence": external_provider_sample.get(
+                "not_native_provider_self_evidence"
+            ),
+            "provider_support_claim": external_provider_sample.get("provider_support_claim"),
+            "forbidden_claims": external_provider_sample.get("forbidden_claims"),
+        },
+        "decision_matrix": {
+            "matched_case_ref": decision_matrix.get("matched_case_ref"),
+            "matched_case_status": decision_matrix.get("matched_case", {}).get("decision_status"),
+            "unmatched_case_ref": decision_matrix.get("unmatched_case_ref"),
+            "unmatched_case_status": decision_matrix.get("unmatched_case", {}).get("decision_status"),
+            "invalid_contract_case_ref": decision_matrix.get("invalid_contract_case_ref"),
+            "invalid_contract_case_status": decision_matrix.get("invalid_contract_case", {}).get(
+                "decision_status"
+            ),
+            "validator_commands": decision_matrix.get("validator_commands"),
+        },
+        "adapter_bound_execution": {
+            "status": adapter_bound_execution.get("status"),
+            "matched_decision_ref": adapter_bound_execution.get("matched_decision_ref"),
+            "matched_decision_id": adapter_bound_execution.get("matched_decision_id"),
+            "runtime_execution_ref": adapter_bound_execution.get("runtime_execution_ref"),
+            "success_task_record_ref": adapter_bound_execution.get("success_task_record_ref"),
+            "failure_task_record_ref": adapter_bound_execution.get("failure_task_record_ref"),
+            "raw_payload_ref": adapter_bound_execution.get("raw_payload_ref"),
+            "normalized_result_ref": adapter_bound_execution.get("normalized_result_ref"),
+            "adapter_mapped_failed_envelope_ref": adapter_bound_execution.get(
+                "adapter_mapped_failed_envelope_ref"
+            ),
+            "provider_error_mapping_checked": adapter_bound_execution.get(
+                "provider_error_mapping_checked"
+            ),
+            "provider_side_error_code": provider_error_mapping.get("provider_side_error_code"),
+            "adapter_mapped_error_code": provider_error_mapping.get("adapter_mapped_error_code"),
+            "resource_profile_consumption_checked": adapter_bound_execution.get(
+                "resource_profile_consumption_checked"
+            ),
+            "resource_lifecycle_disposition_checked": adapter_bound_execution.get(
+                "resource_lifecycle_disposition_checked"
+            ),
+            "resource_lifecycle_disposition_hint": adapter_bound_execution.get(
+                "resource_lifecycle_disposition_hint"
+            ),
+            "observability_carrier_checked": adapter_bound_execution.get(
+                "observability_carrier_checked"
+            ),
+        },
+        "core_surface_no_leakage": {
+            "status": no_leakage.get("status"),
+            "provider_identity_in_core_surface": no_leakage.get("provider_identity_in_core_surface"),
+            "registry_discovery_checked": no_leakage.get("registry_discovery_checked"),
+            "core_routing_checked": no_leakage.get("core_routing_checked"),
+            "task_record_checked": no_leakage.get("task_record_checked"),
+            "resource_lifecycle_checked": no_leakage.get("resource_lifecycle_checked"),
+            "failed_envelope_checked": no_leakage.get("failed_envelope_checked"),
+            "all_forbidden_paths_empty": no_leakage.get("all_forbidden_paths_empty"),
+            "surfaces": no_leakage.get("surfaces"),
+        },
+        "validation_evidence_ref": VALIDATION_EVIDENCE_ARTIFACT_PATH,
+    }
+    return _canonical_json_value(snapshot)
+
+
+def _canonical_json_value(value: Any) -> Any:
+    return json.loads(_canonical_json_bytes(value).decode("utf-8"))
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def _evidence_ref_fail_closed_reasons(report: Mapping[str, Any]) -> tuple[str, ...]:
     repo_root = Path(__file__).parents[1]
     reasons: list[str] = []
     artifact_path = repo_root / EVIDENCE_ARTIFACT_PATH
     if not artifact_path.exists():
         reasons.append("evidence_artifact_missing")
+    else:
+        try:
+            artifact_text = artifact_path.read_text(encoding="utf-8")
+        except OSError:
+            reasons.append("evidence_artifact_unreadable")
+        else:
+            reasons.extend(_evidence_artifact_snapshot_reasons(artifact_text, report))
     validation_artifact_path = repo_root / VALIDATION_EVIDENCE_ARTIFACT_PATH
     if not validation_artifact_path.exists():
         reasons.append("validation_evidence_artifact_missing")
@@ -1009,3 +1165,33 @@ def _evidence_ref_fail_closed_reasons(report: Mapping[str, Any]) -> tuple[str, .
         if not (repo_root / module_path).exists():
             reasons.append(f"validation_module_missing:{module_path}")
     return tuple(reasons)
+
+
+def _evidence_artifact_snapshot_reasons(
+    artifact_text: str,
+    report: Mapping[str, Any],
+) -> tuple[str, ...]:
+    start_index = artifact_text.find(EVIDENCE_ARTIFACT_JSON_START)
+    end_index = artifact_text.find(EVIDENCE_ARTIFACT_JSON_END)
+    if start_index == -1 or end_index == -1 or end_index <= start_index:
+        return ("evidence_artifact_structured_snapshot_missing",)
+    snapshot_text = artifact_text[start_index + len(EVIDENCE_ARTIFACT_JSON_START) : end_index].strip()
+    if snapshot_text.startswith("```"):
+        snapshot_lines = snapshot_text.splitlines()
+        snapshot_text = "\n".join(snapshot_lines[1:-1]).strip()
+    try:
+        artifact_snapshot = json.loads(snapshot_text)
+    except json.JSONDecodeError:
+        return ("evidence_artifact_structured_snapshot_invalid_json",)
+    if not isinstance(artifact_snapshot, Mapping):
+        return ("evidence_artifact_structured_snapshot_not_object",)
+    expected_snapshot = _evidence_report_snapshot(report)
+    if _canonical_json_value(artifact_snapshot) != expected_snapshot:
+        return ("evidence_artifact_structured_snapshot_drift",)
+    expected_sha256 = _evidence_report_snapshot_sha256(report)
+    if report.get("evidence_snapshot_sha256") != expected_sha256:
+        return ("evidence_report_snapshot_sha256_drift",)
+    validation_snapshot_sha256 = report.get("validation_evidence", {}).get("report_snapshot_sha256")
+    if validation_snapshot_sha256 != expected_sha256:
+        return ("validation_report_snapshot_sha256_drift",)
+    return ()

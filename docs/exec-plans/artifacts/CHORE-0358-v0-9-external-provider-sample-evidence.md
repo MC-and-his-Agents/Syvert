@@ -39,6 +39,132 @@
 - third_party_adapter_entry_ref：`tests.runtime.test_third_party_adapter_contract_entry`
 - api_cli_same_core_path_ref：`tests.runtime.test_cli_http_same_path`
 
+## Structured Evidence Snapshot
+
+`build_real_provider_sample_evidence_report()` 使用以下机器可读 snapshot 与运行时计算结果做一致性校验。Markdown 叙述可调整，但该 JSON snapshot 的关键字段漂移必须 fail-closed。
+
+<!-- syvert:evidence-report-json:start -->
+```json
+{
+  "adapter_bound_execution": {
+    "adapter_mapped_error_code": "external_sample_unavailable",
+    "adapter_mapped_failed_envelope_ref": "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope",
+    "failure_task_record_ref": "task_record:task-v0-9-sample-failure",
+    "matched_decision_id": "v0-9-external-provider-sample-matched",
+    "matched_decision_ref": "fr-0355:decision-matrix:matched",
+    "normalized_result_ref": "external-fixture://content-detail/success#normalized",
+    "observability_carrier_checked": true,
+    "provider_error_mapping_checked": true,
+    "provider_side_error_code": "provider_unavailable",
+    "raw_payload_ref": "external-fixture://content-detail/success#raw",
+    "resource_lifecycle_disposition_checked": true,
+    "resource_lifecycle_disposition_hint": "release",
+    "resource_profile_consumption_checked": true,
+    "runtime_execution_ref": "syvert.runtime.execute_task_with_record:v0-9-external-provider-sample",
+    "status": "pass",
+    "success_task_record_ref": "task_record:task-v0-9-sample-success"
+  },
+  "approved_slice": {
+    "capability": "content_detail",
+    "collection_mode": "hybrid",
+    "operation": "content_detail_by_url",
+    "target_type": "url"
+  },
+  "consumed_gate_ref": "FR-0351:provider_compatibility_sample",
+  "core_surface_no_leakage": {
+    "all_forbidden_paths_empty": true,
+    "core_routing_checked": true,
+    "failed_envelope_checked": true,
+    "provider_identity_in_core_surface": false,
+    "registry_discovery_checked": true,
+    "resource_lifecycle_checked": true,
+    "status": "pass",
+    "surfaces": {
+      "core_facing_failed_envelope": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "core_projection": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "core_routing": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "registry_discovery": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "resource_lifecycle": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "resource_trace": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      },
+      "task_record": {
+        "forbidden_field_paths": [],
+        "forbidden_value_paths": [],
+        "status": "passed"
+      }
+    },
+    "task_record_checked": true
+  },
+  "decision_matrix": {
+    "invalid_contract_case_ref": "fr-0355:decision-matrix:invalid-contract",
+    "invalid_contract_case_status": "invalid_contract",
+    "matched_case_ref": "fr-0355:decision-matrix:matched",
+    "matched_case_status": "matched",
+    "unmatched_case_ref": "fr-0355:decision-matrix:unmatched",
+    "unmatched_case_status": "unmatched",
+    "validator_commands": [
+      "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
+      "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence",
+      "python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path"
+    ]
+  },
+  "external_provider_sample": {
+    "adapter_binding_ref": "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-adapter-binding",
+    "adapter_key": "xhs",
+    "author_path": "external-provider-author-fixture",
+    "decision_contract_ref": "fr-0026:runtime-tests:adapter-provider-compatibility-decision",
+    "decision_ref": "v0-9-external-provider-sample-matched",
+    "forbidden_claims": [],
+    "manifest_id": "v0.9.0-external-provider-sample-content-detail",
+    "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+    "not_native_provider_self_evidence": true,
+    "offer_ref": "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample",
+    "profile_proof_refs": [
+      "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+      "fr-0027:profile:content-detail-by-url-hybrid:account"
+    ],
+    "provenance_ref": "controlled-record:v0.9.0:external-provider-sample-content-detail",
+    "provider_identity_scope": "adapter_bound",
+    "provider_key_redaction": "stable fixture provider key; not a product support claim",
+    "provider_support_claim": false,
+    "requirement_ref": "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+    "sample_id": "v0.9.0-external-provider-sample-content-detail"
+  },
+  "fr_ref": "FR-0355",
+  "provider_support_claim": false,
+  "release": "v0.9.0",
+  "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
+  "sample_origin": "external_provider_sample",
+  "validation_evidence_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json"
+}
+```
+<!-- syvert:evidence-report-json:end -->
+
+- snapshot_sha256：`8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e`
+
 ## Decision Matrix
 
 - matched_case_ref：`fr-0355:decision-matrix:matched`
@@ -129,7 +255,7 @@
 
 ## Validation Evidence
 
-机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`。
+机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e`。
 
 | validation | command | result |
 |---|---|---|

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import tempfile
 import unittest
@@ -210,11 +211,16 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(report["adapter_bound_execution"]["status"], "pass")
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
+        self.assertEqual(
+            report["evidence_snapshot_sha256"],
+            "8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e",
+        )
         self.assertEqual(report["validation_evidence"]["status"], "pass")
         self.assertEqual(
             report["validation_evidence"]["artifact_ref"],
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
         )
+        self.assertEqual(report["validation_evidence"]["report_snapshot_sha256"], report["evidence_snapshot_sha256"])
         self.assertEqual(len(report["validation_evidence"]["commands"]), 3)
         self.assertIn("resource_trace", report["core_surface_no_leakage"]["surfaces"])
         self.assertIn("task_record", report["core_surface_no_leakage"]["surfaces"])
@@ -228,6 +234,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(
             evidence["artifact_ref"],
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
+        )
+        self.assertEqual(
+            evidence["report_snapshot_sha256"],
+            "8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e",
         )
         self.assertEqual(
             tuple(command["command"] for command in evidence["commands"]),
@@ -274,6 +284,15 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
                 evidence = evidence_module.build_required_validation_evidence()
 
         self.assertEqual(evidence["status"], "fail")
+
+    def test_evidence_artifact_binding_fails_closed_for_runtime_snapshot_drift(self) -> None:
+        report = build_real_provider_sample_evidence_report()
+        mutated_report = deepcopy(report)
+        mutated_report["decision_matrix"]["matched_case_ref"] = "fr-0355:decision-matrix:drift"
+
+        reasons = evidence_module._evidence_ref_fail_closed_reasons(mutated_report)
+
+        self.assertIn("evidence_artifact_structured_snapshot_drift", reasons)
 
     def test_report_approved_slice_is_not_global_mutable_state(self) -> None:
         report = build_real_provider_sample_evidence_report()
