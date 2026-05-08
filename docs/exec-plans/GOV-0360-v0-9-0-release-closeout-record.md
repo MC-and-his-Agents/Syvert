@@ -97,7 +97,7 @@
 
 ## 待验证项
 
-- 阶段 B PR `#362` checks、guardian 与受控 merge。
+- 阶段 B PR `#362` guardian 与受控 merge。
 - Phase / FR / Work Item closeout comment 与 GitHub 状态。
 
 ## closeout 证据

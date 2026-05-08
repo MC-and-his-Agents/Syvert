@@ -48,7 +48,7 @@
 - PR `#357/#359` 已合入 main。
 - Work Item `#358` 的分支与 worktree 已退役，archive tag 为 `archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`。
 - 阶段 A carrier PR `#361` 已合入，merge commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
-- 阶段 B published truth 回写 PR `#362` 已创建，当前回写本 published truth carrier。
+- 阶段 B published truth 已由 PR `#362` 回写。
 - `v0.9.0` annotated tag 已创建并推送，tag object `d08d5884edb26c5a0112028f4e8a48adcac241eb`，tag target `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
 - GitHub Release `v0.9.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.9.0`。
 
