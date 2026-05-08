@@ -40,6 +40,8 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             {
                 "authorization": "Bearer redacted",
                 "headers": {"authorization": "Bearer redacted"},
+                "ms_token": "ms-token-1",
+                "verify_fp": "verify-1",
                 "xsec_token": "xsec-redacted",
             }
         )
@@ -279,7 +281,7 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "credential_material_projection_redacted": credential_projection["material_fields_redacted"] is True,
                 "private_fields_absent_from_projection": all(
                     token not in json.dumps(credential_projection, sort_keys=True)
-                    for token in ("cookies", "ms_token", "verify_fp", "xsec_token", "authorization")
+                    for token in ("cookies", "ms_token", "verify_fp", "xsec_token", "authorization", "headers")
                 ),
                 "private_values_absent_from_projection": all(
                     value not in json.dumps(credential_projection, sort_keys=True)

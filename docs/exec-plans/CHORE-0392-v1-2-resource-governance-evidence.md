@@ -71,6 +71,8 @@
 - PR guardian 第三轮 `REQUEST_CHANGES`：
   - P1：pre-admission invalid 不改库存状态是硬编码，未从 store truth 推导。处理：replay no-active-lease invalidation helper，读取 resource lifecycle snapshot 推导 `account_status_after=AVAILABLE`。
   - P1：public projection 无泄漏只检查字段名，未检查敏感值。处理：补 cookie/token/header/authorization 实际值断言，artifact snapshot 增加 `private_values_absent_from_projection=true`。
+- PR guardian 第四轮 `REQUEST_CHANGES`：
+  - P1：public projection replay material 未显式包含 `ms_token` / `verify_fp`，且字段名断言漏掉 `headers`。处理：replay material 显式加入 `ms_token`、`verify_fp`、`headers.authorization`，并在字段名断言中加入 `headers`。
 
 ## 未决风险
 
