@@ -50,6 +50,25 @@
 - `python3 scripts/workflow_guard.py --mode ci`
 - `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-388-chore-0388-v1-2-resource-governance-spec`
 
+## 已执行验证
+
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-388-chore-0388-v1-2-resource-governance-spec`
+  - 结果：通过。
+- Initial GitHub checks on PR #389 at head `50dca1019eee92ff12a248770201344e73ac02a6`
+  - `Validate Commit Messages`：通过。
+  - `Validate Docs And Guard Scripts`：通过。
+  - `Validate Governance Tooling`：通过。
+  - `Validate Spec Review Boundaries`：通过。
+- Guardian review on PR #389 at head `50dca1019eee92ff12a248770201344e73ac02a6`
+  - 结果：`REQUEST_CHANGES`。
+  - 处理：移除 `credential_session_stale` 作为直接 invalidation reason，并补齐本节验证证据入口。
+
 ## PR 计划
 
 - PR class：`spec`

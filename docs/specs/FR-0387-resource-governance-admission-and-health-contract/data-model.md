@@ -66,13 +66,13 @@
 - 用途：把 health evidence 映射到 Core-owned invalidation reason。
 - 最小 reason：
   - `credential_session_invalid`
-  - `credential_session_stale`
   - `credential_material_contract_invalid`
   - `health_evidence_contract_invalid`
   - `health_context_mismatch`
 - 约束：
   - reason 必须非空、平台中立、可脱敏记录。
   - 最终 resource state 仍通过既有 `release(target_status_after_release=INVALID)` 或后续已批准 runtime carrier 进入 `INVALID`。
+  - `stale` 不属于最小 invalidation reason；它只能拒绝 admission，除非后续 evidence 明确升级为 `invalid`。
 
 ## 生命周期
 

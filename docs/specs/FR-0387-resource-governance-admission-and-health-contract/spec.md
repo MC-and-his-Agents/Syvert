@@ -46,6 +46,7 @@
   - `ResourceLease` 仍是资源占用和收口的唯一共享 carrier；health evidence 可以绑定 lease，但不得重写 lease schema 或绕过 release 语义。
   - `ResourceTraceEvent` 仍是 task-bound 资源事件 truth；健康证据可引用 trace / lease / resource 关联，但不得替代 trace event。
   - 当 evidence 证明 credential/session invalid 时，Core 的最终资源状态收口必须通过既有 `release(target_status_after_release=INVALID)` 或等价后续 runtime carrier 承接。
+  - `stale` 只表示 freshness 不足或证据过期；它可以拒绝 admission，但不得单独把资源烧成 `INVALID`。只有后续 evidence 明确升级为 `invalid` 时，才允许进入 Core-owned invalidation。
 - 非功能需求：
   - resource health contract 必须 fail-closed；无法证明 evidence 来源、时间、绑定或脱敏边界合法时，不得允许其影响 admission。
   - 所有 public carrier 必须默认脱敏，不得输出 raw secret、cookie、token、session dump、header value 或 provider private key。
@@ -103,7 +104,7 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
   - Provider offer 或 Adapter requirement 暴露 credential/session 私有字段时必须 invalid。
 - 边界场景：
   - `SessionHealth=unknown` 可以作为“需要进一步证明”的状态存在，但不得提升为健康证明。
-  - `stale` 或 `expired` 不自动要求本 FR 定义刷新机制；恢复、刷新、重新登录与人工修复属于后续 FR。
+  - `stale` 或 `expired` 不自动要求本 FR 定义刷新机制，也不自动等同于 `INVALID`；恢复、刷新、重新登录与人工修复属于后续 FR。
   - `CredentialMaterial` 是 account material 的治理边界，不改变 `proxy` material 的最小 contract。
   - 本 FR 不定义新的 public operation，也不改变 `content_detail_by_url` stable baseline。
 
