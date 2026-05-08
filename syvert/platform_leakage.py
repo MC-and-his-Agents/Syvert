@@ -31,6 +31,10 @@ _SCAN_TARGETS = (
         "relative_path": Path("syvert/version_gate.py"),
         "default_boundary": "version_gate_logic",
     },
+    {
+        "relative_path": Path("syvert/operation_taxonomy.py"),
+        "default_boundary": "shared_input_model",
+    },
 )
 
 _RUNTIME_SYMBOL_BOUNDARIES = {

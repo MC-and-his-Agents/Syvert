@@ -43,10 +43,8 @@ FORBIDDEN_TAXONOMY_FIELDS = frozenset(
         "workflow",
         "application_workflow",
         "content_library",
-        "native_xhs",
-        "native_douyin",
-        "xiaohongshu_note",
-        "douyin_aweme",
+        "platform_private_object",
+        "platform_private_business_object",
     }
 )
 
