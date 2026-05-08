@@ -29,9 +29,10 @@
 
 - `#388/#390/#391/#392` 均已 closed completed。
 - 阶段 A carrier base：`eaec42d70ed432b7334eab19ef5ec5f69544f855`。
-- 阶段 A PR 待创建。
-- `v1.2.0` annotated tag 与 GitHub Release 待阶段 A carrier 合入后创建。
-- 阶段 B published truth carrier 待 tag / GitHub Release 创建后回写。
+- 阶段 A PR `#397` 已合入，merge commit `55ad1e5d336907fac6a990bd1742a6e351b92b97`。
+- `v1.2.0` annotated tag 已创建并推送，tag object `1096452ed5ebb41c63005125aa525061c594effb`，target commit `55ad1e5d336907fac6a990bd1742a6e351b92b97`。
+- GitHub Release `v1.2.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.2.0`。
+- 阶段 B 正在回写 published truth carrier。
 
 ## 验证摘要
 
@@ -57,8 +58,8 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 阶段 A base：`eaec42d70ed432b7334eab19ef5ec5f69544f855`
-- 阶段 A PR live head 由 PR `headRefOid` 与 merge gate 绑定。
-- 阶段 B published truth follow-up 将记录 tag object、tag target 与 release URL。
+- 阶段 A release carrier：`55ad1e5d336907fac6a990bd1742a6e351b92b97`
+- 阶段 B PR live head 由 PR `headRefOid` 与 merge gate 绑定。
 
 ## closeout 证据
 
