@@ -16,7 +16,7 @@
 ## 分阶段拆分
 
 - 阶段 1：`#356` 收口本 formal spec suite、ADR、exec-plan 与 roadmap 引用。
-- 阶段 2：创建 implementation / evidence Work Item，新增 external provider sample fixture、decision tests 与 closeout evidence artifact。
+- 阶段 2：创建 implementation / evidence Work Item，新增 external provider sample fixture、decision tests、Adapter-bound execution evidence 与 closeout evidence artifact。
 - 阶段 3：创建 release closeout Work Item，汇总 `v0.9.0` release index、GitHub Phase / FR / Work Item、PR、checks、guardian 与 published truth carrier。
 - 阶段 4：发布 `v0.9.0` annotated tag 与 GitHub Release，并回写 release index published truth。
 
@@ -38,6 +38,7 @@
   - `git diff --check origin/main..HEAD`
 - implementation / evidence PR：
   - compatibility decision runtime tests
+  - Adapter-bound execution sample tests
   - provider no-leakage guard tests
   - dual reference regression tests
   - third-party adapter contract entry tests

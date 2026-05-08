@@ -8,6 +8,8 @@
   - 用途：描述样本来源、Adapter binding、approved slice 与 provider support boundary。
 - `CompatibilityDecisionEvidenceMatrix`
   - 用途：汇总 `matched`、`unmatched`、`invalid_contract` 三类 decision 结果与对应验证入口。
+- `AdapterBoundExecutionEvidence`
+  - 用途：证明 `matched` decision 可以进入 Adapter-owned provider seam，并覆盖 provider 错误、资源、生命周期与观测证据。
 - `CoreSurfaceNoLeakageEvidence`
   - 用途：证明 provider identity 没有进入 Core-facing surfaces。
 
@@ -22,6 +24,7 @@
 - `sample_origin`：必须表达 `external_provider_sample`。
 - `provider_support_claim`：必须为 `false`。
 - `decision_matrix_ref`：指向 implementation / evidence artifact 的 decision matrix。
+- `adapter_bound_execution_ref`：指向 matched decision 后的 Adapter-bound execution evidence。
 - `no_leakage_ref`：指向 provider no-leakage evidence。
 - `dual_reference_ref`：指向双参考 regression evidence。
 - `third_party_adapter_entry_ref`：指向第三方 Adapter-only contract entry evidence。
@@ -47,6 +50,19 @@
 - `invalid_contract_case_ref`：必须存在。
 - `validator_commands`：记录可复验命令或 artifact。
 - `fail_closed_reason`：当 status 为 `fail` 时必须存在。
+
+### AdapterBoundExecutionEvidence
+
+- `matched_decision_ref`：必须指向 `CompatibilityDecisionEvidenceMatrix.matched_case_ref`。
+- `adapter_owned_provider_seam_ref`：必须指向 Adapter-owned provider seam 或 replay fixture。
+- `raw_payload_ref`：成功路径必须存在；失败路径必须说明不适用原因。
+- `normalized_result_ref`：成功路径必须存在；失败路径必须说明不适用原因。
+- `adapter_mapped_failed_envelope_ref`：失败路径必须存在；成功路径必须说明不适用原因。
+- `provider_error_mapping_checked`：必须为 `true`。
+- `resource_profile_consumption_checked`：必须为 `true`。
+- `resource_lifecycle_disposition_checked`：必须为 `true`。
+- `observability_carrier_checked`：必须为 `true`。
+- `core_surface_projection_ref`：必须指向无 provider identity 的 Core-facing projection。
 
 ### CoreSurfaceNoLeakageEvidence
 

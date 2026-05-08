@@ -5,6 +5,7 @@
 - 如果 external provider sample 只是一份仓内 native fixture，`v0.9.0` 会退化为自证，不能满足 `FR-0351` 的 `provider_compatibility_sample` gate。
 - 如果 evidence 依赖私密账号、token 或 provider 控制台，reviewer 和 guardian 无法复验。
 - 如果 closeout 把 external provider sample 写成 provider 产品正式支持，会违反 Syvert 底座边界。
+- 如果 implementation 只交付 decision matrix 而没有 Adapter-bound execution evidence，无法证明 `FR-0351` 要求的执行链路可执行。
 - 如果 implementation 为了适配样本改写 Core routing、registry、TaskRecord 或 resource lifecycle，会破坏 Core / Adapter / Provider 边界。
 - 如果 provider sample 通过但双参考、第三方 Adapter-only entry 或 API / CLI same-path 回归失败，`v0.9.0` 仍不能收口。
 
