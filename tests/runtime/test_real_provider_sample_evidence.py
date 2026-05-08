@@ -161,6 +161,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
             report["external_provider_sample"]["manifest_ref"],
             "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
         )
+        self.assertEqual(
+            report["external_provider_sample"]["provenance_artifact_ref"],
+            "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
+        )
         self.assertTrue(report["external_provider_sample"]["not_native_provider_self_evidence"])
         self.assertEqual(
             report["external_provider_sample"]["requirement_ref"],
@@ -213,7 +217,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
         self.assertEqual(
             report["evidence_snapshot_sha256"],
-            "8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e",
+            "88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21",
         )
         self.assertEqual(report["validation_evidence"]["status"], "pass")
         self.assertEqual(
@@ -237,7 +241,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(
             evidence["report_snapshot_sha256"],
-            "8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e",
+            "88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21",
         )
         self.assertEqual(
             tuple(command["command"] for command in evidence["commands"]),
@@ -248,6 +252,15 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
             ),
         )
         self.assertTrue(all(command["status"] == "pass" for command in evidence["commands"]))
+
+    def test_required_validation_commands_are_bound_to_repo_modules(self) -> None:
+        required_modules = {
+            module
+            for _, modules in evidence_module.REQUIRED_VALIDATION_COMMANDS
+            for module in modules
+        }
+
+        self.assertEqual(required_modules, set(evidence_module.VALIDATION_MODULE_PATHS))
 
     def test_validation_evidence_fails_closed_for_structured_artifact_drift(self) -> None:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json") as artifact:
@@ -347,6 +360,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         manifest = external_provider_sample_manifest()
         manifest.pop("manifest_id")
         manifest.pop("provenance_ref")
+        manifest.pop("provenance_artifact_ref")
         manifest.pop("author_path")
 
         report = build_real_provider_sample_evidence_report(manifest_override=manifest)
@@ -354,6 +368,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertIsNone(report["external_provider_sample"]["manifest_id"])
         self.assertIsNone(report["external_provider_sample"]["provenance_ref"])
+        self.assertIsNone(report["external_provider_sample"]["provenance_artifact_ref"])
         self.assertIsNone(report["external_provider_sample"]["author_path"])
         self.assertIn(
             "manifest_required_field_missing:manifest_id",
@@ -364,9 +379,26 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
             report["decision_matrix"]["fail_closed_reason"],
         )
         self.assertIn(
+            "manifest_required_field_missing:provenance_artifact_ref",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+        self.assertIn(
             "manifest_required_field_missing:author_path",
             report["decision_matrix"]["fail_closed_reason"],
         )
+
+    def test_report_fails_closed_for_provenance_artifact_ref_drift(self) -> None:
+        manifest = external_provider_sample_manifest()
+        manifest["provenance_artifact_ref"] = "syvert/fixtures/missing-provenance.json"
+
+        report = build_real_provider_sample_evidence_report(manifest_override=manifest)
+
+        self.assertEqual(report["status"], "fail")
+        self.assertIn(
+            "manifest_provenance_artifact_ref_not_canonical_fixture",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+        self.assertIn("provenance_artifact_ref_drift", report["decision_matrix"]["fail_closed_reason"])
 
     def test_no_leakage_evidence_reports_identity_presence_when_surface_leaks(self) -> None:
         decision = decide_adapter_provider_compatibility(external_provider_decision_input())

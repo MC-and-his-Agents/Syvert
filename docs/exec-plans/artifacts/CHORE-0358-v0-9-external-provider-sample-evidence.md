@@ -16,6 +16,7 @@
 - manifest_id：`v0.9.0-external-provider-sample-content-detail`
 - manifest_ref：`syvert/fixtures/v0_9_external_provider_sample_manifest.json`
 - provenance_ref：`controlled-record:v0.9.0:external-provider-sample-content-detail`
+- provenance_artifact_ref：`syvert/fixtures/v0_9_external_provider_sample_provenance.json`
 - controlled_record_ref：`controlled-record:v0.9.0:external-provider-sample-content-detail`
 - author_path：`external-provider-author-fixture`
 - adapter_key：`xhs`
@@ -146,6 +147,7 @@
       "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
       "fr-0027:profile:content-detail-by-url-hybrid:account"
     ],
+    "provenance_artifact_ref": "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
     "provenance_ref": "controlled-record:v0.9.0:external-provider-sample-content-detail",
     "provider_identity_scope": "adapter_bound",
     "provider_key_redaction": "stable fixture provider key; not a product support claim",
@@ -163,7 +165,7 @@
 ```
 <!-- syvert:evidence-report-json:end -->
 
-- snapshot_sha256：`8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e`
+- snapshot_sha256：`88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21`
 
 ## Decision Matrix
 
@@ -255,7 +257,7 @@
 
 ## Validation Evidence
 
-机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=8b73c53ceaf39a98b746bb2d220e49a0b2c4ae3470c4d16aa713d40974e0d63e`。
+机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21`。
 
 | validation | command | result |
 |---|---|---|

@@ -43,6 +43,9 @@ EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF = (
 EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF = (
     "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-adapter-binding"
 )
+EXTERNAL_PROVIDER_PROVENANCE_ARTIFACT_REF = (
+    "syvert/fixtures/v0_9_external_provider_sample_provenance.json"
+)
 FR0355_EVIDENCE_REF = "fr-0355:external-provider-sample-evidence:v0-9"
 FR0351_GATE_REF = "FR-0351:provider_compatibility_sample"
 FR0026_DECISION_EVIDENCE_REF = "fr-0026:runtime-tests:adapter-provider-compatibility-decision"
@@ -56,6 +59,10 @@ EVIDENCE_ARTIFACT_JSON_START = "<!-- syvert:evidence-report-json:start -->"
 EVIDENCE_ARTIFACT_JSON_END = "<!-- syvert:evidence-report-json:end -->"
 VALIDATION_MODULE_PATHS = {
     "tests.runtime.test_real_provider_sample_evidence": "tests/runtime/test_real_provider_sample_evidence.py",
+    "tests.runtime.test_adapter_provider_compatibility_decision": (
+        "tests/runtime/test_adapter_provider_compatibility_decision.py"
+    ),
+    "tests.runtime.test_provider_no_leakage_guard": "tests/runtime/test_provider_no_leakage_guard.py",
     "tests.runtime.test_real_adapter_regression": "tests/runtime/test_real_adapter_regression.py",
     "tests.runtime.test_third_party_adapter_contract_entry": "tests/runtime/test_third_party_adapter_contract_entry.py",
     "tests.runtime.test_cli_http_same_path": "tests/runtime/test_cli_http_same_path.py",
@@ -99,6 +106,7 @@ APPROVED_SLICE = {
 REQUIRED_MANIFEST_FIELDS = (
     "manifest_id",
     "provenance_ref",
+    "provenance_artifact_ref",
     "author_path",
 )
 EXPECTED_MANIFEST_FIXTURE_REFS = (
@@ -151,6 +159,7 @@ def build_real_provider_sample_evidence_report(
             "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
             "manifest_id": manifest.get("manifest_id"),
             "provenance_ref": manifest.get("provenance_ref"),
+            "provenance_artifact_ref": manifest.get("provenance_artifact_ref"),
             "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
             "controlled_record_ref": manifest.get("provenance_ref"),
             "author_path": manifest.get("author_path"),
@@ -1016,6 +1025,9 @@ def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...
         reasons.append("manifest_provider_key_redaction_drift")
     if manifest.get("provenance_ref") != "controlled-record:v0.9.0:external-provider-sample-content-detail":
         reasons.append("manifest_provenance_ref_not_canonical_controlled_record")
+    if manifest.get("provenance_artifact_ref") != EXTERNAL_PROVIDER_PROVENANCE_ARTIFACT_REF:
+        reasons.append("manifest_provenance_artifact_ref_not_canonical_fixture")
+    reasons.extend(_provenance_artifact_fail_closed_reasons(manifest))
     if manifest.get("author_path") != "external-provider-author-fixture":
         reasons.append("manifest_author_path_not_external_fixture")
     if tuple(manifest.get("fixture_refs", ())) != EXPECTED_MANIFEST_FIXTURE_REFS:
@@ -1028,6 +1040,65 @@ def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...
             normalized_claim = str(claim).lower().replace("-", "_")
             if any(token in normalized_claim for token in FORBIDDEN_MANIFEST_CLAIM_TOKENS):
                 reasons.append(f"manifest_forbidden_claim_present:{normalized_claim}")
+    return tuple(reasons)
+
+
+def _provenance_artifact_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...]:
+    provenance_artifact_ref = manifest.get("provenance_artifact_ref")
+    if provenance_artifact_ref != EXTERNAL_PROVIDER_PROVENANCE_ARTIFACT_REF:
+        return ("provenance_artifact_ref_drift",)
+    provenance_path = Path(__file__).parents[1] / EXTERNAL_PROVIDER_PROVENANCE_ARTIFACT_REF
+    if not provenance_path.exists():
+        return ("provenance_artifact_missing",)
+    try:
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ("provenance_artifact_unreadable",)
+    if not isinstance(provenance, Mapping):
+        return ("provenance_artifact_not_object",)
+    expected = {
+        "record_id": manifest.get("provenance_ref"),
+        "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+        "sample_origin": "external_provider_sample",
+        "author_path": manifest.get("author_path"),
+        "author_path_kind": "repo_fixture",
+        "adapter_key": "xhs",
+        "provider_identity_scope": "adapter_bound",
+        "provider_key_redaction": "stable fixture provider key; not a product support claim",
+        "provider_support_claim": False,
+        "not_native_provider_self_evidence": True,
+        "not_provider_product_support": True,
+        "fixture_refs": list(EXPECTED_MANIFEST_FIXTURE_REFS),
+    }
+    reasons: list[str] = []
+    for field_name, expected_value in expected.items():
+        if provenance.get(field_name) != expected_value:
+            reasons.append(f"provenance_artifact_field_drift:{field_name}")
+    boundary = provenance.get("boundary")
+    if not isinstance(boundary, Mapping):
+        reasons.append("provenance_artifact_boundary_missing")
+    else:
+        expected_boundary = {
+            "live_network_required": False,
+            "private_token_required": False,
+            "native_provider_self_evidence": False,
+            "provider_product_support_claim": False,
+        }
+        for field_name, expected_value in expected_boundary.items():
+            if boundary.get(field_name) != expected_value:
+                reasons.append(f"provenance_artifact_boundary_drift:{field_name}")
+    reviewable_artifact_refs = provenance.get("reviewable_artifact_refs")
+    if not isinstance(reviewable_artifact_refs, list):
+        reasons.append("provenance_artifact_reviewable_refs_missing")
+    else:
+        required_refs = {
+            EVIDENCE_ARTIFACT_PATH,
+            VALIDATION_EVIDENCE_ARTIFACT_PATH,
+            "tests/runtime/test_real_provider_sample_evidence.py",
+        }
+        missing_refs = required_refs.difference(reviewable_artifact_refs)
+        for missing_ref in sorted(missing_refs):
+            reasons.append(f"provenance_artifact_reviewable_ref_missing:{missing_ref}")
     return tuple(reasons)
 
 
@@ -1054,6 +1125,7 @@ def _evidence_report_snapshot(report: Mapping[str, Any]) -> dict[str, Any]:
             "manifest_id": external_provider_sample.get("manifest_id"),
             "manifest_ref": external_provider_sample.get("manifest_ref"),
             "provenance_ref": external_provider_sample.get("provenance_ref"),
+            "provenance_artifact_ref": external_provider_sample.get("provenance_artifact_ref"),
             "author_path": external_provider_sample.get("author_path"),
             "adapter_key": external_provider_sample.get("adapter_key"),
             "provider_identity_scope": external_provider_sample.get("provider_identity_scope"),

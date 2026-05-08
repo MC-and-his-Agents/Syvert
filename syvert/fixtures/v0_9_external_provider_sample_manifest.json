@@ -2,6 +2,7 @@
   "manifest_id": "v0.9.0-external-provider-sample-content-detail",
   "sample_origin": "external_provider_sample",
   "provenance_ref": "controlled-record:v0.9.0:external-provider-sample-content-detail",
+  "provenance_artifact_ref": "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
   "author_path": "external-provider-author-fixture",
   "adapter_key": "xhs",
   "provider_identity_scope": "adapter_bound",
