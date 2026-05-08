@@ -104,7 +104,11 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
   "validation_commands": [
     "python3 -m unittest tests.runtime.test_resource_governance_evidence tests.runtime.test_resource_health",
     "python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard",
-    "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage"
+    "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage",
+    "python3 scripts/spec_guard.py --mode ci --all",
+    "python3 scripts/docs_guard.py --mode ci",
+    "python3 scripts/workflow_guard.py --mode ci",
+    "BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha \"$BASE\" --head-sha \"$HEAD_SHA\" --head-ref issue-392-v1-2-resource-governance-evidence"
   ],
   "work_item_ref": "#392"
 }
@@ -119,7 +123,7 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
 - Invalid contract evidence covers malformed timestamp, unredacted evidence, and adapter context mismatch; all bind to `health_evidence_contract_invalid`.
 - Pre-admission invalid evidence does not change an available account resource.
 - Active invalid evidence is lease-bound and task/adapter/capability/operation-bound; Core invalidates only the account credential session and releases the co-leased proxy back to `AVAILABLE`.
-- Public projection evidence proves private material fields such as `cookies`, `ms_token`, `verify_fp`, `xsec_token`, and `authorization` do not appear in the projection.
+- Public projection evidence uses account material containing private fields including `cookies`, `ms_token`, `verify_fp`, `xsec_token`, `headers`, and `authorization`, then proves those field names and values do not appear in the projection.
 
 ## Non Goals
 

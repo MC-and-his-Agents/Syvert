@@ -35,11 +35,19 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         return default_resource_lifecycle_store()
 
     def account_record(self, *, resource_id: str = "account-001", status: str = "AVAILABLE") -> ResourceRecord:
+        material = dict(managed_account_material(xhs_account_material(), adapter_key="xhs"))
+        material.update(
+            {
+                "authorization": "Bearer redacted",
+                "headers": {"authorization": "Bearer redacted"},
+                "xsec_token": "xsec-redacted",
+            }
+        )
         return ResourceRecord(
             resource_id=resource_id,
             resource_type="account",
             status=status,
-            material=managed_account_material(xhs_account_material(), adapter_key="xhs"),
+            material=material,
         )
 
     def healthy_evidence(self, **overrides) -> ResourceHealthEvidence:
@@ -264,6 +272,10 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "python3 -m unittest tests.runtime.test_resource_governance_evidence tests.runtime.test_resource_health",
                 "python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard",
                 "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage",
+                "python3 scripts/spec_guard.py --mode ci --all",
+                "python3 scripts/docs_guard.py --mode ci",
+                "python3 scripts/workflow_guard.py --mode ci",
+                'BASE=$(git merge-base origin/main HEAD); HEAD_SHA=$(git rev-parse HEAD); python3 scripts/governance_gate.py --mode ci --base-sha "$BASE" --head-sha "$HEAD_SHA" --head-ref issue-392-v1-2-resource-governance-evidence',
             ],
         }
 

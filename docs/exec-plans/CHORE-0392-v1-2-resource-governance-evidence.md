@@ -64,6 +64,10 @@
 - PR guardian 第一轮 `REQUEST_CHANGES`：
   - P1：artifact 宣称覆盖 malformed / unredacted / context-mismatched 三类 invalid_contract，但 replay report 只构造 unredacted。处理：补 `invalid_contract_malformed`、`invalid_contract_unredacted`、`invalid_contract_context_mismatch` 三个独立 snapshot 场景，并由 replay test 逐字段对比 artifact。
   - P2：artifact validation command 漏掉 `test_resource_lifecycle_store`。处理：同步补入 artifact validation command，并复跑包含 lifecycle store 的回归。
+- PR guardian 第二轮 `REQUEST_CHANGES`：
+  - P1：machine-readable evidence 未承载 PR 声明的 spec/docs/workflow/governance validation set。处理：将三项 guard 与 governance gate 命令补入 structured snapshot。
+  - P2：public projection 无泄漏证明对 `xsec_token` / `authorization` 等字段为空转。处理：replay account material 显式加入 `xsec_token`、`headers.authorization`、`authorization`，并继续验证 public projection 不暴露这些字段。
+  - P2：PR carrier 缺 `integration_check` section。处理：PR body 补 canonical integration_check carrier。
 
 ## 未决风险
 
