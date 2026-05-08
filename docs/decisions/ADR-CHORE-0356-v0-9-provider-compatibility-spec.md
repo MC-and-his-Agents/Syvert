@@ -4,6 +4,11 @@
 
 Accepted
 
+## 关联信息
+
+- Issue：`#356`
+- item_key：`CHORE-0356-v0-9-provider-compatibility-spec`
+
 ## 背景
 
 `v0.8.0` 已经完成 Adapter / Provider compatibility decision 的 contract foundation。`v1.0.0` release gate 要求 `v0.9.0 provider sample evidence`，但在进入 implementation 前需要先冻结该 evidence 的边界，避免把真实 provider 样本误写成 provider 产品支持、selector / fallback 或上层应用能力。
