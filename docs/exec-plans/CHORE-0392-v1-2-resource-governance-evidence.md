@@ -84,5 +84,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `1c24a3fcc026fb2bda6e68e804398e7a70ac6c30`
+- `6ab1ee2a58a606ea1aecc95d12923326014ac223`
 - Current HEAD may include a metadata-only checkpoint follow-up that records this verified implementation checkpoint.
