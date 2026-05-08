@@ -16,14 +16,15 @@
 
 ## Gate Summary
 
-当前阶段 A carrier 建立以下 release truth 输入：
+`v1.2.0` final closeout 已建立以下 release truth：
 
 - `#388/#390/#391/#392` 均已合入并关闭为 completed。
 - `v1.1.0` taxonomy 已发布，resource governance 使用其 stable context 作为 admission 输入。
 - `account` / `proxy` lifecycle regression 保持通过。
 - 小红书 `content_detail_by_url` 账号会话场景证明 credential/session stale、invalid、unknown 不能继续只由 opaque material 表达。
 - `v1.2.0` annotated tag 与 GitHub Release 已创建。
-- `docs/releases/v1.2.0.md` 阶段 B 正在回写 published truth carrier。
+- `docs/releases/v1.2.0.md` 阶段 B 已回写 published truth carrier。
+- Phase `#380`、FR `#387` 与 Work Item `#396` 已关闭为 completed。
 
 ## Gate Item Matrix
 
@@ -54,13 +55,13 @@
 
 | Issue | Role | State |
 | --- | --- | --- |
-| `#380` | Phase | open before final closeout |
-| `#387` | FR | open before final closeout |
+| `#380` | Phase | closed completed |
+| `#387` | FR | closed completed |
 | `#388` | Formal spec Work Item | closed completed |
 | `#390` | Runtime Work Item | closed completed |
 | `#391` | Consumer boundary Work Item | closed completed |
 | `#392` | Evidence Work Item | closed completed |
-| `#396` | Release closeout Work Item | open before final closeout |
+| `#396` | Release closeout Work Item | closed completed |
 
 ## 完成语义
 
@@ -69,4 +70,4 @@
 - `v1.2.0` annotated tag 指向包含阶段 A carrier 的 main commit。
 - GitHub Release `v1.2.0` 存在且非 draft / non-prerelease。
 - `docs/releases/v1.2.0.md` 阶段 B 已回写 tag object、tag target、release URL 与 publish time。
-- Phase `#380`、FR `#387` 与 Work Item `#396` 将在阶段 B PR 合入后关闭为 completed。
+- Phase `#380`、FR `#387` 与 Work Item `#396` 已在阶段 B closeout 后关闭为 completed。
