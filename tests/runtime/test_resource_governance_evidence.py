@@ -78,7 +78,12 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(scenarios["expired_healthy_rejection"]["decision_status"], RESOURCE_ADMISSION_DECISION_REJECTED)
         self.assertEqual(scenarios["expired_healthy_rejection"]["projected_session_health"], SESSION_HEALTH_STALE)
         self.assertEqual(scenarios["missing_evidence_unknown"]["projected_session_health"], SESSION_HEALTH_UNKNOWN)
-        self.assertEqual(scenarios["invalid_contract_evidence"]["decision_status"], RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+        self.assertEqual(scenarios["invalid_contract_malformed"]["decision_status"], RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+        self.assertEqual(scenarios["invalid_contract_unredacted"]["decision_status"], RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+        self.assertEqual(
+            scenarios["invalid_contract_context_mismatch"]["decision_status"],
+            RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT,
+        )
         self.assertEqual(scenarios["pre_admission_invalid_no_active_lease"]["account_status_after"], "AVAILABLE")
         self.assertEqual(scenarios["active_lease_invalid_core_invalidation"]["account_status_after"], "INVALID")
         self.assertEqual(scenarios["active_lease_invalid_core_invalidation"]["proxy_status_after"], "AVAILABLE")
@@ -132,8 +137,19 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             evidence=(),
             evaluated_at="2026-05-08T12:05:00.000000Z",
         )
-        invalid_contract_decision = decide_resource_health_admission(
-            decision_id="decision-invalid-contract",
+        invalid_contract_malformed_decision = decide_resource_health_admission(
+            decision_id="decision-invalid-contract-malformed",
+            task_id="task-001",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            operation="content_detail_by_url",
+            requested_slots=("account",),
+            resources=(account,),
+            evidence=(self.healthy_evidence(observed_at="not-a-time"),),
+            evaluated_at="2026-05-08T12:05:00.000000Z",
+        )
+        invalid_contract_unredacted_decision = decide_resource_health_admission(
+            decision_id="decision-invalid-contract-unredacted",
             task_id="task-001",
             adapter_key="xhs",
             capability="content_detail_by_url",
@@ -141,6 +157,17 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             requested_slots=("account",),
             resources=(account,),
             evidence=(self.healthy_evidence(redaction_status="raw"),),
+            evaluated_at="2026-05-08T12:05:00.000000Z",
+        )
+        invalid_contract_context_mismatch_decision = decide_resource_health_admission(
+            decision_id="decision-invalid-contract-context",
+            task_id="task-001",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            operation="content_detail_by_url",
+            requested_slots=("account",),
+            resources=(account,),
+            evidence=(self.healthy_evidence(adapter_key="douyin"),),
             evaluated_at="2026-05-08T12:05:00.000000Z",
         )
         pre_admission_decision = decide_resource_health_admission(
@@ -205,7 +232,9 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "healthy_admission": _decision_summary(healthy_decision),
                 "expired_healthy_rejection": _decision_summary(expired_decision),
                 "missing_evidence_unknown": _decision_summary(missing_decision),
-                "invalid_contract_evidence": _decision_summary(invalid_contract_decision),
+                "invalid_contract_context_mismatch": _decision_summary(invalid_contract_context_mismatch_decision),
+                "invalid_contract_malformed": _decision_summary(invalid_contract_malformed_decision),
+                "invalid_contract_unredacted": _decision_summary(invalid_contract_unredacted_decision),
                 "pre_admission_invalid_no_active_lease": {
                     **_decision_summary(pre_admission_decision),
                     "account_status_after": "AVAILABLE",
@@ -234,7 +263,7 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "validation_commands": [
                 "python3 -m unittest tests.runtime.test_resource_governance_evidence tests.runtime.test_resource_health",
                 "python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard",
-                "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage",
+                "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage",
             ],
         }
 

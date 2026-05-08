@@ -61,7 +61,9 @@
 
 ## Review 处理记录
 
-- 暂无。
+- PR guardian 第一轮 `REQUEST_CHANGES`：
+  - P1：artifact 宣称覆盖 malformed / unredacted / context-mismatched 三类 invalid_contract，但 replay report 只构造 unredacted。处理：补 `invalid_contract_malformed`、`invalid_contract_unredacted`、`invalid_contract_context_mismatch` 三个独立 snapshot 场景，并由 replay test 逐字段对比 artifact。
+  - P2：artifact validation command 漏掉 `test_resource_lifecycle_store`。处理：同步补入 artifact validation command，并复跑包含 lifecycle store 的回归。
 
 ## 未决风险
 

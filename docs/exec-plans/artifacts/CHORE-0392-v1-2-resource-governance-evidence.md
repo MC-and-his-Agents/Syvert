@@ -68,7 +68,19 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
       "failure_reason": null,
       "projected_session_health": "healthy"
     },
-    "invalid_contract_evidence": {
+    "invalid_contract_context_mismatch": {
+      "decision_status": "invalid_contract",
+      "fail_closed": true,
+      "failure_reason": "health_evidence_contract_invalid",
+      "projected_session_health": "unknown"
+    },
+    "invalid_contract_malformed": {
+      "decision_status": "invalid_contract",
+      "fail_closed": true,
+      "failure_reason": "health_evidence_contract_invalid",
+      "projected_session_health": "unknown"
+    },
+    "invalid_contract_unredacted": {
       "decision_status": "invalid_contract",
       "fail_closed": true,
       "failure_reason": "health_evidence_contract_invalid",
@@ -92,7 +104,7 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
   "validation_commands": [
     "python3 -m unittest tests.runtime.test_resource_governance_evidence tests.runtime.test_resource_health",
     "python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard",
-    "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage"
+    "python3 -m unittest tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_platform_leakage"
   ],
   "work_item_ref": "#392"
 }
@@ -104,7 +116,7 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
 - Healthy admission uses `ResourceHealthEvidence(status=healthy)` with `evaluated_at < expires_at`, returning `admitted / healthy`.
 - Expired healthy evidence uses the same evidence at the expiry boundary, returning `rejected / stale`.
 - Missing evidence keeps health-gated account admission fail-closed as `rejected / unknown`.
-- Invalid contract evidence covers unredacted evidence and binds to `health_evidence_contract_invalid`.
+- Invalid contract evidence covers malformed timestamp, unredacted evidence, and adapter context mismatch; all bind to `health_evidence_contract_invalid`.
 - Pre-admission invalid evidence does not change an available account resource.
 - Active invalid evidence is lease-bound and task/adapter/capability/operation-bound; Core invalidates only the account credential session and releases the co-leased proxy back to `AVAILABLE`.
 - Public projection evidence proves private material fields such as `cookies`, `ms_token`, `verify_fp`, `xsec_token`, and `authorization` do not appear in the projection.
