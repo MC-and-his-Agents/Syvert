@@ -179,11 +179,8 @@ def build_real_provider_sample_evidence_report(
             "unmatched_case": _decision_summary(unmatched_decision),
             "invalid_contract_case_ref": "fr-0355:decision-matrix:invalid-contract",
             "invalid_contract_case": _decision_summary(invalid_contract_decision),
-            "validator_commands": (
-                "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
-                "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision "
-                "tests.runtime.test_provider_no_leakage_guard "
-                "tests.runtime.test_real_provider_sample_evidence",
+            "validator_commands": tuple(
+                _validation_command_text(modules) for _, modules in REQUIRED_VALIDATION_COMMANDS
             ),
         },
         "adapter_bound_execution": adapter_bound_execution,
@@ -447,7 +444,7 @@ def build_adapter_bound_execution_evidence(
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
             "#core-surface-projection"
         ),
-        "core_surface_projection": project_compatibility_decision_for_core(decision),
+        "core_surface_projection": _core_surface_status_projection(decision),
         "core_runtime_surfaces": execution["core_runtime_surfaces"],
     }
 
@@ -465,10 +462,10 @@ def build_core_surface_no_leakage_evidence(
     )
     if isinstance(execution, Mapping):
         surfaces = dict(execution)
-        surfaces["core_projection"] = project_compatibility_decision_for_core(decision)
+        surfaces["core_projection"] = _core_surface_status_projection(decision)
     else:
         surfaces = {
-        "core_projection": project_compatibility_decision_for_core(decision),
+        "core_projection": _core_surface_status_projection(decision),
         "registry_discovery": {
             "adapter_key": "xhs",
             "capabilities": ("content_detail",),
@@ -793,7 +790,17 @@ def _decision_summary(decision: AdapterProviderCompatibilityDecision) -> dict[st
         "resource_profile_evidence_refs": decision.evidence.resource_profile_evidence_refs,
         "compatibility_decision_evidence_refs": decision.evidence.compatibility_decision_evidence_refs,
         "adapter_bound_provider_evidence_present": decision.evidence.adapter_bound_provider_evidence is not None,
-        "core_projection": project_compatibility_decision_for_core(decision),
+        "core_projection": _core_surface_status_projection(decision),
+    }
+
+
+def _core_surface_status_projection(decision: AdapterProviderCompatibilityDecision) -> dict[str, Any]:
+    core_projection = project_compatibility_decision_for_core(decision)
+    return {
+        "decision_status": core_projection["decision_status"],
+        "error_code": core_projection["error_code"],
+        "failure_category": core_projection["failure_category"],
+        "fail_closed": core_projection["fail_closed"],
     }
 
 

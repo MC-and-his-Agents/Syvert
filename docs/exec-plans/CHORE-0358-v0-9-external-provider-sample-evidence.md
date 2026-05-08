@@ -24,6 +24,7 @@
 
 - 本次纳入：
   - `syvert/real_provider_sample_evidence.py`
+  - `syvert/fixtures/v0_9_external_provider_sample_manifest.json`
   - `tests/runtime/test_real_provider_sample_evidence.py`
   - `docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md`
   - `docs/exec-plans/CHORE-0358-v0-9-external-provider-sample-evidence.md`

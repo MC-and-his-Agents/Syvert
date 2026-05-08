@@ -7,11 +7,11 @@
 ## Evidence Summary
 
 - release：`v0.9.0`
-- FR：`FR-0355`
-- Work Item：`#358 / CHORE-0358-v0-9-external-provider-sample-evidence`
-- consumed gate：`FR-0351:provider_compatibility_sample`
-- approved slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
-- sample origin：`external_provider_sample`
+- fr_ref：`FR-0355`
+- work_item_ref：`#358 / CHORE-0358-v0-9-external-provider-sample-evidence`
+- consumed_gate_ref：`FR-0351:provider_compatibility_sample`
+- approved_slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
+- sample_origin：`external_provider_sample`
 - sample_id：`v0.9.0-external-provider-sample-content-detail`
 - manifest_id：`v0.9.0-external-provider-sample-content-detail`
 - manifest_ref：`syvert/fixtures/v0_9_external_provider_sample_manifest.json`
@@ -22,7 +22,7 @@
 - provider_identity_scope：`adapter_bound`
 - provider_key_redaction：`stable fixture provider key; not a product support claim`
 - not_native_provider_self_evidence：`true`
-- provider support claim：`false`
+- provider_support_claim：`false`
 - forbidden_claims：`()`
 - requirement_ref：`fr-0024:reference-adapter-migration:xhs-douyin-content-detail`
 - offer_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample`
@@ -40,20 +40,24 @@
 
 ## Decision Matrix
 
-- `matched`：`v0-9-external-provider-sample-matched`
-  - case ref：`fr-0355:decision-matrix:matched`
+- matched_case_ref：`fr-0355:decision-matrix:matched`
+  - decision_id：`v0-9-external-provider-sample-matched`
   - external provider offer 合法绑定 `adapter_key=xhs`。
   - requirement 与 offer 同处 approved slice。
   - resource profile refs 覆盖 `account_proxy` 与 `account`。
-- `unmatched`：`v0-9-external-provider-sample-unmatched`
-  - case ref：`fr-0355:decision-matrix:unmatched`
+- unmatched_case_ref：`fr-0355:decision-matrix:unmatched`
+  - decision_id：`v0-9-external-provider-sample-unmatched`
   - requirement 合法需要 `account_proxy`。
   - offer 合法只支持 `account`。
   - decision 返回 `unmatched`，不把合法不兼容误报为 contract violation。
-- `invalid_contract`：`v0-9-external-provider-sample-invalid-contract`
-  - case ref：`fr-0355:decision-matrix:invalid-contract`
+- invalid_contract_case_ref：`fr-0355:decision-matrix:invalid-contract`
+  - decision_id：`v0-9-external-provider-sample-invalid-contract`
   - external offer 带 forbidden `selected_provider`。
   - decision fail-closed 返回 `invalid_contract`。
+- validator_commands：
+  - `python3 -m unittest tests.runtime.test_real_provider_sample_evidence`
+  - `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence`
+  - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path`
 
 ## Adapter-Bound Execution Evidence
 
@@ -78,13 +82,13 @@
 - failure evidence 边界：
   - external sample failure input：`source_error=external_sample_timeout`
   - adapter_mapped_failed_envelope_ref：`external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope`
-  - Adapter-mapped failed envelope：由 `execute_task_with_record()` 产出，`capability=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
+  - Adapter-mapped failed envelope：由 `execute_task_with_record()` 产出，`operation=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。
 
 ## Core Surface Projection
 
 - core_surface_projection_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#core-surface-projection`
-- projection fields：`decision_id`、`adapter_key`、`capability`、`decision_status`、`error_code`、`failure_category`、`fail_closed`
+- projection fields：`decision_status`、`error_code`、`failure_category`、`fail_closed`
 - provider fields：none
 
 ## No-Leakage Evidence
