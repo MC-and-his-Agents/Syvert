@@ -37,6 +37,7 @@
   - Core 可以保存、校验、脱敏、注入和基于证据判定 `CredentialMaterial`，但不得把 cookie、token、header、session object、sign request 参数或平台私有字段提升为共享 routing metadata。
   - `SessionHealth` 必须至少能区分可继续执行、过期或疑似过期、已失效、未知四类健康状态；未知状态不得被当作新鲜健康证明。
   - `ResourceHealthEvidence` 必须记录 evidence provenance、observed_at、resource binding、lease / task binding、adapter / capability context、health status、reason 与 redaction boundary。
+  - `healthy` evidence 必须带有可机器判定的 freshness boundary：`observed_at`、`expires_at` 与 `freshness_policy_ref`。在 admission evaluation time 已经达到或超过 `expires_at` 时，Core 必须把该 evidence 投影为 `stale`，不得继续当作 `healthy`。
   - Core 在资源 admission 前必须能消费最近有效的 health evidence；无法证明健康足够时必须 fail-closed 或拒绝把该资源注入需要健康凭据的执行路径。
   - Adapter 只能消费 Core 注入的 credential material，并通过标准诊断或资源处置提示反馈健康问题；最终 invalidation 与状态推进仍由 Core 执行。
   - health evidence 只能解释资源健康，不得被解释为 provider 产品支持、成功率、SLA 或 routing 优先级。
@@ -46,6 +47,7 @@
   - `ResourceLease` 仍是资源占用和收口的唯一共享 carrier；health evidence 可以绑定 lease，但不得重写 lease schema 或绕过 release 语义。
   - `ResourceTraceEvent` 仍是 task-bound 资源事件 truth；健康证据可引用 trace / lease / resource 关联，但不得替代 trace event。
   - 当 evidence 证明 credential/session invalid 时，Core 的最终资源状态收口必须通过既有 `release(target_status_after_release=INVALID)` 或等价后续 runtime carrier 承接。
+  - pre-admission invalid evidence 若没有 active lease，不得调用 `release(target_status_after_release=INVALID)`，也不得直接把 `AVAILABLE` resource 改成 `INVALID`。在本 FR 内，它只能拒绝 admission；若后续需要库存态直接 invalidation carrier，必须另走 runtime/spec Work Item。
   - `stale` 只表示 freshness 不足或证据过期；它可以拒绝 admission，但不得单独把资源烧成 `INVALID`。只有后续 evidence 明确升级为 `invalid` 时，才允许进入 Core-owned invalidation。
 - 非功能需求：
   - resource health contract 必须 fail-closed；无法证明 evidence 来源、时间、绑定或脱敏边界合法时，不得允许其影响 admission。
@@ -83,13 +85,25 @@ Given Adapter 在执行期间通过标准诊断反馈当前 injected account ses
 When Core 消费该诊断并建立 `ResourceHealthEvidence(status=invalid)`  
 Then 最终资源收口必须走 Core-owned invalidation 语义，而不是由 Adapter 直接改写 resource state
 
-### 场景 4：credential 私有字段不得进入 Adapter/Provider metadata
+### 场景 4：pre-admission invalid evidence 不得绕过 active lease
+
+Given 某个 `account` resource 当前处于 `AVAILABLE`，且 Core 在 admission 前得到 `SessionHealth=invalid` evidence  
+When 当前没有 active `ResourceLease` 持有该 resource  
+Then Core 必须拒绝 admission，但不得调用 `release(target_status_after_release=INVALID)` 或直接把该 resource 改成 `INVALID`
+
+### 场景 5：过期 healthy evidence 必须投影为 stale
+
+Given 某条 `ResourceHealthEvidence(status=healthy)` 带有 `expires_at`  
+When admission evaluation time 已经达到或超过 `expires_at`  
+Then Core 必须把该 evidence 投影为 `stale` 并拒绝需要 fresh credential 的 admission
+
+### 场景 6：credential 私有字段不得进入 Adapter/Provider metadata
 
 Given Adapter requirement 或 Provider offer 试图声明 `cookies`、`xsec_token`、`verify_fp`、`ms_token`、`headers` 或 session object 字段  
 When contract consumer 校验该 metadata  
 Then 该声明必须被视为 contract violation，而不是合法 resource capability
 
-### 场景 5：health evidence 不得替代 lease truth
+### 场景 7：health evidence 不得替代 lease truth
 
 Given 某条 `ResourceHealthEvidence` 引用了 `lease_id` 与 `resource_id`  
 When 系统重建 task 的资源占用与收口过程  
@@ -99,6 +113,7 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
 
 - 异常场景：
   - evidence 缺少 `resource_id`、`observed_at`、`status`、`provenance` 或脱敏边界时必须 invalid。
+  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明。
   - evidence 引用的 `lease_id / task_id / adapter_key / capability` 与当前执行上下文不一致时必须 fail-closed。
   - evidence payload 含 raw secret、cookie、token、header value 或 session dump 时必须 invalid。
   - Provider offer 或 Adapter requirement 暴露 credential/session 私有字段时必须 invalid。
@@ -113,6 +128,8 @@ Then 仍必须以 `ResourceLease` 与 `ResourceTraceEvent` 为生命周期 truth
 - [ ] formal spec 明确冻结 `CredentialMaterial` 只属于 `account` resource material 边界，不新增资源类型。
 - [ ] formal spec 明确冻结 `SessionHealth` 最小状态与 unknown / stale / invalid / healthy 的 admission 语义。
 - [ ] formal spec 明确冻结 `ResourceHealthEvidence` 的 provenance、时间、绑定、诊断与脱敏要求。
+- [ ] formal spec 明确冻结 freshness / expiry 的机器判定规则。
+- [ ] formal spec 明确 pre-admission invalid evidence 只能拒绝 admission，不能绕过 active lease 直接 release。
 - [ ] formal spec 明确 health evidence 与 `ResourceRecord`、`ResourceLease`、`ResourceTraceEvent` 的关系。
 - [ ] formal spec 明确 Adapter / Provider metadata 不得声明 credential/session 私有字段。
 - [ ] formal spec 明确本 Work Item 不实现 runtime、不迁移 consumer、不补 evidence、不做 release closeout。

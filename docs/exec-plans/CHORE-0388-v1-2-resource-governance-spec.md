@@ -68,6 +68,9 @@
 - Guardian review on PR #389 at head `50dca1019eee92ff12a248770201344e73ac02a6`
   - 结果：`REQUEST_CHANGES`。
   - 处理：移除 `credential_session_stale` 作为直接 invalidation reason，并补齐本节验证证据入口。
+- Guardian review on PR #389 at head `ce2fa92`
+  - 结果：`REQUEST_CHANGES`。
+  - 处理：补齐 pre-admission invalid evidence 不得绕过 active lease 的边界，并冻结 `observed_at / expires_at / freshness_policy_ref` freshness 判定规则。
 
 ## PR 计划
 

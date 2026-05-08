@@ -31,6 +31,9 @@
   - `resource_type`：当前只允许 `account`。
   - `status`：`healthy`、`stale`、`invalid`、`unknown`。
   - `observed_at`：RFC3339 UTC 时间戳。
+  - `expires_at`：RFC3339 UTC 时间戳；`status=healthy` 时必须存在。
+  - `freshness_policy_ref`：非空 policy 标识，用于说明 `expires_at` 如何被计算；本 FR 不定义自动刷新。
+  - `evaluated_at`：admission evaluation time；用于把 evidence 投影为 admission-time health。
   - `provenance`：`core_validation`、`adapter_diagnostic`、`provider_response_projection`、`operator_assertion` 等来源分类。
   - `task_id`、`lease_id`、`bundle_id`：有执行上下文时必须绑定；库存前置检查可显式为空。
   - `adapter_key`、`capability`、`operation`：用于证明 evidence 适用的 execution slice。
@@ -39,6 +42,8 @@
   - `diagnostic_ref`：可选，只能引用脱敏诊断或 trace，不得内嵌 secret。
 - 约束：
   - 缺少 provenance、observed_at、resource binding 或 redaction status 时必须 invalid。
+  - `healthy` evidence 缺少 `expires_at` 或 `freshness_policy_ref` 时不得作为 fresh credential 证明。
+  - 当 `evaluated_at >= expires_at` 时，admission 必须把该 evidence 投影为 `stale`。
   - evidence 不得包含 raw credential material。
   - evidence 可以引用 `ResourceLease` / `ResourceTraceEvent`，但不得替代它们。
 
@@ -60,6 +65,7 @@
 - 约束：
   - 所有要求健康 credential 的 admission 都必须能追溯到有效 evidence 或显式 fail-closed。
   - `rejected` 表示资源或健康前提不足；`invalid_contract` 表示 evidence、metadata 或上下文违反契约。
+  - pre-admission `invalid` evidence 没有 active lease 时只能产生 `rejected` / `invalid_contract` admission result，不得直接推进 `ResourceRecord.status`。
 
 ## ResourceInvalidationReason
 
@@ -71,7 +77,8 @@
   - `health_context_mismatch`
 - 约束：
   - reason 必须非空、平台中立、可脱敏记录。
-  - 最终 resource state 仍通过既有 `release(target_status_after_release=INVALID)` 或后续已批准 runtime carrier 进入 `INVALID`。
+  - 只有 active lease 持有的 resource 可以通过既有 `release(target_status_after_release=INVALID)` 进入 `INVALID`。
+  - 没有 active lease 的 pre-admission invalid evidence 在本 FR 内只拒绝 admission；直接库存 invalidation carrier 需要后续 Work Item 批准。
   - `stale` 不属于最小 invalidation reason；它只能拒绝 admission，除非后续 evidence 明确升级为 `invalid`。
 
 ## 生命周期
