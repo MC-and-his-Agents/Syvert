@@ -61,7 +61,13 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
 
         self.assertEqual(evidence["status"], "pass")
         self.assertEqual(evidence["raw_payload"]["provider_key"], EXTERNAL_PROVIDER_KEY)
+        self.assertEqual(evidence["raw_payload_ref"], "external-fixture://content-detail/success#raw")
         self.assertEqual(evidence["normalized_result"]["platform"], "xhs")
+        self.assertEqual(
+            evidence["normalized_result_ref"],
+            "external-fixture://content-detail/success#normalized",
+        )
+        self.assertIn("adapter-mapped-failed-envelope", evidence["adapter_mapped_failed_envelope_ref"])
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["category"], "platform")
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
         self.assertTrue(evidence["provider_error_mapping_checked"])
@@ -76,6 +82,11 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
 
         self.assertEqual(evidence["status"], "pass")
         self.assertFalse(evidence["provider_identity_in_core_surface"])
+        self.assertTrue(evidence["registry_discovery_checked"])
+        self.assertTrue(evidence["core_routing_checked"])
+        self.assertTrue(evidence["task_record_checked"])
+        self.assertTrue(evidence["resource_lifecycle_checked"])
+        self.assertTrue(evidence["failed_envelope_checked"])
         self.assertTrue(evidence["all_forbidden_paths_empty"])
         self.assertEqual(
             sorted(evidence["surfaces"]),
@@ -97,9 +108,35 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["sample_origin"], "external_provider_sample")
         self.assertEqual(report["provider_support_claim"], False)
         self.assertEqual(report["consumed_gate_ref"], "FR-0351:provider_compatibility_sample")
+        self.assertEqual(
+            report["external_provider_sample"]["requirement_ref"],
+            "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+        )
+        self.assertEqual(
+            report["external_provider_sample"]["offer_ref"],
+            "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample",
+        )
+        self.assertEqual(
+            report["external_provider_sample"]["decision_ref"],
+            "v0-9-external-provider-sample-matched",
+        )
+        self.assertEqual(
+            report["external_provider_sample"]["profile_proof_refs"],
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
         self.assertEqual(report["dual_reference_ref"], "tests.runtime.test_real_adapter_regression")
         self.assertEqual(report["third_party_adapter_entry_ref"], "tests.runtime.test_third_party_adapter_contract_entry")
         self.assertEqual(report["api_cli_same_core_path_ref"], "tests.runtime.test_cli_http_same_path")
+        self.assertEqual(report["decision_matrix"]["matched_case_ref"], "fr-0355:decision-matrix:matched")
+        self.assertEqual(report["decision_matrix"]["unmatched_case_ref"], "fr-0355:decision-matrix:unmatched")
+        self.assertEqual(
+            report["decision_matrix"]["invalid_contract_case_ref"],
+            "fr-0355:decision-matrix:invalid-contract",
+        )
+        self.assertIn("test_real_provider_sample_evidence", report["decision_matrix"]["validator_commands"][0])
         self.assertEqual(report["decision_matrix"]["matched_case"]["decision_status"], "matched")
         self.assertEqual(report["decision_matrix"]["unmatched_case"]["decision_status"], "unmatched")
         self.assertEqual(

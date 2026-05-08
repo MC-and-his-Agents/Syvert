@@ -13,6 +13,10 @@
 - approved slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
 - sample origin：`external_provider_sample`
 - provider support claim：`false`
+- requirement_ref：`fr-0024:reference-adapter-migration:xhs-douyin-content-detail`
+- offer_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample`
+- decision_ref：`v0-9-external-provider-sample-matched`
+- profile_proof_refs：`fr-0027:profile:content-detail-by-url-hybrid:account-proxy`、`fr-0027:profile:content-detail-by-url-hybrid:account`
 - status：`pass`
 - decision_matrix_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix`
 - adapter_bound_execution_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence`
@@ -24,14 +28,17 @@
 ## Decision Matrix
 
 - `matched`：`v0-9-external-provider-sample-matched`
+  - case ref：`fr-0355:decision-matrix:matched`
   - external provider offer 合法绑定 `adapter_key=xhs`。
   - requirement 与 offer 同处 approved slice。
   - resource profile refs 覆盖 `account_proxy` 与 `account`。
 - `unmatched`：`v0-9-external-provider-sample-unmatched`
+  - case ref：`fr-0355:decision-matrix:unmatched`
   - requirement 合法需要 `account_proxy`。
   - offer 合法只支持 `account`。
   - decision 返回 `unmatched`，不把合法不兼容误报为 contract violation。
 - `invalid_contract`：`v0-9-external-provider-sample-invalid-contract`
+  - case ref：`fr-0355:decision-matrix:invalid-contract`
   - external offer 带 forbidden `selected_provider`。
   - decision fail-closed 返回 `invalid_contract`。
 
@@ -39,15 +46,23 @@
 
 - matched decision 后进入 Adapter-owned provider seam：`xhs:adapter-owned-provider-port:external-fixture`。
 - success evidence 覆盖：
-  - raw payload ref：`external-fixture://content-detail/success`
+  - raw_payload_ref：`external-fixture://content-detail/success#raw`
+  - normalized_result_ref：`external-fixture://content-detail/success#normalized`
   - normalized result：`platform=xhs`、`content_id=external-fixture-content-001`
   - resource profile consumption：`account_proxy`
   - resource lifecycle disposition hint：`release`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
   - provider failure input：`source_error=external_provider_timeout`
+  - adapter_mapped_failed_envelope_ref：`external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope`
   - Adapter-mapped failed envelope：`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。
+
+## Core Surface Projection
+
+- core_surface_projection_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#core-surface-projection`
+- projection fields：`decision_id`、`adapter_key`、`capability`、`decision_status`、`error_code`、`failure_category`、`fail_closed`
+- provider fields：none
 
 ## No-Leakage Evidence
 
@@ -72,6 +87,11 @@
 | `core_facing_failed_envelope` | `passed` | `()` | `()` |
 
 - provider_identity_in_core_surface：`false`
+- registry_discovery_checked：`true`
+- core_routing_checked：`true`
+- task_record_checked：`true`
+- resource_lifecycle_checked：`true`
+- failed_envelope_checked：`true`
 - all_forbidden_paths_empty：`true`
 
 这些 surfaces 均不得出现 `provider_key`、`offer_id`、provider selector、fallback、routing、marketplace、provider lifecycle 或 resource supply 字段。

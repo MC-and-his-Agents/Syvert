@@ -75,13 +75,29 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
             "adapter_key": "xhs",
             "provider_identity_scope": "adapter_bound",
             "provider_key_redaction": "stable fixture provider key; not a product support claim",
+            "requirement_ref": "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
+            "offer_ref": EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
+            "decision_ref": "v0-9-external-provider-sample-matched",
+            "profile_proof_refs": (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
             "provider_support_claim": False,
             "forbidden_claims": (),
         },
         "decision_matrix": {
+            "matched_case_ref": "fr-0355:decision-matrix:matched",
             "matched_case": _decision_summary(matched_decision),
+            "unmatched_case_ref": "fr-0355:decision-matrix:unmatched",
             "unmatched_case": _decision_summary(unmatched_decision),
+            "invalid_contract_case_ref": "fr-0355:decision-matrix:invalid-contract",
             "invalid_contract_case": _decision_summary(invalid_contract_decision),
+            "validator_commands": (
+                "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
+                "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision "
+                "tests.runtime.test_provider_no_leakage_guard "
+                "tests.runtime.test_real_provider_sample_evidence",
+            ),
         },
         "adapter_bound_execution": adapter_bound_execution,
         "core_surface_no_leakage": no_leakage,
@@ -320,8 +336,13 @@ def build_adapter_bound_execution_evidence(
         "status": "pass",
         "matched_decision_ref": decision.decision_id,
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
+        "raw_payload_ref": "external-fixture://content-detail/success#raw",
         "raw_payload": raw_payload,
+        "normalized_result_ref": "external-fixture://content-detail/success#normalized",
         "normalized_result": normalized_result,
+        "adapter_mapped_failed_envelope_ref": (
+            "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
+        ),
         "adapter_mapped_failed_envelope": adapter_mapped_failed_envelope,
         "provider_error_mapping_checked": True,
         "resource_profile_consumption_checked": True,
@@ -334,6 +355,10 @@ def build_adapter_bound_execution_evidence(
             "decision_status": decision.decision_status,
             "proof_refs": decision.evidence.resource_profile_evidence_refs,
         },
+        "core_surface_projection_ref": (
+            "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
+            "#core-surface-projection"
+        ),
         "core_surface_projection": project_compatibility_decision_for_core(decision),
     }
 
@@ -385,6 +410,11 @@ def build_core_surface_no_leakage_evidence(
         if all(result.status == PROVIDER_NO_LEAKAGE_STATUS_PASSED for result in surface_results.values())
         else "fail",
         "provider_identity_in_core_surface": False,
+        "registry_discovery_checked": True,
+        "core_routing_checked": True,
+        "task_record_checked": True,
+        "resource_lifecycle_checked": True,
+        "failed_envelope_checked": True,
         "all_forbidden_paths_empty": all(
             not result.evidence.forbidden_field_paths and not result.evidence.forbidden_value_paths
             for result in surface_results.values()
