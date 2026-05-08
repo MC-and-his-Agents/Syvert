@@ -523,6 +523,64 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
         lease = next(lease for lease in snapshot.leases if lease.lease_id == bundle.lease_id)
         self.assertEqual(lease.release_reason, RESOURCE_INVALIDATION_REASON_CREDENTIAL_SESSION_INVALID)
 
+    def test_account_session_invalidation_does_not_invalidate_coleased_proxy(self) -> None:
+        bundle = acquire(
+            AcquireRequest(
+                task_id="task-001",
+                adapter_key="xhs",
+                capability="content_detail_by_url",
+                requested_slots=("account", "proxy"),
+            ),
+            self.make_store(),
+            "task-001",
+            self.make_trace_store(),
+        )
+        self.assertIsInstance(bundle, ResourceBundle)
+        assert isinstance(bundle, ResourceBundle)
+        evidence = self.healthy_evidence(
+            evidence_id="evidence-invalid-account-proxy-bundle",
+            status=SESSION_HEALTH_INVALID,
+            expires_at=None,
+            freshness_policy_ref=None,
+            provenance="adapter_diagnostic",
+            lease_id=bundle.lease_id,
+            bundle_id=bundle.bundle_id,
+            reason="platform reported credential expired",
+        )
+
+        result = invalidate_active_lease_from_health_evidence(
+            evidence=evidence,
+            store=self.make_store(),
+            task_context_task_id="task-001",
+            operation="content_detail_by_url",
+            resource_trace_store=self.make_trace_store(),
+        )
+
+        self.assertNotIsInstance(result, ResourceAdmissionDecision)
+        snapshot = self.make_store().load_snapshot()
+        resources_by_id = {record.resource_id: record for record in snapshot.resources}
+        self.assertEqual(resources_by_id["account-001"].status, "INVALID")
+        self.assertEqual(resources_by_id["proxy-001"].status, "AVAILABLE")
+        original_lease = next(lease for lease in snapshot.leases if lease.lease_id == bundle.lease_id)
+        invalidation_lease = next(lease for lease in snapshot.leases if lease.lease_id.endswith(":credential-session-invalidation"))
+        self.assertEqual(original_lease.resource_ids, ("account-001", "proxy-001"))
+        self.assertEqual(original_lease.target_status_after_release, "AVAILABLE")
+        self.assertEqual(invalidation_lease.resource_ids, ("account-001",))
+        self.assertEqual(invalidation_lease.target_status_after_release, "INVALID")
+        trace_events = self.make_trace_store().load_events()
+        account_closeout_types = {
+            event.event_type
+            for event in trace_events
+            if event.resource_id == "account-001" and event.event_type in {"invalidated", "released"}
+        }
+        proxy_closeout_types = {
+            event.event_type
+            for event in trace_events
+            if event.resource_id == "proxy-001" and event.event_type in {"invalidated", "released"}
+        }
+        self.assertIn("invalidated", account_closeout_types)
+        self.assertEqual(proxy_closeout_types, {"released"})
+
     def test_invalid_evidence_without_active_lease_does_not_release_available_resource(self) -> None:
         evidence = self.healthy_evidence(
             evidence_id="evidence-invalid-no-lease",

@@ -9,7 +9,9 @@ from typing import Any
 from syvert.resource_lifecycle import (
     MANAGED_ACCOUNT_ADAPTER_KEY_FIELD,
     ReleaseRequest,
+    ResourceBundle,
     ResourceLease,
+    ResourceLifecycleSnapshot,
     ResourceRecord,
     ResourceReleaseResult,
     ResourceLifecycleStore,
@@ -19,6 +21,9 @@ from syvert.resource_lifecycle import (
     parse_rfc3339_utc_datetime,
     release,
     validate_snapshot,
+    write_snapshot_with_tracing,
+    build_acquired_resource_trace_events,
+    build_release_resource_trace_events,
 )
 from syvert.runtime import failure_envelope, runtime_contract_error
 from syvert.task_record import TaskRecordContractError, normalize_json_value
@@ -57,6 +62,7 @@ RESOURCE_ADMISSION_DECISION_REJECTED = "rejected"
 RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT = "invalid_contract"
 RESOURCE_INVALIDATION_REASON_CREDENTIAL_SESSION_INVALID = "credential_session_invalid"
 RESOURCE_HEALTH_CONTRACT_INVALID_REASON = "health_evidence_contract_invalid"
+_RESOURCE_HEALTH_SPLIT_RELEASE_REASON = "credential_session_invalid_release_before_account_invalidation"
 RESOURCE_HEALTH_EVIDENCE_FIELDS = frozenset(
     {
         "evidence_id",
@@ -443,6 +449,15 @@ def invalidate_active_lease_from_health_evidence(
         return _invalid_contract_decision(normalized_evidence, task_context_task_id)
     if normalized_evidence.capability != active_lease.capability:
         return _invalid_contract_decision(normalized_evidence, task_context_task_id)
+    if len(active_lease.resource_ids) > 1:
+        return _split_settle_active_lease_for_account_invalidation(
+            snapshot=snapshot,
+            active_lease=active_lease,
+            account_resource_id=normalized_evidence.resource_id,
+            store=store,
+            task_context_task_id=task_context_task_id,
+            resource_trace_store=resource_trace_store,
+        )
     return release(
         ReleaseRequest(
             lease_id=active_lease.lease_id,
@@ -454,6 +469,133 @@ def invalidate_active_lease_from_health_evidence(
         task_context_task_id,
         resource_trace_store,
     )
+
+
+def _split_settle_active_lease_for_account_invalidation(
+    *,
+    snapshot: ResourceLifecycleSnapshot,
+    active_lease: ResourceLease,
+    account_resource_id: str,
+    store: ResourceLifecycleStore,
+    task_context_task_id: str,
+    resource_trace_store,
+) -> ResourceReleaseResult:
+    resources_by_id = {resource.resource_id: resource for resource in snapshot.resources}
+    released_at = now_rfc3339_utc()
+    released_original_lease = ResourceLease(
+        lease_id=active_lease.lease_id,
+        bundle_id=active_lease.bundle_id,
+        task_id=active_lease.task_id,
+        adapter_key=active_lease.adapter_key,
+        capability=active_lease.capability,
+        resource_ids=active_lease.resource_ids,
+        acquired_at=active_lease.acquired_at,
+        released_at=released_at,
+        target_status_after_release="AVAILABLE",
+        release_reason=_RESOURCE_HEALTH_SPLIT_RELEASE_REASON,
+    )
+    account_resource = resources_by_id[account_resource_id]
+    invalidation_bundle = ResourceBundle(
+        bundle_id=f"{active_lease.bundle_id}:credential-session-invalidation",
+        lease_id=f"{active_lease.lease_id}:credential-session-invalidation",
+        task_id=active_lease.task_id,
+        adapter_key=active_lease.adapter_key,
+        capability=active_lease.capability,
+        requested_slots=("account",),
+        acquired_at=released_at,
+        account=ResourceRecord(
+            resource_id=account_resource.resource_id,
+            resource_type=account_resource.resource_type,
+            status="IN_USE",
+            material=account_resource.material,
+        ),
+    )
+    invalidation_lease = ResourceLease(
+        lease_id=invalidation_bundle.lease_id,
+        bundle_id=invalidation_bundle.bundle_id,
+        task_id=invalidation_bundle.task_id,
+        adapter_key=invalidation_bundle.adapter_key,
+        capability=invalidation_bundle.capability,
+        resource_ids=(account_resource_id,),
+        acquired_at=released_at,
+        released_at=released_at,
+        target_status_after_release="INVALID",
+        release_reason=RESOURCE_INVALIDATION_REASON_CREDENTIAL_SESSION_INVALID,
+    )
+    updated_resources = []
+    for resource in snapshot.resources:
+        if resource.resource_id == account_resource_id:
+            updated_resources.append(
+                ResourceRecord(
+                    resource_id=resource.resource_id,
+                    resource_type=resource.resource_type,
+                    status="INVALID",
+                    material=resource.material,
+                )
+            )
+        elif resource.resource_id in active_lease.resource_ids:
+            updated_resources.append(
+                ResourceRecord(
+                    resource_id=resource.resource_id,
+                    resource_type=resource.resource_type,
+                    status="AVAILABLE",
+                    material=resource.material,
+                )
+            )
+        else:
+            updated_resources.append(resource)
+    updated_leases = tuple(
+        lease_item
+        for lease in snapshot.leases
+        for lease_item in ((released_original_lease, invalidation_lease) if lease.lease_id == active_lease.lease_id else (lease,))
+    )
+    updated_snapshot = ResourceLifecycleSnapshot(
+        schema_version=snapshot.schema_version,
+        revision=snapshot.revision + 1,
+        resources=tuple(sorted(updated_resources, key=lambda resource: resource.resource_id)),
+        leases=updated_leases,
+    )
+    try:
+        validate_snapshot(updated_snapshot)
+        trace_events = (
+            *build_release_resource_trace_events(
+                current_lease=active_lease,
+                settled_lease=released_original_lease,
+                resources_by_id=resources_by_id,
+            ),
+            *build_acquired_resource_trace_events(invalidation_bundle),
+            *build_release_resource_trace_events(
+                current_lease=ResourceLease(
+                    lease_id=invalidation_lease.lease_id,
+                    bundle_id=invalidation_lease.bundle_id,
+                    task_id=invalidation_lease.task_id,
+                    adapter_key=invalidation_lease.adapter_key,
+                    capability=invalidation_lease.capability,
+                    resource_ids=invalidation_lease.resource_ids,
+                    acquired_at=invalidation_lease.acquired_at,
+                ),
+                settled_lease=invalidation_lease,
+                resources_by_id=resources_by_id,
+            ),
+        )
+        write_snapshot_with_tracing(
+            store,
+            updated_snapshot,
+            resource_trace_store=resource_trace_store,
+            trace_events=trace_events,
+        )
+    except ResourceLifecycleContractError as error:
+        return failure_envelope(
+            task_context_task_id,
+            active_lease.adapter_key,
+            active_lease.capability,
+            runtime_contract_error(
+                "resource_state_conflict",
+                "resource health invalidation 无法写入 scoped invalidation",
+                details={"reason": str(error)},
+            ),
+        )
+    return invalidation_lease
 
 
 def _project_account_resources_health(

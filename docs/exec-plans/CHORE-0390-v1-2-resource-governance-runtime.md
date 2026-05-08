@@ -10,7 +10,7 @@
 - Parent Phase：`#380`
 - Parent FR：`#387`
 - 关联 spec：`docs/specs/FR-0387-resource-governance-admission-and-health-contract/`
-- 关联 PR：待创建
+- 关联 PR：`#393`
 
 ## 目标
 
@@ -53,7 +53,7 @@
 
 ## 已验证项
 
-- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：245 tests passed。
+- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：246 tests passed。
 - `python3 -m py_compile syvert/resource_health.py tests/runtime/test_resource_health.py`：通过。
 - `python3 scripts/spec_guard.py --mode ci --all`：通过。
 - `python3 scripts/docs_guard.py --mode ci`：通过。
@@ -104,11 +104,14 @@
   - P1：malformed `observed_at` / `expires_at` / `evaluated_at` 泄漏 lifecycle exception。处理：resource health 边界统一把 RFC3339 解析错误收敛为 `ResourceHealthContractError`；admission 与 active invalidation 均返回 `invalid_contract`，并补回归。
 - Final merge gate follow-up 4：
   - P1：no-active-lease fallback 未校验 evidence resource 是否存在且属于 account。处理：active lease miss 时先校验 resource 存在且为 account，否则 `invalid_contract`；补 missing resource 与 proxy resource 回归。
+- Final merge gate follow-up 5：
+  - P1：account/proxy 同租约 active invalidation 会把 co-leased proxy 一并 INVALID。处理：多资源 active lease 先按既有 trace/lifecycle 合同释放原 lease 到 `AVAILABLE`，再由 Core 内部 account-only invalidation lease 将绑定 account 标记为 `INVALID`；proxy 保持 `AVAILABLE`，并补 account+proxy 同租约回归。
 
 ## 未决风险
 
 - health evidence 被误写成第二套 resource lifecycle status。
 - pre-admission invalid evidence 绕过 active lease 直接改写库存资源。
+- account/proxy 同租约 invalidation 必须保持 proxy 可复用，不能把 credential/session health 当作 proxy health。
 - unredacted diagnostic 泄漏 credential/session 私有字段。
 
 ## 回滚方式
