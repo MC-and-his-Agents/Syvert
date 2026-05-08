@@ -47,7 +47,9 @@
 - Work Item `#356/#358` 已关闭为 `closed completed`。
 - PR `#357/#359` 已合入 main。
 - Work Item `#358` 的分支与 worktree 已退役，archive tag 为 `archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`。
-- `v0.9.0` annotated tag 与 GitHub Release 尚未创建；阶段 A carrier 合入后创建。
+- 阶段 A carrier PR `#361` 已合入，merge commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- `v0.9.0` annotated tag 已创建并推送，tag object `d08d5884edb26c5a0112028f4e8a48adcac241eb`，tag target `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- GitHub Release `v0.9.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.9.0`。
 
 `#358` 分支 / worktree 退役复验：
 
@@ -93,6 +95,12 @@
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `git rev-parse v0.9.0 && git rev-parse v0.9.0^{}`
+  - 结果：tag object `d08d5884edb26c5a0112028f4e8a48adcac241eb`，target commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- `git ls-remote --tags origin 'v0.9.0*'`
+  - 结果：远端存在 `v0.9.0` annotated tag 与 dereferenced target。
+- `gh release view v0.9.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
+  - 结果：`tagName=v0.9.0`，`name=v0.9.0`，`isDraft=false`，`isPrerelease=false`，`publishedAt=2026-05-08T06:55:31Z`，`targetCommitish=870899ac4d8d4cb1713f52a3a98180a6787ec0f9`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.9.0`。
 
 ## 完成语义
 

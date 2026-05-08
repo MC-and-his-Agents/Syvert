@@ -43,12 +43,14 @@
 - Work Item `#358`：closed completed；PR `#359` 已合入，merge commit `ecfc3bf53299191e42c13c5b1c6578fd90aa84b6`。
 - Work Item `#360`：open。
 - 主仓 main 已快进到 `ecfc3bf53299191e42c13c5b1c6578fd90aa84b6`。
-- `v0.9.0` tag 与 GitHub Release 尚未创建。
+- 阶段 A PR `#361` 已合入，merge commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- `v0.9.0` annotated tag 已创建并推送，tag object `d08d5884edb26c5a0112028f4e8a48adcac241eb`，target commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- GitHub Release `v0.9.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.9.0`。
 
 ## 下一步动作
 
 - 阶段 A：提交 release / sprint / closeout evidence carrier，开 docs PR，等待 checks 与 guardian，通过后受控合入。
-- 发布锚点：阶段 A 合入后在 main 上创建并推送 `v0.9.0` annotated tag，创建 GitHub Release。
+- 发布锚点：已完成。
 - 阶段 B：回写 release index 与 closeout evidence 的 published truth carrier，开 follow-up docs PR。
 - 阶段 B 合入后：关闭 `#355/#354/#360`，清理 worktree 并退役分支。
 
@@ -88,11 +90,13 @@
   - 结果：通过。
 - `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
   - 结果：通过，PR class=`docs`，变更类别=`docs`。
+- `git rev-parse v0.9.0 && git rev-parse v0.9.0^{}`
+  - 结果：tag object `d08d5884edb26c5a0112028f4e8a48adcac241eb`，target commit `870899ac4d8d4cb1713f52a3a98180a6787ec0f9`。
+- `gh release view v0.9.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
+  - 结果：`tagName=v0.9.0`，`isDraft=false`，`isPrerelease=false`，`publishedAt=2026-05-08T06:55:31Z`，`targetCommitish=870899ac4d8d4cb1713f52a3a98180a6787ec0f9`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v0.9.0`。
 
 ## 待验证项
 
-- 阶段 A PR checks、guardian 与受控 merge。
-- `v0.9.0` annotated tag 与 GitHub Release。
 - 阶段 B published truth 回写 PR checks、guardian 与受控 merge。
 - Phase / FR / Work Item closeout comment 与 GitHub 状态。
 
@@ -116,4 +120,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- 阶段 A 前 implementation truth：`ecfc3bf53299191e42c13c5b1c6578fd90aa84b6`
+- 阶段 A carrier / published anchor：`870899ac4d8d4cb1713f52a3a98180a6787ec0f9`
