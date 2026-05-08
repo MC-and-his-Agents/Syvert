@@ -11,7 +11,7 @@
 - Parent FR：`#387`
 - 关联 spec：`docs/specs/FR-0387-resource-governance-admission-and-health-contract/`
 - 上游依赖：`#390` runtime carrier 已由 PR `#393` 合入并关闭；`#391` consumer boundary 已由 PR `#394` 合入并关闭
-- 关联 PR：待创建
+- 关联 PR：`#395`
 
 ## 目标
 
@@ -86,5 +86,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `03c835e45107d06817be68ebd18f55292179c467`
-- Current HEAD may include a metadata-only checkpoint follow-up that records this verified implementation checkpoint.
+- `d3c96dc19bddad7fdb5754c44ef39d1d6ce735dc`
