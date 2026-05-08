@@ -190,3 +190,30 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "fail")
         self.assertEqual(report["decision_matrix"]["fail_closed_reason"], ("core_surface_no_leakage_not_pass",))
+
+    def test_report_fails_closed_for_manifest_drift(self) -> None:
+        manifest = external_provider_sample_manifest()
+        manifest["provider_support_claim"] = True
+        manifest["approved_slice"] = {
+            "capability": "content_detail",
+            "operation": "search",
+            "target_type": "keyword",
+            "collection_mode": "list",
+        }
+
+        report = build_real_provider_sample_evidence_report(manifest_override=manifest)
+
+        self.assertEqual(report["status"], "fail")
+        self.assertIn("manifest_provider_support_claim_not_false", report["decision_matrix"]["fail_closed_reason"])
+        self.assertIn("manifest_approved_slice_drift", report["decision_matrix"]["fail_closed_reason"])
+
+    def test_no_leakage_evidence_reports_identity_presence_when_surface_leaks(self) -> None:
+        decision = decide_adapter_provider_compatibility(external_provider_decision_input())
+        evidence = build_core_surface_no_leakage_evidence(
+            decision,
+            surface_overrides={"task_record": {"provider_key": EXTERNAL_PROVIDER_KEY}},
+        )
+
+        self.assertEqual(evidence["status"], "fail")
+        self.assertTrue(evidence["provider_identity_in_core_surface"])
+        self.assertFalse(evidence["all_forbidden_paths_empty"])

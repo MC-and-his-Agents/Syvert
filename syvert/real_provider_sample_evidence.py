@@ -44,9 +44,10 @@ APPROVED_SLICE = {
 
 def build_real_provider_sample_evidence_report(
     *,
+    manifest_override: Mapping[str, Any] | None = None,
     no_leakage_override: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    manifest = external_provider_sample_manifest()
+    manifest = dict(manifest_override) if manifest_override is not None else external_provider_sample_manifest()
     matched_decision = decide_adapter_provider_compatibility(external_provider_decision_input())
     unmatched_decision = decide_adapter_provider_compatibility(external_provider_unmatched_decision_input())
     invalid_contract_decision = decide_adapter_provider_compatibility(
@@ -65,6 +66,7 @@ def build_real_provider_sample_evidence_report(
         invalid_contract_decision=invalid_contract_decision,
         adapter_bound_execution=adapter_bound_execution,
         no_leakage=no_leakage,
+        manifest=manifest,
     )
     status = "pass" if not fail_closed_reasons else "fail"
     report = {
@@ -72,9 +74,9 @@ def build_real_provider_sample_evidence_report(
         "release": "v0.9.0",
         "fr_ref": "FR-0355",
         "consumed_gate_ref": FR0351_GATE_REF,
-        "approved_slice": dict(APPROVED_SLICE),
-        "sample_origin": "external_provider_sample",
-        "provider_support_claim": False,
+        "approved_slice": dict(manifest.get("approved_slice", {})),
+        "sample_origin": manifest.get("sample_origin"),
+        "provider_support_claim": manifest.get("provider_support_claim"),
         "status": status,
         "decision_matrix_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix",
         "adapter_bound_execution_ref": "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence",
@@ -89,9 +91,9 @@ def build_real_provider_sample_evidence_report(
             "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
             "controlled_record_ref": manifest["provenance_ref"],
             "author_path": manifest["author_path"],
-            "adapter_key": "xhs",
-            "provider_identity_scope": "adapter_bound",
-            "provider_key_redaction": "stable fixture provider key; not a product support claim",
+            "adapter_key": manifest.get("adapter_key"),
+            "provider_identity_scope": manifest.get("provider_identity_scope"),
+            "provider_key_redaction": manifest.get("provider_key_redaction"),
             "requirement_ref": "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
             "offer_ref": EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
             "adapter_binding_ref": EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF,
@@ -101,9 +103,9 @@ def build_real_provider_sample_evidence_report(
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
-            "not_native_provider_self_evidence": manifest["not_native_provider_self_evidence"],
-            "provider_support_claim": False,
-            "forbidden_claims": (),
+            "not_native_provider_self_evidence": manifest.get("not_native_provider_self_evidence"),
+            "provider_support_claim": manifest.get("provider_support_claim"),
+            "forbidden_claims": tuple(manifest.get("forbidden_claims", ())),
         },
         "decision_matrix": {
             "matched_case_ref": "fr-0355:decision-matrix:matched",
@@ -130,7 +132,7 @@ def build_real_provider_sample_evidence_report(
             "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
             "fr-0027:profile:content-detail-by-url-hybrid:account",
         ),
-        "not_provider_product_support": True,
+        "not_provider_product_support": manifest.get("not_provider_product_support"),
     }
     if fail_closed_reasons:
         report["decision_matrix"]["fail_closed_reason"] = fail_closed_reasons
@@ -397,6 +399,8 @@ def build_adapter_bound_execution_evidence(
 
 def build_core_surface_no_leakage_evidence(
     decision: AdapterProviderCompatibilityDecision,
+    *,
+    surface_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     surfaces = {
         "core_projection": project_compatibility_decision_for_core(decision),
@@ -435,15 +439,21 @@ def build_core_surface_no_leakage_evidence(
             }
         },
     }
+    if surface_overrides:
+        surfaces.update(surface_overrides)
     surface_results = {
         name: guard_core_provider_no_leakage(surface_name=name, surface=surface, decision=decision)
         for name, surface in surfaces.items()
     }
+    provider_identity_in_core_surface = any(
+        result.evidence.forbidden_field_paths or result.evidence.forbidden_value_paths
+        for result in surface_results.values()
+    )
     return {
         "status": "pass"
         if all(result.status == PROVIDER_NO_LEAKAGE_STATUS_PASSED for result in surface_results.values())
         else "fail",
-        "provider_identity_in_core_surface": False,
+        "provider_identity_in_core_surface": provider_identity_in_core_surface,
         "registry_discovery_checked": True,
         "core_routing_checked": True,
         "task_record_checked": True,
@@ -487,8 +497,10 @@ def _fail_closed_reasons(
     invalid_contract_decision: AdapterProviderCompatibilityDecision,
     adapter_bound_execution: Mapping[str, Any],
     no_leakage: Mapping[str, Any],
+    manifest: Mapping[str, Any],
 ) -> tuple[str, ...]:
     reasons: list[str] = []
+    reasons.extend(_manifest_fail_closed_reasons(manifest))
     if matched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_MATCHED:
         reasons.append("matched_case_not_matched")
     if unmatched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_UNMATCHED:
@@ -499,4 +511,23 @@ def _fail_closed_reasons(
         reasons.append("adapter_bound_execution_not_pass")
     if no_leakage.get("status") != "pass":
         reasons.append("core_surface_no_leakage_not_pass")
+    return tuple(reasons)
+
+
+def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if manifest.get("sample_origin") != "external_provider_sample":
+        reasons.append("manifest_sample_origin_not_external_provider_sample")
+    if manifest.get("provider_support_claim") is not False:
+        reasons.append("manifest_provider_support_claim_not_false")
+    if manifest.get("not_native_provider_self_evidence") is not True:
+        reasons.append("manifest_not_native_provider_self_evidence_not_true")
+    if manifest.get("not_provider_product_support") is not True:
+        reasons.append("manifest_not_provider_product_support_not_true")
+    if manifest.get("provider_identity_scope") != "adapter_bound":
+        reasons.append("manifest_provider_identity_scope_not_adapter_bound")
+    if manifest.get("approved_slice") != APPROVED_SLICE:
+        reasons.append("manifest_approved_slice_drift")
+    if manifest.get("provider_key") != EXTERNAL_PROVIDER_KEY:
+        reasons.append("manifest_provider_key_drift")
     return tuple(reasons)
