@@ -1,0 +1,26 @@
+{
+  "manifest_id": "v0.9.0-external-provider-sample-content-detail",
+  "sample_origin": "external_provider_sample",
+  "provenance_ref": "controlled-record:v0.9.0:external-provider-sample-content-detail",
+  "provenance_artifact_ref": "syvert/fixtures/v0_9_external_provider_sample_provenance.json",
+  "author_path": "external-provider-author-fixture",
+  "adapter_key": "xhs",
+  "provider_identity_scope": "adapter_bound",
+  "provider_key": "external_fixture_content_detail_provider",
+  "provider_key_redaction": "stable fixture provider key; not a product support claim",
+  "provider_support_claim": false,
+  "not_native_provider_self_evidence": true,
+  "not_provider_product_support": true,
+  "approved_slice": {
+    "capability": "content_detail",
+    "operation": "content_detail_by_url",
+    "target_type": "url",
+    "collection_mode": "hybrid"
+  },
+  "fixture_refs": [
+    "external-fixture://content-detail/success#raw",
+    "external-fixture://content-detail/success#normalized",
+    "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
+  ],
+  "forbidden_claims": []
+}

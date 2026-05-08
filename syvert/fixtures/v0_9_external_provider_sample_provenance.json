@@ -1,0 +1,29 @@
+{
+  "record_id": "controlled-record:v0.9.0:external-provider-sample-content-detail",
+  "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+  "sample_origin": "external_provider_sample",
+  "author_path": "external-provider-author-fixture",
+  "author_path_kind": "repo_fixture",
+  "adapter_key": "xhs",
+  "provider_identity_scope": "adapter_bound",
+  "provider_key_redaction": "stable fixture provider key; not a product support claim",
+  "provider_support_claim": false,
+  "not_native_provider_self_evidence": true,
+  "not_provider_product_support": true,
+  "fixture_refs": [
+    "external-fixture://content-detail/success#raw",
+    "external-fixture://content-detail/success#normalized",
+    "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
+  ],
+  "reviewable_artifact_refs": [
+    "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md",
+    "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
+    "tests/runtime/test_real_provider_sample_evidence.py"
+  ],
+  "boundary": {
+    "live_network_required": false,
+    "private_token_required": false,
+    "native_provider_self_evidence": false,
+    "provider_product_support_claim": false
+  }
+}
