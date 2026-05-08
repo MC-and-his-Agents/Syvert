@@ -349,6 +349,8 @@ Syvert Adapter
 
 为 Core 稳定化做准备，并用真实 provider 验证样本检验 `v0.8.0` 冻结的兼容性判断模型。
 
+`v0.9.0` 真实 provider compatibility evidence 由 `docs/specs/FR-0355-v0-9-real-provider-compatibility-evidence/` 冻结。该 evidence 只证明外部 provider sample 可验证 Adapter / Provider compatibility decision 链路，不声明任何指定 provider 产品正式支持。
+
 ### 必须具备
 
 - 契约清理
