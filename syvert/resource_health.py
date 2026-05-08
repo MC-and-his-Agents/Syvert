@@ -413,7 +413,11 @@ def invalidate_active_lease_from_health_evidence(
             ),
         )
     active_lease = _find_active_lease(snapshot.leases, lease_id=normalized_evidence.lease_id)
+    resources_by_id = {resource.resource_id: resource for resource in snapshot.resources}
     if active_lease is None:
+        bound_resource = resources_by_id.get(normalized_evidence.resource_id)
+        if bound_resource is None or bound_resource.resource_type != "account":
+            return _invalid_contract_decision(normalized_evidence, task_context_task_id)
         existing_lease = _find_lease(snapshot.leases, lease_id=normalized_evidence.lease_id)
         if existing_lease is not None and _evidence_mismatches_lease_context(normalized_evidence, existing_lease):
             return _invalid_contract_decision(normalized_evidence, task_context_task_id)
@@ -421,7 +425,6 @@ def invalidate_active_lease_from_health_evidence(
         if active_lease_for_resource is not None:
             return _invalid_contract_decision(normalized_evidence, task_context_task_id)
         return _invalidation_rejected_decision(normalized_evidence, task_context_task_id)
-    resources_by_id = {resource.resource_id: resource for resource in snapshot.resources}
     bound_resource = resources_by_id.get(normalized_evidence.resource_id)
     if normalized_evidence.resource_id not in active_lease.resource_ids or bound_resource is None:
         return _invalid_contract_decision(normalized_evidence, task_context_task_id)

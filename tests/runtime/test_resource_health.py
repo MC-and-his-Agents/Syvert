@@ -525,6 +525,33 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
         account = next(record for record in snapshot.resources if record.resource_id == "account-001")
         self.assertEqual(account.status, "AVAILABLE")
 
+    def test_no_active_lease_fallback_requires_existing_account_resource(self) -> None:
+        for resource_id in ("account-missing", "proxy-001"):
+            with self.subTest(resource_id=resource_id):
+                evidence = self.healthy_evidence(
+                    evidence_id=f"evidence-invalid-no-active-{resource_id}",
+                    resource_id=resource_id,
+                    status=SESSION_HEALTH_INVALID,
+                    expires_at=None,
+                    freshness_policy_ref=None,
+                    provenance="adapter_diagnostic",
+                    lease_id="lease-missing",
+                    bundle_id="bundle-missing",
+                    reason="platform reported credential expired",
+                )
+
+                result = invalidate_active_lease_from_health_evidence(
+                    evidence=evidence,
+                    store=self.make_store(),
+                    task_context_task_id="task-001",
+                    operation="content_detail_by_url",
+                    resource_trace_store=self.make_trace_store(),
+                )
+
+                self.assertIsInstance(result, ResourceAdmissionDecision)
+                assert isinstance(result, ResourceAdmissionDecision)
+                self.assertEqual(result.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+
     def test_active_resource_with_wrong_lease_id_is_invalid_contract(self) -> None:
         bundle = acquire(
             AcquireRequest(
