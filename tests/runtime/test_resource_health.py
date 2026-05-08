@@ -346,6 +346,47 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
 
+    def test_health_gated_admission_rejects_foreign_resource_evidence(self) -> None:
+        foreign_evidence = self.healthy_evidence(
+            evidence_id="evidence-foreign-resource",
+            resource_id="account-other",
+        )
+
+        decision = decide_resource_health_admission(
+            decision_id="decision-foreign-resource",
+            task_id="task-001",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            operation="content_detail_by_url",
+            requested_slots=("account",),
+            resources=(self.account_record(),),
+            evidence=(foreign_evidence,),
+            evaluated_at="2026-05-08T12:05:00.000000Z",
+        )
+
+        self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+
+    def test_health_gated_admission_rejects_mixed_valid_and_foreign_resource_evidence(self) -> None:
+        selected_evidence = self.healthy_evidence(evidence_id="evidence-selected-resource")
+        foreign_evidence = self.healthy_evidence(
+            evidence_id="evidence-foreign-resource",
+            resource_id="account-other",
+        )
+
+        decision = decide_resource_health_admission(
+            decision_id="decision-mixed-resource-evidence",
+            task_id="task-001",
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            operation="content_detail_by_url",
+            requested_slots=("account",),
+            resources=(self.account_record(),),
+            evidence=(selected_evidence, foreign_evidence),
+            evaluated_at="2026-05-08T12:05:00.000000Z",
+        )
+
+        self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+
     def test_malformed_credential_material_fails_closed_before_admission(self) -> None:
         cases = (
             ResourceRecord(

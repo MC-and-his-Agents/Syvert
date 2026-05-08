@@ -309,6 +309,10 @@ def decide_resource_health_admission(
                 failure_reason = "credential_session_unknown"
                 fail_closed = True
             else:
+                account_resource_ids = {account.resource_id for account in account_resources}
+                for item in normalized_evidence:
+                    if item.resource_id not in account_resource_ids:
+                        raise ResourceHealthContractError("ResourceHealthEvidence.resource_id 与当前 account context 不一致")
                 for account_resource in account_resources:
                     credential = credential_material_from_account_resource(account_resource)
                     if credential.adapter_key != adapter_key:
