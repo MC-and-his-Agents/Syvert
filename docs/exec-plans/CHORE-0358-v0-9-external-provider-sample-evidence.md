@@ -65,9 +65,9 @@
 - `python3 scripts/spec_guard.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
 - `python3 scripts/docs_guard.py --mode ci`：通过
 - `python3 scripts/workflow_guard.py --mode ci`：通过
-- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：提交后重跑
-- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`：提交后执行
-- `git diff --check origin/main..HEAD`：提交后执行
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`：通过
+- `python3 scripts/pr_scope_guard.py --class implementation --base-ref origin/main --head-ref HEAD`：通过，变更类别为 `docs, implementation`
+- `git diff --check origin/main..HEAD`：通过
 
 ## 未决风险
 
