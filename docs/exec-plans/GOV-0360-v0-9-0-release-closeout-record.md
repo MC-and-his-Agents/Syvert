@@ -51,7 +51,7 @@
 
 - 阶段 A：提交 release / sprint / closeout evidence carrier，开 docs PR，等待 checks 与 guardian，通过后受控合入。
 - 发布锚点：已完成。
-- 阶段 B：回写 release index 与 closeout evidence 的 published truth carrier，开 follow-up docs PR。
+- 阶段 B：PR `#362` 回写 release index 与 closeout evidence 的 published truth carrier。
 - 阶段 B 合入后：关闭 `#355/#354/#360`，清理 worktree 并退役分支。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -97,7 +97,7 @@
 
 ## 待验证项
 
-- 阶段 B published truth 回写 PR checks、guardian 与受控 merge。
+- 阶段 B PR `#362` checks、guardian 与受控 merge。
 - Phase / FR / Work Item closeout comment 与 GitHub 状态。
 
 ## closeout 证据
