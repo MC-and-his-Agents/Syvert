@@ -26,6 +26,7 @@
 - forbidden_claims：`()`
 - requirement_ref：`fr-0024:reference-adapter-migration:xhs-douyin-content-detail`
 - offer_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample`
+- adapter_binding_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-adapter-binding`
 - decision_ref：`v0-9-external-provider-sample-matched`
 - decision_contract_ref：`fr-0026:runtime-tests:adapter-provider-compatibility-decision`
 - profile_proof_refs：`fr-0027:profile:content-detail-by-url-hybrid:account-proxy`、`fr-0027:profile:content-detail-by-url-hybrid:account`
@@ -69,7 +70,7 @@
 - failure evidence 边界：
   - provider failure input：`source_error=external_provider_timeout`
   - adapter_mapped_failed_envelope_ref：`external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope`
-  - Adapter-mapped failed envelope：`category=platform`、`code=external_sample_unavailable`
+  - Adapter-mapped failed envelope：`capability=content_detail`、`operation=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。
 
 ## Core Surface Projection

@@ -76,6 +76,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("adapter-mapped-failed-envelope", evidence["adapter_mapped_failed_envelope_ref"])
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["category"], "platform")
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
+        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["capability"], "content_detail")
+        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["operation"], "content_detail_by_url")
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
@@ -128,6 +130,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
             "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample",
         )
         self.assertEqual(
+            report["external_provider_sample"]["adapter_binding_ref"],
+            "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-adapter-binding",
+        )
+        self.assertEqual(
             report["external_provider_sample"]["decision_ref"],
             "v0-9-external-provider-sample-matched",
         )
@@ -153,6 +159,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         )
         self.assertIn("test_real_provider_sample_evidence", report["decision_matrix"]["validator_commands"][0])
         self.assertEqual(report["decision_matrix"]["matched_case"]["decision_status"], "matched")
+        self.assertIn(
+            "fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-adapter-binding",
+            report["required_evidence_refs"],
+        )
         self.assertEqual(report["decision_matrix"]["unmatched_case"]["decision_status"], "unmatched")
         self.assertEqual(
             report["decision_matrix"]["invalid_contract_case"]["decision_status"],

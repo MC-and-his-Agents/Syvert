@@ -94,6 +94,7 @@ def build_real_provider_sample_evidence_report(
             "provider_key_redaction": "stable fixture provider key; not a product support claim",
             "requirement_ref": "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
             "offer_ref": EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
+            "adapter_binding_ref": EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF,
             "decision_ref": "v0-9-external-provider-sample-matched",
             "decision_contract_ref": FR0026_DECISION_EVIDENCE_REF,
             "profile_proof_refs": (
@@ -124,6 +125,7 @@ def build_real_provider_sample_evidence_report(
             FR0355_EVIDENCE_REF,
             "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
             EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
+            EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF,
             FR0026_DECISION_EVIDENCE_REF,
             "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
             "fr-0027:profile:content-detail-by-url-hybrid:account",
@@ -349,7 +351,8 @@ def build_adapter_bound_execution_evidence(
     adapter_mapped_failed_envelope = {
         "status": "failed",
         "adapter_key": decision.adapter_key,
-        "capability": "content_detail_by_url",
+        "capability": decision.capability,
+        "operation": decision.execution_slice.operation if decision.execution_slice else None,
         "error": {
             "category": "platform",
             "code": "external_sample_unavailable",
@@ -412,13 +415,15 @@ def build_core_surface_no_leakage_evidence(
         "task_record": {
             "task_id": "task-v0-9-external-provider-sample",
             "adapter_key": "xhs",
-            "capability": "content_detail_by_url",
+            "capability": "content_detail",
+            "operation": "content_detail_by_url",
             "status": "success",
         },
         "resource_lifecycle": {
             "bundle_id": "bundle-v0-9-external-provider-sample",
             "adapter_key": "xhs",
-            "capability": "content_detail_by_url",
+            "capability": "content_detail",
+            "operation": "content_detail_by_url",
             "requested_slots": ("account", "proxy"),
             "disposition_hint": "release",
         },
