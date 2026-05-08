@@ -60,10 +60,14 @@
 - matched_decision_ref：`fr-0355:decision-matrix:matched`
 - matched_decision_id：`v0-9-external-provider-sample-matched`
 - matched decision 后进入 Adapter-owned provider seam：`xhs:adapter-owned-provider-port:external-fixture`。
+- runtime_execution_ref：`syvert.runtime.execute_task_with_record:v0-9-external-provider-sample`
+- success_task_record_ref：`task_record:task-v0-9-sample-success`
+- failure_task_record_ref：`task_record:task-v0-9-sample-failure`
 - success evidence 覆盖：
   - raw_payload_ref：`external-fixture://content-detail/success#raw`
+  - raw payload：由 `XhsAdapter(provider=ExternalFixtureXhsProvider)` 经 `execute_task_with_record()` 产出，不携带 `provider_key`。
   - normalized_result_ref：`external-fixture://content-detail/success#normalized`
-  - normalized result：`platform=xhs`、`content_id=external-fixture-content-001`
+  - normalized result：`platform=xhs`、`content_id=66fad51c000000001b0224b8`
   - provider_error_mapping_checked：`true`
   - resource_profile_consumption_checked：`true`
   - resource profile consumption：`account_proxy`
@@ -72,9 +76,9 @@
   - observability_carrier_checked：`true`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
-  - provider failure input：`source_error=external_provider_timeout`
+  - external sample failure input：`source_error=external_sample_timeout`
   - adapter_mapped_failed_envelope_ref：`external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope`
-  - Adapter-mapped failed envelope：`capability=content_detail`、`operation=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
+  - Adapter-mapped failed envelope：由 `execute_task_with_record()` 产出，`capability=content_detail_by_url`、`category=platform`、`code=external_sample_unavailable`
   - Core-facing failed envelope 不新增 provider category。
 
 ## Core Surface Projection
@@ -88,11 +92,12 @@
 `build_core_surface_no_leakage_evidence()` 审计以下 Core-facing surfaces：
 
 - core projection
-- registry discovery
-- core routing
-- TaskRecord
-- resource lifecycle
-- Core-facing failed envelope
+- registry discovery：来自 `AdapterRegistry.from_mapping({"xhs": XhsAdapter(provider=...)})`
+- core routing：来自 `execute_task_with_record()` 的 adapter selection surface
+- TaskRecord：来自 success / failure 两条 `LocalTaskRecordStore` durable records
+- resource lifecycle：来自 `LocalResourceLifecycleStore` acquire / release snapshot
+- resource trace：来自 `LocalResourceTraceStore`
+- Core-facing failed envelope：来自 failure sample 的 terminal envelope
 
 结果：
 
@@ -103,6 +108,7 @@
 | `core_routing` | `passed` | `()` | `()` |
 | `task_record` | `passed` | `()` | `()` |
 | `resource_lifecycle` | `passed` | `()` | `()` |
+| `resource_trace` | `passed` | `()` | `()` |
 | `core_facing_failed_envelope` | `passed` | `()` | `()` |
 
 - provider_identity_in_core_surface：`false`
@@ -122,6 +128,8 @@
 | external provider sample evidence | `python3 -m unittest tests.runtime.test_real_provider_sample_evidence` | `pass` |
 | compatibility decision / no-leakage / sample | `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence` | `pass` |
 | dual reference / third-party entry / API CLI same path | `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path` | `pass` |
+
+这些命令由 `build_required_validation_evidence()` 绑定到 report status；任一命令失败时，report 必须返回 `status=fail` 与 `required_validation_not_pass`。
 
 ## Boundary
 

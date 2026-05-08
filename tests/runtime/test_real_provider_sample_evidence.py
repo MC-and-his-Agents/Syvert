@@ -66,7 +66,8 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["status"], "pass")
         self.assertEqual(evidence["matched_decision_ref"], "fr-0355:decision-matrix:matched")
         self.assertEqual(evidence["matched_decision_id"], "v0-9-external-provider-sample-matched")
-        self.assertEqual(evidence["raw_payload"]["provider_key"], EXTERNAL_PROVIDER_KEY)
+        self.assertNotIn("provider_key", evidence["raw_payload"])
+        self.assertEqual(evidence["raw_payload"]["sample_id"], "v0.9.0-external-provider-sample-content-detail")
         self.assertEqual(evidence["raw_payload_ref"], "external-fixture://content-detail/success#raw")
         self.assertEqual(evidence["normalized_result"]["platform"], "xhs")
         self.assertEqual(
@@ -76,13 +77,15 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("adapter-mapped-failed-envelope", evidence["adapter_mapped_failed_envelope_ref"])
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["category"], "platform")
         self.assertEqual(evidence["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
-        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["capability"], "content_detail")
-        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["operation"], "content_detail_by_url")
+        self.assertEqual(evidence["adapter_mapped_failed_envelope"]["capability"], "content_detail_by_url")
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
         self.assertEqual(evidence["resource_lifecycle_disposition_hint"], "release")
         self.assertTrue(evidence["observability_carrier_checked"])
+        self.assertEqual(evidence["runtime_execution_ref"], "syvert.runtime.execute_task_with_record:v0-9-external-provider-sample")
+        self.assertEqual(evidence["success_task_record_ref"], "task_record:task-v0-9-sample-success")
+        self.assertEqual(evidence["failure_task_record_ref"], "task_record:task-v0-9-sample-failure")
         self.assertNotIn("provider_key", evidence["core_surface_projection"])
 
     def test_core_surface_no_leakage_evidence_passes_for_external_provider_sample(self) -> None:
@@ -171,6 +174,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(report["adapter_bound_execution"]["status"], "pass")
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
+        self.assertEqual(report["validation_evidence"]["status"], "pass")
+        self.assertEqual(len(report["validation_evidence"]["commands"]), 3)
+        self.assertIn("resource_trace", report["core_surface_no_leakage"]["surfaces"])
+        self.assertIn("task_record", report["core_surface_no_leakage"]["surfaces"])
         self.assertTrue(report["not_provider_product_support"])
         self.assertNotIn("fail_closed_reason", report["decision_matrix"])
 
@@ -207,6 +214,14 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertIn("manifest_provider_support_claim_not_false", report["decision_matrix"]["fail_closed_reason"])
         self.assertIn("manifest_approved_slice_drift", report["decision_matrix"]["fail_closed_reason"])
+
+    def test_report_fails_closed_for_required_validation_failure(self) -> None:
+        report = build_real_provider_sample_evidence_report(
+            validation_evidence_override={"status": "fail", "commands": ()}
+        )
+
+        self.assertEqual(report["status"], "fail")
+        self.assertIn("required_validation_not_pass", report["decision_matrix"]["fail_closed_reason"])
 
     def test_report_fails_closed_for_missing_required_manifest_fields(self) -> None:
         manifest = external_provider_sample_manifest()

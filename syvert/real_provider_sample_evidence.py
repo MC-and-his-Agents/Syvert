@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
+from functools import lru_cache
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 from typing import Any
 
 from syvert.adapter_capability_requirement import baseline_adapter_capability_requirement
@@ -16,11 +21,20 @@ from syvert.adapter_provider_compatibility_decision import (
     decide_adapter_provider_compatibility,
     project_compatibility_decision_for_core,
 )
+from syvert.adapters.xhs import XhsAdapter
+from syvert.adapters.xhs_provider import XhsProviderContext, XhsProviderResult
 from syvert.provider_no_leakage_guard import (
     PROVIDER_NO_LEAKAGE_STATUS_PASSED,
     guard_core_provider_no_leakage,
 )
-from syvert.registry import baseline_multi_profile_resource_requirement_declaration
+from syvert.registry import AdapterRegistry, baseline_multi_profile_resource_requirement_declaration
+from syvert.resource_lifecycle import MANAGED_ACCOUNT_ADAPTER_KEY_FIELD, ResourceRecord, snapshot_to_dict
+from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
+from syvert.resource_trace import resource_trace_event_to_dict
+from syvert.resource_trace_store import LocalResourceTraceStore
+from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task_with_record
+from syvert.task_record import task_record_to_dict
+from syvert.task_record_store import LocalTaskRecordStore
 
 
 EXTERNAL_PROVIDER_SAMPLE_ID = "v0.9.0-external-provider-sample-content-detail"
@@ -49,6 +63,29 @@ VALIDATION_MODULE_PATHS = {
     "tests.runtime.test_third_party_adapter_contract_entry": "tests/runtime/test_third_party_adapter_contract_entry.py",
     "tests.runtime.test_cli_http_same_path": "tests/runtime/test_cli_http_same_path.py",
 }
+REQUIRED_VALIDATION_COMMANDS = (
+    (
+        "external provider sample evidence",
+        ("tests.runtime.test_real_provider_sample_evidence",),
+    ),
+    (
+        "compatibility decision / no-leakage / sample",
+        (
+            "tests.runtime.test_adapter_provider_compatibility_decision",
+            "tests.runtime.test_provider_no_leakage_guard",
+            "tests.runtime.test_real_provider_sample_evidence",
+        ),
+    ),
+    (
+        "dual reference / third-party entry / API CLI same path",
+        (
+            "tests.runtime.test_real_adapter_regression",
+            "tests.runtime.test_third_party_adapter_contract_entry",
+            "tests.runtime.test_cli_http_same_path",
+        ),
+    ),
+)
+NESTED_VALIDATION_ENV = "SYVERT_REAL_PROVIDER_SAMPLE_NESTED_VALIDATION"
 APPROVED_SLICE = {
     "capability": "content_detail",
     "operation": "content_detail_by_url",
@@ -66,6 +103,7 @@ def build_real_provider_sample_evidence_report(
     *,
     manifest_override: Mapping[str, Any] | None = None,
     no_leakage_override: Mapping[str, Any] | None = None,
+    validation_evidence_override: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = dict(manifest_override) if manifest_override is not None else external_provider_sample_manifest()
     matched_decision = decide_adapter_provider_compatibility(external_provider_decision_input())
@@ -77,7 +115,12 @@ def build_real_provider_sample_evidence_report(
     no_leakage = (
         dict(no_leakage_override)
         if no_leakage_override is not None
-        else build_core_surface_no_leakage_evidence(matched_decision)
+        else build_core_surface_no_leakage_evidence(matched_decision, adapter_bound_execution=adapter_bound_execution)
+    )
+    validation_evidence = (
+        dict(validation_evidence_override)
+        if validation_evidence_override is not None
+        else build_required_validation_evidence()
     )
 
     fail_closed_reasons = _fail_closed_reasons(
@@ -87,6 +130,7 @@ def build_real_provider_sample_evidence_report(
         adapter_bound_execution=adapter_bound_execution,
         no_leakage=no_leakage,
         manifest=manifest,
+        validation_evidence=validation_evidence,
     )
     fail_closed_reasons = (*fail_closed_reasons, *_evidence_ref_fail_closed_reasons())
     status = "pass" if not fail_closed_reasons else "fail"
@@ -144,6 +188,7 @@ def build_real_provider_sample_evidence_report(
         },
         "adapter_bound_execution": adapter_bound_execution,
         "core_surface_no_leakage": no_leakage,
+        "validation_evidence": validation_evidence,
         "required_evidence_refs": (
             FR0355_EVIDENCE_REF,
             "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
@@ -357,53 +402,40 @@ def build_adapter_bound_execution_evidence(
             "reason": "adapter_bound_execution_requires_matched_decision",
             "matched_decision_ref": decision.decision_id,
         }
-    raw_payload = {
-        "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
-        "provider_key": decision.evidence.adapter_bound_provider_evidence.provider_key,
-        "source_payload_ref": "external-fixture://content-detail/success",
-        "provider_error_code": None,
-        "resource_profile": "account_proxy",
-    }
-    normalized_result = {
-        "platform": decision.adapter_key,
-        "content_id": "external-fixture-content-001",
-        "canonical_url": "https://example.com/external-provider-sample/1",
-        "content_type": "note",
-        "title": "external provider sample",
-    }
-    adapter_mapped_failed_envelope = {
-        "status": "failed",
-        "adapter_key": decision.adapter_key,
-        "capability": decision.capability,
-        "operation": decision.execution_slice.operation if decision.execution_slice else None,
-        "error": {
-            "category": "platform",
-            "code": "external_sample_unavailable",
-            "message": "adapter mapped external sample failure",
-            "details": {
-                "source_error": "external_provider_timeout",
-                "retryable": False,
-            },
-        },
-    }
+    execution = run_external_provider_sample_runtime_execution()
+    success_envelope = execution["success"]["envelope"]
+    failed_envelope = execution["failure"]["envelope"]
+    evidence_status = (
+        "pass"
+        if (
+            success_envelope.get("status") == "success"
+            and failed_envelope.get("status") == "failed"
+            and execution["success"]["provider_calls"]
+            and execution["failure"]["provider_calls"]
+        )
+        else "fail"
+    )
     return {
-        "status": "pass",
+        "status": evidence_status,
         "matched_decision_ref": "fr-0355:decision-matrix:matched",
         "matched_decision_id": decision.decision_id,
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
         "raw_payload_ref": "external-fixture://content-detail/success#raw",
-        "raw_payload": raw_payload,
+        "raw_payload": success_envelope.get("raw"),
         "normalized_result_ref": "external-fixture://content-detail/success#normalized",
-        "normalized_result": normalized_result,
+        "normalized_result": success_envelope.get("normalized"),
         "adapter_mapped_failed_envelope_ref": (
             "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
         ),
-        "adapter_mapped_failed_envelope": adapter_mapped_failed_envelope,
+        "adapter_mapped_failed_envelope": failed_envelope,
         "provider_error_mapping_checked": True,
-        "resource_profile_consumption_checked": True,
+        "resource_profile_consumption_checked": bool(execution["success"]["resource_trace_events"]),
         "resource_lifecycle_disposition_checked": True,
         "resource_lifecycle_disposition_hint": "release",
-        "observability_carrier_checked": True,
+        "observability_carrier_checked": bool(execution["success"]["task_record"]),
+        "runtime_execution_ref": execution["runtime_execution_ref"],
+        "success_task_record_ref": execution["success"]["task_record_ref"],
+        "failure_task_record_ref": execution["failure"]["task_record_ref"],
         "observability": {
             "adapter_key": decision.adapter_key,
             "capability": decision.capability,
@@ -416,6 +448,7 @@ def build_adapter_bound_execution_evidence(
             "#core-surface-projection"
         ),
         "core_surface_projection": project_compatibility_decision_for_core(decision),
+        "core_runtime_surfaces": execution["core_runtime_surfaces"],
     }
 
 
@@ -423,8 +456,18 @@ def build_core_surface_no_leakage_evidence(
     decision: AdapterProviderCompatibilityDecision,
     *,
     surface_overrides: Mapping[str, Any] | None = None,
+    adapter_bound_execution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    surfaces = {
+    execution = (
+        adapter_bound_execution.get("core_runtime_surfaces")
+        if isinstance(adapter_bound_execution, Mapping)
+        else None
+    )
+    if isinstance(execution, Mapping):
+        surfaces = dict(execution)
+        surfaces["core_projection"] = project_compatibility_decision_for_core(decision)
+    else:
+        surfaces = {
         "core_projection": project_compatibility_decision_for_core(decision),
         "registry_discovery": {
             "adapter_key": "xhs",
@@ -460,7 +503,7 @@ def build_core_surface_no_leakage_evidence(
                 "message": "adapter mapped external sample failure",
             }
         },
-    }
+        }
     if surface_overrides:
         surfaces.update(surface_overrides)
     surface_results = {
@@ -496,6 +539,248 @@ def build_core_surface_no_leakage_evidence(
     }
 
 
+class ExternalFixtureXhsProvider:
+    def __init__(self, *, mode: str) -> None:
+        self.mode = mode
+        self.calls: list[dict[str, Any]] = []
+
+    def fetch_content_detail(self, context: XhsProviderContext, input_url: str) -> XhsProviderResult:
+        self.calls.append(
+            {
+                "note_id": context.parsed_target.note_id,
+                "xsec_token": context.parsed_target.xsec_token,
+                "timeout_seconds": context.session.timeout_seconds,
+                "input_url": input_url,
+            }
+        )
+        if self.mode == "failure":
+            raise PlatformAdapterError(
+                code="external_sample_unavailable",
+                message="adapter mapped external sample failure",
+                details={"source_error": "external_sample_timeout", "retryable": False},
+            )
+        return XhsProviderResult(
+            raw_payload={
+                "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
+                "source_payload_ref": "external-fixture://content-detail/success",
+                "resource_profile": "account_proxy",
+            },
+            platform_detail={
+                "note_id": context.parsed_target.note_id,
+                "type": "normal",
+                "title": "external provider sample",
+                "desc": "external provider sample body",
+                "time": 1712304300,
+                "user": {"user_id": "external-sample-author", "nickname": "External Sample"},
+                "interact_info": {
+                    "liked_count": "11",
+                    "comment_count": "12",
+                    "share_count": "13",
+                    "collected_count": "14",
+                },
+                "image_list": [{"url_default": "https://cdn.example/external-sample-image.jpg"}],
+            },
+        )
+
+
+@lru_cache(maxsize=1)
+def run_external_provider_sample_runtime_execution() -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="syvert-v0-9-provider-sample-") as temp_dir:
+        temp_path = Path(temp_dir)
+        task_store = LocalTaskRecordStore(temp_path / "task-records")
+        resource_store = LocalResourceLifecycleStore(temp_path / "resource-lifecycle.json")
+        trace_store = LocalResourceTraceStore(temp_path / "resource-trace-events.jsonl")
+        _seed_external_provider_sample_resources(resource_store)
+        success_provider = ExternalFixtureXhsProvider(mode="success")
+        failure_provider = ExternalFixtureXhsProvider(mode="failure")
+        success_adapter = XhsAdapter(provider=success_provider)
+        failure_adapter = XhsAdapter(provider=failure_provider)
+        success = _execute_external_provider_sample(
+            adapter=success_adapter,
+            task_id="task-v0-9-sample-success",
+            task_store=task_store,
+            resource_store=resource_store,
+            trace_store=trace_store,
+        )
+        failure = _execute_external_provider_sample(
+            adapter=failure_adapter,
+            task_id="task-v0-9-sample-failure",
+            task_store=task_store,
+            resource_store=resource_store,
+            trace_store=trace_store,
+        )
+        registry = AdapterRegistry.from_mapping({"xhs": success_adapter})
+        return {
+            "runtime_execution_ref": "syvert.runtime.execute_task_with_record:v0-9-external-provider-sample",
+            "success": {
+                **success,
+                "provider_calls": tuple(success_provider.calls),
+            },
+            "failure": {
+                **failure,
+                "provider_calls": tuple(failure_provider.calls),
+            },
+            "core_runtime_surfaces": {
+                "registry_discovery": {
+                    "adapter_key": "xhs",
+                    "capabilities": tuple(sorted(registry.discover_capabilities("xhs") or ())),
+                    "targets": tuple(sorted(registry.discover_targets("xhs") or ())),
+                    "collection_modes": tuple(sorted(registry.discover_collection_modes("xhs") or ())),
+                    "resource_requirements": _resource_requirements_summary(
+                        registry.discover_resource_requirements("xhs") or ()
+                    ),
+                },
+                "core_routing": {
+                    "adapter_key": "xhs",
+                    "capability": "content_detail_by_url",
+                    "target_type": "url",
+                    "collection_mode": "hybrid",
+                    "dispatch_status": "adapter_selected",
+                    "runtime_execution_ref": "syvert.runtime.execute_task_with_record",
+                },
+                "task_record": {
+                    "success": success["task_record"],
+                    "failure": failure["task_record"],
+                },
+                "resource_lifecycle": snapshot_to_dict(resource_store.load_snapshot()),
+                "resource_trace": tuple(
+                    resource_trace_event_to_dict(event) for event in trace_store.load_events()
+                ),
+                "core_facing_failed_envelope": failure["envelope"],
+            },
+        }
+
+
+def _execute_external_provider_sample(
+    *,
+    adapter: XhsAdapter,
+    task_id: str,
+    task_store: LocalTaskRecordStore,
+    resource_store: LocalResourceLifecycleStore,
+    trace_store: LocalResourceTraceStore,
+) -> dict[str, Any]:
+    result = execute_task_with_record(
+        TaskRequest(
+            adapter_key="xhs",
+            capability="content_detail_by_url",
+            input=TaskInput(
+                url="https://www.xiaohongshu.com/explore/66fad51c000000001b0224b8?xsec_token=token-1"
+            ),
+        ),
+        adapters={"xhs": adapter},
+        task_id_factory=lambda: task_id,
+        task_record_store=task_store,
+        resource_lifecycle_store=resource_store,
+        resource_trace_store=trace_store,
+    )
+    task_record = task_record_to_dict(result.task_record) if result.task_record is not None else None
+    return {
+        "envelope": result.envelope,
+        "task_record": task_record,
+        "task_record_ref": f"task_record:{task_id}" if task_record is not None else "none",
+        "resource_trace_events": tuple(
+            resource_trace_event_to_dict(event) for event in trace_store.task_usage_log(task_id).events
+        ),
+    }
+
+
+def _seed_external_provider_sample_resources(store: LocalResourceLifecycleStore) -> None:
+    account_material = {
+        "cookies": "a=1; b=2",
+        "user_agent": "Mozilla/5.0 TestAgent",
+        "sign_base_url": "http://127.0.0.1:8000",
+        "timeout_seconds": 5,
+        MANAGED_ACCOUNT_ADAPTER_KEY_FIELD: "xhs",
+    }
+    store.seed_resources(
+        (
+            ResourceRecord(
+                resource_id="sample-account-001",
+                resource_type="account",
+                status="AVAILABLE",
+                material=account_material,
+            ),
+            ResourceRecord(
+                resource_id="sample-proxy-001",
+                resource_type="proxy",
+                status="AVAILABLE",
+                material={"proxy_endpoint": "http://proxy-001"},
+            ),
+        )
+    )
+
+
+def _resource_requirements_summary(declarations: tuple[Any, ...]) -> tuple[dict[str, Any], ...]:
+    return tuple(
+        {
+            "adapter_key": declaration.adapter_key,
+            "capability": declaration.capability,
+            "profiles": tuple(
+                {
+                    "profile_key": profile.profile_key,
+                    "resource_dependency_mode": profile.resource_dependency_mode,
+                    "required_capabilities": profile.required_capabilities,
+                    "evidence_refs": profile.evidence_refs,
+                }
+                for profile in declaration.resource_requirement_profiles
+            ),
+        }
+        for declaration in declarations
+    )
+
+
+def build_required_validation_evidence() -> dict[str, Any]:
+    return _build_required_validation_evidence_cached()
+
+
+@lru_cache(maxsize=1)
+def _build_required_validation_evidence_cached() -> dict[str, Any]:
+    if os.environ.get(NESTED_VALIDATION_ENV) == "1":
+        commands = tuple(
+            {
+                "validation": validation_name,
+                "command": _validation_command_text(modules),
+                "status": "pass",
+                "nested_validation_guard": True,
+            }
+            for validation_name, modules in REQUIRED_VALIDATION_COMMANDS
+        )
+        return {"status": "pass", "commands": commands}
+
+    repo_root = Path(__file__).parents[1]
+    env = dict(os.environ)
+    env[NESTED_VALIDATION_ENV] = "1"
+    commands: list[dict[str, Any]] = []
+    for validation_name, modules in REQUIRED_VALIDATION_COMMANDS:
+        command = (sys.executable, "-m", "unittest", *modules)
+        completed = subprocess.run(
+            command,
+            cwd=repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        commands.append(
+            {
+                "validation": validation_name,
+                "command": _validation_command_text(modules),
+                "status": "pass" if completed.returncode == 0 else "fail",
+                "returncode": completed.returncode,
+                "stdout_tail": completed.stdout[-1000:],
+                "stderr_tail": completed.stderr[-1000:],
+            }
+        )
+    return {
+        "status": "pass" if all(command["status"] == "pass" for command in commands) else "fail",
+        "commands": tuple(commands),
+    }
+
+
+def _validation_command_text(modules: tuple[str, ...]) -> str:
+    return "python3 -m unittest " + " ".join(modules)
+
+
 def _decision_summary(decision: AdapterProviderCompatibilityDecision) -> dict[str, Any]:
     return {
         "decision_id": decision.decision_id,
@@ -520,9 +805,11 @@ def _fail_closed_reasons(
     adapter_bound_execution: Mapping[str, Any],
     no_leakage: Mapping[str, Any],
     manifest: Mapping[str, Any],
+    validation_evidence: Mapping[str, Any],
 ) -> tuple[str, ...]:
     reasons: list[str] = []
     reasons.extend(_manifest_fail_closed_reasons(manifest))
+    reasons.extend(_validation_fail_closed_reasons(validation_evidence))
     if matched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_MATCHED:
         reasons.append("matched_case_not_matched")
     if unmatched_decision.decision_status != COMPATIBILITY_DECISION_STATUS_UNMATCHED:
@@ -533,6 +820,19 @@ def _fail_closed_reasons(
         reasons.append("adapter_bound_execution_not_pass")
     if no_leakage.get("status") != "pass":
         reasons.append("core_surface_no_leakage_not_pass")
+    return tuple(reasons)
+
+
+def _validation_fail_closed_reasons(validation_evidence: Mapping[str, Any]) -> tuple[str, ...]:
+    if validation_evidence.get("status") != "pass":
+        return ("required_validation_not_pass",)
+    commands = validation_evidence.get("commands")
+    if not isinstance(commands, tuple) or len(commands) != len(REQUIRED_VALIDATION_COMMANDS):
+        return ("required_validation_commands_missing",)
+    reasons: list[str] = []
+    for command in commands:
+        if not isinstance(command, Mapping) or command.get("status") != "pass":
+            reasons.append("required_validation_command_not_pass")
     return tuple(reasons)
 
 
