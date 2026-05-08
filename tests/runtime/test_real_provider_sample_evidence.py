@@ -17,16 +17,20 @@ from syvert.real_provider_sample_evidence import (
     external_provider_capability_offer,
     external_provider_decision_input,
     external_provider_invalid_contract_decision_input,
+    external_provider_sample_manifest,
     external_provider_unmatched_decision_input,
 )
 
 
 class RealProviderSampleEvidenceTests(unittest.TestCase):
     def test_external_provider_offer_is_declared_without_native_provider_identity(self) -> None:
+        manifest = external_provider_sample_manifest()
         offer = external_provider_capability_offer()
         result = validate_provider_capability_offer(offer)
 
         self.assertEqual(result.status, "declared")
+        self.assertTrue(manifest["not_native_provider_self_evidence"])
+        self.assertEqual(manifest["provider_key"], EXTERNAL_PROVIDER_KEY)
         self.assertEqual(offer["provider_key"], EXTERNAL_PROVIDER_KEY)
         self.assertNotIn("native_xhs_detail", offer["provider_key"])
         self.assertEqual(offer["adapter_binding"]["binding_scope"], "adapter_bound")
@@ -111,6 +115,11 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["provider_support_claim"], False)
         self.assertEqual(report["consumed_gate_ref"], "FR-0351:provider_compatibility_sample")
         self.assertEqual(
+            report["external_provider_sample"]["manifest_ref"],
+            "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+        )
+        self.assertTrue(report["external_provider_sample"]["not_native_provider_self_evidence"])
+        self.assertEqual(
             report["external_provider_sample"]["requirement_ref"],
             "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
         )
@@ -121,6 +130,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(
             report["external_provider_sample"]["decision_ref"],
             "v0-9-external-provider-sample-matched",
+        )
+        self.assertEqual(
+            report["external_provider_sample"]["decision_contract_ref"],
+            "fr-0026:runtime-tests:adapter-provider-compatibility-decision",
         )
         self.assertEqual(
             report["external_provider_sample"]["profile_proof_refs"],
@@ -148,3 +161,9 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["adapter_bound_execution"]["status"], "pass")
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
         self.assertTrue(report["not_provider_product_support"])
+
+    def test_report_approved_slice_is_not_global_mutable_state(self) -> None:
+        report = build_real_provider_sample_evidence_report()
+        report["approved_slice"]["capability"] = "mutated"
+
+        self.assertEqual(build_real_provider_sample_evidence_report()["approved_slice"]["capability"], "content_detail")

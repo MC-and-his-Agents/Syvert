@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
+import json
+from pathlib import Path
 from typing import Any
 
 from syvert.adapter_capability_requirement import baseline_adapter_capability_requirement
@@ -31,6 +33,7 @@ EXTERNAL_PROVIDER_ADAPTER_BINDING_EVIDENCE_REF = (
 )
 FR0355_EVIDENCE_REF = "fr-0355:external-provider-sample-evidence:v0-9"
 FR0351_GATE_REF = "FR-0351:provider_compatibility_sample"
+FR0026_DECISION_EVIDENCE_REF = "fr-0026:runtime-tests:adapter-provider-compatibility-decision"
 APPROVED_SLICE = {
     "capability": "content_detail",
     "operation": "content_detail_by_url",
@@ -40,6 +43,7 @@ APPROVED_SLICE = {
 
 
 def build_real_provider_sample_evidence_report() -> dict[str, Any]:
+    manifest = external_provider_sample_manifest()
     matched_decision = decide_adapter_provider_compatibility(external_provider_decision_input())
     unmatched_decision = decide_adapter_provider_compatibility(external_provider_unmatched_decision_input())
     invalid_contract_decision = decide_adapter_provider_compatibility(
@@ -60,7 +64,7 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
         "release": "v0.9.0",
         "fr_ref": "FR-0355",
         "consumed_gate_ref": FR0351_GATE_REF,
-        "approved_slice": APPROVED_SLICE,
+        "approved_slice": dict(APPROVED_SLICE),
         "sample_origin": "external_provider_sample",
         "provider_support_claim": False,
         "status": status,
@@ -72,16 +76,23 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
         "api_cli_same_core_path_ref": "tests.runtime.test_cli_http_same_path",
         "external_provider_sample": {
             "sample_id": EXTERNAL_PROVIDER_SAMPLE_ID,
+            "manifest_id": manifest["manifest_id"],
+            "provenance_ref": manifest["provenance_ref"],
+            "manifest_ref": "syvert/fixtures/v0_9_external_provider_sample_manifest.json",
+            "controlled_record_ref": manifest["provenance_ref"],
+            "author_path": manifest["author_path"],
             "adapter_key": "xhs",
             "provider_identity_scope": "adapter_bound",
             "provider_key_redaction": "stable fixture provider key; not a product support claim",
             "requirement_ref": "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
             "offer_ref": EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
             "decision_ref": "v0-9-external-provider-sample-matched",
+            "decision_contract_ref": FR0026_DECISION_EVIDENCE_REF,
             "profile_proof_refs": (
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
             ),
+            "not_native_provider_self_evidence": manifest["not_native_provider_self_evidence"],
             "provider_support_claim": False,
             "forbidden_claims": (),
         },
@@ -105,12 +116,18 @@ def build_real_provider_sample_evidence_report() -> dict[str, Any]:
             FR0355_EVIDENCE_REF,
             "fr-0024:reference-adapter-migration:xhs-douyin-content-detail",
             EXTERNAL_PROVIDER_OFFER_EVIDENCE_REF,
-            "fr-0026:runtime-tests:adapter-provider-compatibility-decision",
+            FR0026_DECISION_EVIDENCE_REF,
             "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
             "fr-0027:profile:content-detail-by-url-hybrid:account",
         ),
         "not_provider_product_support": True,
     }
+
+
+def external_provider_sample_manifest() -> dict[str, Any]:
+    manifest_path = Path(__file__).parent / "fixtures" / "v0_9_external_provider_sample_manifest.json"
+    with manifest_path.open(encoding="utf-8") as manifest_file:
+        return json.load(manifest_file)
 
 
 def external_provider_decision_input() -> dict[str, Any]:

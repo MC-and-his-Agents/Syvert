@@ -13,14 +13,21 @@
 - approved slice：`capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`
 - sample origin：`external_provider_sample`
 - sample_id：`v0.9.0-external-provider-sample-content-detail`
+- manifest_id：`v0.9.0-external-provider-sample-content-detail`
+- manifest_ref：`syvert/fixtures/v0_9_external_provider_sample_manifest.json`
+- provenance_ref：`controlled-record:v0.9.0:external-provider-sample-content-detail`
+- controlled_record_ref：`controlled-record:v0.9.0:external-provider-sample-content-detail`
+- author_path：`external-provider-author-fixture`
 - adapter_key：`xhs`
 - provider_identity_scope：`adapter_bound`
 - provider_key_redaction：`stable fixture provider key; not a product support claim`
+- not_native_provider_self_evidence：`true`
 - provider support claim：`false`
 - forbidden_claims：`()`
 - requirement_ref：`fr-0024:reference-adapter-migration:xhs-douyin-content-detail`
 - offer_ref：`fr-0025:offer-manifest-fixture-validator:v0-9-external-provider-sample`
 - decision_ref：`v0-9-external-provider-sample-matched`
+- decision_contract_ref：`fr-0026:runtime-tests:adapter-provider-compatibility-decision`
 - profile_proof_refs：`fr-0027:profile:content-detail-by-url-hybrid:account-proxy`、`fr-0027:profile:content-detail-by-url-hybrid:account`
 - status：`pass`
 - decision_matrix_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix`
@@ -105,8 +112,11 @@
 
 ## Validation Evidence
 
-- `python3 -m unittest tests.runtime.test_real_provider_sample_evidence`
-- `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence`
+| validation | command | result |
+|---|---|---|
+| external provider sample evidence | `python3 -m unittest tests.runtime.test_real_provider_sample_evidence` | `pass` |
+| compatibility decision / no-leakage / sample | `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence` | `pass` |
+| dual reference / third-party entry / API CLI same path | `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path` | `pass` |
 
 ## Boundary
 
