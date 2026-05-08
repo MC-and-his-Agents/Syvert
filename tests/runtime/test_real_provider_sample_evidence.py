@@ -89,6 +89,17 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
         self.assertEqual(evidence["resource_lifecycle_disposition_hint"], "release")
         self.assertTrue(evidence["observability_carrier_checked"])
+        self.assertEqual(evidence["observability"]["adapter_key"], "xhs")
+        self.assertEqual(evidence["observability"]["capability"], "content_detail")
+        self.assertEqual(evidence["observability"]["operation"], "content_detail_by_url")
+        self.assertEqual(evidence["observability"]["decision_status"], "matched")
+        self.assertEqual(
+            evidence["observability"]["proof_refs"],
+            (
+                "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fr-0027:profile:content-detail-by-url-hybrid:account",
+            ),
+        )
         self.assertEqual(evidence["runtime_execution_ref"], "syvert.runtime.execute_task_with_record:v0-9-external-provider-sample")
         self.assertEqual(evidence["success_task_record_ref"], "task_record:task-v0-9-sample-success")
         self.assertEqual(evidence["failure_task_record_ref"], "task_record:task-v0-9-sample-failure")
@@ -133,6 +144,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertFalse(evidence["failed_envelope_checked"])
         self.assertIn("task_record", evidence["missing_required_surfaces"])
         self.assertIn("resource_lifecycle", evidence["missing_required_surfaces"])
+        self.assertIn("resource_trace", evidence["missing_required_surfaces"])
         self.assertIn("core_facing_failed_envelope", evidence["missing_required_surfaces"])
 
     @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")

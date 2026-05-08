@@ -91,6 +91,7 @@ REQUIRED_CORE_NO_LEAKAGE_SURFACES = (
     "core_routing",
     "task_record",
     "resource_lifecycle",
+    "resource_trace",
     "core_facing_failed_envelope",
 )
 APPROVED_SLICE = {
@@ -419,7 +420,7 @@ def build_adapter_bound_execution_evidence(
     execution = run_external_provider_sample_runtime_execution()
     success_envelope = execution["success"]["envelope"]
     failed_envelope = execution["failure"]["envelope"]
-    checks = _adapter_bound_execution_checks(execution)
+    checks = _adapter_bound_execution_checks(execution, decision)
     evidence_status = (
         "pass"
         if (
@@ -453,13 +454,7 @@ def build_adapter_bound_execution_evidence(
         "runtime_execution_ref": execution["runtime_execution_ref"],
         "success_task_record_ref": execution["success"]["task_record_ref"],
         "failure_task_record_ref": execution["failure"]["task_record_ref"],
-        "observability": {
-            "adapter_key": decision.adapter_key,
-            "capability": decision.capability,
-            "operation": decision.execution_slice.operation if decision.execution_slice else None,
-            "decision_status": decision.decision_status,
-            "proof_refs": decision.evidence.resource_profile_evidence_refs,
-        },
+        "observability": _adapter_bound_observability_carrier(decision),
         "core_surface_projection_ref": (
             "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
             "#core-surface-projection"
@@ -525,7 +520,10 @@ def build_core_surface_no_leakage_evidence(
     }
 
 
-def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, bool]:
+def _adapter_bound_execution_checks(
+    execution: Mapping[str, Any],
+    decision: AdapterProviderCompatibilityDecision,
+) -> dict[str, bool]:
     success = execution.get("success") if isinstance(execution.get("success"), Mapping) else {}
     failure = execution.get("failure") if isinstance(execution.get("failure"), Mapping) else {}
     success_envelope = success.get("envelope") if isinstance(success.get("envelope"), Mapping) else {}
@@ -543,6 +541,15 @@ def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, b
     )
     success_task_record = success.get("task_record") if isinstance(success.get("task_record"), Mapping) else {}
     failure_task_record = failure.get("task_record") if isinstance(failure.get("task_record"), Mapping) else {}
+    success_result = success_task_record.get("result") if isinstance(success_task_record.get("result"), Mapping) else {}
+    failure_result = failure_task_record.get("result") if isinstance(failure_task_record.get("result"), Mapping) else {}
+    success_terminal_envelope = (
+        success_result.get("envelope") if isinstance(success_result.get("envelope"), Mapping) else {}
+    )
+    failure_terminal_envelope = (
+        failure_result.get("envelope") if isinstance(failure_result.get("envelope"), Mapping) else {}
+    )
+    observability_carrier = _adapter_bound_observability_carrier(decision)
     return {
         "provider_error_mapping_checked": (
             provider_error_mapping.get("provider_side_error_code") == "provider_unavailable"
@@ -563,9 +570,28 @@ def _adapter_bound_execution_checks(execution: Mapping[str, Any]) -> dict[str, b
         "observability_carrier_checked": (
             success_task_record.get("status") == "succeeded"
             and failure_task_record.get("status") == "failed"
-            and isinstance(success_task_record.get("result"), Mapping)
-            and isinstance(failure_task_record.get("result"), Mapping)
+            and success_terminal_envelope.get("adapter_key") == decision.adapter_key
+            and failure_terminal_envelope.get("adapter_key") == decision.adapter_key
+            and success_terminal_envelope.get("capability") == "content_detail_by_url"
+            and failure_terminal_envelope.get("capability") == "content_detail_by_url"
+            and observability_carrier["adapter_key"] == decision.adapter_key
+            and observability_carrier["capability"] == decision.capability
+            and observability_carrier["operation"] == "content_detail_by_url"
+            and observability_carrier["decision_status"] == COMPATIBILITY_DECISION_STATUS_MATCHED
+            and bool(observability_carrier["proof_refs"])
         ),
+    }
+
+
+def _adapter_bound_observability_carrier(
+    decision: AdapterProviderCompatibilityDecision,
+) -> dict[str, Any]:
+    return {
+        "adapter_key": decision.adapter_key,
+        "capability": decision.capability,
+        "operation": decision.execution_slice.operation if decision.execution_slice else None,
+        "decision_status": decision.decision_status,
+        "proof_refs": decision.evidence.resource_profile_evidence_refs,
     }
 
 
