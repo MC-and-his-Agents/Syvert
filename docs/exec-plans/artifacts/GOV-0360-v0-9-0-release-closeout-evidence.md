@@ -74,13 +74,17 @@
 - `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path`
   - 结果：通过，`Ran 79 tests`。
 - `python3 scripts/docs_guard.py --mode ci`
-  - 结果：待阶段 A 本地复验。
+  - 结果：通过。
 - `python3 scripts/spec_guard.py --mode ci --all`
-  - 结果：待阶段 A 本地复验。
+  - 结果：通过。
 - `python3 scripts/workflow_guard.py --mode ci`
-  - 结果：待阶段 A 本地复验。
+  - 结果：通过。
 - `python3 scripts/version_guard.py --mode ci`
-  - 结果：待阶段 A 本地复验。
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `python3 scripts/pr_scope_guard.py --class docs --base-ref origin/main --head-ref HEAD`
+  - 结果：通过，PR class=`docs`，变更类别=`docs`。
 
 ## 完成语义
 
