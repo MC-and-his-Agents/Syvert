@@ -233,6 +233,11 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             "playwright",
             "cdp",
             "chromium",
+            "sessionHealth",
+            "credentialFreshness",
+            "healthSla",
+            "xsecToken",
+            "verifyFp",
         )
         for field_name in cases:
             with self.subTest(field_name=field_name):
@@ -411,6 +416,14 @@ class ProviderNoLeakageGuardTests(unittest.TestCase):
             {"capabilities": "optional_capabilities"},
             {"capabilities": "preferred_capabilities"},
             {"transport": "sign_service"},
+            {"field_names": ["session_health"]},
+            {"field_names": ["credential_freshness"]},
+            {"field_names": ["health_sla"]},
+            {"field_names": ["xsec_token"]},
+            {"field_names": ["verify_fp"]},
+            {"field_names": ["ms_token"]},
+            {"metadata": "authorization"},
+            {"metadata": "headers"},
         )
         for surface in cases:
             with self.subTest(surface=surface):

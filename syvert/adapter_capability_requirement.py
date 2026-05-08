@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from syvert.registry import (
@@ -82,6 +83,24 @@ REQUIRED_ADMISSION_OUTCOME_FIELDS = (
     "error_code",
     "failure_category",
 )
+FORBIDDEN_CREDENTIAL_SESSION_FIELDS = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
+        "verify_fp",
+        "xsec_token",
+    }
+)
 FORBIDDEN_REQUIREMENT_FIELDS = frozenset(
     {
         "provider_offer",
@@ -104,9 +123,17 @@ FORBIDDEN_REQUIREMENT_FIELDS = frozenset(
         "resource_provider",
         "native_provider",
     }
-)
+).union(FORBIDDEN_CREDENTIAL_SESSION_FIELDS)
 FORBIDDEN_OBSERVABILITY_TOKENS = frozenset(
     {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
         "provider",
         "selector",
         "fallback",
@@ -117,6 +144,12 @@ FORBIDDEN_OBSERVABILITY_TOKENS = frozenset(
         "browser",
         "network",
         "transport",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
+        "verify_fp",
+        "xsec_token",
     }
 )
 
@@ -822,7 +855,7 @@ def _find_forbidden_fields(raw_value: Any) -> tuple[str, ...]:
     def visit(value: Any) -> None:
         if isinstance(value, Mapping):
             for key, nested_value in value.items():
-                if isinstance(key, str) and key in FORBIDDEN_REQUIREMENT_FIELDS:
+                if isinstance(key, str) and _contains_forbidden_requirement_field_token(key):
                     found.add(key)
                 visit(nested_value)
         elif not isinstance(value, (str, bytes)):
@@ -835,6 +868,23 @@ def _find_forbidden_fields(raw_value: Any) -> tuple[str, ...]:
 
     visit(raw_value)
     return tuple(sorted(found))
+
+
+def _contains_forbidden_requirement_field_token(field_name: str) -> bool:
+    normalized = _normalize_field_name(field_name)
+    return any(
+        normalized == token
+        or normalized.startswith(f"{token}_")
+        or normalized.endswith(f"_{token}")
+        or f"_{token}_" in normalized
+        for token in FORBIDDEN_REQUIREMENT_FIELDS
+    )
+
+
+def _normalize_field_name(field_name: str) -> str:
+    with_word_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", field_name)
+    with_word_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_boundaries)
+    return re.sub(r"[^a-z0-9]+", "_", with_word_boundaries.lower()).strip("_")
 
 
 def _require_non_empty_string(raw_value: Any, *, field_name: str) -> str:

@@ -432,6 +432,37 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
                 self.assert_provider_terms_not_observed(observed_values)
                 self.assert_no_provider_leakage(decision)
 
+    def test_decision_returns_leakage_for_private_credential_session_health_metadata(self) -> None:
+        cases = (
+            ("decision_context", "session_health", "healthy"),
+            ("decision_context", "credentialFreshness", "fresh"),
+            ("decision_context", "health_sla", "99.9"),
+            ("input", "xsec_token", "redacted"),
+            ("input", "headers", {"authorization": "redacted"}),
+        )
+        for surface, field_name, value in cases:
+            with self.subTest(surface=surface, field_name=field_name):
+                input_value = copy_decision_input()
+                if surface == "decision_context":
+                    input_value["decision_context"][field_name] = value
+                    expected_surface = "decision_context"
+                else:
+                    input_value[field_name] = value
+                    expected_surface = "decision_input"
+
+                decision = decide_adapter_provider_compatibility(input_value)
+                projection = project_compatibility_decision_for_core(decision)
+
+                self.assert_invalid(decision, COMPATIBILITY_DECISION_ERROR_PROVIDER_LEAKAGE_DETECTED)
+                self.assertEqual(decision.error.source_contract_ref, "FR-0026")
+                self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+                self.assertEqual(projection["decision_status"], COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+                observed_values = decision.evidence.invalid_contract_evidence.observed_values
+                self.assertEqual(observed_values["surface"], expected_surface)
+                self.assertGreaterEqual(observed_values["forbidden_semantics_count"], 1)
+                self.assertEqual(decision.matched_profiles, ())
+                self.assert_no_provider_leakage(decision)
+
     def test_non_string_top_level_extra_key_fails_closed(self) -> None:
         input_value = copy_decision_input()
         input_value[("trace", "id")] = "trace-001"
