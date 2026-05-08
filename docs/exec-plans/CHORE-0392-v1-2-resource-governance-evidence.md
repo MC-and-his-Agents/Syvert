@@ -68,6 +68,9 @@
   - P1：machine-readable evidence 未承载 PR 声明的 spec/docs/workflow/governance validation set。处理：将三项 guard 与 governance gate 命令补入 structured snapshot。
   - P2：public projection 无泄漏证明对 `xsec_token` / `authorization` 等字段为空转。处理：replay account material 显式加入 `xsec_token`、`headers.authorization`、`authorization`，并继续验证 public projection 不暴露这些字段。
   - P2：PR carrier 缺 `integration_check` section。处理：PR body 补 canonical integration_check carrier。
+- PR guardian 第三轮 `REQUEST_CHANGES`：
+  - P1：pre-admission invalid 不改库存状态是硬编码，未从 store truth 推导。处理：replay no-active-lease invalidation helper，读取 resource lifecycle snapshot 推导 `account_status_after=AVAILABLE`。
+  - P1：public projection 无泄漏只检查字段名，未检查敏感值。处理：补 cookie/token/header/authorization 实际值断言，artifact snapshot 增加 `private_values_absent_from_projection=true`。
 
 ## 未决风险
 

@@ -41,7 +41,8 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
   "public_boundary": {
     "consumer_boundary_ref": "PR #394",
     "credential_material_projection_redacted": true,
-    "private_fields_absent_from_projection": true
+    "private_fields_absent_from_projection": true,
+    "private_values_absent_from_projection": true
   },
   "release": "v1.2.0",
   "report_id": "CHORE-0392-v1-2-resource-governance-evidence",
@@ -97,6 +98,7 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
       "decision_status": "rejected",
       "fail_closed": true,
       "failure_reason": "pre_admission_session_invalid",
+      "invalidation_result_status": "rejected",
       "projected_session_health": "invalid"
     }
   },
@@ -121,9 +123,9 @@ This artifact records replayable evidence for `FR-0387` after the #390 runtime c
 - Expired healthy evidence uses the same evidence at the expiry boundary, returning `rejected / stale`.
 - Missing evidence keeps health-gated account admission fail-closed as `rejected / unknown`.
 - Invalid contract evidence covers malformed timestamp, unredacted evidence, and adapter context mismatch; all bind to `health_evidence_contract_invalid`.
-- Pre-admission invalid evidence does not change an available account resource.
+- Pre-admission invalid evidence is replayed through the no-active-lease invalidation helper and does not change an available account resource.
 - Active invalid evidence is lease-bound and task/adapter/capability/operation-bound; Core invalidates only the account credential session and releases the co-leased proxy back to `AVAILABLE`.
-- Public projection evidence uses account material containing private fields including `cookies`, `ms_token`, `verify_fp`, `xsec_token`, `headers`, and `authorization`, then proves those field names and values do not appear in the projection.
+- Public projection evidence uses account material containing private fields and values including `cookies`, `ms_token`, `verify_fp`, `xsec_token`, `headers`, `authorization`, cookie content, token values, and header values, then proves those field names and values do not appear in the projection.
 
 ## Non Goals
 

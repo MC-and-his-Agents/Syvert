@@ -98,6 +98,7 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(scenarios["active_lease_invalid_core_invalidation"]["result_type"], "ResourceLease")
         self.assertTrue(report["public_boundary"]["credential_material_projection_redacted"])
         self.assertTrue(report["public_boundary"]["private_fields_absent_from_projection"])
+        self.assertTrue(report["public_boundary"]["private_values_absent_from_projection"])
 
     def build_report(self) -> dict[str, object]:
         account = self.account_record()
@@ -189,6 +190,25 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             evidence=(invalid,),
             evaluated_at="2026-05-08T12:05:00.000000Z",
         )
+        no_active_store = self.make_store()
+        no_active_result = invalidate_active_lease_from_health_evidence(
+            evidence=self.healthy_evidence(
+                evidence_id="evidence-invalid-no-active",
+                status=SESSION_HEALTH_INVALID,
+                expires_at=None,
+                freshness_policy_ref=None,
+                provenance="adapter_diagnostic",
+                lease_id="lease-missing",
+                bundle_id="bundle-missing",
+                reason="platform reported credential expired",
+            ),
+            store=no_active_store,
+            task_context_task_id="task-001",
+            operation="content_detail_by_url",
+            resource_trace_store=self.make_trace_store(),
+        )
+        self.assertIsInstance(no_active_result, ResourceAdmissionDecision)
+        no_active_resources_by_id = {resource.resource_id: resource for resource in no_active_store.load_snapshot().resources}
         store = self.make_store()
         trace_store = self.make_trace_store()
         bundle = acquire(
@@ -245,7 +265,8 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "invalid_contract_unredacted": _decision_summary(invalid_contract_unredacted_decision),
                 "pre_admission_invalid_no_active_lease": {
                     **_decision_summary(pre_admission_decision),
-                    "account_status_after": "AVAILABLE",
+                    "account_status_after": no_active_resources_by_id["account-001"].status,
+                    "invalidation_result_status": no_active_result.decision_status,
                 },
                 "active_lease_invalid_core_invalidation": {
                     "result_type": type(active_result).__name__,
@@ -259,6 +280,16 @@ class ResourceGovernanceEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "private_fields_absent_from_projection": all(
                     token not in json.dumps(credential_projection, sort_keys=True)
                     for token in ("cookies", "ms_token", "verify_fp", "xsec_token", "authorization")
+                ),
+                "private_values_absent_from_projection": all(
+                    value not in json.dumps(credential_projection, sort_keys=True)
+                    for value in (
+                        "a=1; b=2",
+                        "ms-token-1",
+                        "verify-1",
+                        "xsec-redacted",
+                        "Bearer redacted",
+                    )
                 ),
                 "consumer_boundary_ref": "PR #394",
             },
