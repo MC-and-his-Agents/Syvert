@@ -38,18 +38,21 @@
 
 ## 当前停点
 
-- Phase `#363`：open。
+- Phase `#363`：closed completed，`closed_at=2026-05-08T09:05:37Z`。
 - FR `#351`：closed completed；作为 gate truth 被当前事项消费。
 - `v0.9.0` closeout链路已完成：`#355/#356/#358/#360` closed completed；PR `#357/#359/#361/#362` 已合入。
-- 当前主仓 `main == origin/main == 21b30c347c11fc3e576db444cfc073108f512a35`。
-- 当前 open PR 为空。
-- 当前不存在 `v1.0.0` tag 或 GitHub Release。
+- 阶段 A PR `#365` 已合入，merge commit `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`。
+- 阶段 B PR `#366` 已创建，用于回写 published truth 与最终 closeout 对账。
+- 当前主仓 `main == origin/main == 5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`。
+- `v1.0.0` annotated tag 已创建并推送，tag object `b8e9dc14d01599c3faad17c02392a4a8a3a19a98`，target commit `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`。
+- GitHub Release `v1.0.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.0.0`。
+- Work Item `#364`：closed completed，`closed_at=2026-05-08T09:05:36Z`。
 
 ## 下一步动作
 
-- 阶段 A：提交 release / sprint / closeout evidence carrier，开 docs PR，等待 checks 与 guardian，通过后受控合入。
-- 发布锚点：阶段 A carrier 合入后，在阶段 A merge commit 上创建 `v1.0.0` annotated tag 与 GitHub Release。
-- 阶段 B：通过 docs follow-up PR 回写 published truth carrier，并关闭 `#363/#364`。
+- 阶段 A：已完成；PR `#365` 合入 main。
+- 发布锚点：已完成。
+- 阶段 B：通过 docs follow-up PR 回写 published truth carrier，并完成最终 GitHub truth 对账。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -82,13 +85,17 @@
   - 结果：通过。
 - `python3 scripts/docs_guard.py --mode ci`
   - 结果：通过。
+- `gh pr view 365 --json number,state,mergedAt,mergeCommit,headRefName,baseRefName,url`
+  - 结果：PR `#365` merged，merge commit `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`，`mergedAt=2026-05-08T08:59:18Z`。
+- `git rev-parse v1.0.0 && git rev-parse v1.0.0^{} && git cat-file -t v1.0.0`
+  - 结果：annotated tag object `b8e9dc14d01599c3faad17c02392a4a8a3a19a98`，target commit `5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`，tag type=`tag`。
+- `gh release view v1.0.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
+  - 结果：`tagName=v1.0.0`，`name=v1.0.0`，`isDraft=false`，`isPrerelease=false`，`publishedAt=2026-05-08T09:01:54Z`，`targetCommitish=5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`，URL `https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.0.0`。
 
 ## 待验证项
 
 - 阶段 A PR guardian、GitHub checks 与受控 merge。
 - 阶段 B PR published truth 回写、guardian、GitHub checks 与受控 merge。
-- `#364` closeout comment / close issue。
-- Phase `#363` closeout comment / close issue。
 - worktree cleanup 与 branch retirement。
 
 ## closeout 证据
@@ -113,3 +120,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 发布前基线：`21b30c347c11fc3e576db444cfc073108f512a35`
+- 发布锚点：`5f1749ef7e2b6a12d2cfa4218c939e05f31c1171`
