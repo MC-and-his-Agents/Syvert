@@ -652,6 +652,7 @@ class VersionGateTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(
             report["evidence_refs"],
             [
+                "platform_leakage:scan:syvert/operation_taxonomy.py",
                 "platform_leakage:scan:syvert/registry.py",
                 "platform_leakage:scan:syvert/runtime.py",
                 "platform_leakage:scan:syvert/version_gate.py",
@@ -1776,6 +1777,7 @@ class VersionGateTests(ResourceStoreEnvMixin, unittest.TestCase):
             report["source_reports"]["platform_leakage"]["evidence_refs"],
             [
                 "leakage:core-runtime:1",
+                "platform_leakage:scan:syvert/operation_taxonomy.py",
                 "platform_leakage:scan:syvert/registry.py",
                 "platform_leakage:scan:syvert/runtime.py",
                 "platform_leakage:scan:syvert/version_gate.py",

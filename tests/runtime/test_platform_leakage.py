@@ -17,6 +17,7 @@ SCAN_TARGETS = (
     "syvert/runtime.py",
     "syvert/registry.py",
     "syvert/version_gate.py",
+    "syvert/operation_taxonomy.py",
 )
 EXPECTED_SCAN_REFS = {f"platform_leakage:scan:{target}" for target in SCAN_TARGETS}
 
