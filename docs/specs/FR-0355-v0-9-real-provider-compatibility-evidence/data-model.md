@@ -18,7 +18,7 @@
 - `release`：固定为 `v0.9.0`。
 - `fr_ref`：固定为 `FR-0355`。
 - `consumed_gate_ref`：固定为 `FR-0351:provider_compatibility_sample`。
-- `approved_slice`：固定为 `content_detail_by_url + url + hybrid`。
+- `approved_slice`：固定为 `capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`。
 - `sample_origin`：必须表达 `external_provider_sample`。
 - `provider_support_claim`：必须为 `false`。
 - `decision_matrix_ref`：指向 implementation / evidence artifact 的 decision matrix。

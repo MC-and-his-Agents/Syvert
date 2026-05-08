@@ -19,7 +19,7 @@
 
 - 本次纳入：
   - 冻结 `v0.9.0` provider sample evidence 的语义、最小字段与 fail-closed 判定。
-  - 要求样本至少覆盖一个已批准 Adapter capability：当前只能是 `content_detail_by_url + url + hybrid`。
+  - 要求样本至少覆盖一个已批准 Adapter capability slice：当前只能是 `content_detail + content_detail_by_url + url + hybrid`。
   - 要求样本消费 `FR-0024`、`FR-0025`、`FR-0026`、`FR-0027` 与 `FR-0351`，不得重定义 carrier。
   - 要求 evidence 同时证明 `matched`、`unmatched`、`invalid_contract` 的可复验边界。
   - 要求 provider 信息不得进入 Core routing、registry discovery、TaskRecord、resource lifecycle 或 Core-facing failed envelope。
@@ -46,7 +46,7 @@
   - sample evidence 必须声明 `sample_origin=external_provider_sample` 或等价语义，且明确不是 Syvert native provider。
   - sample evidence 必须声明 `provider_support_claim=false`，不得把 sample 解释为 provider 产品正式支持。
   - sample evidence 必须绑定 `FR-0024` requirement ref、`FR-0025` offer ref、`FR-0026` decision ref、`FR-0027` profile proof ref 与 `FR-0351` gate item ref。
-  - sample evidence 必须记录 `approved_slice`，当前固定为 `content_detail_by_url + url + hybrid`。
+  - sample evidence 必须记录 `approved_slice`，当前固定为 `capability=content_detail + operation=content_detail_by_url + target_type=url + collection_mode=hybrid`。
   - sample evidence 的 Core-facing projection 只能暴露无 provider identity 的 status / error 摘要。
   - 任一 required evidence 缺失、只有会话描述、无法从仓内 artifact / tests / PR / issue 复验，或声明 provider 产品正式支持时，`v0.9.0` closeout 必须 fail-closed。
 - 非功能需求：
@@ -58,7 +58,7 @@
 
 - 阶段约束：
   - 本 FR 服务 `v0.9.0`，目标是为 `v1.0.0` Core stable gate 提供 provider sample evidence。
-  - 当前 approved capability slice 不扩展；新 operation / target / collection mode 必须进入 `v1.x` 候选或独立 FR。
+  - 当前 approved capability slice 不扩展；新 capability、operation、target 或 collection mode 必须进入 `v1.x` 候选或独立 FR。
   - `v0.9.0` 可以交付 evidence 与 release closeout，但不得提前声明 `v1.0.0` Core stable。
 - 架构约束：
   - `FR-0024` 继续持有 Adapter capability requirement truth。
