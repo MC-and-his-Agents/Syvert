@@ -91,7 +91,6 @@
 
 ## 待验证项
 
-- 阶段 A 本地 docs / spec / workflow / governance / version guard。
 - 阶段 A PR checks、guardian 与受控 merge。
 - `v0.9.0` annotated tag 与 GitHub Release。
 - 阶段 B published truth 回写 PR checks、guardian 与受控 merge。

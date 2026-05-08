@@ -22,6 +22,7 @@
 - Tag truth：`git tag --list 'v0.9.0*'`、`git rev-parse v0.9.0`、`git rev-parse v0.9.0^{}`、`git ls-remote --tags origin 'v0.9.0*'`
 - GitHub Release truth：`gh release view v0.9.0 --repo MC-and-his-Agents/Syvert --json tagName,name,url,isDraft,isPrerelease,publishedAt,targetCommitish`
 - Worktree truth：`git worktree list --porcelain`
+- Retired branch truth：`git ls-remote origin refs/heads/issue-358-v0-9-0-external-provider-sample-evidence refs/tags/archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`
 
 ## GitHub issue 状态
 
@@ -47,6 +48,13 @@
 - PR `#357/#359` 已合入 main。
 - Work Item `#358` 的分支与 worktree 已退役，archive tag 为 `archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`。
 - `v0.9.0` annotated tag 与 GitHub Release 尚未创建；阶段 A carrier 合入后创建。
+
+`#358` 分支 / worktree 退役复验：
+
+- `git ls-remote origin refs/heads/issue-358-v0-9-0-external-provider-sample-evidence refs/tags/archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`
+  - 结果：远端分支无输出；archive tag 为 `93be68d81ddcfff3de867a1b7210c54a855c033b refs/tags/archive/branches/issue-358-v0-9-0-external-provider-sample-evidence`。
+- `git worktree list --porcelain`
+  - 结果：仅主仓 `main` worktree 与当前 `#360` release closeout worktree；不存在 `issue-358-v0-9-0-external-provider-sample-evidence` worktree。
 
 ## 主干路径证明
 
