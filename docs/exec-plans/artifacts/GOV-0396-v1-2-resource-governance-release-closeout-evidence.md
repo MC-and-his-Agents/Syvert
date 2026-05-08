@@ -22,8 +22,8 @@
 - `v1.1.0` taxonomy 已发布，resource governance 使用其 stable context 作为 admission 输入。
 - `account` / `proxy` lifecycle regression 保持通过。
 - 小红书 `content_detail_by_url` 账号会话场景证明 credential/session stale、invalid、unknown 不能继续只由 opaque material 表达。
-- `v1.2.0` annotated tag 与 GitHub Release 待阶段 A carrier 合入后创建。
-- `docs/releases/v1.2.0.md` 阶段 B 将回写 published truth carrier。
+- `v1.2.0` annotated tag 与 GitHub Release 已创建。
+- `docs/releases/v1.2.0.md` 阶段 B 正在回写 published truth carrier。
 
 ## Gate Item Matrix
 
@@ -36,7 +36,7 @@
 | `stable_baseline` | yes | pass | `content_detail_by_url` baseline 未漂移。 | `tests.runtime.test_real_adapter_regression` |
 | `resource_lifecycle` | yes | pass | `account` / `proxy` lifecycle、store、trace、bootstrap 回归通过。 | `tests.runtime.test_resource_lifecycle*` |
 | `platform_leakage` | yes | pass | Credential/session/private health 字段进入 provider/platform no-leakage scan coverage。 | `tests.runtime.test_provider_no_leakage_guard`、`tests.runtime.test_platform_leakage` |
-| `release_truth_alignment` | yes | pending | 阶段 A 合入后创建 tag / GitHub Release；阶段 B 回写 published truth carrier。 | `docs/releases/v1.2.0.md` |
+| `release_truth_alignment` | yes | pass | `v1.2.0` tag、GitHub Release 与 published truth carrier 已对齐。 | `docs/releases/v1.2.0.md`、`git rev-parse v1.2.0`、`gh release view v1.2.0 ...` |
 
 ## PR / Main 对账
 
@@ -45,10 +45,10 @@
 - PR `#394` merge commit：`d1fe72019d25c7393a5eb3068162926a2b8f08bc`
 - PR `#395` merge commit：`eaec42d70ed432b7334eab19ef5ec5f69544f855`
 - 阶段 A carrier base：`eaec42d70ed432b7334eab19ef5ec5f69544f855`
-- 阶段 A PR：TBD
-- `v1.2.0` annotated tag object：TBD
-- `v1.2.0` tag target：TBD
-- GitHub Release：TBD
+- 阶段 A PR `#397` merge commit：`55ad1e5d336907fac6a990bd1742a6e351b92b97`
+- `v1.2.0` annotated tag object：`1096452ed5ebb41c63005125aa525061c594effb`
+- `v1.2.0` tag target：`55ad1e5d336907fac6a990bd1742a6e351b92b97`
+- GitHub Release：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.2.0`
 
 ## GitHub Issue 状态
 
