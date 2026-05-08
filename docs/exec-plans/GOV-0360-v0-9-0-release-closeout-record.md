@@ -10,7 +10,7 @@
 - Parent Phase：`#354`
 - Parent FR：`#355`
 - 关联 spec：无（治理 / release closeout 事项）
-- 关联 decision：无
+- 关联 decision：`docs/decisions/ADR-GOV-0360-v0-9-0-release-closeout-record.md`
 - active 收口事项：`GOV-0360-v0-9-0-release-closeout-record`
 - 状态：`active`
 
@@ -27,6 +27,7 @@
   - `docs/sprints/2026-S22.md`
   - `docs/exec-plans/GOV-0360-v0-9-0-release-closeout-record.md`
   - `docs/exec-plans/artifacts/GOV-0360-v0-9-0-release-closeout-evidence.md`
+  - `docs/decisions/ADR-GOV-0360-v0-9-0-release-closeout-record.md`
 - 本次不纳入：
   - runtime / adapter / provider 实现变更
   - formal spec 语义变更
