@@ -17,6 +17,7 @@ from syvert.provider_capability_offer import (
     validate_provider_capability_offer,
     _normalize_offer,
 )
+from syvert.operation_taxonomy import stable_operation_entry
 from syvert.resource_capability_evidence import approved_shared_resource_requirement_profile_evidence_entries
 
 
@@ -37,10 +38,15 @@ APPROVED_PROVIDER_PORT_BOUNDARY_REF = "FR-0021"
 APPROVED_COMPATIBILITY_DECISION_EVIDENCE_REF = (
     "fr-0026:runtime-tests:adapter-provider-compatibility-decision"
 )
-APPROVED_CAPABILITY = "content_detail"
-APPROVED_OPERATION = "content_detail_by_url"
-APPROVED_TARGET_TYPE = "url"
-APPROVED_COLLECTION_MODE = "hybrid"
+APPROVED_OPERATION_TAXONOMY_ENTRY = stable_operation_entry(
+    operation="content_detail_by_url",
+    target_type="url",
+    collection_mode="hybrid",
+)
+APPROVED_CAPABILITY = APPROVED_OPERATION_TAXONOMY_ENTRY.capability_family
+APPROVED_OPERATION = APPROVED_OPERATION_TAXONOMY_ENTRY.operation
+APPROVED_TARGET_TYPE = APPROVED_OPERATION_TAXONOMY_ENTRY.target_type
+APPROVED_COLLECTION_MODE = APPROVED_OPERATION_TAXONOMY_ENTRY.collection_mode
 APPROVED_RESOURCE_CAPABILITY_ORDER = ("account", "proxy")
 CONTRACT_VALIDATION_CAPABILITIES = APPROVED_RESOURCE_CAPABILITY_ORDER
 
