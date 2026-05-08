@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 
 from syvert.adapter_provider_compatibility_decision import (
@@ -11,6 +12,7 @@ from syvert.adapter_provider_compatibility_decision import (
 from syvert.provider_capability_offer import validate_provider_capability_offer
 from syvert.real_provider_sample_evidence import (
     EXTERNAL_PROVIDER_KEY,
+    NESTED_VALIDATION_ENV,
     build_adapter_bound_execution_evidence,
     build_core_surface_no_leakage_evidence,
     build_real_provider_sample_evidence_report,
@@ -20,6 +22,8 @@ from syvert.real_provider_sample_evidence import (
     external_provider_sample_manifest,
     external_provider_unmatched_decision_input,
 )
+
+SKIP_NESTED_REPORT_VALIDATION = os.environ.get(NESTED_VALIDATION_ENV) == "1"
 
 
 class RealProviderSampleEvidenceTests(unittest.TestCase):
@@ -131,6 +135,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("resource_lifecycle", evidence["missing_required_surfaces"])
         self.assertIn("core_facing_failed_envelope", evidence["missing_required_surfaces"])
 
+    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_can_feed_fr0351_provider_compatibility_sample_gate(self) -> None:
         report = build_real_provider_sample_evidence_report()
 
@@ -200,6 +205,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertTrue(report["not_provider_product_support"])
         self.assertNotIn("fail_closed_reason", report["decision_matrix"])
 
+    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_approved_slice_is_not_global_mutable_state(self) -> None:
         report = build_real_provider_sample_evidence_report()
         report["approved_slice"]["capability"] = "mutated"
@@ -217,18 +223,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertNotIn("mutated", fresh["raw_payload"])
         self.assertEqual(fresh["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
 
-    def test_report_fail_shape_includes_fail_closed_reason(self) -> None:
-        report = build_real_provider_sample_evidence_report(
-            no_leakage_override={
-                "status": "fail",
-                "provider_identity_in_core_surface": True,
-                "surfaces": {},
-            }
-        )
-
-        self.assertEqual(report["status"], "fail")
-        self.assertEqual(report["decision_matrix"]["fail_closed_reason"], ("core_surface_no_leakage_not_pass",))
-
+    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_fails_closed_for_manifest_drift(self) -> None:
         manifest = external_provider_sample_manifest()
         manifest["provider_support_claim"] = True
@@ -245,14 +240,24 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("manifest_provider_support_claim_not_false", report["decision_matrix"]["fail_closed_reason"])
         self.assertIn("manifest_approved_slice_drift", report["decision_matrix"]["fail_closed_reason"])
 
-    def test_report_fails_closed_for_required_validation_failure(self) -> None:
-        report = build_real_provider_sample_evidence_report(
-            validation_evidence_override={"status": "fail", "commands": ()}
-        )
+    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
+    def test_report_fails_closed_for_manifest_forbidden_claim_semantics(self) -> None:
+        manifest = external_provider_sample_manifest()
+        manifest["forbidden_claims"] = ["provider_product_support", "fallback"]
+
+        report = build_real_provider_sample_evidence_report(manifest_override=manifest)
 
         self.assertEqual(report["status"], "fail")
-        self.assertIn("required_validation_not_pass", report["decision_matrix"]["fail_closed_reason"])
+        self.assertIn(
+            "manifest_forbidden_claim_present:provider_product_support",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
+        self.assertIn(
+            "manifest_forbidden_claim_present:fallback",
+            report["decision_matrix"]["fail_closed_reason"],
+        )
 
+    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_fails_closed_for_missing_required_manifest_fields(self) -> None:
         manifest = external_provider_sample_manifest()
         manifest.pop("manifest_id")

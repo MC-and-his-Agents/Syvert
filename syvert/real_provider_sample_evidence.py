@@ -104,13 +104,24 @@ REQUIRED_MANIFEST_FIELDS = (
     "provenance_ref",
     "author_path",
 )
+EXPECTED_MANIFEST_FIXTURE_REFS = (
+    "external-fixture://content-detail/success#raw",
+    "external-fixture://content-detail/success#normalized",
+    "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope",
+)
+FORBIDDEN_MANIFEST_CLAIM_TOKENS = (
+    "selector",
+    "fallback",
+    "marketplace",
+    "provider_product_support",
+    "product_support",
+    "sla",
+)
 
 
 def build_real_provider_sample_evidence_report(
     *,
     manifest_override: Mapping[str, Any] | None = None,
-    no_leakage_override: Mapping[str, Any] | None = None,
-    validation_evidence_override: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = dict(manifest_override) if manifest_override is not None else external_provider_sample_manifest()
     matched_decision = decide_adapter_provider_compatibility(external_provider_decision_input())
@@ -119,16 +130,11 @@ def build_real_provider_sample_evidence_report(
         external_provider_invalid_contract_decision_input()
     )
     adapter_bound_execution = build_adapter_bound_execution_evidence(matched_decision)
-    no_leakage = (
-        dict(no_leakage_override)
-        if no_leakage_override is not None
-        else build_core_surface_no_leakage_evidence(matched_decision, adapter_bound_execution=adapter_bound_execution)
+    no_leakage = build_core_surface_no_leakage_evidence(
+        matched_decision,
+        adapter_bound_execution=adapter_bound_execution,
     )
-    validation_evidence = (
-        dict(validation_evidence_override)
-        if validation_evidence_override is not None
-        else build_required_validation_evidence()
-    )
+    validation_evidence = build_required_validation_evidence()
 
     fail_closed_reasons = _fail_closed_reasons(
         matched_decision=matched_decision,
@@ -139,7 +145,6 @@ def build_real_provider_sample_evidence_report(
         manifest=manifest,
         validation_evidence=validation_evidence,
     )
-    fail_closed_reasons = (*fail_closed_reasons, *_evidence_ref_fail_closed_reasons())
     status = "pass" if not fail_closed_reasons else "fail"
     report = {
         "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
@@ -205,6 +210,11 @@ def build_real_provider_sample_evidence_report(
         "not_provider_product_support": manifest.get("not_provider_product_support"),
     }
     if fail_closed_reasons:
+        report["decision_matrix"]["fail_closed_reason"] = fail_closed_reasons
+    artifact_reasons = _evidence_ref_fail_closed_reasons(report)
+    if artifact_reasons:
+        fail_closed_reasons = (*fail_closed_reasons, *artifact_reasons)
+        report["status"] = "fail"
         report["decision_matrix"]["fail_closed_reason"] = fail_closed_reasons
     return report
 
@@ -813,18 +823,6 @@ def build_required_validation_evidence() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _build_required_validation_evidence_cached() -> dict[str, Any]:
-    if os.environ.get(NESTED_VALIDATION_ENV) == "1":
-        commands = tuple(
-            {
-                "validation": validation_name,
-                "command": _validation_command_text(modules),
-                "status": "pass",
-                "nested_validation_guard": True,
-            }
-            for validation_name, modules in REQUIRED_VALIDATION_COMMANDS
-        )
-        return {"status": "pass", "commands": commands}
-
     repo_root = Path(__file__).parents[1]
     env = dict(os.environ)
     env[NESTED_VALIDATION_ENV] = "1"
@@ -943,10 +941,28 @@ def _manifest_fail_closed_reasons(manifest: Mapping[str, Any]) -> tuple[str, ...
         reasons.append("manifest_approved_slice_drift")
     if manifest.get("provider_key") != EXTERNAL_PROVIDER_KEY:
         reasons.append("manifest_provider_key_drift")
+    if manifest.get("adapter_key") != "xhs":
+        reasons.append("manifest_adapter_key_not_single_xhs_binding")
+    if manifest.get("provider_key_redaction") != "stable fixture provider key; not a product support claim":
+        reasons.append("manifest_provider_key_redaction_drift")
+    if manifest.get("provenance_ref") != "controlled-record:v0.9.0:external-provider-sample-content-detail":
+        reasons.append("manifest_provenance_ref_not_canonical_controlled_record")
+    if manifest.get("author_path") != "external-provider-author-fixture":
+        reasons.append("manifest_author_path_not_external_fixture")
+    if tuple(manifest.get("fixture_refs", ())) != EXPECTED_MANIFEST_FIXTURE_REFS:
+        reasons.append("manifest_fixture_refs_drift")
+    forbidden_claims = manifest.get("forbidden_claims")
+    if not isinstance(forbidden_claims, list):
+        reasons.append("manifest_forbidden_claims_not_list")
+    else:
+        for claim in forbidden_claims:
+            normalized_claim = str(claim).lower().replace("-", "_")
+            if any(token in normalized_claim for token in FORBIDDEN_MANIFEST_CLAIM_TOKENS):
+                reasons.append(f"manifest_forbidden_claim_present:{normalized_claim}")
     return tuple(reasons)
 
 
-def _evidence_ref_fail_closed_reasons() -> tuple[str, ...]:
+def _evidence_ref_fail_closed_reasons(report: Mapping[str, Any]) -> tuple[str, ...]:
     repo_root = Path(__file__).parents[1]
     reasons: list[str] = []
     artifact_path = repo_root / EVIDENCE_ARTIFACT_PATH
@@ -957,10 +973,40 @@ def _evidence_ref_fail_closed_reasons() -> tuple[str, ...]:
         for anchor in EVIDENCE_ARTIFACT_REQUIRED_ANCHORS:
             if anchor not in artifact_text:
                 reasons.append(f"evidence_artifact_anchor_missing:{anchor}")
+        reasons.extend(_artifact_report_consistency_reasons(artifact_text, report))
     manifest_path = repo_root / "syvert/fixtures/v0_9_external_provider_sample_manifest.json"
     if not manifest_path.exists():
         reasons.append("external_provider_sample_manifest_missing")
     for module_path in VALIDATION_MODULE_PATHS.values():
         if not (repo_root / module_path).exists():
             reasons.append(f"validation_module_missing:{module_path}")
+    return tuple(reasons)
+
+
+def _artifact_report_consistency_reasons(artifact_text: str, report: Mapping[str, Any]) -> tuple[str, ...]:
+    required_tokens = (
+        f"release：`{report.get('release')}`",
+        f"fr_ref：`{report.get('fr_ref')}`",
+        f"consumed_gate_ref：`{report.get('consumed_gate_ref')}`",
+        f"sample_origin：`{report.get('sample_origin')}`",
+        f"provider_support_claim：`{str(report.get('provider_support_claim')).lower()}`",
+        f"status：`{report.get('status')}`",
+        f"matched_case_ref：`{report.get('decision_matrix', {}).get('matched_case_ref')}`",
+        f"unmatched_case_ref：`{report.get('decision_matrix', {}).get('unmatched_case_ref')}`",
+        f"invalid_contract_case_ref：`{report.get('decision_matrix', {}).get('invalid_contract_case_ref')}`",
+        "provider_side_error_code=provider_unavailable",
+        "provider_unavailable -> external_sample_unavailable",
+        "provider_identity_in_core_surface：`false`",
+    )
+    reasons = [
+        f"evidence_artifact_token_missing:{token}"
+        for token in required_tokens
+        if token not in artifact_text
+    ]
+    for command in report.get("decision_matrix", {}).get("validator_commands", ()):
+        if str(command) not in artifact_text:
+            reasons.append(f"evidence_artifact_validator_command_missing:{command}")
+    for fixture_ref in EXPECTED_MANIFEST_FIXTURE_REFS:
+        if fixture_ref not in artifact_text:
+            reasons.append(f"evidence_artifact_fixture_ref_missing:{fixture_ref}")
     return tuple(reasons)
