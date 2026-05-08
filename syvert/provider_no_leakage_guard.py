@@ -103,6 +103,25 @@ RUNTIME_TECHNICAL_TOKENS = frozenset(
     }
 )
 
+CREDENTIAL_SESSION_PRIVATE_TOKENS = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
+        "verify_fp",
+        "xsec_token",
+    }
+)
+
 PROVIDER_FAILURE_VALUE_TOKENS = frozenset(
     {"provider_failure", "provider_unavailable", "provider_contract_violation", "invalid_provider_offer"}
 )
@@ -115,6 +134,7 @@ FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS = frozenset().union(
     PROVIDER_MARKETPLACE_PRODUCT_TOKENS,
     PROVIDER_RESOURCE_LIFECYCLE_TOKENS,
     RUNTIME_TECHNICAL_TOKENS,
+    CREDENTIAL_SESSION_PRIVATE_TOKENS,
 )
 
 FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS = FORBIDDEN_CORE_PROVIDER_FIELD_TOKENS
@@ -140,8 +160,10 @@ FORBIDDEN_CORE_PROVIDER_VALUE_EXACT_TOKENS = PROVIDER_IDENTITY_CARRIER_TOKENS.un
         "score",
         "selector",
         "sla",
+        "session",
         "transport",
     },
+    CREDENTIAL_SESSION_PRIVATE_TOKENS,
 )
 
 FORBIDDEN_CORE_PROVIDER_VALUE_EMBEDDED_TOKENS = FORBIDDEN_CORE_PROVIDER_VALUE_SEMANTIC_TOKENS.difference(
@@ -266,7 +288,7 @@ def _scan_surface(
     if isinstance(value, Mapping):
         for key, child_value in value.items():
             child_path = f"{path}.{key!s}"
-            if isinstance(key, str) and _contains_forbidden_provider_field_token(key):
+            if isinstance(key, str) and _contains_forbidden_provider_field_token(key, path=child_path):
                 forbidden_field_paths.append(child_path)
             if isinstance(key, str) and _contains_provider_identity_value(key, provider_identity_values):
                 forbidden_value_paths.append(child_path)
@@ -282,7 +304,7 @@ def _scan_surface(
         if isinstance(value, str):
             if (
                 _contains_provider_identity_value(value, provider_identity_values)
-                or _contains_forbidden_provider_value_semantics(value)
+                or _contains_forbidden_provider_value_semantics(value, path=path)
                 or _contains_forbidden_provider_failure_value(path, value)
             ):
                 forbidden_value_paths.append(path)
@@ -298,8 +320,10 @@ def _scan_surface(
             )
 
 
-def _contains_forbidden_provider_field_token(field_name: str) -> bool:
+def _contains_forbidden_provider_field_token(field_name: str, *, path: str) -> bool:
     normalized = _normalize_field_name(field_name)
+    if _path_allows_credential_material(path) and _contains_credential_session_private_token(normalized):
+        return False
     if normalized == "provider":
         return True
     if normalized.startswith("provider_"):
@@ -345,8 +369,10 @@ def _contains_forbidden_provider_failure_value(path: str, value: str) -> bool:
     return False
 
 
-def _contains_forbidden_provider_value_semantics(value: str) -> bool:
+def _contains_forbidden_provider_value_semantics(value: str, *, path: str) -> bool:
     normalized_value = _normalize_field_name(value)
+    if _path_allows_credential_material(path) and _contains_credential_session_private_token(normalized_value):
+        return False
     if normalized_value.startswith("provider_"):
         return True
     for token in FORBIDDEN_CORE_PROVIDER_VALUE_EXACT_TOKENS:
@@ -357,6 +383,18 @@ def _contains_forbidden_provider_value_semantics(value: str) -> bool:
         if _contains_normalized_semantic_token(normalized_value, normalized_token):
             return True
     return False
+
+
+def _contains_credential_session_private_token(normalized_value: str) -> bool:
+    return any(
+        _contains_normalized_semantic_token(normalized_value, _normalize_field_name(token))
+        for token in CREDENTIAL_SESSION_PRIVATE_TOKENS
+    )
+
+
+def _path_allows_credential_material(path: str) -> bool:
+    normalized_path = _normalize_field_name(path)
+    return normalized_path.startswith("resource_lifecycle") and "_material_" in f"_{normalized_path}_"
 
 
 def _contains_normalized_semantic_token(normalized_value: str, normalized_token: str) -> bool:

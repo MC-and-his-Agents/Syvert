@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from syvert.operation_taxonomy import stable_operation_entry
@@ -30,6 +31,24 @@ REQUIRED_VALIDATION_OUTCOME_FIELDS = (
     "validation_status",
     "error_code",
     "failure_category",
+)
+FORBIDDEN_CREDENTIAL_SESSION_FIELDS = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
+        "verify_fp",
+        "xsec_token",
+    }
 )
 
 REQUIRED_OFFER_FIELDS = frozenset(
@@ -153,10 +172,18 @@ FORBIDDEN_OFFER_FIELDS = frozenset(
         "network_tier",
         "transport",
     }
-)
+).union(FORBIDDEN_CREDENTIAL_SESSION_FIELDS)
 FORBIDDEN_PROVIDER_KEY_TOKENS = frozenset({"core", "global", "marketplace", "registry", "routing"})
 FORBIDDEN_OBSERVABILITY_TOKENS = frozenset(
     {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
         "selector",
         "routing",
         "fallback",
@@ -171,6 +198,12 @@ FORBIDDEN_OBSERVABILITY_TOKENS = frozenset(
         "browser",
         "network",
         "transport",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
+        "verify_fp",
+        "xsec_token",
     }
 )
 REQUIRED_CAPABILITY_ORDER = ("account", "proxy")
@@ -1187,7 +1220,7 @@ def _find_forbidden_fields(raw_value: Any) -> tuple[str, ...]:
     def visit(value: Any) -> None:
         if isinstance(value, Mapping):
             for key, nested_value in value.items():
-                if isinstance(key, str) and key in FORBIDDEN_OFFER_FIELDS:
+                if isinstance(key, str) and _contains_forbidden_offer_field_token(key):
                     found.add(key)
                 visit(nested_value)
         elif not isinstance(value, (str, bytes)):
@@ -1200,6 +1233,17 @@ def _find_forbidden_fields(raw_value: Any) -> tuple[str, ...]:
 
     visit(raw_value)
     return tuple(sorted(found))
+
+
+def _contains_forbidden_offer_field_token(field_name: str) -> bool:
+    normalized = _normalize_token_text(field_name)
+    return any(
+        normalized == token
+        or normalized.startswith(f"{token}_")
+        or normalized.endswith(f"_{token}")
+        or f"_{token}_" in normalized
+        for token in FORBIDDEN_OFFER_FIELDS
+    )
 
 
 def _require_non_empty_string(raw_value: Any, *, field_name: str) -> str:
@@ -1311,7 +1355,9 @@ def _contains_forbidden_observability_token(value: str) -> bool:
 
 
 def _normalize_token_text(value: str) -> str:
-    normalized = value.replace("-", "_").replace(":", "_").lower()
+    with_word_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", value)
+    with_word_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_boundaries)
+    normalized = with_word_boundaries.replace("-", "_").replace(":", "_").lower()
     chars: list[str] = []
     for char in normalized:
         chars.append(char if char.isalnum() or char == "_" else "_")

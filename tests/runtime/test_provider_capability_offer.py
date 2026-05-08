@@ -242,7 +242,7 @@ class ProviderCapabilityOfferTests(unittest.TestCase):
                 result = validate_provider_capability_offer(offer)
 
                 self.assert_invalid(result)
-                self.assertEqual(result.details["forbidden_fields"], (field_name,))
+                self.assertIn(field_name, result.details["forbidden_fields"])
 
     def test_validator_rejects_top_level_decision_marketplace_core_routing_and_provider_leakage_fields(self) -> None:
         cases = (
@@ -264,7 +264,28 @@ class ProviderCapabilityOfferTests(unittest.TestCase):
                 result = validate_provider_capability_offer(offer)
 
                 self.assert_invalid(result)
-                self.assertEqual(result.details["forbidden_fields"], (field_name,))
+                self.assertIn(field_name, result.details["forbidden_fields"])
+
+    def test_validator_rejects_private_credential_session_health_fields(self) -> None:
+        cases = (
+            ("cookies", {"a": "redacted"}),
+            ("xsecToken", "redacted"),
+            ("verify_fp", "redacted"),
+            ("ms_token", "redacted"),
+            ("headers", {"authorization": "redacted"}),
+            ("credential_freshness", "fresh"),
+            ("session_health", "healthy"),
+            ("health_sla", "99.9"),
+        )
+        for field_name, value in cases:
+            with self.subTest(field_name=field_name):
+                offer = copy_offer()
+                offer["resource_support"]["supported_profiles"][0][field_name] = value
+
+                result = validate_provider_capability_offer(offer)
+
+                self.assert_invalid(result)
+                self.assertIn(field_name, result.details["forbidden_fields"])
 
     def test_validator_rejects_resource_profile_evidence_refs_that_do_not_match_profile_proofs(self) -> None:
         offer = copy_offer()
@@ -395,6 +416,10 @@ class ProviderCapabilityOfferTests(unittest.TestCase):
             "fallbackResult",
             "marketplaceListing",
             "taskRecordProviderField",
+            "sessionHealth",
+            "credentialFreshness",
+            "healthSla",
+            "authorization",
             "browserProfile",
             "networkTier",
             "transportMode",

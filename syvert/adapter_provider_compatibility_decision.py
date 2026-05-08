@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from syvert.adapter_capability_requirement import (
@@ -64,6 +65,14 @@ REQUIRED_CONTEXT_FIELDS = frozenset(
 )
 FORBIDDEN_DECISION_TOKENS = frozenset(
     {
+        "authorization",
+        "cookie",
+        "cookies",
+        "credential_freshness",
+        "credential_material",
+        "headers",
+        "health_sla",
+        "ms_token",
         "provider_key",
         "offer_id",
         "selected_provider",
@@ -99,7 +108,13 @@ FORBIDDEN_DECISION_TOKENS = frozenset(
         "chromium",
         "browser",
         "network",
+        "session",
+        "session_health",
+        "session_object",
+        "token",
         "transport",
+        "verify_fp",
+        "xsec_token",
     }
 )
 CORE_PROJECTION_ALLOWED_FIELDS = frozenset(
@@ -1235,8 +1250,20 @@ def _detect_provider_leakage(value: Any) -> tuple[str, ...]:
 
 
 def _contains_forbidden_token(value: str) -> bool:
-    normalized = value.lower().replace("-", "_")
-    return any(token in normalized for token in FORBIDDEN_DECISION_TOKENS)
+    normalized = _normalize_token_text(value)
+    return any(
+        normalized == token
+        or normalized.startswith(f"{token}_")
+        or normalized.endswith(f"_{token}")
+        or f"_{token}_" in normalized
+        for token in FORBIDDEN_DECISION_TOKENS
+    )
+
+
+def _normalize_token_text(value: str) -> str:
+    with_word_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", value)
+    with_word_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_boundaries)
+    return re.sub(r"[^a-z0-9]+", "_", with_word_boundaries.lower()).strip("_")
 
 
 def _dedupe(raw_values: Iterable[str]) -> tuple[str, ...]:

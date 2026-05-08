@@ -124,7 +124,7 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
                     )
                 )
 
-                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
 
     def test_validator_rejects_profile_proof_mismatch_as_invalid_resource_requirement(self) -> None:
         requirement = copy_requirement()
@@ -343,6 +343,42 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
 
         self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
         self.assertEqual(result.details["forbidden_fields"], ("fallback",))
+
+    def test_validator_rejects_private_credential_session_health_fields(self) -> None:
+        cases = (
+            ("cookies", {"a": "redacted"}),
+            ("xsecToken", "redacted"),
+            ("verify_fp", "redacted"),
+            ("ms_token", "redacted"),
+            ("headers", {"authorization": "redacted"}),
+            ("credential_freshness", "fresh"),
+            ("session_health", "healthy"),
+            ("health_sla", "99.9"),
+        )
+        for field_name, value in cases:
+            with self.subTest(field_name=field_name):
+                requirement = copy_requirement()
+                requirement["resource_requirement"]["resource_requirement_profiles"][0][field_name] = value
+
+                result = validate_adapter_capability_requirement(requirement)
+
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT)
+                self.assertIn(field_name, result.details["forbidden_fields"])
+
+    def test_validator_rejects_private_health_observability_values(self) -> None:
+        for leaked_value in ("session_health", "credentialFreshness", "health_sla", "authorization"):
+            with self.subTest(leaked_value=leaked_value):
+                requirement = copy_requirement()
+                requirement["observability"]["admission_outcome_fields"] = [
+                    "match_status",
+                    "error_code",
+                    "failure_category",
+                    leaked_value,
+                ]
+
+                result = validate_adapter_capability_requirement(requirement)
+
+                self.assert_invalid(result, ADAPTER_REQUIREMENT_ERROR_INVALID_RESOURCE_REQUIREMENT)
 
     def test_legal_requirement_does_not_emit_provider_compatibility_fields(self) -> None:
         result = validate_adapter_capability_requirement(
