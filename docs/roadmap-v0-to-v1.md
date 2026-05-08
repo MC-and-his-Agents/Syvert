@@ -379,6 +379,8 @@ Syvert Adapter
 
 ### v1.0.0 的要求
 
+`v1.0.0` 发布准入由 `docs/specs/FR-0351-v1-core-stable-release-gate/` 冻结。该 gate 是 `v0.9.0` 真实 provider 验证样本完成后的 Core stable 判定入口，不由会话判断、单个 PR 结论或上层应用可运行状态替代。
+
 - Core 边界稳定
 - 适配器契约稳定
 - 任务模型稳定
@@ -389,6 +391,17 @@ Syvert Adapter
 - 第三方 Adapter 可以通过稳定 SDK 表面、contract test 与 registry 校验接入
 - Adapter / Provider 兼容性判断链路稳定，且已有真实 provider 验证样本作为 evidence
 - Core 不承担 provider selector、fallback、routing 或指定 provider 产品适配职责
+
+### v1.0.0 release gate checklist
+
+- Core / Adapter / Provider 边界无漂移
+- `content_detail_by_url` 双参考基线持续通过
+- 第三方 Adapter-only 接入路径可由 SDK + contract test 独立解释
+- Adapter + Provider compatibility decision 有真实 provider 样本 evidence
+- provider 字段没有进入 Core routing、registry、TaskRecord、resource lifecycle
+- API / CLI 仍共享 Core path
+- release index、annotated tag、GitHub Release 与 closeout truth 对齐
+- 上层应用与 Python package publish 不属于默认完成条件
 
 ### v1.0.0 不代表什么
 
