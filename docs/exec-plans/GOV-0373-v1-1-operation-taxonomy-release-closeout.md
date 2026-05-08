@@ -28,8 +28,10 @@
 
 - `#369/#370/#371/#372` 均已 closed completed。
 - 阶段 A carrier base：`27712c7b416c8ff8927e79851fd3ced4ed96e845`。
-- `v1.1.0` tag 与 GitHub Release 尚未创建。
-- 当前 open PR：无。
+- 阶段 A PR `#378` 已合入，merge commit `52ae3b3757a7f88410d50e21670e5b158bbd7fd7`。
+- `v1.1.0` annotated tag 已创建并推送，tag object `2f52b8979ef5195d058be1c1904b7fc55599825a`，target commit `52ae3b3757a7f88410d50e21670e5b158bbd7fd7`。
+- GitHub Release `v1.1.0` 已创建：`https://github.com/MC-and-his-Agents/Syvert/releases/tag/v1.1.0`。
+- 阶段 B 正在回写 published truth carrier。
 
 ## 验证摘要
 
@@ -53,7 +55,8 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - 阶段 A base：`27712c7b416c8ff8927e79851fd3ced4ed96e845`
-- 阶段 A PR live head 由 PR `headRefOid` 与 guardian merge gate 绑定。
+- 阶段 A release carrier：`52ae3b3757a7f88410d50e21670e5b158bbd7fd7`
+- 阶段 B PR live head 由 PR `headRefOid` 与 guardian merge gate 绑定。
 
 ## closeout 证据
 
