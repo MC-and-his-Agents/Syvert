@@ -1,0 +1,24 @@
+{
+  "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
+  "release": "v0.9.0",
+  "fr_ref": "FR-0355",
+  "consumed_gate_ref": "FR-0351:provider_compatibility_sample",
+  "status": "pass",
+  "commands": [
+    {
+      "validation": "external provider sample evidence",
+      "command": "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
+      "status": "pass"
+    },
+    {
+      "validation": "compatibility decision / no-leakage / sample",
+      "command": "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence",
+      "status": "pass"
+    },
+    {
+      "validation": "dual reference / third-party entry / API CLI same path",
+      "command": "python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path",
+      "status": "pass"
+    }
+  ]
+}

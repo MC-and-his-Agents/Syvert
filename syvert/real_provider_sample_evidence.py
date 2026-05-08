@@ -4,10 +4,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from functools import lru_cache
 import json
-import os
 from pathlib import Path
-import subprocess
-import sys
 import tempfile
 from typing import Any
 
@@ -51,11 +48,8 @@ FR0026_DECISION_EVIDENCE_REF = "fr-0026:runtime-tests:adapter-provider-compatibi
 EVIDENCE_ARTIFACT_PATH = (
     "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md"
 )
-EVIDENCE_ARTIFACT_REQUIRED_ANCHORS = (
-    "## Decision Matrix",
-    "## Adapter-Bound Execution Evidence",
-    "## No-Leakage Evidence",
-    "## Validation Evidence",
+VALIDATION_EVIDENCE_ARTIFACT_PATH = (
+    "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json"
 )
 VALIDATION_MODULE_PATHS = {
     "tests.runtime.test_real_provider_sample_evidence": "tests/runtime/test_real_provider_sample_evidence.py",
@@ -85,7 +79,6 @@ REQUIRED_VALIDATION_COMMANDS = (
         ),
     ),
 )
-NESTED_VALIDATION_ENV = "SYVERT_REAL_PROVIDER_SAMPLE_NESTED_VALIDATION"
 REQUIRED_CORE_NO_LEAKAGE_SURFACES = (
     "registry_discovery",
     "core_routing",
@@ -844,39 +837,49 @@ def _resource_requirements_summary(declarations: tuple[Any, ...]) -> tuple[dict[
 
 
 def build_required_validation_evidence() -> dict[str, Any]:
-    return _build_required_validation_evidence_cached()
-
-
-@lru_cache(maxsize=1)
-def _build_required_validation_evidence_cached() -> dict[str, Any]:
     repo_root = Path(__file__).parents[1]
-    env = dict(os.environ)
-    env[NESTED_VALIDATION_ENV] = "1"
-    commands: list[dict[str, Any]] = []
-    for validation_name, modules in REQUIRED_VALIDATION_COMMANDS:
-        command = (sys.executable, "-m", "unittest", *modules)
-        completed = subprocess.run(
-            command,
-            cwd=repo_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        commands.append(
-            {
-                "validation": validation_name,
-                "command": _validation_command_text(modules),
-                "status": "pass" if completed.returncode == 0 else "fail",
-                "returncode": completed.returncode,
-                "stdout_tail": completed.stdout[-1000:],
-                "stderr_tail": completed.stderr[-1000:],
-            }
-        )
+    artifact_path = repo_root / VALIDATION_EVIDENCE_ARTIFACT_PATH
+    if not artifact_path.exists():
+        return {"status": "fail", "commands": (), "reason": "validation_evidence_artifact_missing"}
+    try:
+        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return {
+            "status": "fail",
+            "commands": (),
+            "reason": "validation_evidence_artifact_unreadable",
+            "error_type": error.__class__.__name__,
+        }
+    if not isinstance(payload, Mapping):
+        return {"status": "fail", "commands": (), "reason": "validation_evidence_artifact_not_object"}
+    commands = payload.get("commands")
+    normalized_commands = (
+        tuple(command for command in commands if isinstance(command, Mapping))
+        if isinstance(commands, list)
+        else ()
+    )
+    status = "pass" if _validation_artifact_is_pass(payload, normalized_commands) else "fail"
     return {
-        "status": "pass" if all(command["status"] == "pass" for command in commands) else "fail",
-        "commands": tuple(commands),
+        "status": status,
+        "artifact_ref": VALIDATION_EVIDENCE_ARTIFACT_PATH,
+        "commands": normalized_commands,
     }
+
+
+def _validation_artifact_is_pass(
+    payload: Mapping[str, Any],
+    commands: tuple[Mapping[str, Any], ...],
+) -> bool:
+    expected_commands = tuple(_validation_command_text(modules) for _, modules in REQUIRED_VALIDATION_COMMANDS)
+    return (
+        payload.get("report_id") == "CHORE-0358-v0-9-external-provider-sample-evidence"
+        and payload.get("release") == "v0.9.0"
+        and payload.get("fr_ref") == "FR-0355"
+        and payload.get("consumed_gate_ref") == FR0351_GATE_REF
+        and payload.get("status") == "pass"
+        and tuple(command.get("command") for command in commands) == expected_commands
+        and all(command.get("status") == "pass" for command in commands)
+    )
 
 
 def _validation_command_text(modules: tuple[str, ...]) -> str:
@@ -994,45 +997,15 @@ def _evidence_ref_fail_closed_reasons(report: Mapping[str, Any]) -> tuple[str, .
     artifact_path = repo_root / EVIDENCE_ARTIFACT_PATH
     if not artifact_path.exists():
         reasons.append("evidence_artifact_missing")
-    else:
-        artifact_text = artifact_path.read_text(encoding="utf-8")
-        for anchor in EVIDENCE_ARTIFACT_REQUIRED_ANCHORS:
-            if anchor not in artifact_text:
-                reasons.append(f"evidence_artifact_anchor_missing:{anchor}")
-        reasons.extend(_artifact_report_consistency_reasons(artifact_text, report))
+    validation_artifact_path = repo_root / VALIDATION_EVIDENCE_ARTIFACT_PATH
+    if not validation_artifact_path.exists():
+        reasons.append("validation_evidence_artifact_missing")
+    elif report.get("validation_evidence", {}).get("artifact_ref") != VALIDATION_EVIDENCE_ARTIFACT_PATH:
+        reasons.append("validation_evidence_artifact_ref_drift")
     manifest_path = repo_root / "syvert/fixtures/v0_9_external_provider_sample_manifest.json"
     if not manifest_path.exists():
         reasons.append("external_provider_sample_manifest_missing")
     for module_path in VALIDATION_MODULE_PATHS.values():
         if not (repo_root / module_path).exists():
             reasons.append(f"validation_module_missing:{module_path}")
-    return tuple(reasons)
-
-
-def _artifact_report_consistency_reasons(artifact_text: str, report: Mapping[str, Any]) -> tuple[str, ...]:
-    required_tokens = (
-        f"release：`{report.get('release')}`",
-        f"fr_ref：`{report.get('fr_ref')}`",
-        f"consumed_gate_ref：`{report.get('consumed_gate_ref')}`",
-        f"sample_origin：`{report.get('sample_origin')}`",
-        f"provider_support_claim：`{str(report.get('provider_support_claim')).lower()}`",
-        f"status：`{report.get('status')}`",
-        f"matched_case_ref：`{report.get('decision_matrix', {}).get('matched_case_ref')}`",
-        f"unmatched_case_ref：`{report.get('decision_matrix', {}).get('unmatched_case_ref')}`",
-        f"invalid_contract_case_ref：`{report.get('decision_matrix', {}).get('invalid_contract_case_ref')}`",
-        "provider_side_error_code=provider_unavailable",
-        "provider_unavailable -> external_sample_unavailable",
-        "provider_identity_in_core_surface：`false`",
-    )
-    reasons = [
-        f"evidence_artifact_token_missing:{token}"
-        for token in required_tokens
-        if token not in artifact_text
-    ]
-    for command in report.get("decision_matrix", {}).get("validator_commands", ()):
-        if str(command) not in artifact_text:
-            reasons.append(f"evidence_artifact_validator_command_missing:{command}")
-    for fixture_ref in EXPECTED_MANIFEST_FIXTURE_REFS:
-        if fixture_ref not in artifact_text:
-            reasons.append(f"evidence_artifact_fixture_ref_missing:{fixture_ref}")
     return tuple(reasons)

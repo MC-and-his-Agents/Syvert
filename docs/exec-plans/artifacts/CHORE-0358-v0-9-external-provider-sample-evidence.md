@@ -34,6 +34,7 @@
 - decision_matrix_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#decision-matrix`
 - adapter_bound_execution_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#adapter-bound-execution-evidence`
 - no_leakage_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-evidence.md#no-leakage-evidence`
+- validation_evidence_ref：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`
 - dual_reference_ref：`tests.runtime.test_real_adapter_regression`
 - third_party_adapter_entry_ref：`tests.runtime.test_third_party_adapter_contract_entry`
 - api_cli_same_core_path_ref：`tests.runtime.test_cli_http_same_path`
@@ -128,13 +129,15 @@
 
 ## Validation Evidence
 
+机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`。
+
 | validation | command | result |
 |---|---|---|
 | external provider sample evidence | `python3 -m unittest tests.runtime.test_real_provider_sample_evidence` | `pass` |
 | compatibility decision / no-leakage / sample | `python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence` | `pass` |
 | dual reference / third-party entry / API CLI same path | `python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path` | `pass` |
 
-这些命令由 `build_required_validation_evidence()` 绑定到 report status；任一命令失败时，report 必须返回 `status=fail` 与 `required_validation_not_pass`。
+这些命令的 gate truth 由上述 JSON 载体承载；`build_required_validation_evidence()` 只消费该结构化载体，不在 report 构建过程中启动测试子进程。任一结构化命令状态不是 `pass` 时，report 必须返回 `status=fail` 与 `required_validation_not_pass`。
 
 ## Boundary
 

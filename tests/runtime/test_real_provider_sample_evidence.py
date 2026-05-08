@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import os
+import json
+import tempfile
 import unittest
+from unittest.mock import patch
 
+from syvert import real_provider_sample_evidence as evidence_module
 from syvert.adapter_provider_compatibility_decision import (
     COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT,
     COMPATIBILITY_DECISION_STATUS_MATCHED,
@@ -12,9 +15,9 @@ from syvert.adapter_provider_compatibility_decision import (
 from syvert.provider_capability_offer import validate_provider_capability_offer
 from syvert.real_provider_sample_evidence import (
     EXTERNAL_PROVIDER_KEY,
-    NESTED_VALIDATION_ENV,
     build_adapter_bound_execution_evidence,
     build_core_surface_no_leakage_evidence,
+    build_required_validation_evidence,
     build_real_provider_sample_evidence_report,
     external_provider_capability_offer,
     external_provider_decision_input,
@@ -22,8 +25,6 @@ from syvert.real_provider_sample_evidence import (
     external_provider_sample_manifest,
     external_provider_unmatched_decision_input,
 )
-
-SKIP_NESTED_REPORT_VALIDATION = os.environ.get(NESTED_VALIDATION_ENV) == "1"
 
 
 class RealProviderSampleEvidenceTests(unittest.TestCase):
@@ -147,7 +148,6 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("resource_trace", evidence["missing_required_surfaces"])
         self.assertIn("core_facing_failed_envelope", evidence["missing_required_surfaces"])
 
-    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_can_feed_fr0351_provider_compatibility_sample_gate(self) -> None:
         report = build_real_provider_sample_evidence_report()
 
@@ -211,13 +211,70 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["adapter_bound_execution"]["status"], "pass")
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
         self.assertEqual(report["validation_evidence"]["status"], "pass")
+        self.assertEqual(
+            report["validation_evidence"]["artifact_ref"],
+            "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
+        )
         self.assertEqual(len(report["validation_evidence"]["commands"]), 3)
         self.assertIn("resource_trace", report["core_surface_no_leakage"]["surfaces"])
         self.assertIn("task_record", report["core_surface_no_leakage"]["surfaces"])
         self.assertTrue(report["not_provider_product_support"])
         self.assertNotIn("fail_closed_reason", report["decision_matrix"])
 
-    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
+    def test_validation_evidence_consumes_machine_readable_artifact(self) -> None:
+        evidence = build_required_validation_evidence()
+
+        self.assertEqual(evidence["status"], "pass")
+        self.assertEqual(
+            evidence["artifact_ref"],
+            "docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json",
+        )
+        self.assertEqual(
+            tuple(command["command"] for command in evidence["commands"]),
+            (
+                "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
+                "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence",
+                "python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path",
+            ),
+        )
+        self.assertTrue(all(command["status"] == "pass" for command in evidence["commands"]))
+
+    def test_validation_evidence_fails_closed_for_structured_artifact_drift(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json") as artifact:
+            json.dump(
+                {
+                    "report_id": "CHORE-0358-v0-9-external-provider-sample-evidence",
+                    "release": "v0.9.0",
+                    "fr_ref": "FR-0355",
+                    "consumed_gate_ref": "FR-0351:wrong-gate",
+                    "status": "pass",
+                    "commands": [
+                        {
+                            "validation": "external provider sample evidence",
+                            "command": "python3 -m unittest tests.runtime.test_real_provider_sample_evidence",
+                            "status": "pass",
+                        },
+                        {
+                            "validation": "compatibility decision / no-leakage / sample",
+                            "command": "python3 -m unittest tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_provider_no_leakage_guard tests.runtime.test_real_provider_sample_evidence",
+                            "status": "pass",
+                        },
+                        {
+                            "validation": "dual reference / third-party entry / API CLI same path",
+                            "command": "python3 -m unittest tests.runtime.test_real_adapter_regression tests.runtime.test_third_party_adapter_contract_entry tests.runtime.test_cli_http_same_path",
+                            "status": "pass",
+                        },
+                    ],
+                },
+                artifact,
+            )
+            artifact.flush()
+
+            with patch.object(evidence_module, "VALIDATION_EVIDENCE_ARTIFACT_PATH", artifact.name):
+                evidence = evidence_module.build_required_validation_evidence()
+
+        self.assertEqual(evidence["status"], "fail")
+
     def test_report_approved_slice_is_not_global_mutable_state(self) -> None:
         report = build_real_provider_sample_evidence_report()
         report["approved_slice"]["capability"] = "mutated"
@@ -235,7 +292,6 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertNotIn("mutated", fresh["raw_payload"])
         self.assertEqual(fresh["adapter_mapped_failed_envelope"]["error"]["code"], "external_sample_unavailable")
 
-    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_fails_closed_for_manifest_drift(self) -> None:
         manifest = external_provider_sample_manifest()
         manifest["provider_support_claim"] = True
@@ -252,7 +308,6 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("manifest_provider_support_claim_not_false", report["decision_matrix"]["fail_closed_reason"])
         self.assertIn("manifest_approved_slice_drift", report["decision_matrix"]["fail_closed_reason"])
 
-    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_fails_closed_for_manifest_forbidden_claim_semantics(self) -> None:
         manifest = external_provider_sample_manifest()
         manifest["forbidden_claims"] = ["provider_product_support", "fallback"]
@@ -269,7 +324,6 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
             report["decision_matrix"]["fail_closed_reason"],
         )
 
-    @unittest.skipIf(SKIP_NESTED_REPORT_VALIDATION, "outer report validation owns subprocess execution")
     def test_report_fails_closed_for_missing_required_manifest_fields(self) -> None:
         manifest = external_provider_sample_manifest()
         manifest.pop("manifest_id")
