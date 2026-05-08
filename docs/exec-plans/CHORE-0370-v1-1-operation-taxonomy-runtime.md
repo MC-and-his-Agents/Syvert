@@ -75,6 +75,12 @@ Observed local validation:
 - `python3 scripts/spec_guard.py --mode ci --all` passed.
 - `python3 scripts/docs_guard.py --mode ci` passed.
 - `python3 scripts/workflow_guard.py --mode ci` passed.
+- `python3 scripts/governance_gate.py --mode ci --base-sha <base> --head-sha <head> --head-ref issue-370-v1-1-operation-taxonomy-runtime-carrier` passed locally before first PR push.
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- Local implementation checkpoint before PR update: `7b09d3d6741264d00586149e7ae521fc87630494`
+- Current live PR head is governed by PR #375 `headRefOid` and guardian merge gate.
 
 ## Risks
 
