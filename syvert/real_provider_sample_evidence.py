@@ -31,6 +31,7 @@ from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.resource_trace import resource_trace_event_to_dict
 from syvert.resource_trace_store import LocalResourceTraceStore
 from syvert.runtime import PlatformAdapterError, TaskInput, TaskRequest, execute_task_with_record
+from syvert.runtime import DEFAULT_FAILURE_RELEASE_REASON, DEFAULT_SUCCESS_RELEASE_REASON
 from syvert.task_record import task_record_to_dict
 from syvert.task_record_store import LocalTaskRecordStore
 
@@ -418,6 +419,8 @@ def external_provider_capability_offer(
 
 def build_adapter_bound_execution_evidence(
     decision: AdapterProviderCompatibilityDecision,
+    *,
+    execution_override: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if decision.decision_status != COMPATIBILITY_DECISION_STATUS_MATCHED:
         return {
@@ -425,7 +428,11 @@ def build_adapter_bound_execution_evidence(
             "reason": "adapter_bound_execution_requires_matched_decision",
             "matched_decision_ref": decision.decision_id,
         }
-    execution = run_external_provider_sample_runtime_execution()
+    execution = (
+        deepcopy(dict(execution_override))
+        if execution_override is not None
+        else run_external_provider_sample_runtime_execution()
+    )
     success_envelope = execution["success"]["envelope"]
     failed_envelope = execution["failure"]["envelope"]
     checks = _adapter_bound_execution_checks(execution, decision)
@@ -447,8 +454,10 @@ def build_adapter_bound_execution_evidence(
         "adapter_owned_provider_seam_ref": "xhs:adapter-owned-provider-port:external-fixture",
         "raw_payload_ref": "external-fixture://content-detail/success#raw",
         "raw_payload": deepcopy(success_envelope.get("raw")),
+        "raw_payload_present": checks["raw_payload_present"],
         "normalized_result_ref": "external-fixture://content-detail/success#normalized",
         "normalized_result": deepcopy(success_envelope.get("normalized")),
+        "normalized_result_present": checks["normalized_result_present"],
         "adapter_mapped_failed_envelope_ref": (
             "external-fixture://content-detail/provider-timeout#adapter-mapped-failed-envelope"
         ),
@@ -457,7 +466,9 @@ def build_adapter_bound_execution_evidence(
         "provider_error_mapping_checked": checks["provider_error_mapping_checked"],
         "resource_profile_consumption_checked": checks["resource_profile_consumption_checked"],
         "resource_lifecycle_disposition_checked": checks["resource_lifecycle_disposition_checked"],
-        "resource_lifecycle_disposition_hint": "release",
+        "resource_lifecycle_disposition_hint": None,
+        "resource_lifecycle_release_reason": checks["success_release_reason"],
+        "resource_lifecycle_failure_release_reason": checks["failure_release_reason"],
         "observability_carrier_checked": checks["observability_carrier_checked"],
         "runtime_execution_ref": execution["runtime_execution_ref"],
         "success_task_record_ref": execution["success"]["task_record_ref"],
@@ -557,8 +568,12 @@ def _adapter_bound_execution_checks(
     failure_terminal_envelope = (
         failure_result.get("envelope") if isinstance(failure_result.get("envelope"), Mapping) else {}
     )
+    success_release_reason = _single_release_reason(success_trace_events)
+    failure_release_reason = _single_release_reason(failure_trace_events)
     observability_carrier = _adapter_bound_observability_carrier(decision)
     return {
+        "raw_payload_present": isinstance(success_envelope.get("raw"), Mapping),
+        "normalized_result_present": isinstance(success_envelope.get("normalized"), Mapping),
         "provider_error_mapping_checked": (
             provider_error_mapping.get("provider_side_error_code") == "provider_unavailable"
             and provider_error_mapping.get("adapter_mapped_error_code") == "external_sample_unavailable"
@@ -574,7 +589,11 @@ def _adapter_bound_execution_checks(
         "resource_lifecycle_disposition_checked": (
             _trace_events_released_to_available(success_trace_events)
             and _trace_events_released_to_available(failure_trace_events)
+            and success_release_reason == DEFAULT_SUCCESS_RELEASE_REASON
+            and failure_release_reason == DEFAULT_FAILURE_RELEASE_REASON
         ),
+        "success_release_reason": success_release_reason,
+        "failure_release_reason": failure_release_reason,
         "observability_carrier_checked": (
             success_task_record.get("status") == "succeeded"
             and failure_task_record.get("status") == "failed"
@@ -619,6 +638,17 @@ def _trace_events_released_to_available(events: tuple[Mapping[str, Any], ...]) -
         if event.get("event_type") == "released" and event.get("to_status") == "AVAILABLE"
     }
     return {"account", "proxy"}.issubset(released_resource_types)
+
+
+def _single_release_reason(events: tuple[Mapping[str, Any], ...]) -> str | None:
+    reasons = {
+        str(event.get("reason"))
+        for event in events
+        if event.get("event_type") == "released" and event.get("reason")
+    }
+    if len(reasons) != 1:
+        return None
+    return next(iter(reasons))
 
 
 class ExternalProviderSampleError(Exception):
@@ -1161,7 +1191,9 @@ def _evidence_report_snapshot(report: Mapping[str, Any]) -> dict[str, Any]:
             "success_task_record_ref": adapter_bound_execution.get("success_task_record_ref"),
             "failure_task_record_ref": adapter_bound_execution.get("failure_task_record_ref"),
             "raw_payload_ref": adapter_bound_execution.get("raw_payload_ref"),
+            "raw_payload_present": adapter_bound_execution.get("raw_payload_present"),
             "normalized_result_ref": adapter_bound_execution.get("normalized_result_ref"),
+            "normalized_result_present": adapter_bound_execution.get("normalized_result_present"),
             "adapter_mapped_failed_envelope_ref": adapter_bound_execution.get(
                 "adapter_mapped_failed_envelope_ref"
             ),
@@ -1178,6 +1210,12 @@ def _evidence_report_snapshot(report: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "resource_lifecycle_disposition_hint": adapter_bound_execution.get(
                 "resource_lifecycle_disposition_hint"
+            ),
+            "resource_lifecycle_release_reason": adapter_bound_execution.get(
+                "resource_lifecycle_release_reason"
+            ),
+            "resource_lifecycle_failure_release_reason": adapter_bound_execution.get(
+                "resource_lifecycle_failure_release_reason"
             ),
             "observability_carrier_checked": adapter_bound_execution.get(
                 "observability_carrier_checked"

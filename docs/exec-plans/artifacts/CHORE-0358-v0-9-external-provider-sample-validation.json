@@ -3,7 +3,7 @@
   "release": "v0.9.0",
   "fr_ref": "FR-0355",
   "consumed_gate_ref": "FR-0351:provider_compatibility_sample",
-  "report_snapshot_sha256": "88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21",
+  "report_snapshot_sha256": "31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76",
   "status": "pass",
   "commands": [
     {

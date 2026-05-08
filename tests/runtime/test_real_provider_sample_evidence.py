@@ -25,6 +25,7 @@ from syvert.real_provider_sample_evidence import (
     external_provider_invalid_contract_decision_input,
     external_provider_sample_manifest,
     external_provider_unmatched_decision_input,
+    run_external_provider_sample_runtime_execution,
 )
 
 
@@ -73,8 +74,10 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["matched_decision_ref"], "fr-0355:decision-matrix:matched")
         self.assertEqual(evidence["matched_decision_id"], "v0-9-external-provider-sample-matched")
         self.assertNotIn("provider_key", evidence["raw_payload"])
+        self.assertTrue(evidence["raw_payload_present"])
         self.assertEqual(evidence["raw_payload"]["sample_id"], "v0.9.0-external-provider-sample-content-detail")
         self.assertEqual(evidence["raw_payload_ref"], "external-fixture://content-detail/success#raw")
+        self.assertTrue(evidence["normalized_result_present"])
         self.assertEqual(evidence["normalized_result"]["platform"], "xhs")
         self.assertEqual(
             evidence["normalized_result_ref"],
@@ -89,7 +92,15 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertTrue(evidence["provider_error_mapping_checked"])
         self.assertTrue(evidence["resource_profile_consumption_checked"])
         self.assertTrue(evidence["resource_lifecycle_disposition_checked"])
-        self.assertEqual(evidence["resource_lifecycle_disposition_hint"], "release")
+        self.assertIsNone(evidence["resource_lifecycle_disposition_hint"])
+        self.assertEqual(
+            evidence["resource_lifecycle_release_reason"],
+            "adapter_completed_without_disposition_hint",
+        )
+        self.assertEqual(
+            evidence["resource_lifecycle_failure_release_reason"],
+            "adapter_failed_without_disposition_hint",
+        )
         self.assertTrue(evidence["observability_carrier_checked"])
         self.assertEqual(evidence["observability"]["adapter_key"], "xhs")
         self.assertEqual(evidence["observability"]["capability"], "content_detail")
@@ -148,6 +159,18 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertIn("resource_lifecycle", evidence["missing_required_surfaces"])
         self.assertIn("resource_trace", evidence["missing_required_surfaces"])
         self.assertIn("core_facing_failed_envelope", evidence["missing_required_surfaces"])
+
+    def test_adapter_bound_execution_evidence_fails_closed_when_success_payloads_are_missing(self) -> None:
+        decision = decide_adapter_provider_compatibility(external_provider_decision_input())
+        execution = run_external_provider_sample_runtime_execution()
+        execution["success"]["envelope"].pop("raw")
+        execution["success"]["envelope"].pop("normalized")
+
+        evidence = build_adapter_bound_execution_evidence(decision, execution_override=execution)
+
+        self.assertEqual(evidence["status"], "fail")
+        self.assertFalse(evidence["raw_payload_present"])
+        self.assertFalse(evidence["normalized_result_present"])
 
     def test_report_can_feed_fr0351_provider_compatibility_sample_gate(self) -> None:
         report = build_real_provider_sample_evidence_report()
@@ -217,7 +240,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["core_surface_no_leakage"]["status"], "pass")
         self.assertEqual(
             report["evidence_snapshot_sha256"],
-            "88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21",
+            "31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76",
         )
         self.assertEqual(report["validation_evidence"]["status"], "pass")
         self.assertEqual(
@@ -241,7 +264,7 @@ class RealProviderSampleEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(
             evidence["report_snapshot_sha256"],
-            "88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21",
+            "31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76",
         )
         self.assertEqual(
             tuple(command["command"] for command in evidence["commands"]),

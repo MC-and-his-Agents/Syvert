@@ -53,13 +53,17 @@
     "failure_task_record_ref": "task_record:task-v0-9-sample-failure",
     "matched_decision_id": "v0-9-external-provider-sample-matched",
     "matched_decision_ref": "fr-0355:decision-matrix:matched",
+    "normalized_result_present": true,
     "normalized_result_ref": "external-fixture://content-detail/success#normalized",
     "observability_carrier_checked": true,
     "provider_error_mapping_checked": true,
     "provider_side_error_code": "provider_unavailable",
+    "raw_payload_present": true,
     "raw_payload_ref": "external-fixture://content-detail/success#raw",
     "resource_lifecycle_disposition_checked": true,
-    "resource_lifecycle_disposition_hint": "release",
+    "resource_lifecycle_disposition_hint": null,
+    "resource_lifecycle_failure_release_reason": "adapter_failed_without_disposition_hint",
+    "resource_lifecycle_release_reason": "adapter_completed_without_disposition_hint",
     "resource_profile_consumption_checked": true,
     "runtime_execution_ref": "syvert.runtime.execute_task_with_record:v0-9-external-provider-sample",
     "status": "pass",
@@ -165,7 +169,7 @@
 ```
 <!-- syvert:evidence-report-json:end -->
 
-- snapshot_sha256：`88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21`
+- snapshot_sha256：`31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76`
 
 ## Decision Matrix
 
@@ -205,7 +209,9 @@
   - resource_profile_consumption_checked：`true`
   - resource profile consumption：`account_proxy`
   - resource_lifecycle_disposition_checked：`true`
-  - resource lifecycle disposition hint：`release`
+  - resource lifecycle disposition hint：`null`
+  - success release reason：`adapter_completed_without_disposition_hint`
+  - failure release reason：`adapter_failed_without_disposition_hint`
   - observability_carrier_checked：`true`
   - observability carrier：adapter / capability / operation / decision status / proof refs
 - failure evidence 边界：
@@ -257,7 +263,7 @@
 
 ## Validation Evidence
 
-机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=88d41728888ecbcdb7c77bdbf5ad047c918b47ac1ec19d0b68138599c77e6c21`。
+机器可读验证载体：`docs/exec-plans/artifacts/CHORE-0358-v0-9-external-provider-sample-validation.json`，并绑定 `report_snapshot_sha256=31974bc000995d0f746d6b9132afa818dc85e7971ace8b0e355c918a66f9ba76`。
 
 | validation | command | result |
 |---|---|---|
