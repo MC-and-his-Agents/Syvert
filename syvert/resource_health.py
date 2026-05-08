@@ -289,9 +289,11 @@ def decide_resource_health_admission(
     decision_status = RESOURCE_ADMISSION_DECISION_ADMITTED
     failure_reason: str | None = None
     fail_closed = False
+    decision_evaluated_at = evaluated_at
 
     try:
         evaluated_at_dt = _parse_resource_health_datetime(evaluated_at, field="evaluated_at")
+        decision_evaluated_at = evaluated_at
         if health_gated:
             normalized_evidence = tuple(_coerce_evidence(item) for item in evidence)
             evidence_refs = [item.evidence_id for item in normalized_evidence]
@@ -326,6 +328,7 @@ def decide_resource_health_admission(
     except ResourceHealthContractError as error:
         projected_health = SESSION_HEALTH_UNKNOWN
         decision_status = RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT
+        decision_evaluated_at = now_rfc3339_utc()
         failure_reason = (
             "credential_material_contract_invalid"
             if _is_credential_material_contract_error(error)
@@ -343,7 +346,7 @@ def decide_resource_health_admission(
         requested_slots=normalized_requested_slots,
         resource_ids=tuple(record.resource_id for record in normalized_resources),
         health_evidence_refs=tuple(evidence_refs),
-        evaluated_at=evaluated_at,
+        evaluated_at=decision_evaluated_at,
         projected_session_health=projected_health,
         decision_status=decision_status,
         failure_reason=failure_reason,
@@ -464,34 +467,28 @@ def _project_account_resources_health(
         account_evidence = tuple(item for item in evidence if item.resource_id == account.resource_id)
         if not account_evidence:
             return SESSION_HEALTH_UNKNOWN
-        latest = max(
-            account_evidence,
-            key=lambda item: (
-                _parse_resource_health_datetime(item.observed_at, field="observed_at"),
-                _session_health_severity(item.status),
-            ),
+        max_observed_at = max(
+            _parse_resource_health_datetime(item.observed_at, field="observed_at") for item in account_evidence
         )
-        if latest.status == SESSION_HEALTH_INVALID:
+        latest_evidence = tuple(
+            item
+            for item in account_evidence
+            if _parse_resource_health_datetime(item.observed_at, field="observed_at") == max_observed_at
+        )
+        latest_statuses = {item.status for item in latest_evidence}
+        if SESSION_HEALTH_INVALID in latest_statuses:
             return SESSION_HEALTH_INVALID
-        if latest.status == SESSION_HEALTH_STALE:
+        if SESSION_HEALTH_STALE in latest_statuses:
             projected = SESSION_HEALTH_STALE
             continue
-        if latest.expires_at is None:
-            raise ResourceHealthContractError("healthy evidence 缺少 expires_at")
-        expires_at = _parse_resource_health_datetime(latest.expires_at, field="expires_at")
-        if evaluated_at >= expires_at:
+        healthy_expiries = []
+        for item in latest_evidence:
+            if item.expires_at is None:
+                raise ResourceHealthContractError("healthy evidence 缺少 expires_at")
+            healthy_expiries.append(_parse_resource_health_datetime(item.expires_at, field="expires_at"))
+        if any(evaluated_at >= expires_at for expires_at in healthy_expiries):
             projected = SESSION_HEALTH_STALE
     return projected
-
-
-def _session_health_severity(status: str) -> int:
-    if status == SESSION_HEALTH_INVALID:
-        return 3
-    if status == SESSION_HEALTH_STALE:
-        return 2
-    if status == SESSION_HEALTH_HEALTHY:
-        return 1
-    return 0
 
 
 def _decision_for_projected_health(projected_health: str) -> tuple[str, str | None, bool]:

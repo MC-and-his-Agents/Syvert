@@ -18,6 +18,7 @@ from syvert.resource_health import (
     credential_material_public_projection,
     decide_resource_health_admission,
     invalidate_active_lease_from_health_evidence,
+    resource_admission_decision_to_dict,
     resource_health_evidence_to_dict,
 )
 from syvert.resource_lifecycle import (
@@ -215,6 +216,32 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
                 self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_REJECTED)
                 self.assertTrue(decision.fail_closed)
 
+    def test_same_observed_at_healthy_expiry_conflict_is_deterministic_and_fail_closed(self) -> None:
+        fresh = self.healthy_evidence(
+            evidence_id="evidence-same-time-fresh",
+            expires_at="2026-05-08T12:30:00.000000Z",
+        )
+        expired = self.healthy_evidence(
+            evidence_id="evidence-same-time-expired",
+            expires_at="2026-05-08T12:01:00.000000Z",
+        )
+
+        for evidence_set in ((fresh, expired), (expired, fresh)):
+            with self.subTest(evidence_ids=tuple(item.evidence_id for item in evidence_set)):
+                decision = decide_resource_health_admission(
+                    decision_id="decision-same-observed-at-expiry-conflict",
+                    task_id="task-001",
+                    adapter_key="xhs",
+                    capability="content_detail_by_url",
+                    operation="content_detail_by_url",
+                    requested_slots=("account",),
+                    resources=(self.account_record(),),
+                    evidence=evidence_set,
+                    evaluated_at="2026-05-08T12:05:00.000000Z",
+                )
+                self.assertEqual(decision.decision_status, RESOURCE_ADMISSION_DECISION_REJECTED)
+                self.assertEqual(decision.projected_session_health, SESSION_HEALTH_STALE)
+
     def test_malformed_unredacted_or_context_mismatched_evidence_is_invalid_contract(self) -> None:
         cases = (
             self.healthy_evidence(expires_at=None),
@@ -290,6 +317,9 @@ class ResourceHealthTests(ResourceStoreEnvMixin, unittest.TestCase):
             evaluated_at="not-a-time",
         )
         self.assertEqual(evaluated_at_decision.decision_status, RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
+        self.assertNotEqual(evaluated_at_decision.evaluated_at, "not-a-time")
+        serialized = resource_admission_decision_to_dict(evaluated_at_decision)
+        self.assertEqual(serialized["decision_status"], RESOURCE_ADMISSION_DECISION_INVALID_CONTRACT)
 
     def test_non_health_gated_admission_does_not_consume_unrelated_malformed_evidence(self) -> None:
         malformed_evidence = {"cookies": "a=1; b=2"}

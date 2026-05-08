@@ -53,7 +53,7 @@
 
 ## 已验证项
 
-- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：244 tests passed。
+- `python3 -m unittest tests.runtime.test_resource_health tests.runtime.test_resource_lifecycle tests.runtime.test_resource_lifecycle_store tests.runtime.test_resource_trace_store tests.runtime.test_resource_bootstrap tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_provider_no_leakage_guard tests.runtime.test_runtime`：245 tests passed。
 - `python3 -m py_compile syvert/resource_health.py tests/runtime/test_resource_health.py`：通过。
 - `python3 scripts/spec_guard.py --mode ci --all`：通过。
 - `python3 scripts/docs_guard.py --mode ci`：通过。
@@ -117,5 +117,5 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `50d6c8834a77ee925c649914c0ad2a4d39be8c7a`
+- `86be411efcea14711e36e902e264bc86bb66be85`
 - Current HEAD may include a metadata-only checkpoint follow-up that records this verified implementation checkpoint.
