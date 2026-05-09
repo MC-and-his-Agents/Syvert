@@ -47,6 +47,7 @@
   - `content_detail_by_url` baseline 不得因 collection contract 引入新的 Core 分支或平台私有字段。
 - 非功能需求：
   - collection contract 必须 fail-closed；无法证明 continuation、target、raw/normalized 投影或错误分类合法时，不得返回伪稳定结果。
+  - malformed collection response 不得引入新的未定义公共错误分类；本 FR 中此类 fail-closed 路径统一收敛到已定义的 `parse_failed`。
   - repository 与 GitHub truth 不得记录外部样本项目名或本地路径；所有 evidence source 只能使用脱敏 alias。
   - synthetic fixture 只能从 recorded raw shape family 派生，不得凭空发明平台字段。
 
