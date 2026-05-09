@@ -6,9 +6,9 @@
 
 ## Contract purpose
 
-本 contract 定义 `comment_list_by_content` 的首个公共 comment collection contract。它冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace、raw/normalized 双轨与平台中立错误分类，不新增 runtime implementation、creator profile shape 或 media download contract。
+本 contract 定义 `comment_collection` 的首个公共 comment collection contract。它冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace、raw/normalized 双轨与平台中立错误分类，不新增 runtime implementation、creator profile shape 或 media download contract。
 
-`comment_list_by_content` 是 public executable operation；`comment_collection` 是 adapter-facing capability family。后续 `#417/#418` 必须把 `FR-0368` 的 proposed reserved candidate 升级为 `comment_list_by_content + content + single + paginated`，不得把 proposed placeholder operation 当作 stable operation 名称继续发布。
+`comment_collection` 沿用当前 canonical taxonomy candidate 的 public operation 名称与 adapter-facing capability family。后续若要拆分为更具体的 operation 名，必须另走 taxonomy promotion / compatibility migration，不在本 Work Item 中完成。
 
 ## Core ownership rules
 
@@ -30,8 +30,8 @@
 - Adapter 可以把 comment-id/reply-offset/thread-session 等平台 reply-entry state 编码成公共 reply cursor；该 cursor 只用于进入某条 comment 的首个 reply window。
 - 若 reply window 还有更多数据，Adapter 必须返回绑定同一 `resume_target_ref` / `resume_comment_ref` 的 `next_continuation`，而不是要求 consumer 继续复用旧的 item-level `reply_cursor`。
 - Adapter 必须把 `reply_cursor.resume_comment_ref`、reply-window continuation 的 `resume_comment_ref`、`root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref` 投影到对应 comment 的 `canonical_ref`；`source_ref` 只能用于追溯，不能作为这些绑定对象。
-- Adapter 不得为 deleted/invisible/unavailable placeholder 伪造平台原生 `source_id`；缺少稳定平台 id 时，必须用 operation、target、visibility、stable placeholder marker 或 stable continuation/window slot key 派生可复验的 public placeholder `source_id` 与 `canonical_ref`。
-- Placeholder identity 不得依赖 `raw_payload_ref`、`source_trace`、`fetched_at` 或一次抓取内临时 ordinal；无法构造稳定 placeholder identity 时必须 fail-closed 到 `parse_failed`。
+- Adapter 不得为 deleted/invisible/unavailable placeholder 伪造平台原生 `source_id`；缺少稳定平台 id 时，必须用 operation、target、visibility 与独立稳定 placeholder marker 派生可复验的 public placeholder `source_id` 与 `canonical_ref`。
+- Placeholder identity 不得依赖 continuation token、window slot、`raw_payload_ref`、`source_trace`、`fetched_at` 或一次抓取内临时 ordinal；无法构造稳定 placeholder identity 时必须 fail-closed 到 `parse_failed`。
 - Adapter 必须保留 raw payload reference，但不得把 raw 平台字段提升为 Core 公共字段。
 - Adapter 必须保证 dedup key 来自稳定公共语义，而不是要求 Core 理解平台私有 comment ID 体系。
 

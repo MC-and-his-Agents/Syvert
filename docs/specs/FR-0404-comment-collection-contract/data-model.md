@@ -2,7 +2,7 @@
 
 ## CommentTarget
 
-- 用途：表达 `comment_list_by_content` 的公共 target。
+- 用途：表达 `comment_collection` 的公共 target。
 - 最小字段：
   - `operation`
   - `target_type`
@@ -10,7 +10,7 @@
   - `target_display_hint`（可选）
   - `policy_ref`（可选）
 - 约束：
-  - `comment_list_by_content` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
+  - `comment_collection` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
   - thread-scoped reply loading 必须通过 item-level `reply_cursor` 继续，不得扩展出新的 target admission surface。
 
 ## CommentContinuation
@@ -32,7 +32,7 @@
 
 ## CommentRequestCursor
 
-- 用途：表达 `comment_list_by_content` 请求侧的可选 cursor 输入。
+- 用途：表达 `comment_collection` 请求侧的可选 cursor 输入。
 - 最小字段：
   - `page_continuation`（可选）
   - `reply_cursor`（可选）
@@ -121,9 +121,9 @@
 - 约束：
   - `canonical_ref` 是 comment contract 的唯一公共 comment ref。
   - visible comment 如存在平台稳定 comment id，Adapter 应投影到 `source_id`。
-  - placeholder comment 缺少稳定平台 id 时，`source_id` 必须使用 public placeholder namespace，并从可跨重放稳定的输入派生，例如 `operation`、`target_ref`、`visibility_status`、stable platform placeholder marker 或 stable continuation/window slot key。
-  - placeholder `source_id` 与 `canonical_ref` 不得依赖 `raw_payload_ref`、`source_trace`、`fetched_at` 或一次抓取内临时 ordinal；无法构造稳定 placeholder identity 时，Adapter 必须走 `parse_failed`，不得返回伪稳定 placeholder item。
-  - 使用派生 placeholder identity 时，`dedup_key` 的稳定范围不得超出可证明的 target/page/window identity；跨页去重只能在 Adapter 能证明同一 logical comment 时成立。
+  - placeholder comment 缺少稳定平台 id 时，`source_id` 必须使用 public placeholder namespace，并从可跨重放稳定的输入派生，例如 `operation`、`target_ref`、`visibility_status` 与独立稳定 placeholder marker。
+  - placeholder `source_id` 与 `canonical_ref` 不得依赖 continuation token、window slot、`raw_payload_ref`、`source_trace`、`fetched_at` 或一次抓取内临时 ordinal；无法构造稳定 placeholder identity 时，Adapter 必须走 `parse_failed`，不得返回伪稳定 placeholder item。
+  - 使用派生 placeholder identity 时，`dedup_key` 的稳定范围不得超出可证明的 target 与 placeholder marker identity；跨页去重只能在 Adapter 能证明同一 logical comment 时成立。
   - top-level comment 的 `root_comment_ref` 必须等于自身 `canonical_ref`。
   - reply comment 的 `root_comment_ref` 必须稳定指向 thread root 的 `canonical_ref`。
   - `parent_comment_ref` 指向直接 parent comment 的 `canonical_ref`；top-level comment 不要求该字段。

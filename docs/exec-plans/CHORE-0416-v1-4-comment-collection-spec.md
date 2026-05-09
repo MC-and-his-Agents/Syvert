@@ -18,7 +18,7 @@
 
 - 完成 `#404` 的 Batch 0 与 Batch 1。
 - 交付脱敏 comment fixture/error inventory、formal spec suite、`v1.4.0` release planning index 与 `2026-S25` sprint update。
-- 只冻结 `comment_list_by_content` contract，不交付 runtime carrier、consumer migration、fake/reference tests implementation、release closeout 或 raw fixture payload files。
+- 只冻结 `comment_collection` contract，不交付 runtime carrier、consumer migration、fake/reference tests implementation、release closeout 或 raw fixture payload files。
 
 ## 范围
 
@@ -85,9 +85,9 @@
   - 结果：新增文档未包含外部项目名或本地路径。
 - PR guardian refresh review
   - 结果：曾阻塞于 operation 命名、request continuation 字段映射与 comment ref 绑定歧义。
-  - 处理：已统一 public operation 为 roadmap candidate `comment_list_by_content`，并明确其投影为 `capability_family=comment_collection`、`target_type=content`、`execution_mode=single`、`collection_mode=paginated`。
+  - 处理：已按当前 canonical taxonomy candidate 统一 public operation 为 `comment_collection`，并明确其投影为 `capability_family=comment_collection`、`target_type=content`、`execution_mode=single`、`collection_mode=paginated`。
   - 处理：已冻结 result `next_continuation` -> request `page_continuation` 映射，并把 reply/hierarchy/cursor 绑定固定到 `NormalizedCommentItem.canonical_ref`。
-  - 最新处理：已修正 placeholder comment identity 规则，`source_id` 继续作为 `FR-0403` item identity 基线；deleted/invisible/unavailable placeholder 缺少平台稳定 id 时，不得伪造平台原生 id，必须通过 public placeholder namespace 派生稳定 `source_id` 与 `canonical_ref`。
+  - 最新处理：已修正 placeholder comment identity 规则，`source_id` 继续作为 `FR-0403` item identity 基线；deleted/invisible/unavailable placeholder 缺少平台稳定 id 时，不得伪造平台原生 id，必须通过 public placeholder namespace 与独立稳定 placeholder marker 派生稳定 `source_id` 与 `canonical_ref`。
 - `#427` 已创建，当前 head 绑定本事项的 review round。
 
 ## 未决风险
