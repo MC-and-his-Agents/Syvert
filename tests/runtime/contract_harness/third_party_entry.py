@@ -1291,9 +1291,14 @@ def _execute_and_validate_fixture(
     adapter: Any,
 ) -> dict[str, Any]:
     expected_outcome = "success" if fixture.case_type == "success" else "legal_failure"
-    sample = ContractSampleDefinition(sample_id=fixture.fixture_id, expected_outcome=expected_outcome)
     task_id = f"task-{fixture.fixture_id}"
     fixture_input = _normalize_fixture_input(manifest, fixture)
+    sample = ContractSampleDefinition(
+        sample_id=fixture.fixture_id,
+        expected_outcome=expected_outcome,
+        target_type=fixture_input["target_type"],
+        target_value=fixture_input["target_value"],
+    )
     core_operation = fixture_input["operation"]
     adapter_capability = fixture_input["capability"]
     resource_profile = _resource_profile_for_fixture(manifest, fixture, fixture_input["resource_profile_key"])
@@ -1320,6 +1325,8 @@ def _execute_and_validate_fixture(
             adapter_key=manifest.adapter_key,
             capability=core_operation,
             payload=payload,
+            target_type=fixture_input["target_type"],
+            target_value=fixture_input["target_value"],
         )
     except PlatformAdapterError as error:
         details = _normalize_platform_adapter_error_details(error)
@@ -1365,6 +1372,8 @@ def _build_success_runtime_envelope(
     adapter_key: str,
     capability: str,
     payload: Any,
+    target_type: str | None = None,
+    target_value: str | None = None,
 ) -> dict[str, Any]:
     envelope = {
         "task_id": task_id,
@@ -1373,12 +1382,12 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
-        target_type, target_value = _success_payload_target_context(payload)
+        inferred_target_type, inferred_target_value = _success_payload_target_context(payload)
         payload_error = validate_success_payload(
             payload,
             capability=capability,
-            target_type=target_type,
-            target_value=target_value,
+            target_type=target_type or inferred_target_type,
+            target_value=target_value or inferred_target_value,
         )
         if payload_error is not None:
             return {

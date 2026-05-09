@@ -63,6 +63,7 @@
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（380 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（402 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（450 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（449 tests）
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -90,6 +91,12 @@
   - 处理：已让 `comment_collection_request_error_envelope` 同时支持 `TaskRequest` 与 `CoreTaskRequest`，并新增 `CoreTaskRequest` mixed-cursor fail-closed regression。
 - PR `#429` guardian finding：shared contract harness 仍把所有 success payload 当成 `content_detail_by_url`。
   - 处理：已让 harness/validation tool 从 collection target 推导 target context，并对 collection/comment collection success envelope 保留 carrier 字段；新增 comment collection harness success regression，并纳入 `tests.runtime.test_third_party_adapter_contract_entry` 验证。
+- PR `#429` guardian finding：`comment_collection` 资源证明被 `content_detail` 基线静默兜底。
+  - 处理：已撤销 registry 对 `comment_collection` 的 content-detail proof fallback；`#417` 只保留 runtime carrier、payload validation、request cursor fail-closed carrier，不在本 PR 伪造资源证明。后续 full resource/consumer admission 仍由 `#418` 承接。
+- PR `#429` guardian finding：contract harness 使用 payload 自身 target context 会漏掉 collection/comment target drift。
+  - 处理：已让 `ContractSampleDefinition` 携带 expected target context，automation / third-party entry 从 fixture/request 传入 target，validation 使用 expected target 校验 payload；新增 comment target drift regression。
+- PR `#429` guardian finding：comment cursor fail-closed success carrier 不应绕过 durable TaskRecord。
+  - 处理：已让 pre-adapter comment cursor fail-closed carrier 创建 accepted/running/succeeded TaskRecord，并补 `TaskRequest` / `CoreTaskRequest` 回归断言。
 
 ## 未决风险
 

@@ -23,6 +23,8 @@ _ALLOWED_RUNTIME_ERROR_CATEGORIES = frozenset(
 class ContractSampleDefinition:
     sample_id: str
     expected_outcome: SampleExpectation
+    target_type: str | None = None
+    target_value: str | None = None
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,7 @@ def validate_contract_sample(
         )
 
     if sample.expected_outcome == "success":
-        success_violation = _validate_success_envelope(envelope)
+        success_violation = _validate_success_envelope(envelope, sample=sample)
         if success_violation is None:
             return _build_result(
                 sample_id=sample.sample_id,
@@ -275,7 +277,11 @@ def _build_result(
     return result
 
 
-def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+def _validate_success_envelope(
+    envelope: Mapping[str, Any],
+    *,
+    sample: ContractSampleDefinition,
+) -> dict[str, str] | None:
     context_error = _validate_runtime_context_fields(envelope)
     if context_error is not None:
         return context_error
@@ -285,7 +291,9 @@ def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | 
             "message": "sample expected success but observed failed envelope",
         }
     payload = _success_payload_from_runtime_envelope(envelope)
-    target_type, target_value = _success_payload_target_context(payload)
+    inferred_target_type, inferred_target_value = _success_payload_target_context(payload)
+    target_type = sample.target_type or inferred_target_type
+    target_value = sample.target_value or inferred_target_value
     payload_error = validate_success_payload(
         payload,
         capability=str(envelope.get("capability", "")),

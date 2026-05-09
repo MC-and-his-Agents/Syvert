@@ -319,6 +319,76 @@ def comment_collection_request_error_envelope(
     }
 
 
+def finalize_pre_admission_comment_collection_result(
+    request: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    envelope: dict[str, Any],
+    task_record_store: TaskRecordStore | None,
+) -> TaskExecutionResult:
+    target_type = envelope["target"]["target_type"]
+    target_value = envelope["target"]["target_ref"]
+    snapshot_request = CoreTaskRequest(
+        target=InputTarget(
+            adapter_key=adapter_key,
+            capability=capability,
+            target_type=target_type,
+            target_value=target_value,
+        ),
+        policy=CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+        execution_control_policy=request.execution_control_policy if isinstance(request, (TaskRequest, CoreTaskRequest)) else None,
+    )
+    try:
+        record = create_task_record(task_id, build_task_request_snapshot(snapshot_request))
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="accepted",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        record = persisted_record or record
+        record = start_task_record(record)
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="running",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        record = persisted_record or record
+        record = finish_task_record(record, envelope)
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="completion",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        return TaskExecutionResult(envelope, persisted_record or record)
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("invalid_task_record", str(error)),
+            ),
+            None,
+        )
+
+
 @dataclass(frozen=True)
 class ResourceCapabilityMatcherInput:
     task_id: str
@@ -409,7 +479,14 @@ def execute_task_internal(
             contract_error=contract_error,
         )
         if comment_fail_closed is not None:
-            return TaskExecutionResult(comment_fail_closed, None)
+            return finalize_pre_admission_comment_collection_result(
+                request,
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                envelope=comment_fail_closed,
+                task_record_store=store,
+            )
         return TaskExecutionResult(pre_accepted_failure_envelope(task_id, adapter_key, capability, contract_error), None)
     if normalized_request is None:
         return TaskExecutionResult(

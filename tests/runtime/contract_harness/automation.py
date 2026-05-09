@@ -31,6 +31,8 @@ def build_contract_sample_definitions(
         ContractSampleDefinition(
             sample_id=sample.sample_id,
             expected_outcome=_EXPECTED_OUTCOME_BY_VERDICT[sample.expected_verdict],
+            target_type="url",
+            target_value=sample.input.target_url,
         )
         for sample in samples
         if sample.expected_verdict != ExpectedVerdict.EXECUTION_PRECONDITION_NOT_MET
