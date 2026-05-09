@@ -179,7 +179,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-    def test_reply_window_next_continuation_rejects_cross_comment_thread_drift(self) -> None:
+    def test_reply_window_next_continuation_allows_opaque_reply_refs(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-2",
             source_id="reply-2",
@@ -195,12 +195,9 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             continuation_comment_ref="comment:other-root",
         )
 
-        result = validate_comment_collection_result_envelope(payload)
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("parent_comment_ref", result["message"])
-
-    def test_reply_hierarchy_rejects_cross_thread_target_linkage(self) -> None:
+    def test_reply_hierarchy_allows_opaque_independent_target_linkage(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -214,10 +211,9 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("target_comment_ref", result["message"])
+        self.assertIsNone(result)
 
-    def test_reply_hierarchy_rejects_cross_thread_parent_linkage(self) -> None:
+    def test_reply_hierarchy_allows_opaque_parent_linkage(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-parent-drift",
             source_id="reply-parent-drift",
@@ -230,8 +226,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("parent_comment_ref", result["message"])
+        self.assertIsNone(result)
 
     def test_nested_reply_window_binds_continuation_to_parent_comment(self) -> None:
         reply = make_comment_item(

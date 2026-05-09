@@ -91,7 +91,7 @@
 ## Review finding 处理记录
 
 - PR `#429` guardian finding：`comment_collection` 已声明 stable runtime slice，但 runtime success path 仍按 content-detail payload 校验。
-  - 处理：已将 `comment_collection` 接入 runtime capability map、`content` target、success payload validator、success envelope serializer、resource requirement admission、TaskRecord terminal envelope validation，并新增 focused runtime tests。
+  - 处理：已将 `comment_collection` 接入 runtime capability map、`content` target、success payload validator、success envelope serializer 与 TaskRecord terminal envelope validation，并新增 focused runtime tests；资源准入不在 #417 提升为 mandatory slot。
 - PR `#429` guardian finding：reply-window `next_continuation.resume_comment_ref` 不应要求 root comment 出现在当前 reply page items。
   - 处理：已移除该错误约束，保留 target 绑定校验，并新增“后续 reply page 仅返回 replies，但 continuation 绑定原 root comment”的 focused test。
 - PR `#429` guardian finding：reply-window `next_continuation.resume_comment_ref` 仍必须防止漂移到另一 comment thread。
@@ -113,7 +113,7 @@
 - PR `#429` guardian finding：comment cursor fail-closed success carrier 不应绕过 durable TaskRecord。
   - 处理：已让 pre-adapter comment cursor fail-closed carrier 创建 accepted/running/succeeded TaskRecord，并补 `TaskRequest` / `CoreTaskRequest` 回归断言。
 - PR `#429` guardian finding：`comment_collection` 有效请求无法通过资源准入。
-  - 处理：经后续 guardian 复核，#417 不应提前提升 shared resource profile；已撤回 `comment_collection` approved resource evidence/profile，runtime carrier focused test 改为无资源声明 fake adapter，完整 admission/resource proof 留给后续 evidence/consumer 批次。
+  - 处理：经后续 guardian 复核，#417 不应提前提升 shared resource profile，也不应强制 account/proxy slots；已撤回 `comment_collection` approved resource evidence/profile 和 mandatory resource slot，runtime carrier fake adapter 可以执行，完整 resource proof 留给后续 evidence/consumer 批次。
 - PR `#429` guardian finding：reply hierarchy 没有约束 root/parent/target linkage。
   - 处理：已收紧 reply item hierarchy validation，拒绝 self-root/self-parent 与跨 thread target linkage，并补 malformed hierarchy regression。
 - PR `#429` guardian finding：malformed request cursor 仍漏出通用 failed envelope。
@@ -141,13 +141,15 @@
 - PR `#429` guardian finding：`target_comment_ref` 被强制限制为 root 或 parent。
   - 处理：已放宽 `target_comment_ref`，允许 root / parent / target 三者独立表达，并新增 carrier regression。
 - PR `#429` guardian finding：reply hierarchy 放过跨线程或不自洽 linkage。
-  - 处理：已增加 fail-closed lineage 校验，要求独立 parent / target ref 可从 root ref 的公共 lineage 前缀证明同线程；无法证明时拒绝，并补 cross-thread parent / target regressions。
+  - 处理：后续复核确认 Core 不应解析 opaque ref 编码；已撤回前缀式 lineage 推断，保留 self-root/self-parent/top-level-target 等不依赖编码的结构约束。
 - PR `#429` guardian finding：malformed `CommentRequestCursor` dataclass 绕过字段级 fail-closed validation。
   - 处理：已让 dataclass cursor 先转回 carrier dict 并复用 mapping 解析器，覆盖空 token、空 ref 与非法 `issued_at`；补 request validator 与 runtime fail-closed carrier regressions。
 - PR `#429` guardian finding：malformed dataclass cursor 的错误嵌套类型会抛异常而不是 fail-closed，且 comment carrier 接受 `complete + partial_result`。
   - 处理：已将 dataclass cursor 序列化异常收敛为 `parse_failed`，并禁止 emitted `error_classification=partial_result`；partial page 固定使用 `result_status=partial_result + error_classification=parse_failed`。
 - PR `#429` guardian finding：reply-window 校验误拒同一 thread 的后代 reply，placeholder identity 只做单向校验。
-  - 处理：已将 reply-window binding 放宽为 resumed comment subtree lineage，runtime 与 carrier 保持一致；placeholder `source_id` / `canonical_ref` 双向要求 public placeholder namespace，并补回归。
+  - 处理：已撤回 direct-parent / prefix lineage 推断，reply-window 只拒绝 top-level items 混入 thread-scoped continuation；placeholder `source_id` / `canonical_ref` 双向要求 public placeholder namespace，并补回归。
+- PR `#429` guardian finding：Core 仍把 opaque `canonical_ref` 当成 thread 编码，且 `comment_collection` stable runtime delivery 无法执行。
+  - 处理：已撤回剩余前缀式 parent/target/thread 推断，不再要求 Core 解析 opaque comment refs；同时撤回 mandatory account/proxy slot，让 #417 runtime carrier fake adapter 在无资源声明下可执行，resource proof 留给后续批次。
 
 ## 未决风险
 

@@ -71,7 +71,6 @@ RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_SEARCH_BY_KEYWORD, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_LIST_BY_CREATOR, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
-    (COMMENT_COLLECTION, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
 }
 DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
 DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
@@ -622,42 +621,48 @@ def execute_task_internal(
             None,
         )
 
-    resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
-    if resource_requirement_declaration is None:
-        return TaskExecutionResult(
-            pre_accepted_failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                invalid_resource_requirement_error(
-                    f"adapter `{adapter_key}` 缺少 `{capability_family}` 的资源需求声明",
-                    details={"adapter_key": adapter_key, "capability": capability_family},
+    required_resource_slots = RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE.get(
+        (normalized_request.target.capability, normalized_request.policy.collection_mode),
+        (),
+    )
+    matcher_input: ResourceCapabilityMatcherInput | None = None
+    if required_resource_slots:
+        resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
+        if resource_requirement_declaration is None:
+            return TaskExecutionResult(
+                pre_accepted_failure_envelope(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    invalid_resource_requirement_error(
+                        f"adapter `{adapter_key}` 缺少 `{capability_family}` 的资源需求声明",
+                        details={"adapter_key": adapter_key, "capability": capability_family},
+                    ),
                 ),
-            ),
-            None,
-        )
-
-    try:
-        available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
-        matcher_input = validate_resource_capability_matcher_input(
-            ResourceCapabilityMatcherInput(
-                task_id=task_id,
-                adapter_key=adapter_key,
-                capability=capability_family,
-                requirement_declaration=resource_requirement_declaration,
-                available_resource_capabilities=available_resource_capabilities,
+                None,
             )
-        )
-    except ResourceCapabilityMatcherContractError as error:
-        return TaskExecutionResult(
-            pre_accepted_failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                invalid_resource_requirement_error(error.message, details=error.details),
-            ),
-            None,
-        )
+
+        try:
+            available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
+            matcher_input = validate_resource_capability_matcher_input(
+                ResourceCapabilityMatcherInput(
+                    task_id=task_id,
+                    adapter_key=adapter_key,
+                    capability=capability_family,
+                    requirement_declaration=resource_requirement_declaration,
+                    available_resource_capabilities=available_resource_capabilities,
+                )
+            )
+        except ResourceCapabilityMatcherContractError as error:
+            return TaskExecutionResult(
+                pre_accepted_failure_envelope(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    invalid_resource_requirement_error(error.message, details=error.details),
+                ),
+                None,
+            )
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
     if projection_error is not None:
@@ -823,8 +828,8 @@ def execute_task_internal(
     if persisted_record is not None:
         record = persisted_record
 
-    match_result = match_resource_capabilities(matcher_input)
-    if match_result.match_status == MATCH_STATUS_UNMATCHED:
+    match_result = match_resource_capabilities(matcher_input) if matcher_input is not None else None
+    if match_result is not None and match_result.match_status == MATCH_STATUS_UNMATCHED:
         release_failure = release_admission_guard_or_failure("resource_capability_match")
         if release_failure is not None:
             return finalize_task_execution_result(
@@ -3244,8 +3249,6 @@ def validate_success_payload(
                 item.normalized.canonical_ref
                 for item in envelope.items
                 if item.normalized.parent_comment_ref is None
-                or not item.normalized.parent_comment_ref.startswith(f"{cursor_thread_ref}:")
-                and item.normalized.parent_comment_ref != cursor_thread_ref
             )
             if drifted_items:
                 return runtime_contract_error(
