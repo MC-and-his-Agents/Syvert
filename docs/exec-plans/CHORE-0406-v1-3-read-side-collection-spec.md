@@ -10,7 +10,7 @@
 - Parent Phase：`#381`
 - Parent FR：`#403`
 - 关联 spec：`docs/specs/FR-0403-read-side-collection-result-cursor-contract/spec.md`
-- 关联 decision：无
+- 关联 decision：
 - 关联 PR：待创建
 - 状态：`active`
 
