@@ -8,13 +8,10 @@
   - `target_type`
   - `target_ref`
   - `target_display_hint`（可选）
-  - `root_comment_ref`（可选）
-  - `target_comment_ref`（可选）
   - `policy_ref`（可选）
 - 约束：
   - `comment_list_by_content` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
-  - `root_comment_ref` 仅在请求限定某个 comment thread 时出现。
-  - `target_comment_ref` 仅在请求聚焦某个目标评论或回复窗口时出现。
+  - thread-scoped reply loading 必须通过 item-level `reply_cursor` 继续，不得扩展出新的 target admission surface。
 
 ## CommentPageContinuation
 
@@ -152,6 +149,7 @@
 - 约束：
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
+  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`；`partial_result` 不是独立 emitted error classification。
 
 ## 生命周期
 
@@ -163,7 +161,7 @@
 - 更新：
   - 新页面结果使用新的 `next_continuation`；不得原地篡改历史 continuation 以伪造跨页稳定性。
   - 新 reply window 使用新的 `reply_cursor`；不得把某个 comment 的 reply cursor 迁移到另一 comment。
-  - `partial_result` 允许追加 item-level parse-failure evidence，但不得改写成功 normalized comments 的公共字段。
+  - `partial_result` 允许追加 item-level parse-failure evidence，但固定搭配 `error_classification=parse_failed`，且不得改写成功 normalized comments 的公共字段。
 - 失效/归档：
   - invalid/expired continuation 或 reply cursor 只能导向 `cursor_invalid_or_expired`，不应被当作普通 platform failure。
   - raw payload refs 的持久化/归档策略不在本 FR 范围内。

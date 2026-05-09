@@ -15,6 +15,7 @@
 - Core 必须区分 `empty_result`、`target_not_found`、`cursor_invalid_or_expired`、`rate_limited`、`permission_denied`、`platform_failed`、`parse_failed` 与 `partial_result`。
 - Core 必须把 `credential_invalid` 与 `verification_required` 视为 fail-closed comment boundary，并与 `v1.2.0` resource governance 保持一致。
 - Core 必须把 `deleted`、`invisible`、`unavailable` 视为 item-level visibility，而不是 collection-level error 替代物。
+- 对 partial page，Core 固定消费 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 不是单独 emitted error classification。
 
 ## Adapter consumer rules
 
@@ -32,7 +33,7 @@
 
 ## Consumer rules
 
-- `TaskRecord` 后续只能记录 comment target、page continuation、reply cursor、result status、error classification、visibility status、dedup key 与 source trace，不得记录平台私有 cursor fields。
+- `TaskRecord` 后续只能记录 content-scoped comment target、page continuation、reply cursor、result status、error classification、visibility status、dedup key 与 source trace，不得记录平台私有 cursor fields。
 - result query consumer 后续只能消费公共 comment item envelope 与 normalized comment item，不得依赖 raw payload shape 才能完成 comment workflow。
 - compatibility decision 与 future consumer migration 必须把本 contract 视为 `FR-0403` collection foundation 之上的 comment-specialized surface，而不是平台字段透传协议。
 
