@@ -51,11 +51,9 @@
 
 ## 下一步动作
 
-- 完成 Batch 0 comment fixture/error inventory。
-- 完成 `FR-0404` formal spec、data model、contract README 与 risks。
-- 创建 `v1.4.0` release planning index，并把 sprint truth 从 `#403` published slice 切换到 `#404` active slice。
-- 运行 spec/docs/workflow/version/governance 门禁。
-- 继续收敛 guardian finding，并在 checks / merge gate 对齐后合并 `#427`。
+- 收敛剩余 guardian finding，并重新运行 checks / guardian。
+- 通过 merge gate 后合并 `#427`。
+- 合并后从主干进入 `#417` runtime carrier；不得在本 PR 中提前实施 runtime、consumer 或 evidence。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -88,6 +86,7 @@
 - PR guardian refresh review
   - 结果：曾阻塞于 operation 命名、request continuation 字段映射与 comment ref 绑定歧义。
   - 处理：已统一 public operation 为 canonical `comment_collection`，冻结 result `next_continuation` -> request `page_continuation` 映射，并把 reply/hierarchy/cursor 绑定固定到 `NormalizedCommentItem.canonical_ref`。
+  - 最新处理：已修正 placeholder comment identity 规则，`source_id` 只表示可证明的平台稳定 id；deleted/invisible/unavailable placeholder 不得伪造 `source_id`，必须通过可复验派生 `canonical_ref` 保留公共身份。
 - `#427` 已创建，当前 head 绑定本事项的 review round。
 
 ## 未决风险
