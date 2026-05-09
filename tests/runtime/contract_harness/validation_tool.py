@@ -284,7 +284,14 @@ def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | 
             "code": "unexpected_failed_envelope",
             "message": "sample expected success but observed failed envelope",
         }
-    payload_error = validate_success_payload(envelope)
+    normalized = envelope.get("normalized")
+    target_value = normalized.get("canonical_url", "") if isinstance(normalized, Mapping) else ""
+    payload_error = validate_success_payload(
+        envelope,
+        capability=str(envelope.get("capability", "")),
+        target_type="url",
+        target_value=str(target_value),
+    )
     if payload_error is not None:
         return {
             "code": payload_error["code"],

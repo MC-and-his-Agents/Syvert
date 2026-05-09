@@ -1373,7 +1373,14 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
-        payload_error = validate_success_payload(payload)
+        normalized = payload.get("normalized")
+        target_value = normalized.get("canonical_url", "") if isinstance(normalized, Mapping) else ""
+        payload_error = validate_success_payload(
+            payload,
+            capability=capability,
+            target_type="url",
+            target_value=str(target_value),
+        )
         if payload_error is not None:
             return {
                 **envelope,
