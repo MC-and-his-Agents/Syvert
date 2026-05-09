@@ -3245,6 +3245,15 @@ def validate_success_payload(
                     },
                 )
         if cursor_thread_ref is not None:
+            if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection next_continuation 必须保留请求 cursor 的 comment thread",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": cursor_thread_ref,
+                    },
+                )
             drifted_items = tuple(
                 item.normalized.canonical_ref
                 for item in envelope.items

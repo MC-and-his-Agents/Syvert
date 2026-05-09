@@ -1842,6 +1842,18 @@ def _validate_success_payload_observation(
     result: dict[str, Any],
 ) -> dict[str, Any]:
     expected_target_value = fixture.input["target_value"]
+    target_payload = runtime_envelope.get("target")
+    if isinstance(target_payload, Mapping):
+        if target_payload.get("target_ref") != expected_target_value:
+            return {
+                **result,
+                "verdict": "contract_violation",
+                "reason": {
+                    "code": "success_payload_target_mismatch",
+                    "message": "success payload target.target_ref must bind to fixture target_value",
+                },
+            }
+        return result
     raw_payload = runtime_envelope.get("raw")
     normalized_payload = runtime_envelope.get("normalized")
     raw_canonical_url = raw_payload.get("canonical_url") if isinstance(raw_payload, Mapping) else None

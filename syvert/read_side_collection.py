@@ -1134,6 +1134,13 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "resume_target_ref": envelope.next_continuation.resume_target_ref,
             },
         )
+    if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is None:
+        if envelope.items and all(item.normalized.parent_comment_ref is not None for item in envelope.items):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "pure reply page next_continuation 必须保留 resume_comment_ref",
+                details={"field": "next_continuation.resume_comment_ref"},
+            )
     if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
         if any(item.normalized.parent_comment_ref is None for item in envelope.items):
             return _contract_error(
