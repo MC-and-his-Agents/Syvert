@@ -40,7 +40,13 @@
 ## 验证
 
 - `python3 -m unittest tests.governance.test_version_guard`
+  - 结果：通过，`Ran 20 tests`
 - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过，`version-guard 通过。`
+- `python3 .loom/bin/loom_flow.py shadow-parity --target . --blocking`
+  - 结果：通过，所有 declared surfaces `match`
+- `python3 scripts/governance_gate.py --mode ci --base-sha f6c101e2befe38dffb6194b8b715e40c759b0c16 --head-sha HEAD --head-ref issue-401-decouple-roadmap-phase-from-release-minor`
+  - 结果：通过，`governance-gate 通过。`
 
 ## 最近一次 checkpoint 对应的 head SHA
 
