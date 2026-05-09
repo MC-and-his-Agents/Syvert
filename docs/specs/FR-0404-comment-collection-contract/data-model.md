@@ -149,10 +149,10 @@
   - 只能记录脱敏 alias，不得记录外部项目名或本地路径。
   - 必须足以追溯到本次 comment result 所属的 raw payload family。
 
-## CommentErrorClassification
+## CommentErrorClassificationVocabulary
 
-- 用途：表达 comment collection-level 公共错误分类。
-- 最小分类：
+- 用途：表达 comment collection-level 继承错误词表。
+- 继承分类：
   - `empty_result`
   - `target_not_found`
   - `rate_limited`
@@ -168,7 +168,8 @@
 - 约束：
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
-  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`；`partial_result` 继续保留为继承词表的兼容 entry，但不是本 FR 新增的 emitted error classification。
+  - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
+  - `partial_result` 继续保留为继承词表的兼容 entry，保证与 `FR-0403` vocabulary 对齐。
 
 ## 生命周期
 

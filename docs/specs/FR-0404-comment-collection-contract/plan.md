@@ -19,7 +19,8 @@
 - 阶段 1：`#416` 冻结 Batch 0 comment fixture/error inventory，形成 reviewable hierarchy/visibility/cursor matrix 与公共错误分类。
 - 阶段 2：`#416` 冻结 `FR-0404` formal spec、data model、contract README 与 risks。
 - 阶段 3：`#417` 实现 comment runtime carrier。
-- 阶段 4：`#418` 迁移 TaskRecord / result query / compatibility decision 等 consumers。
+- 阶段 3A：`#417` 同步把 `FR-0368` 中的 `comment_collection/comment_collection` proposed candidate 升级为 `FR-0404` 的 executable runtime slice，更新 operation taxonomy 与 runtime-delivery truth。
+- 阶段 4：`#418` 迁移 TaskRecord / result query / compatibility decision 等 consumers，并把 requirement/offer/compatibility baseline 从 proposed candidate 对齐到 `comment_list_by_content` executable slice。
 - 阶段 5：`#419` 补齐 fake/reference evidence。
 - 阶段 6：`#420` 完成 `v1.4.0` release closeout 与 published truth carrier。
 
@@ -30,6 +31,7 @@
 - 不允许在 repository 或 GitHub truth 中出现外部项目名或本地路径。
 - 不允许把 `v1.4.0` 写成整个 Phase 3 的 release 绑定。
 - 不允许修改 `content_detail_by_url` baseline 或 `FR-0403` public behavior。
+- 不允许把 taxonomy proposed-candidate -> executable-slice 的升级留到实现 PR 自由解释；该升级路径必须由 `#417/#418` 明确承接。
 
 ## 测试与验证策略
 
