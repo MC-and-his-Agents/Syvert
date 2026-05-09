@@ -24,10 +24,12 @@ from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.operation_taxonomy import stable_operation_entry
 from syvert.read_side_collection import (
     COMMENT_COLLECTION_OPERATION,
+    CommentRequestCursor,
     CollectionContractError,
     READ_SIDE_COLLECTION_OPERATIONS,
     comment_collection_result_envelope_from_dict,
     comment_collection_result_envelope_to_dict,
+    comment_request_cursor_to_dict,
     collection_result_envelope_from_dict,
     collection_result_envelope_to_dict,
     validate_comment_request_cursor,
@@ -2607,6 +2609,8 @@ def project_to_adapter_request(
 def clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
     if request_cursor is None:
         return None
+    if isinstance(request_cursor, CommentRequestCursor):
+        return comment_request_cursor_to_dict(request_cursor)
     return copy.deepcopy(request_cursor)
 
 
@@ -3266,7 +3270,7 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "comment collection next_continuation 必须保留请求 cursor 的 comment thread",
                     details={
-                        "reason": "cursor_invalid_or_expired",
+                        "reason": "invalid_comment_collection_contract",
                         "resume_comment_ref": cursor_thread_ref,
                     },
                 )

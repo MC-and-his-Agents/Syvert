@@ -1133,6 +1133,37 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(adapter.last_request.input.comment_request_cursor, cursor)
 
+    def test_execute_task_normalizes_dataclass_cursor_before_adapter_context(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor=CommentRequestCursor(
+                    reply_cursor=CommentReplyCursor(
+                        reply_cursor_token="reply-cursor-1",
+                        reply_cursor_family="opaque",
+                        resume_target_ref="content-001",
+                        resume_comment_ref="comment:root-1",
+                        issued_at="2026-05-09T10:00:00Z",
+                    ),
+                ),
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-dataclass-cursor-normalized",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(
+            adapter.last_request.input.comment_request_cursor,
+            {"page_continuation": None, "reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+        )
+
     def test_execute_task_rejects_reply_drift_after_adapter_mutates_visible_cursor(self) -> None:
         adapter = MutatingCommentCursorAdapter()
         request = TaskRequest(

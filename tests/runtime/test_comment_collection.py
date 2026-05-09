@@ -200,7 +200,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("reply thread", result["message"])
 
-    def test_pure_reply_page_next_continuation_requires_resume_comment_ref(self) -> None:
+    def test_reply_only_top_level_page_allows_top_level_next_continuation(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-missing-thread",
             source_id="reply-missing-thread",
@@ -215,10 +215,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             continuation_comment_ref=None,
         )
 
-        result = validate_comment_collection_result_envelope(payload)
-
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("resume_comment_ref", result["message"])
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
     def test_reply_hierarchy_allows_independent_target_linkage_for_direct_reply(self) -> None:
         reply = make_comment_item(
