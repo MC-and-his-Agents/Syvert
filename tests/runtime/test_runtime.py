@@ -925,6 +925,21 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
+    def test_validate_success_payload_rejects_target_ref_as_thread_proof(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        payload["items"][0]["normalized"]["target_comment_ref"] = "comment:other-thread"
+
+        result = validate_success_payload(
+            payload,
+            capability="comment_collection",
+            target_type="content",
+            target_value="content-001",
+            request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:other-thread")},
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["reason"], "invalid_comment_collection_contract")
+
     def test_validate_success_payload_rejects_top_level_cursor_reply_window_drift(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         payload["next_continuation"] = {

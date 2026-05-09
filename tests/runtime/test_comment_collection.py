@@ -220,7 +220,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("resume_comment_ref", result["message"])
 
-    def test_reply_hierarchy_allows_independent_target_linkage_for_direct_reply(self) -> None:
+    def test_reply_hierarchy_rejects_independent_target_linkage_for_direct_reply(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -234,7 +234,8 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertIsNone(result)
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("target_comment_ref", result["message"])
 
     def test_reply_hierarchy_rejects_opaque_parent_linkage_without_root_target(self) -> None:
         reply = make_comment_item(

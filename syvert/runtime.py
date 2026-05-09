@@ -3428,7 +3428,6 @@ def _comment_item_binds_resume_comment_ref(item: Any, resume_comment_ref: str) -
     return (
         normalized.root_comment_ref == resume_comment_ref
         or normalized.parent_comment_ref == resume_comment_ref
-        or normalized.target_comment_ref == resume_comment_ref
     )
 
 
