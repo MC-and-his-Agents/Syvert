@@ -12,7 +12,7 @@
 
 - Core 拥有 public operation、comment target、page continuation、reply cursor、result envelope、visibility status、dedup key、source trace 与 collection-level 错误分类。
 - Core 只能消费 normalized comment item、continuation token、reply cursor token 与公共错误分类，不得消费平台私有 comment page object、reply object、moderation object 或 thread-session object。
-- Core 必须区分 `empty_result`、`target_not_found`、`cursor_invalid_or_expired`、`rate_limited`、`permission_denied`、`platform_failed`、`parse_failed` 与 `partial_result`。
+- Core 必须区分 `empty_result`、`target_not_found`、`cursor_invalid_or_expired`、`rate_limited`、`permission_denied`、`platform_failed`、`parse_failed` 与 `result_status=partial_result`。
 - Core 必须把 `credential_invalid` 与 `verification_required` 视为 fail-closed comment boundary，并与 `v1.2.0` resource governance 保持一致。
 - Core 必须把 `deleted`、`invisible`、`unavailable` 视为 item-level visibility，而不是 collection-level error 替代物。
 - 对 partial page，Core 固定消费 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 不是单独 emitted error classification。

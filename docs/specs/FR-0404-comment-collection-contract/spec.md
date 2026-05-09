@@ -43,7 +43,8 @@
   - `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
-  - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
+  - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
+  - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 不是独立 emitted error classification。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
   - `reply_cursor` 只能恢复同一 comment item 的 replies；跨 comment 复用必须视为 invalid/expired。
@@ -95,7 +96,7 @@ Then result 返回 `items=[]`、`result_status=empty`、`error_classification=em
 
 Given `comment_list_by_content` 使用的 content target 在平台上不存在或已不可解析
 When Core 执行 comment collection request
-Then result 必须返回 `error_classification=target_not_found`，且不得被降级成 `empty_result`
+Then result 必须返回 `result_status=complete` 与 `error_classification=target_not_found`，且不得被降级成 `empty_result`
 
 ### 场景 6：deleted/invisible comment 作为 item-level visibility 保留
 
@@ -119,43 +120,43 @@ Then public item 必须保留 `root_comment_ref`、`parent_comment_ref` 与 `tar
 
 Given 一页 raw response 中部分 comment 可投影，部分 comment 因 shape drift 解析失败
 When Core 处理该页 comment result
-Then result 返回 `result_status=partial_result`，保留成功 normalized comments，并将失败归类为 `parse_failed`
+Then result 返回 `result_status=partial_result` 与 `error_classification=parse_failed`，保留成功 normalized comments
 
 ### 场景 9：continuation 或 reply cursor 失效有独立错误边界
 
 Given next-page continuation token 或 reply cursor 已失效
 When Adapter 还原 continuation 并请求后续页面
-Then result 必须归类为 `cursor_invalid_or_expired`，而不是 generic `platform_failed`
+Then result 必须返回 `result_status=complete` 与 `error_classification=cursor_invalid_or_expired`，而不是 generic `platform_failed`
 
 ### 场景 10：permission denied 保持独立 collection-level 错误
 
 Given content target 存在，但当前 viewer 或 account 不具备评论访问权限
 When Core 执行 comment collection request
-Then result 必须返回 `error_classification=permission_denied`，且不得伪装成 `empty_result`
+Then result 必须返回 `result_status=complete` 与 `error_classification=permission_denied`，且不得伪装成 `empty_result`
 
 ### 场景 11：rate limited 保持独立 collection-level 错误
 
 Given 平台在加载评论时触发访问频率或 anti-abuse 限流
 When Core 执行 comment collection request
-Then result 必须返回 `error_classification=rate_limited`，且不得与 `platform_failed` 混淆
+Then result 必须返回 `result_status=complete` 与 `error_classification=rate_limited`，且不得与 `platform_failed` 混淆
 
 ### 场景 12：platform/provider failure 保持独立 collection-level 错误
 
 Given 平台上游失败或 provider/network path 被阻断，且不存在更强分类
 When Core 执行 comment collection request
-Then result 必须分别归类为 `platform_failed` 或 `provider_or_network_blocked`
+Then result 必须固定使用 `result_status=complete`，并分别归类为 `platform_failed` 或 `provider_or_network_blocked`
 
 ### 场景 13：整页 parse failure 不得伪装成 partial_result
 
 Given comment response 缺少 comment identity、items family 或 continuation family，导致整页无法建立最小 public projection
 When Core 处理该页 comment result
-Then result 必须 fail-closed 到 `parse_failed`，而不是伪造 `partial_result` 或 `complete`
+Then result 必须 fail-closed 到 `result_status=complete` 与 `error_classification=parse_failed`，而不是伪造 `partial_result`
 
 ### 场景 14：resource health 与 verification 保持 fail-closed
 
 Given comment request 依赖的 account session 已 invalid，或平台要求验证码/安全验证
 When Core 处理 admission 或 Adapter 返回 verification-required signal
-Then result 必须分别归类为 `credential_invalid` 或 `verification_required`，并保持 fail-closed，不得继续返回伪正常 comment items
+Then result 必须分别返回 `result_status=complete` 与 `error_classification=credential_invalid` 或 `verification_required`，并保持 fail-closed，不得继续返回伪正常 comment items
 
 ## 异常与边界场景
 
@@ -175,7 +176,7 @@ Then result 必须分别归类为 `credential_invalid` 或 `verification_require
 - [ ] formal spec 冻结 `comment_list_by_content` 的 comment collection contract。
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
-- [ ] formal spec 明确 `empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 的公共边界。
+- [ ] formal spec 明确 `empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 的公共边界，以及 `partial_result` 的 result-status 语义。
 - [ ] formal spec 明确 synthetic fixture 只能从 recorded raw shape 派生，且所有 evidence source 只能使用脱敏 alias。
 - [ ] formal spec 明确 Adapter 负责平台 comment hierarchy/cursor/visibility projection，Core 不得接收平台私有对象。
 - [ ] formal spec 明确 `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不受本 FR 改写。

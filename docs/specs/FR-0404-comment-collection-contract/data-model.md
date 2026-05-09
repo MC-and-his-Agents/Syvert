@@ -142,7 +142,6 @@
   - `provider_or_network_blocked`
   - `cursor_invalid_or_expired`
   - `parse_failed`
-  - `partial_result`
   - `credential_invalid`
   - `verification_required`
   - `signature_or_request_invalid`

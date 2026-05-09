@@ -93,7 +93,6 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `provider_or_network_blocked` | blocked response / IP/network block signal | preserve provider/network boundary |
 | `cursor_invalid_or_expired` | invalid next-page continuation or reply cursor | continuation-specific failure |
 | `parse_failed` | raw payload present, comment projection unavailable | item or page projection failure |
-| `partial_result` | mixed projection success and failure | preserve usable normalized output |
 | `credential_invalid` | resource-governance failure from session/credential health | align with `v1.2.0` health contract |
 | `verification_required` | captcha / security challenge | fail-closed comment access |
 | `signature_or_request_invalid` | malformed signed request or request-contract failure | adapter/provider execution boundary |
