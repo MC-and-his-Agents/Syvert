@@ -1247,16 +1247,6 @@ def _validate_comment_item_contract(
                 "nested reply comment 必须保留独立 target_comment_ref 以证明 linkage 未塌缩",
                 details={"field": f"{field}.normalized.parent_comment_ref"},
             )
-        if (
-            item.normalized.parent_comment_ref == item.normalized.root_comment_ref
-            and item.normalized.target_comment_ref is not None
-            and item.normalized.target_comment_ref != item.normalized.root_comment_ref
-        ):
-            return _contract_error(
-                "invalid_comment_collection_contract",
-                "direct reply comment 的 target_comment_ref 不得漂移到 root thread 外",
-                details={"field": f"{field}.normalized.target_comment_ref"},
-            )
     if item.normalized.parent_comment_ref is None and item.normalized.target_comment_ref is not None:
         return _contract_error(
             "invalid_comment_collection_contract",
@@ -1284,10 +1274,6 @@ def _comment_item_binds_comment_ref(item: CommentItemEnvelope, comment_ref: str)
     return (
         normalized.root_comment_ref == comment_ref
         or normalized.parent_comment_ref == comment_ref
-        or (
-            normalized.parent_comment_ref != normalized.root_comment_ref
-            and normalized.target_comment_ref == comment_ref
-        )
     )
 
 

@@ -220,7 +220,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("resume_comment_ref", result["message"])
 
-    def test_reply_hierarchy_rejects_independent_target_linkage_for_direct_reply(self) -> None:
+    def test_reply_hierarchy_allows_independent_target_linkage_for_direct_reply(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -234,8 +234,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("target_comment_ref", result["message"])
+        self.assertIsNone(result)
 
     def test_reply_hierarchy_rejects_opaque_parent_linkage_without_root_target(self) -> None:
         reply = make_comment_item(
@@ -308,7 +307,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-    def test_reply_window_allows_descendant_reply_within_non_root_resumed_thread(self) -> None:
+    def test_reply_window_rejects_descendant_reply_when_only_target_matches_non_root_resume(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-non-root-descendant",
             source_id="reply-non-root-descendant",
@@ -325,7 +324,10 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             continuation_comment_ref="comment:parent-1",
         )
 
-        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("reply thread", result["message"])
 
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(
