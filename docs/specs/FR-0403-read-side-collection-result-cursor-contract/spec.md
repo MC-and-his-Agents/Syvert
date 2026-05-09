@@ -80,7 +80,7 @@ Then Adapter 负责还原平台 continuation，Core 仍只接收平台中立 con
 
 Given `content_search_by_keyword` 命中合法但无结果的 target
 When Core 执行 collection request
-Then result 返回 `items=[]`、`result_status=empty`，且不得被分类为 `target_not_found` 或 `platform_failed`
+Then result 返回 `items=[]`、`result_status=empty`、`error_classification=empty_result`，且不得被分类为 `target_not_found` 或 `platform_failed`
 
 ### 场景 3B：目标不存在必须独立分类
 

@@ -42,8 +42,9 @@
   - `audit`
 - 约束：
   - `result_status` 至少支持 `complete`、`empty`、`partial_result`。
-  - `error_classification` 用于表达 collection-level failure/admission classification；成功且无错误时允许为空。
-  - `empty` 不等于 `target_not_found`。
+  - `error_classification` 用于表达 collection-level outcome or failure classification。
+  - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`；不得用空值表达该边界。
+  - `empty_result` 不等于 `target_not_found`。
   - `has_more=false` 时允许 `next_continuation` 为空。
   - `raw_payload_ref` 只能引用原始载荷，不承载 raw payload 内联内容。
 

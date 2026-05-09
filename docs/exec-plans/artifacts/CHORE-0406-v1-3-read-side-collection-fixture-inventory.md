@@ -65,6 +65,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `rate_limited` | access-frequency / anti-abuse signal | distinguish platform throttling from generic failure |
 | `permission_denied` | forbidden / private / unauthorized collection | stable access boundary |
 | `target_not_found` | empty target or unavailable target signal | distinguish missing target from empty search result |
+| `empty_result` | valid target with zero returned items | distinguish legal zero-item result from missing target |
 | `platform_failed` | upstream platform failure without stronger category | generic provider/platform failure |
 | `provider_or_network_blocked` | blocked response / IP/network block signal | preserve provider/network boundary |
 | `cursor_invalid_or_expired` | invalid continuation token or expired search-session-like signal | continuation-specific failure |
@@ -84,6 +85,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 2. Normalize recorded metadata into the sanitized matrix only; do not commit raw payload files in this batch.
 3. Derive synthetic scenarios from recorded response family:
    - empty result
+   - target not found
    - duplicate item across pages
    - continuation invalid/expired
    - permission denied
@@ -92,6 +94,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
    - parse-failed item
    - partial-result page
    - credential-invalid
+   - signature/request-invalid
    - verification-required
 4. Keep source alias to private working context mapping off-repo and out of GitHub truth.
 
