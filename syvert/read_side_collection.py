@@ -884,9 +884,11 @@ def validate_comment_request_cursor(
     target_ref: str,
 ) -> dict[str, Any] | None:
     try:
-        cursor = comment_request_cursor_from_dict(
-            comment_request_cursor_to_dict(payload) if isinstance(payload, CommentRequestCursor) else payload
-        )
+        try:
+            raw_payload = comment_request_cursor_to_dict(payload) if isinstance(payload, CommentRequestCursor) else payload
+        except (AttributeError, TypeError, ValueError) as error:
+            return {"code": "parse_failed", "message": str(error), "details": {"field": "comment_request_cursor"}}
+        cursor = comment_request_cursor_from_dict(raw_payload)
         target_ref = _ensure_non_empty_string(target_ref, "target_ref")
         if cursor.page_continuation is not None and cursor.reply_cursor is not None:
             return _contract_error(
@@ -1084,24 +1086,11 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "partial_result 必须与 parse_failed 配对并保留至少一个 comment item",
                 details={"field": "result_status"},
             )
-    if (
-        envelope.result_status not in {"partial_result", "complete"}
-        and envelope.error_classification == "partial_result"
-    ):
+    if envelope.error_classification == "partial_result":
         return _contract_error(
             "invalid_comment_collection_contract",
-            "partial_result error classification 仅可作为继承兼容 entry 用于 non-failure page",
+            "partial_result 仅保留为继承兼容词表 entry，不作为 emitted error_classification",
             details={"field": "error_classification"},
-        )
-    if (
-        envelope.result_status == "complete"
-        and envelope.error_classification == "partial_result"
-        and not envelope.items
-    ):
-        return _contract_error(
-            "invalid_comment_collection_contract",
-            "complete + partial_result compatibility entry 必须保留 comment items",
-            details={"field": "items"},
         )
     if envelope.error_classification == "parse_failed":
         if envelope.result_status == "partial_result":

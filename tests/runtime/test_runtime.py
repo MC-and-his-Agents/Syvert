@@ -164,8 +164,8 @@ def make_comment_collection_reply_result(
             "source_trace": payload["source_trace"],
         }
     ]
-    payload["result_status"] = "complete"
-    payload["error_classification"] = "partial_result"
+    payload["result_status"] = "partial_result"
+    payload["error_classification"] = "parse_failed"
     return payload
 
 
@@ -1147,6 +1147,29 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["result_status"], "complete")
         self.assertEqual(result.envelope["error_classification"], "parse_failed")
         self.assertEqual(result.envelope["items"], [])
+        self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_execute_task_returns_comment_fail_closed_carrier_for_dataclass_cursor_with_mapping_child(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor=CommentRequestCursor(  # type: ignore[arg-type]
+                    reply_cursor={"reply_cursor_token": "cursor-1"},
+                ),
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-7",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["error_classification"], "parse_failed")
         self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_execute_core_task_request_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:

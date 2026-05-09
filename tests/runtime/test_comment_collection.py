@@ -108,8 +108,8 @@ def make_comment_item(
 def make_payload(
     *,
     items: tuple[dict[str, Any], ...] | list[dict[str, Any]] = (make_comment_item(include_reply_cursor=True),),
-    result_status: str = "complete",
-    error_classification: str = "partial_result",
+    result_status: str = "partial_result",
+    error_classification: str = "parse_failed",
     has_more: bool = False,
     include_continuation: bool = False,
     continuation_comment_ref: str | None = None,
@@ -288,6 +288,14 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "parse_failed")
         self.assertIn("reply_cursor_token", result["message"])
 
+    def test_request_cursor_rejects_dataclass_with_mapping_reply_cursor(self) -> None:
+        result = validate_comment_request_cursor(
+            CommentRequestCursor(reply_cursor={"reply_cursor_token": "cursor-1"}),  # type: ignore[arg-type]
+            target_ref="content-001",
+        )
+
+        self.assertEqual(result["code"], "parse_failed")
+
     def test_empty_result_is_valid_without_continuation(self) -> None:
         payload = make_payload(
             items=(),
@@ -357,7 +365,6 @@ class CommentCollectionCarrierTests(unittest.TestCase):
                     root_comment_ref="public-placeholder:comment:content-001:unavailable:slot-a",
                 ),
             ),
-            error_classification="partial_result",
         )
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
