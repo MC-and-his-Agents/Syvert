@@ -17,6 +17,7 @@ def write_valid_version_fixture(repo: Path) -> None:
         repo / "docs/process/version-management.md",
         """# Syvert Version Management
 
+不得隐式映射到 `MINOR`
 vMAJOR.MINOR.PATCH
 v1.10.0
 v1.9.0
@@ -60,6 +61,8 @@ docs/process/version-management.md
 Stabilization Gate
 v1.10.0
 runtime capability contract
+能力流（track）是实现顺序提示，不是 `MINOR` 映射依据。
+`MINOR` 只由 release planning、release index 与 closeout 决策显式绑定。
 """,
     )
     write(
@@ -174,6 +177,58 @@ class VersionGuardTests(unittest.TestCase):
             errors = validate_repository(repo)
 
         self.assertTrue(any("docs/process/python-packaging.md" in error for error in errors))
+
+    def test_version_management_must_state_minors_are_explicitly_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            content = (repo / "docs/process/version-management.md").read_text(encoding="utf-8")
+            content = content.replace("不得隐式映射到 `MINOR`\n", "")
+            (repo / "docs/process/version-management.md").write_text(content, encoding="utf-8")
+
+            errors = validate_repository(repo)
+
+        self.assertTrue(any("不得隐式映射到 `MINOR`" in error for error in errors))
+
+    def test_roadmap_must_preserve_track_minor_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            content = (repo / "docs/roadmap-v1-to-v2.md").read_text(encoding="utf-8")
+            content = content.replace(
+                "能力流（track）是实现顺序提示，不是 `MINOR` 映射依据。\n"
+                "`MINOR` 只由 release planning、release index 与 closeout 决策显式绑定。\n",
+                "",
+            )
+            (repo / "docs/roadmap-v1-to-v2.md").write_text(content, encoding="utf-8")
+
+            errors = validate_repository(repo, strict_ci=True)
+
+        self.assertTrue(any("缺少 v1.x 到 v2.0.0 关键语义" in error for error in errors))
+
+    def test_ci_mode_rejects_phase_headings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            content = (repo / "docs/roadmap-v1-to-v2.md").read_text(encoding="utf-8")
+            content = content + "\n\n## Phase 1 Operation Taxonomy\n"
+            (repo / "docs/roadmap-v1-to-v2.md").write_text(content, encoding="utf-8")
+
+            errors = validate_repository(repo, strict_ci=True)
+
+        self.assertTrue(any("Phase 1" in error or "Phase N" in error for error in errors))
+
+    def test_ci_mode_allows_capability_track_headings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir)
+            write_valid_version_fixture(repo)
+            content = (repo / "docs/roadmap-v1-to-v2.md").read_text(encoding="utf-8")
+            content = content + "\n\n## Capability Track: Operation Taxonomy\n"
+            (repo / "docs/roadmap-v1-to-v2.md").write_text(content, encoding="utf-8")
+
+            errors = validate_repository(repo, strict_ci=True)
+
+        self.assertEqual(errors, [])
 
     def test_template_style_release_index_does_not_require_truth_carrier(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

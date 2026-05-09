@@ -36,6 +36,11 @@ FORBIDDEN_POSITIONING_PHRASES = (
     "Syvert Application Platform GA",
     "应用平台 GA",
 )
+ROADMAP_PHASE_HEADING_RE = re.compile(r"^##\s+Phase\s+\d+\b", re.MULTILINE | re.IGNORECASE)
+ROADMAP_TRACK_MINOR_HINTS = (
+    "能力流（track）是实现顺序提示，不是 `MINOR` 映射依据。",
+    "`MINOR` 只由 release planning、release index 与 closeout 决策显式绑定。",
+)
 
 
 def read_text(path: Path) -> str:
@@ -214,6 +219,7 @@ def validate_version_management_doc(repo_root: Path) -> list[str]:
     content = read_text(path)
     required = (
         "vMAJOR.MINOR.PATCH",
+        "不得隐式映射到 `MINOR`",
         "v1.10.0",
         "v1.9.0",
         "GitHub Release",
@@ -264,9 +270,29 @@ def validate_roadmap_refs(repo_root: Path) -> list[str]:
 
     if roadmap_v1.exists():
         content = read_text(roadmap_v1)
-        for item in ("docs/process/version-management.md", "Stabilization Gate", "v1.10.0", "runtime capability contract"):
+        for item in (
+            "docs/process/version-management.md",
+            "Stabilization Gate",
+            "v1.10.0",
+            "runtime capability contract",
+            *ROADMAP_TRACK_MINOR_HINTS,
+        ):
             if item not in content:
                 errors.append(f"`docs/roadmap-v1-to-v2.md` 缺少 v1.x 到 v2.0.0 关键语义：`{item}`")
+
+    return errors
+
+
+def validate_roadmap_track_title_guard(repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    roadmap_v1 = require_file(repo_root, "docs/roadmap-v1-to-v2.md", errors)
+    if not roadmap_v1.exists():
+        return errors
+
+    content = read_text(roadmap_v1)
+    for match in ROADMAP_PHASE_HEADING_RE.finditer(content):
+        heading = match.group(0).strip()
+        errors.append(f"`docs/roadmap-v1-to-v2.md` 不得出现旧版 `Phase N` 能力标题：`{heading}`")
 
     return errors
 
@@ -313,7 +339,7 @@ def validate_forbidden_positioning(repo_root: Path) -> list[str]:
     return errors
 
 
-def validate_repository(repo_root: Path) -> list[str]:
+def validate_repository(repo_root: Path, strict_ci: bool = False) -> list[str]:
     errors: list[str] = []
     errors.extend(validate_version_management_doc(repo_root))
     errors.extend(validate_python_packaging_doc(repo_root))
@@ -321,6 +347,8 @@ def validate_repository(repo_root: Path) -> list[str]:
     errors.extend(validate_release_docs(repo_root))
     errors.extend(validate_workflow(repo_root))
     errors.extend(validate_forbidden_positioning(repo_root))
+    if strict_ci:
+        errors.extend(validate_roadmap_track_title_guard(repo_root))
     return errors
 
 
@@ -334,7 +362,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     repo_root = Path(args.repo_root).resolve()
-    errors = validate_repository(repo_root)
+    errors = validate_repository(repo_root, strict_ci=args.mode == "ci")
     if errors:
         for error in errors:
             print(error, file=sys.stderr)

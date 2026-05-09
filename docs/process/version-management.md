@@ -22,9 +22,10 @@ Syvert 同时存在多个版本层次，它们不能互相替代：
 
 - 对外 release、roadmap milestone 与 tag 使用 `vMAJOR.MINOR.PATCH`。
 - `MAJOR` 表示一组底座契约成熟度声明，不由 minor 数字自然滚动触发。
-- `MINOR` 表示一个受控能力阶段或一组兼容扩展完成。
+- `MINOR` 表示一个受控能力阶段或一组兼容扩展完成，不是 roadmap `Phase` 或 capability `Track` 的编号映射。
 - `PATCH` 表示不改变公共 contract 的修复、回写、发布真相同步或兼容性修补。
 - Sprint、Phase、FR、Work Item 不得被当作版本号使用。
+- roadmap capability track、GitHub `Phase`、FR、Work Item 不得隐式映射到 `MINOR`，`MINOR` 仅能由 release planning、release index 或 closeout decision 显式绑定。
 - `v1.x` 表示一组 minor 序列，不表示最多只能走到 `v1.9.0`。
 - 可以存在 `v1.10.0`、`v1.11.0` 等版本；只有满足 major gate 时才进入下一个 major。
 
