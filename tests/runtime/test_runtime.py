@@ -46,6 +46,12 @@ from tests.runtime.resource_fixtures import (
     proxy_material,
     seed_default_runtime_resources,
 )
+from tests.runtime.contract_harness.third_party_entry import _build_success_runtime_envelope
+from tests.runtime.contract_harness.validation_tool import (
+    ContractSampleDefinition,
+    HarnessExecutionResult,
+    validate_contract_sample,
+)
 
 TEST_ADAPTER_KEY = "xhs"
 
@@ -907,6 +913,53 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["error_classification"], "cursor_invalid_or_expired")
         self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
         self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_execute_core_task_request_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+            ),
+            policy=CollectionPolicy(collection_mode="paginated"),
+            request_cursor={
+                "page_continuation": make_comment_page_continuation(),
+                "reply_cursor": make_comment_reply_cursor(),
+            },
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-4",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["result_status"], "complete")
+        self.assertEqual(result.envelope["error_classification"], "signature_or_request_invalid")
+        self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
+        self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_contract_harness_builds_comment_collection_success_envelope(self) -> None:
+        payload = make_comment_collection_result(target_ref="content-001")
+
+        envelope = _build_success_runtime_envelope(
+            task_id="task-harness-comment-collection-1",
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            payload=payload,
+        )
+        result = validate_contract_sample(
+            ContractSampleDefinition(sample_id="comment-collection-success", expected_outcome="success"),
+            HarnessExecutionResult(runtime_envelope=envelope),
+        )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["operation"], "comment_collection")
+        self.assertEqual(envelope["target"]["target_ref"], "content-001")
+        self.assertEqual(result["verdict"], "pass")
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()

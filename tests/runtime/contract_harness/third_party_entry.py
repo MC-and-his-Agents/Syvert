@@ -1373,13 +1373,12 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
-        normalized = payload.get("normalized")
-        target_value = normalized.get("canonical_url", "") if isinstance(normalized, Mapping) else ""
+        target_type, target_value = _success_payload_target_context(payload)
         payload_error = validate_success_payload(
             payload,
             capability=capability,
-            target_type="url",
-            target_value=str(target_value),
+            target_type=target_type,
+            target_value=target_value,
         )
         if payload_error is not None:
             return {
@@ -1387,6 +1386,8 @@ def _build_success_runtime_envelope(
                 "status": "failed",
                 "error": payload_error,
             }
+        if _is_collection_success_payload(payload):
+            return {**envelope, **dict(payload)}
         return {
             **envelope,
             "raw": payload["raw"],
@@ -1396,6 +1397,26 @@ def _build_success_runtime_envelope(
         **envelope,
         "non_mapping_payload_type": type(payload).__name__,
     }
+
+
+def _is_collection_success_payload(payload: Mapping[str, Any]) -> bool:
+    return isinstance(payload.get("target"), Mapping) and "items" in payload
+
+
+def _success_payload_target_context(payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    target = payload.get("target")
+    if isinstance(target, Mapping):
+        target_type = target.get("target_type")
+        target_ref = target.get("target_ref")
+        return (
+            target_type if isinstance(target_type, str) else None,
+            target_ref if isinstance(target_ref, str) else None,
+        )
+    normalized = payload.get("normalized")
+    if isinstance(normalized, Mapping):
+        target_value = normalized.get("canonical_url")
+        return "url", target_value if isinstance(target_value, str) else None
+    return None, None
 
 
 def _normalize_platform_adapter_error_details(error: PlatformAdapterError) -> dict[str, Any]:

@@ -62,6 +62,7 @@
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（380 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（402 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（450 tests）
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -85,6 +86,10 @@
   - 处理：已恢复 content-detail 旧调用兼容；collection/comment collection 调用仍在传入 capability 时校验 target context，并补充 `tests.runtime.test_models` 验证证据。
 - PR `#429` guardian finding：请求侧 cursor fail-closed 返回了通用 failed envelope，而不是 comment collection result carrier。
   - 处理：已在 adapter 执行前为 `signature_or_request_invalid` / `cursor_invalid_or_expired` 构造 `comment_collection` fail-closed result carrier，返回 `result_status=complete`、对应 `error_classification`、`items=[]`、`has_more=false`、`next_continuation=null`。
+- PR `#429` guardian finding：`CoreTaskRequest` 上的无效 comment cursor 仍返回通用 failed envelope。
+  - 处理：已让 `comment_collection_request_error_envelope` 同时支持 `TaskRequest` 与 `CoreTaskRequest`，并新增 `CoreTaskRequest` mixed-cursor fail-closed regression。
+- PR `#429` guardian finding：shared contract harness 仍把所有 success payload 当成 `content_detail_by_url`。
+  - 处理：已让 harness/validation tool 从 collection target 推导 target context，并对 collection/comment collection success envelope 保留 carrier 字段；新增 comment collection harness success regression，并纳入 `tests.runtime.test_third_party_adapter_contract_entry` 验证。
 
 ## 未决风险
 

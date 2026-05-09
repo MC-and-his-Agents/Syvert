@@ -284,13 +284,13 @@ def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | 
             "code": "unexpected_failed_envelope",
             "message": "sample expected success but observed failed envelope",
         }
-    normalized = envelope.get("normalized")
-    target_value = normalized.get("canonical_url", "") if isinstance(normalized, Mapping) else ""
+    payload = _success_payload_from_runtime_envelope(envelope)
+    target_type, target_value = _success_payload_target_context(payload)
     payload_error = validate_success_payload(
-        envelope,
+        payload,
         capability=str(envelope.get("capability", "")),
-        target_type="url",
-        target_value=str(target_value),
+        target_type=target_type,
+        target_value=target_value,
     )
     if payload_error is not None:
         return {
@@ -298,6 +298,40 @@ def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | 
             "message": payload_error["message"],
         }
     return None
+
+
+def _success_payload_from_runtime_envelope(envelope: Mapping[str, Any]) -> Mapping[str, Any]:
+    if isinstance(envelope.get("target"), Mapping) and "items" in envelope:
+        keys = (
+            "operation",
+            "target",
+            "items",
+            "has_more",
+            "next_continuation",
+            "result_status",
+            "error_classification",
+            "raw_payload_ref",
+            "source_trace",
+            "audit",
+        )
+        return {key: envelope.get(key) for key in keys}
+    return envelope
+
+
+def _success_payload_target_context(payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    target = payload.get("target")
+    if isinstance(target, Mapping):
+        target_type = target.get("target_type")
+        target_ref = target.get("target_ref")
+        return (
+            target_type if isinstance(target_type, str) else None,
+            target_ref if isinstance(target_ref, str) else None,
+        )
+    normalized = payload.get("normalized")
+    if isinstance(normalized, Mapping):
+        target_value = normalized.get("canonical_url")
+        return "url", target_value if isinstance(target_value, str) else None
+    return None, None
 
 
 def _validate_failed_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:

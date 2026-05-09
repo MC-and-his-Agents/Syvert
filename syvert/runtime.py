@@ -278,9 +278,12 @@ def comment_collection_request_error_envelope(
 ) -> dict[str, Any] | None:
     if capability != COMMENT_COLLECTION:
         return None
-    if not isinstance(request, TaskRequest) or type(request.input) is not TaskInput:
+    if isinstance(request, TaskRequest) and type(request.input) is TaskInput:
+        target_ref = request.input.content_ref
+    elif isinstance(request, CoreTaskRequest) and request.target.capability == COMMENT_COLLECTION:
+        target_ref = request.target.target_value
+    else:
         return None
-    target_ref = request.input.content_ref
     if not isinstance(target_ref, str) or not target_ref:
         return None
     error_code = contract_error.get("code")
