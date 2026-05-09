@@ -41,14 +41,14 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `comment_next_page_platform_b` | `comment_list_by_content` | `modeled` | second-page response from second reference platform with page/offset-like continuation | public continuation remains platform-neutral | `model_covered_raw_gap` |
 | `empty_comment_result` | `comment_list_by_content` | `synthetic` | valid content target with zero visible comments | result returns `items=[]`, `result_status=empty`, and no false not-found classification | `synthetic_derivable` |
 | `comment_target_not_found` | `comment_list_by_content` | `synthetic` | content target is unavailable or not resolvable on the platform | result classification is `target_not_found`, not `empty_result` | `synthetic_derivable` |
-| `deleted_comment_item` | `comment_list_by_content` | `synthetic` | one comment is returned with deleted marker but the page is otherwise valid | item visibility is `deleted` and the page can still remain `complete` | `gap_needs_visibility_fixture` |
-| `invisible_comment_item` | `comment_list_by_content` | `synthetic` | one comment is hidden or blocked by platform visibility control | item visibility is `invisible` without leaking platform moderation flags | `gap_needs_visibility_fixture` |
+| `deleted_comment_item` | `comment_list_by_content` | `synthetic` | one comment is returned with deleted marker but the page is otherwise valid | item visibility is `deleted` and the page can still remain `complete` | `semantic_freeze_recording_pending` |
+| `invisible_comment_item` | `comment_list_by_content` | `synthetic` | one comment is hidden or blocked by platform visibility control | item visibility is `invisible` without leaking platform moderation flags | `semantic_freeze_recording_pending` |
 | `unavailable_comment_item` | `comment_list_by_content` | `synthetic` | one comment placeholder is returned with stable unavailable marker but without full body payload | item visibility is `unavailable` with minimal placeholder projection, not generic parse failure by default | `synthetic_derivable` |
 | `target_comment_linkage` | `comment_list_by_content` | `synthetic` | reply references both root comment and target comment | normalized item preserves root/parent/target linkage with stable public refs | `recorded_covered` |
 | `reply_cursor_resume` | `comment_list_by_content` | `synthetic` | one comment exposes a reply cursor that can resume nested replies | `reply_cursor.resume_comment_ref` stays bound to the same comment item | `recorded_covered` |
 | `duplicate_comment_item` | `comment_list_by_content` | `synthetic` | same logical comment appears across pages or reply windows | dedup key remains stable across pages without relying on platform-private object name | `synthetic_derivable` |
-| `permission_denied_comment_collection` | `comment_list_by_content` | `synthetic` | platform denies access to comments or target visibility | result classification is `permission_denied` with fail-closed boundary | `gap_needs_failure_fixture` |
-| `rate_limited_comment_collection` | `comment_list_by_content` | `synthetic` | platform response signals rate-limit control while loading comments | result classification is `rate_limited` | `gap_needs_failure_fixture` |
+| `permission_denied_comment_collection` | `comment_list_by_content` | `synthetic` | platform denies access to comments or target visibility | result classification is `permission_denied` with fail-closed boundary | `semantic_freeze_recording_pending` |
+| `rate_limited_comment_collection` | `comment_list_by_content` | `synthetic` | platform response signals rate-limit control while loading comments | result classification is `rate_limited` | `semantic_freeze_recording_pending` |
 | `platform_failed_comment_collection` | `comment_list_by_content` | `synthetic` | upstream platform failure without stronger category | result classification is `platform_failed` | `synthetic_derivable` |
 | `provider_or_network_blocked_comment_collection` | `comment_list_by_content` | `synthetic` | provider path is blocked before stable comment response can be returned | result classification is `provider_or_network_blocked` | `synthetic_derivable` |
 | `signature_or_request_invalid_comment_collection` | `comment_list_by_content` | `synthetic` | signed request or request-contract is malformed before comments can load | result classification is `signature_or_request_invalid` | `synthetic_derivable` |
@@ -65,8 +65,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `recorded_covered` | current sanitized alias inventory already has recorded raw-shape evidence sufficient for spec freeze |
 | `model_covered_raw_gap` | cross-platform model evidence exists, but raw recorded response still needs补采 for later evidence replay |
 | `synthetic_derivable` | scenario can be derived from current recorded raw shape family during runtime/evidence work |
-| `gap_needs_visibility_fixture` | current aliases expose partial hints, but a dedicated deleted/invisible visibility fixture still needs补采 |
-| `gap_needs_failure_fixture` | failure classification is in scope, but an explicit failure fixture still needs补采 |
+| `semantic_freeze_recording_pending` | public semantics are frozen in this batch, but dedicated recorded/synthetic evidence still needs补采 in `#419` |
 
 ## Coverage Snapshot
 
@@ -77,9 +76,9 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 - Model evidence grounds, but still needs second-platform raw response capture:
   - second-platform first page / next page
 - Remaining acquisition gaps for later runtime/evidence rounds:
-  - deleted / invisible visibility fixture
-  - permission-denied failure fixture
-  - rate-limited failure fixture
+  - dedicated deleted / invisible visibility fixture
+  - dedicated permission-denied failure fixture
+  - dedicated rate-limited failure fixture
 
 ## Error Classification Mapping
 
@@ -133,8 +132,8 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 
 ## Spec Freeze Consumption Rule
 
-- `FR-0404` can freeze public semantics when a scenario is `recorded_covered`, `model_covered_raw_gap`, or `synthetic_derivable`.
-- Scenarios marked `gap_needs_visibility_fixture` or `gap_needs_failure_fixture` are explicitly carried forward into `#419` evidence scope and must not be silently treated as already proven.
+- `FR-0404` can freeze public semantics when a scenario is `recorded_covered`, `model_covered_raw_gap`, `synthetic_derivable`, or `semantic_freeze_recording_pending`.
+- Scenarios marked `semantic_freeze_recording_pending` are explicitly carried forward into `#419` evidence scope and must not be silently treated as already recorded-proven.
 
 ## Acceptance For Batch 0
 

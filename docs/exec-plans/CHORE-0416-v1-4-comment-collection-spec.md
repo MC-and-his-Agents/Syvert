@@ -11,7 +11,7 @@
 - Parent FR：`#404`
 - 关联 spec：`docs/specs/FR-0404-comment-collection-contract/spec.md`
 - 关联 decision：
-- 关联 PR：待创建
+- 关联 PR：`#427`
 - 状态：`active`
 
 ## 目标
@@ -47,7 +47,7 @@
 - Workspace key：`issue-416-404-v1-4-0-comment-collection-spec`
 - Branch：`issue-416-404-v1-4-0-comment-collection-spec`
 - 主仓 baseline：`04314d6de9c008cccf5719e982fc7dde67652f83`
-- 当前变更：待写入 Batch 0 artifact、`FR-0404` formal spec suite、`v1.4.0` release planning index 与 `2026-S25` sprint update。
+- 当前变更：Batch 0 artifact、`FR-0404` formal spec suite、`v1.4.0` release planning index 与 `2026-S25` sprint update 已写入，当前处于 spec review / guardian 收口阶段。
 
 ## 下一步动作
 
@@ -55,7 +55,7 @@
 - 完成 `FR-0404` formal spec、data model、contract README 与 risks。
 - 创建 `v1.4.0` release planning index，并把 sprint truth 从 `#403` published slice 切换到 `#404` active slice。
 - 运行 spec/docs/workflow/version/governance 门禁。
-- 创建 spec PR，进入 `spec review`。
+- 继续收敛 guardian finding，并在 checks / merge gate 对齐后合并 `#427`。
 
 ## 当前 checkpoint 推进的 release 目标
 
@@ -64,7 +64,7 @@
 ## 当前事项在 sprint 中的角色 / 阻塞
 
 - 角色：`#404` formal spec carrier。
-- 阻塞：如 `spec review` 未通过，不得进入 `#417` runtime carrier。
+- 阻塞：如 `#427` 的 `spec review` / guardian 未通过，不得进入 `#417` runtime carrier。
 
 ## 已验证项
 
@@ -85,6 +85,7 @@
   - 结果：通过。
 - 脱敏搜索
   - 结果：新增文档未包含外部项目名或本地路径。
+- `#427` 已创建，当前 head 绑定本事项的 review round。
 
 ## 未决风险
 
