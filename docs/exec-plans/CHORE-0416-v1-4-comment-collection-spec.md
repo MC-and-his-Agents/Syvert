@@ -85,6 +85,9 @@
   - 结果：通过。
 - 脱敏搜索
   - 结果：新增文档未包含外部项目名或本地路径。
+- PR guardian refresh review
+  - 结果：曾阻塞于 operation 命名、request continuation 字段映射与 comment ref 绑定歧义。
+  - 处理：已统一 public operation 为 canonical `comment_collection`，冻结 result `next_continuation` -> request `page_continuation` 映射，并把 reply/hierarchy/cursor 绑定固定到 `NormalizedCommentItem.canonical_ref`。
 - `#427` 已创建，当前 head 绑定本事项的 review round。
 
 ## 未决风险

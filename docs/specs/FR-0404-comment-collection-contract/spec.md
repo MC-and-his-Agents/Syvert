@@ -34,7 +34,8 @@
 
 - 功能需求：
   - Core 必须能表达 `comment_collection` 的 content-scoped target 与 page continuation input，而不理解平台私有 comment page object、reply cursor object、moderation object 或 platform-private thread model。
-  - `comment_collection` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
+  - `comment_collection` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以设置 `page_continuation`，也可以设置某条 comment item 产出的 `reply_cursor`。
+  - result envelope 的 `next_continuation` 是下一次 request 的 `request_cursor.page_continuation` 的唯一来源；consumer 必须原样转交公共 carrier，不得重命名、拆解或替换为平台私有 cursor 字段。
   - comment result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`error_classification`、`raw_payload_ref`、`source_trace` 与审计字段，并复用 `FR-0403` 的 collection envelope 基础语义。
   - 每个 comment item 必须可同时保留 raw payload reference 与 normalized comment projection；Core 只能消费 normalized envelope，不消费平台私有 raw 字段。
   - 每个 comment item 必须能表达 `visibility_status`、`root_comment_ref`、`parent_comment_ref`、`target_comment_ref` 与可选 `reply_cursor`。
@@ -44,13 +45,15 @@
   - `comment_collection` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
-  - 请求侧 `request_cursor` 在同一请求中只能二选一：要么继续 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
+  - 请求侧 `request_cursor` 在同一请求中只能二选一：要么通过 `page_continuation` 继续上一页 result 的 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
   - collection-level错误分类 vocabulary 继承 `FR-0403`，至少保留：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - 本 FR 允许 emitted 的 `error_classification` 集合不单独发出 `partial_result`；partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义。`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
   - item-level `reply_cursor` 只用于进入某条 comment 的首个 reply window；若 reply window 仍有更多数据，后续续拉必须通过 `next_continuation` 完成。
-  - `reply_cursor` 与 reply-window `next_continuation` 都只能恢复同一 content target 下、同一 comment item 的 replies；跨 comment 或跨 content target 复用必须视为 invalid/expired。
+  - public comment ref 的唯一绑定对象是 `NormalizedCommentItem.canonical_ref`；`reply_cursor.resume_comment_ref`、reply-window `next_continuation.resume_comment_ref`、`root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref` 都必须引用该 ref。
+  - `source_ref` 只用于 source trace / audit，不得作为 reply resume、hierarchy linkage 或 dedup 的规范绑定对象。
+  - `reply_cursor` 与 reply-window `next_continuation` 都只能恢复同一 content target 下、同一 `canonical_ref` comment item 的 replies；跨 comment 或跨 content target 复用必须视为 invalid/expired。
   - `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不得因 comment contract 引入新的 Core 分支或平台私有字段。
 - 非功能需求：
   - comment contract 必须 fail-closed；无法证明 hierarchy、continuation、reply cursor、visibility 或 raw/normalized 投影合法时，不得返回伪稳定结果。
@@ -79,19 +82,19 @@ Then result 返回 `items`、`has_more=true`、`next_continuation`、`result_sta
 
 ### 场景 2：下一页 continuation 保持公共语义稳定
 
-Given `comment_collection` 已返回第一页并生成 `next_continuation`
-When Core 使用该 continuation 请求下一页，且平台实际需要 page/offset/thread-session 组合
+Given `comment_collection` 已返回第一页并生成 result `next_continuation`
+When Core 将该 carrier 作为下一次 request 的 `request_cursor.page_continuation` 请求下一页，且平台实际需要 page/offset/thread-session 组合
 Then Adapter 负责还原平台 continuation，Core 仍只接收平台中立 continuation token，且 comment item envelope 与错误边界保持不变
 
 ### 场景 3：reply cursor 只恢复同一 comment 的 replies
 
 Given 某个 top-level comment item 返回 `reply_cursor`
 When Core 继续拉取该 comment 的 replies
-Then Adapter 只允许在同一 comment 上恢复 nested reply window，且 `reply_cursor.resume_comment_ref` 与当前 comment public ref 保持一致
+Then Adapter 只允许在同一 comment 上恢复 nested reply window，且 `reply_cursor.resume_comment_ref` 与当前 comment 的 `canonical_ref` 保持一致
 
 ### 场景 3B：reply cursor 请求与 top-level continuation 互斥
 
-Given 同一请求同时携带 top-level `next_continuation` 与某条 comment item 的 `reply_cursor`
+Given 同一请求的 `request_cursor` 同时携带 `page_continuation` 与某条 comment item 的 `reply_cursor`
 When Core 尝试执行该 comment request
 Then request 必须 fail-closed 到 `result_status=complete` 与 `error_classification=signature_or_request_invalid`，而不是让 Adapter 自行猜测优先级
 
@@ -129,7 +132,7 @@ Then item 必须返回 `visibility_status=unavailable` 与最小 normalized plac
 
 Given 一条 reply 同时能识别 root comment、直接 parent comment 与 target comment
 When Adapter 投影 normalized comment item
-Then public item 必须保留 `root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref`，而不要求 Core 理解平台私有 reply object
+Then public item 必须保留 `root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref`，这些 ref 都绑定到对应 comment 的 `canonical_ref`，而不要求 Core 理解平台私有 reply object
 
 ### 场景 7B：duplicate comment item 保持稳定 dedup 语义
 
@@ -202,7 +205,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 
 - [ ] formal spec 冻结 `comment_collection` 的 comment collection contract。
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
-- [ ] formal spec 冻结 `comment_collection` 的请求侧 cursor 规则，明确 `next_continuation` 与 `reply_cursor` 的组合/互斥边界。
+- [ ] formal spec 冻结 `comment_collection` 的请求侧 cursor 规则，明确 result `next_continuation` 到 request `page_continuation` 的映射，以及 `page_continuation` 与 `reply_cursor` 的组合/互斥边界。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
 - [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，并写清 `partial_result` 只作为结果状态组合语义保留。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。

@@ -27,7 +27,8 @@
   - Core 不得直接理解平台私有 continuation 字段。
   - continuation 与 target 必须绑定；跨 target 复用必须视为 invalid/expired。
   - `resume_comment_ref` 为空时表示 top-level page continuation。
-  - `resume_comment_ref` 非空时表示 reply-window continuation，并必须与同一 comment thread 绑定。
+  - `resume_comment_ref` 非空时表示 reply-window continuation，并必须绑定到同一 comment thread 的 `NormalizedCommentItem.canonical_ref`。
+  - result envelope 的 `next_continuation` 在下一次 request 中必须原样进入 `CommentRequestCursor.page_continuation`。
 
 ## CommentRequestCursor
 
@@ -40,7 +41,7 @@
   - `reply_cursor` 承载 `CommentReplyCursor`。
   - canonical 请求最多只能设置其中一个；两者同时出现属于 `signature_or_request_invalid`。
   - `reply_cursor` 存在时，请求仍必须保留 content-scoped `CommentTarget`。
-  - `page_continuation` 可同时用于 top-level page 与 reply-window continuation。
+  - `page_continuation` 是上一页 result `next_continuation` 的唯一请求侧字段名，可同时用于 top-level page 与 reply-window continuation。
 
 ## CommentReplyCursor
 
@@ -55,7 +56,7 @@
   - reply cursor 只用于进入某条 comment 的首个 reply window。
   - reply cursor 可以由 comment-id、reply-offset、thread-session 等平台私有字段组合编码，但 Core 只消费平台中立 token。
   - `resume_target_ref` 必须与请求 target 的 `target_ref` 一致。
-  - `resume_comment_ref` 与 comment item public ref 不一致时必须视为 invalid/expired。
+  - `resume_comment_ref` 必须绑定到 comment item 的 `NormalizedCommentItem.canonical_ref`；与该 ref 不一致时必须视为 invalid/expired。
 
 ## CommentCollectionResultEnvelope
 
@@ -95,6 +96,7 @@
   - `reply_cursor`（可选）
 - 约束：
   - `dedup_key` 必须稳定，且不要求两个平台使用相同原始 comment ID 字段。
+  - `source_ref` 只用于 source trace 与 audit 追溯，不是 reply cursor、hierarchy linkage 或 dedup 的 canonical 绑定对象。
   - `visibility_status` 至少支持 `visible`、`deleted`、`invisible`、`unavailable`。
   - `reply_cursor` 仅在 comment item 可继续加载 replies 时出现。
   - `unavailable` item 仍必须能提供最小 normalized placeholder projection，例如稳定的 `canonical_ref`、`root_comment_ref` 与 placeholder `body_text_hint`。
@@ -115,10 +117,11 @@
   - `target_comment_ref`（可选）
   - `published_at`（可选）
 - 约束：
+  - `canonical_ref` 是 comment contract 的唯一公共 comment ref。
   - top-level comment 的 `root_comment_ref` 必须等于自身 `canonical_ref`。
-  - reply comment 的 `root_comment_ref` 必须稳定指向 thread root。
-  - `parent_comment_ref` 指向直接 parent comment；top-level comment 不要求该字段。
-  - `target_comment_ref` 仅在 reply 明确指向某个目标 comment 时出现。
+  - reply comment 的 `root_comment_ref` 必须稳定指向 thread root 的 `canonical_ref`。
+  - `parent_comment_ref` 指向直接 parent comment 的 `canonical_ref`；top-level comment 不要求该字段。
+  - `target_comment_ref` 仅在 reply 明确指向某个目标 comment 时出现，并必须引用目标 comment 的 `canonical_ref`。
   - `body_text_hint` 对 `unavailable` item 也必须存在，但允许是平台 unavailable placeholder 的最小公共投影，而不是完整正文。
   - 缺少可选字段不会使 item invalid。
 
@@ -179,8 +182,8 @@
   - `CommentContinuation` 在 `has_more=true` 时由 Adapter 生成平台中立 token。
   - `CommentReplyCursor` 在 comment item 允许进入 replies 时由 Adapter 生成。
 - 更新：
-  - 新页面结果使用新的 `next_continuation`；不得原地篡改历史 continuation 以伪造跨页稳定性。
-  - 进入首个 reply window 使用 `reply_cursor`；后续 reply page 使用新的 `next_continuation`，不得把某个 comment 的 cursor/continuation 迁移到另一 comment。
+  - 新页面结果使用新的 `next_continuation`；下一次请求通过 `request_cursor.page_continuation` 原样消费该 carrier，不得原地篡改历史 continuation 以伪造跨页稳定性。
+  - 进入首个 reply window 使用 `reply_cursor`；后续 reply page 使用新的 `next_continuation`，不得把某个 comment 的 cursor/continuation 迁移到另一 `canonical_ref` comment。
   - `partial_result` 允许追加 item-level parse-failure evidence，但固定搭配 `error_classification=parse_failed`，且不得改写成功 normalized comments 的公共字段。
 - 失效/归档：
   - invalid/expired continuation、reply cursor 或 reply-window continuation 只能导向 `cursor_invalid_or_expired`，不应被当作普通 platform failure。
