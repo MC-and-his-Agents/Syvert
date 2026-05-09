@@ -912,7 +912,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
 
     def test_validate_success_payload_accepts_explicit_target_binding_against_request_cursor(self) -> None:
-        payload = make_comment_collection_reply_result(root_comment_ref="comment:outer-root")
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         payload["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
 
         self.assertIsNone(
@@ -1018,7 +1018,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
         item["normalized"]["parent_comment_ref"] = "comment:root-1:parent-1"
-        item["normalized"]["target_comment_ref"] = "comment:root-1:target-1"
+        item["normalized"]["target_comment_ref"] = "comment:root-1"
 
         self.assertIsNone(
             validate_success_payload(
@@ -1034,6 +1034,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
         item["normalized"]["parent_comment_ref"] = "comment:root-1:child-1"
+        item["normalized"]["target_comment_ref"] = "comment:root-1"
 
         self.assertIsNone(
             validate_success_payload(

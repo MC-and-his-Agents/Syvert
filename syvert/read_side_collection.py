@@ -1240,6 +1240,24 @@ def _validate_comment_item_contract(
                 "reply comment 的 parent_comment_ref 不得等于自身 canonical_ref",
                 details={"field": f"{field}.normalized.parent_comment_ref"},
             )
+        if (
+            item.normalized.parent_comment_ref != item.normalized.root_comment_ref
+            and item.normalized.target_comment_ref != item.normalized.root_comment_ref
+        ):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 必须通过 parent_comment_ref 或 target_comment_ref 显式证明绑定 root thread",
+                details={"field": f"{field}.normalized.parent_comment_ref"},
+            )
+        if item.normalized.target_comment_ref is not None and item.normalized.target_comment_ref not in {
+            item.normalized.root_comment_ref,
+            item.normalized.parent_comment_ref,
+        }:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 target_comment_ref 必须绑定 root_comment_ref 或 parent_comment_ref",
+                details={"field": f"{field}.normalized.target_comment_ref"},
+            )
     if item.normalized.parent_comment_ref is None and item.normalized.target_comment_ref is not None:
         return _contract_error(
             "invalid_comment_collection_contract",

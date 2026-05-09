@@ -220,7 +220,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("resume_comment_ref", result["message"])
 
-    def test_reply_hierarchy_allows_opaque_independent_target_linkage(self) -> None:
+    def test_reply_hierarchy_rejects_opaque_independent_target_linkage(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -234,9 +234,10 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertIsNone(result)
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("target_comment_ref", result["message"])
 
-    def test_reply_hierarchy_allows_opaque_parent_linkage(self) -> None:
+    def test_reply_hierarchy_rejects_opaque_parent_linkage_without_root_target(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-parent-drift",
             source_id="reply-parent-drift",
@@ -249,7 +250,8 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertIsNone(result)
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("root thread", result["message"])
 
     def test_nested_reply_window_binds_continuation_to_parent_comment(self) -> None:
         reply = make_comment_item(
@@ -259,7 +261,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             body_text_hint="nested reply",
             root_comment_ref="comment:root-1",
             parent_comment_ref="comment:root-1:parent-1",
-            target_comment_ref="comment:root-1:target-1",
+            target_comment_ref="comment:root-1",
         )
         payload = make_payload(
             items=(reply,),
@@ -278,6 +280,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             body_text_hint="descendant reply",
             root_comment_ref="comment:root-1",
             parent_comment_ref="comment:root-1:child-1",
+            target_comment_ref="comment:root-1",
         )
         payload = make_payload(
             items=(reply,),
