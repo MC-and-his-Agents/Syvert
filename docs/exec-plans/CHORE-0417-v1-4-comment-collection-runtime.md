@@ -71,6 +71,7 @@
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（485 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（487 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（490 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（491 tests）
 - `python3 - <<'PY' ... validate_frozen_resource_capability_evidence_contract() ... PY`
 - `python3 -m unittest tests.runtime.test_registry tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_dataclass_cursor tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_request_cursor`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -136,6 +137,8 @@
   - 处理：已将 reply-window item binding 改为 `parent_comment_ref == resume_comment_ref`，允许非 root comment 的 nested reply window，并新增 runtime/carrier regressions。
 - PR `#429` guardian finding：`target_comment_ref` 被强制限制为 root 或 parent。
   - 处理：已放宽 `target_comment_ref`，允许 root / parent / target 三者独立表达，并新增 carrier regression。
+- PR `#429` guardian finding：reply hierarchy 放过跨线程或不自洽 linkage。
+  - 处理：已增加 fail-closed lineage 校验，要求独立 parent / target ref 可从 root ref 的公共 lineage 前缀证明同线程；无法证明时拒绝，并补 cross-thread parent / target regressions。
 
 ## 未决风险
 

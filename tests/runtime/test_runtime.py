@@ -978,8 +978,8 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_validate_success_payload_accepts_nested_reply_window_bound_to_parent(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
-        item["normalized"]["parent_comment_ref"] = "comment:parent-1"
-        item["normalized"]["target_comment_ref"] = "comment:target-1"
+        item["normalized"]["parent_comment_ref"] = "comment:root-1:parent-1"
+        item["normalized"]["target_comment_ref"] = "comment:root-1:target-1"
 
         self.assertIsNone(
             validate_success_payload(
@@ -987,7 +987,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 capability="comment_collection",
                 target_type="content",
                 target_value="content-001",
-                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:parent-1")},
+                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1:parent-1")},
             )
         )
 

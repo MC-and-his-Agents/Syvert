@@ -1212,6 +1212,24 @@ def _validate_comment_item_contract(
                 "reply comment 的 parent_comment_ref 不得等于自身 canonical_ref",
                 details={"field": f"{field}.normalized.parent_comment_ref"},
             )
+        if not _comment_ref_stays_in_thread(
+            item.normalized.parent_comment_ref,
+            root_comment_ref=item.normalized.root_comment_ref,
+        ):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 parent_comment_ref 必须可证明属于 root_comment_ref thread",
+                details={"field": f"{field}.normalized.parent_comment_ref"},
+            )
+        if item.normalized.target_comment_ref is not None and not _comment_ref_stays_in_thread(
+            item.normalized.target_comment_ref,
+            root_comment_ref=item.normalized.root_comment_ref,
+        ):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 target_comment_ref 必须可证明属于 root_comment_ref thread",
+                details={"field": f"{field}.normalized.target_comment_ref"},
+            )
     if item.normalized.parent_comment_ref is None and item.normalized.target_comment_ref is not None:
         return _contract_error(
             "invalid_comment_collection_contract",
@@ -1232,6 +1250,10 @@ def _validate_comment_item_contract(
                 details={"field": f"{field}.reply_cursor.resume_comment_ref"},
             )
     return None
+
+
+def _comment_ref_stays_in_thread(comment_ref: str, *, root_comment_ref: str) -> bool:
+    return comment_ref == root_comment_ref or comment_ref.startswith(f"{root_comment_ref}:")
 
 
 def _parse_comment_collection_result_envelope(payload: Mapping[str, Any]) -> CommentCollectionResultEnvelope:
