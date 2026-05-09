@@ -33,14 +33,14 @@
 
 - 用途：表达 `comment_list_by_content` 请求侧的可选 cursor 输入。
 - 最小字段：
-  - `cursor_kind`
-  - `cursor_payload`
+  - `page_continuation`（可选）
+  - `reply_cursor`（可选）
 - 约束：
-  - `cursor_kind` 只能是 `page_continuation` 或 `reply_cursor`。
-  - `cursor_payload` 分别承载 `CommentContinuation` 或 `CommentReplyCursor`。
-  - 同一请求最多只能携带一个 `CommentRequestCursor`。
-  - `cursor_kind=reply_cursor` 时，请求仍必须保留 content-scoped `CommentTarget`。
-  - `cursor_kind=page_continuation` 可同时用于 top-level page 与 reply-window continuation。
+  - `page_continuation` 承载 `CommentContinuation`。
+  - `reply_cursor` 承载 `CommentReplyCursor`。
+  - canonical 请求最多只能设置其中一个；两者同时出现属于 `signature_or_request_invalid`。
+  - `reply_cursor` 存在时，请求仍必须保留 content-scoped `CommentTarget`。
+  - `page_continuation` 可同时用于 top-level page 与 reply-window continuation。
 
 ## CommentReplyCursor
 

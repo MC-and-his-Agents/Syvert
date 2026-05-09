@@ -19,8 +19,8 @@
 - 阶段 1：`#416` 冻结 Batch 0 comment fixture/error inventory，形成 reviewable hierarchy/visibility/cursor matrix 与公共错误分类。
 - 阶段 2：`#416` 冻结 `FR-0404` formal spec、data model、contract README 与 risks。
 - 阶段 3：`#417` 实现 comment runtime carrier。
-- 阶段 3A：`#417` 同步把 `FR-0368` 中的 `comment_collection/comment_collection` proposed candidate 升级为 `FR-0404` 的 executable runtime slice，更新 operation taxonomy 与 runtime-delivery truth。
-- 阶段 4：`#418` 迁移 TaskRecord / result query / compatibility decision 等 consumers，并把 requirement/offer/compatibility baseline 从 proposed candidate 对齐到 `comment_list_by_content` executable slice。
+- 阶段 3A：`#417` 同步把 `FR-0368` 中的 comment capability candidate 升级为 `FR-0404` 的 executable runtime slice：public operation `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，并更新 operation taxonomy 与 runtime-delivery truth。
+- 阶段 4：`#418` 迁移 TaskRecord / result query / compatibility decision 等 consumers，并把 requirement/offer/compatibility baseline 对齐到 `comment_list_by_content -> comment_collection + content + single + paginated` executable slice。
 - 阶段 5：`#419` 补齐 fake/reference evidence。
 - 阶段 6：`#420` 完成 `v1.4.0` release closeout 与 published truth carrier。
 

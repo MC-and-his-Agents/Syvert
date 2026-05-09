@@ -173,7 +173,7 @@ Given 平台上游失败或 provider/network path 被阻断，且不存在更强
 When Core 执行 comment collection request
 Then result 必须固定使用 `result_status=complete`，并分别归类为 `platform_failed` 或 `provider_or_network_blocked`
 
-### 场景 13：整页 parse failure 不得伪装成 partial_result
+### 场景 13：整页 parse failure 仍沿用共享 partial_result 语义
 
 Given comment response 缺少 comment identity、items family 或 continuation family，导致整页无法建立最小 public projection
 When Core 处理该页 comment result
