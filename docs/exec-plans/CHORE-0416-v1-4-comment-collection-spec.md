@@ -18,7 +18,7 @@
 
 - 完成 `#404` 的 Batch 0 与 Batch 1。
 - 交付脱敏 comment fixture/error inventory、formal spec suite、`v1.4.0` release planning index 与 `2026-S25` sprint update。
-- 只冻结 `comment_list_by_content` contract，不交付 runtime carrier、consumer migration、fake/reference tests implementation、release closeout 或 raw fixture payload files。
+- 只冻结 `comment_collection` contract，不交付 runtime carrier、consumer migration、fake/reference tests implementation、release closeout 或 raw fixture payload files。
 
 ## 范围
 

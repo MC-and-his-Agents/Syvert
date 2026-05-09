@@ -13,12 +13,12 @@
 ## 背景与目标
 
 - 背景：`v1.3.0` 已冻结 `content_search_by_keyword` 与 `content_list_by_creator` 的 collection result contract，但评论读取仍停留在 proposed taxonomy candidate，尚未统一表达 comment target、reply hierarchy、reply cursor、deleted/invisible visibility、raw/normalized 双轨与 comment-level collection failure boundary。
-- 目标：冻结 `v1.4.0` 首个 comment collection formal spec，定义 `comment_list_by_content` 的公共 target、result envelope、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace 与平台中立错误分类，为后续 runtime carrier、consumer migration、evidence 与 release closeout 提供 formal spec 输入。
+- 目标：冻结 `v1.4.0` 首个 comment collection formal spec，定义 `comment_collection` 的公共 target、result envelope、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace 与平台中立错误分类，为后续 runtime carrier、consumer migration、evidence 与 release closeout 提供 formal spec 输入。
 
 ## 范围
 
 - 本次纳入：
-  - `comment_list_by_content` 的公共 operation contract。
+  - `comment_collection` 的公共 operation contract。
   - comment target、page continuation、comment result envelope、comment item envelope、reply cursor、raw payload reference、normalized comment item、dedup key、source trace、audit fields。
   - first page、next page、empty result、target not found、reply hierarchy、deleted/invisible/unavailable comments、duplicate comment item、continuation invalidation、permission denied、rate limited、platform/provider failure、parse failure、partial result、credential invalid、verification required 的公共边界。
   - Adapter 对平台 comment identity、parent/reply identifiers、cursor fields与 visibility flags 的投影边界。
@@ -33,15 +33,15 @@
 ## 需求说明
 
 - 功能需求：
-  - Core 必须能表达 `comment_list_by_content` 的 content-scoped target 与 page continuation input，而不理解平台私有 comment page object、reply cursor object、moderation object 或 platform-private thread model。
-  - `comment_list_by_content` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
+  - Core 必须能表达 `comment_collection` 的 content-scoped target 与 page continuation input，而不理解平台私有 comment page object、reply cursor object、moderation object 或 platform-private thread model。
+  - `comment_collection` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
   - comment result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`error_classification`、`raw_payload_ref`、`source_trace` 与审计字段，并复用 `FR-0403` 的 collection envelope 基础语义。
   - 每个 comment item 必须可同时保留 raw payload reference 与 normalized comment projection；Core 只能消费 normalized envelope，不消费平台私有 raw 字段。
   - 每个 comment item 必须能表达 `visibility_status`、`root_comment_ref`、`parent_comment_ref`、`target_comment_ref` 与可选 `reply_cursor`。
   - comment contract 必须能表达 `complete`、`empty`、`partial_result` 三种结果状态。
   - top-level page continuation 与 item-level reply cursor 既可以来自 opaque cursor，也可以来自 page/offset/thread-session 等平台私有组合，但 Core 只接收平台中立 token carrier。
 - 契约需求：
-  - `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
+  - `comment_collection` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
   - 请求侧 `request_cursor` 在同一请求中只能二选一：要么继续 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
@@ -73,13 +73,13 @@
 
 ### 场景 1：评论第一页返回完整 collection result
 
-Given `comment_list_by_content` 使用合法 content target，且 Adapter 可以从 reference platform A 投影 recorded first-page comment response
+Given `comment_collection` 使用合法 content target，且 Adapter 可以从 reference platform A 投影 recorded first-page comment response
 When Core 执行 comment collection request
 Then result 返回 `items`、`has_more=true`、`next_continuation`、`result_status=complete`、`raw_payload_ref` 与 normalized comment list，且不暴露平台私有 thread 或 moderation object
 
 ### 场景 2：下一页 continuation 保持公共语义稳定
 
-Given `comment_list_by_content` 已返回第一页并生成 `next_continuation`
+Given `comment_collection` 已返回第一页并生成 `next_continuation`
 When Core 使用该 continuation 请求下一页，且平台实际需要 page/offset/thread-session 组合
 Then Adapter 负责还原平台 continuation，Core 仍只接收平台中立 continuation token，且 comment item envelope 与错误边界保持不变
 
@@ -103,13 +103,13 @@ Then result 必须通过 `next_continuation` 返回后续翻页 carrier，并保
 
 ### 场景 4：空评论结果不会伪装成错误
 
-Given `comment_list_by_content` 命中合法 content target，但当前无评论
+Given `comment_collection` 命中合法 content target，但当前无评论
 When Core 执行 comment collection request
 Then result 返回 `items=[]`、`result_status=empty`、`error_classification=empty_result`，且不得被分类为 `target_not_found` 或 `platform_failed`
 
 ### 场景 5：目标不存在必须独立分类
 
-Given `comment_list_by_content` 使用的 content target 在平台上不存在或已不可解析
+Given `comment_collection` 使用的 content target 在平台上不存在或已不可解析
 When Core 执行 comment collection request
 Then result 必须返回 `result_status=complete` 与 `error_classification=target_not_found`，且不得被降级成 `empty_result`
 
@@ -196,13 +196,13 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
   - `target_not_found` 与 `empty_result` 必须区分；合法 content target 没有评论不是 not found。
   - deleted/invisible/unavailable 是 item-level visibility，不等于 collection-level failure。
   - top-level page continuation 与 reply cursor 可以拥有不同 token family，但都必须保持平台中立 carrier。
-  - `comment_list_by_content` 复用 `FR-0403` 的 collection envelope、source trace、raw/normalized、result status 与 error classification 语义，但不得回写或改写 `content_search_by_keyword` / `content_list_by_creator` 的 public behavior。
+  - `comment_collection` 复用 `FR-0403` 的 collection envelope、source trace、raw/normalized、result status 与 error classification 语义，但不得回写或改写 `content_search_by_keyword` / `content_list_by_creator` 的 public behavior。
 
 ## 验收标准
 
-- [ ] formal spec 冻结 `comment_list_by_content` 的 comment collection contract。
+- [ ] formal spec 冻结 `comment_collection` 的 comment collection contract。
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
-- [ ] formal spec 冻结 `comment_list_by_content` 的请求侧 cursor 规则，明确 `next_continuation` 与 `reply_cursor` 的组合/互斥边界。
+- [ ] formal spec 冻结 `comment_collection` 的请求侧 cursor 规则，明确 `next_continuation` 与 `reply_cursor` 的组合/互斥边界。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
 - [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，并写清 `partial_result` 只作为结果状态组合语义保留。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。

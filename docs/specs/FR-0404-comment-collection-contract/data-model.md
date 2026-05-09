@@ -2,7 +2,7 @@
 
 ## CommentTarget
 
-- 用途：表达 `comment_list_by_content` 的公共 target。
+- 用途：表达 `comment_collection` 的公共 target。
 - 最小字段：
   - `operation`
   - `target_type`
@@ -10,7 +10,7 @@
   - `target_display_hint`（可选）
   - `policy_ref`（可选）
 - 约束：
-  - `comment_list_by_content` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
+  - `comment_collection` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
   - thread-scoped reply loading 必须通过 item-level `reply_cursor` 继续，不得扩展出新的 target admission surface。
 
 ## CommentContinuation
@@ -31,7 +31,7 @@
 
 ## CommentRequestCursor
 
-- 用途：表达 `comment_list_by_content` 请求侧的可选 cursor 输入。
+- 用途：表达 `comment_collection` 请求侧的可选 cursor 输入。
 - 最小字段：
   - `page_continuation`（可选）
   - `reply_cursor`（可选）

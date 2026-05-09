@@ -6,7 +6,7 @@
 
 ## Contract purpose
 
-本 contract 定义 `comment_list_by_content` 的首个公共 comment collection contract。它冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace、raw/normalized 双轨与平台中立错误分类，不新增 runtime implementation、creator profile shape 或 media download contract。
+本 contract 定义 `comment_collection` 的首个公共 comment collection contract。它冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、root/parent/target linkage、source trace、raw/normalized 双轨与平台中立错误分类，不新增 runtime implementation、creator profile shape 或 media download contract。
 
 ## Core ownership rules
 
