@@ -54,7 +54,6 @@ COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS = frozenset(
         "signature_or_request_invalid",
     }
 )
-COMMENT_COLLECTION_COMPLETE_SUCCESS_COMPAT_CLASSIFICATIONS = frozenset({"platform_failed"})
 COMMENT_PLACEHOLDER_SOURCE_ID_PREFIX = "public-placeholder:"
 
 RFC3339_TIMESTAMP_RE = re.compile(
@@ -1073,14 +1072,7 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
             details={"field": "error_classification"},
         )
 
-    if (
-        envelope.error_classification in COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS
-        and not (
-            envelope.result_status == "complete"
-            and envelope.items
-            and envelope.error_classification in COMMENT_COLLECTION_COMPLETE_SUCCESS_COMPAT_CLASSIFICATIONS
-        )
-    ):
+    if envelope.error_classification in COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS:
         if envelope.items or envelope.has_more or envelope.next_continuation is not None:
             return _contract_error(
                 "invalid_comment_collection_contract",
@@ -1094,10 +1086,12 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "partial_result 必须与 parse_failed 配对并保留至少一个 comment item",
                 details={"field": "result_status"},
             )
-    if envelope.error_classification == "partial_result":
+    if envelope.error_classification == "partial_result" and (
+        envelope.result_status != "complete" or not envelope.items
+    ):
         return _contract_error(
             "invalid_comment_collection_contract",
-            "partial_result 仅保留为继承兼容词表 entry，不作为 emitted error_classification",
+            "partial_result 仅可作为非空 complete 成功页的继承兼容分类",
             details={"field": "error_classification"},
         )
     if envelope.error_classification == "parse_failed":
@@ -1290,6 +1284,10 @@ def _comment_item_binds_comment_ref(item: CommentItemEnvelope, comment_ref: str)
     return (
         normalized.root_comment_ref == comment_ref
         or normalized.parent_comment_ref == comment_ref
+        or (
+            normalized.parent_comment_ref != normalized.root_comment_ref
+            and normalized.target_comment_ref == comment_ref
+        )
     )
 
 

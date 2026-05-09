@@ -308,6 +308,25 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
+    def test_reply_window_allows_descendant_reply_within_non_root_resumed_thread(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-non-root-descendant",
+            source_id="reply-non-root-descendant",
+            canonical_ref="comment:reply-non-root-descendant",
+            body_text_hint="non-root descendant reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:child-1",
+            target_comment_ref="comment:parent-1",
+        )
+        payload = make_payload(
+            items=(reply,),
+            has_more=True,
+            include_continuation=True,
+            continuation_comment_ref="comment:parent-1",
+        )
+
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(
             {
@@ -364,7 +383,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
     def test_complete_success_page_with_comment_items_is_valid(self) -> None:
         payload = make_payload(
             result_status="complete",
-            error_classification="platform_failed",
+            error_classification="partial_result",
         )
         envelope = comment_collection_result_envelope_from_dict(payload)
 
@@ -392,16 +411,18 @@ class CommentCollectionCarrierTests(unittest.TestCase):
                 self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
     def test_collection_level_failure_with_items_is_rejected(self) -> None:
-        payload = make_payload(
-            items=(make_comment_item(),),
-            result_status="complete",
-            error_classification="permission_denied",
-        )
+        for error_classification in ("permission_denied", "platform_failed"):
+            with self.subTest(error_classification=error_classification):
+                payload = make_payload(
+                    items=(make_comment_item(),),
+                    result_status="complete",
+                    error_classification=error_classification,
+                )
 
-        result = validate_comment_collection_result_envelope(payload)
+                result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("fail-closed", result["message"])
+                self.assertEqual(result["code"], "invalid_comment_collection_contract")
+                self.assertIn("fail-closed", result["message"])
 
     def test_deleted_invisible_and_unavailable_are_item_level_visibility(self) -> None:
         placeholder_source_id = "public-placeholder:comment:content-001:unavailable:slot-a"
