@@ -1018,7 +1018,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
         item["normalized"]["parent_comment_ref"] = "comment:root-1:parent-1"
-        item["normalized"]["target_comment_ref"] = "comment:root-1"
+        item["normalized"]["target_comment_ref"] = "comment:mentioned-1"
 
         self.assertIsNone(
             validate_success_payload(
@@ -1034,7 +1034,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
         item["normalized"]["parent_comment_ref"] = "comment:root-1:child-1"
-        item["normalized"]["target_comment_ref"] = "comment:root-1"
+        item["normalized"]["target_comment_ref"] = "comment:mentioned-1"
 
         self.assertIsNone(
             validate_success_payload(

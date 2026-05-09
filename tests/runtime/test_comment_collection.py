@@ -220,7 +220,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("resume_comment_ref", result["message"])
 
-    def test_reply_hierarchy_rejects_opaque_independent_target_linkage(self) -> None:
+    def test_reply_hierarchy_allows_independent_target_linkage_for_direct_reply(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -234,8 +234,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("target_comment_ref", result["message"])
+        self.assertIsNone(result)
 
     def test_reply_hierarchy_rejects_opaque_parent_linkage_without_root_target(self) -> None:
         reply = make_comment_item(
@@ -251,7 +250,24 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         result = validate_comment_collection_result_envelope(payload)
 
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("root thread", result["message"])
+        self.assertIn("target_comment_ref", result["message"])
+
+    def test_reply_hierarchy_rejects_parent_drift_with_root_target(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-parent-root-target",
+            source_id="reply-parent-root-target",
+            canonical_ref="comment:reply-parent-root-target",
+            body_text_hint="parent drift reply with root target",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:other-thread-parent",
+            target_comment_ref="comment:root-1",
+        )
+        payload = make_payload(items=(reply,))
+
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("target_comment_ref", result["message"])
 
     def test_nested_reply_window_binds_continuation_to_parent_comment(self) -> None:
         reply = make_comment_item(
@@ -261,7 +277,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             body_text_hint="nested reply",
             root_comment_ref="comment:root-1",
             parent_comment_ref="comment:root-1:parent-1",
-            target_comment_ref="comment:root-1",
+            target_comment_ref="comment:mentioned-1",
         )
         payload = make_payload(
             items=(reply,),
@@ -280,7 +296,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             body_text_hint="descendant reply",
             root_comment_ref="comment:root-1",
             parent_comment_ref="comment:root-1:child-1",
-            target_comment_ref="comment:root-1",
+            target_comment_ref="comment:mentioned-1",
         )
         payload = make_payload(
             items=(reply,),
