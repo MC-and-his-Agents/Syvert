@@ -268,6 +268,54 @@ class AdapterAttemptResult:
     core_timeout_outcome: bool = False
 
 
+def comment_collection_request_error_envelope(
+    request: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    contract_error: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if capability != COMMENT_COLLECTION:
+        return None
+    if not isinstance(request, TaskRequest) or type(request.input) is not TaskInput:
+        return None
+    target_ref = request.input.content_ref
+    if not isinstance(target_ref, str) or not target_ref:
+        return None
+    error_code = contract_error.get("code")
+    if error_code not in {"signature_or_request_invalid", "cursor_invalid_or_expired"}:
+        return None
+    return {
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "status": "success",
+        "operation": COMMENT_COLLECTION,
+        "target": {
+            "operation": COMMENT_COLLECTION,
+            "target_type": "content",
+            "target_ref": target_ref,
+        },
+        "items": [],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "complete",
+        "error_classification": str(error_code),
+        "raw_payload_ref": f"failure://comment_collection/{error_code}",
+        "source_trace": {
+            "adapter_key": adapter_key,
+            "provider_path": "core.runtime",
+            "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "evidence_alias": f"comment_collection_request_cursor_{error_code}",
+        },
+        "audit": {
+            "fail_closed": True,
+            "failure_phase": "request_cursor_validation",
+        },
+    }
+
+
 @dataclass(frozen=True)
 class ResourceCapabilityMatcherInput:
     task_id: str
@@ -350,6 +398,15 @@ def execute_task_internal(
 
     normalized_request, contract_error = normalize_request(request)
     if contract_error is not None:
+        comment_fail_closed = comment_collection_request_error_envelope(
+            request,
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            contract_error=contract_error,
+        )
+        if comment_fail_closed is not None:
+            return TaskExecutionResult(comment_fail_closed, None)
         return TaskExecutionResult(pre_accepted_failure_envelope(task_id, adapter_key, capability, contract_error), None)
     if normalized_request is None:
         return TaskExecutionResult(
@@ -3013,9 +3070,9 @@ def settle_managed_resource_bundle(
 def validate_success_payload(
     payload: Mapping[str, Any],
     *,
-    capability: str,
-    target_type: str,
-    target_value: str,
+    capability: str | None = None,
+    target_type: str | None = None,
+    target_value: str | None = None,
 ) -> dict[str, Any] | None:
     if not isinstance(payload, Mapping):
         return runtime_contract_error(
@@ -3023,6 +3080,11 @@ def validate_success_payload(
             "adapter 成功结果必须是对象",
         )
     if capability in READ_SIDE_COLLECTION_OPERATIONS:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "collection success validation requires target_type and target_value",
+            )
         try:
             envelope = collection_result_envelope_from_dict(payload)
         except CollectionContractError as error:
@@ -3051,6 +3113,11 @@ def validate_success_payload(
             )
         return None
     if capability == COMMENT_COLLECTION:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection success validation requires target_type and target_value",
+            )
         try:
             envelope = comment_collection_result_envelope_from_dict(payload)
         except CollectionContractError as error:

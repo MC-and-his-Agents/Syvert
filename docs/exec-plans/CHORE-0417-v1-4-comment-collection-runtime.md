@@ -61,6 +61,7 @@
 
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（380 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（402 tests）
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -80,6 +81,10 @@
   - 处理：已把 reply-window continuation 绑定到当前 reply page items 的 `root_comment_ref`，并新增 cross-comment continuation drift regression。
 - PR `#429` guardian finding：runtime path 未携带或校验 `CommentRequestCursor`。
   - 处理：已把 `comment_request_cursor` 加入 `TaskInput` / `CoreTaskRequest` / `AdapterTaskRequest` 的 runtime path，进入 Adapter 前执行互斥与 target binding 校验，并新增 cursor propagation 与 mixed-cursor fail-closed tests。
+- PR `#429` guardian finding：`validate_success_payload` 新签名破坏现有 content-detail helper 调用方。
+  - 处理：已恢复 content-detail 旧调用兼容；collection/comment collection 调用仍在传入 capability 时校验 target context，并补充 `tests.runtime.test_models` 验证证据。
+- PR `#429` guardian finding：请求侧 cursor fail-closed 返回了通用 failed envelope，而不是 comment collection result carrier。
+  - 处理：已在 adapter 执行前为 `signature_or_request_invalid` / `cursor_invalid_or_expired` 构造 `comment_collection` fail-closed result carrier，返回 `result_status=complete`、对应 `error_classification`、`items=[]`、`has_more=false`、`next_continuation=null`。
 
 ## 未决风险
 

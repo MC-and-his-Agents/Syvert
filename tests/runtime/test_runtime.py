@@ -854,7 +854,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(adapter.last_request.input.comment_request_cursor, cursor)
 
-    def test_execute_task_rejects_mixed_comment_request_cursors_before_adapter_execution(self) -> None:
+    def test_execute_task_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:
         adapter = CommentCollectionAdapter()
         request = TaskRequest(
             adapter_key=TEST_ADAPTER_KEY,
@@ -874,8 +874,38 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             task_id_factory=lambda: "task-runtime-comment-collection-cursor-2",
         )
 
-        self.assertEqual(result.envelope["status"], "failed")
-        self.assertEqual(result.envelope["error"]["code"], "signature_or_request_invalid")
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "comment_collection")
+        self.assertEqual(result.envelope["items"], [])
+        self.assertFalse(result.envelope["has_more"])
+        self.assertIsNone(result.envelope["next_continuation"])
+        self.assertEqual(result.envelope["result_status"], "complete")
+        self.assertEqual(result.envelope["error_classification"], "signature_or_request_invalid")
+        self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_execute_task_returns_comment_fail_closed_carrier_for_cross_target_reply_cursor(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor={
+                    "reply_cursor": make_comment_reply_cursor(target_ref="other-content"),
+                },
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-3",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["result_status"], "complete")
+        self.assertEqual(result.envelope["error_classification"], "cursor_invalid_or_expired")
+        self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
         self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
