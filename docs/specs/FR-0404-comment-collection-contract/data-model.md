@@ -26,17 +26,31 @@
   - Core 不得直接理解平台私有 continuation 字段。
   - continuation 与 target 必须绑定；跨 target 复用必须视为 invalid/expired。
 
+## CommentRequestCursor
+
+- 用途：表达 `comment_list_by_content` 请求侧的可选 cursor 输入。
+- 最小字段：
+  - `cursor_kind`
+  - `cursor_payload`
+- 约束：
+  - `cursor_kind` 只能是 `page_continuation` 或 `reply_cursor`。
+  - `cursor_payload` 分别承载 `CommentPageContinuation` 或 `CommentReplyCursor`。
+  - 同一请求最多只能携带一个 `CommentRequestCursor`。
+  - `cursor_kind=reply_cursor` 时，请求仍必须保留 content-scoped `CommentTarget`。
+
 ## CommentReplyCursor
 
 - 用途：表达某个 comment item 的 nested reply continuation。
 - 最小字段：
   - `reply_cursor_token`
   - `reply_cursor_family`
+  - `resume_target_ref`
   - `resume_comment_ref`
   - `issued_at`（可选）
 - 约束：
   - reply cursor 只能恢复同一 comment item 的 replies。
   - reply cursor 可以由 comment-id、reply-offset、thread-session 等平台私有字段组合编码，但 Core 只消费平台中立 token。
+  - `resume_target_ref` 必须与请求 target 的 `target_ref` 一致。
   - `resume_comment_ref` 与 comment item public ref 不一致时必须视为 invalid/expired。
 
 ## CommentCollectionResultEnvelope

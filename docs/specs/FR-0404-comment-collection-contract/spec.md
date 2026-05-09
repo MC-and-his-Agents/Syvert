@@ -34,6 +34,7 @@
 
 - 功能需求：
   - Core 必须能表达 `comment_list_by_content` 的 content-scoped target 与 page continuation input，而不理解平台私有 comment page object、reply cursor object、moderation object 或 platform-private thread model。
+  - `comment_list_by_content` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 top-level `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
   - comment result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`error_classification`、`raw_payload_ref`、`source_trace` 与审计字段，并复用 `FR-0403` 的 collection envelope 基础语义。
   - 每个 comment item 必须可同时保留 raw payload reference 与 normalized comment projection；Core 只能消费 normalized envelope，不消费平台私有 raw 字段。
   - 每个 comment item 必须能表达 `visibility_status`、`root_comment_ref`、`parent_comment_ref`、`target_comment_ref` 与可选 `reply_cursor`。
@@ -43,11 +44,12 @@
   - `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
+  - 请求侧 `request_cursor` 在同一请求中只能二选一：要么继续 top-level `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed。
   - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry，但不是本 FR 新增的 emitted error classification。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
-  - `reply_cursor` 只能恢复同一 comment item 的 replies；跨 comment 复用必须视为 invalid/expired。
+  - `reply_cursor` 只能恢复同一 content target 下、同一 comment item 的 replies；跨 comment 或跨 content target 复用必须视为 invalid/expired。
   - `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不得因 comment contract 引入新的 Core 分支或平台私有字段。
 - 非功能需求：
   - comment contract 必须 fail-closed；无法证明 hierarchy、continuation、reply cursor、visibility 或 raw/normalized 投影合法时，不得返回伪稳定结果。
@@ -85,6 +87,12 @@ Then Adapter 负责还原平台 continuation，Core 仍只接收平台中立 con
 Given 某个 top-level comment item 返回 `reply_cursor`
 When Core 继续拉取该 comment 的 replies
 Then Adapter 只允许在同一 comment 上恢复 nested reply window，且 `reply_cursor.resume_comment_ref` 与当前 comment public ref 保持一致
+
+### 场景 3B：reply cursor 请求与 top-level continuation 互斥
+
+Given 同一请求同时携带 top-level `next_continuation` 与某条 comment item 的 `reply_cursor`
+When Core 尝试执行该 comment request
+Then request 必须 fail-closed，而不是让 Adapter 自行猜测优先级
 
 ### 场景 4：空评论结果不会伪装成错误
 
@@ -134,6 +142,12 @@ Given next-page continuation token 或 reply cursor 已失效
 When Adapter 还原 continuation 并请求后续页面
 Then result 必须返回 `result_status=complete` 与 `error_classification=cursor_invalid_or_expired`，而不是 generic `platform_failed`
 
+### 场景 9B：reply cursor 跨 target 复用必须失败
+
+Given 某条 comment item 产出的 `reply_cursor` 被拿去请求另一 content target 的 replies
+When Core 或 Adapter 校验请求上下文
+Then result 必须返回 `result_status=complete` 与 `error_classification=cursor_invalid_or_expired`
+
 ### 场景 10：permission denied 保持独立 collection-level 错误
 
 Given content target 存在，但当前 viewer 或 account 不具备评论访问权限
@@ -181,6 +195,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 
 - [ ] formal spec 冻结 `comment_list_by_content` 的 comment collection contract。
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
+- [ ] formal spec 冻结 `comment_list_by_content` 的请求侧 cursor 规则，明确 `next_continuation` 与 `reply_cursor` 的组合/互斥边界。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
 - [ ] formal spec 明确 `empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 的公共边界，以及 `partial_result` 的 result-status 语义。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。
