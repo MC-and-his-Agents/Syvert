@@ -177,7 +177,7 @@ Then result 必须固定使用 `result_status=complete`，并分别归类为 `pl
 
 Given comment response 缺少 comment identity、items family 或 continuation family，导致整页无法建立最小 public projection
 When Core 处理该页 comment result
-Then result 必须 fail-closed 到 `result_status=complete` 与 `error_classification=parse_failed`，而不是伪造 `partial_result`
+Then result 必须 fail-closed 到 `result_status=partial_result` 与 `error_classification=parse_failed`，并且不得伪造 `complete`
 
 ### 场景 14：resource health 与 verification 保持 fail-closed
 
