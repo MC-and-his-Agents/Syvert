@@ -3416,8 +3416,10 @@ def _comment_request_cursor_is_top_level_page(request_cursor: Any | None) -> boo
     else:
         page_continuation = getattr(request_cursor, "page_continuation", None)
         reply_cursor = getattr(request_cursor, "reply_cursor", None)
-    if reply_cursor is not None or page_continuation is None:
+    if reply_cursor is not None:
         return False
+    if page_continuation is None:
+        return True
     if isinstance(page_continuation, Mapping):
         value = page_continuation.get("resume_comment_ref")
     else:

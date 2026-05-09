@@ -929,6 +929,34 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
         self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
 
+    def test_validate_success_payload_rejects_empty_mapping_cursor_reply_window_drift(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+
+        result = validate_success_payload(
+            payload,
+            capability="comment_collection",
+            target_type="content",
+            target_value="content-001",
+            request_cursor={},
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+
+    def test_validate_success_payload_rejects_empty_dataclass_cursor_reply_window_drift(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+
+        result = validate_success_payload(
+            payload,
+            capability="comment_collection",
+            target_type="content",
+            target_value="content-001",
+            request_cursor=CommentRequestCursor(),
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+
     def test_execute_task_keeps_comment_collection_resource_admission_deferred(self) -> None:
         adapter = CommentCollectionAdapter()
         request = TaskRequest(
