@@ -191,7 +191,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
   - raw response 缺少 `items` family、page continuation family、reply cursor family 或 comment identity family 时，必须按 `parse_failed` fail-closed，不得伪造 `complete`。
   - page continuation、reply cursor 或 reply-window continuation 与 target/comment 上下文不匹配时，必须返回 `cursor_invalid_or_expired`。
   - rate-limit、permission-denied、provider/network-blocked、signature/request-invalid 必须保持为独立公共错误分类。
-  - raw payload present 但 normalized comment 缺少最小必需字段，且无法构造最小 placeholder projection 时，必须进入 `parse_failed` 或 `partial_result` 路径；若页面仍保留合法 comments，则固定使用 `result_status=partial_result + error_classification=parse_failed`。
+  - raw payload present 但 normalized comment 缺少最小必需字段，且无法构造最小 placeholder projection 时，必须统一进入 `result_status=partial_result + error_classification=parse_failed` 路径；无论页面保留的是部分合法 comments，还是零成功投影，都不得伪造 `complete`。
 - 边界场景：
   - `target_not_found` 与 `empty_result` 必须区分；合法 content target 没有评论不是 not found。
   - deleted/invisible/unavailable 是 item-level visibility，不等于 collection-level failure。
