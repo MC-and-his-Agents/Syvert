@@ -60,7 +60,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
-- `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
+- `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`（380 tests）
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -76,6 +76,10 @@
   - 处理：已将 `comment_collection` 接入 runtime capability map、`content` target、success payload validator、success envelope serializer、resource requirement admission、TaskRecord terminal envelope validation，并新增 focused runtime tests。
 - PR `#429` guardian finding：reply-window `next_continuation.resume_comment_ref` 不应要求 root comment 出现在当前 reply page items。
   - 处理：已移除该错误约束，保留 target 绑定校验，并新增“后续 reply page 仅返回 replies，但 continuation 绑定原 root comment”的 focused test。
+- PR `#429` guardian finding：reply-window `next_continuation.resume_comment_ref` 仍必须防止漂移到另一 comment thread。
+  - 处理：已把 reply-window continuation 绑定到当前 reply page items 的 `root_comment_ref`，并新增 cross-comment continuation drift regression。
+- PR `#429` guardian finding：runtime path 未携带或校验 `CommentRequestCursor`。
+  - 处理：已把 `comment_request_cursor` 加入 `TaskInput` / `CoreTaskRequest` / `AdapterTaskRequest` 的 runtime path，进入 Adapter 前执行互斥与 target binding 校验，并新增 cursor propagation 与 mixed-cursor fail-closed tests。
 
 ## 未决风险
 

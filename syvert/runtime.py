@@ -29,6 +29,7 @@ from syvert.read_side_collection import (
     comment_collection_result_envelope_to_dict,
     collection_result_envelope_from_dict,
     collection_result_envelope_to_dict,
+    validate_comment_request_cursor,
 )
 from syvert.task_record import (
     TaskRecord,
@@ -106,6 +107,7 @@ class TaskInput:
     keyword: str | None = None
     creator_id: str | None = None
     continuation_token: str | None = None
+    comment_request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +161,7 @@ class CoreTaskRequest:
     target: InputTarget
     policy: CollectionPolicy
     execution_control_policy: ExecutionControlPolicy | None = None
+    request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -175,6 +178,7 @@ class AdapterTaskRequest:
     target_type: str
     target_value: str
     collection_mode: str
+    request_cursor: Mapping[str, Any] | None = None
 
     @property
     def input(self) -> TaskInput:
@@ -183,7 +187,7 @@ class AdapterTaskRequest:
         if self.target_type == "keyword":
             return TaskInput(keyword=self.target_value)
         if self.target_type == "content":
-            return TaskInput(content_ref=self.target_value)
+            return TaskInput(content_ref=self.target_value, comment_request_cursor=self.request_cursor)
         if self.target_type == "creator":
             return TaskInput(creator_id=self.target_value)
         return TaskInput()
@@ -2303,6 +2307,7 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
                 target=target,
                 policy=policy,
                 execution_control_policy=execution_control_policy,
+                request_cursor=request.input.comment_request_cursor if request.capability == COMMENT_COLLECTION else None,
             ),
             None,
         )
@@ -2329,6 +2334,14 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         return None, invalid_input_error("invalid_task_request", "target_type 不合法")
     if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
         return None, invalid_input_error("invalid_task_request", "collection_mode 不合法")
+    if target.capability == COMMENT_COLLECTION:
+        cursor_error = validate_comment_request_cursor(request.request_cursor, target_ref=target.target_value)
+        if cursor_error is not None:
+            return None, invalid_input_error(
+                cursor_error["code"],
+                cursor_error["message"],
+                details=cursor_error.get("details", {}),
+            )
     execution_control_policy = request.execution_control_policy or default_execution_control_policy()
     if execution_control_policy is request.execution_control_policy:
         return request, None
@@ -2337,6 +2350,7 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
             target=request.target,
             policy=request.policy,
             execution_control_policy=execution_control_policy,
+            request_cursor=request.request_cursor,
         ),
         None,
     )
@@ -2410,6 +2424,7 @@ def project_to_adapter_request(
             target_type=request.target.target_type,
             target_value=request.target.target_value,
             collection_mode=request.policy.collection_mode,
+            request_cursor=request.request_cursor if request.target.capability == COMMENT_COLLECTION else None,
         ),
         None,
     )
@@ -2503,6 +2518,25 @@ def _project_task_input_to_target(
                 InputTarget(adapter_key=adapter_key, capability=capability, target_type="content", target_value=""),
                 CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
                 invalid_input_error("invalid_task_request", "input.content_ref 不能为空"),
+            )
+        cursor_error = validate_comment_request_cursor(
+            input_value.comment_request_cursor,
+            target_ref=input_value.content_ref,
+        )
+        if cursor_error is not None:
+            return (
+                InputTarget(
+                    adapter_key=adapter_key,
+                    capability=capability,
+                    target_type="content",
+                    target_value=input_value.content_ref,
+                ),
+                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+                invalid_input_error(
+                    cursor_error["code"],
+                    cursor_error["message"],
+                    details=cursor_error.get("details", {}),
+                ),
             )
         return (
             InputTarget(

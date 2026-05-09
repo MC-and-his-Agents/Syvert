@@ -131,6 +131,25 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_comment_page_continuation(*, target_ref: str = "content-001") -> dict[str, object]:
+    return {
+        "continuation_token": "comment-page-cursor-1",
+        "continuation_family": "opaque",
+        "resume_target_ref": target_ref,
+        "issued_at": "2026-05-09T10:00:00Z",
+    }
+
+
+def make_comment_reply_cursor(*, target_ref: str = "content-001", comment_ref: str = "comment:root-1") -> dict[str, object]:
+    return {
+        "reply_cursor_token": "reply-cursor-1",
+        "reply_cursor_family": "opaque",
+        "resume_target_ref": target_ref,
+        "resume_comment_ref": comment_ref,
+        "issued_at": "2026-05-09T10:00:00Z",
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -816,6 +835,48 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
         self.assertEqual(result.task_record.request.target_type, "content")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
+
+    def test_execute_task_passes_comment_request_cursor_to_adapter_context(self) -> None:
+        adapter = CommentCollectionAdapter()
+        cursor = {"page_continuation": make_comment_page_continuation()}
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-001", comment_request_cursor=cursor),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(adapter.last_request.input.comment_request_cursor, cursor)
+
+    def test_execute_task_rejects_mixed_comment_request_cursors_before_adapter_execution(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor={
+                    "page_continuation": make_comment_page_continuation(),
+                    "reply_cursor": make_comment_reply_cursor(),
+                },
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-2",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "signature_or_request_invalid")
+        self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()

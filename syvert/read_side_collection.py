@@ -1129,6 +1129,22 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "resume_target_ref": envelope.next_continuation.resume_target_ref,
             },
         )
+    if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
+        drifted_items = tuple(
+            item.normalized.canonical_ref
+            for item in envelope.items
+            if item.normalized.root_comment_ref != envelope.next_continuation.resume_comment_ref
+        )
+        if drifted_items:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply-window next_continuation.resume_comment_ref 必须绑定当前 reply page 的 root_comment_ref",
+                details={
+                    "field": "next_continuation.resume_comment_ref",
+                    "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    "drifted_item_refs": drifted_items,
+                },
+            )
 
     dedup_keys = tuple(item.dedup_key for item in envelope.items)
     if len(dedup_keys) != len(set(dedup_keys)):
