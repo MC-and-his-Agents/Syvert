@@ -81,6 +81,7 @@
   - `dedup_key` 必须稳定，且不要求两个平台使用相同原始 comment ID 字段。
   - `visibility_status` 至少支持 `visible`、`deleted`、`invisible`、`unavailable`。
   - `reply_cursor` 仅在 comment item 可继续加载 replies 时出现。
+  - `unavailable` item 仍必须能提供最小 normalized placeholder projection，例如稳定的 `canonical_ref`、`root_comment_ref` 与 placeholder `body_text_hint`。
   - `normalized` 是 Core 可消费内容；平台私有字段不得直接进入 item envelope 顶层。
 
 ## NormalizedCommentItem
@@ -102,6 +103,7 @@
   - reply comment 的 `root_comment_ref` 必须稳定指向 thread root。
   - `parent_comment_ref` 指向直接 parent comment；top-level comment 不要求该字段。
   - `target_comment_ref` 仅在 reply 明确指向某个目标 comment 时出现。
+  - `body_text_hint` 对 `unavailable` item 也必须存在，但允许是平台 unavailable placeholder 的最小公共投影，而不是完整正文。
   - 缺少可选字段不会使 item invalid。
 
 ## CommentVisibilityStatus
@@ -115,7 +117,7 @@
 - 约束：
   - `deleted` 表示 comment existed but platform marks it deleted。
   - `invisible` 表示 comment exists but is hidden for current viewer。
-  - `unavailable` 表示 comment slot exists but minimum public projection is unavailable。
+  - `unavailable` 表示 comment slot exists，但只保留最小 public placeholder projection，完整正文不可用。
   - visibility status 不是 collection-level error classification 的替代物。
 
 ## SourceTrace
