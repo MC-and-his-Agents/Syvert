@@ -65,6 +65,7 @@
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（450 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（449 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（453 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（455 tests）
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -104,6 +105,10 @@
   - 处理：已收紧 reply item hierarchy validation，拒绝 self-root/self-parent 与跨 thread target linkage，并补 malformed hierarchy regression。
 - PR `#429` guardian finding：malformed request cursor 仍漏出通用 failed envelope。
   - 处理：已把 request cursor `parse_failed` 也收敛为 `comment_collection` fail-closed carrier，并补 malformed cursor regression。
+- PR `#429` guardian finding：成功态未校验请求侧 reply thread 绑定。
+  - 处理：已让 `validate_success_payload` 接收 runtime request cursor，并校验返回 items / next continuation 与请求 cursor 的 `resume_comment_ref` 一致；新增 reply-thread drift regression。
+- PR `#429` guardian finding：非法 `CoreTaskRequest` 轴会被 fail-closed 分支改写成合法 content/paginated。
+  - 处理：已收紧 pre-admission fail-closed 分支，仅对已是 `comment_collection + content + paginated` 的 CoreTaskRequest 生成 comment carrier；非法轴保留通用 failed envelope，并补回归。
 
 ## 未决风险
 

@@ -281,6 +281,8 @@ def comment_collection_request_error_envelope(
     if isinstance(request, TaskRequest) and type(request.input) is TaskInput:
         target_ref = request.input.content_ref
     elif isinstance(request, CoreTaskRequest) and request.target.capability == COMMENT_COLLECTION:
+        if request.target.target_type != "content" or request.policy.collection_mode != PAGINATED_COLLECTION_MODE:
+            return None
         target_ref = request.target.target_value
     else:
         return None
@@ -1434,6 +1436,7 @@ def run_adapter_attempt_with_timeout(
             capability=capability,
             target_type=adapter_context.target_type,
             target_value=adapter_context.target_value,
+            request_cursor=adapter_context.request.request_cursor,
         )
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error), None, DEFAULT_FAILURE_RELEASE_REASON, False, False
@@ -3153,6 +3156,7 @@ def validate_success_payload(
     capability: str | None = None,
     target_type: str | None = None,
     target_value: str | None = None,
+    request_cursor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not isinstance(payload, Mapping):
         return runtime_contract_error(
@@ -3224,6 +3228,37 @@ def validate_success_payload(
                 "comment collection result.target.target_ref 必须与请求 target_value 一致",
                 details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
             )
+        cursor_thread_ref = _comment_request_cursor_thread_ref(request_cursor)
+        if cursor_thread_ref is not None:
+            drifted_items = tuple(
+                item.normalized.canonical_ref
+                for item in envelope.items
+                if item.normalized.root_comment_ref != cursor_thread_ref
+            )
+            if drifted_items:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection result items 必须绑定请求 cursor 的 comment thread",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": cursor_thread_ref,
+                        "drifted_item_refs": drifted_items,
+                    },
+                )
+            if (
+                envelope.next_continuation is not None
+                and envelope.next_continuation.resume_comment_ref is not None
+                and envelope.next_continuation.resume_comment_ref != cursor_thread_ref
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection next_continuation 必须绑定请求 cursor 的 comment thread",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": cursor_thread_ref,
+                        "next_resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    },
+                )
         return None
 
     if "raw" not in payload or "normalized" not in payload:
@@ -3345,6 +3380,20 @@ def validate_success_payload(
             "normalized.media.image_urls 必须是字符串数组",
         )
 
+    return None
+
+
+def _comment_request_cursor_thread_ref(request_cursor: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(request_cursor, Mapping):
+        return None
+    reply_cursor = request_cursor.get("reply_cursor")
+    if isinstance(reply_cursor, Mapping):
+        value = reply_cursor.get("resume_comment_ref")
+        return value if isinstance(value, str) and value else None
+    page_continuation = request_cursor.get("page_continuation")
+    if isinstance(page_continuation, Mapping):
+        value = page_continuation.get("resume_comment_ref")
+        return value if isinstance(value, str) and value else None
     return None
 
 

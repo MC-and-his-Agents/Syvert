@@ -137,6 +137,37 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_comment_collection_reply_result(
+    *,
+    target_ref: str = "content-001",
+    root_comment_ref: str = "comment:root-1",
+) -> dict[str, object]:
+    payload = make_comment_collection_result(target_ref=target_ref)
+    payload["items"] = [
+        {
+            "item_type": "comment",
+            "dedup_key": "comment:reply-1",
+            "source_id": "reply-1",
+            "source_ref": "source:comment:reply-1",
+            "visibility_status": "visible",
+            "normalized": {
+                "source_platform": "reference-platform",
+                "source_type": "comment",
+                "source_id": "reply-1",
+                "canonical_ref": "comment:reply-1",
+                "body_text_hint": "reply",
+                "root_comment_ref": root_comment_ref,
+                "parent_comment_ref": root_comment_ref,
+            },
+            "raw_payload_ref": "raw:comment:reply-1",
+            "source_trace": payload["source_trace"],
+        }
+    ]
+    payload["result_status"] = "complete"
+    payload["error_classification"] = "partial_result"
+    return payload
+
+
 def make_comment_page_continuation(*, target_ref: str = "content-001") -> dict[str, object]:
     return {
         "continuation_token": "comment-page-cursor-1",
@@ -821,6 +852,20 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
+    def test_validate_success_payload_rejects_comment_reply_thread_drift_against_request_cursor(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:other-root")
+
+        result = validate_success_payload(
+            payload,
+            capability="comment_collection",
+            target_type="content",
+            target_value="content-001",
+            request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+
     def test_execute_task_builds_comment_collection_success_envelope_from_adapter_payload(self) -> None:
         adapter = CommentCollectionAdapter()
         request = TaskRequest(
@@ -978,6 +1023,33 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
         self.assertIsNotNone(result.task_record)
         self.assertEqual(result.task_record.status, "succeeded")
+        self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_execute_core_task_request_with_invalid_axes_does_not_rewrite_comment_fail_closed_target(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="comment_collection",
+                target_type="creator",
+                target_value="creator-001",
+            ),
+            policy=CollectionPolicy(collection_mode="public"),
+            request_cursor={
+                "page_continuation": make_comment_page_continuation(),
+                "reply_cursor": make_comment_reply_cursor(),
+            },
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-6",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "signature_or_request_invalid")
+        self.assertNotIn("target", result.envelope)
         self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_contract_harness_builds_comment_collection_success_envelope(self) -> None:
