@@ -49,6 +49,8 @@
   - 请求侧 `request_cursor` 在同一请求中只能二选一：要么通过 `page_continuation` 继续上一页 result 的 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
   - collection-level错误分类 vocabulary 继承 `FR-0403`，至少保留：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
+  - collection-level failure envelope 必须统一返回 `items=[]`、`has_more=false`、`next_continuation=null`；不得在 failure envelope 中继续携带可执行 continuation 或伪正常 comment item。
+  - collection-level failure envelope 仍必须保留 `raw_payload_ref` 与 `source_trace` 审计载体；若失败发生在稳定 raw payload 之前，这些字段必须指向 failure evidence / provider trace alias，而不是平台 raw object。
   - 本 FR 允许 emitted 的 `error_classification` 集合不单独发出 `partial_result`；partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义。`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
   - item-level `reply_cursor` 只用于进入某条 comment 的首个 reply window；若 reply window 仍有更多数据，后续续拉必须通过 `next_continuation` 完成。

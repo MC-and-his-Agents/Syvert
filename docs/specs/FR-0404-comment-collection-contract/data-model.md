@@ -77,10 +77,12 @@
   - `error_classification` 复用 `FR-0403` vocabulary，不新增 comment-only collection-level 分类。
   - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`。
   - `empty_result` 不等于 `target_not_found`。
+  - collection-level failure envelope 必须使用 `items=[]`、`has_more=false`、`next_continuation=null`。
   - `has_more=false` 或 `result_status=empty` 时 `next_continuation` 必须为空。
   - `has_more=true` 时必须提供 `next_continuation`。
   - reply window 如仍有更多数据，必须通过 `next_continuation` 继续，而不是要求再次消费旧的 item-level `reply_cursor`。
   - `raw_payload_ref` 只能引用原始载荷，不承载 raw payload 内联内容。
+  - 对发生在稳定 raw payload 之前的 collection-level failure，`raw_payload_ref` 可指向 failure evidence alias；`source_trace` 仍只用于审计，不得恢复执行。
 
 ## CommentItemEnvelope
 
@@ -180,6 +182,7 @@
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
   - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；至少保留一个成功 normalized comment 的 partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
   - 零成功投影的整页 parse failure 固定使用 `result_status=complete` 与 `error_classification=parse_failed`，并返回 `items=[]`、`has_more=false`、`next_continuation=null`。
+  - `target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 均固定使用 collection-level failure envelope。
   - `partial_result` 继续保留为继承词表的兼容 entry，保证与 `FR-0403` vocabulary 对齐。
 
 ## 生命周期

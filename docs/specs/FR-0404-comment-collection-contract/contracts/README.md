@@ -20,6 +20,7 @@
 - Core 只能消费 normalized comment item、continuation token、reply cursor token 与公共错误分类，不得消费平台私有 comment page object、reply object、moderation object 或 thread-session object。
 - Core 必须区分继承 vocabulary 中的 `empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required` 与 `signature_or_request_invalid`。
 - Core 必须把 `credential_invalid` 与 `verification_required` 视为 fail-closed comment boundary，并与 `v1.2.0` resource governance 保持一致。
+- Core 必须把 collection-level failure 统一消费为 `items=[]`、`has_more=false`、无 `next_continuation` 的 fail-closed envelope；`raw_payload_ref` 与 `source_trace` 只作为审计证据载体。
 - Core 必须把 `deleted`、`invisible`、`unavailable` 视为 item-level visibility，而不是 collection-level error 替代物。
 - 对至少保留一个成功 normalized comment 的 partial page，Core 固定消费 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 继续保留为继承词表的兼容 entry，但不是本 FR 允许单独 emitted 的 error classification。
 - 对零成功投影的整页 parse failure，Core 消费 `result_status=complete`、`error_classification=parse_failed`、`items=[]`、`has_more=false` 且无 `next_continuation` 的 fail-closed envelope。
