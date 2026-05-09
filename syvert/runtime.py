@@ -621,6 +621,33 @@ def execute_task_internal(
             None,
         )
 
+    if capability == COMMENT_COLLECTION:
+        cursor_error = validate_comment_request_cursor(
+            normalized_request.request_cursor,
+            target_ref=normalized_request.target.target_value,
+        )
+        if cursor_error is not None:
+            comment_fail_closed = comment_collection_request_error_envelope(
+                normalized_request,
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                contract_error=invalid_input_error(
+                    cursor_error["code"],
+                    cursor_error["message"],
+                    details=cursor_error.get("details", {}),
+                ),
+            )
+            if comment_fail_closed is not None:
+                return finalize_pre_admission_comment_collection_result(
+                    normalized_request,
+                    task_id=task_id,
+                    adapter_key=adapter_key,
+                    capability=capability,
+                    envelope=comment_fail_closed,
+                    task_record_store=store,
+                )
+
     required_resource_slots = RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE.get(
         (normalized_request.target.capability, normalized_request.policy.collection_mode),
         (),
@@ -2479,14 +2506,6 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         return None, invalid_input_error("invalid_task_request", "target_type 不合法")
     if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
         return None, invalid_input_error("invalid_task_request", "collection_mode 不合法")
-    if target.capability == COMMENT_COLLECTION:
-        cursor_error = validate_comment_request_cursor(request.request_cursor, target_ref=target.target_value)
-        if cursor_error is not None:
-            return None, invalid_input_error(
-                cursor_error["code"],
-                cursor_error["message"],
-                details=cursor_error.get("details", {}),
-            )
     execution_control_policy = request.execution_control_policy or default_execution_control_policy()
     if execution_control_policy is request.execution_control_policy:
         return request, None
@@ -2663,25 +2682,6 @@ def _project_task_input_to_target(
                 InputTarget(adapter_key=adapter_key, capability=capability, target_type="content", target_value=""),
                 CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
                 invalid_input_error("invalid_task_request", "input.content_ref 不能为空"),
-            )
-        cursor_error = validate_comment_request_cursor(
-            input_value.comment_request_cursor,
-            target_ref=input_value.content_ref,
-        )
-        if cursor_error is not None:
-            return (
-                InputTarget(
-                    adapter_key=adapter_key,
-                    capability=capability,
-                    target_type="content",
-                    target_value=input_value.content_ref,
-                ),
-                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
-                invalid_input_error(
-                    cursor_error["code"],
-                    cursor_error["message"],
-                    details=cursor_error.get("details", {}),
-                ),
             )
         return (
             InputTarget(
@@ -3248,7 +3248,7 @@ def validate_success_payload(
             drifted_items = tuple(
                 item.normalized.canonical_ref
                 for item in envelope.items
-                if item.normalized.parent_comment_ref is None
+                if not _comment_item_binds_resume_comment_ref(item, cursor_thread_ref)
             )
             if drifted_items:
                 return runtime_contract_error(
@@ -3396,6 +3396,15 @@ def validate_success_payload(
         )
 
     return None
+
+
+def _comment_item_binds_resume_comment_ref(item: Any, resume_comment_ref: str) -> bool:
+    normalized = item.normalized
+    return (
+        normalized.root_comment_ref == resume_comment_ref
+        or normalized.parent_comment_ref == resume_comment_ref
+        or normalized.target_comment_ref == resume_comment_ref
+    )
 
 
 def _comment_request_cursor_is_top_level_page(request_cursor: Any | None) -> bool:
