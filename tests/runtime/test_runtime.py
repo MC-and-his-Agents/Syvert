@@ -1341,6 +1341,32 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_success_payload")
         self.assertEqual(result["verdict"], "contract_violation")
 
+    def test_contract_harness_uses_comment_request_cursor_context(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:other-root")
+        envelope = _build_success_runtime_envelope(
+            task_id="task-harness-comment-collection-3",
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            payload=payload,
+            target_type="content",
+            target_value="content-001",
+            request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+        )
+        result = validate_contract_sample(
+            ContractSampleDefinition(
+                sample_id="comment-collection-cursor-drift",
+                expected_outcome="success",
+                target_type="content",
+                target_value="content-001",
+                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+            ),
+            HarnessExecutionResult(runtime_envelope=envelope),
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["verdict"], "contract_violation")
+
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()
         request = TaskRequest(

@@ -130,6 +130,7 @@ _FIXTURE_INPUT_FIELD_NAMES = frozenset(
         "capability",
         "collection_mode",
         "operation",
+        "request_cursor",
         "resource_profile_key",
         "target_type",
         "target_value",
@@ -1298,6 +1299,7 @@ def _execute_and_validate_fixture(
         expected_outcome=expected_outcome,
         target_type=fixture_input["target_type"],
         target_value=fixture_input["target_value"],
+        request_cursor=fixture_input["request_cursor"],
     )
     core_operation = fixture_input["operation"]
     adapter_capability = fixture_input["capability"]
@@ -1316,6 +1318,7 @@ def _execute_and_validate_fixture(
                     target_type=fixture_input["target_type"],
                     target_value=fixture_input["target_value"],
                     collection_mode=fixture_input["collection_mode"],
+                    request_cursor=fixture_input["request_cursor"],
                 ),
                 resource_bundle=resource_bundle,
             )
@@ -1327,6 +1330,7 @@ def _execute_and_validate_fixture(
             payload=payload,
             target_type=fixture_input["target_type"],
             target_value=fixture_input["target_value"],
+            request_cursor=fixture_input["request_cursor"],
         )
     except PlatformAdapterError as error:
         details = _normalize_platform_adapter_error_details(error)
@@ -1374,6 +1378,7 @@ def _build_success_runtime_envelope(
     payload: Any,
     target_type: str | None = None,
     target_value: str | None = None,
+    request_cursor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     envelope = {
         "task_id": task_id,
@@ -1388,6 +1393,7 @@ def _build_success_runtime_envelope(
             capability=capability,
             target_type=target_type or inferred_target_type,
             target_value=target_value or inferred_target_value,
+            request_cursor=request_cursor,
         )
         if payload_error is not None:
             return {
@@ -1857,7 +1863,7 @@ def _validate_success_payload_observation(
 def _normalize_fixture_input(
     manifest: ThirdPartyAdapterManifest,
     fixture: AdapterContractFixture,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     input_mapping = fixture.input
     fixture_input = {
         "operation": _require_non_empty_string(
@@ -1891,6 +1897,14 @@ def _normalize_fixture_input(
             field="input.resource_profile_key",
         ),
     }
+    request_cursor = input_mapping.get("request_cursor")
+    if request_cursor is not None and not isinstance(request_cursor, Mapping):
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_input",
+            "fixture input.request_cursor must be null or a mapping",
+            details={"fixture_id": fixture.fixture_id, "field": "input.request_cursor"},
+        )
+    fixture_input["request_cursor"] = request_cursor
     if fixture_input["capability"] not in manifest.supported_capabilities:
         raise ThirdPartyContractEntryError(
             "invalid_fixture_input_metadata",

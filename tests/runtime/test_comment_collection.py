@@ -179,7 +179,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-    def test_reply_window_next_continuation_allows_opaque_reply_refs(self) -> None:
+    def test_reply_window_next_continuation_rejects_opaque_thread_drift(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-2",
             source_id="reply-2",
@@ -195,7 +195,10 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             continuation_comment_ref="comment:other-root",
         )
 
-        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("reply thread", result["message"])
 
     def test_reply_hierarchy_allows_opaque_independent_target_linkage(self) -> None:
         reply = make_comment_item(

@@ -197,8 +197,25 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             ("adapter_key", "capability", "normalized", "raw", "status", "task_id"),
         )
         self.assertEqual(adapter.last_request_capability, "content_detail")
+        self.assertIsNone(adapter.last_request_cursor)
         self.assertEqual(adapter.last_resource_bundle_capability, "content_detail_by_url")
         self.assertEqual(adapter.last_resource_slots, ("account",))
+
+    def test_fixture_request_cursor_is_passed_to_adapter_request(self) -> None:
+        adapter = ThirdPartyContractFixtureAdapter()
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        request_cursor = {"page_continuation": {"cursor": "opaque-cursor"}}
+        fixtures[0]["input"]["request_cursor"] = request_cursor
+        fixtures[1]["input"]["request_cursor"] = request_cursor
+
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=fixtures,
+            adapter=adapter,
+        )
+
+        self.assertEqual(results[0]["verdict"], "pass")
+        self.assertEqual(adapter.last_request_cursor, request_cursor)
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
         manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())

@@ -94,6 +94,7 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
                 "target_value": "https://contract-host/third-party/success",
                 "collection_mode": "hybrid",
                 "resource_profile_key": "account_proxy",
+                "request_cursor": None,
             },
             "expected": {
                 "status": "success",
@@ -111,6 +112,7 @@ def minimal_third_party_adapter_fixtures() -> tuple[dict[str, Any], ...]:
                 "target_value": "https://contract-host/third-party/content-not-found",
                 "collection_mode": "hybrid",
                 "resource_profile_key": "account",
+                "request_cursor": None,
             },
             "expected": {
                 "status": "failed",
@@ -197,6 +199,7 @@ class ThirdPartyContractFixtureAdapter:
     error_code: str = "content_not_found"
     last_resource_slots: tuple[str, ...] | None = None
     last_request_capability: str | None = None
+    last_request_cursor: dict[str, Any] | None = None
     last_resource_bundle_capability: str | None = None
 
     adapter_key = THIRD_PARTY_FIXTURE_ADAPTER_KEY
@@ -229,6 +232,11 @@ class ThirdPartyContractFixtureAdapter:
 
     def execute(self, request: AdapterExecutionContext) -> dict[str, Any]:
         self.last_request_capability = request.request.capability
+        self.last_request_cursor = (
+            dict(request.request.request_cursor)
+            if request.request.request_cursor is not None
+            else None
+        )
         self.last_resource_bundle_capability = (
             request.resource_bundle.capability
             if request.resource_bundle is not None

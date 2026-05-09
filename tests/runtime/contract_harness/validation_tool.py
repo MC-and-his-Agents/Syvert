@@ -25,6 +25,7 @@ class ContractSampleDefinition:
     expected_outcome: SampleExpectation
     target_type: str | None = None
     target_value: str | None = None
+    request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -299,6 +300,7 @@ def _validate_success_envelope(
         capability=str(envelope.get("capability", "")),
         target_type=target_type,
         target_value=target_value,
+        request_cursor=sample.request_cursor,
     )
     if payload_error is not None:
         return {

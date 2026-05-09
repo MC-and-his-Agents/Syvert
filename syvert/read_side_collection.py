@@ -1144,6 +1144,21 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                     "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
                 },
             )
+        drifted_items = tuple(
+            item.normalized.canonical_ref
+            for item in envelope.items
+            if not _comment_item_binds_comment_ref(item, envelope.next_continuation.resume_comment_ref)
+        )
+        if drifted_items:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply-window next_continuation.resume_comment_ref 必须绑定当前 reply thread",
+                details={
+                    "field": "next_continuation.resume_comment_ref",
+                    "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    "drifted_item_refs": drifted_items,
+                },
+            )
 
     dedup_keys = tuple(item.dedup_key for item in envelope.items)
     if len(dedup_keys) != len(set(dedup_keys)):
@@ -1238,6 +1253,15 @@ def _validate_comment_item_contract(
                 details={"field": f"{field}.reply_cursor.resume_comment_ref"},
             )
     return None
+
+
+def _comment_item_binds_comment_ref(item: CommentItemEnvelope, comment_ref: str) -> bool:
+    normalized = item.normalized
+    return (
+        normalized.root_comment_ref == comment_ref
+        or normalized.parent_comment_ref == comment_ref
+        or normalized.target_comment_ref == comment_ref
+    )
 
 
 def _parse_comment_collection_result_envelope(payload: Mapping[str, Any]) -> CommentCollectionResultEnvelope:
