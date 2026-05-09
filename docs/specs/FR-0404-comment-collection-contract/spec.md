@@ -34,7 +34,7 @@
 
 - 功能需求：
   - Core 必须能表达 `comment_list_by_content` 的 content-scoped target 与 page continuation input，而不理解平台私有 comment page object、reply cursor object、moderation object 或 platform-private thread model。
-  - `comment_list_by_content` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 top-level `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
+  - `comment_list_by_content` 的后续请求输入固定为 `target + request_cursor` 组合：`request_cursor` 可以为空、可以是 `next_continuation`，也可以是某条 comment item 产出的 `reply_cursor`。
   - comment result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`error_classification`、`raw_payload_ref`、`source_trace` 与审计字段，并复用 `FR-0403` 的 collection envelope 基础语义。
   - 每个 comment item 必须可同时保留 raw payload reference 与 normalized comment projection；Core 只能消费 normalized envelope，不消费平台私有 raw 字段。
   - 每个 comment item 必须能表达 `visibility_status`、`root_comment_ref`、`parent_comment_ref`、`target_comment_ref` 与可选 `reply_cursor`。
@@ -44,12 +44,13 @@
   - `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
-  - 请求侧 `request_cursor` 在同一请求中只能二选一：要么继续 top-level `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed。
+  - 请求侧 `request_cursor` 在同一请求中只能二选一：要么继续 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
   - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry，但不是本 FR 新增的 emitted error classification。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
-  - `reply_cursor` 只能恢复同一 content target 下、同一 comment item 的 replies；跨 comment 或跨 content target 复用必须视为 invalid/expired。
+  - item-level `reply_cursor` 只用于进入某条 comment 的首个 reply window；若 reply window 仍有更多数据，后续续拉必须通过 `next_continuation` 完成。
+  - `reply_cursor` 与 reply-window `next_continuation` 都只能恢复同一 content target 下、同一 comment item 的 replies；跨 comment 或跨 content target 复用必须视为 invalid/expired。
   - `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不得因 comment contract 引入新的 Core 分支或平台私有字段。
 - 非功能需求：
   - comment contract 必须 fail-closed；无法证明 hierarchy、continuation、reply cursor、visibility 或 raw/normalized 投影合法时，不得返回伪稳定结果。
@@ -92,7 +93,13 @@ Then Adapter 只允许在同一 comment 上恢复 nested reply window，且 `rep
 
 Given 同一请求同时携带 top-level `next_continuation` 与某条 comment item 的 `reply_cursor`
 When Core 尝试执行该 comment request
-Then request 必须 fail-closed，而不是让 Adapter 自行猜测优先级
+Then request 必须 fail-closed 到 `result_status=complete` 与 `error_classification=signature_or_request_invalid`，而不是让 Adapter 自行猜测优先级
+
+### 场景 3C：reply page 的后续翻页通过 next_continuation 继续
+
+Given 某条 comment 的首个 reply page 返回后仍有更多 replies
+When Adapter 返回下一次可用的公共 continuation
+Then result 必须通过 `next_continuation` 返回后续翻页 carrier，并保留与同一 `resume_target_ref` / `resume_comment_ref` 的绑定
 
 ### 场景 4：空评论结果不会伪装成错误
 
@@ -182,7 +189,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 
 - 异常场景：
   - raw response 缺少 `items` family、page continuation family、reply cursor family 或 comment identity family 时，必须按 `parse_failed` fail-closed，不得伪造 `complete`。
-  - page continuation 或 reply cursor 与 target/comment 上下文不匹配时，必须返回 `cursor_invalid_or_expired`。
+  - page continuation、reply cursor 或 reply-window continuation 与 target/comment 上下文不匹配时，必须返回 `cursor_invalid_or_expired`。
   - rate-limit、permission-denied、provider/network-blocked、signature/request-invalid 必须保持为独立公共错误分类。
   - raw payload present 但 normalized comment 缺少最小必需字段，且无法构造最小 placeholder projection 时，必须进入 `parse_failed` 或 `partial_result` 路径；若页面仍保留合法 comments，则固定使用 `result_status=partial_result + error_classification=parse_failed`。
 - 边界场景：

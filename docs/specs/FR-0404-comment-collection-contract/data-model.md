@@ -13,18 +13,21 @@
   - `comment_list_by_content` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
   - thread-scoped reply loading 必须通过 item-level `reply_cursor` 继续，不得扩展出新的 target admission surface。
 
-## CommentPageContinuation
+## CommentContinuation
 
-- 用途：表达 top-level comment page continuation input/output。
+- 用途：表达 top-level page 或 reply window 的 continuation input/output。
 - 最小字段：
   - `continuation_token`
   - `continuation_family`
   - `resume_target_ref`
+  - `resume_comment_ref`（可选）
   - `issued_at`（可选）
 - 约束：
   - 可以承载 opaque cursor，也可以承载 page/offset/thread-session 等平台私有组合的 Adapter-encoded token。
   - Core 不得直接理解平台私有 continuation 字段。
   - continuation 与 target 必须绑定；跨 target 复用必须视为 invalid/expired。
+  - `resume_comment_ref` 为空时表示 top-level page continuation。
+  - `resume_comment_ref` 非空时表示 reply-window continuation，并必须与同一 comment thread 绑定。
 
 ## CommentRequestCursor
 
@@ -34,9 +37,10 @@
   - `cursor_payload`
 - 约束：
   - `cursor_kind` 只能是 `page_continuation` 或 `reply_cursor`。
-  - `cursor_payload` 分别承载 `CommentPageContinuation` 或 `CommentReplyCursor`。
+  - `cursor_payload` 分别承载 `CommentContinuation` 或 `CommentReplyCursor`。
   - 同一请求最多只能携带一个 `CommentRequestCursor`。
   - `cursor_kind=reply_cursor` 时，请求仍必须保留 content-scoped `CommentTarget`。
+  - `cursor_kind=page_continuation` 可同时用于 top-level page 与 reply-window continuation。
 
 ## CommentReplyCursor
 
@@ -48,7 +52,7 @@
   - `resume_comment_ref`
   - `issued_at`（可选）
 - 约束：
-  - reply cursor 只能恢复同一 comment item 的 replies。
+  - reply cursor 只用于进入某条 comment 的首个 reply window。
   - reply cursor 可以由 comment-id、reply-offset、thread-session 等平台私有字段组合编码，但 Core 只消费平台中立 token。
   - `resume_target_ref` 必须与请求 target 的 `target_ref` 一致。
   - `resume_comment_ref` 与 comment item public ref 不一致时必须视为 invalid/expired。
@@ -73,6 +77,7 @@
   - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`。
   - `empty_result` 不等于 `target_not_found`。
   - `has_more=false` 时允许 `next_continuation` 为空。
+  - reply window 如仍有更多数据，必须通过 `next_continuation` 继续，而不是要求再次消费旧的 item-level `reply_cursor`。
   - `raw_payload_ref` 只能引用原始载荷，不承载 raw payload 内联内容。
 
 ## CommentItemEnvelope
@@ -170,12 +175,12 @@
 - 创建：
   - `CommentTarget` 由 task admission 输入创建。
   - `CommentCollectionResultEnvelope` 由 Adapter 完成 raw-to-normalized projection 后返回。
-  - `CommentPageContinuation` 在 `has_more=true` 时由 Adapter 生成平台中立 token。
-  - `CommentReplyCursor` 在 comment item 允许继续加载 replies 时由 Adapter 生成。
+  - `CommentContinuation` 在 `has_more=true` 时由 Adapter 生成平台中立 token。
+  - `CommentReplyCursor` 在 comment item 允许进入 replies 时由 Adapter 生成。
 - 更新：
   - 新页面结果使用新的 `next_continuation`；不得原地篡改历史 continuation 以伪造跨页稳定性。
-  - 新 reply window 使用新的 `reply_cursor`；不得把某个 comment 的 reply cursor 迁移到另一 comment。
+  - 进入首个 reply window 使用 `reply_cursor`；后续 reply page 使用新的 `next_continuation`，不得把某个 comment 的 cursor/continuation 迁移到另一 comment。
   - `partial_result` 允许追加 item-level parse-failure evidence，但固定搭配 `error_classification=parse_failed`，且不得改写成功 normalized comments 的公共字段。
 - 失效/归档：
-  - invalid/expired continuation 或 reply cursor 只能导向 `cursor_invalid_or_expired`，不应被当作普通 platform failure。
+  - invalid/expired continuation、reply cursor 或 reply-window continuation 只能导向 `cursor_invalid_or_expired`，不应被当作普通 platform failure。
   - raw payload refs 的持久化/归档策略不在本 FR 范围内。

@@ -10,7 +10,7 @@
 
 ## Core ownership rules
 
-- Core 拥有 public operation、comment target、page continuation、reply cursor、result envelope、visibility status、dedup key、source trace 与 collection-level 错误分类。
+- Core 拥有 public operation、comment target、continuation、reply cursor、result envelope、visibility status、dedup key、source trace 与 collection-level 错误分类。
 - Core 拥有请求侧 `CommentRequestCursor` 的组合/互斥规则。
 - Core 只能消费 normalized comment item、continuation token、reply cursor token 与公共错误分类，不得消费平台私有 comment page object、reply object、moderation object 或 thread-session object。
 - Core 必须区分 `empty_result`、`target_not_found`、`cursor_invalid_or_expired`、`rate_limited`、`permission_denied`、`platform_failed`、`parse_failed` 与 `partial_result`。
@@ -22,7 +22,8 @@
 
 - Adapter 负责平台 comment identifiers、parent/reply semantics、page continuation shape、reply continuation shape、visibility flags 与 normalized projection。
 - Adapter 可以把 page/offset/thread-session 等平台 continuation 组合编码成公共 continuation token；该 token 只能由同一 Adapter family 解码。
-- Adapter 可以把 comment-id/reply-offset/thread-session 等平台 reply state 编码成公共 reply cursor；该 cursor 只能恢复同一 comment item 的 replies。
+- Adapter 可以把 comment-id/reply-offset/thread-session 等平台 reply-entry state 编码成公共 reply cursor；该 cursor 只用于进入某条 comment 的首个 reply window。
+- 若 reply window 还有更多数据，Adapter 必须返回绑定同一 `resume_target_ref` / `resume_comment_ref` 的 `next_continuation`，而不是要求 consumer 继续复用旧的 item-level `reply_cursor`。
 - Adapter 必须保留 raw payload reference，但不得把 raw 平台字段提升为 Core 公共字段。
 - Adapter 必须保证 dedup key 来自稳定公共语义，而不是要求 Core 理解平台私有 comment ID 体系。
 
@@ -34,7 +35,7 @@
 
 ## Consumer rules
 
-- `TaskRecord` 后续只能记录 content-scoped comment target、page continuation、reply cursor、result status、error classification、visibility status、dedup key 与 source trace，不得记录平台私有 cursor fields。
+- `TaskRecord` 后续只能记录 content-scoped comment target、continuation、reply cursor、result status、error classification、visibility status、dedup key 与 source trace，不得记录平台私有 cursor fields。
 - 请求侧如需继续 top-level page 或某条 comment 的 replies，后续只能记录 `CommentRequestCursor` 的公共 carrier，不得记录平台私有 thread-session 或 reply object。
 - result query consumer 后续只能消费公共 comment item envelope 与 normalized comment item，不得依赖 raw payload shape 才能完成 comment workflow。
 - compatibility decision 与 future consumer migration 必须把本 contract 视为 `FR-0403` collection foundation 之上的 comment-specialized surface，而不是平台字段透传协议。
