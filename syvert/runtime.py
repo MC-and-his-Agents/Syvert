@@ -3408,6 +3408,8 @@ def validate_success_payload(
 
 
 def _comment_request_cursor_is_top_level_page(request_cursor: Any | None) -> bool:
+    if request_cursor is None:
+        return True
     if isinstance(request_cursor, Mapping):
         page_continuation = request_cursor.get("page_continuation")
         reply_cursor = request_cursor.get("reply_cursor")

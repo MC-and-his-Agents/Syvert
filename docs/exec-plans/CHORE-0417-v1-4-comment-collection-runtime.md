@@ -68,6 +68,7 @@
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（455 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（457 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（484 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（485 tests）
 - `python3 - <<'PY' ... validate_frozen_resource_capability_evidence_contract() ... PY`
 - `python3 -m unittest tests.runtime.test_registry tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_dataclass_cursor tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_request_cursor`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -123,6 +124,8 @@
   - 处理：已在 `validate_success_payload` 中校验 top-level page cursor 上下文，拒绝 reply items 或携带 `resume_comment_ref` 的 reply continuation，并新增 drift regression。
 - PR `#429` guardian finding：shared resource profile 在没有 adapter-side proof 的情况下被提前批准。
   - 处理：已撤回 `comment_collection` shared dual-reference evidence、approved vocabulary 扩展与 `fr-0027:profile:comment-collection-paginated:account-proxy` 暴露；#417 只交付 runtime carrier，不声明 resource profile approved。
+- PR `#429` guardian finding：首屏无 cursor 请求仍可返回 reply-thread continuation。
+  - 处理：已将 `request_cursor=None` 视为 top-level comment page context，拒绝带 `resume_comment_ref` 的 reply continuation，并新增 first-page drift regression。
 
 ## 未决风险
 
