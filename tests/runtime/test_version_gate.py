@@ -651,12 +651,7 @@ class VersionGateTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertIn("platform_leakage_evidence_refs_mismatch", {item["code"] for item in report["details"]["failures"]})
         self.assertEqual(
             report["evidence_refs"],
-            [
-                "platform_leakage:scan:syvert/operation_taxonomy.py",
-                "platform_leakage:scan:syvert/registry.py",
-                "platform_leakage:scan:syvert/runtime.py",
-                "platform_leakage:scan:syvert/version_gate.py",
-            ],
+            canonical_platform_leakage_payload()["evidence_refs"],
         )
 
     def test_platform_leakage_rejects_finding_evidence_ref_missing_from_evidence_refs(self) -> None:
@@ -1774,14 +1769,13 @@ class VersionGateTests(ResourceStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(
-            report["source_reports"]["platform_leakage"]["evidence_refs"],
-            [
-                "leakage:core-runtime:1",
-                "platform_leakage:scan:syvert/operation_taxonomy.py",
-                "platform_leakage:scan:syvert/registry.py",
-                "platform_leakage:scan:syvert/runtime.py",
-                "platform_leakage:scan:syvert/version_gate.py",
-            ],
+            sorted(report["source_reports"]["platform_leakage"]["evidence_refs"]),
+            sorted(
+                {
+                    "leakage:core-runtime:1",
+                    *canonical_platform_leakage_payload()["evidence_refs"],
+                }
+            ),
         )
 
     def test_orchestrator_rejects_forged_real_regression_operation(self) -> None:

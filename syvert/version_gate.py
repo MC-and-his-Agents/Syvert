@@ -75,6 +75,7 @@ _REQUIRED_LEAKAGE_SCAN_REFS = tuple(
         "syvert/registry.py",
         "syvert/version_gate.py",
         "syvert/operation_taxonomy.py",
+        "syvert/read_side_collection.py",
     )
 )
 

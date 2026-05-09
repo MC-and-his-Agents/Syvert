@@ -113,6 +113,38 @@ STABLE_CONTENT_DETAIL_ENTRY = OperationTaxonomyEntry(
     notes=("v1.0.0 stable baseline; must not be rewritten by proposed candidates.",),
 )
 
+STABLE_CONTENT_SEARCH_BY_KEYWORD_ENTRY = OperationTaxonomyEntry(
+    capability_family="content_search",
+    operation="content_search_by_keyword",
+    target_type="keyword",
+    execution_mode="single",
+    collection_mode="paginated",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0403",),
+    admission_evidence_refs=(
+        "tests.runtime.test_read_side_collection",
+        "tests.runtime.test_operation_taxonomy_admission_evidence",
+    ),
+    notes=("v1.3.0 runtime contract frozen; collection continuation + envelope shared shape.",),
+)
+
+STABLE_CONTENT_LIST_BY_CREATOR_ENTRY = OperationTaxonomyEntry(
+    capability_family="content_list",
+    operation="content_list_by_creator",
+    target_type="creator",
+    execution_mode="single",
+    collection_mode="paginated",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0403",),
+    admission_evidence_refs=(
+        "tests.runtime.test_read_side_collection",
+        "tests.runtime.test_operation_taxonomy_admission_evidence",
+    ),
+    notes=("v1.3.0 runtime contract frozen; collection continuation + envelope shared shape.",),
+)
+
 PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
     OperationTaxonomyEntry(
         capability_family="content_search",
@@ -238,6 +270,8 @@ PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
 
 DEFAULT_OPERATION_TAXONOMY = (
     STABLE_CONTENT_DETAIL_ENTRY,
+    STABLE_CONTENT_SEARCH_BY_KEYWORD_ENTRY,
+    STABLE_CONTENT_LIST_BY_CREATOR_ENTRY,
     *PROPOSED_OPERATION_TAXONOMY_ENTRIES,
 )
 

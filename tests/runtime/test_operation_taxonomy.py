@@ -42,6 +42,39 @@ class OperationTaxonomyTests(unittest.TestCase):
             )
         )
 
+    def test_stable_search_and_list_by_creator_lookup_return_runtime_entry(self) -> None:
+        search = stable_operation_entry(
+            operation="content_search_by_keyword",
+            target_type="keyword",
+            collection_mode="paginated",
+        )
+        listing = stable_operation_entry(
+            operation="content_list_by_creator",
+            target_type="creator",
+            collection_mode="paginated",
+        )
+
+        self.assertEqual(search.capability_family, "content_search")
+        self.assertTrue(search.runtime_delivery)
+        self.assertEqual(search.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertEqual(listing.capability_family, "content_list")
+        self.assertTrue(listing.runtime_delivery)
+        self.assertEqual(listing.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertTrue(
+            is_stable_operation(
+                operation="content_search_by_keyword",
+                target_type="keyword",
+                collection_mode="paginated",
+            )
+        )
+        self.assertTrue(
+            is_stable_operation(
+                operation="content_list_by_creator",
+                target_type="creator",
+                collection_mode="paginated",
+            )
+        )
+
     def test_proposed_candidates_are_registered_but_not_stable_runtime_operations(self) -> None:
         proposed_operations = {entry.operation for entry in proposed_operation_taxonomy_entries()}
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 
 def canonical_platform_leakage_evidence_refs() -> list[str]:
     return [
-        "platform_leakage:scan:syvert/registry.py",
         "platform_leakage:scan:syvert/operation_taxonomy.py",
+        "platform_leakage:scan:syvert/read_side_collection.py",
+        "platform_leakage:scan:syvert/registry.py",
         "platform_leakage:scan:syvert/runtime.py",
         "platform_leakage:scan:syvert/version_gate.py",
     ]
