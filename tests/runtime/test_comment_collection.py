@@ -252,6 +252,24 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
+    def test_reply_window_allows_descendant_reply_within_resumed_thread(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-descendant",
+            source_id="reply-descendant",
+            canonical_ref="comment:reply-descendant",
+            body_text_hint="descendant reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:root-1:child-1",
+        )
+        payload = make_payload(
+            items=(reply,),
+            has_more=True,
+            include_continuation=True,
+            continuation_comment_ref="comment:root-1",
+        )
+
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(
             {
@@ -368,6 +386,25 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         )
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
+
+    def test_placeholder_canonical_ref_requires_placeholder_source_id(self) -> None:
+        payload = make_payload(
+            items=(
+                make_comment_item(
+                    dedup_key="placeholder-drift",
+                    source_id="comment-1",
+                    canonical_ref="public-placeholder:comment:content-001:unavailable:slot-a",
+                    visibility_status="unavailable",
+                    body_text_hint="unavailable comment",
+                    root_comment_ref="public-placeholder:comment:content-001:unavailable:slot-a",
+                ),
+            ),
+        )
+
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("source_id", result["message"])
 
     def test_partial_result_requires_at_least_one_comment_item(self) -> None:
         payload = make_payload(

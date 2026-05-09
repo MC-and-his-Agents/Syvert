@@ -991,6 +991,21 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
+    def test_validate_success_payload_accepts_descendant_reply_window(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        item = payload["items"][0]
+        item["normalized"]["parent_comment_ref"] = "comment:root-1:child-1"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+            )
+        )
+
     def test_execute_task_keeps_comment_collection_resource_admission_deferred(self) -> None:
         adapter = CommentCollectionAdapter()
         request = TaskRequest(

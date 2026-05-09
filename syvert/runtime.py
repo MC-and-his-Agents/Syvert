@@ -3243,7 +3243,9 @@ def validate_success_payload(
             drifted_items = tuple(
                 item.normalized.canonical_ref
                 for item in envelope.items
-                if item.normalized.parent_comment_ref != cursor_thread_ref
+                if item.normalized.parent_comment_ref is None
+                or not item.normalized.parent_comment_ref.startswith(f"{cursor_thread_ref}:")
+                and item.normalized.parent_comment_ref != cursor_thread_ref
             )
             if drifted_items:
                 return runtime_contract_error(

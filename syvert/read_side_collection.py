@@ -1130,7 +1130,11 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
         drifted_items = tuple(
             item.normalized.canonical_ref
             for item in envelope.items
-            if item.normalized.parent_comment_ref != envelope.next_continuation.resume_comment_ref
+            if item.normalized.parent_comment_ref is None
+            or not _comment_ref_stays_in_thread(
+                item.normalized.parent_comment_ref,
+                root_comment_ref=envelope.next_continuation.resume_comment_ref,
+            )
         )
         if drifted_items:
             return _contract_error(
@@ -1189,6 +1193,13 @@ def _validate_comment_item_contract(
                 "invalid_comment_collection_contract",
                 "placeholder canonical_ref 必须使用 public placeholder namespace",
                 details={"field": f"{field}.normalized.canonical_ref"},
+            )
+    if item.normalized.canonical_ref.startswith(COMMENT_PLACEHOLDER_SOURCE_ID_PREFIX):
+        if not item.normalized.source_id.startswith(COMMENT_PLACEHOLDER_SOURCE_ID_PREFIX):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "placeholder source_id 必须使用 public placeholder namespace",
+                details={"field": f"{field}.normalized.source_id"},
             )
     if item.normalized.parent_comment_ref is None and item.normalized.root_comment_ref != item.normalized.canonical_ref:
         return _contract_error(
