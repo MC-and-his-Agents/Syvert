@@ -30,8 +30,6 @@
   - `docs/specs/FR-0404-comment-collection-contract/data-model.md`
   - `docs/specs/FR-0404-comment-collection-contract/contracts/README.md`
   - `docs/specs/FR-0404-comment-collection-contract/risks.md`
-  - `docs/specs/FR-0368-operation-taxonomy-contract/spec.md`
-  - `docs/specs/FR-0368-operation-taxonomy-contract/data-model.md`
   - `docs/releases/v1.4.0.md`
   - `docs/sprints/2026-S25.md`
 - 本次不纳入：

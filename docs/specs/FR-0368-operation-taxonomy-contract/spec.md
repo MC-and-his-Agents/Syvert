@@ -45,7 +45,6 @@
   - `AdapterCapabilityRequirement`、`ProviderCapabilityOffer` 与 `AdapterProviderCompatibilityDecision` 后续只能消费 taxonomy 的 stable execution slice。
   - 当前 stable baseline 的行为必须保持与 `v1.0.0` 一致。
   - 候选能力从 `proposed` 升级到 `experimental` 或 `stable` 必须另走独立 FR、formal spec、contract test、双参考或等价 evidence。
-  - proposed reserved candidate 名称表达 capability family；后续独立 FR 可以冻结更具体的 public executable operation 名称，并必须在 promotion 时保持 `capability_family / operation / target_type / execution_mode / collection_mode` 单一映射。
   - `content_detail_by_url` baseline 不得被候选能力、mode 扩展或 target type 扩展改写。
 - 非功能需求：
   - taxonomy 必须 fail-closed；无法证明 entry 合法、唯一、无泄漏或生命周期允许时，不得返回 stable execution slice。

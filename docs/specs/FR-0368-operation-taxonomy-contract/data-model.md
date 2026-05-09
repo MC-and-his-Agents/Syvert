@@ -54,8 +54,6 @@
 
 以下候选只能以 `lifecycle=proposed` 与 `runtime_delivery=false` 出现：
 
-这些名称是 reserved capability family，不自动成为后续 stable public executable operation 名称。后续 FR 若把某个 family 升级为 executable slice，必须明确冻结具体 operation 名、target type、execution mode 与 collection mode。
-
 - `content_search`
 - `content_list`
 - `comment_collection`
