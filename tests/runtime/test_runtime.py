@@ -1062,22 +1062,37 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
-    def test_validate_success_payload_rejects_non_root_descendant_when_only_target_matches_resume(self) -> None:
+    def test_validate_success_payload_accepts_non_root_descendant_when_target_matches_resume(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
         item = payload["items"][0]
         item["normalized"]["parent_comment_ref"] = "comment:child-1"
         item["normalized"]["target_comment_ref"] = "comment:parent-1"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:parent-1")},
+            )
+        )
+
+    def test_validate_success_payload_rejects_reply_target_self_reference(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        item = payload["items"][0]
+        item["normalized"]["target_comment_ref"] = item["normalized"]["canonical_ref"]
 
         result = validate_success_payload(
             payload,
             capability="comment_collection",
             target_type="content",
             target_value="content-001",
-            request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:parent-1")},
+            request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
-        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+        self.assertEqual(result["details"]["reason"], "invalid_comment_collection_contract")
 
     def test_validate_success_payload_rejects_reply_window_continuation_without_thread_ref(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")

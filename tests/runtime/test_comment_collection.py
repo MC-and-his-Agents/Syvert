@@ -304,7 +304,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-    def test_reply_window_rejects_descendant_reply_when_only_target_matches_non_root_resume(self) -> None:
+    def test_reply_window_allows_descendant_reply_when_target_matches_non_root_resume(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-non-root-descendant",
             source_id="reply-non-root-descendant",
@@ -321,10 +321,41 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             continuation_comment_ref="comment:parent-1",
         )
 
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+
+    def test_reply_hierarchy_rejects_direct_reply_target_self_reference(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-self-target",
+            source_id="reply-self-target",
+            canonical_ref="comment:reply-self-target",
+            body_text_hint="self target reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:root-1",
+            target_comment_ref="comment:reply-self-target",
+        )
+        payload = make_payload(items=(reply,))
+
         result = validate_comment_collection_result_envelope(payload)
 
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("reply thread", result["message"])
+        self.assertIn("target_comment_ref", result["message"])
+
+    def test_reply_hierarchy_rejects_nested_reply_target_self_reference(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:nested-reply-self-target",
+            source_id="nested-reply-self-target",
+            canonical_ref="comment:nested-reply-self-target",
+            body_text_hint="nested self target reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:child-1",
+            target_comment_ref="comment:nested-reply-self-target",
+        )
+        payload = make_payload(items=(reply,))
+
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("target_comment_ref", result["message"])
 
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(

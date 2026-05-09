@@ -1225,6 +1225,12 @@ def _validate_comment_item_contract(
                 "reply comment 的 parent_comment_ref 不得等于自身 canonical_ref",
                 details={"field": f"{field}.normalized.parent_comment_ref"},
             )
+        if item.normalized.target_comment_ref == item.normalized.canonical_ref:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 target_comment_ref 不得等于自身 canonical_ref",
+                details={"field": f"{field}.normalized.target_comment_ref"},
+            )
         if (
             item.normalized.parent_comment_ref != item.normalized.root_comment_ref
             and (
@@ -1265,6 +1271,10 @@ def _comment_item_binds_comment_ref(item: CommentItemEnvelope, comment_ref: str)
     return (
         normalized.root_comment_ref == comment_ref
         or normalized.parent_comment_ref == comment_ref
+        or (
+            normalized.parent_comment_ref != normalized.root_comment_ref
+            and normalized.target_comment_ref == comment_ref
+        )
     )
 
 
