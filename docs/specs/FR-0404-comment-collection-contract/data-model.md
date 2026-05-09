@@ -2,7 +2,7 @@
 
 ## CommentTarget
 
-- 用途：表达 `comment_collection` 的公共 target。
+- 用途：表达 `comment_list_by_content` 的公共 target。
 - 最小字段：
   - `operation`
   - `target_type`
@@ -10,7 +10,7 @@
   - `target_display_hint`（可选）
   - `policy_ref`（可选）
 - 约束：
-  - `comment_collection` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
+  - `comment_list_by_content` 的 target 必须表达 content public identifier，而不暴露平台 comment page object。
   - thread-scoped reply loading 必须通过 item-level `reply_cursor` 继续，不得扩展出新的 target admission surface。
 
 ## CommentContinuation
@@ -32,7 +32,7 @@
 
 ## CommentRequestCursor
 
-- 用途：表达 `comment_collection` 请求侧的可选 cursor 输入。
+- 用途：表达 `comment_list_by_content` 请求侧的可选 cursor 输入。
 - 最小字段：
   - `page_continuation`（可选）
   - `reply_cursor`（可选）
@@ -87,6 +87,7 @@
 - 最小字段：
   - `item_type`
   - `dedup_key`
+  - `source_id`
   - `source_ref`
   - `visibility_status`
   - `normalized`
@@ -95,7 +96,8 @@
   - `reply_cursor`（可选）
 - 约束：
   - `dedup_key` 必须稳定，且不要求两个平台使用相同原始 comment ID 字段。
-  - `source_id` 可作为 Adapter 投影的平台稳定 comment id 出现，但不是最小必需字段；deleted/invisible/unavailable placeholder 不得为了满足 contract 伪造平台 `source_id`。
+  - `source_id` 是 FR-0403 collection item identity 基线的一部分，必须存在；它可以是 Adapter 可证明的平台稳定 comment id，也可以是按本 contract 派生的 public placeholder id。
+  - deleted/invisible/unavailable placeholder 缺少稳定平台 id 时，不得伪造平台原生 id；Adapter 只能生成带 public placeholder namespace 的确定性 `source_id`。
   - `source_ref` 只用于 source trace 与 audit 追溯，不是 reply cursor、hierarchy linkage 或 dedup 的 canonical 绑定对象。
   - `visibility_status` 至少支持 `visible`、`deleted`、`invisible`、`unavailable`。
   - `reply_cursor` 仅在 comment item 可继续加载 replies 时出现。
@@ -108,19 +110,20 @@
 - 最小字段：
   - `source_platform`
   - `source_type`
+  - `source_id`
   - `canonical_ref`
   - `body_text_hint`
   - `root_comment_ref`
-  - `source_id`（可选）
   - `author_ref`（可选）
   - `parent_comment_ref`（可选）
   - `target_comment_ref`（可选）
   - `published_at`（可选）
 - 约束：
   - `canonical_ref` 是 comment contract 的唯一公共 comment ref。
-  - visible comment 如存在平台稳定 comment id，Adapter 应投影到 `source_id`；placeholder comment 缺少稳定平台 id 时，`source_id` 必须为空或缺省，不得伪造。
-  - placeholder comment 仍必须提供 `canonical_ref`，其值可由 Adapter 从 `target_ref`、`raw_payload_ref`、page/window slot ordinal、`visibility_status` 与 source trace 派生；派生结果只声明 public placeholder identity，不声明平台原生 comment id。
-  - 使用派生 placeholder `canonical_ref` 时，`dedup_key` 的稳定范围不得超出可证明的 target/page/window identity；跨页去重只能在 Adapter 能证明同一 logical comment 时成立。
+  - visible comment 如存在平台稳定 comment id，Adapter 应投影到 `source_id`。
+  - placeholder comment 缺少稳定平台 id 时，`source_id` 必须使用 public placeholder namespace，并从可跨重放稳定的输入派生，例如 `operation`、`target_ref`、`visibility_status`、stable platform placeholder marker 或 stable continuation/window slot key。
+  - placeholder `source_id` 与 `canonical_ref` 不得依赖 `raw_payload_ref`、`source_trace`、`fetched_at` 或一次抓取内临时 ordinal；无法构造稳定 placeholder identity 时，Adapter 必须走 `parse_failed`，不得返回伪稳定 placeholder item。
+  - 使用派生 placeholder identity 时，`dedup_key` 的稳定范围不得超出可证明的 target/page/window identity；跨页去重只能在 Adapter 能证明同一 logical comment 时成立。
   - top-level comment 的 `root_comment_ref` 必须等于自身 `canonical_ref`。
   - reply comment 的 `root_comment_ref` 必须稳定指向 thread root 的 `canonical_ref`。
   - `parent_comment_ref` 指向直接 parent comment 的 `canonical_ref`；top-level comment 不要求该字段。
