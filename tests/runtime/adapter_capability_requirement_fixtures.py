@@ -10,16 +10,20 @@ CAPABILITY_REQUIREMENT_EVIDENCE_REF = "fr-0024:manifest-fixture-validator:conten
 def valid_adapter_capability_requirement(
     *,
     adapter_key: str = "xhs",
+    capability: str = "content_detail",
+    operation: str = "content_detail_by_url",
+    target_type: str = "url",
+    collection_mode: str = "hybrid",
 ) -> dict[str, Any]:
     return {
         "adapter_key": adapter_key,
-        "capability": "content_detail",
+        "capability": capability,
         "execution_requirement": {
-            "operation": "content_detail_by_url",
-            "target_type": "url",
-            "collection_mode": "hybrid",
+            "operation": operation,
+            "target_type": target_type,
+            "collection_mode": collection_mode,
         },
-        "resource_requirement": valid_resource_requirement(adapter_key=adapter_key),
+        "resource_requirement": valid_resource_requirement(adapter_key=adapter_key, capability=capability),
         "evidence": {
             "resource_profile_evidence_refs": [
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
@@ -33,7 +37,7 @@ def valid_adapter_capability_requirement(
             "uses_existing_disposition_hint": True,
         },
         "observability": {
-            "requirement_id": f"{adapter_key}:content_detail:content_detail_by_url:url:hybrid",
+            "requirement_id": f"{adapter_key}:{capability}:{operation}:{target_type}:{collection_mode}",
             "profile_keys": ["account_proxy", "account"],
             "proof_refs": [
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
@@ -52,10 +56,11 @@ def valid_adapter_capability_requirement(
 def valid_resource_requirement(
     *,
     adapter_key: str = "xhs",
+    capability: str = "content_detail",
 ) -> dict[str, Any]:
     return {
         "adapter_key": adapter_key,
-        "capability": "content_detail",
+        "capability": capability,
         "resource_requirement_profiles": [
             {
                 "profile_key": "account_proxy",

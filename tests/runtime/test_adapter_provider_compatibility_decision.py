@@ -94,6 +94,21 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(decision.adapter_key, "douyin")
         self.assert_no_provider_leakage(decision)
 
+    def test_decision_matches_stable_collection_search_slice(self) -> None:
+        decision = decide_adapter_provider_compatibility(
+            valid_compatibility_decision_input(
+                capability="content_search",
+                operation="content_search_by_keyword",
+                target_type="keyword",
+                collection_mode="paginated",
+            )
+        )
+
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_MATCHED)
+        self.assertEqual(decision.capability, "content_search")
+        self.assertEqual(decision.execution_slice.operation, "content_search_by_keyword")
+        self.assert_no_provider_leakage(decision)
+
     def test_decision_returns_unmatched_when_legal_inputs_have_no_profile_tuple_intersection(self) -> None:
         input_value = copy_decision_input()
         offer = input_value["offer"]

@@ -49,6 +49,62 @@ from tests.runtime.resource_fixtures import (
 TEST_ADAPTER_KEY = "xhs"
 
 
+def make_collection_result(
+    *,
+    operation: str,
+    target_type: str,
+    target_ref: str,
+) -> dict[str, object]:
+    return {
+        "operation": operation,
+        "target": {
+            "operation": operation,
+            "target_type": target_type,
+            "target_ref": target_ref,
+            "target_display_hint": target_ref,
+        },
+        "items": [
+            {
+                "item_type": "content_summary",
+                "dedup_key": f"{operation}:item-1",
+                "source_id": "source-1",
+                "source_ref": "content://item-1",
+                "normalized": {
+                    "source_platform": TEST_ADAPTER_KEY,
+                    "source_type": "post",
+                    "source_id": "source-1",
+                    "canonical_ref": "content://item-1",
+                    "title_or_text_hint": "hint-1",
+                    "creator_ref": "creator-1",
+                    "published_at": "2026-05-09T10:00:00Z",
+                    "media_refs": ["media://1"],
+                },
+                "raw_payload_ref": "raw://item-1",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                    "fetched_at": "2026-05-09T10:00:00Z",
+                    "evidence_alias": "alias://collection-page-1",
+                },
+            }
+        ],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "complete",
+        "error_classification": "platform_failed",
+        "raw_payload_ref": "raw://page-1",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://collection-page-1",
+        },
+        "audit": {"page_index": 1},
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -68,12 +124,12 @@ class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
 
 @dataclass(frozen=True)
 class ExtendedTaskInput(TaskInput):
-    platform_hint: str
+    platform_hint: str = ""
 
 
 @dataclass(frozen=True)
 class ExtendedTaskRequest(TaskRequest):
-    extra: str
+    extra: str = ""
 
 
 class StubContentDetailDeclarationMixin:
@@ -119,6 +175,25 @@ class SuccessfulAdapter(StubContentDetailDeclarationMixin):
                 },
             },
         }
+
+
+class CollectionSearchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_search"})
+    supported_targets = frozenset({"keyword"})
+    supported_collection_modes = frozenset({"paginated"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="content_search",
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_collection_result(
+            operation="content_search_by_keyword",
+            target_type="keyword",
+            target_ref=request.input.keyword or "",
+        )
 
 
 def make_execution_control_policy(scope: str) -> ExecutionControlPolicy:
@@ -647,6 +722,26 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def resource_statuses(self) -> dict[str, str]:
         snapshot = self.latest_snapshot()
         return {record.resource_id: record.status for record in snapshot.resources}
+
+    def test_execute_task_builds_collection_success_envelope_from_adapter_payload(self) -> None:
+        adapter = CollectionSearchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_search_by_keyword",
+            input=TaskInput(keyword="deep learning"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-collection-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "content_search_by_keyword")
+        self.assertEqual(result.envelope["target"]["target_ref"], "deep learning")
+        self.assertEqual(result.task_record.request.target_type, "keyword")
+        self.assertEqual(adapter.last_request.collection_mode, "paginated")
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()

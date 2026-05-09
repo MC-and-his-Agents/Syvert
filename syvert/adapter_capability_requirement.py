@@ -746,20 +746,23 @@ def _validate_top_level_slice(
     execution_requirement: AdapterCapabilityExecutionRequirement,
     fail_closed: bool,
 ) -> None:
-    if capability != APPROVED_ADAPTER_CAPABILITY:
-        raise AdapterCapabilityRequirementContractError(
-            ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
-            "AdapterCapabilityRequirement.capability is outside the approved FR-0024 slice",
-            details={"capability": capability},
+    try:
+        stable = stable_operation_entry(
+            operation=execution_requirement.operation,
+            target_type=execution_requirement.target_type,
+            collection_mode=execution_requirement.collection_mode,
         )
-    if execution_requirement.__dict__ != APPROVED_EXECUTION_REQUIREMENT:
+    except Exception as error:
         raise AdapterCapabilityRequirementContractError(
             ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
-            "execution_requirement must stay frozen to content_detail_by_url + url + hybrid",
-            details={
-                "expected_execution_requirement": APPROVED_EXECUTION_REQUIREMENT,
-                "actual_execution_requirement": dict(execution_requirement.__dict__),
-            },
+            "execution_requirement 必须命中 stable + runtime_delivery taxonomy slice",
+            details={"reason": str(error), "actual_execution_requirement": dict(execution_requirement.__dict__)},
+        )
+    if not stable.runtime_delivery or capability != stable.capability_family:
+        raise AdapterCapabilityRequirementContractError(
+            ADAPTER_REQUIREMENT_ERROR_INVALID_CONTRACT,
+            "AdapterCapabilityRequirement.capability 与 execution_requirement 必须共同命中 stable runtime slice",
+            details={"capability": capability, "stable_capability_family": stable.capability_family},
         )
     if not fail_closed:
         raise AdapterCapabilityRequirementContractError(

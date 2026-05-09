@@ -22,6 +22,62 @@ from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_reso
 TEST_ADAPTER_KEY = "xhs"
 
 
+def make_collection_result(
+    *,
+    operation: str = "content_search_by_keyword",
+    target_type: str = "keyword",
+    target_ref: str = "deep learning",
+) -> dict[str, object]:
+    return {
+        "operation": operation,
+        "target": {
+            "operation": operation,
+            "target_type": target_type,
+            "target_ref": target_ref,
+            "target_display_hint": target_ref,
+        },
+        "items": [
+            {
+                "item_type": "content_summary",
+                "dedup_key": f"{operation}:item-1",
+                "source_id": "source-1",
+                "source_ref": "content://item-1",
+                "normalized": {
+                    "source_platform": TEST_ADAPTER_KEY,
+                    "source_type": "post",
+                    "source_id": "source-1",
+                    "canonical_ref": "content://item-1",
+                    "title_or_text_hint": "hint-1",
+                    "creator_ref": "creator-1",
+                    "published_at": "2026-05-09T10:00:00Z",
+                    "media_refs": ["media://1"],
+                },
+                "raw_payload_ref": "raw://item-1",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                    "fetched_at": "2026-05-09T10:00:00Z",
+                    "evidence_alias": "alias://collection-page-1",
+                },
+            }
+        ],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "complete",
+        "error_classification": "platform_failed",
+        "raw_payload_ref": "raw://page-1",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://collection-page-1",
+        },
+        "audit": {"page_index": 1},
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -178,6 +234,20 @@ class OffsetTimestampSuccessAdapter:
                 },
             },
         }
+
+
+class CollectionSearchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_search"})
+    supported_targets = frozenset({"keyword"})
+    supported_collection_modes = frozenset({"paginated"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="content_search",
+    )
+
+    def execute(self, request):
+        return make_collection_result(target_ref=request.input.keyword or "")
 
 
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
@@ -578,6 +648,25 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
 
 class RuntimeTaskRecordTests(TaskRecordStoreEnvMixin, unittest.TestCase):
+    def test_execute_task_with_record_round_trips_collection_search_record(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="content_search_by_keyword",
+                input=TaskInput(keyword="deep learning"),
+            ),
+            adapters={TEST_ADAPTER_KEY: CollectionSearchAdapter()},
+            task_id_factory=lambda: "task-record-collection-1",
+        )
+
+        payload = task_record_to_dict(outcome.task_record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertEqual(outcome.envelope["target"]["target_ref"], "deep learning")
+        self.assertEqual(restored, outcome.task_record)
+        self.assertEqual(restored.request.target_type, "keyword")
+
     def test_execute_task_with_record_keeps_preaccepted_failure_outside_durable_history(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

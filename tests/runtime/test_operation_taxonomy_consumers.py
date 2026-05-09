@@ -6,6 +6,7 @@ from syvert.adapter_capability_requirement import (
     ADAPTER_REQUIREMENT_STATUS_INVALID,
     APPROVED_ADAPTER_CAPABILITY,
     APPROVED_EXECUTION_REQUIREMENT,
+    AdapterCapabilityRequirementValidationInput,
     validate_adapter_capability_requirement,
 )
 from syvert.adapter_provider_compatibility_decision import (
@@ -51,6 +52,46 @@ class OperationTaxonomyConsumerMigrationTests(unittest.TestCase):
                 "collection_mode": stable.collection_mode,
             },
         )
+
+    def test_requirement_offer_and_decision_accept_stable_collection_runtime_slice(self) -> None:
+        requirement = copy_requirement()
+        requirement["capability"] = "content_search"
+        requirement["resource_requirement"]["capability"] = "content_search"
+        requirement["execution_requirement"] = {
+            "operation": "content_search_by_keyword",
+            "target_type": "keyword",
+            "collection_mode": "paginated",
+        }
+        requirement["observability"]["requirement_id"] = "xhs:content_search:content_search_by_keyword:keyword:paginated"
+
+        offer = copy_offer()
+        offer["capability_offer"] = {
+            "capability": "content_search",
+            "operation": "content_search_by_keyword",
+            "target_type": "keyword",
+            "collection_mode": "paginated",
+        }
+        offer["observability"]["capability"] = "content_search"
+        offer["observability"]["operation"] = "content_search_by_keyword"
+        offer["observability"]["offer_id"] = (
+            "xhs:native_xhs_detail:content_search:content_search_by_keyword:keyword:paginated:v0.8.0"
+        )
+
+        decision_input = copy_decision_input()
+        decision_input["requirement"] = requirement
+        decision_input["offer"] = offer
+
+        self.assertEqual(
+            validate_adapter_capability_requirement(
+                AdapterCapabilityRequirementValidationInput(
+                    requirement=requirement,
+                    available_resource_capabilities=("account", "proxy"),
+                )
+            ).status,
+            "declared",
+        )
+        self.assertEqual(validate_provider_capability_offer(offer).status, "declared")
+        self.assertEqual(decide_adapter_provider_compatibility(decision_input).decision_status, "matched")
 
     def test_adapter_requirement_rejects_proposed_taxonomy_candidate(self) -> None:
         requirement = copy_requirement()

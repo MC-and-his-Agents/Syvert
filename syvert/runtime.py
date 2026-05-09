@@ -20,6 +20,13 @@ from syvert.registry import (
     approved_resource_requirement_evidence_refs_for,
 )
 from syvert.resource_capability_evidence import approved_resource_capability_ids
+from syvert.operation_taxonomy import stable_operation_entry
+from syvert.read_side_collection import (
+    CollectionContractError,
+    READ_SIDE_COLLECTION_OPERATIONS,
+    collection_result_envelope_from_dict,
+    collection_result_envelope_to_dict,
+)
 from syvert.task_record import (
     TaskRecord,
     TaskRecordContractError,
@@ -36,16 +43,27 @@ from syvert.task_record_store import (
 )
 
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
+CONTENT_SEARCH_BY_KEYWORD = "content_search_by_keyword"
+CONTENT_LIST_BY_CREATOR = "content_list_by_creator"
 CONTENT_DETAIL = "content_detail"
+CONTENT_SEARCH = "content_search"
+CONTENT_LIST = "content_list"
 LEGACY_COLLECTION_MODE = "hybrid"
-ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
-ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
+PAGINATED_COLLECTION_MODE = "paginated"
+ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator", "creator_id", "keyword"})
+ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
-CAPABILITY_FAMILY_BY_OPERATION = {CONTENT_DETAIL_BY_URL: CONTENT_DETAIL}
+CAPABILITY_FAMILY_BY_OPERATION = {
+    CONTENT_DETAIL_BY_URL: CONTENT_DETAIL,
+    CONTENT_SEARCH_BY_KEYWORD: CONTENT_SEARCH,
+    CONTENT_LIST_BY_CREATOR: CONTENT_LIST,
+}
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
+    (CONTENT_SEARCH_BY_KEYWORD, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
+    (CONTENT_LIST_BY_CREATOR, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
 }
 DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
 DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
@@ -62,7 +80,7 @@ EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID = "execution_control_stat
 EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
 EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
-_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL})
+_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST})
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 _EXECUTION_CONCURRENCY_LOCK = threading.Lock()
 _EXECUTION_CONCURRENCY_IN_FLIGHT: dict[tuple[str, ...], int] = {}
@@ -76,7 +94,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class TaskInput:
-    url: str
+    url: str | None = None
+    keyword: str | None = None
+    creator_id: str | None = None
+    continuation_token: str | None = None
 
 
 @dataclass(frozen=True)
@@ -149,7 +170,13 @@ class AdapterTaskRequest:
 
     @property
     def input(self) -> TaskInput:
-        return TaskInput(url=self.target_value)
+        if self.target_type == "url":
+            return TaskInput(url=self.target_value)
+        if self.target_type == "keyword":
+            return TaskInput(keyword=self.target_value)
+        if self.target_type == "creator":
+            return TaskInput(creator_id=self.target_value)
+        return TaskInput()
 
 
 @dataclass(frozen=True)
@@ -1251,7 +1278,12 @@ def run_adapter_attempt_with_timeout(
     default_release_reason = DEFAULT_SUCCESS_RELEASE_REASON
     if kind == "payload":
         payload = value
-        payload_error = validate_success_payload(payload)
+        payload_error = validate_success_payload(
+            payload,
+            capability=capability,
+            target_type=adapter_context.target_type,
+            target_value=adapter_context.target_value,
+        )
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error), None, DEFAULT_FAILURE_RELEASE_REASON, False, False
         disposition_hint, hint_error = extract_internal_resource_disposition_hint(
@@ -1260,20 +1292,17 @@ def run_adapter_attempt_with_timeout(
         )
         if hint_error is not None:
             return failure_envelope(task_id, adapter_key, capability, hint_error), None, DEFAULT_INVALID_HINT_RELEASE_REASON, False, False
-        return (
-            {
-                "task_id": task_id,
-                "adapter_key": adapter_key,
-                "capability": capability,
-                "status": "success",
-                "raw": payload["raw"],
-                "normalized": payload["normalized"],
-            },
-            disposition_hint,
-            default_release_reason,
-            False,
-            False,
-        )
+        success_envelope = {
+            "task_id": task_id,
+            "adapter_key": adapter_key,
+            "capability": capability,
+            "status": "success",
+        }
+        if capability in READ_SIDE_COLLECTION_OPERATIONS:
+            success_envelope.update(collection_result_envelope_to_dict(collection_result_envelope_from_dict(payload)))
+        else:
+            success_envelope.update({"raw": payload["raw"], "normalized": payload["normalized"]})
+        return (success_envelope, disposition_hint, default_release_reason, False, False)
 
     error = value
     if isinstance(error, PlatformAdapterError):
@@ -2239,28 +2268,26 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
     if type(request) is TaskRequest:
         if not isinstance(request.adapter_key, str) or not request.adapter_key:
             return None, invalid_input_error("invalid_task_request", "adapter_key 不能为空")
-        if request.capability != CONTENT_DETAIL_BY_URL:
-            return None, invalid_input_error(
-                "invalid_capability",
-                f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
-            )
         if type(request.input) is not TaskInput:
             return None, invalid_input_error("invalid_task_request", "input 必须为对象")
-        if not isinstance(request.input.url, str) or not request.input.url:
-            return None, invalid_input_error("invalid_task_request", "input.url 不能为空")
+        operation_error = _validate_runtime_operation(request.capability)
+        if operation_error is not None:
+            return None, operation_error
         execution_control_error = validate_execution_control_policy(request.execution_control_policy)
         if execution_control_error is not None:
             return None, execution_control_error
         execution_control_policy = request.execution_control_policy or default_execution_control_policy()
+        target, policy, input_error = _project_task_input_to_target(
+            adapter_key=request.adapter_key,
+            capability=request.capability,
+            input_value=request.input,
+        )
+        if input_error is not None:
+            return None, input_error
         return (
             CoreTaskRequest(
-                target=InputTarget(
-                    adapter_key=request.adapter_key,
-                    capability=request.capability,
-                    target_type="url",
-                    target_value=request.input.url,
-                ),
-                policy=CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+                target=target,
+                policy=policy,
                 execution_control_policy=execution_control_policy,
             ),
             None,
@@ -2279,11 +2306,9 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
     policy = request.policy
     if not isinstance(target.adapter_key, str) or not target.adapter_key:
         return None, invalid_input_error("invalid_task_request", "adapter_key 不能为空")
-    if target.capability != CONTENT_DETAIL_BY_URL:
-        return None, invalid_input_error(
-            "invalid_capability",
-            f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
-        )
+    capability_error = _validate_runtime_operation(target.capability)
+    if capability_error is not None:
+        return None, capability_error
     if not isinstance(target.target_value, str) or not target.target_value:
         return None, invalid_input_error("invalid_task_request", "target_value 不能为空")
     if not isinstance(target.target_type, str) or target.target_type not in ALLOWED_TARGET_TYPES:
@@ -2354,7 +2379,8 @@ def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, An
             None,
             invalid_input_error(
                 "invalid_capability",
-                f"v0.1.0 仅支持 `{CONTENT_DETAIL_BY_URL}`",
+                "capability 不在当前稳定 runtime contract 允许值范围内",
+                details={"allowed_capabilities": sorted(CAPABILITY_FAMILY_BY_OPERATION)},
             ),
         )
     return mapped, None
@@ -2376,17 +2402,92 @@ def project_to_adapter_request(
 
 
 def validate_projection_axes_for_current_runtime(request: CoreTaskRequest) -> dict[str, Any] | None:
-    if request.target.target_type != "url":
-        return invalid_input_error(
-            "invalid_task_request",
-            "当前运行时执行路径仅支持 target_type=url",
+    try:
+        stable = stable_operation_entry(
+            operation=request.target.capability,
+            target_type=request.target.target_type,
+            collection_mode=request.policy.collection_mode,
         )
-    if request.policy.collection_mode != LEGACY_COLLECTION_MODE:
+    except Exception:
         return invalid_input_error(
             "invalid_task_request",
-            "当前运行时执行路径仅支持 collection_mode=hybrid",
+            "请求执行切片不在当前稳定 runtime contract 内",
+            details={
+                "operation": request.target.capability,
+                "target_type": request.target.target_type,
+                "collection_mode": request.policy.collection_mode,
+            },
+        )
+    if not stable.runtime_delivery:
+        return invalid_input_error(
+            "invalid_task_request",
+            "请求执行切片尚未进入 runtime stable delivery",
+            details={
+                "operation": stable.operation,
+                "target_type": stable.target_type,
+                "collection_mode": stable.collection_mode,
+            },
         )
     return None
+
+
+def _validate_runtime_operation(capability: str) -> dict[str, Any] | None:
+    if capability in CAPABILITY_FAMILY_BY_OPERATION:
+        return None
+    return invalid_input_error(
+        "invalid_capability",
+        "capability 不在当前稳定 runtime contract 允许值范围内",
+        details={"allowed_capabilities": sorted(CAPABILITY_FAMILY_BY_OPERATION)},
+    )
+
+
+def _project_task_input_to_target(
+    *,
+    adapter_key: str,
+    capability: str,
+    input_value: TaskInput,
+) -> tuple[InputTarget, CollectionPolicy, dict[str, Any] | None]:
+    if capability == CONTENT_DETAIL_BY_URL:
+        if not isinstance(input_value.url, str) or not input_value.url:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="url", target_value=""),
+                CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.url 不能为空"),
+            )
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="url", target_value=input_value.url),
+            CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+            None,
+        )
+    if capability == CONTENT_SEARCH_BY_KEYWORD:
+        if not isinstance(input_value.keyword, str) or not input_value.keyword:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="keyword", target_value=""),
+                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.keyword 不能为空"),
+            )
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="keyword", target_value=input_value.keyword),
+            CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+            None,
+        )
+    if capability == CONTENT_LIST_BY_CREATOR:
+        if not isinstance(input_value.creator_id, str) or not input_value.creator_id:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=""),
+                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.creator_id 不能为空"),
+            )
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=input_value.creator_id),
+            CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+            None,
+        )
+    return (
+        InputTarget(adapter_key=adapter_key, capability=capability, target_type="", target_value=""),
+        CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
+        invalid_input_error("invalid_capability", "capability 不在当前稳定 runtime contract 允许值范围内"),
+    )
 
 
 def extract_request_context(request: Any) -> tuple[str, str]:
@@ -2844,12 +2945,46 @@ def settle_managed_resource_bundle(
     return None
 
 
-def validate_success_payload(payload: Mapping[str, Any]) -> dict[str, Any] | None:
+def validate_success_payload(
+    payload: Mapping[str, Any],
+    *,
+    capability: str,
+    target_type: str,
+    target_value: str,
+) -> dict[str, Any] | None:
     if not isinstance(payload, Mapping):
         return runtime_contract_error(
             "invalid_adapter_success_payload",
             "adapter 成功结果必须是对象",
         )
+    if capability in READ_SIDE_COLLECTION_OPERATIONS:
+        try:
+            envelope = collection_result_envelope_from_dict(payload)
+        except CollectionContractError as error:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                error.message,
+                details={"reason": error.code, **error.details},
+            )
+        if envelope.operation != capability:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "collection result.operation 必须与请求 capability 一致",
+                details={"operation": envelope.operation, "capability": capability},
+            )
+        if envelope.target.target_type != target_type:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "collection result.target.target_type 必须与请求一致",
+                details={"target_type": envelope.target.target_type, "expected_target_type": target_type},
+            )
+        if envelope.target.target_ref != target_value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "collection result.target.target_ref 必须与请求 target_value 一致",
+                details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
+            )
+        return None
 
     if "raw" not in payload or "normalized" not in payload:
         return runtime_contract_error(

@@ -12,6 +12,10 @@ def valid_provider_capability_offer(
     *,
     adapter_key: str = "xhs",
     provider_key: str = "native_xhs_detail",
+    capability: str = "content_detail",
+    operation: str = "content_detail_by_url",
+    target_type: str = "url",
+    collection_mode: str = "hybrid",
 ) -> dict[str, Any]:
     resource_profile_evidence_refs = [
         "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
@@ -25,10 +29,10 @@ def valid_provider_capability_offer(
             "provider_port_ref": f"{adapter_key}:adapter-owned-provider-port",
         },
         "capability_offer": {
-            "capability": "content_detail",
-            "operation": "content_detail_by_url",
-            "target_type": "url",
-            "collection_mode": "hybrid",
+            "capability": capability,
+            "operation": operation,
+            "target_type": target_type,
+            "collection_mode": collection_mode,
         },
         "resource_support": {
             "supported_profiles": [
@@ -73,13 +77,13 @@ def valid_provider_capability_offer(
         },
         "observability": {
             "offer_id": (
-                f"{adapter_key}:{provider_key}:content_detail:"
-                "content_detail_by_url:url:hybrid:v0.8.0"
+                f"{adapter_key}:{provider_key}:{capability}:"
+                f"{operation}:{target_type}:{collection_mode}:v0.8.0"
             ),
             "provider_key": provider_key,
             "adapter_key": adapter_key,
-            "capability": "content_detail",
-            "operation": "content_detail_by_url",
+            "capability": capability,
+            "operation": operation,
             "profile_keys": ["account_proxy", "account"],
             "proof_refs": resource_profile_evidence_refs,
             "contract_version": "v0.8.0",
