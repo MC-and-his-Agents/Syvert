@@ -939,7 +939,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
-        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+        self.assertEqual(result["details"]["reason"], "invalid_comment_collection_contract")
 
     def test_validate_success_payload_rejects_top_level_cursor_reply_window_drift(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
@@ -1308,7 +1308,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(result.envelope["result_status"], "complete")
-        self.assertEqual(result.envelope["error_classification"], "parse_failed")
+        self.assertEqual(result.envelope["error_classification"], "signature_or_request_invalid")
         self.assertEqual(result.envelope["items"], [])
         self.assertIsNotNone(result.task_record)
         self.assertEqual(result.task_record.status, "succeeded")
@@ -1341,7 +1341,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(result.envelope["result_status"], "complete")
-        self.assertEqual(result.envelope["error_classification"], "parse_failed")
+        self.assertEqual(result.envelope["error_classification"], "signature_or_request_invalid")
         self.assertEqual(result.envelope["items"], [])
         self.assertFalse(hasattr(adapter, "last_request"))
 
@@ -1365,7 +1365,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result.envelope["status"], "success")
-        self.assertEqual(result.envelope["error_classification"], "parse_failed")
+        self.assertEqual(result.envelope["error_classification"], "signature_or_request_invalid")
         self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_execute_core_task_request_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:

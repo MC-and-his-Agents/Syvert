@@ -887,7 +887,7 @@ def validate_comment_request_cursor(
         try:
             raw_payload = comment_request_cursor_to_dict(payload) if isinstance(payload, CommentRequestCursor) else payload
         except (AttributeError, TypeError, ValueError) as error:
-            return {"code": "parse_failed", "message": str(error), "details": {"field": "comment_request_cursor"}}
+            return {"code": "signature_or_request_invalid", "message": str(error), "details": {"field": "comment_request_cursor"}}
         cursor = comment_request_cursor_from_dict(raw_payload)
         target_ref = _ensure_non_empty_string(target_ref, "target_ref")
         if cursor.page_continuation is not None and cursor.reply_cursor is not None:
@@ -918,7 +918,8 @@ def validate_comment_request_cursor(
             )
         return None
     except CollectionContractError as error:
-        return {"code": error.code, "message": error.message, "details": dict(error.details)}
+        code = "signature_or_request_invalid" if error.code == "parse_failed" else error.code
+        return {"code": code, "message": error.message, "details": dict(error.details)}
 
 
 def comment_request_cursor_to_dict(cursor: CommentRequestCursor) -> dict[str, Any]:
@@ -1229,6 +1230,16 @@ def _validate_comment_item_contract(
             return _contract_error(
                 "invalid_comment_collection_contract",
                 "reply comment 的 target_comment_ref 不得等于自身 canonical_ref",
+                details={"field": f"{field}.normalized.target_comment_ref"},
+            )
+        if (
+            item.normalized.parent_comment_ref == item.normalized.root_comment_ref
+            and item.normalized.target_comment_ref is not None
+            and item.normalized.target_comment_ref != item.normalized.root_comment_ref
+        ):
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "direct reply comment 的 target_comment_ref 必须保留在 root comment thread 内",
                 details={"field": f"{field}.normalized.target_comment_ref"},
             )
         if (
