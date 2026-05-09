@@ -98,6 +98,8 @@
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（512 tests）
 - `python3 -m unittest tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_reply_window_continuation_without_thread_ref tests.runtime.test_comment_collection.CommentCollectionCarrierTests.test_reply_only_top_level_page_allows_top_level_next_continuation tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_normalizes_dataclass_cursor_before_adapter_context tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_passes_comment_request_cursor_to_adapter_context`
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（513 tests）
+- `python3 -m unittest tests.runtime.test_comment_collection.CommentCollectionCarrierTests.test_emitted_partial_result_classification_is_rejected tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_emitted_partial_result_classification tests.runtime.test_comment_collection.CommentCollectionCarrierTests.test_partial_result_requires_at_least_one_comment_item`
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_resource_capability_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（513 tests）
 - `python3 - <<'PY' ... validate_frozen_resource_capability_evidence_contract() ... PY`
 - `python3 -m unittest tests.runtime.test_registry tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_dataclass_cursor tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_request_cursor`
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -178,7 +180,7 @@
 - PR `#429` guardian finding：无效 comment cursor 在 adapter/capability 基本准入前返回 synthetic success carrier，掩盖 missing adapter 等前置失败。
   - 处理：已把 comment cursor validation 从 request normalization 挪到 adapter lookup、capability、target、collection_mode 基本准入之后；missing adapter / unsupported 接线失败保留通用 failed envelope，已补 missing adapter regression。
 - PR `#429` guardian finding：`comment_collection` 无法表示非空 `complete` 成功页。
-  - 处理：已移除 `platform_failed` 非空成功页兼容分支，`platform_failed` 重新保持 collection-level failure fail-closed；非空 `complete` 成功页暂用继承词表中的 `partial_result` 兼容 entry，#418 consumer migration 必须保持该解释边界。
+  - 处理：已移除 `platform_failed` 非空成功页兼容分支，`platform_failed` 重新保持 collection-level failure fail-closed；`partial_result` 只保留为继承词表兼容 entry，不允许作为 comment_collection emitted error classification。
 - PR `#429` guardian finding：shared contract harness 丢弃 `request_cursor`，无法验证 comment cursor 语义。
   - 处理：已将 `request_cursor` 加入 runtime adapter request、success envelope validation 与 `ContractSampleDefinition`；公开 third-party entry 的 comment_collection manifest 支持不在 #417 范围，留给 #418 consumer/contract migration。
 - PR `#429` guardian finding：carrier validator 接受 reply-window continuation 跨 comment 漂移。
@@ -196,15 +198,17 @@
 - PR `#429` guardian finding：`target_comment_ref` 可为另一线程背书，绕过 reply-window 绑定。
   - 处理：runtime/thread continuation 绑定证明不再使用 `target_comment_ref`；direct reply 的独立 target drift 也会在 carrier 层 fail-closed，nested reply 仍可保留独立 target linkage。
 - PR `#429` guardian finding：`platform_failed` 被允许携带正常 comment items，且非 root reply subtree 后代被误判为 thread drift。
-  - 处理：已移除 `platform_failed` 非空成功页兼容分支，非空 complete 成功页使用继承词表中的 `partial_result` 兼容 entry；同时允许非 root resumed subtree 的后代通过 `target_comment_ref == resume_comment_ref` 保持绑定证明，并补 carrier/runtime regressions。
+  - 处理：已移除 `platform_failed` 非空成功页兼容分支，`partial_result` 不再允许作为 emitted error classification；同时允许非 root resumed subtree 的后代通过 `target_comment_ref == resume_comment_ref` 保持绑定证明，并补 carrier/runtime regressions。
 - PR `#429` guardian finding：direct reply 独立 `target_comment_ref` 被误拒，且 nested reply 可通过伪造 `target_comment_ref` 绕过 thread 绑定。
   - 处理：已恢复 direct reply 独立 target linkage；runtime/continuation thread proof 不再接受 `target_comment_ref` 单独命中，root/parent 不属于恢复线程时必须 fail-closed。
 - PR `#429` guardian finding：top-level reply-only page 被误判为必须携带 thread continuation，且 dataclass cursor 原样进入 adapter。
   - 处理：已允许 top-level continuation 搭配 reply-only items；`CommentRequestCursor` dataclass 在进入 `AdapterTaskRequest` 前规范化为 mapping carrier，并补 adapter context shape regression；reply-window 请求下缺失 thread ref 的 continuation 继续归因为 `invalid_comment_collection_contract`。
+- PR `#429` guardian finding：`comment_collection` 非空成功页仍接受 emitted `error_classification=partial_result`。
+  - 处理：已禁止 comment_collection 单独 emitted `partial_result` 分类；partial page 只能使用 `result_status=partial_result + error_classification=parse_failed`，继承词表中的 `partial_result` 仅保留为 vocabulary compatibility entry。
 
 ## 未决风险
 
-- `FR-0404` 继承 `FR-0403` 的必填 `error_classification` 字段，但继承词表没有独立成功态分类；当前 runtime 使用继承兼容 entry 表示 non-failure complete page，后续 #418 consumer migration 必须保持该语义不被解释为 collection-level failure。
+- `FR-0404` 继承 `FR-0403` 的必填 `error_classification` 字段，但继承词表没有独立成功态分类；#417 现在按 formal spec 禁止单独 emitted `partial_result`，#418 consumer migration 不得重新引入该兼容分支。
 - #418 仍需把 TaskRecord/result query/runtime admission/compatibility decision 对齐到 `comment_collection` stable slice，本 PR 不声明 consumer 完成。
 
 ## 回滚方式

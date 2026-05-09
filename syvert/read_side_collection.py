@@ -1086,12 +1086,10 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "partial_result 必须与 parse_failed 配对并保留至少一个 comment item",
                 details={"field": "result_status"},
             )
-    if envelope.error_classification == "partial_result" and (
-        envelope.result_status != "complete" or not envelope.items
-    ):
+    if envelope.error_classification == "partial_result":
         return _contract_error(
             "invalid_comment_collection_contract",
-            "partial_result 仅可作为非空 complete 成功页的继承兼容分类",
+            "comment_collection 不允许单独 emitted error_classification=partial_result",
             details={"field": "error_classification"},
         )
     if envelope.error_classification == "parse_failed":

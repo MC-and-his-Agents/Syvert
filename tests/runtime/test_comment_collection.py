@@ -379,14 +379,15 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
-    def test_complete_success_page_with_comment_items_is_valid(self) -> None:
+    def test_emitted_partial_result_classification_is_rejected(self) -> None:
         payload = make_payload(
             result_status="complete",
             error_classification="partial_result",
         )
-        envelope = comment_collection_result_envelope_from_dict(payload)
+        result = validate_comment_collection_result_envelope(payload)
 
-        self.assertIsNone(validate_comment_collection_result_envelope(envelope))
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("partial_result", result["message"])
 
     def test_collection_level_failures_are_fail_closed(self) -> None:
         for error_classification in (
