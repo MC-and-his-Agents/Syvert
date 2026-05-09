@@ -36,11 +36,13 @@
   - `has_more`
   - `next_continuation`
   - `result_status`
+  - `error_classification`
   - `raw_payload_ref`
   - `source_trace`
   - `audit`
 - 约束：
   - `result_status` 至少支持 `complete`、`empty`、`partial_result`。
+  - `error_classification` 用于表达 collection-level failure/admission classification；成功且无错误时允许为空。
   - `empty` 不等于 `target_not_found`。
   - `has_more=false` 时允许 `next_continuation` 为空。
   - `raw_payload_ref` 只能引用原始载荷，不承载 raw payload 内联内容。

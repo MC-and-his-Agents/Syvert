@@ -33,7 +33,7 @@
 
 - 功能需求：
   - Core 必须能表达 `content_search_by_keyword` 与 `content_list_by_creator` 的 collection target 与 continuation input，而不理解平台私有 query object、page object、search-session object 或 creator page object。
-  - collection result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`raw_payload_ref`、`source_trace` 与审计字段。
+  - collection result 必须包含 `items`、`has_more`、`next_continuation`、`result_status`、`error_classification`、`raw_payload_ref`、`source_trace` 与审计字段。
   - 每个 item 必须可同时保留 raw payload reference 与 normalized item projection；Core 只能消费 normalized envelope，不消费平台私有 raw 字段。
   - collection contract 必须能表达 `empty`、`complete`、`partial_result` 三种结果状态。
   - collection contract 必须能表达跨页 dedup key，并允许不同平台以不同原始标识生成相同公共 dedup 语义。
@@ -81,6 +81,12 @@ Then Adapter 负责还原平台 continuation，Core 仍只接收平台中立 con
 Given `content_search_by_keyword` 命中合法但无结果的 target
 When Core 执行 collection request
 Then result 返回 `items=[]`、`result_status=empty`，且不得被分类为 `target_not_found` 或 `platform_failed`
+
+### 场景 3B：目标不存在必须独立分类
+
+Given `content_list_by_creator` 使用的 creator target 在平台上不存在或已不可解析
+When Core 执行 collection request
+Then result 必须返回 `error_classification=target_not_found`，且不得被降级成 `empty_result`
 
 ### 场景 4：跨页重复 item 可以被稳定去重
 
