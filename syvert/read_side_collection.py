@@ -808,6 +808,9 @@ def _read_comment_continuation(payload: Any, *, field_name: str) -> CommentConti
             "issued_at",
         ),
     )
+    issued_at = _ensure_optional_non_empty_string(raw_continuation.get("issued_at"), f"{field_name}.issued_at")
+    if issued_at is not None:
+        _ensure_rfc3339_timestamp(issued_at, f"{field_name}.issued_at")
     return CommentContinuation(
         continuation_token=_ensure_non_empty_string(
             raw_continuation["continuation_token"], f"{field_name}.continuation_token"
@@ -821,7 +824,7 @@ def _read_comment_continuation(payload: Any, *, field_name: str) -> CommentConti
         resume_comment_ref=_ensure_optional_non_empty_string(
             raw_continuation.get("resume_comment_ref"), f"{field_name}.resume_comment_ref"
         ),
-        issued_at=_ensure_optional_non_empty_string(raw_continuation.get("issued_at"), f"{field_name}.issued_at"),
+        issued_at=issued_at,
     )
 
 
@@ -841,6 +844,9 @@ def _read_comment_reply_cursor(payload: Any, *, field_name: str) -> CommentReply
             "issued_at",
         ),
     )
+    issued_at = _ensure_optional_non_empty_string(raw_cursor.get("issued_at"), f"{field_name}.issued_at")
+    if issued_at is not None:
+        _ensure_rfc3339_timestamp(issued_at, f"{field_name}.issued_at")
     return CommentReplyCursor(
         reply_cursor_token=_ensure_non_empty_string(raw_cursor["reply_cursor_token"], f"{field_name}.reply_cursor_token"),
         reply_cursor_family=_ensure_non_empty_string(
@@ -848,7 +854,7 @@ def _read_comment_reply_cursor(payload: Any, *, field_name: str) -> CommentReply
         ),
         resume_target_ref=_ensure_non_empty_string(raw_cursor["resume_target_ref"], f"{field_name}.resume_target_ref"),
         resume_comment_ref=_ensure_non_empty_string(raw_cursor["resume_comment_ref"], f"{field_name}.resume_comment_ref"),
-        issued_at=_ensure_optional_non_empty_string(raw_cursor.get("issued_at"), f"{field_name}.issued_at"),
+        issued_at=issued_at,
     )
 
 
@@ -878,7 +884,9 @@ def validate_comment_request_cursor(
     target_ref: str,
 ) -> dict[str, Any] | None:
     try:
-        cursor = payload if isinstance(payload, CommentRequestCursor) else comment_request_cursor_from_dict(payload)
+        cursor = comment_request_cursor_from_dict(
+            comment_request_cursor_to_dict(payload) if isinstance(payload, CommentRequestCursor) else payload
+        )
         target_ref = _ensure_non_empty_string(target_ref, "target_ref")
         if cursor.page_continuation is not None and cursor.reply_cursor is not None:
             return _contract_error(

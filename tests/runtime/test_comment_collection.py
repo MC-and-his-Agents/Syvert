@@ -4,6 +4,8 @@ from typing import Any
 import unittest
 
 from syvert.read_side_collection import (
+    CommentReplyCursor,
+    CommentRequestCursor,
     comment_collection_result_envelope_from_dict,
     comment_collection_result_envelope_to_dict,
     validate_comment_collection_result_envelope,
@@ -268,6 +270,23 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         )
 
         self.assertEqual(result["code"], "cursor_invalid_or_expired")
+
+    def test_request_cursor_rejects_malformed_dataclass_reply_cursor(self) -> None:
+        result = validate_comment_request_cursor(
+            CommentRequestCursor(
+                reply_cursor=CommentReplyCursor(
+                    reply_cursor_token="",
+                    reply_cursor_family="opaque",
+                    resume_target_ref="content-001",
+                    resume_comment_ref="comment:root-1",
+                    issued_at="2026-05-09T10:00:00Z",
+                ),
+            ),
+            target_ref="content-001",
+        )
+
+        self.assertEqual(result["code"], "parse_failed")
+        self.assertIn("reply_cursor_token", result["message"])
 
     def test_empty_result_is_valid_without_continuation(self) -> None:
         payload = make_payload(
