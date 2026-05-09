@@ -76,7 +76,10 @@ if _APPROVED_RESOURCE_CAPABILITY_IDS != frozenset(_FROZEN_REQUIRED_CAPABILITY_ID
 _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
     record
     for record in frozen_dual_reference_resource_capability_evidence_records()
-    if record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
+    if (
+        record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
+        and record.capability == "content_detail"
+    )
 )
 _ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
     {"content_detail", "content_search", "content_list", "comment_collection"}
@@ -261,19 +264,6 @@ def baseline_multi_profile_resource_requirement_declaration(
     adapter_key: str,
     capability: str,
 ) -> AdapterResourceRequirementDeclarationV2:
-    if capability == "comment_collection":
-        return AdapterResourceRequirementDeclarationV2(
-            adapter_key=adapter_key,
-            capability=capability,
-            resource_requirement_profiles=(
-                AdapterResourceRequirementProfile(
-                    profile_key="account_proxy",
-                    resource_dependency_mode=RESOURCE_DEPENDENCY_MODE_REQUIRED,
-                    required_capabilities=("account", "proxy"),
-                    evidence_refs=("fr-0027:profile:comment-collection-paginated:account-proxy",),
-                ),
-            ),
-        )
     return AdapterResourceRequirementDeclarationV2(
         adapter_key=adapter_key,
         capability=capability,

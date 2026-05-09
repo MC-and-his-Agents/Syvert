@@ -151,13 +151,11 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                     "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
                     "fr-0015:xhs:content-detail:url:hybrid:account-material",
                     "fr-0015:douyin:content-detail:url:hybrid:account-material",
-                    "fr-0404:runtime:comment-collection-paginated:requested-slots",
                 ),
                 "proxy": (
                     "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
                     "fr-0015:regression:xhs:managed-proxy-seed",
                     "fr-0015:regression:douyin:managed-proxy-seed",
-                    "fr-0404:runtime:comment-collection-paginated:requested-slots",
                 ),
             },
         )
@@ -166,7 +164,6 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             {
                 "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
                 "fr-0027:profile:content-detail-by-url-hybrid:account",
-                "fr-0027:profile:comment-collection-paginated:account-proxy",
             },
         )
 
@@ -193,13 +190,6 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "fr-0027:profile:content-detail-by-url-hybrid:account": (
                     "required",
                     ("account",),
-                    ("xhs", "douyin"),
-                    "shared",
-                    "approve_profile_for_v0_8_0",
-                ),
-                "fr-0027:profile:comment-collection-paginated:account-proxy": (
-                    "required",
-                    ("account", "proxy"),
                     ("xhs", "douyin"),
                     "shared",
                     "approve_profile_for_v0_8_0",
@@ -291,10 +281,6 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 "fr-0015:regression:douyin:managed-proxy-seed": (
                     "syvert/real_adapter_regression.py",
                     "seed_reference_regression_resources",
-                ),
-                "fr-0404:runtime:comment-collection-paginated:requested-slots": (
-                    "syvert/runtime.py",
-                    "RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
                 ),
             },
         )
@@ -426,30 +412,6 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                         "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
                         "fr-0015:regression:douyin:managed-proxy-seed",
                     ),
-                ),
-                ("xhs", "comment_collection", "account"): (
-                    ("runtime_requested_slots=account,proxy",),
-                    "shared",
-                    "approve_for_v0_5_0",
-                    ("fr-0404:runtime:comment-collection-paginated:requested-slots",),
-                ),
-                ("douyin", "comment_collection", "account"): (
-                    ("runtime_requested_slots=account,proxy",),
-                    "shared",
-                    "approve_for_v0_5_0",
-                    ("fr-0404:runtime:comment-collection-paginated:requested-slots",),
-                ),
-                ("xhs", "comment_collection", "proxy"): (
-                    ("runtime_requested_slots=account,proxy",),
-                    "shared",
-                    "approve_for_v0_5_0",
-                    ("fr-0404:runtime:comment-collection-paginated:requested-slots",),
-                ),
-                ("douyin", "comment_collection", "proxy"): (
-                    ("runtime_requested_slots=account,proxy",),
-                    "shared",
-                    "approve_for_v0_5_0",
-                    ("fr-0404:runtime:comment-collection-paginated:requested-slots",),
                 ),
                 ("douyin", "content_detail", "verify_fp"): (
                     ("adapter_private_account_field=verify_fp",),

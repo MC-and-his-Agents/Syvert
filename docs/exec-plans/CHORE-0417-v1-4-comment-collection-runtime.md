@@ -106,7 +106,7 @@
 - PR `#429` guardian finding：comment cursor fail-closed success carrier 不应绕过 durable TaskRecord。
   - 处理：已让 pre-adapter comment cursor fail-closed carrier 创建 accepted/running/succeeded TaskRecord，并补 `TaskRequest` / `CoreTaskRequest` 回归断言。
 - PR `#429` guardian finding：`comment_collection` 有效请求无法通过资源准入。
-  - 处理：已新增 `comment_collection + content + paginated` 的 canonical shared resource profile evidence，registry 使用 `fr-0027:profile:comment-collection-paginated:account-proxy`，并恢复有效请求 focused runtime regression。
+  - 处理：经后续 guardian 复核，#417 不应提前提升 shared resource profile；已撤回 `comment_collection` approved resource evidence/profile，runtime carrier focused test 改为无资源声明 fake adapter，完整 admission/resource proof 留给后续 evidence/consumer 批次。
 - PR `#429` guardian finding：reply hierarchy 没有约束 root/parent/target linkage。
   - 处理：已收紧 reply item hierarchy validation，拒绝 self-root/self-parent 与跨 thread target linkage，并补 malformed hierarchy regression。
 - PR `#429` guardian finding：malformed request cursor 仍漏出通用 failed envelope。
@@ -116,11 +116,13 @@
 - PR `#429` guardian finding：非法 `CoreTaskRequest` 轴会被 fail-closed 分支改写成合法 content/paginated。
   - 处理：已收紧 pre-admission fail-closed 分支，仅对已是 `comment_collection + content + paginated` 的 CoreTaskRequest 生成 comment carrier；非法轴保留通用 failed envelope，并补回归。
 - PR `#429` guardian finding：`comment_collection` resource evidence code baseline 与 formal research registry 不一致。
-  - 处理：#417 是 implementation PR，不能修改正式 spec 区；已将 `fr-0404:runtime:comment-collection-paginated:requested-slots` 作为 v1.4 runtime extension evidence trace-validating 到 `syvert/runtime.py`，同时让 FR-0015 formal alignment 继续只覆盖既有 `content_detail` baseline，并让 evidence record key 支持 `(adapter, capability, candidate)`，避免污染既有 `content_detail` 基线。
+  - 处理：已撤回 #417 中的 shared resource evidence/profile 提升，不修改正式 spec 区；FR-0015 formal alignment 继续只覆盖既有 `content_detail` baseline，避免污染既有 resource governance 基线。
 - PR `#429` guardian finding：canonical `CommentRequestCursor` dataclass 可绕过 reply-thread drift 校验。
   - 处理：已让 runtime request cursor thread extraction 同时支持 mapping 与 dataclass carrier，并新增 dataclass cursor drift regression。
-- PR `#429` guardian finding：registry V1 resource declaration/helper 对 `comment_collection` 仍缺 approved evidence。
-  - 处理：已让 approved frozen resource records 纳入 `comment_collection` account/proxy evidence，并补 `baseline_required_resource_requirement_declaration` / `approved_resource_requirement_evidence_refs_for` regression。
+- PR `#429` guardian finding：top-level `page_continuation` 可以静默漂移到 reply-thread payload。
+  - 处理：已在 `validate_success_payload` 中校验 top-level page cursor 上下文，拒绝 reply items 或携带 `resume_comment_ref` 的 reply continuation，并新增 drift regression。
+- PR `#429` guardian finding：shared resource profile 在没有 adapter-side proof 的情况下被提前批准。
+  - 处理：已撤回 `comment_collection` shared dual-reference evidence、approved vocabulary 扩展与 `fr-0027:profile:comment-collection-paginated:account-proxy` 暴露；#417 只交付 runtime carrier，不声明 resource profile approved。
 
 ## 未决风险
 

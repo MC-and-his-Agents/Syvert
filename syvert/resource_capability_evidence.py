@@ -7,7 +7,7 @@ import re
 
 
 _ALLOWED_ADAPTER_KEYS = frozenset({"xhs", "douyin"})
-_ALLOWED_CAPABILITY_FAMILIES = frozenset({"content_detail", "comment_collection"})
+_ALLOWED_CAPABILITY_FAMILIES = frozenset({"content_detail"})
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
 _ALLOWED_SHARED_STATUSES = frozenset({"shared", "adapter_only", "rejected"})
 _ALLOWED_DECISIONS = frozenset({"approve_for_v0_5_0", "keep_adapter_local", "reject_for_v0_5_0"})
@@ -33,15 +33,6 @@ _FROZEN_EXECUTION_PATH = {
     "target_type": "url",
     "collection_mode": "hybrid",
 }
-_COMMENT_COLLECTION_EXECUTION_PATH = {
-    "operation": "comment_collection",
-    "target_type": "content",
-    "collection_mode": "paginated",
-}
-_FORMAL_RESOURCE_CAPABILITY_FAMILIES = frozenset({"content_detail"})
-_RUNTIME_EXTENSION_EVIDENCE_REFS = frozenset({
-    "fr-0404:runtime:comment-collection-paginated:requested-slots",
-})
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _FORMAL_RESEARCH_PATH = (
     _REPO_ROOT / "docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md"
@@ -208,12 +199,6 @@ _FROZEN_EVIDENCE_REFERENCE_ENTRIES = (
         source_symbol="seed_reference_regression_resources",
         summary="douyin 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
     ),
-    EvidenceReferenceEntry(
-        evidence_ref="fr-0404:runtime:comment-collection-paginated:requested-slots",
-        source_file="syvert/runtime.py",
-        source_symbol="RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
-        summary="共享 Core 路径在 comment_collection + content + paginated 上统一请求 account 与 proxy 两个受管资源 slot。",
-    ),
 )
 
 
@@ -263,62 +248,6 @@ _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS = (
         evidence_refs=(
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:regression:xhs:managed-proxy-seed",
-        ),
-        decision="approve_for_v0_5_0",
-    ),
-    DualReferenceResourceCapabilityEvidenceRecord(
-        adapter_key="xhs",
-        capability="comment_collection",
-        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        resource_signals=(
-            "runtime_requested_slots=account,proxy",
-        ),
-        candidate_abstract_capability="account",
-        shared_status="shared",
-        evidence_refs=(
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        decision="approve_for_v0_5_0",
-    ),
-    DualReferenceResourceCapabilityEvidenceRecord(
-        adapter_key="douyin",
-        capability="comment_collection",
-        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        resource_signals=(
-            "runtime_requested_slots=account,proxy",
-        ),
-        candidate_abstract_capability="account",
-        shared_status="shared",
-        evidence_refs=(
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        decision="approve_for_v0_5_0",
-    ),
-    DualReferenceResourceCapabilityEvidenceRecord(
-        adapter_key="xhs",
-        capability="comment_collection",
-        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        resource_signals=(
-            "runtime_requested_slots=account,proxy",
-        ),
-        candidate_abstract_capability="proxy",
-        shared_status="shared",
-        evidence_refs=(
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        decision="approve_for_v0_5_0",
-    ),
-    DualReferenceResourceCapabilityEvidenceRecord(
-        adapter_key="douyin",
-        capability="comment_collection",
-        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        resource_signals=(
-            "runtime_requested_slots=account,proxy",
-        ),
-        candidate_abstract_capability="proxy",
-        shared_status="shared",
-        evidence_refs=(
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         decision="approve_for_v0_5_0",
     ),
@@ -582,11 +511,6 @@ _EXPECTED_FROZEN_EVIDENCE_REFERENCE_BASELINE = {
         "source_symbol": "seed_reference_regression_resources",
         "summary": "douyin 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
     },
-    "fr-0404:runtime:comment-collection-paginated:requested-slots": {
-        "source_file": "syvert/runtime.py",
-        "source_symbol": "RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
-        "summary": "共享 Core 路径在 comment_collection + content + paginated 上统一请求 account 与 proxy 两个受管资源 slot。",
-    },
 }
 
 _EXPECTED_FROZEN_RECORD_BASELINE = {
@@ -635,46 +559,6 @@ _EXPECTED_FROZEN_RECORD_BASELINE = {
         "evidence_refs": (
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:regression:douyin:managed-proxy-seed",
-        ),
-        "decision": "approve_for_v0_5_0",
-    },
-    ("xhs", "comment_collection", "account"): {
-        "resource_signals": (
-            "runtime_requested_slots=account,proxy",
-        ),
-        "shared_status": "shared",
-        "evidence_refs": (
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        "decision": "approve_for_v0_5_0",
-    },
-    ("douyin", "comment_collection", "account"): {
-        "resource_signals": (
-            "runtime_requested_slots=account,proxy",
-        ),
-        "shared_status": "shared",
-        "evidence_refs": (
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        "decision": "approve_for_v0_5_0",
-    },
-    ("xhs", "comment_collection", "proxy"): {
-        "resource_signals": (
-            "runtime_requested_slots=account,proxy",
-        ),
-        "shared_status": "shared",
-        "evidence_refs": (
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
-        ),
-        "decision": "approve_for_v0_5_0",
-    },
-    ("douyin", "comment_collection", "proxy"): {
-        "resource_signals": (
-            "runtime_requested_slots=account,proxy",
-        ),
-        "shared_status": "shared",
-        "evidence_refs": (
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         "decision": "approve_for_v0_5_0",
     },
@@ -772,7 +656,6 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:xhs:content-detail:url:hybrid:account-material",
             "fr-0015:douyin:content-detail:url:hybrid:account-material",
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         status="approved",
     ),
@@ -782,7 +665,6 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:regression:xhs:managed-proxy-seed",
             "fr-0015:regression:douyin:managed-proxy-seed",
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         status="approved",
     ),
@@ -860,19 +742,6 @@ _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS = (
         evidence_refs=(
             "fr-0015:xhs:content-detail:url:hybrid:account-material",
             "fr-0015:douyin:content-detail:url:hybrid:account-material",
-        ),
-    ),
-    ResourceRequirementProfileEvidenceRecord(
-        profile_ref="fr-0027:profile:comment-collection-paginated:account-proxy",
-        capability="comment_collection",
-        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        resource_dependency_mode="required",
-        required_capabilities=("account", "proxy"),
-        reference_adapters=("xhs", "douyin"),
-        shared_status="shared",
-        decision="approve_profile_for_v0_8_0",
-        evidence_refs=(
-            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
     ),
 )
@@ -966,11 +835,8 @@ def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
             raise ValueError(f"unsupported adapter_key in frozen evidence record: {record.adapter_key}")
         if record.capability not in _ALLOWED_CAPABILITY_FAMILIES:
             raise ValueError(f"unsupported capability family in frozen evidence record: {record.capability}")
-        if record.execution_path not in {
-            ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
-            ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        }:
-            raise ValueError("frozen evidence records must all bind to an approved execution path")
+        if record.execution_path != ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH):
+            raise ValueError("frozen evidence records must all bind to the approved execution path")
         if record.shared_status not in _ALLOWED_SHARED_STATUSES:
             raise ValueError(f"unsupported shared_status in frozen evidence record: {record.shared_status}")
         if record.decision not in _ALLOWED_DECISIONS:
@@ -1065,15 +931,10 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     formal_evidence_entry_index = {
         entry.evidence_ref: entry for entry in formal_research_baseline.evidence_reference_entries
     }
-    formal_aligned_evidence_entry_index = {
-        evidence_ref: entry
-        for evidence_ref, entry in evidence_entry_index.items()
-        if evidence_ref not in _RUNTIME_EXTENSION_EVIDENCE_REFS
-    }
-    if frozenset(formal_aligned_evidence_entry_index) != frozenset(formal_evidence_entry_index):
+    if frozenset(evidence_entry_index) != frozenset(formal_evidence_entry_index):
         raise ValueError("frozen evidence reference entries must stay aligned with the formal research registry")
     parsed_source_trees: dict[Path, ast.AST] = {}
-    for evidence_ref, entry in formal_aligned_evidence_entry_index.items():
+    for evidence_ref, entry in evidence_entry_index.items():
         formal_entry = formal_evidence_entry_index[evidence_ref]
         if (
             entry.source_file != formal_entry.source_file
@@ -1081,23 +942,15 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         ):
             raise ValueError("frozen evidence reference entries must keep canonical source pointers from the formal research registry")
         _validate_traceable_evidence_source(entry, parsed_source_trees)
-    for evidence_ref, entry in evidence_entry_index.items():
-        if evidence_ref in _RUNTIME_EXTENSION_EVIDENCE_REFS:
-            _validate_traceable_evidence_source(entry, parsed_source_trees)
 
     formal_record_index = {
         (record.adapter_key, record.capability, record.candidate_abstract_capability): record
         for record in formal_research_baseline.evidence_record_entries
     }
-    formal_aligned_record_index = {
-        record_key: record
-        for record_key, record in record_index.items()
-        if record.capability in _FORMAL_RESOURCE_CAPABILITY_FAMILIES
-    }
-    if frozenset(formal_aligned_record_index) != frozenset(formal_record_index):
+    if frozenset(record_index) != frozenset(formal_record_index):
         raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
     for record_key, formal_record in formal_record_index.items():
-        record = formal_aligned_record_index[record_key]
+        record = record_index[record_key]
         if (
             record.capability != formal_record.capability
             or record.execution_path != formal_record.execution_path
@@ -1115,12 +968,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         raise ValueError("approved capability ids must stay aligned with the formal research baseline")
     for capability_id, vocabulary_entry in vocabulary_index.items():
         formal_capability_entry = formal_approved_capability_index[capability_id]
-        formal_aligned_evidence_refs = tuple(
-            evidence_ref
-            for evidence_ref in vocabulary_entry.approval_basis_evidence_refs
-            if evidence_ref not in _RUNTIME_EXTENSION_EVIDENCE_REFS
-        )
-        if formal_aligned_evidence_refs != formal_capability_entry.evidence_refs:
+        if vocabulary_entry.approval_basis_evidence_refs != formal_capability_entry.evidence_refs:
             raise ValueError("approved capability vocabulary entries must stay aligned with the formal research baseline")
 
     profile_record_index = _validate_resource_requirement_profile_evidence_records(
@@ -1130,15 +978,10 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     formal_profile_record_index = {
         entry.profile_ref: entry for entry in formal_research_baseline.profile_evidence_record_entries
     }
-    formal_aligned_profile_record_index = {
-        profile_ref: record
-        for profile_ref, record in profile_record_index.items()
-        if record.capability in _FORMAL_RESOURCE_CAPABILITY_FAMILIES
-    }
-    if frozenset(formal_aligned_profile_record_index) != frozenset(formal_profile_record_index):
+    if frozenset(profile_record_index) != frozenset(formal_profile_record_index):
         raise ValueError("profile evidence records must stay aligned with the formal research baseline")
     for profile_ref, formal_record in formal_profile_record_index.items():
-        record = formal_aligned_profile_record_index[profile_ref]
+        record = profile_record_index[profile_ref]
         if (
             record.capability != formal_record.capability
             or record.execution_path != formal_record.execution_path
@@ -1181,14 +1024,12 @@ def _canonical_approval_basis_evidence_refs(
     shared_records: list[DualReferenceResourceCapabilityEvidenceRecord],
 ) -> tuple[str, ...]:
     ordered_refs: list[str] = []
-    for capability in ("content_detail", "comment_collection"):
-        for adapter_key in ("xhs", "douyin"):
-            for record in shared_records:
-                if record.capability != capability or record.adapter_key != adapter_key:
-                    continue
-                for evidence_ref in record.evidence_refs:
-                    if evidence_ref not in ordered_refs:
-                        ordered_refs.append(evidence_ref)
+    records_by_adapter = {record.adapter_key: record for record in shared_records}
+    for adapter_key in ("xhs", "douyin"):
+        record = records_by_adapter[adapter_key]
+        for evidence_ref in record.evidence_refs:
+            if evidence_ref not in ordered_refs:
+                ordered_refs.append(evidence_ref)
     return tuple(ordered_refs)
 
 
@@ -1225,11 +1066,8 @@ def _validate_resource_requirement_profile_evidence_records(
         _require_non_empty_string(record.profile_ref, field_name="profile_ref")
         if record.capability not in _ALLOWED_CAPABILITY_FAMILIES:
             raise ValueError(f"unsupported capability family in profile evidence record: {record.capability}")
-        if record.execution_path not in {
-            ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
-            ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
-        }:
-            raise ValueError("profile evidence records must all bind to an approved execution path")
+        if record.execution_path != ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH):
+            raise ValueError("profile evidence records must all bind to the approved execution path")
         if record.resource_dependency_mode not in _ALLOWED_RESOURCE_DEPENDENCY_MODES:
             raise ValueError("profile evidence records must use a supported resource_dependency_mode")
         if record.shared_status not in _ALLOWED_SHARED_STATUSES:
@@ -1277,7 +1115,6 @@ def _validate_resource_requirement_profile_evidence_records(
     if {entry.profile_ref for entry in approved_profile_entries} != {
         "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
         "fr-0027:profile:content-detail-by-url-hybrid:account",
-        "fr-0027:profile:comment-collection-paginated:account-proxy",
     }:
         raise ValueError("approved shared profile entries must stay frozen to approved account/profile slices")
     return record_index

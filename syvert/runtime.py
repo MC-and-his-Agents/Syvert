@@ -3229,6 +3229,30 @@ def validate_success_payload(
                 details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
             )
         cursor_thread_ref = _comment_request_cursor_thread_ref(request_cursor)
+        if cursor_thread_ref is None and _comment_request_cursor_is_top_level_page(request_cursor):
+            reply_item_refs = tuple(
+                item.normalized.canonical_ref
+                for item in envelope.items
+                if item.normalized.root_comment_ref != item.normalized.canonical_ref
+            )
+            if reply_item_refs:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "top-level comment page cursor 不得返回 reply thread items",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "reply_item_refs": reply_item_refs,
+                    },
+                )
+            if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "top-level comment page cursor 不得切换为 reply thread continuation",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    },
+                )
         if cursor_thread_ref is not None:
             drifted_items = tuple(
                 item.normalized.canonical_ref
@@ -3381,6 +3405,22 @@ def validate_success_payload(
         )
 
     return None
+
+
+def _comment_request_cursor_is_top_level_page(request_cursor: Any | None) -> bool:
+    if isinstance(request_cursor, Mapping):
+        page_continuation = request_cursor.get("page_continuation")
+        reply_cursor = request_cursor.get("reply_cursor")
+    else:
+        page_continuation = getattr(request_cursor, "page_continuation", None)
+        reply_cursor = getattr(request_cursor, "reply_cursor", None)
+    if reply_cursor is not None or page_continuation is None:
+        return False
+    if isinstance(page_continuation, Mapping):
+        value = page_continuation.get("resume_comment_ref")
+    else:
+        value = getattr(page_continuation, "resume_comment_ref", None)
+    return value is None
 
 
 def _comment_request_cursor_thread_ref(request_cursor: Any | None) -> str | None:
