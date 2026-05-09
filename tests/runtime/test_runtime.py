@@ -291,6 +291,17 @@ class CommentCollectionAdapter:
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class MutatingCommentCursorAdapter(CommentCollectionAdapter):
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        cursor = request.request.request_cursor
+        if isinstance(cursor, dict):
+            reply_cursor = cursor.get("reply_cursor")
+            if isinstance(reply_cursor, dict):
+                reply_cursor["resume_comment_ref"] = "comment:other-root"
+        return make_comment_collection_reply_result(root_comment_ref="comment:other-root")
+
+
 def make_execution_control_policy(scope: str) -> ExecutionControlPolicy:
     return ExecutionControlPolicy(
         timeout=ExecutionTimeoutPolicy(timeout_ms=30000),
@@ -1088,6 +1099,27 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(adapter.last_request.input.comment_request_cursor, cursor)
+
+    def test_execute_task_rejects_reply_drift_after_adapter_mutates_visible_cursor(self) -> None:
+        adapter = MutatingCommentCursorAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-mutating-cursor",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result.envelope["error"]["details"]["reason"], "cursor_invalid_or_expired")
 
     def test_execute_task_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:
         adapter = CommentCollectionAdapter()

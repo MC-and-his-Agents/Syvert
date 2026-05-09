@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import queue
@@ -697,6 +698,9 @@ def execute_task_internal(
             pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_error),
             None,
         )
+    request_cursor_validation_snapshot = (
+        clone_request_cursor(normalized_request.request_cursor) if capability == COMMENT_COLLECTION else None
+    )
 
     execution_control_policy = normalized_request.execution_control_policy
     if execution_control_policy is None:
@@ -897,6 +901,7 @@ def execute_task_internal(
         adapter_key=adapter_key,
         capability=capability,
         adapter_request=adapter_request,
+        request_cursor_validation_snapshot=request_cursor_validation_snapshot,
         adapter=adapter_declaration.adapter,
         policy=execution_control_policy,
         initial_admission_guard=admission_guard,
@@ -939,6 +944,7 @@ def execute_controlled_adapter_attempts(
     adapter_key: str,
     capability: str,
     adapter_request: AdapterTaskRequest,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     adapter: Any,
     policy: ExecutionControlPolicy,
     initial_admission_guard: ExecutionConcurrencyAdmissionGuard,
@@ -960,6 +966,7 @@ def execute_controlled_adapter_attempts(
             adapter_key=adapter_key,
             capability=capability,
             adapter_request=adapter_request,
+            request_cursor_validation_snapshot=request_cursor_validation_snapshot,
             adapter=adapter,
             policy=policy,
             attempt_index=attempt_index,
@@ -1123,6 +1130,7 @@ def execute_single_controlled_adapter_attempt(
     adapter_key: str,
     capability: str,
     adapter_request: AdapterTaskRequest,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     adapter: Any,
     policy: ExecutionControlPolicy,
     attempt_index: int,
@@ -1320,6 +1328,7 @@ def execute_single_controlled_adapter_attempt(
             capability=capability,
             adapter=adapter,
             adapter_context=adapter_context,
+            request_cursor_validation_snapshot=request_cursor_validation_snapshot,
             timeout_ms=policy.timeout.timeout_ms,
             resource_bundle=resource_bundle,
             slot=slot,
@@ -1356,6 +1365,7 @@ def run_adapter_attempt_with_timeout(
     capability: str,
     adapter: Any,
     adapter_context: AdapterExecutionContext,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     timeout_ms: int,
     resource_bundle: Any,
     slot: ExecutionConcurrencySlot | None,
@@ -1468,7 +1478,7 @@ def run_adapter_attempt_with_timeout(
             capability=capability,
             target_type=adapter_context.target_type,
             target_value=adapter_context.target_value,
-            request_cursor=adapter_context.request.request_cursor,
+            request_cursor=request_cursor_validation_snapshot,
         )
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error), None, DEFAULT_FAILURE_RELEASE_REASON, False, False
@@ -2588,10 +2598,16 @@ def project_to_adapter_request(
             target_type=request.target.target_type,
             target_value=request.target.target_value,
             collection_mode=request.policy.collection_mode,
-            request_cursor=request.request_cursor if request.target.capability == COMMENT_COLLECTION else None,
+            request_cursor=clone_request_cursor(request.request_cursor) if request.target.capability == COMMENT_COLLECTION else None,
         ),
         None,
     )
+
+
+def clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if request_cursor is None:
+        return None
+    return copy.deepcopy(request_cursor)
 
 
 def validate_projection_axes_for_current_runtime(request: CoreTaskRequest) -> dict[str, Any] | None:

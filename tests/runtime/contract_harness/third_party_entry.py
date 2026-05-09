@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import copy
 from dataclasses import dataclass, replace
 import re
 from typing import Any, Literal
@@ -1294,12 +1295,13 @@ def _execute_and_validate_fixture(
     expected_outcome = "success" if fixture.case_type == "success" else "legal_failure"
     task_id = f"task-{fixture.fixture_id}"
     fixture_input = _normalize_fixture_input(manifest, fixture)
+    validation_request_cursor = _clone_request_cursor(fixture_input["request_cursor"])
     sample = ContractSampleDefinition(
         sample_id=fixture.fixture_id,
         expected_outcome=expected_outcome,
         target_type=fixture_input["target_type"],
         target_value=fixture_input["target_value"],
-        request_cursor=fixture_input["request_cursor"],
+        request_cursor=validation_request_cursor,
     )
     core_operation = fixture_input["operation"]
     adapter_capability = fixture_input["capability"]
@@ -1318,7 +1320,7 @@ def _execute_and_validate_fixture(
                     target_type=fixture_input["target_type"],
                     target_value=fixture_input["target_value"],
                     collection_mode=fixture_input["collection_mode"],
-                    request_cursor=fixture_input["request_cursor"],
+                    request_cursor=_clone_request_cursor(fixture_input["request_cursor"]),
                 ),
                 resource_bundle=resource_bundle,
             )
@@ -1330,7 +1332,7 @@ def _execute_and_validate_fixture(
             payload=payload,
             target_type=fixture_input["target_type"],
             target_value=fixture_input["target_value"],
-            request_cursor=fixture_input["request_cursor"],
+            request_cursor=validation_request_cursor,
         )
     except PlatformAdapterError as error:
         details = _normalize_platform_adapter_error_details(error)
@@ -1393,7 +1395,7 @@ def _build_success_runtime_envelope(
             capability=capability,
             target_type=target_type or inferred_target_type,
             target_value=target_value or inferred_target_value,
-            request_cursor=request_cursor,
+            request_cursor=_clone_request_cursor(request_cursor),
         )
         if payload_error is not None:
             return {
@@ -1870,6 +1872,12 @@ def _validate_success_payload_observation(
             },
         }
     return result
+
+
+def _clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if request_cursor is None:
+        return None
+    return copy.deepcopy(request_cursor)
 
 
 def _normalize_fixture_input(
