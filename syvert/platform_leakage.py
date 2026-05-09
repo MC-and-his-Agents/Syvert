@@ -327,7 +327,7 @@ def _collect_runtime_statement_boundary_overrides(module: ast.Module) -> list[tu
             (
                 child
                 for child in ast.walk(node)
-                if isinstance(child, (ast.Assign, ast.AnnAssign, ast.Return))
+                if isinstance(child, (ast.Assign, ast.AnnAssign, ast.Return, ast.Expr))
             ),
             key=lambda child: (child.lineno, getattr(child, "end_lineno", child.lineno)),
         ):
@@ -357,6 +357,8 @@ def _statement_value(statement: ast.stmt) -> ast.AST | None:
     if isinstance(statement, ast.Assign):
         return statement.value
     if isinstance(statement, ast.AnnAssign):
+        return statement.value
+    if isinstance(statement, ast.Expr):
         return statement.value
     return None
 
@@ -389,10 +391,23 @@ def _return_contains_success_envelope(value: ast.AST | None) -> bool:
 
 
 def _is_success_envelope_expr(value: ast.AST | None) -> bool:
-    if not isinstance(value, ast.Dict):
-        return False
-    keys = {key.value for key in value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
-    return {"raw", "normalized"}.issubset(keys)
+    if isinstance(value, ast.Dict):
+        keys = {key.value for key in value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
+        return {"raw", "normalized"}.issubset(keys)
+    if (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Attribute)
+        and value.func.attr == "update"
+        and value.args
+        and isinstance(value.args[0], ast.Dict)
+    ):
+        keys = {
+            key.value
+            for key in value.args[0].keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        }
+        return {"raw", "normalized"}.issubset(keys)
+    return False
 
 
 def _build_allowed_exception_statements(relative_name: str, source_text: str) -> frozenset[tuple[int, int, int, int]]:
@@ -1192,6 +1207,8 @@ def _statement_has_platform_specific_field(
     key_signals: Mapping[str, tuple[frozenset[str], bool]],
     platform_aliases: frozenset[str],
 ) -> bool:
+    if _success_envelope_update_has_platform_specific_field(node):
+        return True
     if _assignment_contains_disallowed_shared_field(
         node,
         shared_result_container_aliases=shared_result_container_aliases,
@@ -1211,6 +1228,27 @@ def _statement_has_platform_specific_field(
     if _PLATFORM_FIELD_RE.search(statement_source) is not None:
         return True
     return any(_string_literal_has_platform_specific_fragment(literal) for literal in _string_literals(node))
+
+
+def _success_envelope_update_has_platform_specific_field(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+        return False
+    call = node.value
+    if (
+        not isinstance(call.func, ast.Attribute)
+        or call.func.attr != "update"
+        or not isinstance(call.func.value, ast.Name)
+        or call.func.value.id != "success_envelope"
+        or not call.args
+        or not isinstance(call.args[0], ast.Dict)
+    ):
+        return False
+    return any(
+        isinstance(key, ast.Constant)
+        and isinstance(key.value, str)
+        and _string_literal_has_platform_specific_fragment(key.value)
+        for key in call.args[0].keys
+    )
 
 
 def _assignment_contains_disallowed_shared_field(

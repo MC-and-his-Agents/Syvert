@@ -117,15 +117,15 @@ class PlatformLeakageTests(unittest.TestCase):
         report = self.run_with_fixture(
             {
                 "syvert/runtime.py": (
-                    '        "normalized": payload["normalized"],\n',
-                    '        "xhs_extra": "1",\n        "normalized": payload["normalized"],\n',
+                    '            success_envelope.update({"raw": payload["raw"], "normalized": payload["normalized"]})\n',
+                    '            success_envelope.update({"raw": payload["raw"], "aweme_id": "1", "normalized": payload["normalized"]})\n',
                 )
             }
         )
 
         self.assertEqual(report["verdict"], "fail")
-        self.assertIn("single_platform_shared_semantic", {item["code"] for item in report["details"]["findings"]})
-        self.assertEqual({item["boundary"] for item in report["details"]["findings"]}, {"shared_result_contract"})
+        self.assertIn("platform_specific_field_leak", {item["code"] for item in report["details"]["findings"]})
+        self.assertIn("shared_result_contract", {item["boundary"] for item in report["details"]["findings"]})
 
     def test_run_check_maps_direct_failure_return_to_shared_error_model(self) -> None:
         report = self.run_with_fixture(
