@@ -318,6 +318,15 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
+    def test_complete_success_page_with_comment_items_is_valid(self) -> None:
+        payload = make_payload(
+            result_status="complete",
+            error_classification="platform_failed",
+        )
+        envelope = comment_collection_result_envelope_from_dict(payload)
+
+        self.assertIsNone(validate_comment_collection_result_envelope(envelope))
+
     def test_collection_level_failures_are_fail_closed(self) -> None:
         for error_classification in (
             "target_not_found",

@@ -54,6 +54,7 @@ COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS = frozenset(
         "signature_or_request_invalid",
     }
 )
+COMMENT_COLLECTION_COMPLETE_SUCCESS_COMPAT_CLASSIFICATIONS = frozenset({"platform_failed"})
 COMMENT_PLACEHOLDER_SOURCE_ID_PREFIX = "public-placeholder:"
 
 RFC3339_TIMESTAMP_RE = re.compile(
@@ -1072,7 +1073,14 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
             details={"field": "error_classification"},
         )
 
-    if envelope.error_classification in COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS:
+    if (
+        envelope.error_classification in COMMENT_COLLECTION_FAILURE_CLASSIFICATIONS
+        and not (
+            envelope.result_status == "complete"
+            and envelope.items
+            and envelope.error_classification in COMMENT_COLLECTION_COMPLETE_SUCCESS_COMPAT_CLASSIFICATIONS
+        )
+    ):
         if envelope.items or envelope.has_more or envelope.next_continuation is not None:
             return _contract_error(
                 "invalid_comment_collection_contract",

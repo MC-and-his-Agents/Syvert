@@ -850,6 +850,20 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
+    def test_validate_success_payload_accepts_non_empty_comment_complete_page(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        payload["result_status"] = "complete"
+        payload["error_classification"] = "platform_failed"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+            )
+        )
+
     def test_validate_success_payload_rejects_opaque_reply_refs_not_bound_to_request_cursor(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:other-root")
 
