@@ -3,8 +3,7 @@
 ## 研究边界
 
 - 本研究只服务 `FR-0015` 当前要冻结的双参考适配器资源能力证据基线。
-- 初始证据边界固定为仓内共享执行路径：`content_detail_by_url + target_type=url + collection_mode=hybrid`。
-- `FR-0404` 只追加 `comment_collection + target_type=content + collection_mode=paginated` 的资源 slot 证据，不改变 `FR-0015` 对平台私有字段、请求 token 或浏览器回退的判定。
+- 证据边界固定为仓内当前共享执行路径：`content_detail_by_url + target_type=url + collection_mode=hybrid`。
 - 研究目标不是发明更多能力名，而是证明在现有双参考适配器事实下，哪些候选能力可以被批准、哪些必须留在 adapter 私有层，哪些必须作为错误抽象方向被 `rejected` 收口。
 
 ## 证据登记项
@@ -20,7 +19,6 @@
 | `fr-0015:douyin:content-detail:url:hybrid:page-state-fallback` | `syvert/adapters/douyin.py` 中 `DouyinAdapter._recover_aweme_detail_from_page_state()` | 抖音 adapter 在 detail 路径失败时会退回 browser page-state 恢复链路，这属于技术绑定回退 |
 | `fr-0015:regression:xhs:managed-proxy-seed` | `syvert/real_adapter_regression.py` 中 `seed_reference_regression_resources()` | 小红书真实适配器回归基线在共享路径上同时种入 `account` 与 `proxy` 资源 |
 | `fr-0015:regression:douyin:managed-proxy-seed` | `syvert/real_adapter_regression.py` 中 `seed_reference_regression_resources()` | 抖音真实适配器回归基线在共享路径上同时种入 `account` 与 `proxy` 资源 |
-| `fr-0404:runtime:comment-collection-paginated:requested-slots` | `syvert/runtime.py` 中 `RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE` | 共享 Core 路径在 `comment_collection + content + paginated` 上统一请求 `account` 与 `proxy` 两个受管资源 slot |
 
 ## 共性资源语义
 
@@ -55,8 +53,8 @@
 
 | capability_id | 结论 | evidence_refs |
 | --- | --- | --- |
-| `account` | `shared + approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material`、`fr-0404:runtime:comment-collection-paginated:requested-slots` |
-| `proxy` | `shared + approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed`、`fr-0404:runtime:comment-collection-paginated:requested-slots` |
+| `account` | `shared + approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |
+| `proxy` | `shared + approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed` |
 
 ## 冻结的 evidence record 基线示例
 
@@ -66,10 +64,6 @@
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `account` | `shared` | `approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |
 | `xhs` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `proxy` | `shared` | `approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:xhs:managed-proxy-seed` |
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `proxy` | `shared` | `approve_for_v0_5_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:douyin:managed-proxy-seed` |
-| `xhs` | `comment_collection` | `target_type=content, collection_mode=paginated, operation=comment_collection` | `account` | `shared` | `approve_for_v0_5_0` | `fr-0404:runtime:comment-collection-paginated:requested-slots` |
-| `douyin` | `comment_collection` | `target_type=content, collection_mode=paginated, operation=comment_collection` | `account` | `shared` | `approve_for_v0_5_0` | `fr-0404:runtime:comment-collection-paginated:requested-slots` |
-| `xhs` | `comment_collection` | `target_type=content, collection_mode=paginated, operation=comment_collection` | `proxy` | `shared` | `approve_for_v0_5_0` | `fr-0404:runtime:comment-collection-paginated:requested-slots` |
-| `douyin` | `comment_collection` | `target_type=content, collection_mode=paginated, operation=comment_collection` | `proxy` | `shared` | `approve_for_v0_5_0` | `fr-0404:runtime:comment-collection-paginated:requested-slots` |
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `verify_fp` | `adapter_only` | `keep_adapter_local` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `ms_token` | `adapter_only` | `keep_adapter_local` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
 | `douyin` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `webid` | `adapter_only` | `keep_adapter_local` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
@@ -100,7 +94,6 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `fr-0027:profile:content-detail-by-url-hybrid:account-proxy` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account`、`proxy` | `xhs`、`douyin` | `shared` | `approve_profile_for_v0_8_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed` |
 | `fr-0027:profile:content-detail-by-url-hybrid:account` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account` | `xhs`、`douyin` | `shared` | `approve_profile_for_v0_8_0` | `fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |
-| `fr-0027:profile:comment-collection-paginated:account-proxy` | `comment_collection` | `target_type=content, collection_mode=paginated, operation=comment_collection` | `required` | `account`、`proxy` | `xhs`、`douyin` | `shared` | `approve_profile_for_v0_8_0` | `fr-0404:runtime:comment-collection-paginated:requested-slots` |
 | `fr-0027:profile:content-detail-by-url-hybrid:douyin-account-private-material` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `account`、`verify_fp`、`ms_token`、`webid` | `douyin` | `adapter_only` | `keep_adapter_local` | `fr-0015:douyin:content-detail:url:hybrid:account-material` |
 | `fr-0027:profile:content-detail-by-url-hybrid:proxy` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `required` | `proxy` | `xhs`、`douyin` | `rejected` | `reject_profile_for_v0_8_0` | `fr-0015:runtime:content-detail-by-url-hybrid:requested-slots`、`fr-0015:regression:xhs:managed-proxy-seed`、`fr-0015:regression:douyin:managed-proxy-seed` |
 | `fr-0027:profile:content-detail-by-url-hybrid:none` | `content_detail` | `target_type=url, collection_mode=hybrid, operation=content_detail_by_url` | `none` | - | `xhs`、`douyin` | `rejected` | `reject_profile_for_v0_8_0` | `fr-0015:xhs:content-detail:url:hybrid:account-material`、`fr-0015:douyin:content-detail:url:hybrid:account-material` |

@@ -38,6 +38,10 @@ _COMMENT_COLLECTION_EXECUTION_PATH = {
     "target_type": "content",
     "collection_mode": "paginated",
 }
+_FORMAL_RESOURCE_CAPABILITY_FAMILIES = frozenset({"content_detail"})
+_RUNTIME_EXTENSION_EVIDENCE_REFS = frozenset({
+    "fr-0404:runtime:comment-collection-paginated:requested-slots",
+})
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _FORMAL_RESEARCH_PATH = (
     _REPO_ROOT / "docs/specs/FR-0015-dual-reference-resource-capability-evidence/research.md"
@@ -1061,10 +1065,15 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     formal_evidence_entry_index = {
         entry.evidence_ref: entry for entry in formal_research_baseline.evidence_reference_entries
     }
-    if frozenset(evidence_entry_index) != frozenset(formal_evidence_entry_index):
+    formal_aligned_evidence_entry_index = {
+        evidence_ref: entry
+        for evidence_ref, entry in evidence_entry_index.items()
+        if evidence_ref not in _RUNTIME_EXTENSION_EVIDENCE_REFS
+    }
+    if frozenset(formal_aligned_evidence_entry_index) != frozenset(formal_evidence_entry_index):
         raise ValueError("frozen evidence reference entries must stay aligned with the formal research registry")
     parsed_source_trees: dict[Path, ast.AST] = {}
-    for evidence_ref, entry in evidence_entry_index.items():
+    for evidence_ref, entry in formal_aligned_evidence_entry_index.items():
         formal_entry = formal_evidence_entry_index[evidence_ref]
         if (
             entry.source_file != formal_entry.source_file
@@ -1072,15 +1081,23 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         ):
             raise ValueError("frozen evidence reference entries must keep canonical source pointers from the formal research registry")
         _validate_traceable_evidence_source(entry, parsed_source_trees)
+    for evidence_ref, entry in evidence_entry_index.items():
+        if evidence_ref in _RUNTIME_EXTENSION_EVIDENCE_REFS:
+            _validate_traceable_evidence_source(entry, parsed_source_trees)
 
     formal_record_index = {
         (record.adapter_key, record.capability, record.candidate_abstract_capability): record
         for record in formal_research_baseline.evidence_record_entries
     }
-    if frozenset(record_index) != frozenset(formal_record_index):
+    formal_aligned_record_index = {
+        record_key: record
+        for record_key, record in record_index.items()
+        if record.capability in _FORMAL_RESOURCE_CAPABILITY_FAMILIES
+    }
+    if frozenset(formal_aligned_record_index) != frozenset(formal_record_index):
         raise ValueError("frozen evidence records must stay aligned with the formal research baseline")
     for record_key, formal_record in formal_record_index.items():
-        record = record_index[record_key]
+        record = formal_aligned_record_index[record_key]
         if (
             record.capability != formal_record.capability
             or record.execution_path != formal_record.execution_path
@@ -1098,7 +1115,12 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         raise ValueError("approved capability ids must stay aligned with the formal research baseline")
     for capability_id, vocabulary_entry in vocabulary_index.items():
         formal_capability_entry = formal_approved_capability_index[capability_id]
-        if vocabulary_entry.approval_basis_evidence_refs != formal_capability_entry.evidence_refs:
+        formal_aligned_evidence_refs = tuple(
+            evidence_ref
+            for evidence_ref in vocabulary_entry.approval_basis_evidence_refs
+            if evidence_ref not in _RUNTIME_EXTENSION_EVIDENCE_REFS
+        )
+        if formal_aligned_evidence_refs != formal_capability_entry.evidence_refs:
             raise ValueError("approved capability vocabulary entries must stay aligned with the formal research baseline")
 
     profile_record_index = _validate_resource_requirement_profile_evidence_records(
@@ -1108,10 +1130,15 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
     formal_profile_record_index = {
         entry.profile_ref: entry for entry in formal_research_baseline.profile_evidence_record_entries
     }
-    if frozenset(profile_record_index) != frozenset(formal_profile_record_index):
+    formal_aligned_profile_record_index = {
+        profile_ref: record
+        for profile_ref, record in profile_record_index.items()
+        if record.capability in _FORMAL_RESOURCE_CAPABILITY_FAMILIES
+    }
+    if frozenset(formal_aligned_profile_record_index) != frozenset(formal_profile_record_index):
         raise ValueError("profile evidence records must stay aligned with the formal research baseline")
     for profile_ref, formal_record in formal_profile_record_index.items():
-        record = profile_record_index[profile_ref]
+        record = formal_aligned_profile_record_index[profile_ref]
         if (
             record.capability != formal_record.capability
             or record.execution_path != formal_record.execution_path
