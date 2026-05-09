@@ -10,7 +10,7 @@
 - Parent Phase：`#381`
 - Parent FR：`#404`
 - 关联 spec：`docs/specs/FR-0404-comment-collection-contract/spec.md`
-- 关联 decision：
+- 关联 decision：`docs/decisions/ADR-CHORE-0416-comment-collection-operation-name.md`
 - 关联 PR：`#427`
 - 状态：`active`
 
