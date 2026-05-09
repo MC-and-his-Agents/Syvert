@@ -76,10 +76,7 @@ if _APPROVED_RESOURCE_CAPABILITY_IDS != frozenset(_FROZEN_REQUIRED_CAPABILITY_ID
 _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
     record
     for record in frozen_dual_reference_resource_capability_evidence_records()
-    if (
-        record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
-        and record.capability == "content_detail"
-    )
+    if record.candidate_abstract_capability in _APPROVED_RESOURCE_CAPABILITY_IDS
 )
 _ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
     {"content_detail", "content_search", "content_list", "comment_collection"}

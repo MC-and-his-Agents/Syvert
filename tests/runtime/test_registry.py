@@ -9,6 +9,7 @@ from syvert.registry import (
     AdapterResourceRequirementDeclarationV2,
     AdapterResourceRequirementProfile,
     RegistryError,
+    approved_resource_requirement_evidence_refs_for,
     baseline_required_resource_requirement_declaration,
 )
 
@@ -303,6 +304,26 @@ class RegistryTests(unittest.TestCase):
                     capability="content_detail",
                 ),
             ),
+        )
+
+    def test_comment_collection_baseline_resource_evidence_is_adapter_scoped(self) -> None:
+        declaration = baseline_required_resource_requirement_declaration(
+            adapter_key="xhs",
+            capability="comment_collection",
+        )
+
+        self.assertEqual(declaration.capability, "comment_collection")
+        self.assertEqual(declaration.required_capabilities, ("account", "proxy"))
+        self.assertEqual(
+            declaration.evidence_refs,
+            ("fr-0404:runtime:comment-collection-paginated:requested-slots",),
+        )
+        self.assertEqual(
+            approved_resource_requirement_evidence_refs_for(
+                adapter_key="xhs",
+                capability="comment_collection",
+            ),
+            frozenset({"fr-0404:runtime:comment-collection-paginated:requested-slots"}),
         )
 
     def test_registry_rejects_declaration_for_unsupported_capability(self) -> None:

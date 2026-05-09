@@ -17,6 +17,7 @@ from syvert.registry import (
     AdapterResourceRequirementProfile,
     baseline_required_resource_requirement_declaration,
 )
+from syvert.read_side_collection import CommentReplyCursor, CommentRequestCursor
 from syvert.resource_lifecycle import ResourceRecord
 from syvert.resource_lifecycle_store import LocalResourceLifecycleStore
 from syvert.resource_lifecycle_store import default_resource_lifecycle_store
@@ -861,6 +862,28 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             target_type="content",
             target_value="content-001",
             request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:root-1")},
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+
+    def test_validate_success_payload_rejects_comment_reply_thread_drift_against_dataclass_cursor(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:other-root")
+
+        result = validate_success_payload(
+            payload,
+            capability="comment_collection",
+            target_type="content",
+            target_value="content-001",
+            request_cursor=CommentRequestCursor(
+                reply_cursor=CommentReplyCursor(
+                    reply_cursor_token="reply-cursor-1",
+                    reply_cursor_family="opaque",
+                    resume_target_ref="content-001",
+                    resume_comment_ref="comment:root-1",
+                    issued_at="2026-05-09T10:00:00Z",
+                ),
+            ),
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")

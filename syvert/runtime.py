@@ -3383,17 +3383,25 @@ def validate_success_payload(
     return None
 
 
-def _comment_request_cursor_thread_ref(request_cursor: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(request_cursor, Mapping):
-        return None
-    reply_cursor = request_cursor.get("reply_cursor")
+def _comment_request_cursor_thread_ref(request_cursor: Any | None) -> str | None:
+    if isinstance(request_cursor, Mapping):
+        reply_cursor = request_cursor.get("reply_cursor")
+        page_continuation = request_cursor.get("page_continuation")
+    else:
+        reply_cursor = getattr(request_cursor, "reply_cursor", None)
+        page_continuation = getattr(request_cursor, "page_continuation", None)
     if isinstance(reply_cursor, Mapping):
         value = reply_cursor.get("resume_comment_ref")
         return value if isinstance(value, str) and value else None
-    page_continuation = request_cursor.get("page_continuation")
+    value = getattr(reply_cursor, "resume_comment_ref", None)
+    if isinstance(value, str) and value:
+        return value
     if isinstance(page_continuation, Mapping):
         value = page_continuation.get("resume_comment_ref")
         return value if isinstance(value, str) and value else None
+    value = getattr(page_continuation, "resume_comment_ref", None)
+    if isinstance(value, str) and value:
+        return value
     return None
 
 

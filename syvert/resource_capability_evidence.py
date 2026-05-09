@@ -263,6 +263,62 @@ _FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS = (
         decision="approve_for_v0_5_0",
     ),
     DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="comment_collection",
+        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        resource_signals=(
+            "runtime_requested_slots=account,proxy",
+        ),
+        candidate_abstract_capability="account",
+        shared_status="shared",
+        evidence_refs=(
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        decision="approve_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="douyin",
+        capability="comment_collection",
+        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        resource_signals=(
+            "runtime_requested_slots=account,proxy",
+        ),
+        candidate_abstract_capability="account",
+        shared_status="shared",
+        evidence_refs=(
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        decision="approve_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="xhs",
+        capability="comment_collection",
+        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        resource_signals=(
+            "runtime_requested_slots=account,proxy",
+        ),
+        candidate_abstract_capability="proxy",
+        shared_status="shared",
+        evidence_refs=(
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        decision="approve_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
+        adapter_key="douyin",
+        capability="comment_collection",
+        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        resource_signals=(
+            "runtime_requested_slots=account,proxy",
+        ),
+        candidate_abstract_capability="proxy",
+        shared_status="shared",
+        evidence_refs=(
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        decision="approve_for_v0_5_0",
+    ),
+    DualReferenceResourceCapabilityEvidenceRecord(
         adapter_key="douyin",
         capability="content_detail",
         execution_path=ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
@@ -530,7 +586,7 @@ _EXPECTED_FROZEN_EVIDENCE_REFERENCE_BASELINE = {
 }
 
 _EXPECTED_FROZEN_RECORD_BASELINE = {
-    ("xhs", "account"): {
+    ("xhs", "content_detail", "account"): {
         "resource_signals": (
             "runtime_requested_slots=account,proxy",
             "adapter_consumes_account_material=cookies,user_agent,sign_base_url,timeout_seconds",
@@ -542,7 +598,7 @@ _EXPECTED_FROZEN_RECORD_BASELINE = {
         ),
         "decision": "approve_for_v0_5_0",
     },
-    ("douyin", "account"): {
+    ("douyin", "content_detail", "account"): {
         "resource_signals": (
             "runtime_requested_slots=account,proxy",
             "adapter_consumes_account_material=cookies,user_agent,verify_fp,ms_token,webid,sign_base_url,timeout_seconds",
@@ -554,7 +610,7 @@ _EXPECTED_FROZEN_RECORD_BASELINE = {
         ),
         "decision": "approve_for_v0_5_0",
     },
-    ("xhs", "proxy"): {
+    ("xhs", "content_detail", "proxy"): {
         "resource_signals": (
             "runtime_requested_slots=account,proxy",
             "regression_seeded_resources=account,proxy",
@@ -566,7 +622,7 @@ _EXPECTED_FROZEN_RECORD_BASELINE = {
         ),
         "decision": "approve_for_v0_5_0",
     },
-    ("douyin", "proxy"): {
+    ("douyin", "content_detail", "proxy"): {
         "resource_signals": (
             "runtime_requested_slots=account,proxy",
             "regression_seeded_resources=account,proxy",
@@ -578,85 +634,125 @@ _EXPECTED_FROZEN_RECORD_BASELINE = {
         ),
         "decision": "approve_for_v0_5_0",
     },
-    ("douyin", "verify_fp"): {
+    ("xhs", "comment_collection", "account"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "comment_collection", "account"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("xhs", "comment_collection", "proxy"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "comment_collection", "proxy"): {
+        "resource_signals": (
+            "runtime_requested_slots=account,proxy",
+        ),
+        "shared_status": "shared",
+        "evidence_refs": (
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
+        ),
+        "decision": "approve_for_v0_5_0",
+    },
+    ("douyin", "content_detail", "verify_fp"): {
         "resource_signals": ("adapter_private_account_field=verify_fp",),
         "shared_status": "adapter_only",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "keep_adapter_local",
     },
-    ("douyin", "ms_token"): {
+    ("douyin", "content_detail", "ms_token"): {
         "resource_signals": ("adapter_private_account_field=ms_token",),
         "shared_status": "adapter_only",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "keep_adapter_local",
     },
-    ("douyin", "webid"): {
+    ("douyin", "content_detail", "webid"): {
         "resource_signals": ("adapter_private_account_field=webid",),
         "shared_status": "adapter_only",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "keep_adapter_local",
     },
-    ("douyin", "a_bogus"): {
+    ("douyin", "content_detail", "a_bogus"): {
         "resource_signals": ("adapter_private_request_token=a_bogus",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:request-signature-token",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "xsec_token"): {
+    ("xhs", "content_detail", "xsec_token"): {
         "resource_signals": ("adapter_private_request_token=xsec_token",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "xsec_source"): {
+    ("xhs", "content_detail", "xsec_source"): {
         "resource_signals": ("adapter_private_request_token=xsec_source",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "sign_base_url"): {
+    ("xhs", "content_detail", "sign_base_url"): {
         "resource_signals": ("technical_binding_field=sign_base_url",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("douyin", "sign_base_url"): {
+    ("douyin", "content_detail", "sign_base_url"): {
         "resource_signals": ("technical_binding_field=sign_base_url",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "cookies"): {
+    ("xhs", "content_detail", "cookies"): {
         "resource_signals": ("account_material_field=cookies",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("douyin", "cookies"): {
+    ("douyin", "content_detail", "cookies"): {
         "resource_signals": ("account_material_field=cookies",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "user_agent"): {
+    ("xhs", "content_detail", "user_agent"): {
         "resource_signals": ("account_material_field=user_agent",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("douyin", "user_agent"): {
+    ("douyin", "content_detail", "user_agent"): {
         "resource_signals": ("account_material_field=user_agent",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
         "decision": "reject_for_v0_5_0",
     },
-    ("xhs", "browser_state"): {
+    ("xhs", "content_detail", "browser_state"): {
         "resource_signals": ("technical_binding_candidate=browser_state",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",),
         "decision": "reject_for_v0_5_0",
     },
-    ("douyin", "browser_state"): {
+    ("douyin", "content_detail", "browser_state"): {
         "resource_signals": ("technical_binding_candidate=browser_state",),
         "shared_status": "rejected",
         "evidence_refs": ("fr-0015:douyin:content-detail:url:hybrid:page-state-fallback",),
@@ -672,6 +768,7 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:xhs:content-detail:url:hybrid:account-material",
             "fr-0015:douyin:content-detail:url:hybrid:account-material",
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         status="approved",
     ),
@@ -681,6 +778,7 @@ _APPROVED_RESOURCE_CAPABILITY_VOCABULARY_ENTRIES = (
             "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
             "fr-0015:regression:xhs:managed-proxy-seed",
             "fr-0015:regression:douyin:managed-proxy-seed",
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
         status="approved",
     ),
@@ -830,7 +928,7 @@ def approved_shared_resource_requirement_profile_evidence_entries() -> tuple[
 
 def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
     dict[str, EvidenceReferenceEntry],
-    dict[tuple[str, str], DualReferenceResourceCapabilityEvidenceRecord],
+    dict[tuple[str, str, str], DualReferenceResourceCapabilityEvidenceRecord],
     dict[str, ApprovedResourceCapabilityVocabularyEntry],
 ]:
     evidence_entries = _FROZEN_EVIDENCE_REFERENCE_ENTRIES
@@ -857,15 +955,18 @@ def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
         raise ValueError("frozen evidence records must not be empty")
 
     shared_records_by_capability: dict[str, list[DualReferenceResourceCapabilityEvidenceRecord]] = {}
-    record_index: dict[tuple[str, str], DualReferenceResourceCapabilityEvidenceRecord] = {}
-    shared_record_keys: set[tuple[str, str]] = set()
+    record_index: dict[tuple[str, str, str], DualReferenceResourceCapabilityEvidenceRecord] = {}
+    shared_record_keys: set[tuple[str, str, str]] = set()
     for record in records:
         if record.adapter_key not in _ALLOWED_ADAPTER_KEYS:
             raise ValueError(f"unsupported adapter_key in frozen evidence record: {record.adapter_key}")
         if record.capability not in _ALLOWED_CAPABILITY_FAMILIES:
             raise ValueError(f"unsupported capability family in frozen evidence record: {record.capability}")
-        if record.execution_path != ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH):
-            raise ValueError("frozen evidence records must all bind to the approved execution path")
+        if record.execution_path not in {
+            ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+            ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        }:
+            raise ValueError("frozen evidence records must all bind to an approved execution path")
         if record.shared_status not in _ALLOWED_SHARED_STATUSES:
             raise ValueError(f"unsupported shared_status in frozen evidence record: {record.shared_status}")
         if record.decision not in _ALLOWED_DECISIONS:
@@ -877,14 +978,14 @@ def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
         _require_unique_non_empty_strings(record.evidence_refs, field_name="evidence_refs")
         if any(ref not in evidence_entry_index for ref in record.evidence_refs):
             raise ValueError("frozen evidence record references unknown evidence_ref")
-        record_key = (record.adapter_key, record.candidate_abstract_capability)
+        record_key = (record.adapter_key, record.capability, record.candidate_abstract_capability)
         if record_key in record_index:
-            raise ValueError("frozen evidence records must not duplicate candidate/adapter pairs")
+            raise ValueError("frozen evidence records must not duplicate adapter/capability/candidate triples")
         record_index[record_key] = record
         if record.shared_status == "shared":
-            shared_record_key = (record.candidate_abstract_capability, record.adapter_key)
+            shared_record_key = (record.candidate_abstract_capability, record.adapter_key, record.capability)
             if shared_record_key in shared_record_keys:
-                raise ValueError("shared evidence records must not duplicate capability/adapter pairs")
+                raise ValueError("shared evidence records must not duplicate candidate/adapter/capability triples")
             shared_record_keys.add(shared_record_key)
             shared_records_by_capability.setdefault(record.candidate_abstract_capability, []).append(record)
 
@@ -911,12 +1012,16 @@ def _validate_internal_frozen_resource_capability_evidence_baseline() -> tuple[
     if shared_capability_ids != approved_capability_ids:
         raise ValueError("shared evidence records must stay frozen to the approved capability ids")
     expected_shared_record_keys = {
-        (capability_id, adapter_key)
-        for capability_id in _APPROVED_RESOURCE_CAPABILITY_IDS
-        for adapter_key in _ALLOWED_ADAPTER_KEYS
+        (candidate_abstract_capability, adapter_key, capability)
+        for (
+            adapter_key,
+            capability,
+            candidate_abstract_capability,
+        ), expected_record in _EXPECTED_FROZEN_RECORD_BASELINE.items()
+        if expected_record["shared_status"] == "shared"
     }
     if shared_record_keys != expected_shared_record_keys:
-        raise ValueError("shared evidence records must stay frozen to one xhs and one douyin record per approved capability")
+        raise ValueError("shared evidence records must stay aligned with the canonical shared candidate matrix")
 
     rejected_or_adapter_only = {
         record.candidate_abstract_capability
@@ -969,7 +1074,7 @@ def validate_frozen_resource_capability_evidence_contract() -> None:
         _validate_traceable_evidence_source(entry, parsed_source_trees)
 
     formal_record_index = {
-        (record.adapter_key, record.candidate_abstract_capability): record
+        (record.adapter_key, record.capability, record.candidate_abstract_capability): record
         for record in formal_research_baseline.evidence_record_entries
     }
     if frozenset(record_index) != frozenset(formal_record_index):
@@ -1049,12 +1154,14 @@ def _canonical_approval_basis_evidence_refs(
     shared_records: list[DualReferenceResourceCapabilityEvidenceRecord],
 ) -> tuple[str, ...]:
     ordered_refs: list[str] = []
-    records_by_adapter = {record.adapter_key: record for record in shared_records}
-    for adapter_key in ("xhs", "douyin"):
-        record = records_by_adapter[adapter_key]
-        for evidence_ref in record.evidence_refs:
-            if evidence_ref not in ordered_refs:
-                ordered_refs.append(evidence_ref)
+    for capability in ("content_detail", "comment_collection"):
+        for adapter_key in ("xhs", "douyin"):
+            for record in shared_records:
+                if record.capability != capability or record.adapter_key != adapter_key:
+                    continue
+                for evidence_ref in record.evidence_refs:
+                    if evidence_ref not in ordered_refs:
+                        ordered_refs.append(evidence_ref)
     return tuple(ordered_refs)
 
 
@@ -1201,8 +1308,8 @@ def _load_formal_research_baseline() -> FormalResearchBaseline:
     )
     _require_unique_formal_research_rows(
         evidence_record_entries,
-        key_fn=lambda entry: (entry.adapter_key, entry.candidate_abstract_capability),
-        error_message="formal research evidence record table must not duplicate adapter/candidate rows",
+        key_fn=lambda entry: (entry.adapter_key, entry.capability, entry.candidate_abstract_capability),
+        error_message="formal research evidence record table must not duplicate adapter/capability/candidate rows",
     )
     _require_unique_formal_research_rows(
         profile_evidence_record_entries,

@@ -66,6 +66,9 @@
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（449 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（453 tests）
 - `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（455 tests）
+- `python3 -m unittest tests.runtime.test_models tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate tests.runtime.test_third_party_adapter_contract_entry`（457 tests）
+- `python3 - <<'PY' ... validate_frozen_resource_capability_evidence_contract() ... PY`
+- `python3 -m unittest tests.runtime.test_registry tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_dataclass_cursor tests.runtime.test_runtime.RuntimeExecutionTests.test_validate_success_payload_rejects_comment_reply_thread_drift_against_request_cursor`
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
@@ -109,6 +112,12 @@
   - 处理：已让 `validate_success_payload` 接收 runtime request cursor，并校验返回 items / next continuation 与请求 cursor 的 `resume_comment_ref` 一致；新增 reply-thread drift regression。
 - PR `#429` guardian finding：非法 `CoreTaskRequest` 轴会被 fail-closed 分支改写成合法 content/paginated。
   - 处理：已收紧 pre-admission fail-closed 分支，仅对已是 `comment_collection + content + paginated` 的 CoreTaskRequest 生成 comment carrier；非法轴保留通用 failed envelope，并补回归。
+- PR `#429` guardian finding：`comment_collection` resource evidence code baseline 与 formal research registry 不一致。
+  - 处理：已将 `fr-0404:runtime:comment-collection-paginated:requested-slots`、`comment_collection` account/proxy dual-reference records、`fr-0027:profile:comment-collection-paginated:account-proxy` 同步到 formal research registry，并让 evidence validation 支持 `(adapter, capability, candidate)` 维度，避免污染既有 `content_detail` 基线。
+- PR `#429` guardian finding：canonical `CommentRequestCursor` dataclass 可绕过 reply-thread drift 校验。
+  - 处理：已让 runtime request cursor thread extraction 同时支持 mapping 与 dataclass carrier，并新增 dataclass cursor drift regression。
+- PR `#429` guardian finding：registry V1 resource declaration/helper 对 `comment_collection` 仍缺 approved evidence。
+  - 处理：已让 approved frozen resource records 纳入 `comment_collection` account/proxy evidence，并补 `baseline_required_resource_requirement_declaration` / `approved_resource_requirement_evidence_refs_for` regression。
 
 ## 未决风险
 
