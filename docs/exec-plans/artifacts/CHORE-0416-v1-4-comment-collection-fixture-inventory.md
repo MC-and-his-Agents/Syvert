@@ -133,8 +133,10 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 
 ## Spec Freeze Consumption Rule
 
-- `FR-0404` can freeze public semantics when a scenario is `recorded_covered`, `model_covered_raw_gap`, `synthetic_derivable`, or `semantic_freeze_recording_pending`.
+- `FR-0404` may freeze the minimum public semantics grounded by `recorded_covered` and `synthetic_derivable` scenarios.
+- Scenarios marked `model_covered_raw_gap` are research inputs only. They may inform risk and evidence planning, but they are not accepted as recorded cross-platform proof and must not be used to claim implementation-ready second-reference coverage.
 - Scenarios marked `semantic_freeze_recording_pending` are explicitly carried forward into `#419` evidence scope and must not be silently treated as already recorded-proven.
+- Runtime promotion, stable release evidence, and any claim of cross-platform hierarchy / continuation proof must wait for `#419` to provide sanitized recorded or equivalent replayable evidence for the second reference path.
 
 ## Acceptance For Batch 0
 
@@ -142,3 +144,4 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 - Error boundaries and item visibility states are grouped into public semantics suitable for `FR-0404` spec writing.
 - No external project names or local paths appear in this artifact.
 - The artifact can be consumed by `spec.md`, `plan.md`, and `risks.md` without introducing runtime decisions.
+- The artifact does not mark second-reference raw coverage as complete; `#419` remains responsible for closing `model_covered_raw_gap` before evidence closeout.

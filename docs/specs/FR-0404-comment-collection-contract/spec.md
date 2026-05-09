@@ -62,6 +62,7 @@
   - malformed comment response 不得引入新的未定义公共错误分类；本 FR 中此类 fail-closed 路径统一收敛到已定义的 `parse_failed`。
   - repository 与 GitHub truth 不得记录外部样本项目名或本地路径；所有 evidence source 只能使用脱敏 alias。
   - synthetic fixture 只能从 recorded raw shape family 派生，不得凭空发明平台字段。
+  - `model_covered_raw_gap` 只能作为 research input 与 `#419` evidence planning 输入，不得作为当前 formal spec 的第二参考平台 recorded proof，也不得支撑 implementation-ready claim。
 
 ## 约束
 
@@ -215,6 +216,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 - [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，并写清 `partial_result` 只作为结果状态组合语义保留。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。
 - [ ] formal spec 明确 synthetic fixture 只能从 recorded raw shape 派生，且所有 evidence source 只能使用脱敏 alias。
+- [ ] formal spec 明确第二参考平台 raw gap 由 `#419` 关闭，当前 Work Item 不宣称跨平台 recorded proof 已完成。
 - [ ] formal spec 明确 Adapter 负责平台 comment hierarchy/cursor/visibility projection，Core 不得接收平台私有对象。
 - [ ] formal spec 明确 `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不受本 FR 改写。
 - [ ] 本事项不修改 runtime、tests implementation、raw fixture payload files 或 release closeout truth。

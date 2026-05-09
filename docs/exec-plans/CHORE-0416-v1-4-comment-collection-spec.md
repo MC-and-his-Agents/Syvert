@@ -90,6 +90,7 @@
   - 处理：已按当前 canonical taxonomy candidate 统一 public operation 为 `comment_collection`，并通过 `ADR-CHORE-0416-comment-collection-operation-name` 与 roadmap 写回明确其取代 `comment_list_by_content` 作为 `#404` slice 的 public operation。
   - 处理：已冻结 result `next_continuation` -> request `page_continuation` 映射，并把 reply/hierarchy/cursor 绑定固定到 `NormalizedCommentItem.canonical_ref`。
   - 最新处理：已修正 placeholder comment identity 规则，`source_id` 继续作为 `FR-0403` item identity 基线；deleted/invisible/unavailable placeholder 缺少平台稳定 id 时，不得伪造平台原生 id，必须通过 public placeholder namespace 与独立稳定 placeholder marker 派生稳定 `source_id` 与 `canonical_ref`。
+  - 最新处理：已将第二参考平台 `model_covered_raw_gap` 限定为 research input，不作为 implementation-ready proof；`#419` 必须补齐 recorded 或等价 replayable evidence 后才能声明跨平台 evidence closeout。
 - `#427` 已创建，当前 head 绑定本事项的 review round。
 
 ## 未决风险
