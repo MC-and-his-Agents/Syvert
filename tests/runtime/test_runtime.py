@@ -821,6 +821,45 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             )
         )
 
+    def test_execute_task_builds_comment_collection_success_envelope_from_adapter_payload(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-001"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "comment_collection")
+        self.assertEqual(result.envelope["target"]["target_type"], "content")
+        self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
+        self.assertEqual(result.task_record.request.target_type, "content")
+        self.assertEqual(adapter.last_request.collection_mode, "paginated")
+
+    def test_execute_task_passes_comment_request_cursor_to_adapter_context(self) -> None:
+        adapter = CommentCollectionAdapter()
+        cursor = {"page_continuation": make_comment_page_continuation()}
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-001", comment_request_cursor=cursor),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(adapter.last_request.input.comment_request_cursor, cursor)
+
     def test_execute_task_returns_comment_fail_closed_carrier_for_mixed_request_cursors(self) -> None:
         adapter = CommentCollectionAdapter()
         request = TaskRequest(
@@ -876,6 +915,37 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["result_status"], "complete")
         self.assertEqual(result.envelope["error_classification"], "cursor_invalid_or_expired")
         self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
+        self.assertIsNotNone(result.task_record)
+        self.assertEqual(result.task_record.status, "succeeded")
+        self.assertFalse(hasattr(adapter, "last_request"))
+
+    def test_execute_task_returns_comment_fail_closed_carrier_for_malformed_request_cursor(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(
+                content_ref="content-001",
+                comment_request_cursor={
+                    "reply_cursor": {
+                        "reply_cursor_family": "opaque",
+                        "resume_target_ref": "content-001",
+                        "resume_comment_ref": "comment:root-1",
+                    },
+                },
+            ),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-cursor-5",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["result_status"], "complete")
+        self.assertEqual(result.envelope["error_classification"], "parse_failed")
+        self.assertEqual(result.envelope["items"], [])
         self.assertIsNotNone(result.task_record)
         self.assertEqual(result.task_record.status, "succeeded")
         self.assertFalse(hasattr(adapter, "last_request"))

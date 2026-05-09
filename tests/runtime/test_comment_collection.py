@@ -199,6 +199,23 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
         self.assertIn("root_comment_ref", result["message"])
 
+    def test_reply_hierarchy_rejects_conflicting_target_linkage(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-conflict",
+            source_id="reply-conflict",
+            canonical_ref="comment:reply-conflict",
+            body_text_hint="conflicting reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:parent-1",
+            target_comment_ref="comment:other-thread",
+        )
+        payload = make_payload(items=(reply,))
+
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("target_comment_ref", result["message"])
+
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(
             {

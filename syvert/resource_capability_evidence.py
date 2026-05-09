@@ -7,7 +7,7 @@ import re
 
 
 _ALLOWED_ADAPTER_KEYS = frozenset({"xhs", "douyin"})
-_ALLOWED_CAPABILITY_FAMILIES = frozenset({"content_detail"})
+_ALLOWED_CAPABILITY_FAMILIES = frozenset({"content_detail", "comment_collection"})
 _ALLOWED_RESOURCE_DEPENDENCY_MODES = frozenset({"none", "required"})
 _ALLOWED_SHARED_STATUSES = frozenset({"shared", "adapter_only", "rejected"})
 _ALLOWED_DECISIONS = frozenset({"approve_for_v0_5_0", "keep_adapter_local", "reject_for_v0_5_0"})
@@ -32,6 +32,11 @@ _FROZEN_EXECUTION_PATH = {
     "operation": "content_detail_by_url",
     "target_type": "url",
     "collection_mode": "hybrid",
+}
+_COMMENT_COLLECTION_EXECUTION_PATH = {
+    "operation": "comment_collection",
+    "target_type": "content",
+    "collection_mode": "paginated",
 }
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _FORMAL_RESEARCH_PATH = (
@@ -198,6 +203,12 @@ _FROZEN_EVIDENCE_REFERENCE_ENTRIES = (
         source_file="syvert/real_adapter_regression.py",
         source_symbol="seed_reference_regression_resources",
         summary="douyin 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
+    ),
+    EvidenceReferenceEntry(
+        evidence_ref="fr-0404:runtime:comment-collection-paginated:requested-slots",
+        source_file="syvert/runtime.py",
+        source_symbol="RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
+        summary="共享 Core 路径在 comment_collection + content + paginated 上统一请求 account 与 proxy 两个受管资源 slot。",
     ),
 )
 
@@ -511,6 +522,11 @@ _EXPECTED_FROZEN_EVIDENCE_REFERENCE_BASELINE = {
         "source_symbol": "seed_reference_regression_resources",
         "summary": "douyin 真实适配器回归基线在共享路径上同时种入 account 与 proxy。",
     },
+    "fr-0404:runtime:comment-collection-paginated:requested-slots": {
+        "source_file": "syvert/runtime.py",
+        "source_symbol": "RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE",
+        "summary": "共享 Core 路径在 comment_collection + content + paginated 上统一请求 account 与 proxy 两个受管资源 slot。",
+    },
 }
 
 _EXPECTED_FROZEN_RECORD_BASELINE = {
@@ -742,6 +758,19 @@ _FROZEN_RESOURCE_REQUIREMENT_PROFILE_EVIDENCE_RECORDS = (
         evidence_refs=(
             "fr-0015:xhs:content-detail:url:hybrid:account-material",
             "fr-0015:douyin:content-detail:url:hybrid:account-material",
+        ),
+    ),
+    ResourceRequirementProfileEvidenceRecord(
+        profile_ref="fr-0027:profile:comment-collection-paginated:account-proxy",
+        capability="comment_collection",
+        execution_path=ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        resource_dependency_mode="required",
+        required_capabilities=("account", "proxy"),
+        reference_adapters=("xhs", "douyin"),
+        shared_status="shared",
+        decision="approve_profile_for_v0_8_0",
+        evidence_refs=(
+            "fr-0404:runtime:comment-collection-paginated:requested-slots",
         ),
     ),
 )
@@ -1062,8 +1091,11 @@ def _validate_resource_requirement_profile_evidence_records(
         _require_non_empty_string(record.profile_ref, field_name="profile_ref")
         if record.capability not in _ALLOWED_CAPABILITY_FAMILIES:
             raise ValueError(f"unsupported capability family in profile evidence record: {record.capability}")
-        if record.execution_path != ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH):
-            raise ValueError("profile evidence records must all bind to the approved execution path")
+        if record.execution_path not in {
+            ExecutionPathDescriptor(**_FROZEN_EXECUTION_PATH),
+            ExecutionPathDescriptor(**_COMMENT_COLLECTION_EXECUTION_PATH),
+        }:
+            raise ValueError("profile evidence records must all bind to an approved execution path")
         if record.resource_dependency_mode not in _ALLOWED_RESOURCE_DEPENDENCY_MODES:
             raise ValueError("profile evidence records must use a supported resource_dependency_mode")
         if record.shared_status not in _ALLOWED_SHARED_STATUSES:
@@ -1111,8 +1143,9 @@ def _validate_resource_requirement_profile_evidence_records(
     if {entry.profile_ref for entry in approved_profile_entries} != {
         "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
         "fr-0027:profile:content-detail-by-url-hybrid:account",
+        "fr-0027:profile:comment-collection-paginated:account-proxy",
     }:
-        raise ValueError("approved shared profile entries must stay frozen to account+proxy and account")
+        raise ValueError("approved shared profile entries must stay frozen to approved account/profile slices")
     return record_index
 
 

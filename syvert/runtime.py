@@ -287,7 +287,7 @@ def comment_collection_request_error_envelope(
     if not isinstance(target_ref, str) or not target_ref:
         return None
     error_code = contract_error.get("code")
-    if error_code not in {"signature_or_request_invalid", "cursor_invalid_or_expired"}:
+    if error_code not in {"signature_or_request_invalid", "cursor_invalid_or_expired", "parse_failed"}:
         return None
     return {
         "task_id": task_id,

@@ -1199,6 +1199,34 @@ def _validate_comment_item_contract(
             "top-level comment 的 root_comment_ref 必须等于 canonical_ref",
             details={"field": f"{field}.normalized.root_comment_ref"},
         )
+    if item.normalized.parent_comment_ref is not None:
+        if item.normalized.root_comment_ref == item.normalized.canonical_ref:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 root_comment_ref 不得等于自身 canonical_ref",
+                details={"field": f"{field}.normalized.root_comment_ref"},
+            )
+        if item.normalized.parent_comment_ref == item.normalized.canonical_ref:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 parent_comment_ref 不得等于自身 canonical_ref",
+                details={"field": f"{field}.normalized.parent_comment_ref"},
+            )
+        if item.normalized.target_comment_ref is not None and item.normalized.target_comment_ref not in {
+            item.normalized.root_comment_ref,
+            item.normalized.parent_comment_ref,
+        }:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "reply comment 的 target_comment_ref 必须绑定 root 或 parent comment",
+                details={"field": f"{field}.normalized.target_comment_ref"},
+            )
+    if item.normalized.parent_comment_ref is None and item.normalized.target_comment_ref is not None:
+        return _contract_error(
+            "invalid_comment_collection_contract",
+            "top-level comment 不得携带 target_comment_ref",
+            details={"field": f"{field}.normalized.target_comment_ref"},
+        )
     if item.reply_cursor is not None:
         if item.reply_cursor.resume_target_ref != target_ref:
             return _contract_error(
