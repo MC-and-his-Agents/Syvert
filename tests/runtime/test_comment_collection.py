@@ -160,6 +160,24 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
+    def test_reply_window_next_page_can_bind_root_comment_not_present_in_items(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-2",
+            source_id="reply-2",
+            canonical_ref="comment:reply-2",
+            body_text_hint="second reply page item",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:root-1",
+        )
+        payload = make_payload(
+            items=(reply,),
+            has_more=True,
+            include_continuation=True,
+            continuation_comment_ref="comment:root-1",
+        )
+
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
+
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(
             {

@@ -1137,18 +1137,10 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
             "CommentItemEnvelope.dedup_key 不能重复",
             details={"field": "items"},
         )
-    canonical_refs = {item.normalized.canonical_ref for item in envelope.items}
     for index, item in enumerate(envelope.items):
         item_error = _validate_comment_item_contract(item, index=index, target_ref=envelope.target.target_ref)
         if item_error is not None:
             return item_error
-    if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
-        if canonical_refs and envelope.next_continuation.resume_comment_ref not in canonical_refs:
-            return _contract_error(
-                "invalid_comment_collection_contract",
-                "reply-window next_continuation.resume_comment_ref 必须绑定返回页内 comment canonical_ref",
-                details={"field": "next_continuation.resume_comment_ref"},
-            )
     return None
 
 

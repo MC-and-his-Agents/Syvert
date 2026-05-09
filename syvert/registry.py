@@ -81,7 +81,9 @@ _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
         and record.capability == "content_detail"
     )
 )
-_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset({"content_detail", "content_search", "content_list"})
+_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
+    {"content_detail", "content_search", "content_list", "comment_collection"}
+)
 _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS = frozenset(
     evidence_ref
     for record in _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS
@@ -936,7 +938,7 @@ def _validate_profile_proof_alignment(
     resource_dependency_mode: str,
     required_capabilities: tuple[str, ...],
 ) -> None:
-    if proof.capability != capability and capability not in {"content_search", "content_list"}:
+    if proof.capability != capability and capability not in {"content_search", "content_list", "comment_collection"}:
         raise RegistryError(
             "invalid_adapter_resource_requirements",
             "profile proof capability 必须与 declaration capability 完全一致",
@@ -1113,7 +1115,7 @@ def _canonical_required_evidence_refs(
     ordered_refs: list[str] = []
     for required_capability in ordered_required_capabilities:
         record = _FROZEN_RESOURCE_CAPABILITY_RECORD_INDEX.get((adapter_key, capability, required_capability))
-        if record is None and capability in {"content_search", "content_list"}:
+        if record is None and capability in {"content_search", "content_list", "comment_collection"}:
             record = _FROZEN_RESOURCE_CAPABILITY_RECORD_INDEX.get((adapter_key, "content_detail", required_capability))
         if record is None:
             raise RegistryError(

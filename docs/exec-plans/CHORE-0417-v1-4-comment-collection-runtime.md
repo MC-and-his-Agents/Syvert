@@ -60,13 +60,22 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
+- `python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_read_side_collection tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_registry tests.runtime.test_platform_leakage tests.runtime.test_real_adapter_regression tests.runtime.test_cli_http_same_path tests.runtime.test_version_gate`
 - `python3 scripts/spec_guard.py --mode ci --all`
 - `python3 scripts/docs_guard.py --mode ci`
 - `python3 scripts/workflow_guard.py --mode ci`
 - `python3 scripts/version_guard.py --mode ci`
-- `python3 -m py_compile syvert/read_side_collection.py syvert/operation_taxonomy.py tests/runtime/test_comment_collection.py tests/runtime/contract_harness/validation_tool.py tests/runtime/contract_harness/third_party_entry.py`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+- `python3 -m py_compile syvert/read_side_collection.py syvert/operation_taxonomy.py syvert/runtime.py syvert/task_record.py syvert/registry.py tests/runtime/test_comment_collection.py tests/runtime/test_runtime.py tests/runtime/contract_harness/validation_tool.py tests/runtime/contract_harness/third_party_entry.py`
 - `python3 - <<'PY' ... run_platform_leakage_check(version='v1.4.0', repo_root='.') ... PY`
 - `git diff --check`
+
+## Review finding 处理记录
+
+- PR `#429` guardian finding：`comment_collection` 已声明 stable runtime slice，但 runtime success path 仍按 content-detail payload 校验。
+  - 处理：已将 `comment_collection` 接入 runtime capability map、`content` target、success payload validator、success envelope serializer、resource requirement admission、TaskRecord terminal envelope validation，并新增 focused runtime tests。
+- PR `#429` guardian finding：reply-window `next_continuation.resume_comment_ref` 不应要求 root comment 出现在当前 reply page items。
+  - 处理：已移除该错误约束，保留 target 绑定校验，并新增“后续 reply page 仅返回 replies，但 continuation 绑定原 root comment”的 focused test。
 
 ## 未决风险
 

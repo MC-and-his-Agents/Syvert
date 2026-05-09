@@ -36,6 +36,7 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
     execute_task_with_record,
+    validate_success_payload,
 )
 from tests.runtime.resource_fixtures import (
     ResourceStoreEnvMixin,
@@ -100,6 +101,31 @@ def make_collection_result(
             "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
             "fetched_at": "2026-05-09T10:00:00Z",
             "evidence_alias": "alias://collection-page-1",
+        },
+        "audit": {"page_index": 1},
+    }
+
+
+def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[str, object]:
+    return {
+        "operation": "comment_collection",
+        "target": {
+            "operation": "comment_collection",
+            "target_type": "content",
+            "target_ref": target_ref,
+        },
+        "items": [],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "empty",
+        "error_classification": "empty_result",
+        "raw_payload_ref": "raw://comment-page-empty",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:comment-collection-paginated:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://comment-page-empty",
         },
         "audit": {"page_index": 1},
     }
@@ -194,6 +220,21 @@ class CollectionSearchAdapter:
             target_type="keyword",
             target_ref=request.input.keyword or "",
         )
+
+
+class CommentCollectionAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"comment_collection"})
+    supported_targets = frozenset({"content"})
+    supported_collection_modes = frozenset({"paginated"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="comment_collection",
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
 def make_execution_control_policy(scope: str) -> ExecutionControlPolicy:
@@ -741,6 +782,39 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["operation"], "content_search_by_keyword")
         self.assertEqual(result.envelope["target"]["target_ref"], "deep learning")
         self.assertEqual(result.task_record.request.target_type, "keyword")
+        self.assertEqual(adapter.last_request.collection_mode, "paginated")
+
+    def test_validate_success_payload_accepts_comment_collection_runtime_carrier(self) -> None:
+        payload = make_comment_collection_result(target_ref="content-001")
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+            )
+        )
+
+    def test_execute_task_builds_comment_collection_success_envelope_from_adapter_payload(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-001"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-comment-collection-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "comment_collection")
+        self.assertEqual(result.envelope["target"]["target_type"], "content")
+        self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
+        self.assertEqual(result.task_record.request.target_type, "content")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:

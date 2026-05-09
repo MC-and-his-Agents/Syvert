@@ -22,8 +22,11 @@ from syvert.registry import (
 from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.operation_taxonomy import stable_operation_entry
 from syvert.read_side_collection import (
+    COMMENT_COLLECTION_OPERATION,
     CollectionContractError,
     READ_SIDE_COLLECTION_OPERATIONS,
+    comment_collection_result_envelope_from_dict,
+    comment_collection_result_envelope_to_dict,
     collection_result_envelope_from_dict,
     collection_result_envelope_to_dict,
 )
@@ -45,18 +48,21 @@ from syvert.task_record_store import (
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_SEARCH_BY_KEYWORD = "content_search_by_keyword"
 CONTENT_LIST_BY_CREATOR = "content_list_by_creator"
+COMMENT_COLLECTION = COMMENT_COLLECTION_OPERATION
 CONTENT_DETAIL = "content_detail"
 CONTENT_SEARCH = "content_search"
 CONTENT_LIST = "content_list"
+COMMENT_COLLECTION_FAMILY = "comment_collection"
 LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
-ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator", "creator_id", "keyword"})
+ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword"})
 ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {
     CONTENT_DETAIL_BY_URL: CONTENT_DETAIL,
     CONTENT_SEARCH_BY_KEYWORD: CONTENT_SEARCH,
     CONTENT_LIST_BY_CREATOR: CONTENT_LIST,
+    COMMENT_COLLECTION: COMMENT_COLLECTION_FAMILY,
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
@@ -64,6 +70,7 @@ RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_SEARCH_BY_KEYWORD, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_LIST_BY_CREATOR, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
+    (COMMENT_COLLECTION, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
 }
 DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
 DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
@@ -80,7 +87,7 @@ EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID = "execution_control_stat
 EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
 EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
-_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST})
+_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY})
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 _EXECUTION_CONCURRENCY_LOCK = threading.Lock()
 _EXECUTION_CONCURRENCY_IN_FLIGHT: dict[tuple[str, ...], int] = {}
@@ -95,6 +102,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class TaskInput:
     url: str | None = None
+    content_ref: str | None = None
     keyword: str | None = None
     creator_id: str | None = None
     continuation_token: str | None = None
@@ -174,6 +182,8 @@ class AdapterTaskRequest:
             return TaskInput(url=self.target_value)
         if self.target_type == "keyword":
             return TaskInput(keyword=self.target_value)
+        if self.target_type == "content":
+            return TaskInput(content_ref=self.target_value)
         if self.target_type == "creator":
             return TaskInput(creator_id=self.target_value)
         return TaskInput()
@@ -1300,6 +1310,10 @@ def run_adapter_attempt_with_timeout(
         }
         if capability in READ_SIDE_COLLECTION_OPERATIONS:
             success_envelope.update(collection_result_envelope_to_dict(collection_result_envelope_from_dict(payload)))
+        elif capability == COMMENT_COLLECTION:
+            success_envelope.update(
+                comment_collection_result_envelope_to_dict(comment_collection_result_envelope_from_dict(payload))
+            )
         else:
             success_envelope.update({"raw": payload["raw"], "normalized": payload["normalized"]})
         return (success_envelope, disposition_hint, default_release_reason, False, False)
@@ -2483,6 +2497,23 @@ def _project_task_input_to_target(
             CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
             None,
         )
+    if capability == COMMENT_COLLECTION:
+        if not isinstance(input_value.content_ref, str) or not input_value.content_ref:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="content", target_value=""),
+                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.content_ref 不能为空"),
+            )
+        return (
+            InputTarget(
+                adapter_key=adapter_key,
+                capability=capability,
+                target_type="content",
+                target_value=input_value.content_ref,
+            ),
+            CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+            None,
+        )
     return (
         InputTarget(adapter_key=adapter_key, capability=capability, target_type="", target_value=""),
         CollectionPolicy(collection_mode=LEGACY_COLLECTION_MODE),
@@ -2982,6 +3013,34 @@ def validate_success_payload(
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
                 "collection result.target.target_ref 必须与请求 target_value 一致",
+                details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
+            )
+        return None
+    if capability == COMMENT_COLLECTION:
+        try:
+            envelope = comment_collection_result_envelope_from_dict(payload)
+        except CollectionContractError as error:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                error.message,
+                details={"reason": error.code, **error.details},
+            )
+        if envelope.operation != capability:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.operation 必须与请求 capability 一致",
+                details={"operation": envelope.operation, "capability": capability},
+            )
+        if envelope.target.target_type != target_type:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.target.target_type 必须与请求一致",
+                details={"target_type": envelope.target.target_type, "expected_target_type": target_type},
+            )
+        if envelope.target.target_ref != target_value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.target.target_ref 必须与请求 target_value 一致",
                 details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
             )
         return None

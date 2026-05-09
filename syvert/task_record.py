@@ -8,7 +8,9 @@ import re
 from typing import Any
 
 from syvert.read_side_collection import (
+    COMMENT_COLLECTION_OPERATION,
     READ_SIDE_COLLECTION_OPERATIONS,
+    comment_collection_result_envelope_from_dict,
     collection_result_envelope_from_dict,
 )
 
@@ -17,8 +19,10 @@ TASK_RECORD_STATUSES = frozenset({"accepted", "running", "succeeded", "failed"})
 TASK_LOG_STAGES = frozenset({"admission", "execution", "completion"})
 TASK_LOG_LEVELS = frozenset({"info", "error"})
 TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
-SHARED_CAPABILITIES = frozenset({"content_detail_by_url", "content_search_by_keyword", "content_list_by_creator"})
-SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator", "creator_id", "keyword"})
+SHARED_CAPABILITIES = frozenset(
+    {"content_detail_by_url", "content_search_by_keyword", "content_list_by_creator", "comment_collection"}
+)
+SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
 ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
@@ -986,6 +990,12 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
                 raise TaskRecordContractError("collection target_type 与请求快照不一致")
             if collection.target.target_ref != record.request.target_value:
                 raise TaskRecordContractError("collection target_ref 与请求快照不一致")
+        if capability == COMMENT_COLLECTION_OPERATION:
+            collection = comment_collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
+            if collection.target.target_type != record.request.target_type:
+                raise TaskRecordContractError("comment collection target_type 与请求快照不一致")
+            if collection.target.target_ref != record.request.target_value:
+                raise TaskRecordContractError("comment collection target_ref 与请求快照不一致")
         if "error" in envelope:
             raise TaskRecordContractError("success TaskTerminalResult.envelope 不得包含 error")
         return
@@ -1041,6 +1051,9 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     capability = require_string(envelope.get("capability"), field="result.envelope.capability")
     if capability in READ_SIDE_COLLECTION_OPERATIONS:
         _validate_collection_success_terminal_envelope(envelope)
+        return
+    if capability == COMMENT_COLLECTION_OPERATION:
+        _validate_comment_collection_success_terminal_envelope(envelope)
         return
     if "raw" not in envelope:
         raise TaskRecordContractError("success TaskTerminalResult.envelope 必须包含 raw")
@@ -1111,6 +1124,13 @@ def _validate_collection_success_terminal_envelope(envelope: Mapping[str, Any]) 
         collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
     except Exception as error:
         raise TaskRecordContractError(f"collection TaskTerminalResult.envelope 不合法: {error}") from error
+
+
+def _validate_comment_collection_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    try:
+        comment_collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
+    except Exception as error:
+        raise TaskRecordContractError(f"comment collection TaskTerminalResult.envelope 不合法: {error}") from error
 
 
 def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
