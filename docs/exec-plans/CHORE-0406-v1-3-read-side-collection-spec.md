@@ -44,7 +44,7 @@
 - Phase `#381`：open，作为 Phase container。
 - FR `#403`：open，已显式绑定 `v1.3.0 / 2026-S25`，但只覆盖首个 collection-contract batch。
 - Work Item `#406`：open，唯一进入 execution workspace 的事项。
-- Workspace：`/Users/mc/code/worktrees/syvert/issue-406-403-v1-3-0-read-side-collection-spec`
+- Workspace key：`issue-406-403-v1-3-0-read-side-collection-spec`
 - Branch：`issue-406-403-v1-3-0-read-side-collection-spec`
 - 主仓 baseline：`016a1759f16cc5f75f63a7bd37b920dae82b82b0`
 - 当前变更：Batch 0 artifact、`FR-0403` formal spec suite、`v1.3.0` release planning index、`2026-S25` sprint index 已写入 worktree，待受控 PR preflight 与提交。

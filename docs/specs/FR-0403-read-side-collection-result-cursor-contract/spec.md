@@ -108,7 +108,7 @@ Then result 必须分别归类为 `credential_invalid` 或 `verification_require
 ## 异常与边界场景
 
 - 异常场景：
-  - raw response 缺少 `items` family、continuation family 或 collection status family 时，必须 `invalid_contract` 或 `parse_failed` fail-closed，不得伪造 `complete`。
+  - raw response 缺少 `items` family、continuation family 或 collection status family 时，必须按 `parse_failed` fail-closed，不得伪造 `complete`。
   - continuation token 与 target 上下文不匹配时，必须返回 `cursor_invalid_or_expired`。
   - rate-limit、permission-denied、provider/network-blocked、signature/request-invalid 必须保持为独立公共错误分类。
   - raw payload present 但 normalized item 缺少最小必需字段时，必须进入 `parse_failed` 或 `partial_result` 路径。
