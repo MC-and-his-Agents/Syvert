@@ -142,13 +142,14 @@
   - `provider_or_network_blocked`
   - `cursor_invalid_or_expired`
   - `parse_failed`
+  - `partial_result`
   - `credential_invalid`
   - `verification_required`
   - `signature_or_request_invalid`
 - 约束：
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
-  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`；`partial_result` 不是独立 emitted error classification。
+  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`；`partial_result` 继续保留为继承词表的兼容 entry，但不是本 FR 新增的 emitted error classification。
 
 ## 生命周期
 

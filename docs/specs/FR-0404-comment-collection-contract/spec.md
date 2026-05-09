@@ -43,9 +43,9 @@
   - `comment_list_by_content` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
-  - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
+  - collection-level错误分类必须至少覆盖：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
-  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 不是独立 emitted error classification。
+  - partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义；`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry，但不是本 FR 新增的 emitted error classification。
   - `credential_invalid` 与 `verification_required` 必须保持 fail-closed，并与 `v1.2.0` resource governance 边界一致，不得被降级成普通 `platform_failed`。
   - `reply_cursor` 只能恢复同一 comment item 的 replies；跨 comment 复用必须视为 invalid/expired。
   - `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不得因 comment contract 引入新的 Core 分支或平台私有字段。
@@ -116,6 +116,12 @@ Given 一条 reply 同时能识别 root comment、直接 parent comment 与 targ
 When Adapter 投影 normalized comment item
 Then public item 必须保留 `root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref`，而不要求 Core 理解平台私有 reply object
 
+### 场景 7B：duplicate comment item 保持稳定 dedup 语义
+
+Given 同一逻辑 comment item 出现在连续页面或 reply window 中
+When Adapter 为这些 comment item 分别投影 public envelope
+Then comment contract 必须生成稳定 `dedup_key`，且不要求 Core 理解平台私有 comment object name 或 comment ID 体系
+
 ### 场景 8：部分 comment 解析失败时返回 partial result
 
 Given 一页 raw response 中部分 comment 可投影，部分 comment 因 shape drift 解析失败
@@ -177,6 +183,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
 - [ ] formal spec 明确 `empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 的公共边界，以及 `partial_result` 的 result-status 语义。
+- [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。
 - [ ] formal spec 明确 synthetic fixture 只能从 recorded raw shape 派生，且所有 evidence source 只能使用脱敏 alias。
 - [ ] formal spec 明确 Adapter 负责平台 comment hierarchy/cursor/visibility projection，Core 不得接收平台私有对象。
 - [ ] formal spec 明确 `content_detail_by_url` baseline 与 `FR-0403` collection public behavior 不受本 FR 改写。
