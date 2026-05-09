@@ -7,15 +7,19 @@ import math
 import re
 from typing import Any
 
+from syvert.read_side_collection import (
+    READ_SIDE_COLLECTION_OPERATIONS,
+    collection_result_envelope_from_dict,
+)
 
 TASK_RECORD_SCHEMA_VERSION = "v0.3.0"
 TASK_RECORD_STATUSES = frozenset({"accepted", "running", "succeeded", "failed"})
 TASK_LOG_STAGES = frozenset({"admission", "execution", "completion"})
 TASK_LOG_LEVELS = frozenset({"info", "error"})
 TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
-SHARED_CAPABILITIES = frozenset({"content_detail_by_url"})
-SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator_id", "keyword"})
-SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid"})
+SHARED_CAPABILITIES = frozenset({"content_detail_by_url", "content_search_by_keyword", "content_list_by_creator"})
+SHARED_TARGET_TYPES = frozenset({"url", "content_id", "creator", "creator_id", "keyword"})
+SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
 ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
 RUNTIME_FAILURE_PHASES = frozenset(
@@ -976,6 +980,12 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
     status = terminal_record_status(envelope)
     if status == "succeeded":
         validate_success_terminal_envelope(envelope)
+        if capability in READ_SIDE_COLLECTION_OPERATIONS:
+            collection = collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
+            if collection.target.target_type != record.request.target_type:
+                raise TaskRecordContractError("collection target_type 与请求快照不一致")
+            if collection.target.target_ref != record.request.target_value:
+                raise TaskRecordContractError("collection target_ref 与请求快照不一致")
         if "error" in envelope:
             raise TaskRecordContractError("success TaskTerminalResult.envelope 不得包含 error")
         return
@@ -1028,6 +1038,10 @@ def _observability_entries_are_subset(entries: tuple[Any, ...], superset: tuple[
 
 
 def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    capability = require_string(envelope.get("capability"), field="result.envelope.capability")
+    if capability in READ_SIDE_COLLECTION_OPERATIONS:
+        _validate_collection_success_terminal_envelope(envelope)
+        return
     if "raw" not in envelope:
         raise TaskRecordContractError("success TaskTerminalResult.envelope 必须包含 raw")
     normalized = envelope.get("normalized")
@@ -1090,6 +1104,29 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     image_urls = media.get("image_urls")
     if not isinstance(image_urls, list) or not all(isinstance(item, str) for item in image_urls):
         raise TaskRecordContractError("result.envelope.normalized.media.image_urls 必须是字符串数组")
+
+
+def _validate_collection_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    try:
+        collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
+    except Exception as error:
+        raise TaskRecordContractError(f"collection TaskTerminalResult.envelope 不合法: {error}") from error
+
+
+def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    keys = (
+        "operation",
+        "target",
+        "items",
+        "has_more",
+        "next_continuation",
+        "result_status",
+        "error_classification",
+        "raw_payload_ref",
+        "source_trace",
+        "audit",
+    )
+    return {key: envelope.get(key) for key in keys}
 
 
 def validate_failed_terminal_envelope(envelope: Mapping[str, Any]) -> None:

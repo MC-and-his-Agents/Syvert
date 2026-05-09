@@ -11,10 +11,27 @@ def valid_compatibility_decision_input(
     *,
     adapter_key: str = "xhs",
     provider_key: str = "native_xhs_detail",
+    capability: str = "content_detail",
+    operation: str = "content_detail_by_url",
+    target_type: str = "url",
+    collection_mode: str = "hybrid",
 ) -> dict[str, Any]:
     return {
-        "requirement": valid_adapter_capability_requirement(adapter_key=adapter_key),
-        "offer": valid_provider_capability_offer(adapter_key=adapter_key, provider_key=provider_key),
+        "requirement": valid_adapter_capability_requirement(
+            adapter_key=adapter_key,
+            capability=capability,
+            operation=operation,
+            target_type=target_type,
+            collection_mode=collection_mode,
+        ),
+        "offer": valid_provider_capability_offer(
+            adapter_key=adapter_key,
+            provider_key=provider_key,
+            capability=capability,
+            operation=operation,
+            target_type=target_type,
+            collection_mode=collection_mode,
+        ),
         "decision_context": {
             "decision_id": "compatibility-decision-001",
             "contract_version": "v0.8.0",

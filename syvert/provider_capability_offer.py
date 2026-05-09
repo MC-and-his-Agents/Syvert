@@ -882,13 +882,25 @@ def _validate_adapter_binding(adapter_binding: ProviderAdapterBinding) -> None:
 
 def _validate_capability_offer(capability_offer: ProviderCapabilityOfferDescriptor) -> None:
     actual_offer = dict(capability_offer.__dict__)
-    if actual_offer != APPROVED_CAPABILITY_OFFER:
+    try:
+        stable = stable_operation_entry(
+            operation=capability_offer.operation,
+            target_type=capability_offer.target_type,
+            collection_mode=capability_offer.collection_mode,
+        )
+    except Exception as error:
         raise ProviderCapabilityOfferContractError(
             PROVIDER_OFFER_ERROR_INVALID_OFFER,
-            "capability_offer must stay frozen to content_detail_by_url + url + hybrid",
+            "capability_offer 必须命中 stable + runtime_delivery taxonomy slice",
+            details={"reason": str(error), "actual_capability_offer": actual_offer},
+        )
+    if not stable.runtime_delivery or capability_offer.capability != stable.capability_family:
+        raise ProviderCapabilityOfferContractError(
+            PROVIDER_OFFER_ERROR_INVALID_OFFER,
+            "capability_offer.capability 与 execution slice 必须共同命中 stable runtime slice",
             details={
-                "expected_capability_offer": APPROVED_CAPABILITY_OFFER,
                 "actual_capability_offer": actual_offer,
+                "stable_capability_family": stable.capability_family,
             },
         )
 
@@ -975,16 +987,12 @@ def _validate_resource_support(
                 },
             )
         if (
-            proof.capability != capability_offer.capability
-            or proof.execution_path.operation != capability_offer.operation
-            or proof.execution_path.target_type != capability_offer.target_type
-            or proof.execution_path.collection_mode != capability_offer.collection_mode
-            or proof.resource_dependency_mode != profile.resource_dependency_mode
+            proof.resource_dependency_mode != profile.resource_dependency_mode
             or proof.required_capabilities != profile.required_capabilities
         ):
             raise ProviderCapabilityOfferContractError(
                 PROVIDER_OFFER_ERROR_INVALID_OFFER,
-                "profile proof must align with capability_offer and supported profile tuple",
+                "profile proof must align with supported profile tuple",
                 details={"profile_key": profile.profile_key, "proof_ref": proof_ref},
             )
 
