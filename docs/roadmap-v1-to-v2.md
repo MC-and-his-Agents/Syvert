@@ -74,8 +74,9 @@ Syvert 主仓继续聚焦：
 | Stabilization | 何时可以宣布扩展能力契约稳定 | 全部关键能力流的成熟度 gate |
 
 任何能力流进入执行前，都必须通过 GitHub Phase / FR / Work Item 与正式规约流程确认。路线图只定义方向和依赖，不直接创建 backlog truth。
+能力流（track）是实现顺序提示，不是 `MINOR` 映射依据。`MINOR` 只由 release planning、release index 与 closeout 决策显式绑定。
 
-## Phase 1 Operation Taxonomy
+## Capability Track: Operation Taxonomy
 
 ### 目标
 
@@ -133,7 +134,7 @@ Syvert 主仓继续聚焦：
 - 平台私有业务对象直接进入 Core
 - provider selector / fallback / marketplace
 
-## Phase 2 Resource Governance
+## Capability Track: Resource Governance
 
 ### 目标
 
@@ -189,7 +190,7 @@ Syvert 主仓继续聚焦：
 - 平台账号画像产品模型
 - 平台私有风控策略进入 Core
 
-## Phase 3 Read-Side Capabilities
+## Capability Track: Read-Side Capabilities
 
 ### 目标
 
@@ -248,7 +249,7 @@ Syvert 主仓继续聚焦：
 - 数据分析产品
 - 选题策略或运营策略
 
-## Phase 4 Batch And Dataset
+## Capability Track: Batch And Dataset
 
 ### 目标
 
@@ -296,7 +297,7 @@ Syvert 主仓继续聚焦：
 - BI / 报表 / 监控看板
 - 上层采集任务配置 UI
 
-## Phase 5 Scheduled Execution
+## Capability Track: Scheduled Execution
 
 ### 目标
 
@@ -344,7 +345,7 @@ Syvert 主仓继续聚焦：
 - 多步骤业务 workflow DSL
 - 产品级任务编排 UI
 
-## Phase 6 Write-Side Capabilities
+## Capability Track: Write-Side Capabilities
 
 ### 目标
 
@@ -403,7 +404,7 @@ Syvert 主仓继续聚焦：
 - 平台运营策略
 - 未经安全门禁的自动写入
 
-## Phase 7 Ecosystem Boundary
+## Capability Track: Ecosystem Boundary
 
 ### 目标
 
