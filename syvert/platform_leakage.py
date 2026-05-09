@@ -35,6 +35,10 @@ _SCAN_TARGETS = (
         "relative_path": Path("syvert/operation_taxonomy.py"),
         "default_boundary": "shared_input_model",
     },
+    {
+        "relative_path": Path("syvert/read_side_collection.py"),
+        "default_boundary": "shared_result_contract",
+    },
 )
 
 _RUNTIME_SYMBOL_BOUNDARIES = {
