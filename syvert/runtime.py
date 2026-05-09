@@ -3230,20 +3230,6 @@ def validate_success_payload(
             )
         cursor_thread_ref = _comment_request_cursor_thread_ref(request_cursor)
         if cursor_thread_ref is None and _comment_request_cursor_is_top_level_page(request_cursor):
-            reply_item_refs = tuple(
-                item.normalized.canonical_ref
-                for item in envelope.items
-                if item.normalized.root_comment_ref != item.normalized.canonical_ref
-            )
-            if reply_item_refs:
-                return runtime_contract_error(
-                    "invalid_adapter_success_payload",
-                    "top-level comment page cursor 不得返回 reply thread items",
-                    details={
-                        "reason": "cursor_invalid_or_expired",
-                        "reply_item_refs": reply_item_refs,
-                    },
-                )
             if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
                 return runtime_contract_error(
                     "invalid_adapter_success_payload",
@@ -3257,7 +3243,7 @@ def validate_success_payload(
             drifted_items = tuple(
                 item.normalized.canonical_ref
                 for item in envelope.items
-                if item.normalized.root_comment_ref != cursor_thread_ref
+                if item.normalized.parent_comment_ref != cursor_thread_ref
             )
             if drifted_items:
                 return runtime_contract_error(

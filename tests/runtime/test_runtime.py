@@ -931,6 +931,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
     def test_validate_success_payload_rejects_empty_mapping_cursor_reply_window_drift(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        payload["has_more"] = True
+        payload["next_continuation"] = make_comment_page_continuation()
+        payload["next_continuation"]["resume_comment_ref"] = "comment:root-1"
 
         result = validate_success_payload(
             payload,
@@ -945,6 +948,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
     def test_validate_success_payload_rejects_empty_dataclass_cursor_reply_window_drift(self) -> None:
         payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        payload["has_more"] = True
+        payload["next_continuation"] = make_comment_page_continuation()
+        payload["next_continuation"]["resume_comment_ref"] = "comment:root-1"
 
         result = validate_success_payload(
             payload,
@@ -956,6 +962,34 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
         self.assertEqual(result["details"]["reason"], "cursor_invalid_or_expired")
+
+    def test_validate_success_payload_accepts_top_level_page_with_reply_items(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+            )
+        )
+
+    def test_validate_success_payload_accepts_nested_reply_window_bound_to_parent(self) -> None:
+        payload = make_comment_collection_reply_result(root_comment_ref="comment:root-1")
+        item = payload["items"][0]
+        item["normalized"]["parent_comment_ref"] = "comment:parent-1"
+        item["normalized"]["target_comment_ref"] = "comment:target-1"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="comment_collection",
+                target_type="content",
+                target_value="content-001",
+                request_cursor={"reply_cursor": make_comment_reply_cursor(comment_ref="comment:parent-1")},
+            )
+        )
 
     def test_execute_task_keeps_comment_collection_resource_admission_deferred(self) -> None:
         adapter = CommentCollectionAdapter()

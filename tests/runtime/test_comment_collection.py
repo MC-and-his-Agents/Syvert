@@ -141,7 +141,6 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         self.assertEqual(comment_collection_result_envelope_to_dict(envelope), payload)
 
     def test_reply_hierarchy_and_reply_window_continuation_are_valid(self) -> None:
-        root = make_comment_item(dedup_key="comment:root-1", canonical_ref="comment:root-1")
         reply = make_comment_item(
             dedup_key="comment:reply-1",
             source_id="reply-1",
@@ -152,7 +151,7 @@ class CommentCollectionCarrierTests(unittest.TestCase):
             target_comment_ref="comment:root-1",
         )
         payload = make_payload(
-            items=(root, reply),
+            items=(reply,),
             has_more=True,
             include_continuation=True,
             continuation_comment_ref="comment:root-1",
@@ -197,9 +196,9 @@ class CommentCollectionCarrierTests(unittest.TestCase):
         result = validate_comment_collection_result_envelope(payload)
 
         self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("root_comment_ref", result["message"])
+        self.assertIn("parent_comment_ref", result["message"])
 
-    def test_reply_hierarchy_rejects_conflicting_target_linkage(self) -> None:
+    def test_reply_hierarchy_allows_independent_target_linkage(self) -> None:
         reply = make_comment_item(
             dedup_key="comment:reply-conflict",
             source_id="reply-conflict",
@@ -213,8 +212,26 @@ class CommentCollectionCarrierTests(unittest.TestCase):
 
         result = validate_comment_collection_result_envelope(payload)
 
-        self.assertEqual(result["code"], "invalid_comment_collection_contract")
-        self.assertIn("target_comment_ref", result["message"])
+        self.assertIsNone(result)
+
+    def test_nested_reply_window_binds_continuation_to_parent_comment(self) -> None:
+        reply = make_comment_item(
+            dedup_key="comment:reply-nested",
+            source_id="reply-nested",
+            canonical_ref="comment:reply-nested",
+            body_text_hint="nested reply",
+            root_comment_ref="comment:root-1",
+            parent_comment_ref="comment:parent-1",
+            target_comment_ref="comment:target-1",
+        )
+        payload = make_payload(
+            items=(reply,),
+            has_more=True,
+            include_continuation=True,
+            continuation_comment_ref="comment:parent-1",
+        )
+
+        self.assertIsNone(validate_comment_collection_result_envelope(payload))
 
     def test_request_cursor_rejects_page_continuation_and_reply_cursor_together(self) -> None:
         result = validate_comment_request_cursor(

@@ -1133,12 +1133,12 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
         drifted_items = tuple(
             item.normalized.canonical_ref
             for item in envelope.items
-            if item.normalized.root_comment_ref != envelope.next_continuation.resume_comment_ref
+            if item.normalized.parent_comment_ref != envelope.next_continuation.resume_comment_ref
         )
         if drifted_items:
             return _contract_error(
                 "invalid_comment_collection_contract",
-                "reply-window next_continuation.resume_comment_ref 必须绑定当前 reply page 的 root_comment_ref",
+                "reply-window next_continuation.resume_comment_ref 必须绑定当前 reply page 的 parent_comment_ref",
                 details={
                     "field": "next_continuation.resume_comment_ref",
                     "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
@@ -1211,15 +1211,6 @@ def _validate_comment_item_contract(
                 "invalid_comment_collection_contract",
                 "reply comment 的 parent_comment_ref 不得等于自身 canonical_ref",
                 details={"field": f"{field}.normalized.parent_comment_ref"},
-            )
-        if item.normalized.target_comment_ref is not None and item.normalized.target_comment_ref not in {
-            item.normalized.root_comment_ref,
-            item.normalized.parent_comment_ref,
-        }:
-            return _contract_error(
-                "invalid_comment_collection_contract",
-                "reply comment 的 target_comment_ref 必须绑定 root 或 parent comment",
-                details={"field": f"{field}.normalized.target_comment_ref"},
             )
     if item.normalized.parent_comment_ref is None and item.normalized.target_comment_ref is not None:
         return _contract_error(
