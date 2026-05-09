@@ -77,7 +77,8 @@
   - `error_classification` 复用 `FR-0403` vocabulary，不新增 comment-only collection-level 分类。
   - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`。
   - `empty_result` 不等于 `target_not_found`。
-  - `has_more=false` 时允许 `next_continuation` 为空。
+  - `has_more=false` 或 `result_status=empty` 时 `next_continuation` 必须为空。
+  - `has_more=true` 时必须提供 `next_continuation`。
   - reply window 如仍有更多数据，必须通过 `next_continuation` 继续，而不是要求再次消费旧的 item-level `reply_cursor`。
   - `raw_payload_ref` 只能引用原始载荷，不承载 raw payload 内联内容。
 
@@ -177,7 +178,8 @@
 - 约束：
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
-  - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
+  - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；至少保留一个成功 normalized comment 的 partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
+  - 零成功投影的整页 parse failure 固定使用 `result_status=complete` 与 `error_classification=parse_failed`，并返回 `items=[]`、`has_more=false`、`next_continuation=null`。
   - `partial_result` 继续保留为继承词表的兼容 entry，保证与 `FR-0403` vocabulary 对齐。
 
 ## 生命周期
@@ -190,7 +192,7 @@
 - 更新：
   - 新页面结果使用新的 `next_continuation`；下一次请求通过 `request_cursor.page_continuation` 原样消费该 carrier，不得原地篡改历史 continuation 以伪造跨页稳定性。
   - 进入首个 reply window 使用 `reply_cursor`；后续 reply page 使用新的 `next_continuation`，不得把某个 comment 的 cursor/continuation 迁移到另一 `canonical_ref` comment。
-  - `partial_result` 允许追加 item-level parse-failure evidence，但固定搭配 `error_classification=parse_failed`，且不得改写成功 normalized comments 的公共字段。
+  - `partial_result` 允许追加 item-level parse-failure evidence，但固定搭配 `error_classification=parse_failed`，且必须保留至少一个成功 normalized comment，不得改写成功 normalized comments 的公共字段。
 - 失效/归档：
   - invalid/expired continuation、reply cursor 或 reply-window continuation 只能导向 `cursor_invalid_or_expired`，不应被当作普通 platform failure。
   - raw payload refs 的持久化/归档策略不在本 FR 范围内。

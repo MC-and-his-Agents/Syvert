@@ -178,11 +178,11 @@ Given 平台上游失败或 provider/network path 被阻断，且不存在更强
 When Core 执行 comment collection request
 Then result 必须固定使用 `result_status=complete`，并分别归类为 `platform_failed` 或 `provider_or_network_blocked`
 
-### 场景 13：整页 parse failure 仍沿用共享 partial_result 语义
+### 场景 13：整页 parse failure 使用 fail-closed envelope
 
-Given comment response 缺少 comment identity、items family 或 continuation family，导致整页无法建立最小 public projection
+Given comment response 缺少 comment identity、items family，或在 `has_more=true` 时缺少 continuation family，导致整页无法建立任何 public projection
 When Core 处理该页 comment result
-Then result 必须 fail-closed 到 `result_status=partial_result` 与 `error_classification=parse_failed`，并且不得伪造 `complete`
+Then result 必须 fail-closed 到 `result_status=complete`、`error_classification=parse_failed`、`items=[]`、`has_more=false`，且不得返回 `next_continuation`
 
 ### 场景 14：resource health 与 verification 保持 fail-closed
 
@@ -193,10 +193,13 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 ## 异常与边界场景
 
 - 异常场景：
-  - raw response 缺少 `items` family、page continuation family、reply cursor family 或 comment identity family 时，必须按 `parse_failed` fail-closed，不得伪造 `complete`。
+  - raw response 缺少 `items` family 或 comment identity family 时，必须按 `parse_failed` fail-closed。
+  - raw response 声明 `has_more=true` 但缺少 page continuation family 时，必须按 `parse_failed` fail-closed；`has_more=false` 的终页不得因缺少 continuation 被视为 malformed。
+  - comment item 声明可以继续 replies 但缺少 reply cursor family 时，必须按 `parse_failed` fail-closed；不可继续 replies 的叶子 comment 不要求 `reply_cursor`。
   - page continuation、reply cursor 或 reply-window continuation 与 target/comment 上下文不匹配时，必须返回 `cursor_invalid_or_expired`。
   - rate-limit、permission-denied、provider/network-blocked、signature/request-invalid 必须保持为独立公共错误分类。
-  - raw payload present 但 normalized comment 缺少最小必需字段，且无法构造最小 placeholder projection 时，必须统一进入 `result_status=partial_result + error_classification=parse_failed` 路径；无论页面保留的是部分合法 comments，还是零成功投影，都不得伪造 `complete`。
+  - raw payload present 但部分 normalized comment 缺少最小必需字段，且该页至少保留一个成功 normalized comment 时，必须进入 `result_status=partial_result + error_classification=parse_failed` 路径。
+  - raw payload present 但零成功投影时，必须进入 `result_status=complete + error_classification=parse_failed` fail-closed 路径，返回 `items=[]` 且不得携带 `next_continuation`。
 - 边界场景：
   - `target_not_found` 与 `empty_result` 必须区分；合法 content target 没有评论不是 not found。
   - deleted/invisible/unavailable 是 item-level visibility，不等于 collection-level failure。
