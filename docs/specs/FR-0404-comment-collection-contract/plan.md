@@ -46,6 +46,26 @@
   - 搜索变更内容，确认不含外部项目名或本地路径。
   - 用 `spec_review.md` rubric 做 formal spec review。
 
+## 当前验证结果
+
+- 已执行：
+  - `python3 scripts/spec_guard.py --mode ci --all`
+    - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+    - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+    - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+    - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+    - 结果：通过。
+  - `git diff --check`
+    - 结果：通过。
+  - 脱敏搜索：未命中外部项目名或本地路径。
+- 未执行：
+  - runtime / consumer / evidence replay tests
+    - 理由：由 `#417/#418/#419` 分别承接，不在本 Work Item 范围。
+
 ## TDD 范围
 
 - 先写测试的模块：不适用，本 Work Item 只交付 formal spec 与 planning truth。

@@ -102,6 +102,12 @@ Given 一页评论中同时包含正常 comment item 与 deleted/invisible place
 When Core 处理该页 comment result
 Then deleted/invisible item 通过 `visibility_status` 表达，且合法页面仍可返回 `result_status=complete`
 
+### 场景 6B：unavailable comment 保留为 item-level visibility
+
+Given 一页评论中出现 comment placeholder，但当前 payload 无法提供最小 body projection
+When Adapter 仍能证明该 comment slot 属于同一合法页面
+Then item 必须返回 `visibility_status=unavailable`，且不得默认降级成 collection-level `parse_failed`
+
 ### 场景 7：reply hierarchy 保留 root/parent/target linkage
 
 Given 一条 reply 同时能识别 root comment、直接 parent comment 与 target comment
@@ -120,7 +126,31 @@ Given next-page continuation token 或 reply cursor 已失效
 When Adapter 还原 continuation 并请求后续页面
 Then result 必须归类为 `cursor_invalid_or_expired`，而不是 generic `platform_failed`
 
-### 场景 10：resource health 与 verification 保持 fail-closed
+### 场景 10：permission denied 保持独立 collection-level 错误
+
+Given content target 存在，但当前 viewer 或 account 不具备评论访问权限
+When Core 执行 comment collection request
+Then result 必须返回 `error_classification=permission_denied`，且不得伪装成 `empty_result`
+
+### 场景 11：rate limited 保持独立 collection-level 错误
+
+Given 平台在加载评论时触发访问频率或 anti-abuse 限流
+When Core 执行 comment collection request
+Then result 必须返回 `error_classification=rate_limited`，且不得与 `platform_failed` 混淆
+
+### 场景 12：platform/provider failure 保持独立 collection-level 错误
+
+Given 平台上游失败或 provider/network path 被阻断，且不存在更强分类
+When Core 执行 comment collection request
+Then result 必须分别归类为 `platform_failed` 或 `provider_or_network_blocked`
+
+### 场景 13：整页 parse failure 不得伪装成 partial_result
+
+Given comment response 缺少 comment identity、items family 或 continuation family，导致整页无法建立最小 public projection
+When Core 处理该页 comment result
+Then result 必须 fail-closed 到 `parse_failed`，而不是伪造 `partial_result` 或 `complete`
+
+### 场景 14：resource health 与 verification 保持 fail-closed
 
 Given comment request 依赖的 account session 已 invalid，或平台要求验证码/安全验证
 When Core 处理 admission 或 Adapter 返回 verification-required signal

@@ -34,27 +34,50 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 
 | scenario_id | operation | source_kind | raw_shape_signal | expected_normalized_assertion | status |
 | --- | --- | --- | --- | --- | --- |
-| `comment_first_page_platform_a` | `comment_list_by_content` | `recorded` | first-page top-level comment response with item array and continuation signal | result contains comment item envelope list, `has_more`, and next continuation input | `missing` |
-| `comment_next_page_platform_a` | `comment_list_by_content` | `recorded` | second-page top-level comment response using same continuation family | next-page continuation is stable and does not change comment public envelope shape | `missing` |
-| `reply_page_platform_a` | `comment_list_by_content` | `recorded` | reply page for one root comment with reply cursor signal | comment item can carry a stable reply cursor without leaking platform cursor object | `missing` |
-| `comment_first_page_platform_b` | `comment_list_by_content` | `recorded` | first-page response from second reference platform with different parent/reply identifiers | comment target, root/parent linkage, and source trace can project into same public surface | `missing` |
-| `comment_next_page_platform_b` | `comment_list_by_content` | `recorded` | second-page response from second reference platform with page/offset-like continuation | public continuation remains platform-neutral | `missing` |
-| `empty_comment_result` | `comment_list_by_content` | `synthetic` | valid content target with zero visible comments | result returns `items=[]`, `result_status=empty`, and no false not-found classification | `missing` |
-| `comment_target_not_found` | `comment_list_by_content` | `synthetic` | content target is unavailable or not resolvable on the platform | result classification is `target_not_found`, not `empty_result` | `missing` |
-| `deleted_comment_item` | `comment_list_by_content` | `synthetic` | one comment is returned with deleted marker but the page is otherwise valid | item visibility is `deleted` and the page can still remain `complete` | `missing` |
-| `invisible_comment_item` | `comment_list_by_content` | `synthetic` | one comment is hidden or blocked by platform visibility control | item visibility is `invisible` without leaking platform moderation flags | `missing` |
-| `unavailable_comment_item` | `comment_list_by_content` | `synthetic` | one comment placeholder is returned but payload omits full body fields | item visibility is `unavailable`, not generic parse failure by default | `missing` |
-| `target_comment_linkage` | `comment_list_by_content` | `synthetic` | reply references both root comment and target comment | normalized item preserves root/parent/target linkage with stable public refs | `missing` |
-| `reply_cursor_resume` | `comment_list_by_content` | `synthetic` | one comment exposes a reply cursor that can resume nested replies | `reply_cursor.resume_comment_ref` stays bound to the same comment item | `missing` |
-| `duplicate_comment_item` | `comment_list_by_content` | `synthetic` | same logical comment appears across pages or reply windows | dedup key remains stable across pages without relying on platform-private object name | `missing` |
-| `permission_denied_comment_collection` | `comment_list_by_content` | `synthetic` | platform denies access to comments or target visibility | result classification is `permission_denied` with fail-closed boundary | `missing` |
-| `rate_limited_comment_collection` | `comment_list_by_content` | `synthetic` | platform response signals rate-limit control while loading comments | result classification is `rate_limited` | `missing` |
-| `platform_failed_comment_collection` | `comment_list_by_content` | `synthetic` | upstream platform failure without stronger category | result classification is `platform_failed` | `missing` |
-| `parse_failed_comment_item` | `comment_list_by_content` | `synthetic` | raw payload is present but one comment cannot be projected | malformed comment item can force `partial_result` without discarding valid comments | `missing` |
-| `partial_result_comment_page` | `comment_list_by_content` | `synthetic` | one page mixes valid comments and parse-failed comments | result returns `partial_result` with valid normalized comments preserved | `missing` |
-| `cursor_invalid_or_expired_comment_collection` | `comment_list_by_content` | `synthetic` | next-page continuation or reply cursor expires or becomes invalid | failure is classified as continuation invalid/expired | `missing` |
-| `credential_invalid_comment_collection` | `comment_list_by_content` | `synthetic` | resource/session health input is invalid before platform query completes | boundary aligns with `v1.2.0` resource governance | `missing` |
-| `verification_required_comment_collection` | `comment_list_by_content` | `synthetic` | platform requires verification or captcha before comments can load | result classification is `verification_required` and remains fail-closed | `missing` |
+| `comment_first_page_platform_a` | `comment_list_by_content` | `recorded` | first-page top-level comment response with item array and continuation signal | result contains comment item envelope list, `has_more`, and next continuation input | `recorded_covered` |
+| `comment_next_page_platform_a` | `comment_list_by_content` | `recorded` | second-page top-level comment response using same continuation family | next-page continuation is stable and does not change comment public envelope shape | `recorded_covered` |
+| `reply_page_platform_a` | `comment_list_by_content` | `recorded` | reply page for one root comment with reply cursor signal | comment item can carry a stable reply cursor without leaking platform cursor object | `recorded_covered` |
+| `comment_first_page_platform_b` | `comment_list_by_content` | `recorded` | first-page response from second reference platform with different parent/reply identifiers | comment target, root/parent linkage, and source trace can project into same public surface | `model_covered_raw_gap` |
+| `comment_next_page_platform_b` | `comment_list_by_content` | `recorded` | second-page response from second reference platform with page/offset-like continuation | public continuation remains platform-neutral | `model_covered_raw_gap` |
+| `empty_comment_result` | `comment_list_by_content` | `synthetic` | valid content target with zero visible comments | result returns `items=[]`, `result_status=empty`, and no false not-found classification | `synthetic_derivable` |
+| `comment_target_not_found` | `comment_list_by_content` | `synthetic` | content target is unavailable or not resolvable on the platform | result classification is `target_not_found`, not `empty_result` | `synthetic_derivable` |
+| `deleted_comment_item` | `comment_list_by_content` | `synthetic` | one comment is returned with deleted marker but the page is otherwise valid | item visibility is `deleted` and the page can still remain `complete` | `gap_needs_visibility_fixture` |
+| `invisible_comment_item` | `comment_list_by_content` | `synthetic` | one comment is hidden or blocked by platform visibility control | item visibility is `invisible` without leaking platform moderation flags | `gap_needs_visibility_fixture` |
+| `unavailable_comment_item` | `comment_list_by_content` | `synthetic` | one comment placeholder is returned but payload omits full body fields | item visibility is `unavailable`, not generic parse failure by default | `synthetic_derivable` |
+| `target_comment_linkage` | `comment_list_by_content` | `synthetic` | reply references both root comment and target comment | normalized item preserves root/parent/target linkage with stable public refs | `recorded_covered` |
+| `reply_cursor_resume` | `comment_list_by_content` | `synthetic` | one comment exposes a reply cursor that can resume nested replies | `reply_cursor.resume_comment_ref` stays bound to the same comment item | `recorded_covered` |
+| `duplicate_comment_item` | `comment_list_by_content` | `synthetic` | same logical comment appears across pages or reply windows | dedup key remains stable across pages without relying on platform-private object name | `synthetic_derivable` |
+| `permission_denied_comment_collection` | `comment_list_by_content` | `synthetic` | platform denies access to comments or target visibility | result classification is `permission_denied` with fail-closed boundary | `gap_needs_failure_fixture` |
+| `rate_limited_comment_collection` | `comment_list_by_content` | `synthetic` | platform response signals rate-limit control while loading comments | result classification is `rate_limited` | `gap_needs_failure_fixture` |
+| `platform_failed_comment_collection` | `comment_list_by_content` | `synthetic` | upstream platform failure without stronger category | result classification is `platform_failed` | `synthetic_derivable` |
+| `parse_failed_comment_item` | `comment_list_by_content` | `synthetic` | raw payload is present but one comment cannot be projected | malformed comment item can force `partial_result` without discarding valid comments | `synthetic_derivable` |
+| `partial_result_comment_page` | `comment_list_by_content` | `synthetic` | one page mixes valid comments and parse-failed comments | result returns `partial_result` with valid normalized comments preserved | `synthetic_derivable` |
+| `cursor_invalid_or_expired_comment_collection` | `comment_list_by_content` | `synthetic` | next-page continuation or reply cursor expires or becomes invalid | failure is classified as continuation invalid/expired | `synthetic_derivable` |
+| `credential_invalid_comment_collection` | `comment_list_by_content` | `synthetic` | resource/session health input is invalid before platform query completes | boundary aligns with `v1.2.0` resource governance | `synthetic_derivable` |
+| `verification_required_comment_collection` | `comment_list_by_content` | `synthetic` | platform requires verification or captcha before comments can load | result classification is `verification_required` and remains fail-closed | `synthetic_derivable` |
+
+## Coverage Status Legend
+
+| status | meaning |
+| --- | --- |
+| `recorded_covered` | current sanitized alias inventory already has recorded raw-shape evidence sufficient for spec freeze |
+| `model_covered_raw_gap` | cross-platform model evidence exists, but raw recorded response still needs补采 for later evidence replay |
+| `synthetic_derivable` | scenario can be derived from current recorded raw shape family during runtime/evidence work |
+| `gap_needs_visibility_fixture` | current aliases expose partial hints, but a dedicated deleted/invisible visibility fixture still needs补采 |
+| `gap_needs_failure_fixture` | failure classification is in scope, but an explicit failure fixture still needs补采 |
+
+## Coverage Snapshot
+
+- Recorded raw shape already grounds:
+  - top-level first page / next page
+  - reply page / reply cursor family
+  - target/root/parent linkage
+- Model evidence grounds, but still needs second-platform raw response capture:
+  - second-platform first page / next page
+- Remaining acquisition gaps for later runtime/evidence rounds:
+  - deleted / invisible visibility fixture
+  - permission-denied failure fixture
+  - rate-limited failure fixture
 
 ## Error Classification Mapping
 
@@ -106,6 +129,11 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
    - signature/request-invalid
    - verification-required
 4. Keep source alias to private working context mapping off-repo and out of GitHub truth.
+
+## Spec Freeze Consumption Rule
+
+- `FR-0404` can freeze public semantics when a scenario is `recorded_covered`, `model_covered_raw_gap`, or `synthetic_derivable`.
+- Scenarios marked `gap_needs_visibility_fixture` or `gap_needs_failure_fixture` are explicitly carried forward into `#419` evidence scope and must not be silently treated as already proven.
 
 ## Acceptance For Batch 0
 

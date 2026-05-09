@@ -71,6 +71,20 @@
 - `#381/#404/#416` GitHub truth 已对齐到本批次执行入口。
 - `#404` 当前已显式绑定 `release=v1.4.0`、`sprint=2026-S25`。
 - 独立 worktree 与 issue-scoped branch 已创建。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- 脱敏搜索
+  - 结果：新增文档未包含外部项目名或本地路径。
 
 ## 未决风险
 
