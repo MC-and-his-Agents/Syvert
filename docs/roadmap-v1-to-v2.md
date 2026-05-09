@@ -208,7 +208,7 @@ Syvert 主仓继续聚焦：
 
 - `content_search_by_keyword`
 - `content_list_by_creator`
-- `comment_list_by_content`
+- `comment_collection`
 - `creator_profile_by_id`
 - `media_asset_fetch_by_ref`
 

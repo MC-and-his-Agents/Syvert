@@ -25,6 +25,8 @@
 - 本次纳入：
   - `docs/exec-plans/artifacts/CHORE-0416-v1-4-comment-collection-fixture-inventory.md`
   - `docs/exec-plans/CHORE-0416-v1-4-comment-collection-spec.md`
+  - `docs/decisions/ADR-CHORE-0416-comment-collection-operation-name.md`
+  - `docs/roadmap-v1-to-v2.md`
   - `docs/specs/FR-0404-comment-collection-contract/spec.md`
   - `docs/specs/FR-0404-comment-collection-contract/plan.md`
   - `docs/specs/FR-0404-comment-collection-contract/data-model.md`
@@ -85,7 +87,7 @@
   - 结果：新增文档未包含外部项目名或本地路径。
 - PR guardian refresh review
   - 结果：曾阻塞于 operation 命名、request continuation 字段映射与 comment ref 绑定歧义。
-  - 处理：已按当前 canonical taxonomy candidate 统一 public operation 为 `comment_collection`，并明确其投影为 `capability_family=comment_collection`、`target_type=content`、`execution_mode=single`、`collection_mode=paginated`。
+  - 处理：已按当前 canonical taxonomy candidate 统一 public operation 为 `comment_collection`，并通过 `ADR-CHORE-0416-comment-collection-operation-name` 与 roadmap 写回明确其取代 `comment_list_by_content` 作为 `#404` slice 的 public operation。
   - 处理：已冻结 result `next_continuation` -> request `page_continuation` 映射，并把 reply/hierarchy/cursor 绑定固定到 `NormalizedCommentItem.canonical_ref`。
   - 最新处理：已修正 placeholder comment identity 规则，`source_id` 继续作为 `FR-0403` item identity 基线；deleted/invisible/unavailable placeholder 缺少平台稳定 id 时，不得伪造平台原生 id，必须通过 public placeholder namespace 与独立稳定 placeholder marker 派生稳定 `source_id` 与 `canonical_ref`。
 - `#427` 已创建，当前 head 绑定本事项的 review round。
