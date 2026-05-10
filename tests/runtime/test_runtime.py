@@ -1391,6 +1391,25 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_unavailable_policy_bypass(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="video",
+            fetch_outcome=None,
+            result_status="unavailable",
+            error_classification="permission_denied",
+        )
+        payload["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_download_required_policy_failure_class(self) -> None:
         payload = make_media_asset_fetch_result(
             fetch_mode="download_required",
@@ -1536,6 +1555,20 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_validate_success_payload_rejects_media_asset_fetch_download_audit_gap(self) -> None:
         payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
         payload["audit"] = {}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_audit_mismatch(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["audit"]["byte_size"] = 9999
 
         result = validate_success_payload(
             payload,

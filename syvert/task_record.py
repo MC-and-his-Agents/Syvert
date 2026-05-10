@@ -1261,6 +1261,14 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
 
     error_classification = envelope.get("error_classification")
+    if (
+        result_status in {"unavailable", "failed"}
+        and content_type in MEDIA_ASSET_CONTENT_TYPES
+        and isinstance(allowed_content_types, list)
+        and content_type not in allowed_content_types
+        and error_classification != "fetch_policy_denied"
+    ):
+        raise TaskRecordContractError("media asset fetch 公共 content_type 被请求 policy 排除时必须使用 fetch_policy_denied")
     if result_status == "complete":
         if content_type not in MEDIA_ASSET_CONTENT_TYPES:
             raise TaskRecordContractError("media asset fetch complete result content_type 不在 stable 允许范围")
@@ -1463,6 +1471,11 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             value = audit.get(field)
             if not isinstance(value, str) or not value:
                 raise TaskRecordContractError(f"media asset fetch downloaded_bytes audit.{field} 必须为非空字符串")
+        if isinstance(media, Mapping) and isinstance(media.get("metadata"), Mapping):
+            metadata = media["metadata"]
+            for field in ("byte_size", "checksum_digest", "checksum_family"):
+                if audit.get(field) != metadata.get(field):
+                    raise TaskRecordContractError("media asset fetch audit 必须与 public metadata 下载事实一致")
 
 
 def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:

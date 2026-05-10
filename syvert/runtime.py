@@ -3113,7 +3113,12 @@ def _validate_media_asset_fetch_no_storage(
     return None
 
 
-def _validate_media_asset_fetch_audit(audit: Any, *, fetch_outcome: str | None) -> dict[str, Any] | None:
+def _validate_media_asset_fetch_audit(
+    audit: Any,
+    *,
+    fetch_outcome: str | None,
+    media: Any,
+) -> dict[str, Any] | None:
     if audit is None:
         audit = {}
     if not isinstance(audit, Mapping):
@@ -3160,6 +3165,15 @@ def _validate_media_asset_fetch_audit(audit: Any, *, fetch_outcome: str | None) 
                 "invalid_adapter_success_payload",
                 f"media asset fetch downloaded_bytes audit.{field} 必须为非空字符串",
             )
+    if isinstance(media, Mapping) and isinstance(media.get("metadata"), Mapping):
+        metadata = media["metadata"]
+        for field in ("byte_size", "checksum_digest", "checksum_family"):
+            if audit.get(field) != metadata.get(field):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch audit 必须与 public metadata 下载事实一致",
+                    details={"field": field},
+                )
     return None
 
 
@@ -4013,6 +4027,19 @@ def validate_success_payload(
             )
         fetch_outcome = payload.get("fetch_outcome")
         error_classification = payload.get("error_classification")
+        allowed_content_types = request_policy.get("allowed_content_types")
+        if (
+            result_status in {"unavailable", "failed"}
+            and content_type in MEDIA_ASSET_CONTENT_TYPES
+            and isinstance(allowed_content_types, list)
+            and content_type not in allowed_content_types
+            and error_classification != "fetch_policy_denied"
+        ):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch 公共 content_type 被请求 policy 排除时必须使用 fetch_policy_denied",
+                details={"content_type": content_type, "error_classification": error_classification},
+            )
         if result_status == "complete":
             if content_type not in MEDIA_ASSET_CONTENT_TYPES:
                 return runtime_contract_error(
@@ -4072,18 +4099,6 @@ def validate_success_payload(
                 return runtime_contract_error(
                     "invalid_adapter_success_payload",
                     "media asset fetch 非 stable content_type 必须使用 unsupported_content_type",
-                    details={"content_type": content_type, "error_classification": error_classification},
-                )
-            allowed_content_types = request_policy.get("allowed_content_types")
-            if (
-                content_type in MEDIA_ASSET_CONTENT_TYPES
-                and isinstance(allowed_content_types, list)
-                and content_type not in allowed_content_types
-                and error_classification != "fetch_policy_denied"
-            ):
-                return runtime_contract_error(
-                    "invalid_adapter_success_payload",
-                    "media asset fetch 公共 content_type 被请求 policy 排除时必须使用 fetch_policy_denied",
                     details={"content_type": content_type, "error_classification": error_classification},
                 )
             fetch_mode = request_policy.get("fetch_mode")
@@ -4171,6 +4186,7 @@ def validate_success_payload(
         audit_error = _validate_media_asset_fetch_audit(
             payload.get("audit", {}),
             fetch_outcome=fetch_outcome if isinstance(fetch_outcome, str) else None,
+            media=media,
         )
         if audit_error is not None:
             return audit_error
