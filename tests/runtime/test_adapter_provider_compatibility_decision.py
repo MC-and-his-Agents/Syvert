@@ -109,6 +109,73 @@ class AdapterProviderCompatibilityDecisionTests(unittest.TestCase):
         self.assertEqual(decision.execution_slice.operation, "content_search_by_keyword")
         self.assert_no_provider_leakage(decision)
 
+    def test_decision_matches_comment_collection_slice(self) -> None:
+        decision = decide_adapter_provider_compatibility(
+            valid_compatibility_decision_input(
+                capability="comment_collection",
+                operation="comment_collection",
+                target_type="content",
+                collection_mode="paginated",
+            )
+        )
+
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_MATCHED)
+        self.assertEqual(decision.capability, "comment_collection")
+        self.assertEqual(decision.execution_slice.operation, "comment_collection")
+        self.assertEqual(decision.execution_slice.target_type, "content")
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_returns_unmatched_for_comment_collection_profile_mismatch(self) -> None:
+        input_value = valid_compatibility_decision_input(
+            capability="comment_collection",
+            operation="comment_collection",
+            target_type="content",
+            collection_mode="paginated",
+        )
+        input_value["offer"]["resource_support"]["supported_profiles"] = [
+            input_value["offer"]["resource_support"]["supported_profiles"][1]
+        ]
+        input_value["offer"]["evidence"]["resource_profile_evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account"
+        ]
+        input_value["offer"]["observability"]["profile_keys"] = ["account"]
+        input_value["offer"]["observability"]["proof_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account"
+        ]
+        input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"] = [
+            input_value["requirement"]["resource_requirement"]["resource_requirement_profiles"][0]
+        ]
+        input_value["requirement"]["evidence"]["resource_profile_evidence_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        ]
+        input_value["requirement"]["observability"]["profile_keys"] = ["account_proxy"]
+        input_value["requirement"]["observability"]["proof_refs"] = [
+            "fr-0027:profile:content-detail-by-url-hybrid:account-proxy"
+        ]
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_UNMATCHED)
+        self.assertEqual(decision.capability, "comment_collection")
+        self.assertEqual(decision.matched_profiles, ())
+        self.assert_no_provider_leakage(decision)
+
+    def test_decision_returns_invalid_contract_for_comment_collection_slice_drift(self) -> None:
+        input_value = valid_compatibility_decision_input(
+            capability="comment_collection",
+            operation="comment_collection",
+            target_type="content",
+            collection_mode="paginated",
+        )
+        input_value["offer"]["capability_offer"]["target_type"] = "creator"
+
+        decision = decide_adapter_provider_compatibility(input_value)
+
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(decision.error.error_code, COMPATIBILITY_DECISION_ERROR_INVALID_PROVIDER_OFFER_CONTRACT)
+        self.assertEqual(decision.matched_profiles, ())
+        self.assert_no_provider_leakage(decision)
+
     def test_decision_returns_unmatched_when_legal_inputs_have_no_profile_tuple_intersection(self) -> None:
         input_value = copy_decision_input()
         offer = input_value["offer"]
