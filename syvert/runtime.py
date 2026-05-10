@@ -73,7 +73,7 @@ CAPABILITY_FAMILY_BY_OPERATION = {
     MEDIA_ASSET_FETCH_BY_REF: MEDIA_ASSET_FETCH,
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
-MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video", "mixed_media", "unknown"})
+MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
@@ -736,7 +736,9 @@ def execute_task_internal(
             None,
         )
     request_cursor_validation_snapshot = (
-        clone_request_cursor(normalized_request.request_cursor) if capability == COMMENT_COLLECTION else None
+        clone_request_cursor(normalized_request.request_cursor)
+        if capability in {COMMENT_COLLECTION, MEDIA_ASSET_FETCH_BY_REF}
+        else None
     )
 
     execution_control_policy = normalized_request.execution_control_policy
@@ -2751,6 +2753,25 @@ def validate_media_fetch_policy_payload(policy: Any) -> dict[str, Any] | None:
     return None
 
 
+def _media_fetch_policy_allows_outcome(policy: Mapping[str, Any], fetch_outcome: str, content_type: str) -> bool:
+    allowed_content_types = policy.get("allowed_content_types")
+    if not isinstance(allowed_content_types, list) or content_type not in allowed_content_types:
+        return False
+    fetch_mode = policy.get("fetch_mode")
+    allow_download = policy.get("allow_download")
+    if fetch_outcome == "metadata_only":
+        return True
+    if fetch_outcome == "source_ref_preserved":
+        return fetch_mode in {"preserve_source_ref", "download_if_allowed", "download_required"}
+    if fetch_outcome == "downloaded_bytes":
+        return fetch_mode in {"download_if_allowed", "download_required"} and allow_download is True
+    return False
+
+
+def _media_fetch_policies_match(request_policy: Mapping[str, Any], result_policy: Mapping[str, Any]) -> bool:
+    return normalize_media_fetch_policy(request_policy) == normalize_media_fetch_policy(result_policy)
+
+
 def _validate_media_asset_fetch_source_trace(source_trace: Any) -> dict[str, Any] | None:
     if not isinstance(source_trace, Mapping):
         return runtime_contract_error(
@@ -2785,6 +2806,22 @@ def _validate_media_asset_fetch_metadata(
             "invalid_adapter_success_payload",
             "media asset fetch media.metadata 必须是对象或 null",
         )
+    allowed_metadata_fields = {
+        "mime_type",
+        "width",
+        "height",
+        "duration_ms",
+        "byte_size",
+        "checksum_digest",
+        "checksum_family",
+    }
+    for field in metadata:
+        if field not in allowed_metadata_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch media.metadata 只能包含公共白名单字段",
+                details={"field": field},
+            )
     forbidden_fields = {
         "local_path",
         "file_path",
@@ -3753,6 +3790,13 @@ def validate_success_payload(
         policy_error = validate_media_fetch_policy_payload(payload.get("fetch_policy"))
         if policy_error is not None:
             return policy_error
+        result_policy = normalize_media_fetch_policy(payload["fetch_policy"])
+        request_policy = normalize_media_fetch_policy(request_cursor)
+        if request_cursor is not None and not _media_fetch_policies_match(request_policy, result_policy):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.fetch_policy 必须与请求 fetch_policy 一致",
+            )
 
         result_status = payload.get("result_status")
         if not isinstance(result_status, str) or result_status not in MEDIA_ASSET_RESULT_STATUSES:
@@ -3775,6 +3819,16 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch complete result 必须使用 null error_classification",
                     details={"error_classification": error_classification},
+                )
+            if request_cursor is not None and not _media_fetch_policy_allows_outcome(
+                request_policy,
+                fetch_outcome,
+                content_type,
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch complete result 不得违反请求 fetch_policy",
+                    details={"fetch_outcome": fetch_outcome, "content_type": content_type},
                 )
         elif result_status == "unavailable":
             if fetch_outcome is not None:

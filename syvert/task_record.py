@@ -31,7 +31,7 @@ SHARED_CAPABILITIES = frozenset(
 SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", "direct"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
-MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video", "mixed_media", "unknown"})
+MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
@@ -1281,6 +1281,18 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         metadata = media.get("metadata") or {}
         if not isinstance(metadata, Mapping):
             raise TaskRecordContractError("media asset fetch media.metadata 必须是对象或 null")
+        allowed_metadata_fields = {
+            "mime_type",
+            "width",
+            "height",
+            "duration_ms",
+            "byte_size",
+            "checksum_digest",
+            "checksum_family",
+        }
+        for field in metadata:
+            if field not in allowed_metadata_fields:
+                raise TaskRecordContractError("media asset fetch media.metadata 只能包含公共白名单字段")
         for forbidden_field in (
             "local_path",
             "file_path",

@@ -49,6 +49,7 @@
 - Branch：`issue-423-405-v1-5-0-media-asset-fetch-runtime`
 - 当前实现已落地并提交到 PR `#439`。
 - PR guardian 首轮 findings 已处理：fetch policy 请求对象、`result_status`/`fetch_outcome` 分离、`source_ref_lineage`、downloaded-bytes public metadata、permission/auth failure classifications 均已按 FR-0405 对齐。
+- PR guardian 第二轮 findings 已处理：结果绑定原始请求 fetch policy、stable media content type 收窄为 `image`/`video`、media metadata 改为公共白名单字段。
 
 ## 下一步动作
 
@@ -69,7 +70,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，138 tests。
+  - 结果：通过，141 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`

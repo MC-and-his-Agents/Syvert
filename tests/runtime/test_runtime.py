@@ -1074,6 +1074,51 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_request_policy_drift(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor={
+                "fetch_mode": "metadata_only",
+                "allowed_content_types": ["image", "video"],
+                "allow_download": False,
+                "max_bytes": None,
+            },
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_unstable_content_type(self) -> None:
+        payload = make_media_asset_fetch_result(content_type="mixed_media")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_metadata(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["metadata"], dict)
+        payload["media"]["metadata"]["signed_url"] = "https://media.example.invalid/private"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
         for status, classification in (
             ("unavailable", "permission_denied"),
