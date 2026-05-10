@@ -82,6 +82,10 @@
 - `git diff --check`
   - 结果：通过。
 
+## 最近一次 checkpoint 对应的 head SHA
+
+- `a5a41631851d57f4a3c8692195a19eaf353841c7`
+
 ## 未决风险
 
 - `#424` 尚未迁移 TaskRecord/result query/runtime admission 与 compatibility consumers，当前只交付 creator runtime carrier。
