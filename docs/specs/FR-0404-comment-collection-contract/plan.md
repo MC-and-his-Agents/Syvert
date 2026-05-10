@@ -8,6 +8,7 @@
 - release：`v1.4.0`
 - sprint：`2026-S25`
 - 关联 exec-plan：`docs/exec-plans/CHORE-0416-v1-4-comment-collection-spec.md`
+- staged migration exec-plan：`docs/exec-plans/CHORE-0432-v1-4-comment-collection-success-classification-amendment.md`
 
 ## 实施目标
 
@@ -21,12 +22,14 @@
 - 阶段 3：`#417` 实现 comment runtime carrier。
 - 阶段 3A：`#417` 同步把 `FR-0368` 中的 comment capability candidate 升级为 `FR-0404` 的 executable runtime slice：public operation `comment_collection` 投影到 `comment_collection + content + single + paginated`，并更新 operation taxonomy 与 runtime-delivery truth。
 - 阶段 4：`#418` 迁移 TaskRecord / result query / compatibility decision 等 consumers，并把 requirement/offer/compatibility baseline 对齐到 `comment_collection -> comment_collection + content + single + paginated` executable slice。
-- 阶段 5：`#419` 补齐 fake/reference evidence。
+- 阶段 4A：`#432` 冻结 `comment_collection` 非空成功页 carrier amendment：`result_status=complete + error_classification=success`，并明确 `success` 不进入 `FR-0403` 共享词表。
+- 阶段 4B：`#434` 落地 executable contract support，只允许 `success` 用于 `comment_collection` 非空 `complete` 成功页，并回归证明 `FR-0403` search/list 不接受 `success`。
+- 阶段 5：`#419` 补齐 fake/reference evidence。`#419` 不得在 `#432/#434` 合入前关闭或合并。
 - 阶段 6：`#420` 完成 `v1.4.0` release closeout 与 published truth carrier。
 
 ## 实现约束
 
-- 不允许触碰 runtime、tests implementation、raw fixture payload files。
+- formal spec Work Item 不允许触碰 runtime、tests implementation、raw fixture payload files；`#434` 作为独立 implementation Work Item 承接 executable contract。
 - 不允许把 creator profile、media download/no-download boundary 混入 `FR-0404`。
 - 不允许在 repository 或 GitHub truth 中出现外部项目名或本地路径。
 - 不允许把 `v1.4.0` 写成整个 Phase 3 的 release 绑定。

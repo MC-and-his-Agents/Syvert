@@ -74,7 +74,8 @@
   - `audit`
 - 约束：
   - `result_status` 至少支持 `complete`、`empty`、`partial_result`。
-  - `error_classification` 复用 `FR-0403` vocabulary，不新增 comment-only collection-level 分类。
+  - `error_classification` 复用 `FR-0403` 基础 vocabulary，并为 `comment_collection` 额外允许 `success` 作为非空 `complete` 成功页 sentinel。
+  - `success` 是 comment-specific success sentinel，不进入 `FR-0403` 共享 collection vocabulary，不得用于 collection-level failure、`empty`、`partial_result` 或零 item envelope。
   - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`。
   - `empty_result` 不等于 `target_not_found`。
   - collection-level failure envelope 必须使用 `items=[]`、`has_more=false`、`next_continuation=null`。
@@ -177,9 +178,12 @@
   - `credential_invalid`
   - `verification_required`
   - `signature_or_request_invalid`
+  - `success`
 - 约束：
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
+  - `success` 只能与 `result_status=complete`、非空 `items` 的正常成功页组合。
+  - collection-level failure envelope 不得携带非空 `items`、`has_more=true` 或 executable continuation；`partial_result + parse_failed` 的部分成功页不属于 collection-level failure envelope。
   - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；至少保留一个成功 normalized comment 的 partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
   - 零成功投影的整页 parse failure 固定使用 `result_status=complete` 与 `error_classification=parse_failed`，并返回 `items=[]`、`has_more=false`、`next_continuation=null`。
   - `target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 均固定使用 collection-level failure envelope。
