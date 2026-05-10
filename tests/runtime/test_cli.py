@@ -17,6 +17,7 @@ from syvert.task_record import (
     TaskRecordContractError,
     TaskRequestSnapshot,
     create_task_record,
+    finish_task_record,
     start_task_record,
     task_record_to_dict,
 )
@@ -123,6 +124,129 @@ _DYNAMIC_TIMESTAMP_PATHS = {
     ("runtime_structured_log_events", "*", "runtime_result_refs", "*", "ended_at"),
     ("runtime_execution_metric_samples", "*", "occurred_at"),
 }
+
+
+def make_creator_profile_record(task_id: str):
+    accepted = create_task_record(
+        task_id,
+        TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+            collection_mode="direct",
+        ),
+        occurred_at="2026-04-24T00:00:00Z",
+    )
+    running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+    return finish_task_record(
+        running,
+        {
+            "task_id": task_id,
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "creator_profile_by_id",
+            "status": "success",
+            "operation": "creator_profile_by_id",
+            "target": {
+                "operation": "creator_profile_by_id",
+                "target_type": "creator",
+                "creator_ref": "creator-001",
+                "target_display_hint": "creator-hint-001",
+                "policy_ref": "policy:creator-profile",
+            },
+            "result_status": "complete",
+            "error_classification": None,
+            "profile": {
+                "creator_ref": "creator-001",
+                "canonical_ref": "creator:canonical:creator-001",
+                "display_name": "creator-name",
+                "avatar_ref": "avatar:creator-001",
+                "description": "desc",
+                "public_counts": {
+                    "follower_count": 100,
+                    "following_count": 5,
+                    "content_count": 8,
+                    "like_count": 16,
+                },
+                "profile_url_hint": "profile:creator-slug",
+            },
+            "raw_payload_ref": "raw://creator-profile",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "resource_profile_ref": "fr-0405:profile:creator-profile-by-id:account-proxy",
+                "fetched_at": "2026-05-09T10:00:00Z",
+                "evidence_alias": "alias://creator-profile-success",
+            },
+            "audit": {},
+        },
+        occurred_at="2026-04-24T00:00:02Z",
+    )
+
+
+def make_media_asset_fetch_record(task_id: str):
+    accepted = create_task_record(
+        task_id,
+        TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            collection_mode="direct",
+        ),
+        occurred_at="2026-04-24T00:00:00Z",
+    )
+    running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+    return finish_task_record(
+        running,
+        {
+            "task_id": task_id,
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "media_asset_fetch_by_ref",
+            "status": "success",
+            "operation": "media_asset_fetch_by_ref",
+            "target": {
+                "operation": "media_asset_fetch_by_ref",
+                "target_type": "media_ref",
+                "media_ref": "media:asset-001",
+                "origin_ref": "origin:content-001",
+                "policy_ref": "policy:media-metadata",
+            },
+            "content_type": "image",
+            "fetch_policy": {
+                "fetch_mode": "metadata_only",
+                "allowed_content_types": ["image", "video"],
+                "allow_download": False,
+                "max_bytes": None,
+            },
+            "fetch_outcome": "metadata_only",
+            "result_status": "complete",
+            "error_classification": None,
+            "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+            "media": {
+                "source_media_ref": "source:media:asset-001",
+                "source_ref_lineage": {
+                    "input_ref": "media:asset-001",
+                    "source_media_ref": "source:media:asset-001",
+                    "resolved_ref": "resolved:media:asset-001",
+                    "canonical_ref": "canonical:media:asset-001",
+                    "preservation_status": "preserved",
+                },
+                "canonical_ref": "canonical:media:asset-001",
+                "content_type": "image",
+                "metadata": {"mime_type": "image/jpeg", "width": 1200, "height": 900},
+            },
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                "fetched_at": "2026-05-09T10:00:00Z",
+                "evidence_alias": "alias://media-asset-fetch-1",
+            },
+            "audit": {},
+        },
+        occurred_at="2026-04-24T00:00:02Z",
+    )
 _EXECUTION_DURATION_METRIC_SAMPLE_PATH = ("runtime_execution_metric_samples", "*")
 
 
@@ -481,6 +605,48 @@ class CliTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(query_exit_code, 0)
         self.assertEqual(query_stderr.getvalue(), "")
         self.assertEqual(json.loads(query_stdout.getvalue()), expected_payload)
+
+    def test_query_subcommand_returns_creator_profile_record(self) -> None:
+        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
+        record = make_creator_profile_record("task-cli-query-creator-profile-1")
+        accepted = create_task_record(record.task_id, record.request, occurred_at=record.created_at)
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        store.write(accepted)
+        store.write(running)
+        store.write(finish_task_record(running, record.result.envelope, occurred_at=record.terminal_at))
+
+        query_stdout = io.StringIO()
+        query_stderr = io.StringIO()
+        query_exit_code = main(
+            ["query", "--task-id", "task-cli-query-creator-profile-1"],
+            stdout=query_stdout,
+            stderr=query_stderr,
+        )
+
+        self.assertEqual(query_exit_code, 0)
+        self.assertEqual(query_stderr.getvalue(), "")
+        self.assertEqual(json.loads(query_stdout.getvalue()), task_record_to_dict(record))
+
+    def test_query_subcommand_returns_media_asset_fetch_record(self) -> None:
+        store = LocalTaskRecordStore(Path(self._task_record_store_dir.name))
+        record = make_media_asset_fetch_record("task-cli-query-media-fetch-1")
+        accepted = create_task_record(record.task_id, record.request, occurred_at=record.created_at)
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        store.write(accepted)
+        store.write(running)
+        store.write(finish_task_record(running, record.result.envelope, occurred_at=record.terminal_at))
+
+        query_stdout = io.StringIO()
+        query_stderr = io.StringIO()
+        query_exit_code = main(
+            ["query", "--task-id", "task-cli-query-media-fetch-1"],
+            stdout=query_stdout,
+            stderr=query_stderr,
+        )
+
+        self.assertEqual(query_exit_code, 0)
+        self.assertEqual(query_stderr.getvalue(), "")
+        self.assertEqual(json.loads(query_stdout.getvalue()), task_record_to_dict(record))
 
     def test_query_subcommand_returns_invalid_cli_arguments_when_task_id_missing(self) -> None:
         stdout = io.StringIO()

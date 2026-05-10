@@ -225,6 +225,46 @@ class AdapterCapabilityRequirementTests(unittest.TestCase):
 
                 self.assertEqual(result.status, ADAPTER_REQUIREMENT_STATUS_DECLARED)
 
+    def test_validator_accepts_creator_profile_direct_requirement(self) -> None:
+        result = validate_adapter_capability_requirement(
+            AdapterCapabilityRequirementValidationInput(
+                requirement=valid_adapter_capability_requirement(
+                    capability="creator_profile",
+                    operation="creator_profile_by_id",
+                    target_type="creator",
+                    collection_mode="direct",
+                ),
+                available_resource_capabilities=("account", "proxy"),
+            )
+        )
+
+        self.assertEqual(result.status, ADAPTER_REQUIREMENT_STATUS_DECLARED)
+        self.assertEqual(result.capability, "creator_profile")
+        self.assertEqual(
+            result.details["requirement_id"],
+            "xhs:creator_profile:creator_profile_by_id:creator:direct",
+        )
+
+    def test_validator_accepts_media_asset_fetch_direct_requirement(self) -> None:
+        result = validate_adapter_capability_requirement(
+            AdapterCapabilityRequirementValidationInput(
+                requirement=valid_adapter_capability_requirement(
+                    capability="media_asset_fetch",
+                    operation="media_asset_fetch_by_ref",
+                    target_type="media_ref",
+                    collection_mode="direct",
+                ),
+                available_resource_capabilities=("account", "proxy"),
+            )
+        )
+
+        self.assertEqual(result.status, ADAPTER_REQUIREMENT_STATUS_DECLARED)
+        self.assertEqual(result.capability, "media_asset_fetch")
+        self.assertEqual(
+            result.details["requirement_id"],
+            "xhs:media_asset_fetch:media_asset_fetch_by_ref:media_ref:direct",
+        )
+
     def test_validator_rejects_requirement_level_evidence_outside_fr0024_categories(self) -> None:
         requirement = copy_requirement()
         requirement["evidence"]["capability_requirement_evidence_refs"] = [

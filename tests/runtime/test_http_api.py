@@ -152,6 +152,99 @@ def make_failed_envelope(task_id: str) -> dict[str, Any]:
     }
 
 
+def make_creator_profile_envelope(task_id: str) -> dict[str, Any]:
+    return {
+        "task_id": task_id,
+        "adapter_key": TEST_ADAPTER_KEY,
+        "capability": "creator_profile_by_id",
+        "status": "success",
+        "task_record_ref": f"task_record:{task_id}",
+        "operation": "creator_profile_by_id",
+        "target": {
+            "operation": "creator_profile_by_id",
+            "target_type": "creator",
+            "creator_ref": "creator-001",
+            "target_display_hint": "creator-hint-001",
+            "policy_ref": "policy:creator-profile",
+        },
+        "result_status": "complete",
+        "error_classification": None,
+        "profile": {
+            "creator_ref": "creator-001",
+            "canonical_ref": "creator:canonical:creator-001",
+            "display_name": "creator-name",
+            "avatar_ref": "avatar:creator-001",
+            "description": "desc",
+            "public_counts": {
+                "follower_count": 100,
+                "following_count": 5,
+                "content_count": 8,
+                "like_count": 16,
+            },
+            "profile_url_hint": "profile:creator-slug",
+        },
+        "raw_payload_ref": "raw://creator-profile",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0405:profile:creator-profile-by-id:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://creator-profile-success",
+        },
+        "audit": {},
+    }
+
+
+def make_media_asset_fetch_envelope(task_id: str) -> dict[str, Any]:
+    return {
+        "task_id": task_id,
+        "adapter_key": TEST_ADAPTER_KEY,
+        "capability": "media_asset_fetch_by_ref",
+        "status": "success",
+        "task_record_ref": f"task_record:{task_id}",
+        "operation": "media_asset_fetch_by_ref",
+        "target": {
+            "operation": "media_asset_fetch_by_ref",
+            "target_type": "media_ref",
+            "media_ref": "media:asset-001",
+            "origin_ref": "origin:content-001",
+            "policy_ref": "policy:media-metadata",
+        },
+        "content_type": "image",
+        "fetch_policy": {
+            "fetch_mode": "metadata_only",
+            "allowed_content_types": ["image", "video"],
+            "allow_download": False,
+            "max_bytes": None,
+        },
+        "fetch_outcome": "metadata_only",
+        "result_status": "complete",
+        "error_classification": None,
+        "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+        "media": {
+            "source_media_ref": "source:media:asset-001",
+            "source_ref_lineage": {
+                "input_ref": "media:asset-001",
+                "source_media_ref": "source:media:asset-001",
+                "resolved_ref": "resolved:media:asset-001",
+                "canonical_ref": "canonical:media:asset-001",
+                "preservation_status": "preserved",
+            },
+            "canonical_ref": "canonical:media:asset-001",
+            "content_type": "image",
+            "metadata": {"mime_type": "image/jpeg", "width": 1200, "height": 900},
+        },
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://media-asset-fetch-1",
+        },
+        "audit": {},
+    }
+
+
 def invoke_wsgi_app(
     app: Any,
     *,
@@ -328,6 +421,38 @@ class TaskHttpServiceTests(ResourceStoreEnvMixin, unittest.TestCase):
             occurred_at="2026-04-24T00:00:02Z",
         )
 
+    def make_creator_profile_record(self, task_id: str):
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+            collection_mode="direct",
+        )
+        accepted = create_task_record(task_id, request, occurred_at="2026-04-24T00:00:00Z")
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        return finish_task_record(
+            running,
+            make_creator_profile_envelope(task_id),
+            occurred_at="2026-04-24T00:00:02Z",
+        )
+
+    def make_media_asset_fetch_record(self, task_id: str):
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            collection_mode="direct",
+        )
+        accepted = create_task_record(task_id, request, occurred_at="2026-04-24T00:00:00Z")
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        return finish_task_record(
+            running,
+            make_media_asset_fetch_envelope(task_id),
+            occurred_at="2026-04-24T00:00:02Z",
+        )
+
     def test_submit_happy_path_returns_receipt_and_persists_task_record(self) -> None:
         service = self.make_service(task_id="task-http-submit-1")
 
@@ -476,6 +601,29 @@ class TaskHttpServiceTests(ResourceStoreEnvMixin, unittest.TestCase):
         self.assertEqual(response.body, make_failed_envelope("task-http-result-failed-1"))
         self.assertEqual(response.body["error"]["category"], "platform")
         self.assertEqual(response.body["error"]["code"], "platform_broken")
+
+    def test_result_returns_creator_profile_public_envelope_without_rewrapping(self) -> None:
+        record = self.make_creator_profile_record("task-http-result-creator-profile-1")
+        self.write_record(record)
+        service = self.make_service()
+
+        response = service.result("task-http-result-creator-profile-1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, make_creator_profile_envelope("task-http-result-creator-profile-1"))
+        self.assertNotIn("fetch_policy", response.body)
+        self.assertNotIn("media", response.body)
+
+    def test_result_returns_media_asset_fetch_public_envelope_without_rewrapping(self) -> None:
+        record = self.make_media_asset_fetch_record("task-http-result-media-fetch-1")
+        self.write_record(record)
+        service = self.make_service()
+
+        response = service.result("task-http-result-media-fetch-1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, make_media_asset_fetch_envelope("task-http-result-media-fetch-1"))
+        self.assertNotIn("no_storage", response.body)
 
     def test_result_returns_conflict_when_result_is_not_ready(self) -> None:
         record = self.make_accepted_record("task-http-accepted-1")
