@@ -72,6 +72,9 @@
 - guardian preflight finding（PR #442，第 1 轮）：
   - 问题：`## Review Artifacts` 使用绝对路径 Markdown 链接，且 `Review artifact` 字段未按 rubric 要求绑定 `code_review.md` 与 `spec_review.md`。
   - 处理：改为 repo-relative locator 文本，并在 `Review artifact` 明确填入 `code_review.md, spec_review.md`；随后重跑 `pr_guardian.py review`。
+- guardian review blocker（PR #442，第 2 轮）：
+  - 现象：`python3 scripts/pr_guardian.py review 442 --json-output /tmp/syvert-425-guardian-review.json` 无输出且长时间不返回。
+  - 处理：已终止挂起进程（PID `26207`），当前不绕过 merge gate；等待修复 guardian subprocess 环境后再继续受控合并。
 
 ## 未决风险
 
