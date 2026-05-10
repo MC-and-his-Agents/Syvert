@@ -28,6 +28,7 @@ COLLECTION_ERROR_CLASSIFICATIONS = frozenset(
         "credential_invalid",
         "verification_required",
         "signature_or_request_invalid",
+        "success",
     }
 )
 
@@ -1104,6 +1105,20 @@ def _validate_comment_contract(envelope: CommentCollectionResultEnvelope) -> dic
                 "parse_failed 必须是 partial page 或零成功 fail-closed envelope",
                 details={"field": "error_classification"},
             )
+
+    if envelope.error_classification == "success":
+        if envelope.result_status != "complete" or not envelope.items:
+            return _contract_error(
+                "invalid_comment_collection_contract",
+                "success 仅用于 complete 且非空的正常成功页",
+                details={"field": "error_classification"},
+            )
+    elif envelope.result_status == "complete" and envelope.items:
+        return _contract_error(
+            "invalid_comment_collection_contract",
+            "非空 complete 成功页必须使用 success",
+            details={"field": "error_classification"},
+        )
 
     if envelope.has_more and envelope.next_continuation is None:
         return _contract_error(

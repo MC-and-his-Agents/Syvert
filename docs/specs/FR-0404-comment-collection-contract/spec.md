@@ -44,10 +44,11 @@
 - 契约需求：
   - `comment_collection` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - `comment_collection` 同时沿用当前 canonical taxonomy candidate 的 public operation 名称与 adapter-facing capability family；后续若要拆分为更具体的 operation 名，必须另走 taxonomy promotion / compatibility migration，不在本 Work Item 中完成。
-  - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
+  - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary，并为非空正常成功页冻结 `error_classification=success` success sentinel；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
   - 请求侧 `request_cursor` 在同一请求中只能二选一：要么通过 `page_continuation` 继续上一页 result 的 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
   - collection-level错误分类 vocabulary 继承 `FR-0403`，至少保留：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
+  - `error_classification=success` 是 comment contract 的非错误 success sentinel，只能与 `result_status=complete`、非空 `items` 的正常成功页组合；不得用于 `empty`、`partial_result` 或任何 fail-closed envelope。
   - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - collection-level failure envelope 必须统一返回 `items=[]`、`has_more=false`、`next_continuation=null`；不得在 failure envelope 中继续携带可执行 continuation 或伪正常 comment item。
   - collection-level failure envelope 仍必须保留 `raw_payload_ref` 与 `source_trace` 审计载体；若失败发生在稳定 raw payload 之前，这些字段必须指向 failure evidence / provider trace alias，而不是平台 raw object。
@@ -84,6 +85,7 @@
 Given `comment_collection` 使用合法 content target，且 Adapter 可以从 reference platform A 投影 recorded first-page comment response
 When Core 执行 comment collection request
 Then result 返回 `items`、`has_more=true`、`next_continuation`、`result_status=complete`、`raw_payload_ref` 与 normalized comment list，且不暴露平台私有 thread 或 moderation object
+And result 使用 `error_classification=success` 表示非空正常成功页
 
 ### 场景 2：下一页 continuation 保持公共语义稳定
 
@@ -126,6 +128,7 @@ Then result 必须返回 `result_status=complete` 与 `error_classification=targ
 Given 一页评论中同时包含正常 comment item 与 deleted/invisible placeholder
 When Core 处理该页 comment result
 Then deleted/invisible item 通过 `visibility_status` 表达，且合法页面仍可返回 `result_status=complete`
+And 合法页面仍使用 `error_classification=success`，不得把 deleted/invisible 提升为 collection-level failure
 
 ### 场景 6B：unavailable comment 保留为 item-level visibility
 
@@ -138,6 +141,7 @@ Then item 必须返回 `visibility_status=unavailable` 与最小 normalized plac
 Given 一条 reply 同时能识别 root comment、直接 parent comment 与 target comment
 When Adapter 投影 normalized comment item
 Then public item 必须保留 `root_comment_ref`、`parent_comment_ref` 与 `target_comment_ref`，这些 ref 都绑定到对应 comment 的 `canonical_ref`，而不要求 Core 理解平台私有 reply object
+And 正常 reply page 使用 `error_classification=success`
 
 ### 场景 7B：duplicate comment item 保持稳定 dedup 语义
 
@@ -196,6 +200,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 ## 异常与边界场景
 
 - 异常场景：
+  - 非空正常成功页必须使用 `result_status=complete + error_classification=success`；使用 `platform_failed`、`parse_failed` 或其他 failure classification 携带非空 `items` 必须视为 invalid contract。
   - raw response 缺少 `items` family 或 comment identity family 时，必须按 `parse_failed` fail-closed。
   - raw response 声明 `has_more=true` 但缺少 page continuation family 时，必须按 `parse_failed` fail-closed；`has_more=false` 的终页不得因缺少 continuation 被视为 malformed。
   - comment item 声明可以继续 replies 但缺少 reply cursor family 时，必须按 `parse_failed` fail-closed；不可继续 replies 的叶子 comment 不要求 `reply_cursor`。
@@ -215,7 +220,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
 - [ ] formal spec 冻结 `comment_collection` 的请求侧 cursor 规则，明确 result `next_continuation` 到 request `page_continuation` 的映射，以及 `page_continuation` 与 `reply_cursor` 的组合/互斥边界。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
-- [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，并写清 `partial_result` 只作为结果状态组合语义保留。
+- [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，写清 `success` 只作为非空 complete 成功页 sentinel，且 `partial_result` 只作为结果状态组合语义保留。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。
 - [ ] formal spec 明确 synthetic fixture 只能从 recorded raw shape 派生，且所有 evidence source 只能使用脱敏 alias。
 - [ ] formal spec 明确第二参考平台 raw gap 由 `#419` 关闭，当前 Work Item 不宣称跨平台 recorded proof 已完成。

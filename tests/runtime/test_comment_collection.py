@@ -108,8 +108,8 @@ def make_comment_item(
 def make_payload(
     *,
     items: tuple[dict[str, Any], ...] | list[dict[str, Any]] = (make_comment_item(include_reply_cursor=True),),
-    result_status: str = "partial_result",
-    error_classification: str = "parse_failed",
+    result_status: str = "complete",
+    error_classification: str = "success",
     has_more: bool = False,
     include_continuation: bool = False,
     continuation_comment_ref: str | None = None,
@@ -134,13 +134,32 @@ def make_payload(
 
 
 class CommentCollectionCarrierTests(unittest.TestCase):
-    def test_fake_carrier_happy_path_with_reply_cursor_and_page_continuation(self) -> None:
+    def test_fake_carrier_success_path_with_reply_cursor_and_page_continuation(self) -> None:
         payload = make_payload(has_more=True, include_continuation=True)
 
         envelope = comment_collection_result_envelope_from_dict(payload)
 
         self.assertIsNone(validate_comment_collection_result_envelope(envelope))
         self.assertEqual(comment_collection_result_envelope_to_dict(envelope), payload)
+
+    def test_success_classification_requires_complete_non_empty_page(self) -> None:
+        for payload in (
+            make_payload(items=(), result_status="complete", error_classification="success"),
+            make_payload(result_status="empty", error_classification="success"),
+            make_payload(result_status="partial_result", error_classification="success"),
+        ):
+            with self.subTest(result_status=payload["result_status"], items=len(payload["items"])):
+                result = validate_comment_collection_result_envelope(payload)
+
+                self.assertEqual(result["code"], "invalid_comment_collection_contract")
+
+    def test_non_empty_complete_page_requires_success_classification(self) -> None:
+        payload = make_payload(result_status="complete", error_classification="platform_failed")
+
+        result = validate_comment_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_comment_collection_contract")
+        self.assertIn("fail-closed", result["message"])
 
     def test_reply_hierarchy_and_reply_window_continuation_are_valid(self) -> None:
         reply = make_comment_item(

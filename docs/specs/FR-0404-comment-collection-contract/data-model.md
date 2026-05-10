@@ -74,7 +74,8 @@
   - `audit`
 - 约束：
   - `result_status` 至少支持 `complete`、`empty`、`partial_result`。
-  - `error_classification` 复用 `FR-0403` vocabulary，不新增 comment-only collection-level 分类。
+  - `error_classification` 复用 `FR-0403` vocabulary，并为非空正常成功页新增 `success` sentinel；`success` 不是 collection-level error classification。
+  - 非空正常成功页必须使用 `result_status=complete` 与 `error_classification=success`。
   - 合法空结果必须显式使用 `result_status=empty` 且 `error_classification=empty_result`。
   - `empty_result` 不等于 `target_not_found`。
   - collection-level failure envelope 必须使用 `items=[]`、`has_more=false`、`next_continuation=null`。
@@ -163,7 +164,9 @@
 
 ## CommentErrorClassificationVocabulary
 
-- 用途：表达 comment collection-level 继承错误词表。
+- 用途：表达 comment collection-level 继承错误词表，以及 comment 非空成功页的 success sentinel。
+- 成功 sentinel：
+  - `success`
 - 继承分类：
   - `empty_result`
   - `target_not_found`
@@ -178,11 +181,13 @@
   - `verification_required`
   - `signature_or_request_invalid`
 - 约束：
+  - `success` 只能用于 `result_status=complete` 且 `items` 非空的正常成功页；它不得用于 `empty`、`partial_result`、collection-level failure 或零成功 parse failure。
   - deleted/invisible/unavailable 必须留在 item-level visibility，而不是提升为 collection-level error classification。
   - `credential_invalid` 与 `verification_required` 必须与 `v1.2.0` resource governance 边界兼容。
   - 本 FR 允许 emitted 的 `error_classification` 不单独发出 `partial_result`；至少保留一个成功 normalized comment 的 partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed`。
   - 零成功投影的整页 parse failure 固定使用 `result_status=complete` 与 `error_classification=parse_failed`，并返回 `items=[]`、`has_more=false`、`next_continuation=null`。
   - `target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 均固定使用 collection-level failure envelope。
+  - failure classification 不得携带非空 `items` 或可执行 continuation。
   - `partial_result` 继续保留为继承词表的兼容 entry，保证与 `FR-0403` vocabulary 对齐。
 
 ## 生命周期
