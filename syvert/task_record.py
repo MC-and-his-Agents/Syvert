@@ -1181,8 +1181,6 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     require_string(target.get("target_ref"), field="media asset fetch result.target.target_ref")
 
     content_type = require_string(envelope.get("content_type"), field="result.envelope.content_type")
-    if content_type not in MEDIA_ASSET_CONTENT_TYPES:
-        raise TaskRecordContractError("media asset fetch content_type 不在允许范围")
     fetch_policy = envelope.get("fetch_policy")
     if not isinstance(fetch_policy, Mapping):
         raise TaskRecordContractError("media asset fetch fetch_policy 必须是对象")
@@ -1210,6 +1208,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
 
     error_classification = envelope.get("error_classification")
     if result_status == "complete":
+        if content_type not in MEDIA_ASSET_CONTENT_TYPES:
+            raise TaskRecordContractError("media asset fetch complete result content_type 不在 stable 允许范围")
         if not isinstance(fetch_outcome, str) or fetch_outcome not in MEDIA_ASSET_FETCH_OUTCOMES:
             raise TaskRecordContractError("media asset fetch complete result fetch_outcome 不在允许范围")
         if error_classification is not None:
@@ -1234,6 +1234,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     raw_payload_ref = envelope.get("raw_payload_ref")
     if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
         raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
+    if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
+        raise TaskRecordContractError("media asset fetch complete result 必须包含 raw_payload_ref")
 
     source_trace = envelope.get("source_trace")
     if not isinstance(source_trace, Mapping):

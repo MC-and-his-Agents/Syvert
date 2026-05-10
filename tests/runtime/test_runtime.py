@@ -1092,6 +1092,64 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_max_bytes_violation(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["fetch_policy"]["max_bytes"] = 1
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_degrade(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="source_ref_preserved", fetch_mode="download_required")
+        payload["fetch_policy"]["allow_download"] = True
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_unsupported_content_type_failure(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="mixed_media",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_complete_without_raw_payload_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["raw_payload_ref"] = None
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_unstable_content_type(self) -> None:
         payload = make_media_asset_fetch_result(content_type="mixed_media")
 

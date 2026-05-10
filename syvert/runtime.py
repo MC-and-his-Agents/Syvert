@@ -2753,7 +2753,12 @@ def validate_media_fetch_policy_payload(policy: Any) -> dict[str, Any] | None:
     return None
 
 
-def _media_fetch_policy_allows_outcome(policy: Mapping[str, Any], fetch_outcome: str, content_type: str) -> bool:
+def _media_fetch_policy_allows_outcome(
+    policy: Mapping[str, Any],
+    fetch_outcome: str,
+    content_type: str,
+    byte_size: int | None = None,
+) -> bool:
     allowed_content_types = policy.get("allowed_content_types")
     if not isinstance(allowed_content_types, list) or content_type not in allowed_content_types:
         return False
@@ -2762,8 +2767,12 @@ def _media_fetch_policy_allows_outcome(policy: Mapping[str, Any], fetch_outcome:
     if fetch_outcome == "metadata_only":
         return True
     if fetch_outcome == "source_ref_preserved":
-        return fetch_mode in {"preserve_source_ref", "download_if_allowed", "download_required"}
+        return fetch_mode in {"preserve_source_ref", "download_if_allowed"}
     if fetch_outcome == "downloaded_bytes":
+        max_bytes = policy.get("max_bytes")
+        if isinstance(max_bytes, int) and not isinstance(max_bytes, bool):
+            if not isinstance(byte_size, int) or isinstance(byte_size, bool) or byte_size > max_bytes:
+                return False
         return fetch_mode in {"download_if_allowed", "download_required"} and allow_download is True
     return False
 
@@ -3781,10 +3790,10 @@ def validate_success_payload(
             )
 
         content_type = payload.get("content_type")
-        if not isinstance(content_type, str) or content_type not in MEDIA_ASSET_CONTENT_TYPES:
+        if not isinstance(content_type, str) or not content_type:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
-                "media asset fetch content_type 不在允许范围",
+                "media asset fetch content_type 必须为非空字符串",
                 details={"content_type": content_type},
             )
         policy_error = validate_media_fetch_policy_payload(payload.get("fetch_policy"))
@@ -3808,6 +3817,12 @@ def validate_success_payload(
         fetch_outcome = payload.get("fetch_outcome")
         error_classification = payload.get("error_classification")
         if result_status == "complete":
+            if content_type not in MEDIA_ASSET_CONTENT_TYPES:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch complete result content_type 不在 stable 允许范围",
+                    details={"content_type": content_type},
+                )
             if not isinstance(fetch_outcome, str) or fetch_outcome not in MEDIA_ASSET_FETCH_OUTCOMES:
                 return runtime_contract_error(
                     "invalid_adapter_success_payload",
@@ -3819,16 +3834,6 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch complete result 必须使用 null error_classification",
                     details={"error_classification": error_classification},
-                )
-            if request_cursor is not None and not _media_fetch_policy_allows_outcome(
-                request_policy,
-                fetch_outcome,
-                content_type,
-            ):
-                return runtime_contract_error(
-                    "invalid_adapter_success_payload",
-                    "media asset fetch complete result 不得违反请求 fetch_policy",
-                    details={"fetch_outcome": fetch_outcome, "content_type": content_type},
                 )
         elif result_status == "unavailable":
             if fetch_outcome is not None:
@@ -3869,6 +3874,11 @@ def validate_success_payload(
                 "invalid_adapter_success_payload",
                 "media asset fetch raw_payload_ref 必须为字符串或 null",
             )
+        if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch complete result 必须包含 raw_payload_ref",
+            )
         source_trace_error = _validate_media_asset_fetch_source_trace(payload.get("source_trace"))
         if source_trace_error is not None:
             return source_trace_error
@@ -3883,6 +3893,22 @@ def validate_success_payload(
             )
             if media_error is not None:
                 return media_error
+            byte_size = None
+            if isinstance(media, Mapping) and isinstance(media.get("metadata"), Mapping):
+                value = media["metadata"].get("byte_size")
+                if isinstance(value, int) and not isinstance(value, bool):
+                    byte_size = value
+            if request_cursor is not None and not _media_fetch_policy_allows_outcome(
+                request_policy,
+                fetch_outcome,
+                content_type,
+                byte_size,
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch complete result 不得违反请求 fetch_policy",
+                    details={"fetch_outcome": fetch_outcome, "content_type": content_type},
+                )
         elif media is not None:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
