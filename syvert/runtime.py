@@ -1559,7 +1559,7 @@ def run_adapter_attempt_with_timeout(
                     "operation": payload["operation"],
                     "target": payload["target"],
                     "content_type": payload["content_type"],
-                    "fetch_policy": payload["fetch_policy"],
+                    "fetch_policy": normalize_media_fetch_policy(payload["fetch_policy"]),
                     "fetch_outcome": payload["fetch_outcome"],
                     "result_status": payload["result_status"],
                     "error_classification": payload["error_classification"],
@@ -2732,6 +2732,14 @@ def validate_media_fetch_policy(policy: Mapping[str, Any] | None) -> dict[str, A
         return None
     if not isinstance(policy, Mapping):
         return invalid_input_error("invalid_task_request", "media_fetch_policy 必须是对象或 null")
+    allowed_fields = {"fetch_mode", "allowed_content_types", "allow_download", "max_bytes"}
+    extra_fields = sorted(str(field) for field in policy if field not in allowed_fields)
+    if extra_fields:
+        return invalid_input_error(
+            "invalid_task_request",
+            "media_fetch_policy 只能包含公共白名单字段",
+            details={"fields": tuple(extra_fields)},
+        )
     normalized = normalize_media_fetch_policy(policy)
     fetch_mode = normalized.get("fetch_mode")
     if not isinstance(fetch_mode, str) or fetch_mode not in MEDIA_ASSET_FETCH_MODES:
@@ -3049,6 +3057,13 @@ def _validate_media_asset_fetch_no_storage(
                     "invalid_adapter_success_payload",
                     "media asset fetch downloaded_byte_length 必须与 metadata.byte_size 一致",
                 )
+    else:
+        byte_length = no_storage.get("downloaded_byte_length")
+        if byte_length not in (None, 0):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length",
+            )
     return None
 
 
@@ -3934,6 +3949,18 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch failed result 错误分类不允许",
                     details={"error_classification": error_classification},
+                )
+            allowed_content_types = request_policy.get("allowed_content_types")
+            if (
+                content_type in MEDIA_ASSET_CONTENT_TYPES
+                and isinstance(allowed_content_types, list)
+                and content_type not in allowed_content_types
+                and error_classification != "fetch_policy_denied"
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch 公共 content_type 被请求 policy 排除时必须使用 fetch_policy_denied",
+                    details={"content_type": content_type, "error_classification": error_classification},
                 )
 
         raw_payload_ref = payload.get("raw_payload_ref")

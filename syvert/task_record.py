@@ -1229,6 +1229,9 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     fetch_policy = envelope.get("fetch_policy")
     if not isinstance(fetch_policy, Mapping):
         raise TaskRecordContractError("media asset fetch fetch_policy 必须是对象")
+    allowed_policy_fields = {"fetch_mode", "allowed_content_types", "allow_download", "max_bytes"}
+    if any(field not in allowed_policy_fields for field in fetch_policy):
+        raise TaskRecordContractError("media asset fetch fetch_policy 只能包含公共白名单字段")
     fetch_mode = fetch_policy.get("fetch_mode")
     if fetch_mode not in MEDIA_ASSET_FETCH_MODES:
         raise TaskRecordContractError("media asset fetch fetch_policy.fetch_mode 不在允许范围")
@@ -1404,6 +1407,10 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             byte_size = media["metadata"].get("byte_size")
             if isinstance(byte_size, int) and not isinstance(byte_size, bool) and byte_length != byte_size:
                 raise TaskRecordContractError("media asset fetch downloaded_byte_length 必须与 metadata.byte_size 一致")
+    else:
+        byte_length = no_storage.get("downloaded_byte_length")
+        if byte_length not in (None, 0):
+            raise TaskRecordContractError("media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length")
 
 
 def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:

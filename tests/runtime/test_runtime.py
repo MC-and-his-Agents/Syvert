@@ -1300,6 +1300,51 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_private_fetch_policy(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["fetch_policy"]["provider_route"] = "https://signed.example.invalid/route?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_wrong_policy_denied_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="video",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+        payload["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_non_download_byte_count(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["no_storage"]["downloaded_byte_length"] = 1
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
         for status, classification in (
             ("unavailable", "permission_denied"),
