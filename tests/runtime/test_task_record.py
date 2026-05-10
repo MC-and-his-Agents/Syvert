@@ -448,6 +448,44 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.request.target_type, "media_ref")
         self.assertEqual(restored.request.target_value, "media:asset-001")
 
+    def test_round_trips_media_asset_fetch_parse_failed_record(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-parse",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-parse",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-parse")
+        envelope["content_type"] = "unknown"
+        envelope["fetch_outcome"] = None
+        envelope["result_status"] = "failed"
+        envelope["error_classification"] = "parse_failed"
+        envelope["media"] = None
+        envelope["raw_payload_ref"] = "raw://media-asset-fetch/parse-failed"
+        envelope["task_id"] = "task-record-media-asset-fetch-parse"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+        record = finish_task_record(
+            record,
+            envelope,
+            occurred_at="2026-05-09T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(task_record_to_dict(record))
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.result.envelope["error_classification"], "parse_failed")
+
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

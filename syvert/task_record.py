@@ -1256,6 +1256,9 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     if result_status not in MEDIA_ASSET_RESULT_STATUSES:
         raise TaskRecordContractError("media asset fetch result_status 不在允许范围")
     fetch_outcome = envelope.get("fetch_outcome")
+    raw_payload_ref = envelope.get("raw_payload_ref")
+    if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
+        raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
 
     error_classification = envelope.get("error_classification")
     if result_status == "complete":
@@ -1288,9 +1291,6 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         ):
             raise TaskRecordContractError("media asset fetch 非 stable content_type 必须使用 unsupported_content_type")
 
-    raw_payload_ref = envelope.get("raw_payload_ref")
-    if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
-        raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
     if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
         raise TaskRecordContractError("media asset fetch complete result 必须包含 raw_payload_ref")
     if error_classification == "provider_or_network_blocked" and raw_payload_ref is not None:
