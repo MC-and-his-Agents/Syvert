@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import copy
 from dataclasses import dataclass, replace
 import re
 from typing import Any, Literal
@@ -130,6 +131,7 @@ _FIXTURE_INPUT_FIELD_NAMES = frozenset(
         "capability",
         "collection_mode",
         "operation",
+        "request_cursor",
         "resource_profile_key",
         "target_type",
         "target_value",
@@ -1291,9 +1293,16 @@ def _execute_and_validate_fixture(
     adapter: Any,
 ) -> dict[str, Any]:
     expected_outcome = "success" if fixture.case_type == "success" else "legal_failure"
-    sample = ContractSampleDefinition(sample_id=fixture.fixture_id, expected_outcome=expected_outcome)
     task_id = f"task-{fixture.fixture_id}"
     fixture_input = _normalize_fixture_input(manifest, fixture)
+    validation_request_cursor = _clone_request_cursor(fixture_input["request_cursor"])
+    sample = ContractSampleDefinition(
+        sample_id=fixture.fixture_id,
+        expected_outcome=expected_outcome,
+        target_type=fixture_input["target_type"],
+        target_value=fixture_input["target_value"],
+        request_cursor=validation_request_cursor,
+    )
     core_operation = fixture_input["operation"]
     adapter_capability = fixture_input["capability"]
     resource_profile = _resource_profile_for_fixture(manifest, fixture, fixture_input["resource_profile_key"])
@@ -1311,6 +1320,7 @@ def _execute_and_validate_fixture(
                     target_type=fixture_input["target_type"],
                     target_value=fixture_input["target_value"],
                     collection_mode=fixture_input["collection_mode"],
+                    request_cursor=_clone_request_cursor(fixture_input["request_cursor"]),
                 ),
                 resource_bundle=resource_bundle,
             )
@@ -1320,6 +1330,9 @@ def _execute_and_validate_fixture(
             adapter_key=manifest.adapter_key,
             capability=core_operation,
             payload=payload,
+            target_type=fixture_input["target_type"],
+            target_value=fixture_input["target_value"],
+            request_cursor=validation_request_cursor,
         )
     except PlatformAdapterError as error:
         details = _normalize_platform_adapter_error_details(error)
@@ -1365,6 +1378,9 @@ def _build_success_runtime_envelope(
     adapter_key: str,
     capability: str,
     payload: Any,
+    target_type: str | None = None,
+    target_value: str | None = None,
+    request_cursor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     envelope = {
         "task_id": task_id,
@@ -1373,13 +1389,22 @@ def _build_success_runtime_envelope(
         "status": "success",
     }
     if isinstance(payload, Mapping):
-        payload_error = validate_success_payload(payload)
+        inferred_target_type, inferred_target_value = _success_payload_target_context(payload)
+        payload_error = validate_success_payload(
+            payload,
+            capability=capability,
+            target_type=target_type or inferred_target_type,
+            target_value=target_value or inferred_target_value,
+            request_cursor=_clone_request_cursor(request_cursor),
+        )
         if payload_error is not None:
             return {
                 **envelope,
                 "status": "failed",
                 "error": payload_error,
             }
+        if _is_collection_success_payload(payload):
+            return {**envelope, **dict(payload)}
         return {
             **envelope,
             "raw": payload["raw"],
@@ -1389,6 +1414,26 @@ def _build_success_runtime_envelope(
         **envelope,
         "non_mapping_payload_type": type(payload).__name__,
     }
+
+
+def _is_collection_success_payload(payload: Mapping[str, Any]) -> bool:
+    return isinstance(payload.get("target"), Mapping) and "items" in payload
+
+
+def _success_payload_target_context(payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    target = payload.get("target")
+    if isinstance(target, Mapping):
+        target_type = target.get("target_type")
+        target_ref = target.get("target_ref")
+        return (
+            target_type if isinstance(target_type, str) else None,
+            target_ref if isinstance(target_ref, str) else None,
+        )
+    normalized = payload.get("normalized")
+    if isinstance(normalized, Mapping):
+        target_value = normalized.get("canonical_url")
+        return "url", target_value if isinstance(target_value, str) else None
+    return None, None
 
 
 def _normalize_platform_adapter_error_details(error: PlatformAdapterError) -> dict[str, Any]:
@@ -1799,6 +1844,18 @@ def _validate_success_payload_observation(
     result: dict[str, Any],
 ) -> dict[str, Any]:
     expected_target_value = fixture.input["target_value"]
+    target_payload = runtime_envelope.get("target")
+    if isinstance(target_payload, Mapping):
+        if target_payload.get("target_ref") != expected_target_value:
+            return {
+                **result,
+                "verdict": "contract_violation",
+                "reason": {
+                    "code": "success_payload_target_mismatch",
+                    "message": "success payload target.target_ref must bind to fixture target_value",
+                },
+            }
+        return result
     raw_payload = runtime_envelope.get("raw")
     normalized_payload = runtime_envelope.get("normalized")
     raw_canonical_url = raw_payload.get("canonical_url") if isinstance(raw_payload, Mapping) else None
@@ -1817,10 +1874,16 @@ def _validate_success_payload_observation(
     return result
 
 
+def _clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if request_cursor is None:
+        return None
+    return copy.deepcopy(request_cursor)
+
+
 def _normalize_fixture_input(
     manifest: ThirdPartyAdapterManifest,
     fixture: AdapterContractFixture,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     input_mapping = fixture.input
     fixture_input = {
         "operation": _require_non_empty_string(
@@ -1854,6 +1917,14 @@ def _normalize_fixture_input(
             field="input.resource_profile_key",
         ),
     }
+    request_cursor = input_mapping.get("request_cursor")
+    if request_cursor is not None and not isinstance(request_cursor, Mapping):
+        raise ThirdPartyContractEntryError(
+            "invalid_fixture_input",
+            "fixture input.request_cursor must be null or a mapping",
+            details={"fixture_id": fixture.fixture_id, "field": "input.request_cursor"},
+        )
+    fixture_input["request_cursor"] = request_cursor
     if fixture_input["capability"] not in manifest.supported_capabilities:
         raise ThirdPartyContractEntryError(
             "invalid_fixture_input_metadata",

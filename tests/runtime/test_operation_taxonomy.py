@@ -75,6 +75,25 @@ class OperationTaxonomyTests(unittest.TestCase):
             )
         )
 
+    def test_stable_comment_collection_lookup_returns_runtime_entry(self) -> None:
+        entry = stable_operation_entry(
+            operation="comment_collection",
+            target_type="content",
+            collection_mode="paginated",
+        )
+
+        self.assertEqual(entry.capability_family, "comment_collection")
+        self.assertTrue(entry.runtime_delivery)
+        self.assertEqual(entry.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertEqual(entry.contract_refs, ("FR-0404",))
+        self.assertTrue(
+            is_stable_operation(
+                operation="comment_collection",
+                target_type="content",
+                collection_mode="paginated",
+            )
+        )
+
     def test_proposed_candidates_are_registered_but_not_stable_runtime_operations(self) -> None:
         proposed_operations = {entry.operation for entry in proposed_operation_taxonomy_entries()}
 
@@ -83,7 +102,6 @@ class OperationTaxonomyTests(unittest.TestCase):
             {
                 "content_search",
                 "content_list",
-                "comment_collection",
                 "creator_profile",
                 "media_asset_fetch",
                 "media_upload",

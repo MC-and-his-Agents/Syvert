@@ -145,6 +145,22 @@ STABLE_CONTENT_LIST_BY_CREATOR_ENTRY = OperationTaxonomyEntry(
     notes=("v1.3.0 runtime contract frozen; collection continuation + envelope shared shape.",),
 )
 
+STABLE_COMMENT_COLLECTION_ENTRY = OperationTaxonomyEntry(
+    capability_family="comment_collection",
+    operation="comment_collection",
+    target_type="content",
+    execution_mode="single",
+    collection_mode="paginated",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0404",),
+    admission_evidence_refs=(
+        "tests.runtime.test_comment_collection",
+        "tests.runtime.test_operation_taxonomy",
+    ),
+    notes=("v1.4.0 comment collection runtime contract frozen; comment-specific hierarchy and visibility surface.",),
+)
+
 PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
     OperationTaxonomyEntry(
         capability_family="content_search",
@@ -162,18 +178,6 @@ PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
         capability_family="content_list",
         operation="content_list",
         target_type="collection",
-        execution_mode="single",
-        collection_mode="paginated",
-        lifecycle=CAPABILITY_LIFECYCLE_PROPOSED,
-        runtime_delivery=False,
-        contract_refs=("FR-0368",),
-        admission_evidence_refs=(),
-        notes=("reserved candidate only; no v1.1 runtime capability",),
-    ),
-    OperationTaxonomyEntry(
-        capability_family="comment_collection",
-        operation="comment_collection",
-        target_type="content",
         execution_mode="single",
         collection_mode="paginated",
         lifecycle=CAPABILITY_LIFECYCLE_PROPOSED,
@@ -272,6 +276,7 @@ DEFAULT_OPERATION_TAXONOMY = (
     STABLE_CONTENT_DETAIL_ENTRY,
     STABLE_CONTENT_SEARCH_BY_KEYWORD_ENTRY,
     STABLE_CONTENT_LIST_BY_CREATOR_ENTRY,
+    STABLE_COMMENT_COLLECTION_ENTRY,
     *PROPOSED_OPERATION_TAXONOMY_ENTRIES,
 )
 

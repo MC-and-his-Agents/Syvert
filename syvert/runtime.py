@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import queue
@@ -22,10 +23,16 @@ from syvert.registry import (
 from syvert.resource_capability_evidence import approved_resource_capability_ids
 from syvert.operation_taxonomy import stable_operation_entry
 from syvert.read_side_collection import (
+    COMMENT_COLLECTION_OPERATION,
+    CommentRequestCursor,
     CollectionContractError,
     READ_SIDE_COLLECTION_OPERATIONS,
+    comment_collection_result_envelope_from_dict,
+    comment_collection_result_envelope_to_dict,
+    comment_request_cursor_to_dict,
     collection_result_envelope_from_dict,
     collection_result_envelope_to_dict,
+    validate_comment_request_cursor,
 )
 from syvert.task_record import (
     TaskRecord,
@@ -45,18 +52,21 @@ from syvert.task_record_store import (
 CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_SEARCH_BY_KEYWORD = "content_search_by_keyword"
 CONTENT_LIST_BY_CREATOR = "content_list_by_creator"
+COMMENT_COLLECTION = COMMENT_COLLECTION_OPERATION
 CONTENT_DETAIL = "content_detail"
 CONTENT_SEARCH = "content_search"
 CONTENT_LIST = "content_list"
+COMMENT_COLLECTION_FAMILY = "comment_collection"
 LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
-ALLOWED_TARGET_TYPES = frozenset({"url", "content_id", "creator", "creator_id", "keyword"})
+ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword"})
 ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {
     CONTENT_DETAIL_BY_URL: CONTENT_DETAIL,
     CONTENT_SEARCH_BY_KEYWORD: CONTENT_SEARCH,
     CONTENT_LIST_BY_CREATOR: CONTENT_LIST,
+    COMMENT_COLLECTION: COMMENT_COLLECTION_FAMILY,
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
@@ -80,7 +90,7 @@ EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID = "execution_control_stat
 EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
 EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
-_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST})
+_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY})
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 _EXECUTION_CONCURRENCY_LOCK = threading.Lock()
 _EXECUTION_CONCURRENCY_IN_FLIGHT: dict[tuple[str, ...], int] = {}
@@ -95,9 +105,11 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class TaskInput:
     url: str | None = None
+    content_ref: str | None = None
     keyword: str | None = None
     creator_id: str | None = None
     continuation_token: str | None = None
+    comment_request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +163,7 @@ class CoreTaskRequest:
     target: InputTarget
     policy: CollectionPolicy
     execution_control_policy: ExecutionControlPolicy | None = None
+    request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -167,6 +180,7 @@ class AdapterTaskRequest:
     target_type: str
     target_value: str
     collection_mode: str
+    request_cursor: Mapping[str, Any] | None = None
 
     @property
     def input(self) -> TaskInput:
@@ -174,6 +188,8 @@ class AdapterTaskRequest:
             return TaskInput(url=self.target_value)
         if self.target_type == "keyword":
             return TaskInput(keyword=self.target_value)
+        if self.target_type == "content":
+            return TaskInput(content_ref=self.target_value, comment_request_cursor=self.request_cursor)
         if self.target_type == "creator":
             return TaskInput(creator_id=self.target_value)
         return TaskInput()
@@ -252,6 +268,129 @@ class AdapterAttemptResult:
     attempt_outcome_ref: dict[str, Any] | None
     execution_control_event: dict[str, Any] | None = None
     core_timeout_outcome: bool = False
+
+
+def comment_collection_request_error_envelope(
+    request: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    contract_error: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if capability != COMMENT_COLLECTION:
+        return None
+    if isinstance(request, TaskRequest) and type(request.input) is TaskInput:
+        target_ref = request.input.content_ref
+    elif isinstance(request, CoreTaskRequest) and request.target.capability == COMMENT_COLLECTION:
+        if request.target.target_type != "content" or request.policy.collection_mode != PAGINATED_COLLECTION_MODE:
+            return None
+        target_ref = request.target.target_value
+    else:
+        return None
+    if not isinstance(target_ref, str) or not target_ref:
+        return None
+    error_code = contract_error.get("code")
+    if error_code not in {"signature_or_request_invalid", "cursor_invalid_or_expired", "parse_failed"}:
+        return None
+    return {
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability,
+        "status": "success",
+        "operation": COMMENT_COLLECTION,
+        "target": {
+            "operation": COMMENT_COLLECTION,
+            "target_type": "content",
+            "target_ref": target_ref,
+        },
+        "items": [],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "complete",
+        "error_classification": str(error_code),
+        "raw_payload_ref": f"failure://comment_collection/{error_code}",
+        "source_trace": {
+            "adapter_key": adapter_key,
+            "provider_path": "core.runtime",
+            "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "evidence_alias": f"comment_collection_request_cursor_{error_code}",
+        },
+        "audit": {
+            "fail_closed": True,
+            "failure_phase": "request_cursor_validation",
+        },
+    }
+
+
+def finalize_pre_admission_comment_collection_result(
+    request: Any,
+    *,
+    task_id: str,
+    adapter_key: str,
+    capability: str,
+    envelope: dict[str, Any],
+    task_record_store: TaskRecordStore | None,
+) -> TaskExecutionResult:
+    target_type = envelope["target"]["target_type"]
+    target_value = envelope["target"]["target_ref"]
+    snapshot_request = CoreTaskRequest(
+        target=InputTarget(
+            adapter_key=adapter_key,
+            capability=capability,
+            target_type=target_type,
+            target_value=target_value,
+        ),
+        policy=CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+        execution_control_policy=request.execution_control_policy if isinstance(request, (TaskRequest, CoreTaskRequest)) else None,
+    )
+    try:
+        record = create_task_record(task_id, build_task_request_snapshot(snapshot_request))
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="accepted",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        record = persisted_record or record
+        record = start_task_record(record)
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="running",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        record = persisted_record or record
+        record = finish_task_record(record, envelope)
+        persisted_record, persistence_error = persist_task_record(
+            task_id,
+            adapter_key,
+            capability,
+            record,
+            stage="completion",
+            task_record_store=task_record_store,
+        )
+        if persistence_error is not None:
+            return persistence_error
+        return TaskExecutionResult(envelope, persisted_record or record)
+    except TaskRecordContractError as error:
+        return TaskExecutionResult(
+            failure_envelope(
+                task_id,
+                adapter_key,
+                capability,
+                runtime_contract_error("invalid_task_record", str(error)),
+            ),
+            None,
+        )
 
 
 @dataclass(frozen=True)
@@ -336,6 +475,22 @@ def execute_task_internal(
 
     normalized_request, contract_error = normalize_request(request)
     if contract_error is not None:
+        comment_fail_closed = comment_collection_request_error_envelope(
+            request,
+            task_id=task_id,
+            adapter_key=adapter_key,
+            capability=capability,
+            contract_error=contract_error,
+        )
+        if comment_fail_closed is not None:
+            return finalize_pre_admission_comment_collection_result(
+                request,
+                task_id=task_id,
+                adapter_key=adapter_key,
+                capability=capability,
+                envelope=comment_fail_closed,
+                task_record_store=store,
+            )
         return TaskExecutionResult(pre_accepted_failure_envelope(task_id, adapter_key, capability, contract_error), None)
     if normalized_request is None:
         return TaskExecutionResult(
@@ -469,42 +624,75 @@ def execute_task_internal(
             None,
         )
 
-    resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
-    if resource_requirement_declaration is None:
-        return TaskExecutionResult(
-            pre_accepted_failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                invalid_resource_requirement_error(
-                    f"adapter `{adapter_key}` 缺少 `{capability_family}` 的资源需求声明",
-                    details={"adapter_key": adapter_key, "capability": capability_family},
-                ),
-            ),
-            None,
+    if capability == COMMENT_COLLECTION:
+        cursor_error = validate_comment_request_cursor(
+            normalized_request.request_cursor,
+            target_ref=normalized_request.target.target_value,
         )
-
-    try:
-        available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
-        matcher_input = validate_resource_capability_matcher_input(
-            ResourceCapabilityMatcherInput(
+        if cursor_error is not None:
+            comment_fail_closed = comment_collection_request_error_envelope(
+                normalized_request,
                 task_id=task_id,
                 adapter_key=adapter_key,
-                capability=capability_family,
-                requirement_declaration=resource_requirement_declaration,
-                available_resource_capabilities=available_resource_capabilities,
+                capability=capability,
+                contract_error=invalid_input_error(
+                    cursor_error["code"],
+                    cursor_error["message"],
+                    details=cursor_error.get("details", {}),
+                ),
             )
-        )
-    except ResourceCapabilityMatcherContractError as error:
-        return TaskExecutionResult(
-            pre_accepted_failure_envelope(
-                task_id,
-                adapter_key,
-                capability,
-                invalid_resource_requirement_error(error.message, details=error.details),
-            ),
-            None,
-        )
+            if comment_fail_closed is not None:
+                return finalize_pre_admission_comment_collection_result(
+                    normalized_request,
+                    task_id=task_id,
+                    adapter_key=adapter_key,
+                    capability=capability,
+                    envelope=comment_fail_closed,
+                    task_record_store=store,
+                )
+
+    required_resource_slots = RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE.get(
+        (normalized_request.target.capability, normalized_request.policy.collection_mode),
+        (),
+    )
+    matcher_input: ResourceCapabilityMatcherInput | None = None
+    if required_resource_slots:
+        resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
+        if resource_requirement_declaration is None:
+            return TaskExecutionResult(
+                pre_accepted_failure_envelope(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    invalid_resource_requirement_error(
+                        f"adapter `{adapter_key}` 缺少 `{capability_family}` 的资源需求声明",
+                        details={"adapter_key": adapter_key, "capability": capability_family},
+                    ),
+                ),
+                None,
+            )
+
+        try:
+            available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
+            matcher_input = validate_resource_capability_matcher_input(
+                ResourceCapabilityMatcherInput(
+                    task_id=task_id,
+                    adapter_key=adapter_key,
+                    capability=capability_family,
+                    requirement_declaration=resource_requirement_declaration,
+                    available_resource_capabilities=available_resource_capabilities,
+                )
+            )
+        except ResourceCapabilityMatcherContractError as error:
+            return TaskExecutionResult(
+                pre_accepted_failure_envelope(
+                    task_id,
+                    adapter_key,
+                    capability,
+                    invalid_resource_requirement_error(error.message, details=error.details),
+                ),
+                None,
+            )
 
     adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
     if projection_error is not None:
@@ -512,6 +700,9 @@ def execute_task_internal(
             pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_error),
             None,
         )
+    request_cursor_validation_snapshot = (
+        clone_request_cursor(normalized_request.request_cursor) if capability == COMMENT_COLLECTION else None
+    )
 
     execution_control_policy = normalized_request.execution_control_policy
     if execution_control_policy is None:
@@ -670,8 +861,8 @@ def execute_task_internal(
     if persisted_record is not None:
         record = persisted_record
 
-    match_result = match_resource_capabilities(matcher_input)
-    if match_result.match_status == MATCH_STATUS_UNMATCHED:
+    match_result = match_resource_capabilities(matcher_input) if matcher_input is not None else None
+    if match_result is not None and match_result.match_status == MATCH_STATUS_UNMATCHED:
         release_failure = release_admission_guard_or_failure("resource_capability_match")
         if release_failure is not None:
             return finalize_task_execution_result(
@@ -712,6 +903,7 @@ def execute_task_internal(
         adapter_key=adapter_key,
         capability=capability,
         adapter_request=adapter_request,
+        request_cursor_validation_snapshot=request_cursor_validation_snapshot,
         adapter=adapter_declaration.adapter,
         policy=execution_control_policy,
         initial_admission_guard=admission_guard,
@@ -754,6 +946,7 @@ def execute_controlled_adapter_attempts(
     adapter_key: str,
     capability: str,
     adapter_request: AdapterTaskRequest,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     adapter: Any,
     policy: ExecutionControlPolicy,
     initial_admission_guard: ExecutionConcurrencyAdmissionGuard,
@@ -775,6 +968,7 @@ def execute_controlled_adapter_attempts(
             adapter_key=adapter_key,
             capability=capability,
             adapter_request=adapter_request,
+            request_cursor_validation_snapshot=request_cursor_validation_snapshot,
             adapter=adapter,
             policy=policy,
             attempt_index=attempt_index,
@@ -938,6 +1132,7 @@ def execute_single_controlled_adapter_attempt(
     adapter_key: str,
     capability: str,
     adapter_request: AdapterTaskRequest,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     adapter: Any,
     policy: ExecutionControlPolicy,
     attempt_index: int,
@@ -1135,6 +1330,7 @@ def execute_single_controlled_adapter_attempt(
             capability=capability,
             adapter=adapter,
             adapter_context=adapter_context,
+            request_cursor_validation_snapshot=request_cursor_validation_snapshot,
             timeout_ms=policy.timeout.timeout_ms,
             resource_bundle=resource_bundle,
             slot=slot,
@@ -1171,6 +1367,7 @@ def run_adapter_attempt_with_timeout(
     capability: str,
     adapter: Any,
     adapter_context: AdapterExecutionContext,
+    request_cursor_validation_snapshot: Mapping[str, Any] | None,
     timeout_ms: int,
     resource_bundle: Any,
     slot: ExecutionConcurrencySlot | None,
@@ -1283,6 +1480,7 @@ def run_adapter_attempt_with_timeout(
             capability=capability,
             target_type=adapter_context.target_type,
             target_value=adapter_context.target_value,
+            request_cursor=request_cursor_validation_snapshot,
         )
         if payload_error is not None:
             return failure_envelope(task_id, adapter_key, capability, payload_error), None, DEFAULT_FAILURE_RELEASE_REASON, False, False
@@ -1300,6 +1498,10 @@ def run_adapter_attempt_with_timeout(
         }
         if capability in READ_SIDE_COLLECTION_OPERATIONS:
             success_envelope.update(collection_result_envelope_to_dict(collection_result_envelope_from_dict(payload)))
+        elif capability == COMMENT_COLLECTION:
+            success_envelope.update(
+                comment_collection_result_envelope_to_dict(comment_collection_result_envelope_from_dict(payload))
+            )
         else:
             success_envelope.update({"raw": payload["raw"], "normalized": payload["normalized"]})
         return (success_envelope, disposition_hint, default_release_reason, False, False)
@@ -2289,6 +2491,7 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
                 target=target,
                 policy=policy,
                 execution_control_policy=execution_control_policy,
+                request_cursor=request.input.comment_request_cursor if request.capability == COMMENT_COLLECTION else None,
             ),
             None,
         )
@@ -2323,6 +2526,7 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
             target=request.target,
             policy=request.policy,
             execution_control_policy=execution_control_policy,
+            request_cursor=request.request_cursor,
         ),
         None,
     )
@@ -2396,9 +2600,18 @@ def project_to_adapter_request(
             target_type=request.target.target_type,
             target_value=request.target.target_value,
             collection_mode=request.policy.collection_mode,
+            request_cursor=clone_request_cursor(request.request_cursor) if request.target.capability == COMMENT_COLLECTION else None,
         ),
         None,
     )
+
+
+def clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if request_cursor is None:
+        return None
+    if isinstance(request_cursor, CommentRequestCursor):
+        return comment_request_cursor_to_dict(request_cursor)
+    return copy.deepcopy(request_cursor)
 
 
 def validate_projection_axes_for_current_runtime(request: CoreTaskRequest) -> dict[str, Any] | None:
@@ -2480,6 +2693,23 @@ def _project_task_input_to_target(
             )
         return (
             InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=input_value.creator_id),
+            CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+            None,
+        )
+    if capability == COMMENT_COLLECTION:
+        if not isinstance(input_value.content_ref, str) or not input_value.content_ref:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="content", target_value=""),
+                CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.content_ref 不能为空"),
+            )
+        return (
+            InputTarget(
+                adapter_key=adapter_key,
+                capability=capability,
+                target_type="content",
+                target_value=input_value.content_ref,
+            ),
             CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
             None,
         )
@@ -2948,9 +3178,10 @@ def settle_managed_resource_bundle(
 def validate_success_payload(
     payload: Mapping[str, Any],
     *,
-    capability: str,
-    target_type: str,
-    target_value: str,
+    capability: str | None = None,
+    target_type: str | None = None,
+    target_value: str | None = None,
+    request_cursor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not isinstance(payload, Mapping):
         return runtime_contract_error(
@@ -2958,6 +3189,11 @@ def validate_success_payload(
             "adapter 成功结果必须是对象",
         )
     if capability in READ_SIDE_COLLECTION_OPERATIONS:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "collection success validation requires target_type and target_value",
+            )
         try:
             envelope = collection_result_envelope_from_dict(payload)
         except CollectionContractError as error:
@@ -2984,6 +3220,89 @@ def validate_success_payload(
                 "collection result.target.target_ref 必须与请求 target_value 一致",
                 details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
             )
+        return None
+    if capability == COMMENT_COLLECTION:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection success validation requires target_type and target_value",
+            )
+        try:
+            envelope = comment_collection_result_envelope_from_dict(payload)
+        except CollectionContractError as error:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                error.message,
+                details={"reason": error.code, **error.details},
+            )
+        if envelope.operation != capability:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.operation 必须与请求 capability 一致",
+                details={"operation": envelope.operation, "capability": capability},
+            )
+        if envelope.target.target_type != target_type:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.target.target_type 必须与请求一致",
+                details={"target_type": envelope.target.target_type, "expected_target_type": target_type},
+            )
+        if envelope.target.target_ref != target_value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "comment collection result.target.target_ref 必须与请求 target_value 一致",
+                details={"target_ref": envelope.target.target_ref, "expected_target_ref": target_value},
+            )
+        cursor_thread_ref = _comment_request_cursor_thread_ref(request_cursor)
+        if cursor_thread_ref is None and _comment_request_cursor_is_top_level_page(request_cursor):
+            if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is not None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "top-level comment page cursor 不得切换为 reply thread continuation",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    },
+                )
+        if cursor_thread_ref is not None:
+            if envelope.next_continuation is not None and envelope.next_continuation.resume_comment_ref is None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection next_continuation 必须保留请求 cursor 的 comment thread",
+                    details={
+                        "reason": "invalid_comment_collection_contract",
+                        "resume_comment_ref": cursor_thread_ref,
+                    },
+                )
+            drifted_items = tuple(
+                item.normalized.canonical_ref
+                for item in envelope.items
+                if not _comment_item_binds_resume_comment_ref(item, cursor_thread_ref)
+            )
+            if drifted_items:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection result items 必须绑定请求 cursor 的 comment thread",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": cursor_thread_ref,
+                        "drifted_item_refs": drifted_items,
+                    },
+                )
+            if (
+                envelope.next_continuation is not None
+                and envelope.next_continuation.resume_comment_ref is not None
+                and envelope.next_continuation.resume_comment_ref != cursor_thread_ref
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "comment collection next_continuation 必须绑定请求 cursor 的 comment thread",
+                    details={
+                        "reason": "cursor_invalid_or_expired",
+                        "resume_comment_ref": cursor_thread_ref,
+                        "next_resume_comment_ref": envelope.next_continuation.resume_comment_ref,
+                    },
+                )
         return None
 
     if "raw" not in payload or "normalized" not in payload:
@@ -3105,6 +3424,60 @@ def validate_success_payload(
             "normalized.media.image_urls 必须是字符串数组",
         )
 
+    return None
+
+
+def _comment_item_binds_resume_comment_ref(item: Any, resume_comment_ref: str) -> bool:
+    normalized = item.normalized
+    return (
+        normalized.root_comment_ref == resume_comment_ref
+        or normalized.parent_comment_ref == resume_comment_ref
+        or (
+            normalized.parent_comment_ref != normalized.root_comment_ref
+            and normalized.target_comment_ref == resume_comment_ref
+        )
+    )
+
+
+def _comment_request_cursor_is_top_level_page(request_cursor: Any | None) -> bool:
+    if request_cursor is None:
+        return True
+    if isinstance(request_cursor, Mapping):
+        page_continuation = request_cursor.get("page_continuation")
+        reply_cursor = request_cursor.get("reply_cursor")
+    else:
+        page_continuation = getattr(request_cursor, "page_continuation", None)
+        reply_cursor = getattr(request_cursor, "reply_cursor", None)
+    if reply_cursor is not None:
+        return False
+    if page_continuation is None:
+        return True
+    if isinstance(page_continuation, Mapping):
+        value = page_continuation.get("resume_comment_ref")
+    else:
+        value = getattr(page_continuation, "resume_comment_ref", None)
+    return value is None
+
+
+def _comment_request_cursor_thread_ref(request_cursor: Any | None) -> str | None:
+    if isinstance(request_cursor, Mapping):
+        reply_cursor = request_cursor.get("reply_cursor")
+        page_continuation = request_cursor.get("page_continuation")
+    else:
+        reply_cursor = getattr(request_cursor, "reply_cursor", None)
+        page_continuation = getattr(request_cursor, "page_continuation", None)
+    if isinstance(reply_cursor, Mapping):
+        value = reply_cursor.get("resume_comment_ref")
+        return value if isinstance(value, str) and value else None
+    value = getattr(reply_cursor, "resume_comment_ref", None)
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(page_continuation, Mapping):
+        value = page_continuation.get("resume_comment_ref")
+        return value if isinstance(value, str) and value else None
+    value = getattr(page_continuation, "resume_comment_ref", None)
+    if isinstance(value, str) and value:
+        return value
     return None
 
 

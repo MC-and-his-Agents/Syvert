@@ -129,6 +129,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             {
                 entry.evidence_ref: (entry.source_file, entry.source_symbol)
                 for entry in frozen_evidence_reference_entries()
+                if entry.evidence_ref.startswith("fr-0015:")
             },
         )
 
@@ -329,7 +330,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             return original_read_text(path_obj, *args, **kwargs)
 
         with mock.patch("pathlib.Path.read_text", autospec=True, side_effect=fake_read_text):
-            with self.assertRaisesRegex(ValueError, "must not duplicate adapter/candidate rows"):
+            with self.assertRaisesRegex(ValueError, "must not duplicate adapter/capability/candidate rows"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_validate_fails_closed_when_formal_research_execution_path_duplicates_key(self) -> None:
@@ -355,7 +356,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
     def test_canonical_records_freeze_shared_adapter_only_and_rejected_outcomes(self) -> None:
         self.assertEqual(
             {
-                (record.adapter_key, record.candidate_abstract_capability): (
+                (record.adapter_key, record.capability, record.candidate_abstract_capability): (
                     record.resource_signals,
                     record.shared_status,
                     record.decision,
@@ -364,7 +365,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                 for record in frozen_dual_reference_resource_capability_evidence_records()
             },
             {
-                ("xhs", "account"): (
+                ("xhs", "content_detail", "account"): (
                     (
                         "runtime_requested_slots=account,proxy",
                         "adapter_consumes_account_material=cookies,user_agent,sign_base_url,timeout_seconds",
@@ -376,7 +377,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                         "fr-0015:xhs:content-detail:url:hybrid:account-material",
                     ),
                 ),
-                ("douyin", "account"): (
+                ("douyin", "content_detail", "account"): (
                     (
                         "runtime_requested_slots=account,proxy",
                         "adapter_consumes_account_material=cookies,user_agent,verify_fp,ms_token,webid,sign_base_url,timeout_seconds",
@@ -388,7 +389,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                         "fr-0015:douyin:content-detail:url:hybrid:account-material",
                     ),
                 ),
-                ("xhs", "proxy"): (
+                ("xhs", "content_detail", "proxy"): (
                     (
                         "runtime_requested_slots=account,proxy",
                         "regression_seeded_resources=account,proxy",
@@ -400,7 +401,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                         "fr-0015:regression:xhs:managed-proxy-seed",
                     ),
                 ),
-                ("douyin", "proxy"): (
+                ("douyin", "content_detail", "proxy"): (
                     (
                         "runtime_requested_slots=account,proxy",
                         "regression_seeded_resources=account,proxy",
@@ -412,85 +413,85 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
                         "fr-0015:regression:douyin:managed-proxy-seed",
                     ),
                 ),
-                ("douyin", "verify_fp"): (
+                ("douyin", "content_detail", "verify_fp"): (
                     ("adapter_private_account_field=verify_fp",),
                     "adapter_only",
                     "keep_adapter_local",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "ms_token"): (
+                ("douyin", "content_detail", "ms_token"): (
                     ("adapter_private_account_field=ms_token",),
                     "adapter_only",
                     "keep_adapter_local",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "webid"): (
+                ("douyin", "content_detail", "webid"): (
                     ("adapter_private_account_field=webid",),
                     "adapter_only",
                     "keep_adapter_local",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "a_bogus"): (
+                ("douyin", "content_detail", "a_bogus"): (
                     ("adapter_private_request_token=a_bogus",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:douyin:content-detail:url:hybrid:request-signature-token",),
                 ),
-                ("xhs", "xsec_token"): (
+                ("xhs", "content_detail", "xsec_token"): (
                     ("adapter_private_request_token=xsec_token",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
                 ),
-                ("xhs", "xsec_source"): (
+                ("xhs", "content_detail", "xsec_source"): (
                     ("adapter_private_request_token=xsec_source",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:url-request-tokens",),
                 ),
-                ("xhs", "sign_base_url"): (
+                ("xhs", "content_detail", "sign_base_url"): (
                     ("technical_binding_field=sign_base_url",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "sign_base_url"): (
+                ("douyin", "content_detail", "sign_base_url"): (
                     ("technical_binding_field=sign_base_url",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("xhs", "cookies"): (
+                ("xhs", "content_detail", "cookies"): (
                     ("account_material_field=cookies",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "cookies"): (
+                ("douyin", "content_detail", "cookies"): (
                     ("account_material_field=cookies",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("xhs", "user_agent"): (
+                ("xhs", "content_detail", "user_agent"): (
                     ("account_material_field=user_agent",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:account-material",),
                 ),
-                ("douyin", "user_agent"): (
+                ("douyin", "content_detail", "user_agent"): (
                     ("account_material_field=user_agent",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:douyin:content-detail:url:hybrid:account-material",),
                 ),
-                ("xhs", "browser_state"): (
+                ("xhs", "content_detail", "browser_state"): (
                     ("technical_binding_candidate=browser_state",),
                     "rejected",
                     "reject_for_v0_5_0",
                     ("fr-0015:xhs:content-detail:url:hybrid:page-state-fallback",),
                 ),
-                ("douyin", "browser_state"): (
+                ("douyin", "content_detail", "browser_state"): (
                     ("technical_binding_candidate=browser_state",),
                     "rejected",
                     "reject_for_v0_5_0",
@@ -538,7 +539,7 @@ class ResourceCapabilityEvidenceTests(ResourceStoreEnvMixin, unittest.TestCase):
             "_FROZEN_DUAL_REFERENCE_RESOURCE_CAPABILITY_EVIDENCE_RECORDS",
             duplicated_records,
         ):
-            with self.assertRaisesRegex(ValueError, "duplicate candidate/adapter pairs"):
+            with self.assertRaisesRegex(ValueError, "duplicate adapter/capability/candidate triples"):
                 validate_frozen_resource_capability_evidence_contract()
 
     def test_validate_fails_closed_when_negative_candidate_disappears(self) -> None:

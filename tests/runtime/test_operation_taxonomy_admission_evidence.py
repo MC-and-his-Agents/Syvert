@@ -18,36 +18,43 @@ from syvert.operation_taxonomy import (
 from tests.runtime.adapter_provider_compatibility_decision_fixtures import copy_decision_input
 from tests.runtime.operation_taxonomy_admission_fixtures import (
     copy_fake_adapter_admission_manifest,
-    proposed_comment_collection_entry,
     proposed_content_search_entry,
+    stable_comment_collection_entry,
 )
 
 
 class OperationTaxonomyAdmissionEvidenceTests(unittest.TestCase):
-    def test_fake_adapter_can_express_proposed_content_search_and_comment_collection(self) -> None:
+    def test_fake_adapter_can_express_proposed_content_search_and_stable_comment_collection(self) -> None:
         manifest = copy_fake_adapter_admission_manifest()
 
         reports = [validate_operation_taxonomy_entry(entry) for entry in manifest["declared_taxonomy_entries"]]
 
         self.assertEqual([report.status for report in reports], [ADMISSION_STATUS_ADMITTED, ADMISSION_STATUS_ADMITTED])
         self.assertEqual({report.operation for report in reports}, {"content_search", "comment_collection"})
-        self.assertFalse(manifest["execution_contract"]["runtime_delivery_allowed"])
+        self.assertTrue(manifest["execution_contract"]["comment_collection_runtime_delivery_allowed"])
         self.assertFalse(manifest["execution_contract"]["stable_lookup_allowed"])
         self.assertFalse(manifest["execution_contract"]["compatibility_match_allowed"])
 
-    def test_proposed_content_search_and_comment_collection_are_not_stable_runtime_capabilities(self) -> None:
-        for entry in (proposed_content_search_entry(), proposed_comment_collection_entry()):
-            with self.subTest(operation=entry["operation"]):
-                with self.assertRaises(OperationTaxonomyContractError) as raised:
-                    stable_operation_entry(
-                        operation=entry["operation"],
-                        target_type=entry["target_type"],
-                        collection_mode=entry["collection_mode"],
-                    )
+    def test_proposed_content_search_is_not_stable_but_comment_collection_is_runtime_capability(self) -> None:
+        content_search = proposed_content_search_entry()
+        with self.assertRaises(OperationTaxonomyContractError) as raised:
+            stable_operation_entry(
+                operation=content_search["operation"],
+                target_type=content_search["target_type"],
+                collection_mode=content_search["collection_mode"],
+            )
 
-                self.assertEqual(raised.exception.code, ADMISSION_ERROR_NOT_STABLE)
+        self.assertEqual(raised.exception.code, ADMISSION_ERROR_NOT_STABLE)
 
-    def test_proposed_candidate_cannot_make_compatibility_decision_matched(self) -> None:
+        comment = stable_comment_collection_entry()
+        entry = stable_operation_entry(
+            operation=comment["operation"],
+            target_type=comment["target_type"],
+            collection_mode=comment["collection_mode"],
+        )
+        self.assertEqual(entry.contract_refs, ("FR-0404",))
+
+    def test_comment_collection_stable_slice_still_cannot_match_before_consumer_migration(self) -> None:
         input_value = copy_decision_input()
         input_value["requirement"]["capability"] = "comment_collection"
         input_value["requirement"]["execution_requirement"] = {

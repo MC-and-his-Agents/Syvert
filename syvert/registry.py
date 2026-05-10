@@ -81,7 +81,9 @@ _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
         and record.capability == "content_detail"
     )
 )
-_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset({"content_detail", "content_search", "content_list"})
+_ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
+    {"content_detail", "content_search", "content_list", "comment_collection"}
+)
 _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS = frozenset(
     evidence_ref
     for record in _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS

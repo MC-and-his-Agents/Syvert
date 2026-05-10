@@ -6,7 +6,9 @@ import unittest
 from syvert.registry import AdapterResourceRequirementDeclarationV2
 from syvert.runtime import PlatformAdapterError
 from tests.runtime.contract_harness.third_party_entry import (
+    AdapterContractFixture,
     ThirdPartyContractEntryError,
+    _validate_success_payload_observation,
     run_third_party_adapter_contract_test,
     validate_third_party_adapter_manifest,
 )
@@ -197,8 +199,56 @@ class ThirdPartyAdapterContractEntryTests(unittest.TestCase):
             ("adapter_key", "capability", "normalized", "raw", "status", "task_id"),
         )
         self.assertEqual(adapter.last_request_capability, "content_detail")
+        self.assertIsNone(adapter.last_request_cursor)
         self.assertEqual(adapter.last_resource_bundle_capability, "content_detail_by_url")
         self.assertEqual(adapter.last_resource_slots, ("account",))
+
+    def test_fixture_request_cursor_is_passed_to_adapter_request(self) -> None:
+        adapter = ThirdPartyContractFixtureAdapter()
+        fixtures = copy.deepcopy(minimal_third_party_adapter_fixtures())
+        request_cursor = {"page_continuation": {"cursor": "opaque-cursor"}}
+        fixtures[0]["input"]["request_cursor"] = request_cursor
+        fixtures[1]["input"]["request_cursor"] = request_cursor
+
+        results = run_third_party_adapter_contract_test(
+            manifest=minimal_third_party_adapter_manifest(),
+            fixtures=fixtures,
+            adapter=adapter,
+        )
+
+        self.assertEqual(results[0]["verdict"], "pass")
+        self.assertEqual(adapter.last_request_cursor, request_cursor)
+
+    def test_success_observation_accepts_collection_target_carrier(self) -> None:
+        fixture = AdapterContractFixture(
+            fixture_id="comment-collection-success",
+            manifest_ref=THIRD_PARTY_FIXTURE_ADAPTER_KEY,
+            case_type="success",
+            input={
+                "operation": "comment_collection",
+                "capability": "comment_collection",
+                "target_type": "content",
+                "target_value": "content-001",
+                "collection_mode": "paginated",
+                "resource_profile_key": "none",
+                "request_cursor": None,
+            },
+            expected={"status": "success", "required_payload_fields": ("items",)},
+        )
+        result = {
+            "sample_id": "comment-collection-success",
+            "verdict": "pass",
+            "reason": {"code": "success_envelope_observed", "message": "ok"},
+        }
+        runtime_envelope = {
+            "status": "success",
+            "target": {"target_type": "content", "target_ref": "content-001"},
+            "items": [],
+        }
+
+        observed = _validate_success_payload_observation(fixture, runtime_envelope, result)
+
+        self.assertEqual(observed["verdict"], "pass")
 
     def test_manifest_resource_declarations_are_normalized_through_fr0027_profile_proof(self) -> None:
         manifest = validate_third_party_adapter_manifest(minimal_third_party_adapter_manifest())

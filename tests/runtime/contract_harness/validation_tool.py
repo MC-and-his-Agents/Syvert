@@ -23,6 +23,9 @@ _ALLOWED_RUNTIME_ERROR_CATEGORIES = frozenset(
 class ContractSampleDefinition:
     sample_id: str
     expected_outcome: SampleExpectation
+    target_type: str | None = None
+    target_value: str | None = None
+    request_cursor: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -91,7 +94,7 @@ def validate_contract_sample(
         )
 
     if sample.expected_outcome == "success":
-        success_violation = _validate_success_envelope(envelope)
+        success_violation = _validate_success_envelope(envelope, sample=sample)
         if success_violation is None:
             return _build_result(
                 sample_id=sample.sample_id,
@@ -275,7 +278,11 @@ def _build_result(
     return result
 
 
-def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
+def _validate_success_envelope(
+    envelope: Mapping[str, Any],
+    *,
+    sample: ContractSampleDefinition,
+) -> dict[str, str] | None:
     context_error = _validate_runtime_context_fields(envelope)
     if context_error is not None:
         return context_error
@@ -284,13 +291,57 @@ def _validate_success_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | 
             "code": "unexpected_failed_envelope",
             "message": "sample expected success but observed failed envelope",
         }
-    payload_error = validate_success_payload(envelope)
+    payload = _success_payload_from_runtime_envelope(envelope)
+    inferred_target_type, inferred_target_value = _success_payload_target_context(payload)
+    target_type = sample.target_type or inferred_target_type
+    target_value = sample.target_value or inferred_target_value
+    payload_error = validate_success_payload(
+        payload,
+        capability=str(envelope.get("capability", "")),
+        target_type=target_type,
+        target_value=target_value,
+        request_cursor=sample.request_cursor,
+    )
     if payload_error is not None:
         return {
             "code": payload_error["code"],
             "message": payload_error["message"],
         }
     return None
+
+
+def _success_payload_from_runtime_envelope(envelope: Mapping[str, Any]) -> Mapping[str, Any]:
+    if isinstance(envelope.get("target"), Mapping) and "items" in envelope:
+        keys = (
+            "operation",
+            "target",
+            "items",
+            "has_more",
+            "next_continuation",
+            "result_status",
+            "error_classification",
+            "raw_payload_ref",
+            "source_trace",
+            "audit",
+        )
+        return {key: envelope.get(key) for key in keys}
+    return envelope
+
+
+def _success_payload_target_context(payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    target = payload.get("target")
+    if isinstance(target, Mapping):
+        target_type = target.get("target_type")
+        target_ref = target.get("target_ref")
+        return (
+            target_type if isinstance(target_type, str) else None,
+            target_ref if isinstance(target_ref, str) else None,
+        )
+    normalized = payload.get("normalized")
+    if isinstance(normalized, Mapping):
+        target_value = normalized.get("canonical_url")
+        return "url", target_value if isinstance(target_value, str) else None
+    return None, None
 
 
 def _validate_failed_envelope(envelope: Mapping[str, Any]) -> dict[str, str] | None:
