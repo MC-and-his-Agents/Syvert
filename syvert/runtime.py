@@ -656,6 +656,7 @@ def execute_task_internal(
         (normalized_request.target.capability, normalized_request.policy.collection_mode),
         (),
     )
+    runtime_requested_slots: tuple[str, ...] | None = None
     matcher_input: ResourceCapabilityMatcherInput | None = None
     if required_resource_slots:
         resource_requirement_declaration = registry.lookup_resource_requirement(adapter_key, capability_family)
@@ -674,14 +675,17 @@ def execute_task_internal(
             )
 
         try:
-            available_resource_capabilities = resolve_runtime_available_resource_capabilities(normalized_request)
+            runtime_requested_slots = resolve_runtime_requested_resource_slots(
+                resource_requirement_declaration,
+                available_resource_capabilities=required_resource_slots,
+            )
             matcher_input = validate_resource_capability_matcher_input(
                 ResourceCapabilityMatcherInput(
                     task_id=task_id,
                     adapter_key=adapter_key,
                     capability=capability_family,
                     requirement_declaration=resource_requirement_declaration,
-                    available_resource_capabilities=available_resource_capabilities,
+                    available_resource_capabilities=runtime_requested_slots,
                 )
             )
         except ResourceCapabilityMatcherContractError as error:
@@ -908,6 +912,7 @@ def execute_task_internal(
         adapter=adapter_declaration.adapter,
         policy=execution_control_policy,
         initial_admission_guard=admission_guard,
+        runtime_requested_slots=runtime_requested_slots,
         resource_lifecycle_store=resource_lifecycle_store,
         resource_trace_store=resource_trace_store,
     )
@@ -951,6 +956,7 @@ def execute_controlled_adapter_attempts(
     adapter: Any,
     policy: ExecutionControlPolicy,
     initial_admission_guard: ExecutionConcurrencyAdmissionGuard,
+    runtime_requested_slots: tuple[str, ...] | None,
     resource_lifecycle_store: "LocalResourceLifecycleStore | None",
     resource_trace_store: "LocalResourceTraceStore | None",
 ) -> dict[str, Any]:
@@ -974,6 +980,7 @@ def execute_controlled_adapter_attempts(
             policy=policy,
             attempt_index=attempt_index,
             admission_guard=admission_guard,
+            runtime_requested_slots=runtime_requested_slots,
             resource_lifecycle_store=resource_lifecycle_store,
             resource_trace_store=resource_trace_store,
         )
@@ -1138,21 +1145,11 @@ def execute_single_controlled_adapter_attempt(
     policy: ExecutionControlPolicy,
     attempt_index: int,
     admission_guard: ExecutionConcurrencyAdmissionGuard,
+    runtime_requested_slots: tuple[str, ...] | None,
     resource_lifecycle_store: "LocalResourceLifecycleStore | None",
     resource_trace_store: "LocalResourceTraceStore | None",
 ) -> AdapterAttemptResult:
-    requested_slots = resolve_requested_resource_slots(
-        CoreTaskRequest(
-            target=InputTarget(
-                adapter_key=adapter_key,
-                capability=capability,
-                target_type=adapter_request.target_type,
-                target_value=adapter_request.target_value,
-            ),
-            policy=CollectionPolicy(collection_mode=adapter_request.collection_mode),
-            execution_control_policy=policy,
-        )
-    )
+    requested_slots = runtime_requested_slots
     managed_resource_store = None
     managed_trace_store = None
     resource_bundle = None
@@ -1203,7 +1200,7 @@ def execute_single_controlled_adapter_attempt(
         )
 
     try:
-        if requested_slots is not None:
+        if requested_slots:
             managed_resource_store = resource_lifecycle_store or default_runtime_resource_lifecycle_store()
             managed_trace_store = resource_trace_store or default_runtime_resource_trace_store(managed_resource_store)
             acquire_result = acquire_runtime_resource_bundle(
@@ -2926,6 +2923,43 @@ def resolve_runtime_available_resource_capabilities(request: CoreTaskRequest) ->
         adapter_key=request.target.adapter_key,
         capability=CAPABILITY_FAMILY_BY_OPERATION.get(request.target.capability, request.target.capability),
     )
+
+
+def resolve_runtime_requested_resource_slots(
+    requirement_declaration: AdapterResourceRequirementDeclaration | AdapterResourceRequirementDeclarationV2,
+    *,
+    available_resource_capabilities: Iterable[str],
+) -> tuple[str, ...]:
+    available_capabilities = _normalize_available_resource_capabilities(
+        available_resource_capabilities,
+        task_id="",
+        adapter_key=requirement_declaration.adapter_key,
+        capability=requirement_declaration.capability,
+    )
+    if (
+        type(requirement_declaration) is not AdapterResourceRequirementDeclarationV2
+        or requirement_declaration.capability != COMMENT_COLLECTION_FAMILY
+    ):
+        return available_capabilities
+
+    available_set = frozenset(available_capabilities)
+    compatible_profiles = tuple(
+        profile
+        for profile in requirement_declaration.resource_requirement_profiles
+        if profile.resource_dependency_mode == RESOURCE_DEPENDENCY_MODE_NONE
+        or frozenset(profile.required_capabilities).issubset(available_set)
+    )
+    if not compatible_profiles:
+        return available_capabilities
+    selected_profile = sorted(
+        compatible_profiles,
+        key=lambda profile: (
+            len(profile.required_capabilities),
+            profile.required_capabilities,
+            profile.profile_key,
+        ),
+    )[0]
+    return tuple(selected_profile.required_capabilities)
 
 
 def default_runtime_resource_lifecycle_store():

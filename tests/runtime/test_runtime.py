@@ -1135,6 +1135,40 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
         self.assertIsNotNone(adapter.last_request.resource_bundle)
         self.assertEqual(adapter.last_request.resource_bundle.capability, "comment_collection")
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+
+    def test_execute_task_uses_comment_collection_account_only_profile(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-comment-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-comment-collection-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
 
     def test_execute_task_fails_closed_when_comment_collection_resource_pool_is_empty(self) -> None:
         adapter = CommentCollectionAdapter()
