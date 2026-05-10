@@ -13,6 +13,7 @@ import syvert.runtime as runtime_module
 from syvert.adapters.douyin import DouyinAdapter
 from syvert.adapters.xhs import XhsAdapter
 from syvert.registry import (
+    AdapterResourceRequirementDeclaration,
     AdapterResourceRequirementDeclarationV2,
     AdapterResourceRequirementProfile,
     baseline_required_resource_requirement_declaration,
@@ -292,6 +293,21 @@ class CommentCollectionAdapter:
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
+
+
+class V1AccountOnlyCommentCollectionAdapter(CommentCollectionAdapter):
+    resource_requirement_declarations = (
+        AdapterResourceRequirementDeclaration(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            resource_dependency_mode="required",
+            required_capabilities=("account",),
+            evidence_refs=(
+                "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            ),
+        ),
+    )
 
 
 class MutatingCommentCursorAdapter(CommentCollectionAdapter):
@@ -1161,6 +1177,39 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 request,
                 adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-runtime-comment-collection-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
+
+    def test_execute_task_uses_v1_comment_collection_account_only_declaration(self) -> None:
+        adapter = V1AccountOnlyCommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-v1-account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-comment-v1-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-comment-collection-v1-account-only",
                 resource_lifecycle_store=account_only_store,
             )
 

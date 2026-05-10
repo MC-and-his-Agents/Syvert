@@ -2936,11 +2936,10 @@ def resolve_runtime_requested_resource_slots(
         adapter_key=requirement_declaration.adapter_key,
         capability=requirement_declaration.capability,
     )
-    if (
-        type(requirement_declaration) is not AdapterResourceRequirementDeclarationV2
-        or requirement_declaration.capability != COMMENT_COLLECTION_FAMILY
-    ):
+    if requirement_declaration.capability != COMMENT_COLLECTION_FAMILY:
         return available_capabilities
+    if type(requirement_declaration) is not AdapterResourceRequirementDeclarationV2:
+        return tuple(requirement_declaration.required_capabilities)
 
     available_set = frozenset(available_capabilities)
     compatible_profiles = tuple(
