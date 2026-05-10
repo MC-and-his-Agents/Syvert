@@ -1565,7 +1565,6 @@ def run_adapter_attempt_with_timeout(
                     "error_classification": payload["error_classification"],
                     "raw_payload_ref": payload["raw_payload_ref"],
                     "media": payload["media"],
-                    "no_storage": payload["no_storage"],
                     "source_trace": payload["source_trace"],
                     "audit": payload.get("audit", {}),
                 }
@@ -3063,59 +3062,6 @@ def _validate_media_asset_fetch_media(
     return _validate_media_asset_fetch_metadata(media.get("metadata"), fetch_outcome=fetch_outcome)
 
 
-def _validate_media_asset_fetch_no_storage(
-    no_storage: Any,
-    *,
-    fetch_outcome: str | None,
-    media: Any,
-) -> dict[str, Any] | None:
-    if not isinstance(no_storage, Mapping):
-        return runtime_contract_error(
-            "invalid_adapter_success_payload",
-            "media asset fetch no_storage 必须是对象",
-        )
-    allowed_fields = {"stored", "downloaded_byte_length", "retention_policy"}
-    for field in no_storage:
-        if field not in allowed_fields:
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                "media asset fetch no_storage 只能包含公共白名单字段",
-                details={"field": field},
-            )
-    if no_storage.get("stored") is not False:
-        return runtime_contract_error(
-            "invalid_adapter_success_payload",
-            "media asset fetch no_storage.stored 必须为 false",
-        )
-    retention_policy = no_storage.get("retention_policy")
-    if retention_policy is not None:
-        ref_error = _validate_media_ref_value(retention_policy, field="no_storage.retention_policy")
-        if ref_error is not None:
-            return ref_error
-    if fetch_outcome == "downloaded_bytes":
-        byte_length = no_storage.get("downloaded_byte_length")
-        if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                "media asset fetch downloaded_bytes 必须记录非负 downloaded_byte_length",
-            )
-        if isinstance(media, Mapping) and isinstance(media.get("metadata"), Mapping):
-            byte_size = media["metadata"].get("byte_size")
-            if isinstance(byte_size, int) and not isinstance(byte_size, bool) and byte_length != byte_size:
-                return runtime_contract_error(
-                    "invalid_adapter_success_payload",
-                    "media asset fetch downloaded_byte_length 必须与 metadata.byte_size 一致",
-                )
-    else:
-        byte_length = no_storage.get("downloaded_byte_length")
-        if byte_length not in (None, 0):
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                "media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length",
-            )
-    return None
-
-
 def _validate_media_asset_fetch_audit(
     audit: Any,
     *,
@@ -3954,7 +3900,7 @@ def validate_success_payload(
                 "invalid_adapter_success_payload",
                 "media asset fetch result.target 必须是对象",
             )
-        allowed_target_fields = {"operation", "target_type", "media_ref"}
+        allowed_target_fields = {"operation", "target_type", "media_ref", "origin_ref", "policy_ref"}
         for field in target:
             if field not in allowed_target_fields:
                 return runtime_contract_error(
@@ -3990,6 +3936,17 @@ def validate_success_payload(
                 "media asset fetch result.target.media_ref 必须与请求 target_value 一致",
                 details={"target_ref": result_target_ref, "expected_target_ref": target_value},
             )
+        for optional_ref in ("origin_ref", "policy_ref"):
+            value = target.get(optional_ref)
+            if value is not None:
+                ref_error = _validate_media_ref_value(value, field=f"target.{optional_ref}")
+                if ref_error is not None:
+                    return ref_error
+        if "no_storage" in payload:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result 不得包含未规约 no_storage 字段",
+            )
 
         for required_field in (
             "content_type",
@@ -3999,7 +3956,6 @@ def validate_success_payload(
             "error_classification",
             "raw_payload_ref",
             "source_trace",
-            "no_storage",
             "media",
         ):
             if required_field not in payload:
@@ -4191,13 +4147,6 @@ def validate_success_payload(
                 "media asset fetch unavailable/failed result 时 media 必须为 null",
             )
 
-        no_storage_error = _validate_media_asset_fetch_no_storage(
-            payload.get("no_storage"),
-            fetch_outcome=fetch_outcome if isinstance(fetch_outcome, str) else None,
-            media=media,
-        )
-        if no_storage_error is not None:
-            return no_storage_error
         audit_error = _validate_media_asset_fetch_audit(
             payload.get("audit", {}),
             fetch_outcome=fetch_outcome if isinstance(fetch_outcome, str) else None,

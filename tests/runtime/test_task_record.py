@@ -165,11 +165,6 @@ def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dic
             "content_type": "image",
             "metadata": {"mime_type": "image/jpeg", "width": 1200, "height": 900},
         },
-        "no_storage": {
-            "stored": False,
-            "downloaded_byte_length": 0,
-            "retention_policy": "metadata_only",
-        },
         "source_trace": {
             "adapter_key": TEST_ADAPTER_KEY,
             "provider_path": "provider://sanitized",
@@ -485,6 +480,67 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(restored, record)
         self.assertEqual(restored.result.envelope["error_classification"], "parse_failed")
+
+    def test_round_trips_media_asset_fetch_optional_target_refs(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-origin",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-origin",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-origin")
+        envelope["target"]["origin_ref"] = "origin:content-001"
+        envelope["target"]["policy_ref"] = "policy:media-metadata"
+        envelope["task_id"] = "task-record-media-asset-fetch-origin"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+        record = finish_task_record(
+            record,
+            envelope,
+            occurred_at="2026-05-09T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(task_record_to_dict(record))
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.result.envelope["target"]["origin_ref"], "origin:content-001")
+        self.assertEqual(restored.result.envelope["target"]["policy_ref"], "policy:media-metadata")
+
+    def test_rejects_media_asset_fetch_no_storage_field(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-storage",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-storage",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-storage")
+        envelope["no_storage"] = {"stored": False}
+        envelope["task_id"] = "task-record-media-asset-fetch-storage"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+
+        with self.assertRaises(TaskRecordContractError):
+            finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
 
     def test_rejects_media_asset_fetch_record_policy_violation(self) -> None:
         request = TaskRequestSnapshot(

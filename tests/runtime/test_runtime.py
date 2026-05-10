@@ -192,11 +192,6 @@ def make_media_asset_fetch_result(
         "error_classification": error_classification,
         "raw_payload_ref": "raw://media-asset-fetch/asset-001",
         "media": media,
-        "no_storage": {
-            "stored": False,
-            "downloaded_byte_length": 2048 if fetch_outcome == "downloaded_bytes" else 0,
-            "retention_policy": "metadata_only",
-        },
         "source_trace": {
             "adapter_key": TEST_ADAPTER_KEY,
             "provider_path": "provider://sanitized",
@@ -391,7 +386,7 @@ class MediaAssetFetchAdapter:
 class MediaAssetFetchLeakyStorageAdapter(MediaAssetFetchAdapter):
     def execute(self, request: TaskRequest) -> dict[str, object]:
         payload = make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
-        payload["no_storage"]["local_path"] = "forbidden-storage-ref"
+        payload["no_storage"] = {"local_path": "forbidden-storage-ref"}
         return payload
 
 
@@ -1029,8 +1024,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["result_status"], "complete")
         self.assertEqual(result.envelope["fetch_outcome"], "metadata_only")
         self.assertEqual(result.envelope["fetch_policy"], fetch_policy)
-        self.assertFalse(result.envelope["no_storage"]["stored"])
-        self.assertNotIn("local_path", result.envelope["no_storage"])
+        self.assertNotIn("no_storage", result.envelope)
         self.assertEqual(result.task_record.request.target_type, "media_ref")
         self.assertEqual(result.task_record.request.collection_mode, "direct")
         self.assertEqual(adapter.last_request.request.capability, "media_asset_fetch")
@@ -1087,7 +1081,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "failed")
         self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
-        self.assertEqual(result.envelope["error"]["details"]["field"], "local_path")
+        self.assertIn("no_storage", result.envelope["error"]["message"])
 
     def test_execute_task_fails_closed_for_media_asset_fetch_default_policy_download(self) -> None:
         request = TaskRequest(
@@ -1517,19 +1511,6 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
-    def test_validate_success_payload_rejects_media_asset_fetch_non_download_byte_count(self) -> None:
-        payload = make_media_asset_fetch_result()
-        payload["no_storage"]["downloaded_byte_length"] = 1
-
-        result = validate_success_payload(
-            payload,
-            capability="media_asset_fetch_by_ref",
-            target_type="media_ref",
-            target_value="media:asset-001",
-        )
-
-        self.assertEqual(result["code"], "invalid_adapter_success_payload")
-
     def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
         for status, classification in (
             ("unavailable", "permission_denied"),
@@ -1734,9 +1715,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
-    def test_validate_success_payload_rejects_media_asset_fetch_no_storage_private_field(self) -> None:
+    def test_validate_success_payload_rejects_media_asset_fetch_no_storage_field(self) -> None:
         payload = make_media_asset_fetch_result()
-        payload["no_storage"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
+        payload["no_storage"] = {"signed_url": "https://signed.example.invalid/media?token=secret"}
 
         result = validate_success_payload(
             payload,
@@ -1746,6 +1727,20 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_optional_target_refs(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["origin_ref"] = "origin:content-001"
+        payload["target"]["policy_ref"] = "policy:media-metadata"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
 
     def test_validate_success_payload_accepts_comment_collection_runtime_carrier(self) -> None:
         payload = make_comment_collection_result(target_ref="content-001")

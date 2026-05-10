@@ -1234,7 +1234,7 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     target = envelope.get("target")
     if not isinstance(target, Mapping):
         raise TaskRecordContractError("media asset fetch result.target 必须是对象")
-    allowed_target_fields = {"operation", "target_type", "media_ref"}
+    allowed_target_fields = {"operation", "target_type", "media_ref", "origin_ref", "policy_ref"}
     if any(field not in allowed_target_fields for field in target):
         raise TaskRecordContractError("media asset fetch result.target 只能包含公共白名单字段")
     if target.get("operation") != operation:
@@ -1242,6 +1242,12 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     if target.get("target_type") != "media_ref":
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
     _require_sanitized_media_ref(target.get("media_ref"), field="media asset fetch result.target.media_ref")
+    for optional_ref in ("origin_ref", "policy_ref"):
+        value = target.get(optional_ref)
+        if value is not None:
+            _require_sanitized_media_ref(value, field=f"media asset fetch result.target.{optional_ref}")
+    if "no_storage" in envelope:
+        raise TaskRecordContractError("media asset fetch result 不得包含未规约 no_storage 字段")
 
     for required_field in (
         "content_type",
@@ -1251,7 +1257,6 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         "error_classification",
         "raw_payload_ref",
         "source_trace",
-        "no_storage",
         "media",
     ):
         if required_field not in envelope:
@@ -1461,30 +1466,6 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             raise TaskRecordContractError("media asset fetch complete result 不得违反 fetch_policy")
     elif media is not None:
         raise TaskRecordContractError("media asset fetch unavailable/failed result 时 media 必须为 null")
-
-    no_storage = envelope.get("no_storage")
-    if not isinstance(no_storage, Mapping):
-        raise TaskRecordContractError("media asset fetch no_storage 必须是对象")
-    allowed_no_storage_fields = {"stored", "downloaded_byte_length", "retention_policy"}
-    if any(field not in allowed_no_storage_fields for field in no_storage):
-        raise TaskRecordContractError("media asset fetch no_storage 只能包含公共白名单字段")
-    if no_storage.get("stored") is not False:
-        raise TaskRecordContractError("media asset fetch no_storage.stored 必须为 false")
-    retention_policy = no_storage.get("retention_policy")
-    if retention_policy is not None:
-        _require_sanitized_media_ref(retention_policy, field="result.envelope.no_storage.retention_policy")
-    if fetch_outcome == "downloaded_bytes":
-        byte_length = no_storage.get("downloaded_byte_length")
-        if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
-            raise TaskRecordContractError("media asset fetch downloaded_bytes 必须记录非负 downloaded_byte_length")
-        if isinstance(media, Mapping) and isinstance(media.get("metadata"), Mapping):
-            byte_size = media["metadata"].get("byte_size")
-            if isinstance(byte_size, int) and not isinstance(byte_size, bool) and byte_length != byte_size:
-                raise TaskRecordContractError("media asset fetch downloaded_byte_length 必须与 metadata.byte_size 一致")
-    else:
-        byte_length = no_storage.get("downloaded_byte_length")
-        if byte_length not in (None, 0):
-            raise TaskRecordContractError("media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length")
 
     audit = envelope.get("audit", {})
     if audit is None:
