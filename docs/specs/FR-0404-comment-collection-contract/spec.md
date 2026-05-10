@@ -44,11 +44,12 @@
 - 契约需求：
   - `comment_collection` 投影到 `comment_collection + content + single + paginated`，不额外引入 thread-scoped admission target。
   - `comment_collection` 同时沿用当前 canonical taxonomy candidate 的 public operation 名称与 adapter-facing capability family；后续若要拆分为更具体的 operation 名，必须另走 taxonomy promotion / compatibility migration，不在本 Work Item 中完成。
-  - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` vocabulary；deleted/invisible/unavailable 作为 item-level visibility 状态，而不是新的 collection-level error classification。
+  - comment result envelope 复用 `FR-0403` 的 `result_status` 与 `error_classification` 基础 vocabulary，并为 `comment_collection` 新增 comment-specific success sentinel：`success`。`success` 只表示非空正常成功页，不进入 `FR-0403` 共享 collection vocabulary。
   - `visibility_status` 至少支持：`visible`、`deleted`、`invisible`、`unavailable`。
   - 请求侧 `request_cursor` 在同一请求中只能二选一：要么通过 `page_continuation` 继续上一页 result 的 `next_continuation`，要么继续某条 comment item 的 `reply_cursor`；两者同时出现必须 fail-closed 到 `signature_or_request_invalid`。
-  - collection-level错误分类 vocabulary 继承 `FR-0403`，至少保留：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`。
-  - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope；`target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
+  - collection-level错误分类 vocabulary 继承 `FR-0403`，至少保留：`empty_result`、`target_not_found`、`rate_limited`、`permission_denied`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`parse_failed`、`partial_result`、`credential_invalid`、`verification_required`、`signature_or_request_invalid`；`comment_collection` 额外允许 emitted `success` 作为非错误 success sentinel。
+  - `result_status=complete` 既可表示成功页面，也可表示 fail-closed 的 collection-level failure envelope。非空正常成功页必须使用 `result_status=complete` 与 `error_classification=success`；`success` 不得用于 `empty`、`partial_result`、零 item success 或任何 fail-closed envelope。
+  - `target_not_found`、`permission_denied`、`rate_limited`、`platform_failed`、`provider_or_network_blocked`、`cursor_invalid_or_expired`、`credential_invalid`、`verification_required`、`signature_or_request_invalid` 都固定使用 `result_status=complete`。
   - collection-level failure envelope 必须统一返回 `items=[]`、`has_more=false`、`next_continuation=null`；不得在 failure envelope 中继续携带可执行 continuation 或伪正常 comment item。
   - collection-level failure envelope 仍必须保留 `raw_payload_ref` 与 `source_trace` 审计载体；若失败发生在稳定 raw payload 之前，这些字段必须指向 failure evidence / provider trace alias，而不是平台 raw object。
   - 本 FR 允许 emitted 的 `error_classification` 集合不单独发出 `partial_result`；partial page 固定使用 `result_status=partial_result` 与 `error_classification=parse_failed` 的组合语义。`partial_result` 继续保留在继承词表中作为兼容 vocabulary entry。
@@ -83,7 +84,7 @@
 
 Given `comment_collection` 使用合法 content target，且 Adapter 可以从 reference platform A 投影 recorded first-page comment response
 When Core 执行 comment collection request
-Then result 返回 `items`、`has_more=true`、`next_continuation`、`result_status=complete`、`raw_payload_ref` 与 normalized comment list，且不暴露平台私有 thread 或 moderation object
+Then result 返回 `items`、`has_more=true`、`next_continuation`、`result_status=complete`、`error_classification=success`、`raw_payload_ref` 与 normalized comment list，且不暴露平台私有 thread 或 moderation object
 
 ### 场景 2：下一页 continuation 保持公共语义稳定
 
@@ -125,7 +126,7 @@ Then result 必须返回 `result_status=complete` 与 `error_classification=targ
 
 Given 一页评论中同时包含正常 comment item 与 deleted/invisible placeholder
 When Core 处理该页 comment result
-Then deleted/invisible item 通过 `visibility_status` 表达，且合法页面仍可返回 `result_status=complete`
+Then deleted/invisible item 通过 `visibility_status` 表达，且合法页面仍可返回 `result_status=complete` 与 `error_classification=success`
 
 ### 场景 6B：unavailable comment 保留为 item-level visibility
 
@@ -215,7 +216,7 @@ Then result 必须分别返回 `result_status=complete` 与 `error_classificatio
 - [ ] formal spec 冻结 comment target、page continuation、reply cursor、comment item envelope、visibility status、source trace、raw payload reference 与 result status。
 - [ ] formal spec 冻结 `comment_collection` 的请求侧 cursor 规则，明确 result `next_continuation` 到 request `page_continuation` 的映射，以及 `page_continuation` 与 `reply_cursor` 的组合/互斥边界。
 - [ ] formal spec 冻结 `visible`、`deleted`、`invisible`、`unavailable` 四类 item-level visibility 语义。
-- [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，并写清 `partial_result` 只作为结果状态组合语义保留。
+- [ ] formal spec 明确继承 vocabulary 与允许 emitted 的 `error_classification` 边界，写清 `success` 只作为 `comment_collection` 非空 `complete` 成功页 sentinel，且 `partial_result` 只作为结果状态组合语义保留。
 - [ ] formal spec 明确 `duplicate comment item` 与 `dedup_key` 的稳定去重边界，至少覆盖跨页与 reply window。
 - [ ] formal spec 明确 synthetic fixture 只能从 recorded raw shape 派生，且所有 evidence source 只能使用脱敏 alias。
 - [ ] formal spec 明确第二参考平台 raw gap 由 `#419` 关闭，当前 Work Item 不宣称跨平台 recorded proof 已完成。
