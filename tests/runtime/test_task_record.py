@@ -486,6 +486,30 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored, record)
         self.assertEqual(restored.result.envelope["error_classification"], "parse_failed")
 
+    def test_rejects_media_asset_fetch_record_policy_violation(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-policy",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-policy",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-policy")
+        envelope["content_type"] = "video"
+        envelope["media"]["content_type"] = "video"
+        envelope["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        with self.assertRaises(TaskRecordContractError):
+            finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
+
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

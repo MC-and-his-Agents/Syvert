@@ -1199,6 +1199,31 @@ def _require_sanitized_media_ref(value: Any, *, field: str) -> str:
     return ref
 
 
+def _media_fetch_policy_allows_outcome(
+    policy: Mapping[str, Any],
+    *,
+    fetch_outcome: str,
+    content_type: str,
+    byte_size: int | None = None,
+) -> bool:
+    allowed_content_types = policy.get("allowed_content_types")
+    if not isinstance(allowed_content_types, list) or content_type not in allowed_content_types:
+        return False
+    fetch_mode = policy.get("fetch_mode")
+    allow_download = policy.get("allow_download")
+    if fetch_outcome == "metadata_only":
+        return fetch_mode == "metadata_only"
+    if fetch_outcome == "source_ref_preserved":
+        return fetch_mode in {"preserve_source_ref", "download_if_allowed"}
+    if fetch_outcome == "downloaded_bytes":
+        max_bytes = policy.get("max_bytes")
+        if isinstance(max_bytes, int) and not isinstance(max_bytes, bool):
+            if not isinstance(byte_size, int) or isinstance(byte_size, bool) or byte_size > max_bytes:
+                return False
+        return fetch_mode in {"download_if_allowed", "download_required"} and allow_download is True
+    return False
+
+
 def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     operation = require_string(envelope.get("operation"), field="result.envelope.operation")
     if operation != "media_asset_fetch_by_ref":
@@ -1210,6 +1235,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     allowed_target_fields = {"operation", "target_type", "media_ref"}
     if any(field not in allowed_target_fields for field in target):
         raise TaskRecordContractError("media asset fetch result.target 只能包含公共白名单字段")
+    if target.get("operation") != operation:
+        raise TaskRecordContractError("media asset fetch result.target.operation 必须与顶层 operation 一致")
     if target.get("target_type") != "media_ref":
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
     _require_sanitized_media_ref(target.get("media_ref"), field="media asset fetch result.target.media_ref")
@@ -1420,6 +1447,14 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             for field in ("byte_size", "checksum_digest", "checksum_family"):
                 if field in metadata:
                     raise TaskRecordContractError("media asset fetch 非 downloaded_bytes outcome 不得包含下载字节元数据")
+        byte_size = metadata.get("byte_size")
+        if not _media_fetch_policy_allows_outcome(
+            fetch_policy,
+            fetch_outcome=fetch_outcome,
+            content_type=content_type,
+            byte_size=byte_size if isinstance(byte_size, int) and not isinstance(byte_size, bool) else None,
+        ):
+            raise TaskRecordContractError("media asset fetch complete result 不得违反 fetch_policy")
     elif media is not None:
         raise TaskRecordContractError("media asset fetch unavailable/failed result 时 media 必须为 null")
 

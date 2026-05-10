@@ -3959,6 +3959,12 @@ def validate_success_payload(
                     "media asset fetch result.target 只能包含公共白名单字段",
                     details={"field": field},
                 )
+        if target.get("operation") != MEDIA_ASSET_FETCH_BY_REF:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.target.operation 必须与顶层 operation 一致",
+                details={"operation": target.get("operation"), "expected_operation": MEDIA_ASSET_FETCH_BY_REF},
+            )
         result_target_type = target.get("target_type")
         result_target_ref = target.get("media_ref")
         if result_target_type != target_type:

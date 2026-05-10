@@ -1454,6 +1454,19 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_target_operation_drift(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["operation"] = "creator_profile_by_id"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_target_extra_field(self) -> None:
         payload = make_media_asset_fetch_result()
         payload["target"]["signed_url"] = "https://signed.example.invalid/media?token=secret"

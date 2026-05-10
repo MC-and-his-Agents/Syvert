@@ -63,6 +63,7 @@
 - PR guardian 第十三轮后执行系统性合同核对：按 FR-0405 重新核对 public field whitelist、`MediaAssetTarget.media_ref`、result status/error mapping、fetch policy decision matrix、raw/normalized/audit split、source trace/lineage/no-storage 脱敏六类不变量；runtime 与 TaskRecord 均已按同一不变量收敛。
 - 系统性核对补正：TaskRecord `unknown + parse_failed + raw_payload_ref` 回放顺序与 runtime 对齐，并增加 durable round-trip 回归，防止合法 parse_failed carrier 在持久化/回放路径崩溃。
 - 系统性核对补正：`allowed_content_types` policy priority 现在覆盖所有非 complete carrier，downloaded-bytes audit proof 必须与 public metadata / no_storage 下载事实一致。
+- 系统性核对补正：TaskRecord complete carrier replay 现在执行与 runtime 相同的 fetch policy outcome matrix，`target.operation` 必须存在且与顶层 operation 一致。
 
 ## FR-0405 media carrier 不变量核对
 
@@ -92,7 +93,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，177 tests。
+  - 结果：通过，179 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`
