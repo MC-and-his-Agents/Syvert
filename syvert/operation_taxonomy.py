@@ -172,7 +172,7 @@ STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY = OperationTaxonomyEntry(
     contract_refs=("FR-0405",),
     admission_evidence_refs=("tests.runtime.test_operation_taxonomy",),
     notes=(
-        "v1.5.0 media asset fetch runtime carrier; one-shot media ref read contract with no-storage metadata.",
+        "v1.5.0 media asset fetch runtime carrier; one-shot media ref read contract with fail-closed no-storage boundary.",
     ),
 )
 
