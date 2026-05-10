@@ -82,10 +82,10 @@ _APPROVED_FROZEN_RESOURCE_CAPABILITY_RECORDS = tuple(
     )
 )
 _ALLOWED_RESOURCE_REQUIREMENT_CAPABILITIES = frozenset(
-    {"content_detail", "content_search", "content_list", "comment_collection"}
+    {"content_detail", "content_search", "content_list", "comment_collection", "media_asset_fetch"}
 )
 _CONTENT_DETAIL_RESOURCE_PROFILE_COMPATIBLE_CAPABILITIES = frozenset(
-    {"content_search", "content_list", "comment_collection"}
+    {"content_search", "content_list", "comment_collection", "media_asset_fetch"}
 )
 _APPROVED_RESOURCE_REQUIREMENT_EVIDENCE_REFS = frozenset(
     evidence_ref

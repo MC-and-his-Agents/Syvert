@@ -94,6 +94,25 @@ class OperationTaxonomyTests(unittest.TestCase):
             )
         )
 
+    def test_stable_media_asset_fetch_lookup_returns_runtime_entry(self) -> None:
+        entry = stable_operation_entry(
+            operation="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            collection_mode="direct",
+        )
+
+        self.assertEqual(entry.capability_family, "media_asset_fetch")
+        self.assertTrue(entry.runtime_delivery)
+        self.assertEqual(entry.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertEqual(entry.contract_refs, ("FR-0405",))
+        self.assertTrue(
+            is_stable_operation(
+                operation="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                collection_mode="direct",
+            )
+        )
+
     def test_proposed_candidates_are_registered_but_not_stable_runtime_operations(self) -> None:
         proposed_operations = {entry.operation for entry in proposed_operation_taxonomy_entries()}
 

@@ -16,6 +16,7 @@ from syvert.registry import (
     AdapterResourceRequirementDeclaration,
     AdapterResourceRequirementDeclarationV2,
     AdapterResourceRequirementProfile,
+    baseline_multi_profile_resource_requirement_declaration,
     baseline_required_resource_requirement_declaration,
 )
 from syvert.read_side_collection import CommentReplyCursor, CommentRequestCursor
@@ -136,6 +137,78 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
             "evidence_alias": "alias://comment-page-empty",
         },
         "audit": {"page_index": 1},
+    }
+
+
+def make_media_asset_fetch_result(
+    *,
+    target_ref: str = "media:asset-001",
+    content_type: str = "image",
+    fetch_mode: str = "metadata_only",
+    fetch_outcome: str | None = "metadata_only",
+    result_status: str = "complete",
+    error_classification: str | None = None,
+) -> dict[str, object]:
+    media = None
+    if result_status == "complete":
+        metadata: dict[str, object] = {"mime_type": "image/jpeg", "width": 1200, "height": 900}
+        if fetch_outcome == "downloaded_bytes":
+            metadata.update(
+                {
+                    "byte_size": 2048,
+                    "checksum_digest": "sha256:abc123",
+                    "checksum_family": "sha256",
+                }
+            )
+        media = {
+            "source_media_ref": f"source:{target_ref}",
+            "source_ref_lineage": {
+                "input_ref": target_ref,
+                "source_media_ref": f"source:{target_ref}",
+                "resolved_ref": f"resolved:{target_ref}",
+                "canonical_ref": f"canonical:{target_ref}",
+                "preservation_status": "preserved",
+            },
+            "canonical_ref": f"canonical:{target_ref}",
+            "content_type": content_type,
+            "metadata": metadata,
+        }
+    return {
+        "operation": "media_asset_fetch_by_ref",
+        "target": {
+            "operation": "media_asset_fetch_by_ref",
+            "target_type": "media_ref",
+            "media_ref": target_ref,
+        },
+        "content_type": content_type,
+        "fetch_policy": {
+            "fetch_mode": fetch_mode,
+            "allowed_content_types": ["image", "video"],
+            "allow_download": fetch_outcome == "downloaded_bytes",
+            "max_bytes": 4096 if fetch_outcome == "downloaded_bytes" else None,
+        },
+        "fetch_outcome": fetch_outcome,
+        "result_status": result_status,
+        "error_classification": error_classification,
+        "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+        "media": media,
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://media-asset-fetch-1",
+        },
+        "audit": (
+            {
+                "transfer_observed": True,
+                "byte_size": 2048,
+                "checksum_digest": "sha256:abc123",
+                "checksum_family": "sha256",
+            }
+            if fetch_outcome == "downloaded_bytes"
+            else {}
+        ),
     }
 
 
@@ -293,6 +366,62 @@ class CommentCollectionAdapter:
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
+
+
+class MediaAssetFetchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"media_asset_fetch"})
+    supported_targets = frozenset({"media_ref"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="media_asset_fetch",
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+
+
+class MediaAssetFetchLeakyStorageAdapter(MediaAssetFetchAdapter):
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        payload = make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+        payload["no_storage"] = {"local_path": "forbidden-storage-ref"}
+        return payload
+
+
+class MediaAssetFetchUnexpectedDownloadAdapter(MediaAssetFetchAdapter):
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_media_asset_fetch_result(
+            target_ref=request.input.media_ref or "",
+            fetch_mode="download_if_allowed",
+            fetch_outcome="downloaded_bytes",
+        )
+
+
+class V1AccountOnlyMediaAssetFetchAdapter(MediaAssetFetchAdapter):
+    resource_requirement_declarations = (
+        AdapterResourceRequirementDeclaration(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch",
+            resource_dependency_mode="required",
+            required_capabilities=("account",),
+            evidence_refs=(
+                "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            ),
+        ),
+    )
+
+
+class MultiProfileMediaAssetFetchAdapter(MediaAssetFetchAdapter):
+    resource_requirement_declarations = (
+        baseline_multi_profile_resource_requirement_declaration(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch",
+        ),
+    )
 
 
 class V1AccountOnlyCommentCollectionAdapter(CommentCollectionAdapter):
@@ -868,6 +997,751 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.task_record.request.target_type, "keyword")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
 
+    def test_execute_task_builds_media_asset_fetch_success_envelope_from_adapter_payload(self) -> None:
+        adapter = MediaAssetFetchAdapter()
+        fetch_policy = {
+            "fetch_mode": "metadata_only",
+            "allowed_content_types": ["image", "video"],
+            "allow_download": False,
+            "max_bytes": None,
+        }
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-001", media_fetch_policy=fetch_policy),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "media_asset_fetch_by_ref")
+        self.assertEqual(result.envelope["target"]["target_type"], "media_ref")
+        self.assertEqual(result.envelope["target"]["media_ref"], "media:asset-001")
+        self.assertEqual(result.envelope["result_status"], "complete")
+        self.assertEqual(result.envelope["fetch_outcome"], "metadata_only")
+        self.assertEqual(result.envelope["fetch_policy"], fetch_policy)
+        self.assertNotIn("no_storage", result.envelope)
+        self.assertEqual(result.task_record.request.target_type, "media_ref")
+        self.assertEqual(result.task_record.request.collection_mode, "direct")
+        self.assertEqual(adapter.last_request.request.capability, "media_asset_fetch")
+        self.assertEqual(adapter.last_request.request.target_type, "media_ref")
+        self.assertEqual(adapter.last_request.request.target_value, "media:asset-001")
+        self.assertEqual(adapter.last_request.input.media_fetch_policy, fetch_policy)
+        self.assertEqual(adapter.last_request.collection_mode, "direct")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.capability, "media_asset_fetch_by_ref")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_unavailable_carrier(self) -> None:
+        payload = make_media_asset_fetch_result(
+            target_ref="media:asset-missing",
+            fetch_outcome=None,
+            result_status="unavailable",
+            error_classification="media_unavailable",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-missing",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_target_drift(self) -> None:
+        payload = make_media_asset_fetch_result(target_ref="media:asset-other")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["expected_target_ref"], "media:asset-001")
+
+    def test_execute_task_fails_closed_for_media_asset_fetch_storage_leak(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-leaky"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchLeakyStorageAdapter()},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-leak",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
+        self.assertIn("no_storage", result.envelope["error"]["message"])
+
+    def test_execute_task_fails_closed_for_media_asset_fetch_default_policy_download(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-default-policy"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchUnexpectedDownloadAdapter()},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-policy",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
+
+    def test_execute_task_rejects_private_media_ref_request(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="https://signed.example.invalid/media?token=secret"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-media-private-ref",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
+
+    def test_execute_core_task_request_rejects_private_media_ref_target(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="https://signed.example.invalid/media?token=secret",
+            ),
+            policy=CollectionPolicy(collection_mode="direct"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-core-media-private-ref",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_missing_lineage(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        payload["media"].pop("source_ref_lineage")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_metadata_gap(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["metadata"], dict)
+        payload["media"]["metadata"].pop("checksum_digest")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_request_policy_drift(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor={
+                "fetch_mode": "metadata_only",
+                "allowed_content_types": ["image", "video"],
+                "allow_download": False,
+                "max_bytes": None,
+            },
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_max_bytes_violation(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["fetch_policy"]["max_bytes"] = 1
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_degrade(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="source_ref_preserved", fetch_mode="download_required")
+        payload["fetch_policy"]["allow_download"] = True
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_metadata_only(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_mode="download_required", fetch_outcome="metadata_only")
+        payload["fetch_policy"]["allow_download"] = True
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_missing_failed_media_null(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload.pop("media")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_missing_nullable_failure_field(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload.pop("fetch_outcome")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["field"], "fetch_outcome")
+
+    def test_validate_success_payload_accepts_unsupported_content_type_failure(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="mixed_media",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_complete_without_raw_payload_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["raw_payload_ref"] = None
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_task_request_rejects_media_fetch_policy_allowed_content_type_shape(self) -> None:
+        result = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                input=TaskInput(
+                    media_ref="media:asset-001",
+                    media_fetch_policy={
+                        "fetch_mode": "metadata_only",
+                        "allowed_content_types": 1,
+                        "allow_download": False,
+                        "max_bytes": None,
+                    },
+                ),
+            ),
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-media-policy-shape",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_unstable_content_type(self) -> None:
+        payload = make_media_asset_fetch_result(content_type="mixed_media")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_unsupported_content_type_wrong_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="mixed_media",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="parse_failed",
+        )
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_unknown_content_type_parse_failed(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="unknown",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="parse_failed",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_metadata(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["metadata"], dict)
+        payload["media"]["metadata"]["signed_url"] = "https://media.example.invalid/private"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_fetch_policy(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["fetch_policy"]["provider_route"] = "https://signed.example.invalid/route?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_wrong_policy_denied_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="video",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+        payload["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_stable_media_unsupported_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="image",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_unavailable_policy_bypass(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="video",
+            fetch_outcome=None,
+            result_status="unavailable",
+            error_classification="permission_denied",
+        )
+        payload["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_policy_failure_class(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_mode="download_required",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload["fetch_policy"]["allow_download"] = False
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_formal_media_ref_target(self) -> None:
+        payload = make_media_asset_fetch_result()
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_legacy_target_ref_only(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["target_ref"] = payload["target"].pop("media_ref")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_target_operation_drift(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["operation"] = "creator_profile_by_id"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_target_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
+        for status, classification in (
+            ("unavailable", "permission_denied"),
+            ("failed", "credential_invalid"),
+            ("failed", "verification_required"),
+        ):
+            with self.subTest(status=status, classification=classification):
+                target_ref = f"media:{classification}".replace("credential_invalid", "auth-invalid")
+                payload = make_media_asset_fetch_result(
+                    target_ref=target_ref,
+                    fetch_outcome=None,
+                    result_status=status,
+                    error_classification=classification,
+                )
+
+                self.assertIsNone(
+                    validate_success_payload(
+                        payload,
+                        capability="media_asset_fetch_by_ref",
+                        target_type="media_ref",
+                        target_value=target_ref,
+                    )
+                )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_blocked_raw_payload(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["raw_payload_ref"] = "raw://blocked-should-be-null"
+        payload["source_trace"]["provider_path"] = "provider://blocked-path-alias/media"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_blocked_routing_path(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["source_trace"]["provider_path"] = "provider://primary/fallback/selector"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_source_trace_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["source_trace"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_audit_gap(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["audit"] = {}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_audit_mismatch(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["audit"]["byte_size"] = 9999
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_non_download_audit(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["audit"] = {"transfer_observed": True}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_blocked_alias(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["raw_payload_ref"] = None
+        payload["source_trace"]["provider_path"] = "provider://blocked-path-alias/media"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_signed_source_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        payload["media"]["source_media_ref"] = "https://signed.example.invalid/media?token=secret"
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["source_media_ref"] = payload["media"]["source_media_ref"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_media_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        payload["media"]["storage_handle"] = "storage://private"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_local_lineage_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["resolved_ref"] = "/tmp/downloaded-file.mp4"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_lineage_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["platform_media_schema"] = {"private": True}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_target_ref(self) -> None:
+        private_ref = "https://signed.example.invalid/media?token=secret"
+        payload = make_media_asset_fetch_result(target_ref=private_ref)
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value=private_ref,
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_no_storage_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["no_storage"] = {"signed_url": "https://signed.example.invalid/media?token=secret"}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_optional_target_refs(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["origin_ref"] = "origin:content-001"
+        payload["target"]["policy_ref"] = "policy:media-metadata"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
     def test_validate_success_payload_accepts_comment_collection_runtime_carrier(self) -> None:
         payload = make_comment_collection_result(target_ref="content-001")
 
@@ -1210,6 +2084,72 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 request,
                 adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-runtime-comment-collection-v1-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
+
+    def test_execute_task_uses_media_asset_fetch_account_only_profile(self) -> None:
+        adapter = MultiProfileMediaAssetFetchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-media-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-media-asset-fetch-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
+
+    def test_execute_task_uses_v1_media_asset_fetch_account_only_declaration(self) -> None:
+        adapter = V1AccountOnlyMediaAssetFetchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:v1-account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-media-v1-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-media-asset-fetch-v1-account-only",
                 resource_lifecycle_store=account_only_store,
             )
 

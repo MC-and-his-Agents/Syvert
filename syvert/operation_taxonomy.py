@@ -161,6 +161,21 @@ STABLE_COMMENT_COLLECTION_ENTRY = OperationTaxonomyEntry(
     notes=("v1.4.0 comment collection runtime contract frozen; comment-specific hierarchy and visibility surface.",),
 )
 
+STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY = OperationTaxonomyEntry(
+    capability_family="media_asset_fetch",
+    operation="media_asset_fetch_by_ref",
+    target_type="media_ref",
+    execution_mode="single",
+    collection_mode="direct",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0405",),
+    admission_evidence_refs=("tests.runtime.test_operation_taxonomy",),
+    notes=(
+        "v1.5.0 media asset fetch runtime carrier; one-shot media ref read contract with fail-closed no-storage boundary.",
+    ),
+)
+
 PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
     OperationTaxonomyEntry(
         capability_family="content_search",
@@ -277,6 +292,7 @@ DEFAULT_OPERATION_TAXONOMY = (
     STABLE_CONTENT_SEARCH_BY_KEYWORD_ENTRY,
     STABLE_CONTENT_LIST_BY_CREATOR_ENTRY,
     STABLE_COMMENT_COLLECTION_ENTRY,
+    STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY,
     *PROPOSED_OPERATION_TAXONOMY_ENTRIES,
 )
 

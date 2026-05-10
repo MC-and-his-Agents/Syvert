@@ -133,6 +133,49 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dict[str, object]:
+    return {
+        "operation": "media_asset_fetch_by_ref",
+        "target": {
+            "operation": "media_asset_fetch_by_ref",
+            "target_type": "media_ref",
+            "media_ref": target_ref,
+        },
+        "content_type": "image",
+        "fetch_policy": {
+            "fetch_mode": "metadata_only",
+            "allowed_content_types": ["image", "video"],
+            "allow_download": False,
+            "max_bytes": None,
+        },
+        "fetch_outcome": "metadata_only",
+        "result_status": "complete",
+        "error_classification": None,
+        "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+        "media": {
+            "source_media_ref": f"source:{target_ref}",
+            "source_ref_lineage": {
+                "input_ref": target_ref,
+                "source_media_ref": f"source:{target_ref}",
+                "resolved_ref": f"resolved:{target_ref}",
+                "canonical_ref": f"canonical:{target_ref}",
+                "preservation_status": "preserved",
+            },
+            "canonical_ref": f"canonical:{target_ref}",
+            "content_type": "image",
+            "metadata": {"mime_type": "image/jpeg", "width": 1200, "height": 900},
+        },
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://media-asset-fetch-1",
+        },
+        "audit": {},
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -319,6 +362,20 @@ class CommentCollectionAdapter:
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class MediaAssetFetchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"media_asset_fetch"})
+    supported_targets = frozenset({"media_ref"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="media_asset_fetch",
+    )
+
+    def execute(self, request):
+        return make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+
+
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
@@ -362,6 +419,166 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.request.capability, "comment_collection")
         self.assertEqual(restored.request.target_type, "content")
         self.assertEqual(restored.request.target_value, "content-001")
+
+    def test_round_trips_media_asset_fetch_record(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                input=TaskInput(media_ref="media:asset-001"),
+            ),
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-record-media-asset-fetch-1",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertEqual(outcome.envelope["operation"], "media_asset_fetch_by_ref")
+        self.assertIsNotNone(outcome.task_record)
+
+        payload = task_record_to_dict(outcome.task_record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, outcome.task_record)
+        self.assertEqual(restored.request.capability, "media_asset_fetch_by_ref")
+        self.assertEqual(restored.request.target_type, "media_ref")
+        self.assertEqual(restored.request.target_value, "media:asset-001")
+
+    def test_round_trips_media_asset_fetch_parse_failed_record(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-parse",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-parse",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-parse")
+        envelope["content_type"] = "unknown"
+        envelope["fetch_outcome"] = None
+        envelope["result_status"] = "failed"
+        envelope["error_classification"] = "parse_failed"
+        envelope["media"] = None
+        envelope["raw_payload_ref"] = "raw://media-asset-fetch/parse-failed"
+        envelope["task_id"] = "task-record-media-asset-fetch-parse"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+        record = finish_task_record(
+            record,
+            envelope,
+            occurred_at="2026-05-09T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(task_record_to_dict(record))
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.result.envelope["error_classification"], "parse_failed")
+
+    def test_round_trips_media_asset_fetch_optional_target_refs(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-origin",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-origin",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-origin")
+        envelope["target"]["origin_ref"] = "origin:content-001"
+        envelope["target"]["policy_ref"] = "policy:media-metadata"
+        envelope["task_id"] = "task-record-media-asset-fetch-origin"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+        record = finish_task_record(
+            record,
+            envelope,
+            occurred_at="2026-05-09T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(task_record_to_dict(record))
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.result.envelope["target"]["origin_ref"], "origin:content-001")
+        self.assertEqual(restored.result.envelope["target"]["policy_ref"], "policy:media-metadata")
+
+    def test_rejects_media_asset_fetch_no_storage_field(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-storage",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-storage",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-storage")
+        envelope["no_storage"] = {"stored": False}
+        envelope["task_id"] = "task-record-media-asset-fetch-storage"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "media_asset_fetch_by_ref"
+        envelope["status"] = "success"
+
+        with self.assertRaises(TaskRecordContractError):
+            finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
+
+    def test_rejects_media_asset_fetch_record_policy_violation(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-policy",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-media-asset-fetch-policy",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_media_asset_fetch_result(target_ref="media:asset-policy")
+        envelope["content_type"] = "video"
+        envelope["media"]["content_type"] = "video"
+        envelope["fetch_policy"]["allowed_content_types"] = ["image"]
+
+        with self.assertRaises(TaskRecordContractError):
+            finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
+
+    def test_rejects_private_media_asset_fetch_request_snapshot(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-media-private-ref",
+                TaskRequestSnapshot(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="media_asset_fetch_by_ref",
+                    target_type="media_ref",
+                    target_value="https://signed.example.invalid/media?token=secret",
+                    collection_mode="direct",
+                ),
+                occurred_at="2026-05-09T10:00:00Z",
+            )
 
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
