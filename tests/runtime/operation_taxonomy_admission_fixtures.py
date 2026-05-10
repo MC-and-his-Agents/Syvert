@@ -45,7 +45,7 @@ def fake_adapter_admission_manifest() -> dict[str, Any]:
             "runtime_delivery_allowed": False,
             "comment_collection_runtime_delivery_allowed": True,
             "stable_lookup_allowed": False,
-            "compatibility_match_allowed": False,
+            "compatibility_match_allowed": True,
         },
     }
 
