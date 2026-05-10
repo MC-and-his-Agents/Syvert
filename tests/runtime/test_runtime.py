@@ -1323,6 +1323,90 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                     )
                 )
 
+    def test_validate_success_payload_rejects_media_asset_fetch_blocked_raw_payload(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["raw_payload_ref"] = "raw://blocked-should-be-null"
+        payload["source_trace"]["provider_path"] = "provider://blocked-path-alias/media"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_blocked_routing_path(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["source_trace"]["provider_path"] = "provider://primary/fallback/selector"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_blocked_alias(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="provider_or_network_blocked",
+        )
+        payload["raw_payload_ref"] = None
+        payload["source_trace"]["provider_path"] = "provider://blocked-path-alias/media"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_signed_source_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        payload["media"]["source_media_ref"] = "https://signed.example.invalid/media?token=secret"
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["source_media_ref"] = payload["media"]["source_media_ref"]
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_local_lineage_ref(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["resolved_ref"] = "/tmp/downloaded-file.mp4"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_accepts_comment_collection_runtime_carrier(self) -> None:
         payload = make_comment_collection_result(target_ref="content-001")
 

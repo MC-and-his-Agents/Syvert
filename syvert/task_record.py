@@ -49,6 +49,25 @@ MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
         "signature_or_request_invalid",
     }
 )
+MEDIA_ASSET_FORBIDDEN_REF_VALUE_TOKENS = (
+    "http://",
+    "https://",
+    "file://",
+    "/tmp/",
+    "/var/",
+    "\\",
+    "token=",
+    "session",
+    "credential",
+    "secret",
+    "signed",
+    "bucket",
+    "download",
+    "fallback",
+    "selector",
+    "route",
+    "routing",
+)
 ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
 RUNTIME_FAILURE_PHASES = frozenset(
     {
@@ -1168,6 +1187,18 @@ def _validate_comment_collection_success_terminal_envelope(envelope: Mapping[str
         raise TaskRecordContractError(f"comment collection TaskTerminalResult.envelope 不合法: {error}") from error
 
 
+def _media_ref_value_is_sanitized(value: str) -> bool:
+    normalized = value.lower()
+    return not any(token in normalized for token in MEDIA_ASSET_FORBIDDEN_REF_VALUE_TOKENS)
+
+
+def _require_sanitized_media_ref(value: Any, *, field: str) -> str:
+    ref = require_string(value, field=field)
+    if not _media_ref_value_is_sanitized(ref):
+        raise TaskRecordContractError(f"{field} 不得包含 URL、路径、凭证、路由或下载定位信息")
+    return ref
+
+
 def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     operation = require_string(envelope.get("operation"), field="result.envelope.operation")
     if operation != "media_asset_fetch_by_ref":
@@ -1250,6 +1281,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
     if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
         raise TaskRecordContractError("media asset fetch complete result 必须包含 raw_payload_ref")
+    if error_classification == "provider_or_network_blocked" and raw_payload_ref is not None:
+        raise TaskRecordContractError("media asset fetch provider_or_network_blocked 必须使用 null raw_payload_ref")
 
     source_trace = envelope.get("source_trace")
     if not isinstance(source_trace, Mapping):
@@ -1259,13 +1292,26 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         if not isinstance(value, str) or not value:
             raise TaskRecordContractError(f"media asset fetch source_trace 字段缺失或无效: {required_field}")
     validate_timestamp(source_trace.get("fetched_at"), field="result.envelope.source_trace.fetched_at")
+    provider_path = source_trace.get("provider_path")
+    if isinstance(provider_path, str) and not _media_ref_value_is_sanitized(provider_path):
+        raise TaskRecordContractError("media asset fetch source_trace.provider_path 不得包含路由或定位信息")
+    if error_classification == "provider_or_network_blocked" and not (
+        isinstance(provider_path, str) and provider_path.startswith("provider://blocked-path-alias")
+    ):
+        raise TaskRecordContractError("media asset fetch provider_or_network_blocked 必须使用脱敏 blocked-path alias")
 
     media = envelope.get("media")
     if result_status == "complete":
         if not isinstance(media, Mapping):
             raise TaskRecordContractError("media asset fetch complete result 必须包含 media 对象")
-        source_media_ref = require_string(media.get("source_media_ref"), field="result.envelope.media.source_media_ref")
-        canonical_ref = require_string(media.get("canonical_ref"), field="result.envelope.media.canonical_ref")
+        source_media_ref = _require_sanitized_media_ref(
+            media.get("source_media_ref"),
+            field="result.envelope.media.source_media_ref",
+        )
+        canonical_ref = _require_sanitized_media_ref(
+            media.get("canonical_ref"),
+            field="result.envelope.media.canonical_ref",
+        )
         if media.get("content_type") != content_type:
             raise TaskRecordContractError("media asset fetch media.content_type 必须与顶层 content_type 一致")
         lineage = media.get("source_ref_lineage")
@@ -1281,8 +1327,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             if lineage.get(field) != expected:
                 raise TaskRecordContractError("media asset fetch source_ref_lineage 必须绑定请求和公共媒体引用")
         resolved_ref = lineage.get("resolved_ref")
-        if resolved_ref is not None and not isinstance(resolved_ref, str):
-            raise TaskRecordContractError("media asset fetch source_ref_lineage.resolved_ref 必须为字符串或 null")
+        if resolved_ref is not None:
+            _require_sanitized_media_ref(resolved_ref, field="result.envelope.media.source_ref_lineage.resolved_ref")
         for forbidden_field in (
             "download_handle",
             "storage_handle",

@@ -92,6 +92,25 @@ MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
     }
 )
 MEDIA_ASSET_ALLOWED_CLASSIFICATIONS = MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS | MEDIA_ASSET_FAILED_CLASSIFICATIONS
+MEDIA_ASSET_FORBIDDEN_REF_VALUE_TOKENS = (
+    "http://",
+    "https://",
+    "file://",
+    "/tmp/",
+    "/var/",
+    "\\",
+    "token=",
+    "session",
+    "credential",
+    "secret",
+    "signed",
+    "bucket",
+    "download",
+    "fallback",
+    "selector",
+    "route",
+    "routing",
+)
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
@@ -2788,6 +2807,26 @@ def _media_fetch_policies_match(request_policy: Mapping[str, Any], result_policy
     return normalize_media_fetch_policy(request_policy) == normalize_media_fetch_policy(result_policy)
 
 
+def _media_ref_value_is_sanitized(value: str) -> bool:
+    normalized = value.lower()
+    return not any(token in normalized for token in MEDIA_ASSET_FORBIDDEN_REF_VALUE_TOKENS)
+
+
+def _validate_media_ref_value(value: Any, *, field: str) -> dict[str, Any] | None:
+    if not isinstance(value, str) or not value:
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            f"media asset fetch {field} 必须为非空脱敏 opaque ref",
+        )
+    if not _media_ref_value_is_sanitized(value):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            f"media asset fetch {field} 不得包含 URL、路径、凭证、路由或下载定位信息",
+            details={"field": field},
+        )
+    return None
+
+
 def _validate_media_asset_fetch_source_trace(source_trace: Any) -> dict[str, Any] | None:
     if not isinstance(source_trace, Mapping):
         return runtime_contract_error(
@@ -2806,6 +2845,13 @@ def _validate_media_asset_fetch_source_trace(source_trace: Any) -> dict[str, Any
         return runtime_contract_error(
             "invalid_adapter_success_payload",
             "media asset fetch source_trace.fetched_at 必须为 RFC3339 UTC",
+        )
+    provider_path = source_trace.get("provider_path")
+    if isinstance(provider_path, str) and not _media_ref_value_is_sanitized(provider_path):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "media asset fetch source_trace.provider_path 不得包含路由、fallback、selector、URL 或路径信息",
+            details={"field": "source_trace.provider_path"},
         )
     return None
 
@@ -2908,11 +2954,9 @@ def _validate_media_asset_fetch_media(
     source_media_ref = media.get("source_media_ref")
     canonical_ref = media.get("canonical_ref")
     for field, value in (("source_media_ref", source_media_ref), ("canonical_ref", canonical_ref)):
-        if not isinstance(value, str) or not value:
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                f"media asset fetch media.{field} 必须为非空字符串",
-            )
+        ref_error = _validate_media_ref_value(value, field=f"media.{field}")
+        if ref_error is not None:
+            return ref_error
     if media.get("content_type") != content_type:
         return runtime_contract_error(
             "invalid_adapter_success_payload",
@@ -2939,11 +2983,10 @@ def _validate_media_asset_fetch_media(
                 details={"field": field, "value": value, "expected": expected},
             )
     resolved_ref = lineage.get("resolved_ref")
-    if resolved_ref is not None and not isinstance(resolved_ref, str):
-        return runtime_contract_error(
-            "invalid_adapter_success_payload",
-            "media asset fetch source_ref_lineage.resolved_ref 必须为字符串或 null",
-        )
+    if resolved_ref is not None:
+        ref_error = _validate_media_ref_value(resolved_ref, field="source_ref_lineage.resolved_ref")
+        if ref_error is not None:
+            return ref_error
     for forbidden_field in (
         "download_handle",
         "storage_handle",
@@ -3904,9 +3947,23 @@ def validate_success_payload(
                 "invalid_adapter_success_payload",
                 "media asset fetch complete result 必须包含 raw_payload_ref",
             )
+        if error_classification == "provider_or_network_blocked" and raw_payload_ref is not None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch provider_or_network_blocked 必须使用 null raw_payload_ref",
+            )
         source_trace_error = _validate_media_asset_fetch_source_trace(payload.get("source_trace"))
         if source_trace_error is not None:
             return source_trace_error
+        source_trace = payload.get("source_trace")
+        if error_classification == "provider_or_network_blocked":
+            provider_path = source_trace.get("provider_path") if isinstance(source_trace, Mapping) else None
+            if not (isinstance(provider_path, str) and provider_path.startswith("provider://blocked-path-alias")):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch provider_or_network_blocked 必须使用脱敏 blocked-path alias",
+                    details={"field": "source_trace.provider_path"},
+                )
 
         media = payload.get("media")
         if result_status == "complete":
