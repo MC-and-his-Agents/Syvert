@@ -2986,6 +2986,14 @@ def _validate_media_asset_fetch_media(
             "invalid_adapter_success_payload",
             "media asset fetch complete result 必须包含 media 对象",
         )
+    allowed_media_fields = {"source_media_ref", "source_ref_lineage", "canonical_ref", "content_type", "metadata"}
+    for field in media:
+        if field not in allowed_media_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch media 只能包含公共白名单字段",
+                details={"field": field},
+            )
     source_media_ref = media.get("source_media_ref")
     canonical_ref = media.get("canonical_ref")
     for field, value in (("source_media_ref", source_media_ref), ("canonical_ref", canonical_ref)):
@@ -3003,6 +3011,14 @@ def _validate_media_asset_fetch_media(
             "invalid_adapter_success_payload",
             "media asset fetch media.source_ref_lineage 必须是对象",
         )
+    allowed_lineage_fields = {"input_ref", "source_media_ref", "resolved_ref", "canonical_ref", "preservation_status"}
+    for field in lineage:
+        if field not in allowed_lineage_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_ref_lineage 只能包含公共白名单字段",
+                details={"field": field},
+            )
     lineage_required = {
         "input_ref": target_value,
         "source_media_ref": source_media_ref,
@@ -3921,6 +3937,14 @@ def validate_success_payload(
                 "invalid_adapter_success_payload",
                 "media asset fetch result.target 必须是对象",
             )
+        allowed_target_fields = {"operation", "target_type", "media_ref"}
+        for field in target:
+            if field not in allowed_target_fields:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch result.target 只能包含公共白名单字段",
+                    details={"field": field},
+                )
         result_target_type = target.get("target_type")
         result_target_ref = target.get("media_ref")
         if result_target_type != target_type:

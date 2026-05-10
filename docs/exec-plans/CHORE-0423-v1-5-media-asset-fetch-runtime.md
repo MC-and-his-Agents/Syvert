@@ -59,6 +59,7 @@
 - PR guardian 第九轮 findings 已处理：`MediaAssetTarget` 公共字段改为 formal `media_ref`，`download_required` 被 policy 阻止时 failed carrier 必须 `fetch_policy_denied`。
 - PR guardian 第十轮 findings 已处理：`target_not_found` 纳入 media unavailable vocabulary，非 stable media shape 必须 `unsupported_content_type`，Issue `#423` integration metadata 已对齐 PR integration_check。
 - PR guardian 第十一轮 findings 已处理：按 FR-0405 移除 media `target_not_found`，`source_trace`/`audit` 改为公共字段白名单并增加下载 audit proof 校验，Issue/PR `merge_gate` 已对齐 `integration_check_required`。
+- PR guardian 第十二轮 findings 已处理：`target`、`media`、`source_ref_lineage` 嵌套对象均改为公共字段白名单并补私有字段回归。
 
 ## 下一步动作
 
@@ -79,7 +80,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，170 tests。
+  - 结果：通过，173 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`

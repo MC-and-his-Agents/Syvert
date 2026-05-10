@@ -1418,6 +1418,19 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_target_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_non_download_byte_count(self) -> None:
         payload = make_media_asset_fetch_result()
         payload["no_storage"]["downloaded_byte_length"] = 1
@@ -1564,11 +1577,40 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_media_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        payload["media"]["storage_handle"] = "storage://private"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_local_lineage_ref(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)
         assert isinstance(payload["media"]["source_ref_lineage"], dict)
         payload["media"]["source_ref_lineage"]["resolved_ref"] = "/tmp/downloaded-file.mp4"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_lineage_extra_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        assert isinstance(payload["media"], dict)
+        assert isinstance(payload["media"]["source_ref_lineage"], dict)
+        payload["media"]["source_ref_lineage"]["platform_media_schema"] = {"private": True}
 
         result = validate_success_payload(
             payload,

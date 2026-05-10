@@ -1207,6 +1207,9 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     target = envelope.get("target")
     if not isinstance(target, Mapping):
         raise TaskRecordContractError("media asset fetch result.target 必须是对象")
+    allowed_target_fields = {"operation", "target_type", "media_ref"}
+    if any(field not in allowed_target_fields for field in target):
+        raise TaskRecordContractError("media asset fetch result.target 只能包含公共白名单字段")
     if target.get("target_type") != "media_ref":
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
     _require_sanitized_media_ref(target.get("media_ref"), field="media asset fetch result.target.media_ref")
@@ -1317,6 +1320,9 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     if result_status == "complete":
         if not isinstance(media, Mapping):
             raise TaskRecordContractError("media asset fetch complete result 必须包含 media 对象")
+        allowed_media_fields = {"source_media_ref", "source_ref_lineage", "canonical_ref", "content_type", "metadata"}
+        if any(field not in allowed_media_fields for field in media):
+            raise TaskRecordContractError("media asset fetch media 只能包含公共白名单字段")
         source_media_ref = _require_sanitized_media_ref(
             media.get("source_media_ref"),
             field="result.envelope.media.source_media_ref",
@@ -1330,6 +1336,9 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         lineage = media.get("source_ref_lineage")
         if not isinstance(lineage, Mapping):
             raise TaskRecordContractError("media asset fetch media.source_ref_lineage 必须是对象")
+        allowed_lineage_fields = {"input_ref", "source_media_ref", "resolved_ref", "canonical_ref", "preservation_status"}
+        if any(field not in allowed_lineage_fields for field in lineage):
+            raise TaskRecordContractError("media asset fetch source_ref_lineage 只能包含公共白名单字段")
         expected_lineage = {
             "input_ref": target.get("media_ref"),
             "source_media_ref": source_media_ref,
