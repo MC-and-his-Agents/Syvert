@@ -108,9 +108,10 @@ This artifact records sanitized, replayable evidence for `FR-0404` after the #41
       "result_status": "complete"
     },
     "reply_hierarchy": {
+      "error_classification": "success",
       "parent_comment_ref": "comment:alpha-root-1",
       "reply_cursor_resume": "comment:alpha-root-1",
-      "result_status": "partial_result",
+      "result_status": "complete",
       "root_comment_ref": "comment:alpha-root-1",
       "target_comment_ref": "comment:alpha-root-1"
     },
@@ -125,16 +126,18 @@ This artifact records sanitized, replayable evidence for `FR-0404` after the #41
       "result_status": "complete"
     },
     "top_level_first_page": {
+      "error_classification": "success",
       "has_more": true,
       "item_count": 1,
       "next_continuation": true,
       "reply_cursor": true,
-      "result_status": "partial_result",
+      "result_status": "complete",
       "source_alias": "reference_source_comment_alpha"
     },
     "top_level_next_page": {
+      "error_classification": "success",
       "item_count": 1,
-      "result_status": "partial_result",
+      "result_status": "complete",
       "source_alias": "reference_source_comment_beta"
     },
     "total_parse_failed": {
@@ -148,7 +151,9 @@ This artifact records sanitized, replayable evidence for `FR-0404` after the #41
       "result_status": "complete"
     },
     "visibility_states": {
+      "error_classification": "success",
       "item_count": 3,
+      "result_status": "complete",
       "statuses": [
         "deleted",
         "invisible",
@@ -172,11 +177,11 @@ This artifact records sanitized, replayable evidence for `FR-0404` after the #41
   },
   "validation_commands": [
     "python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_comment_collection_evidence tests.runtime.test_runtime tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_task_record tests.runtime.test_read_side_collection_evidence tests.runtime.test_platform_leakage tests.runtime.test_cli_http_same_path tests.runtime.test_real_adapter_regression",
-    "python3 scripts/spec_guard.py --mode ci --base-sha 918cff01a8fa3b8488cfee747d79f07233c84691 --head-sha HEAD",
+    "python3 scripts/spec_guard.py --mode ci --base-sha ac421426eb5f5a4bce1ea5d0ed908962a05b6e5f --head-sha HEAD",
     "python3 scripts/docs_guard.py --mode ci",
     "python3 scripts/workflow_guard.py --mode ci",
     "python3 scripts/version_guard.py --mode ci",
-    "python3 scripts/governance_gate.py --mode ci --base-sha 918cff01a8fa3b8488cfee747d79f07233c84691 --head-sha HEAD --head-ref issue-419-404-v1-4-0-comment-collection-evidence"
+    "python3 scripts/governance_gate.py --mode ci --base-sha ac421426eb5f5a4bce1ea5d0ed908962a05b6e5f --head-sha HEAD --head-ref issue-419-404-v1-4-0-comment-collection-evidence"
   ],
   "work_item_ref": "#419"
 }

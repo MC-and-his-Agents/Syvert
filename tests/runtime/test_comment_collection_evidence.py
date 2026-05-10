@@ -95,8 +95,8 @@ def make_payload(
     target_ref: str = "content-001",
     has_more: bool = False,
     continuation_comment_ref: str | None = None,
-    result_status: str = "partial_result",
-    error_classification: str = "parse_failed",
+    result_status: str = "complete",
+    error_classification: str = "success",
 ) -> dict[str, Any]:
     return {
         "operation": "comment_collection",
@@ -144,17 +144,36 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
         self.assertTrue(report["baseline"]["fr_0403_collection_behavior_unchanged"])
 
     def test_artifact_text_does_not_expose_forbidden_source_identifiers(self) -> None:
-        text = ARTIFACT_PATH.read_text(encoding="utf-8").lower()
+        test_names = "\n".join(name for name in dir(self) if name.startswith("test_"))
+        text = "\n".join(
+            (
+                ARTIFACT_PATH.read_text(encoding="utf-8"),
+                Path(__file__).read_text(encoding="utf-8"),
+                test_names,
+            )
+        ).lower()
         forbidden_fragments = (
-            "hotcp",
-            "mediacrawler",
-            "mediacrawlpro",
-            "/users/",
-            "python-main",
-            "docs/research/",
+            "hot" + "cp",
+            "media" + "crawler",
+            "media" + "crawlpro",
+            "/" + "users/",
+            "python" + "-main",
+            "docs/" + "research/",
         )
 
         self.assertFalse(any(fragment in text for fragment in forbidden_fragments))
+
+    def content_detail_baseline_unchanged(self) -> bool:
+        suite = unittest.defaultTestLoader.loadTestsFromName("tests.runtime.test_cli_http_same_path")
+        result = unittest.TestResult()
+        suite.run(result)
+        return result.wasSuccessful()
+
+    def fr_0403_collection_behavior_unchanged(self) -> bool:
+        suite = unittest.defaultTestLoader.loadTestsFromName("tests.runtime.test_read_side_collection_evidence")
+        result = unittest.TestResult()
+        suite.run(result)
+        return result.wasSuccessful()
 
     def build_report(self) -> dict[str, object]:
         top_level = comment_collection_result_envelope_from_dict(
@@ -249,6 +268,8 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
                         evidence_alias="synthetic_comment_partial",
                     )
                 ],
+                result_status="partial_result",
+                error_classification="parse_failed",
             )
         )
         total_parse_failed = comment_collection_result_envelope_from_dict(
@@ -305,8 +326,8 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
                 "source_alias_only": True,
             },
             "baseline": {
-                "content_detail_by_url_unchanged": True,
-                "fr_0403_collection_behavior_unchanged": True,
+                "content_detail_by_url_unchanged": self.content_detail_baseline_unchanged(),
+                "fr_0403_collection_behavior_unchanged": self.fr_0403_collection_behavior_unchanged(),
                 "baseline_regression_refs": [
                     "tests.runtime.test_cli_http_same_path",
                     "tests.runtime.test_read_side_collection_evidence",
@@ -315,6 +336,7 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
             "scenarios": {
                 "top_level_first_page": {
                     "result_status": top_level.result_status,
+                    "error_classification": top_level.error_classification,
                     "item_count": len(top_level.items),
                     "has_more": top_level.has_more,
                     "next_continuation": top_level.next_continuation is not None,
@@ -323,11 +345,13 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
                 },
                 "top_level_next_page": {
                     "result_status": next_page.result_status,
+                    "error_classification": next_page.error_classification,
                     "item_count": len(next_page.items),
                     "source_alias": next_page.source_trace.evidence_alias,
                 },
                 "reply_hierarchy": {
                     "result_status": reply_page.result_status,
+                    "error_classification": reply_page.error_classification,
                     "root_comment_ref": reply_page.items[0].normalized.root_comment_ref,
                     "parent_comment_ref": reply_page.items[0].normalized.parent_comment_ref,
                     "target_comment_ref": reply_page.items[0].normalized.target_comment_ref,
@@ -339,6 +363,8 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
                 },
                 "visibility_states": {
                     "item_count": len(visibility_page.items),
+                    "result_status": visibility_page.result_status,
+                    "error_classification": visibility_page.error_classification,
                     "statuses": [item.visibility_status for item in visibility_page.items],
                 },
                 "duplicate_comment_item": duplicate_error,
@@ -363,11 +389,11 @@ class CommentCollectionEvidenceTests(unittest.TestCase):
             },
             "validation_commands": [
                 "python3 -m unittest tests.runtime.test_comment_collection tests.runtime.test_comment_collection_evidence tests.runtime.test_runtime tests.runtime.test_operation_taxonomy_admission_evidence tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_task_record tests.runtime.test_read_side_collection_evidence tests.runtime.test_platform_leakage tests.runtime.test_cli_http_same_path tests.runtime.test_real_adapter_regression",
-                "python3 scripts/spec_guard.py --mode ci --base-sha 918cff01a8fa3b8488cfee747d79f07233c84691 --head-sha HEAD",
+                "python3 scripts/spec_guard.py --mode ci --base-sha ac421426eb5f5a4bce1ea5d0ed908962a05b6e5f --head-sha HEAD",
                 "python3 scripts/docs_guard.py --mode ci",
                 "python3 scripts/workflow_guard.py --mode ci",
                 "python3 scripts/version_guard.py --mode ci",
-                "python3 scripts/governance_gate.py --mode ci --base-sha 918cff01a8fa3b8488cfee747d79f07233c84691 --head-sha HEAD --head-ref issue-419-404-v1-4-0-comment-collection-evidence",
+                "python3 scripts/governance_gate.py --mode ci --base-sha ac421426eb5f5a4bce1ea5d0ed908962a05b6e5f --head-sha HEAD --head-ref issue-419-404-v1-4-0-comment-collection-evidence",
             ],
         }
 
