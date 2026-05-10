@@ -16,6 +16,7 @@ from syvert.registry import (
     AdapterResourceRequirementDeclaration,
     AdapterResourceRequirementDeclarationV2,
     AdapterResourceRequirementProfile,
+    baseline_multi_profile_resource_requirement_declaration,
     baseline_required_resource_requirement_declaration,
 )
 from syvert.read_side_collection import CommentReplyCursor, CommentRequestCursor
@@ -393,6 +394,30 @@ class MediaAssetFetchUnexpectedDownloadAdapter(MediaAssetFetchAdapter):
             fetch_mode="download_if_allowed",
             fetch_outcome="downloaded_bytes",
         )
+
+
+class V1AccountOnlyMediaAssetFetchAdapter(MediaAssetFetchAdapter):
+    resource_requirement_declarations = (
+        AdapterResourceRequirementDeclaration(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch",
+            resource_dependency_mode="required",
+            required_capabilities=("account",),
+            evidence_refs=(
+                "fr-0015:runtime:content-detail-by-url-hybrid:requested-slots",
+                "fr-0015:xhs:content-detail:url:hybrid:account-material",
+            ),
+        ),
+    )
+
+
+class MultiProfileMediaAssetFetchAdapter(MediaAssetFetchAdapter):
+    resource_requirement_declarations = (
+        baseline_multi_profile_resource_requirement_declaration(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch",
+        ),
+    )
 
 
 class V1AccountOnlyCommentCollectionAdapter(CommentCollectionAdapter):
@@ -1178,6 +1203,24 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_missing_nullable_failure_field(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload.pop("fetch_outcome")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["field"], "fetch_outcome")
+
     def test_validate_success_payload_accepts_unsupported_content_type_failure(self) -> None:
         payload = make_media_asset_fetch_result(
             content_type="mixed_media",
@@ -1622,6 +1665,72 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 request,
                 adapters={TEST_ADAPTER_KEY: adapter},
                 task_id_factory=lambda: "task-runtime-comment-collection-v1-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
+
+    def test_execute_task_uses_media_asset_fetch_account_only_profile(self) -> None:
+        adapter = MultiProfileMediaAssetFetchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-media-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-media-asset-fetch-account-only",
+                resource_lifecycle_store=account_only_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.requested_slots, ("account",))
+        self.assertIsNotNone(adapter.last_request.resource_bundle.account)
+        self.assertIsNone(adapter.last_request.resource_bundle.proxy)
+
+    def test_execute_task_uses_v1_media_asset_fetch_account_only_declaration(self) -> None:
+        adapter = V1AccountOnlyMediaAssetFetchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:v1-account-only-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            account_only_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            account_only_store.seed_resources(
+                (
+                    ResourceRecord(
+                        resource_id="account-media-v1-only-001",
+                        resource_type="account",
+                        status="AVAILABLE",
+                        material=managed_account_material(generic_account_material(), adapter_key=TEST_ADAPTER_KEY),
+                    ),
+                )
+            )
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-media-asset-fetch-v1-account-only",
                 resource_lifecycle_store=account_only_store,
             )
 

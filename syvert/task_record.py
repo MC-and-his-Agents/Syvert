@@ -1180,6 +1180,20 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
     require_string(target.get("target_ref"), field="media asset fetch result.target.target_ref")
 
+    for required_field in (
+        "content_type",
+        "fetch_policy",
+        "fetch_outcome",
+        "result_status",
+        "error_classification",
+        "raw_payload_ref",
+        "source_trace",
+        "no_storage",
+        "media",
+    ):
+        if required_field not in envelope:
+            raise TaskRecordContractError("media asset fetch result 字段必须显式存在")
+
     content_type = require_string(envelope.get("content_type"), field="result.envelope.content_type")
     fetch_policy = envelope.get("fetch_policy")
     if not isinstance(fetch_policy, Mapping):
@@ -1246,8 +1260,6 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             raise TaskRecordContractError(f"media asset fetch source_trace 字段缺失或无效: {required_field}")
     validate_timestamp(source_trace.get("fetched_at"), field="result.envelope.source_trace.fetched_at")
 
-    if "media" not in envelope:
-        raise TaskRecordContractError("media asset fetch result.media 字段必须存在")
     media = envelope.get("media")
     if result_status == "complete":
         if not isinstance(media, Mapping):

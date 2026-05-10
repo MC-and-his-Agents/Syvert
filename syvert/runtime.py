@@ -3352,7 +3352,7 @@ def resolve_runtime_requested_resource_slots(
         adapter_key=requirement_declaration.adapter_key,
         capability=requirement_declaration.capability,
     )
-    if requirement_declaration.capability != COMMENT_COLLECTION_FAMILY:
+    if requirement_declaration.capability not in {COMMENT_COLLECTION_FAMILY, MEDIA_ASSET_FETCH}:
         return available_capabilities
     if type(requirement_declaration) is not AdapterResourceRequirementDeclarationV2:
         return tuple(requirement_declaration.required_capabilities)
@@ -3796,6 +3796,24 @@ def validate_success_payload(
                 details={"target_ref": result_target_ref, "expected_target_ref": target_value},
             )
 
+        for required_field in (
+            "content_type",
+            "fetch_policy",
+            "fetch_outcome",
+            "result_status",
+            "error_classification",
+            "raw_payload_ref",
+            "source_trace",
+            "no_storage",
+            "media",
+        ):
+            if required_field not in payload:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch result 字段必须显式存在",
+                    details={"field": required_field},
+                )
+
         content_type = payload.get("content_type")
         if not isinstance(content_type, str) or not content_type:
             return runtime_contract_error(
@@ -3890,11 +3908,6 @@ def validate_success_payload(
         if source_trace_error is not None:
             return source_trace_error
 
-        if "media" not in payload:
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                "media asset fetch result.media 字段必须存在",
-            )
         media = payload.get("media")
         if result_status == "complete":
             media_error = _validate_media_asset_fetch_media(
