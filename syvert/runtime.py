@@ -53,11 +53,13 @@ CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_SEARCH_BY_KEYWORD = "content_search_by_keyword"
 CONTENT_LIST_BY_CREATOR = "content_list_by_creator"
 COMMENT_COLLECTION = COMMENT_COLLECTION_OPERATION
+CREATOR_PROFILE_BY_ID = "creator_profile_by_id"
 MEDIA_ASSET_FETCH_BY_REF = "media_asset_fetch_by_ref"
 CONTENT_DETAIL = "content_detail"
 CONTENT_SEARCH = "content_search"
 CONTENT_LIST = "content_list"
 COMMENT_COLLECTION_FAMILY = "comment_collection"
+CREATOR_PROFILE = "creator_profile"
 MEDIA_ASSET_FETCH = "media_asset_fetch"
 LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
@@ -70,9 +72,46 @@ CAPABILITY_FAMILY_BY_OPERATION = {
     CONTENT_SEARCH_BY_KEYWORD: CONTENT_SEARCH,
     CONTENT_LIST_BY_CREATOR: CONTENT_LIST,
     COMMENT_COLLECTION: COMMENT_COLLECTION_FAMILY,
+    CREATOR_PROFILE_BY_ID: CREATOR_PROFILE,
     MEDIA_ASSET_FETCH_BY_REF: MEDIA_ASSET_FETCH,
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
+CREATOR_PROFILE_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
+CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS = frozenset(
+    {
+        "target_not_found",
+        "profile_unavailable",
+        "permission_denied",
+    }
+)
+CREATOR_PROFILE_FAILED_CLASSIFICATIONS = frozenset(
+    {
+        "rate_limited",
+        "platform_failed",
+        "provider_or_network_blocked",
+        "parse_failed",
+        "credential_invalid",
+        "verification_required",
+        "signature_or_request_invalid",
+    }
+)
+CREATOR_PROFILE_ALLOWED_CLASSIFICATIONS = (
+    CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS | CREATOR_PROFILE_FAILED_CLASSIFICATIONS
+)
+CREATOR_PROFILE_FORBIDDEN_REF_VALUE_TOKENS = (
+    "http://",
+    "https://",
+    "file://",
+    "/tmp/",
+    "/var/",
+    "\\",
+    "token=",
+    "session",
+    "credential",
+    "secret",
+    "account-pool",
+    "proxy-pool",
+)
 MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
@@ -117,6 +156,7 @@ RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_SEARCH_BY_KEYWORD, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_LIST_BY_CREATOR, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (COMMENT_COLLECTION, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
+    (CREATOR_PROFILE_BY_ID, DIRECT_COLLECTION_MODE): ("account", "proxy"),
     (MEDIA_ASSET_FETCH_BY_REF, DIRECT_COLLECTION_MODE): ("account", "proxy"),
 }
 DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
@@ -135,7 +175,7 @@ EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
 EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
 _ALLOWED_MATCHER_CAPABILITIES = frozenset(
-    {CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY, MEDIA_ASSET_FETCH}
+    {CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY, CREATOR_PROFILE, MEDIA_ASSET_FETCH}
 )
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 _EXECUTION_CONCURRENCY_LOCK = threading.Lock()
@@ -1553,6 +1593,19 @@ def run_adapter_attempt_with_timeout(
             success_envelope.update(
                 comment_collection_result_envelope_to_dict(comment_collection_result_envelope_from_dict(payload))
             )
+        elif capability == CREATOR_PROFILE_BY_ID:
+            success_envelope.update(
+                {
+                    "operation": payload["operation"],
+                    "target": payload["target"],
+                    "result_status": payload["result_status"],
+                    "error_classification": payload["error_classification"],
+                    "profile": payload["profile"],
+                    "raw_payload_ref": payload["raw_payload_ref"],
+                    "source_trace": payload["source_trace"],
+                    "audit": payload.get("audit", {}),
+                }
+            )
         elif capability == MEDIA_ASSET_FETCH_BY_REF:
             success_envelope.update(
                 {
@@ -2817,6 +2870,26 @@ def _media_fetch_policies_match(request_policy: Mapping[str, Any], result_policy
     return normalize_media_fetch_policy(request_policy) == normalize_media_fetch_policy(result_policy)
 
 
+def _creator_ref_value_is_sanitized(value: str) -> bool:
+    normalized = value.lower()
+    return not any(token in normalized for token in CREATOR_PROFILE_FORBIDDEN_REF_VALUE_TOKENS)
+
+
+def _validate_creator_ref_value(value: Any, *, field: str) -> dict[str, Any] | None:
+    if not isinstance(value, str) or not value:
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            f"creator profile {field} 必须为非空脱敏 opaque ref",
+        )
+    if not _creator_ref_value_is_sanitized(value):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            f"creator profile {field} 不得包含 URL、路径、平台名、凭证或账号池定位信息",
+            details={"field": field},
+        )
+    return None
+
+
 def _media_ref_value_is_sanitized(value: str) -> bool:
     normalized = value.lower()
     return not any(token in normalized for token in MEDIA_ASSET_FORBIDDEN_REF_VALUE_TOKENS)
@@ -3208,6 +3281,25 @@ def _project_task_input_to_target(
             CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
             None,
         )
+    if capability == CREATOR_PROFILE_BY_ID:
+        if not isinstance(input_value.creator_id, str) or not input_value.creator_id:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=""),
+                CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.creator_id 不能为空"),
+            )
+        creator_ref_error = _validate_creator_ref_value(input_value.creator_id, field="input.creator_id")
+        if creator_ref_error is not None:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=input_value.creator_id),
+                CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.creator_id 必须是脱敏 opaque ref"),
+            )
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="creator", target_value=input_value.creator_id),
+            CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+            None,
+        )
     if capability == MEDIA_ASSET_FETCH_BY_REF:
         if not isinstance(input_value.media_ref, str) or not input_value.media_ref:
             return (
@@ -3476,7 +3568,7 @@ def resolve_runtime_requested_resource_slots(
         adapter_key=requirement_declaration.adapter_key,
         capability=requirement_declaration.capability,
     )
-    if requirement_declaration.capability not in {COMMENT_COLLECTION_FAMILY, MEDIA_ASSET_FETCH}:
+    if requirement_declaration.capability not in {COMMENT_COLLECTION_FAMILY, CREATOR_PROFILE, MEDIA_ASSET_FETCH}:
         return available_capabilities
     if type(requirement_declaration) is not AdapterResourceRequirementDeclarationV2:
         return tuple(requirement_declaration.required_capabilities)
@@ -3877,6 +3969,293 @@ def validate_success_payload(
                         "next_resume_comment_ref": envelope.next_continuation.resume_comment_ref,
                     },
                 )
+        return None
+    if capability == CREATOR_PROFILE_BY_ID:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile success validation requires target_type and target_value",
+            )
+
+        operation = payload.get("operation")
+        if not isinstance(operation, str) or operation != CREATOR_PROFILE_BY_ID:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.operation 必须为 creator_profile_by_id",
+                details={"operation": operation, "expected_operation": CREATOR_PROFILE_BY_ID},
+            )
+
+        target = payload.get("target")
+        if not isinstance(target, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.target 必须是对象",
+            )
+        allowed_payload_fields = {
+            "operation",
+            "target",
+            "result_status",
+            "error_classification",
+            "profile",
+            "raw_payload_ref",
+            "source_trace",
+            "audit",
+        }
+        for field in payload:
+            if field not in allowed_payload_fields:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result 只能包含公共白名单字段",
+                    details={"field": field},
+                )
+        allowed_target_fields = {"operation", "target_type", "creator_ref", "target_display_hint", "policy_ref"}
+        for field in target:
+            if field not in allowed_target_fields:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result.target 只能包含公共白名单字段",
+                    details={"field": field},
+                )
+        if target.get("operation") != CREATOR_PROFILE_BY_ID:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.target.operation 必须与顶层 operation 一致",
+                details={"operation": target.get("operation"), "expected_operation": CREATOR_PROFILE_BY_ID},
+            )
+
+        result_target_type = target.get("target_type")
+        result_target_ref = target.get("creator_ref")
+        if result_target_type != target_type:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.target.target_type 必须与请求一致",
+                details={"target_type": result_target_type, "expected_target_type": target_type},
+            )
+        target_ref_error = _validate_creator_ref_value(result_target_ref, field="target.creator_ref")
+        if target_ref_error is not None:
+            return target_ref_error
+        if result_target_ref != target_value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.target.creator_ref 必须与请求 target_value 一致",
+                details={"target_ref": result_target_ref, "expected_target_ref": target_value},
+            )
+        for optional_ref in ("target_display_hint", "policy_ref"):
+            value = target.get(optional_ref)
+            if value is not None:
+                ref_error = _validate_creator_ref_value(value, field=f"target.{optional_ref}")
+                if ref_error is not None:
+                    return ref_error
+        for required_field in (
+            "result_status",
+            "error_classification",
+            "profile",
+            "raw_payload_ref",
+            "source_trace",
+            "audit",
+        ):
+            if required_field not in payload:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result 字段必须显式存在",
+                    details={"field": required_field},
+                )
+
+        result_status = payload.get("result_status")
+        if not isinstance(result_status, str) or result_status not in CREATOR_PROFILE_RESULT_STATUSES:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result.result_status 不在允许范围",
+                details={"result_status": result_status},
+            )
+
+        error_classification = payload.get("error_classification")
+        if result_status == "complete":
+            if error_classification is not None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result_status=complete 时 error_classification 必须为 null",
+                    details={"error_classification": error_classification},
+                )
+        elif result_status == "unavailable":
+            if not (isinstance(error_classification, str) and error_classification in CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result_status=unavailable 时错误分类不允许",
+                    details={"error_classification": error_classification},
+                )
+        else:
+            if not (isinstance(error_classification, str) and error_classification in CREATOR_PROFILE_FAILED_CLASSIFICATIONS):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile result_status=failed 时错误分类不允许",
+                    details={"error_classification": error_classification},
+                )
+
+        raw_payload_ref = payload.get("raw_payload_ref")
+        if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile raw_payload_ref 必须为字符串或 null",
+            )
+        if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile complete result 必须包含 raw_payload_ref",
+            )
+        if error_classification == "provider_or_network_blocked" and raw_payload_ref is not None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile provider_or_network_blocked 必须使用 null raw_payload_ref",
+            )
+
+        source_trace = payload.get("source_trace")
+        if not isinstance(source_trace, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile source_trace 必须是对象",
+            )
+        allowed_source_trace_fields = {"adapter_key", "provider_path", "resource_profile_ref", "fetched_at", "evidence_alias"}
+        for field in source_trace:
+            if field not in allowed_source_trace_fields:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile source_trace 只能包含公共白名单字段",
+                    details={"field": field},
+                )
+        for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
+            value = source_trace.get(required_field)
+            if not isinstance(value, str) or not value:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile source_trace 字段缺失或无效",
+                    details={"field": required_field},
+                )
+        if not is_valid_rfc3339_utc(source_trace.get("fetched_at")):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile source_trace.fetched_at 必须为 RFC3339 UTC",
+            )
+        provider_path = source_trace.get("provider_path")
+        if not isinstance(provider_path, str) or not _creator_ref_value_is_sanitized(provider_path):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile source_trace.provider_path 不得包含平台、路径、凭证或账号池定位信息",
+                details={"field": "source_trace.provider_path"},
+            )
+        if error_classification == "provider_or_network_blocked" and not provider_path.startswith("provider://blocked-path-alias"):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile provider_or_network_blocked 必须使用脱敏 blocked-path alias",
+                details={"field": "source_trace.provider_path"},
+            )
+        resource_profile_ref = source_trace.get("resource_profile_ref")
+        if resource_profile_ref is not None:
+            resource_profile_error = _validate_creator_ref_value(
+                resource_profile_ref,
+                field="source_trace.resource_profile_ref",
+            )
+            if resource_profile_error is not None:
+                return resource_profile_error
+
+        if "audit" not in payload:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile result 字段必须显式存在",
+                details={"field": "audit"},
+            )
+        audit = payload.get("audit")
+        if audit is None:
+            audit = {}
+        if not isinstance(audit, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile audit 必须是对象或 null",
+            )
+        if audit:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile audit 只能是空对象",
+            )
+
+        profile = payload.get("profile")
+        if result_status == "complete":
+            if not isinstance(profile, Mapping):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile complete 结果 profile 必须是对象",
+                )
+            allowed_profile_fields = {
+                "creator_ref",
+                "canonical_ref",
+                "display_name",
+                "avatar_ref",
+                "description",
+                "public_counts",
+                "profile_url_hint",
+            }
+            for field in profile:
+                if field not in allowed_profile_fields:
+                    return runtime_contract_error(
+                        "invalid_adapter_success_payload",
+                        "creator profile profile 只能包含公共白名单字段",
+                        details={"field": field},
+                    )
+            creator_ref = profile.get("creator_ref")
+            creator_ref_error = _validate_creator_ref_value(creator_ref, field="profile.creator_ref")
+            if creator_ref_error is not None:
+                return creator_ref_error
+            canonical_ref_error = _validate_creator_ref_value(profile.get("canonical_ref"), field="profile.canonical_ref")
+            if canonical_ref_error is not None:
+                return canonical_ref_error
+            display_name = profile.get("display_name")
+            if not isinstance(display_name, str) or not display_name:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "creator profile 完整成功时 normalized display_name 必须为非空字符串",
+                )
+            for field in ("avatar_ref", "description", "profile_url_hint"):
+                value = profile.get(field)
+                if field == "description":
+                    if value is not None and not isinstance(value, str):
+                        return runtime_contract_error(
+                            "invalid_adapter_success_payload",
+                            "creator profile 字段 description 必须为字符串或 null",
+                        )
+                    continue
+                if value is not None:
+                    ref_error = _validate_creator_ref_value(value, field=f"profile.{field}")
+                    if ref_error is not None:
+                        return ref_error
+            public_counts = profile.get("public_counts")
+            if public_counts is not None:
+                if not isinstance(public_counts, Mapping):
+                    return runtime_contract_error(
+                        "invalid_adapter_success_payload",
+                        "creator profile public_counts 必须是对象或 null",
+                    )
+                allowed_count_fields = {"follower_count", "following_count", "content_count", "like_count"}
+                for count_name, value in public_counts.items():
+                    if count_name not in allowed_count_fields:
+                        return runtime_contract_error(
+                            "invalid_adapter_success_payload",
+                            "creator profile public_counts 只能包含公共白名单字段",
+                            details={"field": count_name},
+                        )
+                    if value is None:
+                        continue
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        return runtime_contract_error(
+                            "invalid_adapter_success_payload",
+                            "creator profile public_counts 计数字段必须为非负整数或 null",
+                            details={"field": count_name},
+                        )
+        elif profile is not None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "creator profile unavailable/failed 时 profile 必须为 null",
+            )
+
         return None
 
     if capability == MEDIA_ASSET_FETCH_BY_REF:

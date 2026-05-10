@@ -26,11 +26,41 @@ SHARED_CAPABILITIES = frozenset(
         "content_list_by_creator",
         "comment_collection",
         "media_asset_fetch_by_ref",
+        "creator_profile_by_id",
     }
 )
 SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
 SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", "direct"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
+CREATOR_PROFILE_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
+CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS = frozenset(
+    {"target_not_found", "profile_unavailable", "permission_denied"}
+)
+CREATOR_PROFILE_FAILED_CLASSIFICATIONS = frozenset(
+    {
+        "rate_limited",
+        "platform_failed",
+        "provider_or_network_blocked",
+        "parse_failed",
+        "credential_invalid",
+        "verification_required",
+        "signature_or_request_invalid",
+    }
+)
+CREATOR_PROFILE_FORBIDDEN_REF_VALUE_TOKENS = (
+    "http://",
+    "https://",
+    "file://",
+    "/tmp/",
+    "/var/",
+    "\\",
+    "token=",
+    "session",
+    "credential",
+    "secret",
+    "account-pool",
+    "proxy-pool",
+)
 MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
@@ -757,6 +787,8 @@ def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
         raise TaskRecordContractError("TaskRequestSnapshot.collection_mode 不在共享请求模型允许值范围内")
     if not adapter_key:
         raise TaskRecordContractError("TaskRequestSnapshot.adapter_key 必须为非空字符串")
+    if capability == "creator_profile_by_id" and target_type == "creator":
+        _require_sanitized_creator_ref(target_value, field="TaskRequestSnapshot.target_value")
     if capability == "media_asset_fetch_by_ref" and target_type == "media_ref":
         _require_sanitized_media_ref(target_value, field="TaskRequestSnapshot.target_value")
 
@@ -1041,6 +1073,14 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
                 raise TaskRecordContractError("comment collection target_type 与请求快照不一致")
             if collection.target.target_ref != record.request.target_value:
                 raise TaskRecordContractError("comment collection target_ref 与请求快照不一致")
+        if capability == "creator_profile_by_id":
+            target = envelope.get("target")
+            if not isinstance(target, Mapping):
+                raise TaskRecordContractError("creator profile target 必须是对象")
+            if target.get("target_type") != record.request.target_type:
+                raise TaskRecordContractError("creator profile target_type 与请求快照不一致")
+            if target.get("creator_ref") != record.request.target_value:
+                raise TaskRecordContractError("creator profile creator_ref 与请求快照不一致")
         if capability == "media_asset_fetch_by_ref":
             target = envelope.get("target")
             if not isinstance(target, Mapping):
@@ -1108,6 +1148,9 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     if capability == COMMENT_COLLECTION_OPERATION:
         _validate_comment_collection_success_terminal_envelope(envelope)
         return
+    if capability == "creator_profile_by_id":
+        _validate_creator_profile_success_terminal_envelope(envelope)
+        return
     if capability == "media_asset_fetch_by_ref":
         _validate_media_asset_fetch_success_terminal_envelope(envelope)
         return
@@ -1173,6 +1216,145 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
     image_urls = media.get("image_urls")
     if not isinstance(image_urls, list) or not all(isinstance(item, str) for item in image_urls):
         raise TaskRecordContractError("result.envelope.normalized.media.image_urls 必须是字符串数组")
+
+
+def _validate_creator_profile_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    operation = require_string(envelope.get("operation"), field="result.envelope.operation")
+    if operation != "creator_profile_by_id":
+        raise TaskRecordContractError("creator profile result.operation 必须为 creator_profile_by_id")
+
+    target = envelope.get("target")
+    if not isinstance(target, Mapping):
+        raise TaskRecordContractError("creator profile result.target 必须是对象")
+    allowed_target_fields = {"operation", "target_type", "creator_ref", "target_display_hint", "policy_ref"}
+    if any(field not in allowed_target_fields for field in target):
+        raise TaskRecordContractError("creator profile result.target 只能包含公共白名单字段")
+    if target.get("operation") != operation:
+        raise TaskRecordContractError("creator profile result.target.operation 必须与顶层 operation 一致")
+    if target.get("target_type") != "creator":
+        raise TaskRecordContractError("creator profile result.target.target_type 必须为 creator")
+    _require_sanitized_creator_ref(target.get("creator_ref"), field="creator profile result.target.creator_ref")
+    for optional_ref in ("target_display_hint", "policy_ref"):
+        value = target.get(optional_ref)
+        if value is not None:
+            _require_sanitized_creator_ref(value, field=f"creator profile result.target.{optional_ref}")
+    for required_field in ("result_status", "error_classification", "profile", "raw_payload_ref", "source_trace", "audit"):
+        if required_field not in envelope:
+            raise TaskRecordContractError("creator profile result 字段必须显式存在")
+
+    result_status = envelope.get("result_status")
+    if not isinstance(result_status, str) or result_status not in CREATOR_PROFILE_RESULT_STATUSES:
+        raise TaskRecordContractError("creator profile result_status 不在允许范围")
+
+    error_classification = envelope.get("error_classification")
+    if result_status == "complete":
+        if error_classification is not None:
+            raise TaskRecordContractError("creator profile result_status=complete 时 error_classification 必须为 null")
+    elif result_status == "unavailable":
+        if not (isinstance(error_classification, str) and error_classification in CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS):
+            raise TaskRecordContractError("creator profile result_status=unavailable 时错误分类不允许")
+    else:
+        if not (isinstance(error_classification, str) and error_classification in CREATOR_PROFILE_FAILED_CLASSIFICATIONS):
+            raise TaskRecordContractError("creator profile result_status=failed 时错误分类不允许")
+
+    raw_payload_ref = envelope.get("raw_payload_ref")
+    if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
+        raise TaskRecordContractError("creator profile raw_payload_ref 必须为字符串或 null")
+    if result_status == "complete" and not (isinstance(raw_payload_ref, str) and raw_payload_ref):
+        raise TaskRecordContractError("creator profile complete result 必须包含 raw_payload_ref")
+    if error_classification == "provider_or_network_blocked" and raw_payload_ref is not None:
+        raise TaskRecordContractError("creator profile provider_or_network_blocked 必须使用 null raw_payload_ref")
+
+    source_trace = envelope.get("source_trace")
+    if not isinstance(source_trace, Mapping):
+        raise TaskRecordContractError("creator profile source_trace 必须是对象")
+    allowed_source_trace_fields = {"adapter_key", "provider_path", "resource_profile_ref", "fetched_at", "evidence_alias"}
+    if any(field not in allowed_source_trace_fields for field in source_trace):
+        raise TaskRecordContractError("creator profile source_trace 只能包含公共白名单字段")
+    for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
+        value = source_trace.get(required_field)
+        if not isinstance(value, str) or not value:
+            raise TaskRecordContractError(f"creator profile source_trace 字段缺失或无效: {required_field}")
+    fetched_at = source_trace.get("fetched_at")
+    try:
+        validate_timestamp(fetched_at, field="result.envelope.source_trace.fetched_at")
+    except TaskRecordContractError as error:
+        raise TaskRecordContractError("creator profile source_trace.fetched_at 必须为 RFC3339 UTC") from error
+    resource_profile_ref = source_trace.get("resource_profile_ref")
+    if resource_profile_ref is not None:
+        _require_sanitized_creator_ref(resource_profile_ref, field="result.envelope.source_trace.resource_profile_ref")
+    provider_path = source_trace.get("provider_path")
+    if not isinstance(provider_path, str) or not _creator_ref_value_is_sanitized(provider_path):
+        raise TaskRecordContractError("creator profile source_trace.provider_path 不得包含平台、路径、凭证或账号池定位信息")
+    if error_classification == "provider_or_network_blocked" and not (
+        isinstance(provider_path, str) and provider_path.startswith("provider://blocked-path-alias")
+    ):
+        raise TaskRecordContractError("creator profile provider_or_network_blocked 必须使用脱敏 blocked-path alias")
+
+    if "audit" not in envelope:
+        raise TaskRecordContractError("creator profile result 字段必须显式存在")
+    audit = envelope.get("audit", {})
+    if audit is None:
+        audit = {}
+    if not isinstance(audit, Mapping):
+        raise TaskRecordContractError("creator profile audit 必须是对象或 null")
+    if audit:
+        raise TaskRecordContractError("creator profile audit 只能是空对象")
+
+    profile = envelope.get("profile")
+    if result_status == "complete":
+        if not isinstance(profile, Mapping):
+            raise TaskRecordContractError("creator profile complete 结果 profile 必须是对象")
+        allowed_profile_fields = {
+            "creator_ref",
+            "canonical_ref",
+            "display_name",
+            "avatar_ref",
+            "description",
+            "public_counts",
+            "profile_url_hint",
+        }
+        if any(field not in allowed_profile_fields for field in profile):
+            raise TaskRecordContractError("creator profile profile 只能包含公共白名单字段")
+        _require_sanitized_creator_ref(profile.get("creator_ref"), field="result.envelope.profile.creator_ref")
+        _require_sanitized_creator_ref(profile.get("canonical_ref"), field="result.envelope.profile.canonical_ref")
+        display_name = profile.get("display_name")
+        if not isinstance(display_name, str) or not display_name:
+            raise TaskRecordContractError("creator profile 完整成功时 display_name 必须为非空字符串")
+        for field in ("avatar_ref", "profile_url_hint"):
+            value = profile.get(field)
+            if value is not None:
+                _require_sanitized_creator_ref(value, field=f"result.envelope.profile.{field}")
+        description = profile.get("description")
+        if description is not None and not isinstance(description, str):
+            raise TaskRecordContractError("creator profile 字段 description 必须为字符串或 null")
+
+        public_counts = profile.get("public_counts")
+        if public_counts is not None:
+            if not isinstance(public_counts, Mapping):
+                raise TaskRecordContractError("creator profile public_counts 必须是对象或 null")
+            allowed_count_fields = {"follower_count", "following_count", "content_count", "like_count"}
+            for count_name, value in public_counts.items():
+                if count_name not in allowed_count_fields:
+                    raise TaskRecordContractError("creator profile public_counts 只能包含公共白名单字段")
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise TaskRecordContractError("creator profile public_counts 计数字段必须为非负整数或 null")
+    elif profile is not None:
+        raise TaskRecordContractError("creator profile unavailable/failed 时 profile 必须为 null")
+
+
+def _creator_ref_value_is_sanitized(value: str) -> bool:
+    normalized = value.lower()
+    return not any(token in normalized for token in CREATOR_PROFILE_FORBIDDEN_REF_VALUE_TOKENS)
+
+
+def _require_sanitized_creator_ref(value: Any, *, field: str) -> str:
+    ref = require_string(value, field=field)
+    if not _creator_ref_value_is_sanitized(ref):
+        raise TaskRecordContractError(f"{field} 不得包含 URL、路径、平台名、凭证或账号池定位信息")
+    return ref
 
 
 def _validate_collection_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
