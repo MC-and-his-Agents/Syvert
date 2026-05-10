@@ -69,7 +69,9 @@
 
 ## Review finding 处理记录
 
-- 当前尚无 guardian findings，待 PR 创建并执行 `pr_guardian.py review` 后回填。
+- guardian preflight finding（PR #442，第 1 轮）：
+  - 问题：`## Review Artifacts` 使用绝对路径 Markdown 链接，且 `Review artifact` 字段未按 rubric 要求绑定 `code_review.md` 与 `spec_review.md`。
+  - 处理：改为 repo-relative locator 文本，并在 `Review artifact` 明确填入 `code_review.md, spec_review.md`；随后重跑 `pr_guardian.py review`。
 
 ## 未决风险
 
