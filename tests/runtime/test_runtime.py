@@ -1301,6 +1301,23 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_unsupported_content_type_wrong_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="mixed_media",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="parse_failed",
+        )
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_private_metadata(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)
@@ -1408,6 +1425,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
         for status, classification in (
             ("unavailable", "permission_denied"),
+            ("unavailable", "target_not_found"),
             ("failed", "credential_invalid"),
             ("failed", "verification_required"),
         ):

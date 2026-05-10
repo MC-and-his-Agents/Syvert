@@ -77,7 +77,7 @@ MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
-MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied"})
+MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied", "target_not_found"})
 MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
     {
         "unsupported_content_type",
@@ -3962,6 +3962,12 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch failed result 错误分类不允许",
                     details={"error_classification": error_classification},
+                )
+            if content_type not in MEDIA_ASSET_CONTENT_TYPES and error_classification != "unsupported_content_type":
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch 非 stable content_type 必须使用 unsupported_content_type",
+                    details={"content_type": content_type, "error_classification": error_classification},
                 )
             allowed_content_types = request_policy.get("allowed_content_types")
             if (

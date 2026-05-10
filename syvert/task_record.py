@@ -35,7 +35,7 @@ MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
-MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied"})
+MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied", "target_not_found"})
 MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
     {
         "unsupported_content_type",
@@ -1278,6 +1278,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             and error_classification in MEDIA_ASSET_FAILED_CLASSIFICATIONS
         ):
             raise TaskRecordContractError("media asset fetch failed result 错误分类不允许")
+        if content_type not in MEDIA_ASSET_CONTENT_TYPES and error_classification != "unsupported_content_type":
+            raise TaskRecordContractError("media asset fetch 非 stable content_type 必须使用 unsupported_content_type")
 
     raw_payload_ref = envelope.get("raw_payload_ref")
     if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
