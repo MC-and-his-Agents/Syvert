@@ -158,6 +158,40 @@ class ProviderCapabilityOfferTests(unittest.TestCase):
 
                 self.assert_invalid(result)
 
+    def test_validator_accepts_creator_profile_direct_offer(self) -> None:
+        result = validate_provider_capability_offer(
+            valid_provider_capability_offer(
+                capability="creator_profile",
+                operation="creator_profile_by_id",
+                target_type="creator",
+                collection_mode="direct",
+            )
+        )
+
+        self.assertEqual(result.status, PROVIDER_OFFER_STATUS_DECLARED)
+        self.assertEqual(result.capability, "creator_profile")
+        self.assertEqual(
+            result.details["offer_id"],
+            "xhs:native_xhs_detail:creator_profile:creator_profile_by_id:creator:direct:v0.8.0",
+        )
+
+    def test_validator_accepts_media_asset_fetch_direct_offer(self) -> None:
+        result = validate_provider_capability_offer(
+            valid_provider_capability_offer(
+                capability="media_asset_fetch",
+                operation="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                collection_mode="direct",
+            )
+        )
+
+        self.assertEqual(result.status, PROVIDER_OFFER_STATUS_DECLARED)
+        self.assertEqual(result.capability, "media_asset_fetch")
+        self.assertEqual(
+            result.details["offer_id"],
+            "xhs:native_xhs_detail:media_asset_fetch:media_asset_fetch_by_ref:media_ref:direct:v0.8.0",
+        )
+
     def test_validator_rejects_proof_not_covering_adapter_binding(self) -> None:
         offer = copy_offer(valid_provider_capability_offer(adapter_key="external_adapter"))
         offer["adapter_binding"]["provider_port_ref"] = "external_adapter:adapter-owned-provider-port"
