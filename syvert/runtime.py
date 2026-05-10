@@ -737,7 +737,9 @@ def execute_task_internal(
         )
     request_cursor_validation_snapshot = (
         clone_request_cursor(normalized_request.request_cursor)
-        if capability in {COMMENT_COLLECTION, MEDIA_ASSET_FETCH_BY_REF}
+        if capability == COMMENT_COLLECTION
+        else normalize_media_fetch_policy(normalized_request.request_cursor)
+        if capability == MEDIA_ASSET_FETCH_BY_REF
         else None
     )
 
@@ -2693,9 +2695,14 @@ def default_media_fetch_policy() -> dict[str, Any]:
 def normalize_media_fetch_policy(policy: Mapping[str, Any] | None) -> dict[str, Any]:
     if policy is None:
         return default_media_fetch_policy()
+    allowed_content_types = policy.get("allowed_content_types")
+    if isinstance(allowed_content_types, list):
+        normalized_allowed_content_types = list(allowed_content_types)
+    else:
+        normalized_allowed_content_types = allowed_content_types
     return {
         "fetch_mode": policy.get("fetch_mode"),
-        "allowed_content_types": list(policy.get("allowed_content_types") or []),
+        "allowed_content_types": normalized_allowed_content_types,
         "allow_download": policy.get("allow_download"),
         "max_bytes": policy.get("max_bytes"),
     }
@@ -2765,7 +2772,7 @@ def _media_fetch_policy_allows_outcome(
     fetch_mode = policy.get("fetch_mode")
     allow_download = policy.get("allow_download")
     if fetch_outcome == "metadata_only":
-        return True
+        return fetch_mode == "metadata_only"
     if fetch_outcome == "source_ref_preserved":
         return fetch_mode in {"preserve_source_ref", "download_if_allowed"}
     if fetch_outcome == "downloaded_bytes":
@@ -3801,7 +3808,7 @@ def validate_success_payload(
             return policy_error
         result_policy = normalize_media_fetch_policy(payload["fetch_policy"])
         request_policy = normalize_media_fetch_policy(request_cursor)
-        if request_cursor is not None and not _media_fetch_policies_match(request_policy, result_policy):
+        if not _media_fetch_policies_match(request_policy, result_policy):
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
                 "media asset fetch result.fetch_policy 必须与请求 fetch_policy 一致",
@@ -3883,6 +3890,11 @@ def validate_success_payload(
         if source_trace_error is not None:
             return source_trace_error
 
+        if "media" not in payload:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.media 字段必须存在",
+            )
         media = payload.get("media")
         if result_status == "complete":
             media_error = _validate_media_asset_fetch_media(
@@ -3898,7 +3910,7 @@ def validate_success_payload(
                 value = media["metadata"].get("byte_size")
                 if isinstance(value, int) and not isinstance(value, bool):
                     byte_size = value
-            if request_cursor is not None and not _media_fetch_policy_allows_outcome(
+            if not _media_fetch_policy_allows_outcome(
                 request_policy,
                 fetch_outcome,
                 content_type,

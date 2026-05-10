@@ -385,6 +385,16 @@ class MediaAssetFetchLeakyStorageAdapter(MediaAssetFetchAdapter):
         return payload
 
 
+class MediaAssetFetchUnexpectedDownloadAdapter(MediaAssetFetchAdapter):
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_media_asset_fetch_result(
+            target_ref=request.input.media_ref or "",
+            fetch_mode="download_if_allowed",
+            fetch_outcome="downloaded_bytes",
+        )
+
+
 class V1AccountOnlyCommentCollectionAdapter(CommentCollectionAdapter):
     resource_requirement_declarations = (
         AdapterResourceRequirementDeclaration(
@@ -1045,6 +1055,23 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
         self.assertEqual(result.envelope["error"]["details"]["field"], "local_path")
 
+    def test_execute_task_fails_closed_for_media_asset_fetch_default_policy_download(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-default-policy"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchUnexpectedDownloadAdapter()},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-policy",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_rejects_media_asset_fetch_missing_lineage(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)
@@ -1120,6 +1147,37 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_metadata_only(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_mode="download_required", fetch_outcome="metadata_only")
+        payload["fetch_policy"]["allow_download"] = True
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_missing_failed_media_null(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload.pop("media")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
     def test_validate_success_payload_accepts_unsupported_content_type_failure(self) -> None:
         payload = make_media_asset_fetch_result(
             content_type="mixed_media",
@@ -1149,6 +1207,28 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_task_request_rejects_media_fetch_policy_allowed_content_type_shape(self) -> None:
+        result = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                input=TaskInput(
+                    media_ref="media:asset-001",
+                    media_fetch_policy={
+                        "fetch_mode": "metadata_only",
+                        "allowed_content_types": 1,
+                        "allow_download": False,
+                        "max_bytes": None,
+                    },
+                ),
+            ),
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-media-policy-shape",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
 
     def test_validate_success_payload_rejects_media_asset_fetch_unstable_content_type(self) -> None:
         payload = make_media_asset_fetch_result(content_type="mixed_media")

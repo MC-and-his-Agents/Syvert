@@ -51,6 +51,7 @@
 - PR guardian 首轮 findings 已处理：fetch policy 请求对象、`result_status`/`fetch_outcome` 分离、`source_ref_lineage`、downloaded-bytes public metadata、permission/auth failure classifications 均已按 FR-0405 对齐。
 - PR guardian 第二轮 findings 已处理：结果绑定原始请求 fetch policy、stable media content type 收窄为 `image`/`video`、media metadata 改为公共白名单字段。
 - PR guardian 第三轮 findings 已处理：`unsupported_content_type` failed carrier 可表达非 stable shape、`max_bytes`/`download_required` policy boundary 已执行、complete success 必须包含 `raw_payload_ref`。
+- PR guardian 第四轮 findings 已处理：默认 fetch policy 参与结果校验、`download_required` 不接受 metadata/source-ref 降级、非法 `allowed_content_types` fail-closed、failed/unavailable carrier 必须显式 `media: null`。
 
 ## 下一步动作
 
@@ -71,7 +72,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，145 tests。
+  - 结果：通过，149 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`

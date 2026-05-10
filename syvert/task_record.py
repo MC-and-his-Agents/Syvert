@@ -1246,6 +1246,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             raise TaskRecordContractError(f"media asset fetch source_trace 字段缺失或无效: {required_field}")
     validate_timestamp(source_trace.get("fetched_at"), field="result.envelope.source_trace.fetched_at")
 
+    if "media" not in envelope:
+        raise TaskRecordContractError("media asset fetch result.media 字段必须存在")
     media = envelope.get("media")
     if result_status == "complete":
         if not isinstance(media, Mapping):
