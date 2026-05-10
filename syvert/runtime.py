@@ -2597,6 +2597,9 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
     if not isinstance(policy.collection_mode, str) or policy.collection_mode not in ALLOWED_COLLECTION_MODES:
         return None, invalid_input_error("invalid_task_request", "collection_mode 不合法")
     if target.capability == MEDIA_ASSET_FETCH_BY_REF:
+        media_ref_error = _validate_media_ref_value(target.target_value, field="target.target_value")
+        if media_ref_error is not None:
+            return None, invalid_input_error("invalid_task_request", "target.target_value 必须是脱敏 opaque media ref")
         media_policy_error = validate_media_fetch_policy(request.request_cursor)
         if media_policy_error is not None:
             return None, media_policy_error
@@ -4096,6 +4099,12 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch failed result 错误分类不允许",
                     details={"error_classification": error_classification},
+                )
+            if content_type in MEDIA_ASSET_CONTENT_TYPES and error_classification == "unsupported_content_type":
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch stable content_type 不得使用 unsupported_content_type",
+                    details={"content_type": content_type},
                 )
             if (
                 content_type not in MEDIA_ASSET_CONTENT_TYPES

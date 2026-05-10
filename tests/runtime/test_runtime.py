@@ -1122,6 +1122,26 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "failed")
         self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
 
+    def test_execute_core_task_request_rejects_private_media_ref_target(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="https://signed.example.invalid/media?token=secret",
+            ),
+            policy=CollectionPolicy(collection_mode="direct"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-core-media-private-ref",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
+
     def test_validate_success_payload_rejects_media_asset_fetch_missing_lineage(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)
@@ -1387,6 +1407,23 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             target_type="media_ref",
             target_value="media:asset-001",
             request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_stable_media_unsupported_classification(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="image",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="unsupported_content_type",
+        )
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")

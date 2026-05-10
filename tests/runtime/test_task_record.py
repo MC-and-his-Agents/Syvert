@@ -510,6 +510,20 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
 
+    def test_rejects_private_media_asset_fetch_request_snapshot(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-media-private-ref",
+                TaskRequestSnapshot(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="media_asset_fetch_by_ref",
+                    target_type="media_ref",
+                    target_value="https://signed.example.invalid/media?token=secret",
+                    collection_mode="direct",
+                ),
+                occurred_at="2026-05-09T10:00:00Z",
+            )
+
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

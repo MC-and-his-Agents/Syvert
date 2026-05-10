@@ -747,7 +747,7 @@ def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
     adapter_key = require_string(snapshot.adapter_key, field="TaskRequestSnapshot.adapter_key")
     capability = require_string(snapshot.capability, field="TaskRequestSnapshot.capability")
     target_type = require_string(snapshot.target_type, field="TaskRequestSnapshot.target_type")
-    require_string(snapshot.target_value, field="TaskRequestSnapshot.target_value")
+    target_value = require_string(snapshot.target_value, field="TaskRequestSnapshot.target_value")
     collection_mode = require_string(snapshot.collection_mode, field="TaskRequestSnapshot.collection_mode")
     if capability not in SHARED_CAPABILITIES:
         raise TaskRecordContractError("TaskRequestSnapshot.capability 不在共享请求模型允许值范围内")
@@ -757,6 +757,8 @@ def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
         raise TaskRecordContractError("TaskRequestSnapshot.collection_mode 不在共享请求模型允许值范围内")
     if not adapter_key:
         raise TaskRecordContractError("TaskRequestSnapshot.adapter_key 必须为非空字符串")
+    if capability == "media_asset_fetch_by_ref" and target_type == "media_ref":
+        _require_sanitized_media_ref(target_value, field="TaskRequestSnapshot.target_value")
 
 
 def validate_timestamp(value: str, *, field: str) -> None:
@@ -1319,6 +1321,8 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
             and error_classification in MEDIA_ASSET_FAILED_CLASSIFICATIONS
         ):
             raise TaskRecordContractError("media asset fetch failed result 错误分类不允许")
+        if content_type in MEDIA_ASSET_CONTENT_TYPES and error_classification == "unsupported_content_type":
+            raise TaskRecordContractError("media asset fetch stable content_type 不得使用 unsupported_content_type")
         if (
             content_type not in MEDIA_ASSET_CONTENT_TYPES
             and error_classification != "unsupported_content_type"
