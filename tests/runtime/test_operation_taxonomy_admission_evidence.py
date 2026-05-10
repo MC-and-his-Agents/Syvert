@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from syvert.adapter_provider_compatibility_decision import (
-    COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT,
+    COMPATIBILITY_DECISION_STATUS_MATCHED,
     decide_adapter_provider_compatibility,
 )
 from syvert.operation_taxonomy import (
@@ -33,7 +33,7 @@ class OperationTaxonomyAdmissionEvidenceTests(unittest.TestCase):
         self.assertEqual({report.operation for report in reports}, {"content_search", "comment_collection"})
         self.assertTrue(manifest["execution_contract"]["comment_collection_runtime_delivery_allowed"])
         self.assertFalse(manifest["execution_contract"]["stable_lookup_allowed"])
-        self.assertFalse(manifest["execution_contract"]["compatibility_match_allowed"])
+        self.assertTrue(manifest["execution_contract"]["compatibility_match_allowed"])
 
     def test_proposed_content_search_is_not_stable_but_comment_collection_is_runtime_capability(self) -> None:
         content_search = proposed_content_search_entry()
@@ -54,9 +54,10 @@ class OperationTaxonomyAdmissionEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(entry.contract_refs, ("FR-0404",))
 
-    def test_comment_collection_stable_slice_still_cannot_match_before_consumer_migration(self) -> None:
+    def test_comment_collection_stable_slice_matches_after_consumer_migration(self) -> None:
         input_value = copy_decision_input()
         input_value["requirement"]["capability"] = "comment_collection"
+        input_value["requirement"]["resource_requirement"]["capability"] = "comment_collection"
         input_value["requirement"]["execution_requirement"] = {
             "operation": "comment_collection",
             "target_type": "content",
@@ -79,8 +80,8 @@ class OperationTaxonomyAdmissionEvidenceTests(unittest.TestCase):
 
         decision = decide_adapter_provider_compatibility(input_value)
 
-        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
-        self.assertEqual(decision.matched_profiles, ())
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_MATCHED)
+        self.assertNotEqual(decision.matched_profiles, ())
 
     def test_taxonomy_rejects_provider_workflow_marketplace_and_platform_private_fields(self) -> None:
         forbidden_fields = (

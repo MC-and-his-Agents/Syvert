@@ -93,6 +93,49 @@ class OperationTaxonomyConsumerMigrationTests(unittest.TestCase):
         self.assertEqual(validate_provider_capability_offer(offer).status, "declared")
         self.assertEqual(decide_adapter_provider_compatibility(decision_input).decision_status, "matched")
 
+    def test_requirement_offer_and_decision_accept_comment_collection_runtime_slice(self) -> None:
+        requirement = copy_requirement()
+        requirement["capability"] = "comment_collection"
+        requirement["resource_requirement"]["capability"] = "comment_collection"
+        requirement["execution_requirement"] = {
+            "operation": "comment_collection",
+            "target_type": "content",
+            "collection_mode": "paginated",
+        }
+        requirement["observability"]["requirement_id"] = "xhs:comment_collection:comment_collection:content:paginated"
+
+        offer = copy_offer()
+        offer["capability_offer"] = {
+            "capability": "comment_collection",
+            "operation": "comment_collection",
+            "target_type": "content",
+            "collection_mode": "paginated",
+        }
+        offer["observability"]["capability"] = "comment_collection"
+        offer["observability"]["operation"] = "comment_collection"
+        offer["observability"]["offer_id"] = (
+            "xhs:native_xhs_detail:comment_collection:comment_collection:content:paginated:v0.8.0"
+        )
+
+        decision_input = copy_decision_input()
+        decision_input["requirement"] = requirement
+        decision_input["offer"] = offer
+
+        self.assertEqual(
+            validate_adapter_capability_requirement(
+                AdapterCapabilityRequirementValidationInput(
+                    requirement=requirement,
+                    available_resource_capabilities=("account", "proxy"),
+                )
+            ).status,
+            "declared",
+        )
+        self.assertEqual(validate_provider_capability_offer(offer).status, "declared")
+        decision = decide_adapter_provider_compatibility(decision_input)
+        self.assertEqual(decision.decision_status, "matched")
+        self.assertEqual(decision.capability, "comment_collection")
+        self.assertEqual(decision.execution_slice.operation, "comment_collection")
+
     def test_adapter_requirement_rejects_proposed_taxonomy_candidate(self) -> None:
         requirement = copy_requirement()
         requirement["capability"] = "content_search"

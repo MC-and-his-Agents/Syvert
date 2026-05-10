@@ -78,6 +78,61 @@ def make_collection_result(
     }
 
 
+def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[str, object]:
+    return {
+        "operation": "comment_collection",
+        "target": {
+            "operation": "comment_collection",
+            "target_type": "content",
+            "target_ref": target_ref,
+            "target_display_hint": target_ref,
+        },
+        "items": [
+            {
+                "item_type": "comment",
+                "dedup_key": "comment:root-1",
+                "source_id": "root-1",
+                "source_ref": "comment://root-1",
+                "normalized": {
+                    "source_platform": TEST_ADAPTER_KEY,
+                    "source_type": "comment",
+                    "source_id": "root-1",
+                    "canonical_ref": "comment:root-1",
+                    "body_text_hint": "root comment",
+                    "author_ref": "creator-1",
+                    "published_at": "2026-05-09T10:00:00Z",
+                    "root_comment_ref": "comment:root-1",
+                    "parent_comment_ref": None,
+                    "target_comment_ref": None,
+                },
+                "visibility_status": "visible",
+                "reply_cursor": None,
+                "raw_payload_ref": "raw://comment/root-1",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+                    "fetched_at": "2026-05-09T10:00:00Z",
+                    "evidence_alias": "alias://comment-page-1",
+                },
+            }
+        ],
+        "has_more": False,
+        "next_continuation": None,
+        "result_status": "partial_result",
+        "error_classification": "parse_failed",
+        "raw_payload_ref": "raw://comment/page-1",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://comment-page-1",
+        },
+        "audit": {"page_index": 1},
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -250,6 +305,20 @@ class CollectionSearchAdapter:
         return make_collection_result(target_ref=request.input.keyword or "")
 
 
+class CommentCollectionAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"comment_collection"})
+    supported_targets = frozenset({"content"})
+    supported_collection_modes = frozenset({"paginated"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="comment_collection",
+    )
+
+    def execute(self, request):
+        return make_comment_collection_result(target_ref=request.input.content_ref or "")
+
+
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
@@ -270,6 +339,29 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(restored, outcome.task_record)
         self.assertEqual(restored.status, "succeeded")
+
+    def test_round_trips_comment_collection_record(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="comment_collection",
+                input=TaskInput(content_ref="content-001"),
+            ),
+            adapters={TEST_ADAPTER_KEY: CommentCollectionAdapter()},
+            task_id_factory=lambda: "task-record-comment-collection-1",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertEqual(outcome.envelope["operation"], "comment_collection")
+        self.assertIsNotNone(outcome.task_record)
+
+        payload = task_record_to_dict(outcome.task_record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, outcome.task_record)
+        self.assertEqual(restored.request.capability, "comment_collection")
+        self.assertEqual(restored.request.target_type, "content")
+        self.assertEqual(restored.request.target_value, "content-001")
 
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(
