@@ -51,3 +51,7 @@
 ## 回滚方式
 
 - Use a revert PR for this Work Item only. #417 runtime carrier remains independently merged on main.
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- `a29efc6f5f369a13632979f9538850a04fd04c1a`
