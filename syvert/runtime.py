@@ -3845,7 +3845,7 @@ def validate_success_payload(
                 "media asset fetch result.target 必须是对象",
             )
         result_target_type = target.get("target_type")
-        result_target_ref = target.get("target_ref")
+        result_target_ref = target.get("media_ref")
         if result_target_type != target_type:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
@@ -3855,15 +3855,15 @@ def validate_success_payload(
         if not isinstance(result_target_ref, str) or not result_target_ref:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
-                "media asset fetch result.target.target_ref 必须为非空字符串",
+                "media asset fetch result.target.media_ref 必须为非空字符串",
             )
-        target_ref_error = _validate_media_ref_value(result_target_ref, field="target.target_ref")
+        target_ref_error = _validate_media_ref_value(result_target_ref, field="target.media_ref")
         if target_ref_error is not None:
             return target_ref_error
         if result_target_ref != target_value:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
-                "media asset fetch result.target.target_ref 必须与请求 target_value 一致",
+                "media asset fetch result.target.media_ref 必须与请求 target_value 一致",
                 details={"target_ref": result_target_ref, "expected_target_ref": target_value},
             )
 
@@ -3974,6 +3974,19 @@ def validate_success_payload(
                     "invalid_adapter_success_payload",
                     "media asset fetch 公共 content_type 被请求 policy 排除时必须使用 fetch_policy_denied",
                     details={"content_type": content_type, "error_classification": error_classification},
+                )
+            fetch_mode = request_policy.get("fetch_mode")
+            allow_download = request_policy.get("allow_download")
+            max_bytes = request_policy.get("max_bytes")
+            if (
+                fetch_mode == "download_required"
+                and (allow_download is not True or max_bytes == 0)
+                and error_classification != "fetch_policy_denied"
+            ):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch download_required 被请求 policy 阻止时必须使用 fetch_policy_denied",
+                    details={"fetch_mode": fetch_mode, "error_classification": error_classification},
                 )
 
         raw_payload_ref = payload.get("raw_payload_ref")

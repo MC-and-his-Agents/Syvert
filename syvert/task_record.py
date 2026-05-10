@@ -1045,8 +1045,8 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
                 raise TaskRecordContractError("media asset fetch target 必须是对象")
             if target.get("target_type") != record.request.target_type:
                 raise TaskRecordContractError("media asset fetch target_type 与请求快照不一致")
-            if target.get("target_ref") != record.request.target_value:
-                raise TaskRecordContractError("media asset fetch target_ref 与请求快照不一致")
+            if target.get("media_ref") != record.request.target_value:
+                raise TaskRecordContractError("media asset fetch media_ref 与请求快照不一致")
         if "error" in envelope:
             raise TaskRecordContractError("success TaskTerminalResult.envelope 不得包含 error")
         return
@@ -1209,7 +1209,7 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         raise TaskRecordContractError("media asset fetch result.target 必须是对象")
     if target.get("target_type") != "media_ref":
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
-    _require_sanitized_media_ref(target.get("target_ref"), field="media asset fetch result.target.target_ref")
+    _require_sanitized_media_ref(target.get("media_ref"), field="media asset fetch result.target.media_ref")
 
     for required_field in (
         "content_type",
@@ -1321,7 +1321,7 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         if not isinstance(lineage, Mapping):
             raise TaskRecordContractError("media asset fetch media.source_ref_lineage 必须是对象")
         expected_lineage = {
-            "input_ref": target.get("target_ref"),
+            "input_ref": target.get("media_ref"),
             "source_media_ref": source_media_ref,
             "canonical_ref": canonical_ref,
             "preservation_status": "preserved",

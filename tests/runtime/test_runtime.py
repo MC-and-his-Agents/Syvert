@@ -178,7 +178,7 @@ def make_media_asset_fetch_result(
         "target": {
             "operation": "media_asset_fetch_by_ref",
             "target_type": "media_ref",
-            "target_ref": target_ref,
+            "media_ref": target_ref,
         },
         "content_type": content_type,
         "fetch_policy": {
@@ -1016,7 +1016,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["status"], "success")
         self.assertEqual(result.envelope["operation"], "media_asset_fetch_by_ref")
         self.assertEqual(result.envelope["target"]["target_type"], "media_ref")
-        self.assertEqual(result.envelope["target"]["target_ref"], "media:asset-001")
+        self.assertEqual(result.envelope["target"]["media_ref"], "media:asset-001")
         self.assertEqual(result.envelope["result_status"], "complete")
         self.assertEqual(result.envelope["fetch_outcome"], "metadata_only")
         self.assertEqual(result.envelope["fetch_policy"], fetch_policy)
@@ -1344,6 +1344,50 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             target_type="media_ref",
             target_value="media:asset-001",
             request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_required_policy_failure_class(self) -> None:
+        payload = make_media_asset_fetch_result(
+            fetch_mode="download_required",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="platform_failed",
+        )
+        payload["fetch_policy"]["allow_download"] = False
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_formal_media_ref_target(self) -> None:
+        payload = make_media_asset_fetch_result()
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_legacy_target_ref_only(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["target"]["target_ref"] = payload["target"].pop("media_ref")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
         )
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")

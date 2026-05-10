@@ -139,7 +139,7 @@ def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dic
         "target": {
             "operation": "media_asset_fetch_by_ref",
             "target_type": "media_ref",
-            "target_ref": target_ref,
+            "media_ref": target_ref,
         },
         "content_type": "image",
         "fetch_policy": {
