@@ -115,6 +115,14 @@ class ReadSideCollectionCarrierTests(unittest.TestCase):
         self.assertIsNone(validate_collection_result_envelope(envelope))
         self.assertEqual(collection_result_envelope_to_dict(envelope), payload)
 
+    def test_success_classification_remains_comment_collection_only(self) -> None:
+        payload = make_payload(error_classification="success")
+
+        result = validate_collection_result_envelope(payload)
+
+        self.assertEqual(result["code"], "invalid_collection_contract")
+        self.assertIn("error_classification", result["message"])
+
     def test_fake_carrier_empty_result(self) -> None:
         payload = make_payload(
             result_status="empty",
