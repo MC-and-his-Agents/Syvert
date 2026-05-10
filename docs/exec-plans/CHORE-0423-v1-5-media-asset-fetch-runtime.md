@@ -11,7 +11,7 @@
 - Parent FR：`#405`
 - 关联 spec：`docs/specs/FR-0405-creator-profile-media-asset-read-contract/spec.md`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#439`（`https://github.com/MC-and-his-Agents/Syvert/pull/439`）
 - 状态：`active`
 - active 收口事项：`CHORE-0423-v1-5-media-asset-fetch-runtime`
 
@@ -47,7 +47,7 @@
 - Canonical spec input：`#421` / PR `#428`。
 - Worktree key：`issue-423-405-v1-5-0-media-asset-fetch-runtime`
 - Branch：`issue-423-405-v1-5-0-media-asset-fetch-runtime`
-- 当前实现已落地，等待 PR / guardian / merge gate。
+- 当前实现已落地并提交到 PR `#439`，等待 guardian / merge gate。
 
 ## 下一步动作
 
@@ -88,6 +88,8 @@
   - 结果：通过。
 - `python3 -m unittest`
   - 结果：未执行测试；当前仓库默认 unittest discovery 未配置，返回 `NO TESTS RAN`。
+- PR `#439`
+  - 结果：已创建并绑定 branch/workspace；当前 head SHA 由 PR `headRefOid` 与 guardian merge gate 判定。
 
 ## 未决风险
 
