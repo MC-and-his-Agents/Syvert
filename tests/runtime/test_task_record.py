@@ -133,6 +133,43 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dict[str, object]:
+    return {
+        "operation": "media_asset_fetch_by_ref",
+        "target": {
+            "operation": "media_asset_fetch_by_ref",
+            "target_type": "media_ref",
+            "target_ref": target_ref,
+        },
+        "content_type": "image",
+        "fetch_policy": "metadata_only",
+        "fetch_outcome": "metadata_only",
+        "error_classification": None,
+        "source_ref": f"source:{target_ref}",
+        "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+        "media": {
+            "media_ref": target_ref,
+            "content_type": "image",
+            "source_url_hint": "https://media.example.invalid/object/asset-001",
+            "byte_length": None,
+            "checksum": None,
+        },
+        "no_storage": {
+            "stored": False,
+            "downloaded_byte_length": 0,
+            "retention_policy": "metadata_only",
+        },
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://media-asset-fetch-1",
+        },
+        "audit": {"case": "media_asset_fetch_reference"},
+    }
+
+
 class TaskRecordStoreEnvMixin(ResourceStoreEnvMixin):
     def setUp(self) -> None:
         super().setUp()
@@ -319,6 +356,20 @@ class CommentCollectionAdapter:
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class MediaAssetFetchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"media_asset_fetch"})
+    supported_targets = frozenset({"media_ref"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="media_asset_fetch",
+    )
+
+    def execute(self, request):
+        return make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+
+
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
@@ -362,6 +413,29 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.request.capability, "comment_collection")
         self.assertEqual(restored.request.target_type, "content")
         self.assertEqual(restored.request.target_value, "content-001")
+
+    def test_round_trips_media_asset_fetch_record(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="media_asset_fetch_by_ref",
+                input=TaskInput(media_ref="media:asset-001"),
+            ),
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-record-media-asset-fetch-1",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertEqual(outcome.envelope["operation"], "media_asset_fetch_by_ref")
+        self.assertIsNotNone(outcome.task_record)
+
+        payload = task_record_to_dict(outcome.task_record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, outcome.task_record)
+        self.assertEqual(restored.request.capability, "media_asset_fetch_by_ref")
+        self.assertEqual(restored.request.target_type, "media_ref")
+        self.assertEqual(restored.request.target_value, "media:asset-001")
 
     def test_rejects_missing_required_lifecycle_event(self) -> None:
         outcome = execute_task_with_record(

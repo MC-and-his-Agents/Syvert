@@ -53,28 +53,50 @@ CONTENT_DETAIL_BY_URL = "content_detail_by_url"
 CONTENT_SEARCH_BY_KEYWORD = "content_search_by_keyword"
 CONTENT_LIST_BY_CREATOR = "content_list_by_creator"
 COMMENT_COLLECTION = COMMENT_COLLECTION_OPERATION
+MEDIA_ASSET_FETCH_BY_REF = "media_asset_fetch_by_ref"
 CONTENT_DETAIL = "content_detail"
 CONTENT_SEARCH = "content_search"
 CONTENT_LIST = "content_list"
 COMMENT_COLLECTION_FAMILY = "comment_collection"
+MEDIA_ASSET_FETCH = "media_asset_fetch"
 LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
-ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword"})
-ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
+DIRECT_COLLECTION_MODE = "direct"
+ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
+ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", DIRECT_COLLECTION_MODE})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {
     CONTENT_DETAIL_BY_URL: CONTENT_DETAIL,
     CONTENT_SEARCH_BY_KEYWORD: CONTENT_SEARCH,
     CONTENT_LIST_BY_CREATOR: CONTENT_LIST,
     COMMENT_COLLECTION: COMMENT_COLLECTION_FAMILY,
+    MEDIA_ASSET_FETCH_BY_REF: MEDIA_ASSET_FETCH,
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
+MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video", "mixed_media", "unknown"})
+MEDIA_ASSET_FETCH_POLICIES = frozenset({"metadata_only", "source_ref_preserved", "download_bytes"})
+MEDIA_ASSET_FETCH_OUTCOMES = frozenset(
+    {"metadata_only", "source_ref_preserved", "downloaded_bytes", "unavailable", "denied", "failed"}
+)
+MEDIA_ASSET_FAILED_OUTCOME_CLASSIFICATIONS = frozenset(
+    {
+        "media_unavailable",
+        "unsupported_content_type",
+        "fetch_policy_denied",
+        "rate_limited",
+        "platform_failed",
+        "provider_or_network_blocked",
+        "parse_failed",
+        "signature_or_request_invalid",
+    }
+)
 RFC3339_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE = {
     (CONTENT_DETAIL_BY_URL, LEGACY_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_SEARCH_BY_KEYWORD, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (CONTENT_LIST_BY_CREATOR, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
     (COMMENT_COLLECTION, PAGINATED_COLLECTION_MODE): ("account", "proxy"),
+    (MEDIA_ASSET_FETCH_BY_REF, DIRECT_COLLECTION_MODE): ("account", "proxy"),
 }
 DEFAULT_BUNDLE_VALIDATION_RELEASE_REASON = "host_side_bundle_validation_failed"
 DEFAULT_SUCCESS_RELEASE_REASON = "adapter_completed_without_disposition_hint"
@@ -91,7 +113,9 @@ EXECUTION_CONTROL_CODE_EXECUTION_CONTROL_STATE_INVALID = "execution_control_stat
 EXECUTION_CONTROL_CODE_RETRY_EXHAUSTED = "retry_exhausted"
 EXECUTION_TIMEOUT_CLOSEOUT_GRACE_SECONDS = 0.1
 _ALLOWED_MATCH_STATUSES = frozenset({MATCH_STATUS_MATCHED, MATCH_STATUS_UNMATCHED})
-_ALLOWED_MATCHER_CAPABILITIES = frozenset({CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY})
+_ALLOWED_MATCHER_CAPABILITIES = frozenset(
+    {CONTENT_DETAIL, CONTENT_SEARCH, CONTENT_LIST, COMMENT_COLLECTION_FAMILY, MEDIA_ASSET_FETCH}
+)
 _APPROVED_RESOURCE_CAPABILITY_IDS = approved_resource_capability_ids()
 _EXECUTION_CONCURRENCY_LOCK = threading.Lock()
 _EXECUTION_CONCURRENCY_IN_FLIGHT: dict[tuple[str, ...], int] = {}
@@ -109,6 +133,7 @@ class TaskInput:
     content_ref: str | None = None
     keyword: str | None = None
     creator_id: str | None = None
+    media_ref: str | None = None
     continuation_token: str | None = None
     comment_request_cursor: Mapping[str, Any] | None = None
 
@@ -193,6 +218,8 @@ class AdapterTaskRequest:
             return TaskInput(content_ref=self.target_value, comment_request_cursor=self.request_cursor)
         if self.target_type == "creator":
             return TaskInput(creator_id=self.target_value)
+        if self.target_type == "media_ref":
+            return TaskInput(media_ref=self.target_value)
         return TaskInput()
 
 
@@ -1500,6 +1527,23 @@ def run_adapter_attempt_with_timeout(
             success_envelope.update(
                 comment_collection_result_envelope_to_dict(comment_collection_result_envelope_from_dict(payload))
             )
+        elif capability == MEDIA_ASSET_FETCH_BY_REF:
+            success_envelope.update(
+                {
+                    "operation": payload["operation"],
+                    "target": payload["target"],
+                    "content_type": payload["content_type"],
+                    "fetch_policy": payload["fetch_policy"],
+                    "fetch_outcome": payload["fetch_outcome"],
+                    "error_classification": payload["error_classification"],
+                    "source_ref": payload["source_ref"],
+                    "raw_payload_ref": payload["raw_payload_ref"],
+                    "media": payload["media"],
+                    "no_storage": payload["no_storage"],
+                    "source_trace": payload["source_trace"],
+                    "audit": payload.get("audit", {}),
+                }
+            )
         else:
             success_envelope.update({"raw": payload["raw"], "normalized": payload["normalized"]})
         return (success_envelope, disposition_hint, default_release_reason, False, False)
@@ -2694,6 +2738,18 @@ def _project_task_input_to_target(
             CollectionPolicy(collection_mode=PAGINATED_COLLECTION_MODE),
             None,
         )
+    if capability == MEDIA_ASSET_FETCH_BY_REF:
+        if not isinstance(input_value.media_ref, str) or not input_value.media_ref:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="media_ref", target_value=""),
+                CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.media_ref 不能为空"),
+            )
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="media_ref", target_value=input_value.media_ref),
+            CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+            None,
+        )
     if capability == COMMENT_COLLECTION:
         if not isinstance(input_value.content_ref, str) or not input_value.content_ref:
             return (
@@ -3337,6 +3393,193 @@ def validate_success_payload(
                         "next_resume_comment_ref": envelope.next_continuation.resume_comment_ref,
                     },
                 )
+        return None
+
+    if capability == MEDIA_ASSET_FETCH_BY_REF:
+        if target_type is None or target_value is None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch success validation requires target_type and target_value",
+            )
+
+        operation = payload.get("operation")
+        if not isinstance(operation, str) or operation != MEDIA_ASSET_FETCH_BY_REF:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.operation 必须为 media_asset_fetch_by_ref",
+                details={"operation": operation, "expected_operation": MEDIA_ASSET_FETCH_BY_REF},
+            )
+
+        target = payload.get("target")
+        if not isinstance(target, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.target 必须是对象",
+            )
+        result_target_type = target.get("target_type")
+        result_target_ref = target.get("target_ref")
+        if result_target_type != target_type:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.target.target_type 与请求不一致",
+                details={"target_type": result_target_type, "expected_target_type": target_type},
+            )
+        if not isinstance(result_target_ref, str) or not result_target_ref:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.target.target_ref 必须为非空字符串",
+            )
+        if result_target_ref != target_value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch result.target.target_ref 必须与请求 target_value 一致",
+                details={"target_ref": result_target_ref, "expected_target_ref": target_value},
+            )
+
+        content_type = payload.get("content_type")
+        if not isinstance(content_type, str) or content_type not in MEDIA_ASSET_CONTENT_TYPES:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch content_type 不在允许范围",
+                details={"content_type": content_type},
+            )
+        fetch_policy = payload.get("fetch_policy")
+        if not isinstance(fetch_policy, str) or fetch_policy not in MEDIA_ASSET_FETCH_POLICIES:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch fetch_policy 不在允许范围",
+                details={"fetch_policy": fetch_policy},
+            )
+        fetch_outcome = payload.get("fetch_outcome")
+        if not isinstance(fetch_outcome, str) or fetch_outcome not in MEDIA_ASSET_FETCH_OUTCOMES:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch fetch_outcome 不在允许范围",
+                details={"fetch_outcome": fetch_outcome},
+            )
+
+        error_classification = payload.get("error_classification")
+        if fetch_outcome in {"metadata_only", "source_ref_preserved", "downloaded_bytes"}:
+            if error_classification is not None:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch 成功 outcome 必须使用 null error_classification",
+                    details={"error_classification": error_classification},
+                )
+        elif not (
+            isinstance(error_classification, str)
+            and error_classification in MEDIA_ASSET_FAILED_OUTCOME_CLASSIFICATIONS
+        ):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch 失败 outcome 错误分类不允许",
+                details={"error_classification": error_classification},
+            )
+
+        raw_payload_ref = payload.get("raw_payload_ref")
+        if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch raw_payload_ref 必须为字符串或 null",
+            )
+        source_ref = payload.get("source_ref")
+        if not isinstance(source_ref, str) or not source_ref:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_ref 必须为非空字符串",
+            )
+
+        source_trace = payload.get("source_trace")
+        if not isinstance(source_trace, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace 必须是对象",
+            )
+        for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
+            value = source_trace.get(required_field)
+            if not isinstance(value, str) or not value:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch source_trace 字段缺失或无效",
+                    details={"field": required_field},
+                )
+        if not is_valid_rfc3339_utc(source_trace.get("fetched_at")):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace.fetched_at 必须为 RFC3339 UTC",
+            )
+
+        media = payload.get("media")
+        if fetch_outcome in {"metadata_only", "source_ref_preserved", "downloaded_bytes"}:
+            if not isinstance(media, Mapping):
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch 成功 outcome 必须包含 media 对象",
+                )
+            media_ref = media.get("media_ref")
+            if not isinstance(media_ref, str) or not media_ref:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch media.media_ref 必须为非空字符串",
+                )
+            if media_ref != target_value:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch media.media_ref 必须与请求 target_value 一致",
+                    details={"media_ref": media_ref, "expected_target_ref": target_value},
+                )
+            if media.get("content_type") != content_type:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch media.content_type 必须与顶层 content_type 一致",
+                )
+            for field in ("source_url_hint", "checksum", "byte_length"):
+                if field not in media:
+                    continue
+                value = media[field]
+                if field == "byte_length":
+                    if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                        return runtime_contract_error(
+                            "invalid_adapter_success_payload",
+                            "media asset fetch media.byte_length 必须为非负整数或 null",
+                        )
+                elif value is not None and not isinstance(value, str):
+                    return runtime_contract_error(
+                        "invalid_adapter_success_payload",
+                        f"media asset fetch media.{field} 必须为字符串或 null",
+                    )
+        elif media is not None:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch 失败 outcome 时 media 必须为 null",
+            )
+
+        no_storage = payload.get("no_storage")
+        if not isinstance(no_storage, Mapping):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch no_storage 必须是对象",
+            )
+        if no_storage.get("stored") is not False:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch no_storage.stored 必须为 false",
+            )
+        for forbidden_field in ("local_path", "storage_handle", "file_path"):
+            if forbidden_field in no_storage:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch no_storage 不得包含存储定位字段",
+                    details={"field": forbidden_field},
+                )
+        if fetch_outcome == "downloaded_bytes":
+            byte_length = no_storage.get("downloaded_byte_length")
+            if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
+                return runtime_contract_error(
+                    "invalid_adapter_success_payload",
+                    "media asset fetch downloaded_bytes 必须记录非负 downloaded_byte_length",
+                )
+
         return None
 
     if "raw" not in payload or "normalized" not in payload:

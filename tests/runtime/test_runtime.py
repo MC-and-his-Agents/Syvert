@@ -139,6 +139,53 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_media_asset_fetch_result(
+    *,
+    target_ref: str = "media:asset-001",
+    content_type: str = "image",
+    fetch_policy: str = "metadata_only",
+    fetch_outcome: str = "metadata_only",
+    error_classification: str | None = None,
+) -> dict[str, object]:
+    media = None
+    if fetch_outcome in {"metadata_only", "source_ref_preserved", "downloaded_bytes"}:
+        media = {
+            "media_ref": target_ref,
+            "content_type": content_type,
+            "source_url_hint": "https://media.example.invalid/object/asset-001",
+            "byte_length": 2048 if fetch_outcome == "downloaded_bytes" else None,
+            "checksum": None,
+        }
+    return {
+        "operation": "media_asset_fetch_by_ref",
+        "target": {
+            "operation": "media_asset_fetch_by_ref",
+            "target_type": "media_ref",
+            "target_ref": target_ref,
+        },
+        "content_type": content_type,
+        "fetch_policy": fetch_policy,
+        "fetch_outcome": fetch_outcome,
+        "error_classification": error_classification,
+        "source_ref": f"source:{target_ref}",
+        "raw_payload_ref": "raw://media-asset-fetch/asset-001",
+        "media": media,
+        "no_storage": {
+            "stored": False,
+            "downloaded_byte_length": 2048 if fetch_outcome == "downloaded_bytes" else 0,
+            "retention_policy": "metadata_only",
+        },
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0027:profile:content-detail-by-url-hybrid:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://media-asset-fetch-1",
+        },
+        "audit": {"case": "media_asset_fetch_reference"},
+    }
+
+
 def make_comment_collection_reply_result(
     *,
     target_ref: str = "content-001",
@@ -293,6 +340,28 @@ class CommentCollectionAdapter:
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
+
+
+class MediaAssetFetchAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"media_asset_fetch"})
+    supported_targets = frozenset({"media_ref"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="media_asset_fetch",
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+
+
+class MediaAssetFetchLeakyStorageAdapter(MediaAssetFetchAdapter):
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        payload = make_media_asset_fetch_result(target_ref=request.input.media_ref or "")
+        payload["no_storage"]["local_path"] = "forbidden-storage-ref"
+        return payload
 
 
 class V1AccountOnlyCommentCollectionAdapter(CommentCollectionAdapter):
@@ -867,6 +936,83 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["target"]["target_ref"], "deep learning")
         self.assertEqual(result.task_record.request.target_type, "keyword")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
+
+    def test_execute_task_builds_media_asset_fetch_success_envelope_from_adapter_payload(self) -> None:
+        adapter = MediaAssetFetchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-001"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-1",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(result.envelope["operation"], "media_asset_fetch_by_ref")
+        self.assertEqual(result.envelope["target"]["target_type"], "media_ref")
+        self.assertEqual(result.envelope["target"]["target_ref"], "media:asset-001")
+        self.assertEqual(result.envelope["fetch_outcome"], "metadata_only")
+        self.assertFalse(result.envelope["no_storage"]["stored"])
+        self.assertNotIn("local_path", result.envelope["no_storage"])
+        self.assertEqual(result.task_record.request.target_type, "media_ref")
+        self.assertEqual(result.task_record.request.collection_mode, "direct")
+        self.assertEqual(adapter.last_request.request.capability, "media_asset_fetch")
+        self.assertEqual(adapter.last_request.request.target_type, "media_ref")
+        self.assertEqual(adapter.last_request.request.target_value, "media:asset-001")
+        self.assertEqual(adapter.last_request.collection_mode, "direct")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.capability, "media_asset_fetch_by_ref")
+
+    def test_validate_success_payload_accepts_media_asset_fetch_unavailable_carrier(self) -> None:
+        payload = make_media_asset_fetch_result(
+            target_ref="media:asset-missing",
+            fetch_outcome="unavailable",
+            error_classification="media_unavailable",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-missing",
+            )
+        )
+
+    def test_validate_success_payload_rejects_media_asset_fetch_target_drift(self) -> None:
+        payload = make_media_asset_fetch_result(target_ref="media:asset-other")
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["details"]["expected_target_ref"], "media:asset-001")
+
+    def test_execute_task_fails_closed_for_media_asset_fetch_storage_leak(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="media:asset-leaky"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchLeakyStorageAdapter()},
+            task_id_factory=lambda: "task-runtime-media-asset-fetch-leak",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result.envelope["error"]["details"]["field"], "local_path")
 
     def test_validate_success_payload_accepts_comment_collection_runtime_carrier(self) -> None:
         payload = make_comment_collection_result(target_ref="content-001")

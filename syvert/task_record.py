@@ -20,11 +20,34 @@ TASK_LOG_STAGES = frozenset({"admission", "execution", "completion"})
 TASK_LOG_LEVELS = frozenset({"info", "error"})
 TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
 SHARED_CAPABILITIES = frozenset(
-    {"content_detail_by_url", "content_search_by_keyword", "content_list_by_creator", "comment_collection"}
+    {
+        "content_detail_by_url",
+        "content_search_by_keyword",
+        "content_list_by_creator",
+        "comment_collection",
+        "media_asset_fetch_by_ref",
+    }
 )
-SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword"})
-SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated"})
+SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
+SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", "direct"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
+MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video", "mixed_media", "unknown"})
+MEDIA_ASSET_FETCH_POLICIES = frozenset({"metadata_only", "source_ref_preserved", "download_bytes"})
+MEDIA_ASSET_FETCH_OUTCOMES = frozenset(
+    {"metadata_only", "source_ref_preserved", "downloaded_bytes", "unavailable", "denied", "failed"}
+)
+MEDIA_ASSET_FAILED_OUTCOME_CLASSIFICATIONS = frozenset(
+    {
+        "media_unavailable",
+        "unsupported_content_type",
+        "fetch_policy_denied",
+        "rate_limited",
+        "platform_failed",
+        "provider_or_network_blocked",
+        "parse_failed",
+        "signature_or_request_invalid",
+    }
+)
 ALLOWED_ERROR_CATEGORIES = frozenset({"invalid_input", "unsupported", "runtime_contract", "platform"})
 RUNTIME_FAILURE_PHASES = frozenset(
     {
@@ -996,6 +1019,14 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
                 raise TaskRecordContractError("comment collection target_type 与请求快照不一致")
             if collection.target.target_ref != record.request.target_value:
                 raise TaskRecordContractError("comment collection target_ref 与请求快照不一致")
+        if capability == "media_asset_fetch_by_ref":
+            target = envelope.get("target")
+            if not isinstance(target, Mapping):
+                raise TaskRecordContractError("media asset fetch target 必须是对象")
+            if target.get("target_type") != record.request.target_type:
+                raise TaskRecordContractError("media asset fetch target_type 与请求快照不一致")
+            if target.get("target_ref") != record.request.target_value:
+                raise TaskRecordContractError("media asset fetch target_ref 与请求快照不一致")
         if "error" in envelope:
             raise TaskRecordContractError("success TaskTerminalResult.envelope 不得包含 error")
         return
@@ -1054,6 +1085,9 @@ def validate_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
         return
     if capability == COMMENT_COLLECTION_OPERATION:
         _validate_comment_collection_success_terminal_envelope(envelope)
+        return
+    if capability == "media_asset_fetch_by_ref":
+        _validate_media_asset_fetch_success_terminal_envelope(envelope)
         return
     if "raw" not in envelope:
         raise TaskRecordContractError("success TaskTerminalResult.envelope 必须包含 raw")
@@ -1131,6 +1165,85 @@ def _validate_comment_collection_success_terminal_envelope(envelope: Mapping[str
         comment_collection_result_envelope_from_dict(_collection_result_payload_from_terminal_envelope(envelope))
     except Exception as error:
         raise TaskRecordContractError(f"comment collection TaskTerminalResult.envelope 不合法: {error}") from error
+
+
+def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str, Any]) -> None:
+    operation = require_string(envelope.get("operation"), field="result.envelope.operation")
+    if operation != "media_asset_fetch_by_ref":
+        raise TaskRecordContractError("media asset fetch result.operation 必须为 media_asset_fetch_by_ref")
+
+    target = envelope.get("target")
+    if not isinstance(target, Mapping):
+        raise TaskRecordContractError("media asset fetch result.target 必须是对象")
+    if target.get("target_type") != "media_ref":
+        raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
+    require_string(target.get("target_ref"), field="media asset fetch result.target.target_ref")
+
+    content_type = require_string(envelope.get("content_type"), field="result.envelope.content_type")
+    if content_type not in MEDIA_ASSET_CONTENT_TYPES:
+        raise TaskRecordContractError("media asset fetch content_type 不在允许范围")
+    fetch_policy = require_string(envelope.get("fetch_policy"), field="result.envelope.fetch_policy")
+    if fetch_policy not in MEDIA_ASSET_FETCH_POLICIES:
+        raise TaskRecordContractError("media asset fetch fetch_policy 不在允许范围")
+    fetch_outcome = require_string(envelope.get("fetch_outcome"), field="result.envelope.fetch_outcome")
+    if fetch_outcome not in MEDIA_ASSET_FETCH_OUTCOMES:
+        raise TaskRecordContractError("media asset fetch fetch_outcome 不在允许范围")
+
+    error_classification = envelope.get("error_classification")
+    if fetch_outcome in {"metadata_only", "source_ref_preserved", "downloaded_bytes"}:
+        if error_classification is not None:
+            raise TaskRecordContractError("media asset fetch 成功 outcome 必须使用 null error_classification")
+    elif not (
+        isinstance(error_classification, str)
+        and error_classification in MEDIA_ASSET_FAILED_OUTCOME_CLASSIFICATIONS
+    ):
+        raise TaskRecordContractError("media asset fetch 失败 outcome 错误分类不允许")
+
+    raw_payload_ref = envelope.get("raw_payload_ref")
+    if not (isinstance(raw_payload_ref, str) or raw_payload_ref is None):
+        raise TaskRecordContractError("media asset fetch raw_payload_ref 必须为字符串或 null")
+    require_string(envelope.get("source_ref"), field="result.envelope.source_ref")
+
+    source_trace = envelope.get("source_trace")
+    if not isinstance(source_trace, Mapping):
+        raise TaskRecordContractError("media asset fetch source_trace 必须是对象")
+    for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
+        value = source_trace.get(required_field)
+        if not isinstance(value, str) or not value:
+            raise TaskRecordContractError(f"media asset fetch source_trace 字段缺失或无效: {required_field}")
+    validate_timestamp(source_trace.get("fetched_at"), field="result.envelope.source_trace.fetched_at")
+
+    media = envelope.get("media")
+    if fetch_outcome in {"metadata_only", "source_ref_preserved", "downloaded_bytes"}:
+        if not isinstance(media, Mapping):
+            raise TaskRecordContractError("media asset fetch 成功 outcome 必须包含 media 对象")
+        if media.get("media_ref") != target.get("target_ref"):
+            raise TaskRecordContractError("media asset fetch media.media_ref 必须与 result target 一致")
+        if media.get("content_type") != content_type:
+            raise TaskRecordContractError("media asset fetch media.content_type 必须与顶层 content_type 一致")
+        if "byte_length" in media:
+            value = media.get("byte_length")
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                raise TaskRecordContractError("media asset fetch media.byte_length 必须为非负整数或 null")
+        for field in ("source_url_hint", "checksum"):
+            value = media.get(field)
+            if value is not None and not isinstance(value, str):
+                raise TaskRecordContractError(f"media asset fetch media.{field} 必须为字符串或 null")
+    elif media is not None:
+        raise TaskRecordContractError("media asset fetch 失败 outcome 时 media 必须为 null")
+
+    no_storage = envelope.get("no_storage")
+    if not isinstance(no_storage, Mapping):
+        raise TaskRecordContractError("media asset fetch no_storage 必须是对象")
+    if no_storage.get("stored") is not False:
+        raise TaskRecordContractError("media asset fetch no_storage.stored 必须为 false")
+    for forbidden_field in ("local_path", "storage_handle", "file_path"):
+        if forbidden_field in no_storage:
+            raise TaskRecordContractError("media asset fetch no_storage 不得包含存储定位字段")
+    if fetch_outcome == "downloaded_bytes":
+        byte_length = no_storage.get("downloaded_byte_length")
+        if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
+            raise TaskRecordContractError("media asset fetch downloaded_bytes 必须记录非负 downloaded_byte_length")
 
 
 def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
