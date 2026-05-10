@@ -25,7 +25,7 @@
 | `#432` success carrier spec migration | `#436` | `5ee1b6408459aae4c499ba03c29fb9bda9b6c8d2` | comment-specific success sentinel spec truth |
 | `#434` success executable contract | `#437` | `ac421426eb5f5a4bce1ea5d0ed908962a05b6e5f` | validator/tests for `complete + success` |
 | `#419` evidence | `#431` | `2b40b9195b08d22c84ad9cbe472ff647e118c1aa` | replayable sanitized evidence |
-| `#420` closeout | pending | pending | published truth and GitHub reconciliation |
+| `#420` closeout | `#438` | pending | published truth and GitHub reconciliation |
 
 ## Evidence Inputs
 

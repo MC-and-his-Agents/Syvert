@@ -10,7 +10,7 @@
 - Parent Phase：`#381`
 - Parent FR：`#404`
 - 关联 spec：`docs/specs/FR-0404-comment-collection-contract/`
-- 关联 PR：
+- 关联 PR：`#438`
 - 状态：`active`
 - active 收口事项：`CHORE-0420-v1-4-comment-collection-closeout`
 
@@ -39,7 +39,7 @@
 
 ## Review finding 处理记录
 
-- 尚无 PR guardian finding。
+- PR `#438` created; guardian finding state pending.
 
 ## 未决风险
 
