@@ -27,6 +27,8 @@ from syvert.resource_trace_store import LocalResourceTraceStore
 from syvert.runtime import (
     AdapterExecutionContext,
     AdapterTaskRequest,
+    CREATOR_PROFILE,
+    CREATOR_PROFILE_BY_ID,
     CollectionPolicy,
     CoreTaskRequest,
     ExecutionConcurrencyPolicy,
@@ -139,6 +141,56 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
         "audit": {"page_index": 1},
     }
 
+def make_creator_profile_success_payload(*, target_ref: str = "creator-001", creator_id: str = "creator-001") -> dict[str, object]:
+    return {
+        "operation": "creator_profile_by_id",
+        "target": {
+            "operation": "creator_profile_by_id",
+            "target_type": "creator",
+            "creator_ref": target_ref,
+            "target_display_hint": "creator-hint-001",
+            "policy_ref": "policy:creator-profile",
+        },
+        "result_status": "complete",
+        "error_classification": None,
+        "profile": {
+            "creator_ref": creator_id,
+            "canonical_ref": f"creator:canonical:{creator_id}",
+            "display_name": "creator-name",
+            "avatar_ref": "avatar:creator-001",
+            "description": "desc",
+            "public_counts": {
+                "follower_count": 100,
+                "following_count": 5,
+                "content_count": 8,
+                "like_count": 16,
+            },
+            "profile_url_hint": "profile:creator-slug",
+        },
+        "raw_payload_ref": "raw://creator-profile",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0405:profile:creator-profile-by-id:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://creator-profile-success",
+        },
+        "audit": {},
+    }
+
+
+def make_creator_profile_unavailable_payload(*, target_ref: str = "creator-001", classification: str = "target_not_found") -> dict[str, object]:
+    payload = make_creator_profile_success_payload(target_ref=target_ref)
+    payload.update(
+        {
+            "result_status": "unavailable",
+            "error_classification": classification,
+            "profile": None,
+            "raw_payload_ref": None,
+        }
+    )
+    return payload
+
 
 def make_media_asset_fetch_result(
     *,
@@ -210,6 +262,19 @@ def make_media_asset_fetch_result(
             else {}
         ),
     }
+
+
+def make_creator_profile_failed_payload(*, target_ref: str = "creator-001", classification: str = "parse_failed") -> dict[str, object]:
+    payload = make_creator_profile_success_payload(target_ref=target_ref)
+    payload.update(
+        {
+            "result_status": "failed",
+            "error_classification": classification,
+            "profile": None,
+            "raw_payload_ref": "raw://creator-profile-failed",
+        }
+    )
+    return payload
 
 
 def make_comment_collection_reply_result(
@@ -366,6 +431,32 @@ class CommentCollectionAdapter:
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
+
+class CreatorProfileAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({CREATOR_PROFILE})
+    supported_targets = frozenset({"creator"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability=CREATOR_PROFILE,
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_creator_profile_success_payload(target_ref=request.input.creator_id or "")
+
+
+class CreatorProfileFailureAdapter(CreatorProfileAdapter):
+    def __init__(self, payload: dict[str, object] | None = None) -> None:
+        self.last_request = None
+        self._payload = payload
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        if self._payload is not None:
+            return self._payload
+        return make_creator_profile_unavailable_payload(target_ref=request.input.creator_id or "")
 
 
 class MediaAssetFetchAdapter:
@@ -2547,6 +2638,189 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(envelope["status"], "failed")
         self.assertEqual(envelope["error"]["code"], "invalid_adapter_success_payload")
         self.assertEqual(result["verdict"], "contract_violation")
+
+    def test_validate_success_payload_accepts_creator_profile_runtime_carrier(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="creator-001")
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="creator_profile_by_id",
+                target_type="creator",
+                target_value="creator-001",
+            )
+        )
+
+    def test_validate_success_payload_accepts_creator_profile_blocked_alias(self) -> None:
+        payload = make_creator_profile_failed_payload(target_ref="creator-001", classification="provider_or_network_blocked")
+        payload["raw_payload_ref"] = None
+        payload["source_trace"]["provider_path"] = "provider://blocked-path-alias/creator"
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="creator_profile_by_id",
+                target_type="creator",
+                target_value="creator-001",
+            )
+        )
+
+    def test_validate_success_payload_rejects_creator_profile_complete_payload_with_forbidden_error_classification(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="creator-001")
+        payload["error_classification"] = "parse_failed"
+
+        result = validate_success_payload(
+            payload,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["message"], "creator profile result_status=complete 时 error_classification 必须为 null")
+
+    def test_validate_success_payload_rejects_creator_profile_missing_profile_id(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="creator-001")
+        del payload["profile"]["creator_ref"]
+
+        result = validate_success_payload(
+            payload,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+        self.assertEqual(result["message"], "creator profile profile.creator_ref 必须为非空脱敏 opaque ref")
+
+    def test_validate_success_payload_rejects_creator_profile_private_target_ref(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="https://douyin.example.invalid/user?id=1")
+
+        result = validate_success_payload(
+            payload,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="https://douyin.example.invalid/user?id=1",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_creator_profile_invalid_public_counts(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="creator-001")
+        payload["profile"]["public_counts"]["followers"] = 1
+
+        result = validate_success_payload(
+            payload,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_creator_profile_non_empty_audit(self) -> None:
+        payload = make_creator_profile_success_payload(target_ref="creator-001")
+        payload["audit"] = {"transfer_observed": True}
+
+        result = validate_success_payload(
+            payload,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_execute_task_builds_creator_profile_success_envelope_from_adapter_payload(self) -> None:
+        adapter = CreatorProfileAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            input=TaskInput(creator_id="creator-001"),
+        )
+
+        with mock.patch("syvert.runtime.validate_resource_capability_matcher_input", side_effect=lambda value: value):
+            envelope = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-creator-profile-1",
+            )
+
+        self.assertEqual(envelope.envelope["status"], "success")
+        self.assertEqual(envelope.envelope["operation"], "creator_profile_by_id")
+        self.assertEqual(envelope.envelope["target"]["creator_ref"], "creator-001")
+        self.assertEqual(envelope.envelope["target"]["target_type"], "creator")
+        self.assertEqual(envelope.envelope["result_status"], "complete")
+        self.assertIsNone(envelope.envelope["error_classification"])
+        self.assertEqual(envelope.envelope["profile"]["creator_ref"], "creator-001")
+        self.assertEqual(envelope.envelope["audit"], {})
+        self.assertIsInstance(adapter.last_request, AdapterExecutionContext)
+        self.assertEqual(adapter.last_request.request.capability, "creator_profile")
+        self.assertEqual(adapter.last_request.request.target_type, "creator")
+        self.assertEqual(adapter.last_request.request.target_value, "creator-001")
+        self.assertEqual(adapter.last_request.request.collection_mode, "direct")
+
+    def test_execute_task_builds_creator_profile_success_envelope_from_core_request(self) -> None:
+        adapter = CreatorProfileAdapter()
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="creator_profile_by_id",
+                target_type="creator",
+                target_value="creator-001",
+            ),
+            policy=CollectionPolicy(collection_mode="direct"),
+        )
+
+        with mock.patch("syvert.runtime.validate_resource_capability_matcher_input", side_effect=lambda value: value):
+            envelope = execute_task(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-creator-profile-2",
+            )
+
+        self.assertEqual(envelope["status"], "success")
+        self.assertEqual(envelope["operation"], "creator_profile_by_id")
+        self.assertEqual(envelope["result_status"], "complete")
+        self.assertEqual(adapter.last_request.request.collection_mode, "direct")
+
+    def test_execute_task_builds_creator_profile_unavailable_from_adapter_payload(self) -> None:
+        adapter = CreatorProfileFailureAdapter(payload=make_creator_profile_unavailable_payload(classification="target_not_found"))
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            input=TaskInput(creator_id="creator-001"),
+        )
+
+        with mock.patch("syvert.runtime.validate_resource_capability_matcher_input", side_effect=lambda value: value):
+            envelope = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-creator-profile-3",
+            )
+
+        self.assertEqual(envelope.envelope["status"], "success")
+        self.assertEqual(envelope.envelope["result_status"], "unavailable")
+        self.assertEqual(envelope.envelope["error_classification"], "target_not_found")
+        self.assertIsNone(envelope.envelope["profile"])
+        self.assertIsNone(envelope.envelope["raw_payload_ref"])
+
+    def test_execute_task_rejects_private_creator_id(self) -> None:
+        adapter = CreatorProfileAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            input=TaskInput(creator_id="https://xhs.example.invalid/user/1"),
+        )
+
+        envelope = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-creator-profile-4",
+        )
+
+        self.assertEqual(envelope.envelope["status"], "failed")
+        self.assertEqual(envelope.envelope["error"]["code"], "invalid_task_request")
 
     def test_execute_task_builds_success_envelope_from_adapter_payload(self) -> None:
         adapter = SuccessfulAdapter()

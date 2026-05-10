@@ -133,6 +133,44 @@ def make_comment_collection_result(*, target_ref: str = "content-001") -> dict[s
     }
 
 
+def make_creator_profile_result(*, target_ref: str = "creator-001", creator_id: str = "creator-001") -> dict[str, object]:
+    return {
+        "operation": "creator_profile_by_id",
+        "target": {
+            "operation": "creator_profile_by_id",
+            "target_type": "creator",
+            "creator_ref": target_ref,
+            "target_display_hint": "creator-hint-001",
+            "policy_ref": "policy:creator-profile",
+        },
+        "result_status": "complete",
+        "error_classification": None,
+        "profile": {
+            "creator_ref": creator_id,
+            "canonical_ref": f"creator:canonical:{creator_id}",
+            "display_name": "creator-name",
+            "avatar_ref": "avatar:creator-001",
+            "description": "desc",
+            "public_counts": {
+                "follower_count": 100,
+                "following_count": 5,
+                "content_count": 8,
+                "like_count": 16,
+            },
+            "profile_url_hint": "profile:creator-slug",
+        },
+        "raw_payload_ref": "raw://creator-profile",
+        "source_trace": {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "provider://sanitized",
+            "resource_profile_ref": "fr-0405:profile:creator-profile-by-id:account-proxy",
+            "fetched_at": "2026-05-09T10:00:00Z",
+            "evidence_alias": "alias://creator-profile-success",
+        },
+        "audit": {},
+    }
+
+
 def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dict[str, object]:
     return {
         "operation": "media_asset_fetch_by_ref",
@@ -362,6 +400,20 @@ class CommentCollectionAdapter:
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class CreatorProfileAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"creator_profile"})
+    supported_targets = frozenset({"creator"})
+    supported_collection_modes = frozenset({"direct"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="creator_profile",
+    )
+
+    def execute(self, request):
+        return make_creator_profile_result(target_ref=request.input.creator_id or "")
+
+
 class MediaAssetFetchAdapter:
     adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"media_asset_fetch"})
@@ -442,6 +494,102 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.request.capability, "media_asset_fetch_by_ref")
         self.assertEqual(restored.request.target_type, "media_ref")
         self.assertEqual(restored.request.target_value, "media:asset-001")
+
+    def test_round_trips_creator_profile_record(self) -> None:
+        outcome = execute_task_with_record(
+            TaskRequest(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="creator_profile_by_id",
+                input=TaskInput(creator_id="creator-001"),
+            ),
+            adapters={TEST_ADAPTER_KEY: CreatorProfileAdapter()},
+            task_id_factory=lambda: "task-record-creator-profile-1",
+        )
+
+        self.assertEqual(outcome.envelope["status"], "success")
+        self.assertEqual(outcome.envelope["operation"], "creator_profile_by_id")
+        self.assertIsNotNone(outcome.task_record)
+
+        payload = task_record_to_dict(outcome.task_record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, outcome.task_record)
+        self.assertEqual(restored.request.capability, "creator_profile_by_id")
+        self.assertEqual(restored.request.target_type, "creator")
+        self.assertEqual(restored.request.target_value, "creator-001")
+
+    def test_round_trips_creator_profile_optional_target_refs(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-creator-profile-origin",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_creator_profile_result(target_ref="creator-001")
+        envelope["task_id"] = "task-record-creator-profile-origin"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "creator_profile_by_id"
+        envelope["status"] = "success"
+        record = finish_task_record(
+            record,
+            envelope,
+            occurred_at="2026-05-09T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(task_record_to_dict(record))
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.result.envelope["target"]["target_display_hint"], "creator-hint-001")
+        self.assertEqual(restored.result.envelope["target"]["policy_ref"], "policy:creator-profile")
+
+    def test_rejects_private_creator_profile_request_snapshot(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-creator-private-ref",
+                TaskRequestSnapshot(
+                    adapter_key=TEST_ADAPTER_KEY,
+                    capability="creator_profile_by_id",
+                    target_type="creator",
+                    target_value="https://xhs.example.invalid/user/1",
+                    collection_mode="direct",
+                ),
+                occurred_at="2026-05-09T10:00:00Z",
+            )
+
+    def test_rejects_creator_profile_non_empty_audit(self) -> None:
+        request = TaskRequestSnapshot(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="creator_profile_by_id",
+            target_type="creator",
+            target_value="creator-001",
+            collection_mode="direct",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-creator-profile-audit",
+                request=request,
+                occurred_at="2026-05-09T10:00:00Z",
+            ),
+            occurred_at="2026-05-09T10:00:00Z",
+        )
+        envelope = make_creator_profile_result(target_ref="creator-001")
+        envelope["audit"] = {"transfer_observed": True}
+        envelope["task_id"] = "task-record-creator-profile-audit"
+        envelope["adapter_key"] = TEST_ADAPTER_KEY
+        envelope["capability"] = "creator_profile_by_id"
+        envelope["status"] = "success"
+
+        with self.assertRaises(TaskRecordContractError):
+            finish_task_record(record, envelope, occurred_at="2026-05-09T10:00:01Z")
 
     def test_round_trips_media_asset_fetch_parse_failed_record(self) -> None:
         request = TaskRequestSnapshot(

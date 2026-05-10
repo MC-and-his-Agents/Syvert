@@ -161,6 +161,19 @@ STABLE_COMMENT_COLLECTION_ENTRY = OperationTaxonomyEntry(
     notes=("v1.4.0 comment collection runtime contract frozen; comment-specific hierarchy and visibility surface.",),
 )
 
+STABLE_CREATOR_PROFILE_BY_ID_ENTRY = OperationTaxonomyEntry(
+    capability_family="creator_profile",
+    operation="creator_profile_by_id",
+    target_type="creator",
+    execution_mode="single",
+    collection_mode="direct",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0405",),
+    admission_evidence_refs=("tests.runtime.test_operation_taxonomy",),
+    notes=("v1.5.0 creator profile runtime carrier; one-shot creator read contract and platform-neutral profile result.",),
+)
+
 STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY = OperationTaxonomyEntry(
     capability_family="media_asset_fetch",
     operation="media_asset_fetch_by_ref",
@@ -292,6 +305,7 @@ DEFAULT_OPERATION_TAXONOMY = (
     STABLE_CONTENT_SEARCH_BY_KEYWORD_ENTRY,
     STABLE_CONTENT_LIST_BY_CREATOR_ENTRY,
     STABLE_COMMENT_COLLECTION_ENTRY,
+    STABLE_CREATOR_PROFILE_BY_ID_ENTRY,
     STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY,
     *PROPOSED_OPERATION_TAXONOMY_ENTRIES,
 )

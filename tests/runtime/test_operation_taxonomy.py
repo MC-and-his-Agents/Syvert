@@ -94,6 +94,25 @@ class OperationTaxonomyTests(unittest.TestCase):
             )
         )
 
+    def test_stable_creator_profile_lookup_returns_runtime_entry(self) -> None:
+        entry = stable_operation_entry(
+            operation="creator_profile_by_id",
+            target_type="creator",
+            collection_mode="direct",
+        )
+
+        self.assertEqual(entry.capability_family, "creator_profile")
+        self.assertTrue(entry.runtime_delivery)
+        self.assertEqual(entry.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertEqual(entry.contract_refs, ("FR-0405",))
+        self.assertTrue(
+            is_stable_operation(
+                operation="creator_profile_by_id",
+                target_type="creator",
+                collection_mode="direct",
+            )
+        )
+
     def test_stable_media_asset_fetch_lookup_returns_runtime_entry(self) -> None:
         entry = stable_operation_entry(
             operation="media_asset_fetch_by_ref",
