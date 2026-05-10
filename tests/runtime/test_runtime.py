@@ -284,7 +284,10 @@ class CommentCollectionAdapter:
     supported_capabilities = frozenset({"comment_collection"})
     supported_targets = frozenset({"content"})
     supported_collection_modes = frozenset({"paginated"})
-    resource_requirement_declarations = ()
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="comment_collection",
+    )
 
     def execute(self, request: TaskRequest) -> dict[str, object]:
         self.last_request = request
@@ -1130,6 +1133,33 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["target"]["target_ref"], "content-001")
         self.assertEqual(result.task_record.request.target_type, "content")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
+        self.assertIsNotNone(adapter.last_request.resource_bundle)
+        self.assertEqual(adapter.last_request.resource_bundle.capability, "comment_collection")
+
+    def test_execute_task_fails_closed_when_comment_collection_resource_pool_is_empty(self) -> None:
+        adapter = CommentCollectionAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="comment_collection",
+            input=TaskInput(content_ref="content-empty-resource-pool"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            empty_store = LocalResourceLifecycleStore(Path(temp_dir) / "resource-lifecycle.json")
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda: "task-runtime-comment-collection-empty-resource-pool",
+                resource_lifecycle_store=empty_store,
+            )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(result.envelope["error"]["code"], "resource_unavailable")
+        self.assertIsNotNone(result.task_record)
+        self.assertEqual(result.task_record.status, "failed")
+        self.assertEqual(result.task_record.result.envelope["error"]["code"], "resource_unavailable")
+        self.assertFalse(hasattr(adapter, "last_request"))
 
     def test_execute_task_passes_comment_request_cursor_to_adapter_context(self) -> None:
         adapter = CommentCollectionAdapter()
