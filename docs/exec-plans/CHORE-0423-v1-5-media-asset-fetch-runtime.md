@@ -47,11 +47,13 @@
 - Canonical spec input：`#421` / PR `#428`。
 - Worktree key：`issue-423-405-v1-5-0-media-asset-fetch-runtime`
 - Branch：`issue-423-405-v1-5-0-media-asset-fetch-runtime`
-- 当前实现已落地并提交到 PR `#439`，等待 guardian / merge gate。
+- 当前实现已落地并提交到 PR `#439`。
+- PR guardian 首轮 findings 已处理：fetch policy 请求对象、`result_status`/`fetch_outcome` 分离、`source_ref_lineage`、downloaded-bytes public metadata、permission/auth failure classifications 均已按 FR-0405 对齐。
 
 ## 下一步动作
 
-- 通过完整本地 guard 后创建 PR，PR 只绑定 `#423` 与本 runtime carrier 范围。
+- 重新触发 PR guardian review。
+- guardian 与 GitHub checks 通过后合入 `#423`。
 - 合入后进入 `#424` consumer migration；不得在本 PR 中提前实施 #424/#425/#426。
 
 ## 当前 checkpoint 推进的 release 目标
@@ -67,7 +69,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，135 tests。
+  - 结果：通过，138 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`
