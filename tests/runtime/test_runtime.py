@@ -204,7 +204,16 @@ def make_media_asset_fetch_result(
             "fetched_at": "2026-05-09T10:00:00Z",
             "evidence_alias": "alias://media-asset-fetch-1",
         },
-        "audit": {"case": "media_asset_fetch_reference"},
+        "audit": (
+            {
+                "transfer_observed": True,
+                "byte_size": 2048,
+                "checksum_digest": "sha256:abc123",
+                "checksum_family": "sha256",
+            }
+            if fetch_outcome == "downloaded_bytes"
+            else {}
+        ),
     }
 
 
@@ -1425,7 +1434,6 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_validate_success_payload_accepts_media_asset_fetch_permission_and_auth_failures(self) -> None:
         for status, classification in (
             ("unavailable", "permission_denied"),
-            ("unavailable", "target_not_found"),
             ("failed", "credential_invalid"),
             ("failed", "verification_required"),
         ):
@@ -1472,6 +1480,46 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             error_classification="provider_or_network_blocked",
         )
         payload["source_trace"]["provider_path"] = "provider://primary/fallback/selector"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_source_trace_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["source_trace"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_download_audit_gap(self) -> None:
+        payload = make_media_asset_fetch_result(fetch_outcome="downloaded_bytes", fetch_mode="download_if_allowed")
+        payload["audit"] = {}
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+            request_cursor=payload["fetch_policy"],
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_non_download_audit(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["audit"] = {"transfer_observed": True}
 
         result = validate_success_payload(
             payload,

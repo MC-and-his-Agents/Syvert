@@ -77,7 +77,7 @@ MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
-MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied", "target_not_found"})
+MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied"})
 MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
     {
         "unsupported_content_type",
@@ -2841,6 +2841,14 @@ def _validate_media_asset_fetch_source_trace(source_trace: Any) -> dict[str, Any
             "invalid_adapter_success_payload",
             "media asset fetch source_trace 必须是对象",
         )
+    allowed_fields = {"adapter_key", "provider_path", "resource_profile_ref", "fetched_at", "evidence_alias"}
+    for field in source_trace:
+        if field not in allowed_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace 只能包含公共白名单字段",
+                details={"field": field},
+            )
     for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
         value = source_trace.get(required_field)
         if not isinstance(value, str) or not value:
@@ -2848,6 +2856,25 @@ def _validate_media_asset_fetch_source_trace(source_trace: Any) -> dict[str, Any
                 "invalid_adapter_success_payload",
                 "media asset fetch source_trace 字段缺失或无效",
                 details={"field": required_field},
+            )
+        if not _media_ref_value_is_sanitized(value):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace 字段不得包含 URL、路径、凭证、路由或下载定位信息",
+                details={"field": required_field},
+            )
+    resource_profile_ref = source_trace.get("resource_profile_ref")
+    if resource_profile_ref is not None:
+        if not isinstance(resource_profile_ref, str) or not resource_profile_ref:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace.resource_profile_ref 必须为非空字符串或 null",
+            )
+        if not _media_ref_value_is_sanitized(resource_profile_ref):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch source_trace.resource_profile_ref 不得包含 URL、路径、凭证、路由或下载定位信息",
+                details={"field": "resource_profile_ref"},
             )
     if not is_valid_rfc3339_utc(source_trace.get("fetched_at")):
         return runtime_contract_error(
@@ -3066,6 +3093,56 @@ def _validate_media_asset_fetch_no_storage(
             return runtime_contract_error(
                 "invalid_adapter_success_payload",
                 "media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length",
+            )
+    return None
+
+
+def _validate_media_asset_fetch_audit(audit: Any, *, fetch_outcome: str | None) -> dict[str, Any] | None:
+    if audit is None:
+        audit = {}
+    if not isinstance(audit, Mapping):
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "media asset fetch audit 必须是对象或 null",
+        )
+    allowed_fields = {"transfer_observed", "byte_size", "checksum_digest", "checksum_family"}
+    for field, value in audit.items():
+        if field not in allowed_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch audit 只能包含公共白名单字段",
+                details={"field": field},
+            )
+        if isinstance(value, str) and not _media_ref_value_is_sanitized(value):
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch audit 不得包含 URL、路径、凭证、路由或下载定位信息",
+                details={"field": field},
+            )
+    if fetch_outcome != "downloaded_bytes":
+        if audit:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch 非 downloaded_bytes outcome 不得携带下载 audit",
+            )
+        return None
+    if audit.get("transfer_observed") is not True:
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "media asset fetch downloaded_bytes audit.transfer_observed 必须为 true",
+        )
+    byte_size = audit.get("byte_size")
+    if isinstance(byte_size, bool) or not isinstance(byte_size, int) or byte_size < 0:
+        return runtime_contract_error(
+            "invalid_adapter_success_payload",
+            "media asset fetch downloaded_bytes audit.byte_size 必须为非负整数",
+        )
+    for field in ("checksum_digest", "checksum_family"):
+        value = audit.get(field)
+        if not isinstance(value, str) or not value:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                f"media asset fetch downloaded_bytes audit.{field} 必须为非空字符串",
             )
     return None
 
@@ -4063,6 +4140,12 @@ def validate_success_payload(
         )
         if no_storage_error is not None:
             return no_storage_error
+        audit_error = _validate_media_asset_fetch_audit(
+            payload.get("audit", {}),
+            fetch_outcome=fetch_outcome if isinstance(fetch_outcome, str) else None,
+        )
+        if audit_error is not None:
+            return audit_error
 
         return None
 

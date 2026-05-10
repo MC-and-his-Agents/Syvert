@@ -177,7 +177,7 @@ def make_media_asset_fetch_result(*, target_ref: str = "media:asset-001") -> dic
             "fetched_at": "2026-05-09T10:00:00Z",
             "evidence_alias": "alias://media-asset-fetch-1",
         },
-        "audit": {"case": "media_asset_fetch_reference"},
+        "audit": {},
     }
 
 

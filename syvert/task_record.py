@@ -35,7 +35,7 @@ MEDIA_ASSET_CONTENT_TYPES = frozenset({"image", "video"})
 MEDIA_ASSET_FETCH_MODES = frozenset({"metadata_only", "preserve_source_ref", "download_if_allowed", "download_required"})
 MEDIA_ASSET_FETCH_OUTCOMES = frozenset({"metadata_only", "source_ref_preserved", "downloaded_bytes"})
 MEDIA_ASSET_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
-MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied", "target_not_found"})
+MEDIA_ASSET_UNAVAILABLE_CLASSIFICATIONS = frozenset({"media_unavailable", "permission_denied"})
 MEDIA_ASSET_FAILED_CLASSIFICATIONS = frozenset(
     {
         "unsupported_content_type",
@@ -1292,10 +1292,18 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     source_trace = envelope.get("source_trace")
     if not isinstance(source_trace, Mapping):
         raise TaskRecordContractError("media asset fetch source_trace 必须是对象")
+    allowed_source_trace_fields = {"adapter_key", "provider_path", "resource_profile_ref", "fetched_at", "evidence_alias"}
+    if any(field not in allowed_source_trace_fields for field in source_trace):
+        raise TaskRecordContractError("media asset fetch source_trace 只能包含公共白名单字段")
     for required_field in ("adapter_key", "provider_path", "fetched_at", "evidence_alias"):
         value = source_trace.get(required_field)
         if not isinstance(value, str) or not value:
             raise TaskRecordContractError(f"media asset fetch source_trace 字段缺失或无效: {required_field}")
+        if not _media_ref_value_is_sanitized(value):
+            raise TaskRecordContractError(f"media asset fetch source_trace.{required_field} 不得包含私有定位信息")
+    resource_profile_ref = source_trace.get("resource_profile_ref")
+    if resource_profile_ref is not None:
+        _require_sanitized_media_ref(resource_profile_ref, field="result.envelope.source_trace.resource_profile_ref")
     validate_timestamp(source_trace.get("fetched_at"), field="result.envelope.source_trace.fetched_at")
     provider_path = source_trace.get("provider_path")
     if isinstance(provider_path, str) and not _media_ref_value_is_sanitized(provider_path):
@@ -1417,6 +1425,31 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         byte_length = no_storage.get("downloaded_byte_length")
         if byte_length not in (None, 0):
             raise TaskRecordContractError("media asset fetch 非 downloaded_bytes outcome 不得记录 downloaded_byte_length")
+
+    audit = envelope.get("audit", {})
+    if audit is None:
+        audit = {}
+    if not isinstance(audit, Mapping):
+        raise TaskRecordContractError("media asset fetch audit 必须是对象或 null")
+    allowed_audit_fields = {"transfer_observed", "byte_size", "checksum_digest", "checksum_family"}
+    if any(field not in allowed_audit_fields for field in audit):
+        raise TaskRecordContractError("media asset fetch audit 只能包含公共白名单字段")
+    for field, value in audit.items():
+        if isinstance(value, str) and not _media_ref_value_is_sanitized(value):
+            raise TaskRecordContractError("media asset fetch audit 不得包含私有定位信息")
+    if fetch_outcome != "downloaded_bytes":
+        if audit:
+            raise TaskRecordContractError("media asset fetch 非 downloaded_bytes outcome 不得携带下载 audit")
+    else:
+        if audit.get("transfer_observed") is not True:
+            raise TaskRecordContractError("media asset fetch downloaded_bytes audit.transfer_observed 必须为 true")
+        byte_size = audit.get("byte_size")
+        if isinstance(byte_size, bool) or not isinstance(byte_size, int) or byte_size < 0:
+            raise TaskRecordContractError("media asset fetch downloaded_bytes audit.byte_size 必须为非负整数")
+        for field in ("checksum_digest", "checksum_family"):
+            value = audit.get(field)
+            if not isinstance(value, str) or not value:
+                raise TaskRecordContractError(f"media asset fetch downloaded_bytes audit.{field} 必须为非空字符串")
 
 
 def _collection_result_payload_from_terminal_envelope(envelope: Mapping[str, Any]) -> dict[str, Any]:
