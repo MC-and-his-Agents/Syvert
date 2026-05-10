@@ -4064,7 +4064,11 @@ def validate_success_payload(
                     "media asset fetch failed result 错误分类不允许",
                     details={"error_classification": error_classification},
                 )
-            if content_type not in MEDIA_ASSET_CONTENT_TYPES and error_classification != "unsupported_content_type":
+            if (
+                content_type not in MEDIA_ASSET_CONTENT_TYPES
+                and error_classification != "unsupported_content_type"
+                and not (content_type == "unknown" and error_classification == "parse_failed" and payload.get("raw_payload_ref"))
+            ):
                 return runtime_contract_error(
                     "invalid_adapter_success_payload",
                     "media asset fetch 非 stable content_type 必须使用 unsupported_content_type",

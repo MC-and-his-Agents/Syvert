@@ -1327,6 +1327,23 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(result["code"], "invalid_adapter_success_payload")
 
+    def test_validate_success_payload_accepts_unknown_content_type_parse_failed(self) -> None:
+        payload = make_media_asset_fetch_result(
+            content_type="unknown",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="parse_failed",
+        )
+
+        self.assertIsNone(
+            validate_success_payload(
+                payload,
+                capability="media_asset_fetch_by_ref",
+                target_type="media_ref",
+                target_value="media:asset-001",
+            )
+        )
+
     def test_validate_success_payload_rejects_media_asset_fetch_private_metadata(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)

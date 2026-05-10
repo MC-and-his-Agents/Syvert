@@ -60,6 +60,16 @@
 - PR guardian 第十轮 findings 已处理：`target_not_found` 纳入 media unavailable vocabulary，非 stable media shape 必须 `unsupported_content_type`，Issue `#423` integration metadata 已对齐 PR integration_check。
 - PR guardian 第十一轮 findings 已处理：按 FR-0405 移除 media `target_not_found`，`source_trace`/`audit` 改为公共字段白名单并增加下载 audit proof 校验，Issue/PR `merge_gate` 已对齐 `integration_check_required`。
 - PR guardian 第十二轮 findings 已处理：`target`、`media`、`source_ref_lineage` 嵌套对象均改为公共字段白名单并补私有字段回归。
+- PR guardian 第十三轮后执行系统性合同核对：按 FR-0405 重新核对 public field whitelist、`MediaAssetTarget.media_ref`、result status/error mapping、fetch policy decision matrix、raw/normalized/audit split、source trace/lineage/no-storage 脱敏六类不变量；runtime 与 TaskRecord 均已按同一不变量收敛。
+
+## FR-0405 media carrier 不变量核对
+
+- public carrier 字段必须白名单：`target`、`fetch_policy`、`media`、`media.metadata`、`media.source_ref_lineage`、`source_trace`、`audit`、`no_storage` 不接受未定义扩展字段。
+- target 使用 formal `MediaAssetTarget.media_ref`；request `media_ref`、target `media_ref` 与 lineage `input_ref` 均必须是脱敏 opaque ref。
+- `result_status` 与 `error_classification` 使用 media-only 映射：success 为 `complete/null`，`media_unavailable`/`permission_denied` 为 `unavailable`，media failed 分类不接受 creator-only `target_not_found/profile_unavailable`。
+- fetch policy 按 spec matrix 执行：先 content type projection，再 `allowed_content_types`，再 source-ref preservation / download policy；`download_required` 不允许降级为 non-download success。
+- raw/normalized/audit split 固定：complete 必须有 raw ref；`provider_or_network_blocked` 必须 raw null；download facts 只进入 public metadata 与 audit proof，非下载 outcome 不携带 audit/download bytes。
+- privacy/no-storage 边界固定：source trace、lineage、metadata、audit、no_storage 均拒绝 URL、签名参数、session/credential、provider routing/fallback/selector、bucket/storage/download/local path。
 
 ## 下一步动作
 
@@ -80,7 +90,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，173 tests。
+  - 结果：通过，174 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`
