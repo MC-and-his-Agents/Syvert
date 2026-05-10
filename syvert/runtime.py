@@ -2990,6 +2990,10 @@ def _validate_media_asset_fetch_media(
                 "media asset fetch source_ref_lineage 必须绑定请求和公共媒体引用",
                 details={"field": field, "value": value, "expected": expected},
             )
+        if isinstance(value, str):
+            ref_error = _validate_media_ref_value(value, field=f"source_ref_lineage.{field}")
+            if ref_error is not None:
+                return ref_error
     resolved_ref = lineage.get("resolved_ref")
     if resolved_ref is not None:
         ref_error = _validate_media_ref_value(resolved_ref, field="source_ref_lineage.resolved_ref")
@@ -3024,25 +3028,24 @@ def _validate_media_asset_fetch_no_storage(
             "invalid_adapter_success_payload",
             "media asset fetch no_storage 必须是对象",
         )
+    allowed_fields = {"stored", "downloaded_byte_length", "retention_policy"}
+    for field in no_storage:
+        if field not in allowed_fields:
+            return runtime_contract_error(
+                "invalid_adapter_success_payload",
+                "media asset fetch no_storage 只能包含公共白名单字段",
+                details={"field": field},
+            )
     if no_storage.get("stored") is not False:
         return runtime_contract_error(
             "invalid_adapter_success_payload",
             "media asset fetch no_storage.stored 必须为 false",
         )
-    for forbidden_field in (
-        "local_path",
-        "storage_handle",
-        "file_path",
-        "download_handle",
-        "retrieval_token",
-        "bucket_url",
-    ):
-        if forbidden_field in no_storage:
-            return runtime_contract_error(
-                "invalid_adapter_success_payload",
-                "media asset fetch no_storage 不得包含存储定位字段",
-                details={"field": forbidden_field},
-            )
+    retention_policy = no_storage.get("retention_policy")
+    if retention_policy is not None:
+        ref_error = _validate_media_ref_value(retention_policy, field="no_storage.retention_policy")
+        if ref_error is not None:
+            return ref_error
     if fetch_outcome == "downloaded_bytes":
         byte_length = no_storage.get("downloaded_byte_length")
         if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
@@ -3155,6 +3158,13 @@ def _project_task_input_to_target(
                 InputTarget(adapter_key=adapter_key, capability=capability, target_type="media_ref", target_value=""),
                 CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
                 invalid_input_error("invalid_task_request", "input.media_ref 不能为空"),
+            )
+        media_ref_error = _validate_media_ref_value(input_value.media_ref, field="input.media_ref")
+        if media_ref_error is not None:
+            return (
+                InputTarget(adapter_key=adapter_key, capability=capability, target_type="media_ref", target_value=input_value.media_ref),
+                CollectionPolicy(collection_mode=DIRECT_COLLECTION_MODE),
+                invalid_input_error("invalid_task_request", "input.media_ref 必须是脱敏 opaque ref"),
             )
         media_fetch_policy = input_value.media_fetch_policy
         if media_fetch_policy is not None and not isinstance(media_fetch_policy, Mapping):
@@ -3847,6 +3857,9 @@ def validate_success_payload(
                 "invalid_adapter_success_payload",
                 "media asset fetch result.target.target_ref 必须为非空字符串",
             )
+        target_ref_error = _validate_media_ref_value(result_target_ref, field="target.target_ref")
+        if target_ref_error is not None:
+            return target_ref_error
         if result_target_ref != target_value:
             return runtime_contract_error(
                 "invalid_adapter_success_payload",

@@ -1097,6 +1097,22 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["error"]["category"], "runtime_contract")
         self.assertEqual(result.envelope["error"]["code"], "invalid_adapter_success_payload")
 
+    def test_execute_task_rejects_private_media_ref_request(self) -> None:
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="media_asset_fetch_by_ref",
+            input=TaskInput(media_ref="https://signed.example.invalid/media?token=secret"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: MediaAssetFetchAdapter()},
+            task_id_factory=lambda: "task-runtime-media-private-ref",
+        )
+
+        self.assertEqual(result.envelope["status"], "failed")
+        self.assertEqual(result.envelope["error"]["code"], "invalid_task_request")
+
     def test_validate_success_payload_rejects_media_asset_fetch_missing_lineage(self) -> None:
         payload = make_media_asset_fetch_result()
         assert isinstance(payload["media"], dict)
@@ -1352,8 +1368,9 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
             ("failed", "verification_required"),
         ):
             with self.subTest(status=status, classification=classification):
+                target_ref = f"media:{classification}".replace("credential_invalid", "auth-invalid")
                 payload = make_media_asset_fetch_result(
-                    target_ref=f"media:{classification}",
+                    target_ref=target_ref,
                     fetch_outcome=None,
                     result_status=status,
                     error_classification=classification,
@@ -1364,7 +1381,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                         payload,
                         capability="media_asset_fetch_by_ref",
                         target_type="media_ref",
-                        target_value=f"media:{classification}",
+                        target_value=target_ref,
                     )
                 )
 
@@ -1442,6 +1459,32 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         assert isinstance(payload["media"], dict)
         assert isinstance(payload["media"]["source_ref_lineage"], dict)
         payload["media"]["source_ref_lineage"]["resolved_ref"] = "/tmp/downloaded-file.mp4"
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value="media:asset-001",
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_private_target_ref(self) -> None:
+        private_ref = "https://signed.example.invalid/media?token=secret"
+        payload = make_media_asset_fetch_result(target_ref=private_ref)
+
+        result = validate_success_payload(
+            payload,
+            capability="media_asset_fetch_by_ref",
+            target_type="media_ref",
+            target_value=private_ref,
+        )
+
+        self.assertEqual(result["code"], "invalid_adapter_success_payload")
+
+    def test_validate_success_payload_rejects_media_asset_fetch_no_storage_private_field(self) -> None:
+        payload = make_media_asset_fetch_result()
+        payload["no_storage"]["signed_url"] = "https://signed.example.invalid/media?token=secret"
 
         result = validate_success_payload(
             payload,

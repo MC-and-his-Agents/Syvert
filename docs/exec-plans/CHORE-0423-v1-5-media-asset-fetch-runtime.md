@@ -55,6 +55,7 @@
 - PR guardian 第五轮 findings 已处理：nullable media carrier 字段必须显式存在、`media_asset_fetch` resource slot resolution 尊重 V1/V2 account-only declarations。
 - PR guardian 第六轮 findings 已处理：`provider_or_network_blocked` 强制 `raw_payload_ref=null` 与 blocked-path alias，source refs/lineage/provider_path 增加值级脱敏校验。
 - PR guardian 第七轮 findings 已处理：`fetch_policy` 严格公共字段白名单、公共 content type 被请求 policy 排除时必须 `fetch_policy_denied`、非下载 outcome 不得记录下载字节数。
+- PR guardian 第八轮 findings 已处理：request/target/lineage media ref 均做值级脱敏校验，`no_storage` 改为严格公共白名单载体。
 
 ## 下一步动作
 
@@ -75,7 +76,7 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record`
-  - 结果：通过，160 tests。
+  - 结果：通过，163 tests。
 - `python3 -m unittest tests.runtime.test_adapter_resource_requirement_declaration tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_platform_leakage`
   - 结果：通过，161 tests。
 - `python3 -m unittest discover -s tests -p 'test*.py'`

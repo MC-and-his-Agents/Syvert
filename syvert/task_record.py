@@ -1209,7 +1209,7 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         raise TaskRecordContractError("media asset fetch result.target 必须是对象")
     if target.get("target_type") != "media_ref":
         raise TaskRecordContractError("media asset fetch result.target.target_type 必须为 media_ref")
-    require_string(target.get("target_ref"), field="media asset fetch result.target.target_ref")
+    _require_sanitized_media_ref(target.get("target_ref"), field="media asset fetch result.target.target_ref")
 
     for required_field in (
         "content_type",
@@ -1329,6 +1329,7 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
         for field, expected in expected_lineage.items():
             if lineage.get(field) != expected:
                 raise TaskRecordContractError("media asset fetch source_ref_lineage 必须绑定请求和公共媒体引用")
+            _require_sanitized_media_ref(lineage.get(field), field=f"result.envelope.media.source_ref_lineage.{field}")
         resolved_ref = lineage.get("resolved_ref")
         if resolved_ref is not None:
             _require_sanitized_media_ref(resolved_ref, field="result.envelope.media.source_ref_lineage.resolved_ref")
@@ -1394,11 +1395,14 @@ def _validate_media_asset_fetch_success_terminal_envelope(envelope: Mapping[str,
     no_storage = envelope.get("no_storage")
     if not isinstance(no_storage, Mapping):
         raise TaskRecordContractError("media asset fetch no_storage 必须是对象")
+    allowed_no_storage_fields = {"stored", "downloaded_byte_length", "retention_policy"}
+    if any(field not in allowed_no_storage_fields for field in no_storage):
+        raise TaskRecordContractError("media asset fetch no_storage 只能包含公共白名单字段")
     if no_storage.get("stored") is not False:
         raise TaskRecordContractError("media asset fetch no_storage.stored 必须为 false")
-    for forbidden_field in ("local_path", "storage_handle", "file_path", "download_handle", "retrieval_token", "bucket_url"):
-        if forbidden_field in no_storage:
-            raise TaskRecordContractError("media asset fetch no_storage 不得包含存储定位字段")
+    retention_policy = no_storage.get("retention_policy")
+    if retention_policy is not None:
+        _require_sanitized_media_ref(retention_policy, field="result.envelope.no_storage.retention_policy")
     if fetch_outcome == "downloaded_bytes":
         byte_length = no_storage.get("downloaded_byte_length")
         if isinstance(byte_length, bool) or not isinstance(byte_length, int) or byte_length < 0:
