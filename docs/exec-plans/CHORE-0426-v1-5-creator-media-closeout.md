@@ -18,41 +18,43 @@
 
 - Work Item：`#426`
 - Parent FR：`#405`
-- Scope：在 `#425` evidence 完成前，先把 `#439/#440/#441` 的 post-merge audit truth 固定为 closeout 输入，避免对已合入实现的质量状态反复猜测。
-- Out of scope：`v1.5.0` final published truth、`#405` 关闭、Phase `#381` 关闭、tag / GitHub Release。
+- Scope：消费 `#421/#422/#423/#424/#425` 的 merged truth、验证结果与审计证据，完成 `#405` closeout、`v1.5.0` 发布锚点（tag + GitHub Release）与 release/sprint 索引回写。
+- Out of scope：新增 runtime 行为、formal spec 语义扩展、Phase `#381` 自动关闭推断。
 
 ## 改动记录
 
-- 新增 `#405` post-merge audit artifact，记录 `#439/#440/#441` 的 merge provenance、补做回归命令、结果和 residual risk。
-- 明确这三次 merge 没有通过仓库标准的 `scripts/pr_guardian.py merge-if-safe` 完整入口，但合入前使用了 head-pinned squash merge，并在 merged `origin/main` 上补做了针对性回归。
-- 固化回滚触发门槛：只有 merged `origin/main` 上复现 shared runtime regression、FR-0405 public contract drift、creator/media result envelope drift，或 compatibility decision 读取 result carrier 时，才进入 remediation / revert Work Item。
+- 基于 `origin/main@ddebe39040be0c7a9374a923f15004e3880a45bc` 更新 `v1.5.0` release index、`2026-S25` sprint index 和 `#405` closeout evidence。
+- 统一记录 `#421-#425` 的 PR / merge commit / validation inputs，并将 `#442` 的受控 merge provenance 纳入 closeout 事实链。
+- 保留 `#439/#440/#441` 的 manual merge provenance 事实，不将其改写为标准 `merge-if-safe` provenance；同时记录 `#442` 已走 guardian approve + `merge-if-safe`。
+- 在发布完成后回写 annotated tag object、tag target、GitHub Release URL、published timestamp。
 
 ## 验证记录
 
-- `python3 -m unittest tests.runtime.test_operation_taxonomy tests.runtime.test_runtime tests.runtime.test_task_record tests.runtime.test_platform_leakage`
-  - 在 detached audit worktree `/tmp/syvert-postmerge-audit.hJQM5O`、`origin/main@508c5a5223d75169f374a7db4c15dd7a825702fd` 上执行；结果：通过，311 tests。
-- `python3 -m unittest tests.runtime.test_adapter_capability_requirement tests.runtime.test_provider_capability_offer tests.runtime.test_adapter_provider_compatibility_decision tests.runtime.test_http_api tests.runtime.test_cli`
-  - 在 detached audit worktree `/tmp/syvert-postmerge-audit.hJQM5O`、`origin/main@508c5a5223d75169f374a7db4c15dd7a825702fd` 上执行；结果：通过，177 tests。
+- `python3 scripts/docs_guard.py --mode ci`
+- `python3 scripts/workflow_guard.py --mode ci`
+- `python3 scripts/version_guard.py --mode ci`
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
 - `git diff --check`
-  - 结果：通过。
+- 发布锚点验证：
+  - `git rev-parse v1.5.0^{tag}`
+  - `git rev-parse v1.5.0^{}`
+  - `gh release view v1.5.0 --json tagName,url,publishedAt,targetCommitish`
 
 ## Review finding 处理记录
 
-- 发现：本地 `main` checkout 停留在 `05c4bfb`，不包含 `#439/#440/#441`，不能作为 post-merge 质量判断基线。
-- 处理：使用 detached audit worktree 挂到 `origin/main@508c5a5223d75169f374a7db4c15dd7a825702fd`，只在 merged main 上重跑高价值回归。
-- 发现：本地 `scripts/pr_guardian.py review <pr>` 会卡在内部再起的 `codex exec`，无法稳定产出 guardian verdict。
-- 处理：在 closeout truth 中显式记录该流程偏差，不把它伪装成标准 `merge-if-safe` provenance。
+- 历史 finding：`#439/#440/#441` 未通过标准 `merge-if-safe`。
+- 处理：以 post-merge audit artifact 固定 provenance 与回滚门槛，并在 `#442` 上补齐标准 guardian + merge-if-safe 路径证明。
 
 ## 未决风险
 
-- `#425` evidence 仍未合入，当前 audit 只证明 runtime/consumer 行为在 merged main 上未复现 blocker，不等于 `v1.5.0` release criteria 已满足。
-- `#426` 当前只记录 closeout 输入，不宣布 `#405` 已完成，也不宣布 Phase `#381` 已满足关闭条件。
+- Phase `#381` close conditions 需独立评估，不应从 `v1.5.0` 发布自动推导。
+- 若 closeout PR 被 guardian/checks 阻断，`#405/#426` 不得关闭，release 索引需维持 pending 状态。
 
 ## 回滚方式
 
-- 若 merged `origin/main` 上出现 shared runtime regression、public contract drift 或 consumer drift，则创建独立 remediation / revert Work Item；不要直接在 closeout PR 中混入实现修复。
-- 若只是 guardian provenance 缺口或 closeout truth 漏写，使用独立 docs / GitHub truth 修正 PR 补齐，不回滚已合入实现。
+- closeout truth 错误：使用独立 docs PR 与 GitHub issue/release metadata 修正，不回滚 `#421-#425` 已合入实现。
+- 若发布后复现 runtime/contract drift：创建独立 remediation/revert Work Item，按回滚门槛处理，不在 closeout PR 混入代码修复。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- `508c5a5223d75169f374a7db4c15dd7a825702fd`
+- `ddebe39040be0c7a9374a923f15004e3880a45bc`

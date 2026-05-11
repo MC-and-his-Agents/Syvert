@@ -52,6 +52,6 @@ Only open a remediation / revert Work Item when at least one of the following be
 
 ## Residual Risk
 
-- This audit reduces code-quality uncertainty for `#439/#440/#441`, but does not prove `v1.5.0` release readiness.
-- `#425` evidence and `#426` final closeout still remain open.
+- This audit reduces code-quality uncertainty for `#439/#440/#441`, but does not replace final release closeout reconciliation.
+- `#425` evidence has merged via `#442`; `#426` remains responsible for release/sprint/issue truth reconciliation.
 - `governance_gate` is not a meaningful post-merge quality signal on the detached audit worktree because it intentionally fails closed without an issue-scoped `head-ref`.
