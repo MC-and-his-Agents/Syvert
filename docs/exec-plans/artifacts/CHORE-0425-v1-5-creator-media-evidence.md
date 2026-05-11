@@ -46,6 +46,7 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
     "coverage": {
       "creator_recorded_reference_present": true,
       "derived_failure_matrix_present": true,
+      "inventory_matrix_replayed": true,
       "media_recorded_reference_present": true
     },
     "creator_reference_descriptors": [
@@ -66,6 +67,50 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
     ],
     "derived_scenario_basis": "creator/media failure and policy scenarios are derived_from_acquired_descriptor from CHORE-0421 inventory.",
     "inventory_artifact_ref": "docs/exec-plans/artifacts/CHORE-0421-v1-5-creator-profile-media-asset-fixture-inventory.md",
+    "inventory_matrix_bindings": [
+      {
+        "raw_shape_signal": "public creator profile response with id, display name, avatar, description, and public counters",
+        "scenario_id": "creator_profile_success_platform_a",
+        "source_kind": "recorded",
+        "status": "acquired_sanitized_descriptor"
+      },
+      {
+        "raw_shape_signal": "second reference public creator model with different field names and optional counters",
+        "scenario_id": "creator_profile_success_platform_b",
+        "source_kind": "recorded",
+        "status": "acquired_sanitized_descriptor"
+      },
+      {
+        "raw_shape_signal": "content/media object exposes image-like media reference",
+        "scenario_id": "image_media_ref",
+        "source_kind": "recorded",
+        "status": "acquired_sanitized_descriptor"
+      },
+      {
+        "raw_shape_signal": "content/media object exposes video-like media reference",
+        "scenario_id": "video_media_ref",
+        "source_kind": "recorded",
+        "status": "acquired_sanitized_descriptor"
+      },
+      {
+        "raw_shape_signal": "media content type is recognized and supported but excluded by `allowed_content_types`",
+        "scenario_id": "media_policy_content_type_denied",
+        "source_kind": "synthetic",
+        "status": "derived_from_acquired_descriptor"
+      },
+      {
+        "raw_shape_signal": "sanitized source ref lineage cannot be preserved",
+        "scenario_id": "media_source_ref_lineage_denied",
+        "source_kind": "synthetic",
+        "status": "derived_from_acquired_descriptor"
+      },
+      {
+        "raw_shape_signal": "`download_if_allowed` request exceeds policy/cost boundary but source ref lineage is available",
+        "scenario_id": "media_large_asset_download_if_allowed_downgrade",
+        "source_kind": "synthetic",
+        "status": "derived_from_acquired_descriptor"
+      }
+    ],
     "media_reference_descriptors": [
       {
         "content_type": "image",
@@ -162,6 +207,11 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
       "error_classification": "credential_invalid",
       "result_status": "failed"
     },
+    "media_download_if_allowed_downgrade": {
+      "fetch_mode": "download_if_allowed",
+      "fetch_outcome": "source_ref_preserved",
+      "result_status": "complete"
+    },
     "media_downloaded_bytes_metadata_audit": {
       "audit_transfer_observed": true,
       "byte_size": 4096,
@@ -202,6 +252,14 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
       "error_classification": "platform_failed",
       "result_status": "failed"
     },
+    "media_policy_content_type_denied": {
+      "allowed_content_types": [
+        "image"
+      ],
+      "content_type": "video",
+      "error_classification": "fetch_policy_denied",
+      "result_status": "failed"
+    },
     "media_provider_or_network_blocked": {
       "content_type": "image",
       "error_classification": "provider_or_network_blocked",
@@ -215,6 +273,11 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
     "media_signature_or_request_invalid": {
       "content_type": "image",
       "error_classification": "signature_or_request_invalid",
+      "result_status": "failed"
+    },
+    "media_source_ref_lineage_denied": {
+      "error_classification": "fetch_policy_denied",
+      "fetch_mode": "preserve_source_ref",
       "result_status": "failed"
     },
     "media_unsupported_content_type": {

@@ -21,6 +21,7 @@ ARTIFACT_PATH = Path("docs/exec-plans/artifacts/CHORE-0425-v1-5-creator-media-ev
 EXEC_PLAN_PATH = Path("docs/exec-plans/CHORE-0425-v1-5-creator-media-evidence.md")
 ADAPTER_KEY = "reference_adapter_creator_media"
 INVENTORY_ARTIFACT_REF = "docs/exec-plans/artifacts/CHORE-0421-v1-5-creator-profile-media-asset-fixture-inventory.md"
+INVENTORY_ARTIFACT_PATH = Path(INVENTORY_ARTIFACT_REF)
 
 CREATOR_REFERENCE_DESCRIPTORS = (
     {
@@ -60,6 +61,16 @@ MEDIA_REFERENCE_DESCRIPTORS = (
         "fetch_mode": "preserve_source_ref",
         "fetch_outcome": "source_ref_preserved",
     },
+)
+
+INVENTORY_REQUIRED_SCENARIOS = (
+    ("creator_profile_success_platform_a", "recorded", "acquired_sanitized_descriptor"),
+    ("creator_profile_success_platform_b", "recorded", "acquired_sanitized_descriptor"),
+    ("image_media_ref", "recorded", "acquired_sanitized_descriptor"),
+    ("video_media_ref", "recorded", "acquired_sanitized_descriptor"),
+    ("media_policy_content_type_denied", "synthetic", "derived_from_acquired_descriptor"),
+    ("media_source_ref_lineage_denied", "synthetic", "derived_from_acquired_descriptor"),
+    ("media_large_asset_download_if_allowed_downgrade", "synthetic", "derived_from_acquired_descriptor"),
 )
 
 
@@ -169,6 +180,7 @@ def make_media_payload(
     fetch_outcome: str | None,
     result_status: str,
     error_classification: str | None,
+    allowed_content_types: tuple[str, ...] | None = None,
 ) -> dict[str, object]:
     media: dict[str, object] | None = None
     audit: dict[str, object] = {}
@@ -216,7 +228,7 @@ def make_media_payload(
         "content_type": content_type,
         "fetch_policy": {
             "fetch_mode": fetch_mode,
-            "allowed_content_types": ["image", "video"],
+            "allowed_content_types": list(allowed_content_types or ("image", "video")),
             "allow_download": fetch_outcome == "downloaded_bytes",
             "max_bytes": 8192 if fetch_outcome == "downloaded_bytes" else None,
         },
@@ -284,6 +296,27 @@ def creator_task_record_round_trip(envelope: dict[str, object]) -> dict[str, Any
     return task_record_to_dict(task_record_from_dict(task_record_to_dict(finished)))
 
 
+def load_inventory_matrix() -> dict[str, dict[str, str]]:
+    text = INVENTORY_ARTIFACT_PATH.read_text(encoding="utf-8")
+    row_pattern = re.compile(
+        r"^\|\s*`(?P<scenario_id>[^`]+)`\s*\|\s*`(?P<operation>[^`]+)`\s*\|\s*`(?P<source_kind>[^`]+)`\s*\|"
+        r"\s*(?P<raw_shape_signal>.*?)\s*\|\s*(?P<assertion>.*?)\s*\|\s*`(?P<status>[^`]+)`\s*\|\s*$"
+    )
+    rows: dict[str, dict[str, str]] = {}
+    for line in text.splitlines():
+        match = row_pattern.match(line.strip())
+        if match is None:
+            continue
+        scenario_id = match.group("scenario_id")
+        rows[scenario_id] = {
+            "operation": match.group("operation"),
+            "source_kind": match.group("source_kind"),
+            "raw_shape_signal": match.group("raw_shape_signal"),
+            "status": match.group("status"),
+        }
+    return rows
+
+
 def media_task_record_round_trip(envelope: dict[str, object]) -> dict[str, Any]:
     target = envelope["target"]
     assert isinstance(target, dict)
@@ -334,6 +367,7 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         self.assertTrue(report["evidence_provenance"]["coverage"]["creator_recorded_reference_present"])
         self.assertTrue(report["evidence_provenance"]["coverage"]["media_recorded_reference_present"])
         self.assertTrue(report["evidence_provenance"]["coverage"]["derived_failure_matrix_present"])
+        self.assertTrue(report["evidence_provenance"]["coverage"]["inventory_matrix_replayed"])
 
     def test_artifact_text_does_not_expose_forbidden_fragments(self) -> None:
         text = "\n".join(
@@ -378,6 +412,25 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         return result.wasSuccessful()
 
     def build_report(self) -> dict[str, object]:
+        inventory_rows = load_inventory_matrix()
+        inventory_bindings: list[dict[str, str]] = []
+        for scenario_id, expected_source_kind, expected_status in INVENTORY_REQUIRED_SCENARIOS:
+            row = inventory_rows.get(scenario_id)
+            if row is None:
+                raise AssertionError(f"missing inventory scenario: {scenario_id}")
+            if row["source_kind"] != expected_source_kind:
+                raise AssertionError(f"inventory source_kind mismatch: {scenario_id}")
+            if row["status"] != expected_status:
+                raise AssertionError(f"inventory status mismatch: {scenario_id}")
+            inventory_bindings.append(
+                {
+                    "scenario_id": scenario_id,
+                    "source_kind": row["source_kind"],
+                    "status": row["status"],
+                    "raw_shape_signal": row["raw_shape_signal"],
+                }
+            )
+
         creator_success_payloads = [
             make_creator_success_payload(
                 target_ref=f"creator:{descriptor['scenario_id']}",
@@ -496,6 +549,40 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         for payload in media_failed.values():
             assert_runtime_valid("media_asset_fetch_by_ref", payload)
 
+        media_content_type_denied = make_media_payload(
+            target_ref="media:policy-content-type-denied",
+            evidence_alias="synthetic_media_policy_content_type_denied",
+            content_type="video",
+            fetch_mode="metadata_only",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="fetch_policy_denied",
+            allowed_content_types=("image",),
+        )
+        assert_runtime_valid("media_asset_fetch_by_ref", media_content_type_denied)
+
+        media_source_ref_lineage_denied = make_media_payload(
+            target_ref="media:source-ref-lineage-denied",
+            evidence_alias="synthetic_media_source_ref_lineage_denied",
+            content_type="image",
+            fetch_mode="preserve_source_ref",
+            fetch_outcome=None,
+            result_status="failed",
+            error_classification="fetch_policy_denied",
+        )
+        assert_runtime_valid("media_asset_fetch_by_ref", media_source_ref_lineage_denied)
+
+        media_download_if_allowed_downgrade = make_media_payload(
+            target_ref="media:if-allowed-downgrade",
+            evidence_alias="synthetic_media_if_allowed_downgrade",
+            content_type="video",
+            fetch_mode="download_if_allowed",
+            fetch_outcome="source_ref_preserved",
+            result_status="complete",
+            error_classification=None,
+        )
+        assert_runtime_valid("media_asset_fetch_by_ref", media_download_if_allowed_downgrade)
+
         no_storage_payload = make_media_payload(
             target_ref="media:no-extra-field",
             evidence_alias="synthetic_media_no_extra_field",
@@ -529,11 +616,13 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
                 "inventory_artifact_ref": INVENTORY_ARTIFACT_REF,
                 "creator_reference_descriptors": list(CREATOR_REFERENCE_DESCRIPTORS),
                 "media_reference_descriptors": list(MEDIA_REFERENCE_DESCRIPTORS),
+                "inventory_matrix_bindings": inventory_bindings,
                 "derived_scenario_basis": "creator/media failure and policy scenarios are derived_from_acquired_descriptor from CHORE-0421 inventory.",
                 "coverage": {
                     "creator_recorded_reference_present": True,
                     "media_recorded_reference_present": True,
                     "derived_failure_matrix_present": True,
+                    "inventory_matrix_replayed": True,
                 },
             },
             "two_reference_equivalent_proof": {
@@ -597,6 +686,22 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
                     "byte_size": media_downloaded["media"]["metadata"]["byte_size"],
                     "checksum_family": media_downloaded["media"]["metadata"]["checksum_family"],
                     "audit_transfer_observed": media_downloaded["audit"]["transfer_observed"],
+                },
+                "media_policy_content_type_denied": {
+                    "result_status": media_content_type_denied["result_status"],
+                    "error_classification": media_content_type_denied["error_classification"],
+                    "content_type": media_content_type_denied["content_type"],
+                    "allowed_content_types": media_content_type_denied["fetch_policy"]["allowed_content_types"],
+                },
+                "media_source_ref_lineage_denied": {
+                    "result_status": media_source_ref_lineage_denied["result_status"],
+                    "error_classification": media_source_ref_lineage_denied["error_classification"],
+                    "fetch_mode": media_source_ref_lineage_denied["fetch_policy"]["fetch_mode"],
+                },
+                "media_download_if_allowed_downgrade": {
+                    "result_status": media_download_if_allowed_downgrade["result_status"],
+                    "fetch_mode": media_download_if_allowed_downgrade["fetch_policy"]["fetch_mode"],
+                    "fetch_outcome": media_download_if_allowed_downgrade["fetch_outcome"],
                 },
                 **{
                     f"media_{classification}": {

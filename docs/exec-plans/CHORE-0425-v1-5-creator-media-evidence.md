@@ -81,6 +81,9 @@
 - guardian review finding（PR #442，第 4 轮）：
   - 问题：evidence replay 仅直接构造 public envelope，缺少可审计的 sanitized reference provenance；无法证明 two-reference 语义来自 `CHORE-0421` inventory descriptor。
   - 处理：新增 descriptor-driven provenance matrix（creator/media 的 `scenario_id/source_kind/inventory_source_alias/raw_shape_signal`），artifact 新增 `evidence_provenance`，并让泄漏扫描覆盖 exec-plan，防止本地路径再次入仓。
+- guardian review finding（PR #442，第 5 轮）：
+  - 问题：provenance 仍是自证，且 media fetch policy 缺少 `content_type_denied`、`source_ref_lineage_denied`、`download_if_allowed` downgrade 关键边界。
+  - 处理：replay 测试已实际解析并绑定 `CHORE-0421` fixture matrix；新增上述三类 media policy 证据场景，并同步 artifact snapshot。
 
 ## 未决风险
 
