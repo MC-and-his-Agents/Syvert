@@ -18,6 +18,7 @@ from syvert.task_record import (
 
 
 ARTIFACT_PATH = Path("docs/exec-plans/artifacts/CHORE-0425-v1-5-creator-media-evidence.md")
+EXEC_PLAN_PATH = Path("docs/exec-plans/CHORE-0425-v1-5-creator-media-evidence.md")
 ADAPTER_KEY = "reference_adapter_creator_media"
 
 
@@ -293,6 +294,7 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         text = "\n".join(
             (
                 ARTIFACT_PATH.read_text(encoding="utf-8"),
+                EXEC_PLAN_PATH.read_text(encoding="utf-8"),
                 Path(__file__).read_text(encoding="utf-8"),
             )
         ).lower()
