@@ -10,7 +10,7 @@
 - Parent Phase：`#381`
 - Parent FR：`#405`
 - 关联 spec：`docs/specs/FR-0405-creator-profile-media-asset-read-contract/`
-- 关联 PR：待创建
+- 关联 PR：`#443`（merge commit pending）
 - 状态：`active`
 - active 收口事项：`CHORE-0426-v1-5-creator-media-closeout`
 

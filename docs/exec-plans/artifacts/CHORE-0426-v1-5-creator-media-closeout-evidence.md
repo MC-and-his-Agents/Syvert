@@ -17,7 +17,7 @@
 | `#422` creator runtime | `#440` | `005329da83fe299ff0996099901999117c4f770d` | `creator_profile_by_id` runtime carrier |
 | `#424` consumer migration proof | `#441` | `508c5a5223d75169f374a7db4c15dd7a825702fd` | requirement/offer/compatibility/result consumers |
 | `#425` evidence | `#442` | `ddebe39040be0c7a9374a923f15004e3880a45bc` | creator/media sanitized replay evidence |
-| `#426` closeout | pending | pending | release/sprint/FR reconciliation and publish truth |
+| `#426` closeout | `#443` | pending | release/sprint/FR reconciliation and publish truth |
 
 ## Guardian Provenance
 
