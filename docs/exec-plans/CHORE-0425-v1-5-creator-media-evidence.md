@@ -75,6 +75,9 @@
 - guardian review blocker（PR #442，第 2 轮）：
   - 现象：`python3 scripts/pr_guardian.py review 442 --json-output /tmp/syvert-425-guardian-review.json` 无输出且长时间不返回。
   - 处理：已终止挂起进程（PID `26207`），当前不绕过 merge gate；等待修复 guardian subprocess 环境后再继续受控合并。
+- guardian review blocker（PR #442，第 3 轮，额度恢复后重试）：
+  - 现象：`SYVERT_GUARDIAN_TIMEOUT_SECONDS=180 python3 scripts/pr_guardian.py review 442 --json-output /tmp/syvert-425-guardian-review.json` 仍无输出且未产出 JSON 文件。
+  - 处理：已终止挂起进程（PID `31169`）；确认这是稳定环境阻断而非瞬时额度问题。
 
 ## 未决风险
 
