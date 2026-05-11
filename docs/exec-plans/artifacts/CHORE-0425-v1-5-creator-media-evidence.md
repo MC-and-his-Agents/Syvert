@@ -42,6 +42,53 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
     "fr_0403_collection_behavior_unchanged": true,
     "fr_0404_comment_behavior_unchanged": true
   },
+  "evidence_provenance": {
+    "coverage": {
+      "creator_recorded_reference_present": true,
+      "derived_failure_matrix_present": true,
+      "media_recorded_reference_present": true
+    },
+    "creator_reference_descriptors": [
+      {
+        "inventory_source_alias": "raw-page-sample-a",
+        "raw_shape_signal": "creator_profile_public_fields",
+        "scenario_id": "creator_profile_success_platform_a",
+        "source_alias": "reference_source_creator_alpha",
+        "source_kind": "recorded"
+      },
+      {
+        "inventory_source_alias": "raw-page-sample-b",
+        "raw_shape_signal": "creator_profile_public_fields",
+        "scenario_id": "creator_profile_success_platform_b",
+        "source_alias": "reference_source_creator_beta",
+        "source_kind": "recorded"
+      }
+    ],
+    "derived_scenario_basis": "creator/media failure and policy scenarios are derived_from_acquired_descriptor from CHORE-0421 inventory.",
+    "inventory_artifact_ref": "docs/exec-plans/artifacts/CHORE-0421-v1-5-creator-profile-media-asset-fixture-inventory.md",
+    "media_reference_descriptors": [
+      {
+        "content_type": "image",
+        "fetch_mode": "metadata_only",
+        "fetch_outcome": "metadata_only",
+        "inventory_source_alias": "raw-page-sample-b",
+        "raw_shape_signal": "image_media_reference_shape",
+        "scenario_id": "image_media_ref",
+        "source_alias": "reference_source_media_alpha",
+        "source_kind": "recorded"
+      },
+      {
+        "content_type": "video",
+        "fetch_mode": "preserve_source_ref",
+        "fetch_outcome": "source_ref_preserved",
+        "inventory_source_alias": "reference-crawler-model-c",
+        "raw_shape_signal": "video_media_reference_shape",
+        "scenario_id": "video_media_ref",
+        "source_alias": "reference_source_media_beta",
+        "source_kind": "recorded"
+      }
+    ]
+  },
   "fr_ref": "FR-0405",
   "governing_spec_ref": "docs/specs/FR-0405-creator-profile-media-asset-read-contract/",
   "predecessor_pr_refs": [
@@ -93,12 +140,12 @@ This artifact records sanitized, replayable evidence for `FR-0405` after creator
       "result_status": "failed"
     },
     "creator_success_reference_alpha": {
-      "display_name": "creator-alpha",
+      "display_name": "reference_source_creator_alpha",
       "result_status": "complete",
       "source_alias": "reference_source_creator_alpha"
     },
     "creator_success_reference_beta": {
-      "display_name": "creator-beta",
+      "display_name": "reference_source_creator_beta",
       "result_status": "complete",
       "source_alias": "reference_source_creator_beta"
     },

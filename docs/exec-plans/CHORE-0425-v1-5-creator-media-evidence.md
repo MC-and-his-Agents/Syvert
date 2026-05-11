@@ -78,6 +78,9 @@
 - guardian review blocker（PR #442，第 3 轮，额度恢复后重试）：
   - 现象：`SYVERT_GUARDIAN_TIMEOUT_SECONDS=180 python3 scripts/pr_guardian.py review 442 --json-output <guardian_review_output_json>` 仍无输出且未产出 JSON 文件。
   - 处理：已终止挂起进程（PID `31169`）；确认这是稳定环境阻断而非瞬时额度问题。
+- guardian review finding（PR #442，第 4 轮）：
+  - 问题：evidence replay 仅直接构造 public envelope，缺少可审计的 sanitized reference provenance；无法证明 two-reference 语义来自 `CHORE-0421` inventory descriptor。
+  - 处理：新增 descriptor-driven provenance matrix（creator/media 的 `scenario_id/source_kind/inventory_source_alias/raw_shape_signal`），artifact 新增 `evidence_provenance`，并让泄漏扫描覆盖 exec-plan，防止本地路径再次入仓。
 
 ## 未决风险
 

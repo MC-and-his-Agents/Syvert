@@ -20,6 +20,47 @@ from syvert.task_record import (
 ARTIFACT_PATH = Path("docs/exec-plans/artifacts/CHORE-0425-v1-5-creator-media-evidence.md")
 EXEC_PLAN_PATH = Path("docs/exec-plans/CHORE-0425-v1-5-creator-media-evidence.md")
 ADAPTER_KEY = "reference_adapter_creator_media"
+INVENTORY_ARTIFACT_REF = "docs/exec-plans/artifacts/CHORE-0421-v1-5-creator-profile-media-asset-fixture-inventory.md"
+
+CREATOR_REFERENCE_DESCRIPTORS = (
+    {
+        "scenario_id": "creator_profile_success_platform_a",
+        "source_alias": "reference_source_creator_alpha",
+        "source_kind": "recorded",
+        "inventory_source_alias": "raw-page-sample-a",
+        "raw_shape_signal": "creator_profile_public_fields",
+    },
+    {
+        "scenario_id": "creator_profile_success_platform_b",
+        "source_alias": "reference_source_creator_beta",
+        "source_kind": "recorded",
+        "inventory_source_alias": "raw-page-sample-b",
+        "raw_shape_signal": "creator_profile_public_fields",
+    },
+)
+
+MEDIA_REFERENCE_DESCRIPTORS = (
+    {
+        "scenario_id": "image_media_ref",
+        "source_alias": "reference_source_media_alpha",
+        "source_kind": "recorded",
+        "inventory_source_alias": "raw-page-sample-b",
+        "raw_shape_signal": "image_media_reference_shape",
+        "content_type": "image",
+        "fetch_mode": "metadata_only",
+        "fetch_outcome": "metadata_only",
+    },
+    {
+        "scenario_id": "video_media_ref",
+        "source_alias": "reference_source_media_beta",
+        "source_kind": "recorded",
+        "inventory_source_alias": "reference-crawler-model-c",
+        "raw_shape_signal": "video_media_reference_shape",
+        "content_type": "video",
+        "fetch_mode": "preserve_source_ref",
+        "fetch_outcome": "source_ref_preserved",
+    },
+)
 
 
 def make_source_trace(*, evidence_alias: str, blocked: bool = False) -> dict[str, object]:
@@ -289,6 +330,10 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         self.assertTrue(report["baseline"]["content_detail_by_url_unchanged"])
         self.assertTrue(report["baseline"]["fr_0403_collection_behavior_unchanged"])
         self.assertTrue(report["baseline"]["fr_0404_comment_behavior_unchanged"])
+        self.assertEqual(report["evidence_provenance"]["inventory_artifact_ref"], INVENTORY_ARTIFACT_REF)
+        self.assertTrue(report["evidence_provenance"]["coverage"]["creator_recorded_reference_present"])
+        self.assertTrue(report["evidence_provenance"]["coverage"]["media_recorded_reference_present"])
+        self.assertTrue(report["evidence_provenance"]["coverage"]["derived_failure_matrix_present"])
 
     def test_artifact_text_does_not_expose_forbidden_fragments(self) -> None:
         text = "\n".join(
@@ -333,36 +378,30 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
         return result.wasSuccessful()
 
     def build_report(self) -> dict[str, object]:
-        creator_alpha = make_creator_success_payload(
-            target_ref="creator:alpha",
-            creator_ref="creator-alpha",
-            evidence_alias="reference_source_creator_alpha",
-            display_name="creator-alpha",
-        )
-        creator_beta = make_creator_success_payload(
-            target_ref="creator:beta",
-            creator_ref="creator-beta",
-            evidence_alias="reference_source_creator_beta",
-            display_name="creator-beta",
-        )
-        media_image = make_media_payload(
-            target_ref="media:image-alpha",
-            evidence_alias="reference_source_media_alpha",
-            content_type="image",
-            fetch_mode="metadata_only",
-            fetch_outcome="metadata_only",
-            result_status="complete",
-            error_classification=None,
-        )
-        media_video = make_media_payload(
-            target_ref="media:video-beta",
-            evidence_alias="reference_source_media_beta",
-            content_type="video",
-            fetch_mode="preserve_source_ref",
-            fetch_outcome="source_ref_preserved",
-            result_status="complete",
-            error_classification=None,
-        )
+        creator_success_payloads = [
+            make_creator_success_payload(
+                target_ref=f"creator:{descriptor['scenario_id']}",
+                creator_ref=f"creator:{descriptor['scenario_id']}",
+                evidence_alias=descriptor["source_alias"],
+                display_name=descriptor["source_alias"],
+            )
+            for descriptor in CREATOR_REFERENCE_DESCRIPTORS
+        ]
+        creator_alpha, creator_beta = creator_success_payloads
+
+        media_success_payloads = [
+            make_media_payload(
+                target_ref=f"media:{descriptor['scenario_id']}",
+                evidence_alias=descriptor["source_alias"],
+                content_type=descriptor["content_type"],
+                fetch_mode=descriptor["fetch_mode"],
+                fetch_outcome=descriptor["fetch_outcome"],
+                result_status="complete",
+                error_classification=None,
+            )
+            for descriptor in MEDIA_REFERENCE_DESCRIPTORS
+        ]
+        media_image, media_video = media_success_payloads
         media_downloaded = make_media_payload(
             target_ref="media:video-bytes-proof",
             evidence_alias="synthetic_media_bytes_evidence",
@@ -373,10 +412,10 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
             error_classification=None,
         )
 
-        assert_runtime_valid("creator_profile_by_id", creator_alpha)
-        assert_runtime_valid("creator_profile_by_id", creator_beta)
-        assert_runtime_valid("media_asset_fetch_by_ref", media_image)
-        assert_runtime_valid("media_asset_fetch_by_ref", media_video)
+        for payload in creator_success_payloads:
+            assert_runtime_valid("creator_profile_by_id", payload)
+        for payload in media_success_payloads:
+            assert_runtime_valid("media_asset_fetch_by_ref", payload)
         assert_runtime_valid("media_asset_fetch_by_ref", media_downloaded)
 
         creator_unavailable: dict[str, dict[str, object]] = {}
@@ -486,14 +525,21 @@ class CreatorMediaEvidenceTests(unittest.TestCase):
             "status": "pass",
             "governing_spec_ref": "docs/specs/FR-0405-creator-profile-media-asset-read-contract/",
             "predecessor_pr_refs": ["#428", "#439", "#440", "#441"],
+            "evidence_provenance": {
+                "inventory_artifact_ref": INVENTORY_ARTIFACT_REF,
+                "creator_reference_descriptors": list(CREATOR_REFERENCE_DESCRIPTORS),
+                "media_reference_descriptors": list(MEDIA_REFERENCE_DESCRIPTORS),
+                "derived_scenario_basis": "creator/media failure and policy scenarios are derived_from_acquired_descriptor from CHORE-0421 inventory.",
+                "coverage": {
+                    "creator_recorded_reference_present": True,
+                    "media_recorded_reference_present": True,
+                    "derived_failure_matrix_present": True,
+                },
+            },
             "two_reference_equivalent_proof": {
                 "operations": ["creator_profile_by_id", "media_asset_fetch_by_ref"],
-                "source_aliases": [
-                    "reference_source_creator_alpha",
-                    "reference_source_creator_beta",
-                    "reference_source_media_alpha",
-                    "reference_source_media_beta",
-                ],
+                "source_aliases": [descriptor["source_alias"] for descriptor in CREATOR_REFERENCE_DESCRIPTORS]
+                + [descriptor["source_alias"] for descriptor in MEDIA_REFERENCE_DESCRIPTORS],
                 "public_surface_consistent": True,
             },
             "sanitization": {
