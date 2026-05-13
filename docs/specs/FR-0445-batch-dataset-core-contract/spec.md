@@ -32,13 +32,15 @@
 
 ## 需求说明
 
-- Core 必须能接收一组 `BatchTargetItem`，每个 item 绑定稳定 read-side operation、target type、target ref、dedup key 与可选 request cursor。
-- Core 必须为每个 item 生成独立 `BatchItemOutcome`，并保留 item-level success envelope 或 failure envelope；partial failure 不得吞掉 item 级错误。
+- Core 必须能接收一组 `BatchTargetItem`，每个 item 绑定稳定 read-side operation、脱敏 `adapter_key`、target type、target ref、dedup key 与可选 request cursor；`adapter_key` 复用现有 `InputTarget.adapter_key` 的 Syvert 内部 alias 语义，不得承载平台名、source name、provider route、账号池或 fallback 策略。
+- Core 必须为每个已处理 item 生成独立 `BatchItemOutcome`，并保留 item-level success envelope 或 failure envelope；partial failure 不得吞掉 item 级错误。
 - Core 必须在 batch-level result 中表达 `complete`、`partial_success`、`all_failed` 与 `resumable`。
 - duplicate `dedup_key` 采用 first-wins：第一个 item 正常执行或写入，后续 duplicate item 标记 `duplicate_skipped`，不得写第二份 dataset record。
 - `duplicate_skipped` 参与 batch 聚合时按 neutral terminal outcome 处理：若所有非 duplicate item 都 succeeded，batch result 为 `complete`；若至少一个非 duplicate item succeeded 且至少一个 failed，batch result 为 `partial_success`；若所有非 duplicate item 都 failed，batch result 为 `all_failed`；若执行中断且可恢复，batch result 为 `resumable`。
 - `BatchResumeToken` 只用于恢复 target set 的 runtime position，不承载 scheduler、业务优先级、运营策略或 provider fallback。
-- 成功 item 可投影为 `DatasetRecord.normalized_payload`，同时保留 `source_operation`、`target_ref`、`raw_payload_ref`、`evidence_ref` 与 `dedup_key`。
+- `result_status=resumable` 时，`item_outcomes` 只包含已经处理完成的 target-set 前缀；未执行 item 不生成 pending/not_started outcome，调用方必须通过 `resume_token.next_item_index` 和原始 target set 判断剩余范围。
+- resume 后必须复用同一 `batch_id`、target set hash、dedup state 与 dataset sink state；已写入 dataset record 的 item 不得重复写入，已标记 `duplicate_skipped` 的 item 不得在恢复后变成 success write。
+- 成功 item 可投影为 `DatasetRecord.normalized_payload`，同时保留 `source_operation`、`adapter_key`、`target_ref`、`raw_payload_ref`、`evidence_ref` 与 `dedup_key`。
 - Dataset sink 必须支持 write、readback、audit replay 的最小 contract；首个实现只能使用 JSON-safe reference sink，不引入产品数据库 schema、storage handle 或内容库模型。
 - `BatchItemOutcome` 必须复用已有 read-side operation result envelope；不得在 batch contract 中重新定义 creator/comment/media/content 的私有字段。
 - item operation 需要资源时，仍由已有 resource governance 通过单 item execution path 处理；batch 本身不得要求真实账号、登录态或 resource bundle 作为 Core admission 前置条件。
@@ -73,13 +75,13 @@ Then 第一个 item 按正常路径处理，后续 duplicate item 返回 `duplic
 
 Given batch execution 在第 N 个 item 后中断，并生成 resume token
 When caller 使用该 token 恢复同一 batch target set
-Then Core 从 recorded runtime position 继续执行，且 token 不包含 scheduler rule、business priority、provider fallback 或 marketplace 信息
+Then Core 返回的 resumable batch result 只包含前 N 个已处理 item 的 outcomes，并从 recorded runtime position 继续执行；token 不包含 scheduler rule、business priority、provider fallback 或 marketplace 信息
 
 ### 场景 6：dataset record 可回读和审计
 
 Given batch 成功写入 dataset records
 When consumer 按 dataset id 或 batch id 回读
-Then 返回 JSON-safe `DatasetRecord`，包含 `source_operation`、`target_ref`、`raw_payload_ref`、`normalized_payload`、`evidence_ref`、`dedup_key`、`batch_id` 与 `batch_item_id`
+Then 返回 JSON-safe `DatasetRecord`，包含 `source_operation`、脱敏 `adapter_key`、`target_ref`、`raw_payload_ref`、`normalized_payload`、`evidence_ref`、`source_trace`、`dedup_key`、`batch_id` 与 `batch_item_id`
 
 ### 场景 7：dataset replay 不需要 raw payload files
 
@@ -113,6 +115,7 @@ Then carrier 必须 fail-closed，并返回 contract validation error
 - dataset record 的 `normalized_payload` 必须是 JSON-safe value；不可序列化对象必须 fail-closed。
 - duplicate detection 只能基于 contract-level `dedup_key`，不得依赖平台私有 raw id。
 - batch audit trace 不得记录 provider selector、fallback、marketplace 或 routing policy。
+- `adapter_key` 与 `source_trace` 只能使用 Syvert 内部脱敏 alias；不得写入平台 source name、外部项目名、provider path、账号池、代理池、本地路径或 storage handle。
 
 ## 验收标准
 

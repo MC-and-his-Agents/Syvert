@@ -20,6 +20,8 @@
 
 - Guardian review on PR `#451` returned `REQUEST_CHANGES` for three issues: `#381` completed truth drift, missing batch-id dataset readback surface, and undefined `duplicate_skipped` batch aggregation semantics.
 - This follow-up resolves those blockers by aligning upstream truth with published read-side release slices, adding `read_by_batch(batch_id)`, and defining `duplicate_skipped` as a neutral terminal outcome for batch aggregation.
+- Guardian follow-up review returned two contract closure issues: missing sanitized adapter identity and incomplete `resumable` outcome cardinality semantics.
+- This follow-up resolves them by adding `adapter_key` / `source_trace` as sanitized Core carriers and defining `resumable` item outcomes as the processed target-set prefix with remaining work identified by `resume_token.next_item_index`.
 
 ## Notes
 

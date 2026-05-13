@@ -14,6 +14,7 @@
 - Core 只封装已稳定 read-side result envelope，不重新定义 creator/comment/media/content 私有字段。
 - Core 必须保留 item-level success/failure truth；batch-level partial success 不得吞掉 item-level error。
 - Core 必须执行 dataset record validation、dedup first-wins、dataset-id readback、batch-id readback 与 audit replay。
+- Core 使用 `adapter_key` / `source_trace` 承载脱敏 adapter identity 与来源追溯；该 identity 必须来自既有 `InputTarget` / read-side envelope，不得引入 provider selector、fallback、platform source name 或 marketplace 语义。
 
 ## Adapter consumer rules
 
@@ -30,7 +31,7 @@
 ## Dataset sink rules
 
 - Dataset sink contract 只提供 write、dataset-id readback、batch-id readback 与 audit replay。
-- Dataset record 必须使用 sanitized evidence ref、raw payload ref 与 JSON-safe normalized payload。
+- Dataset record 必须使用 sanitized adapter key、source trace、evidence ref、raw payload ref 与 JSON-safe normalized payload。
 - Sink 不得暴露 storage handle、本地路径、bucket URL、download path 或产品数据库 schema。
 
 ## Consumer rules
