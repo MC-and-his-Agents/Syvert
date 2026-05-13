@@ -42,6 +42,8 @@
 - 初次执行中断并返回 `result_status=resumable` 时，`item_outcomes` 只包含已经处理完成的 target-set 前缀；未执行 item 不生成 pending/not_started outcome，调用方必须通过 `resume_token.next_item_index` 和原始 target set 判断剩余范围。
 - 使用 resume token 发起恢复执行后，Core 必须返回新的 batch envelope；若恢复后完成，`item_outcomes` 必须包含完整 target set 的 canonical combined outcomes。若再次中断，`item_outcomes` 必须扩展为截至新 `next_item_index` 的已处理前缀。
 - resume 后必须复用同一 `batch_id`、target set hash、dedup state、`dataset_id` 与 dataset sink state；已写入 dataset record 的 item 不得重复写入，已标记 `duplicate_skipped` 的 item 不得在恢复后变成 success write。
+- cancel / timeout 只表达运行时停止边界，不表达 scheduler 或业务策略：若仍有未处理 suffix 且 target set hash 可验证，batch result 必须返回 `result_status=resumable`、已处理 outcome 前缀、`resume_token.next_item_index` 与 sanitized cancel/timeout audit；未 dispatch 的 item 不生成 outcome。
+- 若 cancel / timeout 发生在 item 已 dispatch 后且 item 返回稳定 failure envelope，该 item 进入已处理前缀并标记 `outcome_status=failed`；无 dataset record 写入，后续 suffix 通过 resume token 继续。
 - 成功 item 可投影为 `DatasetRecord.normalized_payload`，同时保留 `source_operation`、`adapter_key`、`target_ref`、`raw_payload_ref`、`evidence_ref` 与 `dedup_key`。
 - Dataset sink 必须支持 write、readback、audit replay 的最小 contract；首个实现只能使用 JSON-safe reference sink，不引入产品数据库 schema、storage handle 或内容库模型。
 - `BatchItemOutcome` 必须复用已有 read-side operation result envelope；不得在 batch contract 中重新定义 creator/comment/media/content 的私有字段。
@@ -82,6 +84,12 @@ Then 该 envelope 的 `result_status=resumable`，且只包含前 N 个已处理
 When caller 使用该 token 恢复同一 batch target set
 Then Core 从 recorded runtime position 继续执行，并在恢复完成时返回包含完整 target set canonical outcomes 的 terminal envelope；dataset dedup/write state 不重复写入已完成 item
 
+### 场景 5b：cancel / timeout 保留可恢复边界
+
+Given batch execution 在 target set 中途收到 cancel 或 timeout
+When Core 能验证同一 `batch_id` 与 target set hash
+Then batch result 返回 `result_status=resumable`，`item_outcomes` 只包含已处理前缀；若当前 item 已返回 stable timeout/cancel failure envelope，该 item 为 `failed` 且不写 dataset record；audit trace 使用 sanitized evidence alias
+
 ### 场景 6：dataset record 可回读和审计
 
 Given batch 成功写入 dataset records
@@ -116,11 +124,11 @@ Then carrier 必须 fail-closed，并返回 contract validation error
 
 - invalid target item operation 不属于稳定 read-side operations 时，batch request 必须被拒绝。
 - resume token 绑定的 `batch_id`、target set hash 或 next item position 不一致时，必须返回 invalid/expired resume boundary。
-- dataset sink write 失败时，item outcome 不得伪装为 dataset-written success；batch result 必须保留 dataset write failure audit。
+- dataset sink write 失败时，该 item 必须返回 `outcome_status=failed`、`dataset_record_ref=null`，并保留 read-side success envelope 与 `dataset_write_failed` error/audit carrier；batch 聚合按 failed item 计算，不能伪装为 dataset-written success。
 - dataset record 的 `normalized_payload` 必须是 JSON-safe value；不可序列化对象必须 fail-closed。
 - duplicate detection 只能基于 contract-level `dedup_key`，不得依赖平台私有 raw id。
 - batch audit trace 不得记录 provider selector、fallback、marketplace 或 routing policy。
-- `adapter_key` 与 `source_trace` 只能使用 Syvert 内部脱敏 alias；不得写入平台 source name、外部项目名、provider path、账号池、代理池、本地路径或 storage handle。
+- `adapter_key` 与 `source_trace` 只能使用 Syvert 内部脱敏 alias；`source_trace.provider_path` 允许保留已发布 read-side contract 定义的 sanitized opaque execution-path alias，但不得写入 raw provider route/path、平台 source name、外部项目名、账号池、代理池、本地路径或 storage handle。
 
 ## 验收标准
 

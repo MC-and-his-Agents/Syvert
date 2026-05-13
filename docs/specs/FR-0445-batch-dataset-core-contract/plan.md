@@ -34,7 +34,7 @@
 ## 测试与验证策略
 
 - 单元测试：
-  - `#447` 覆盖 all success、partial success、all failed、duplicate target、resume token、dataset sink readback、invalid target operation、resume token mismatch、dataset sink write failure、non-JSON normalized payload 与 carrier validation failure。
+  - `#447` 覆盖 all success、partial success、all failed、duplicate target、resume token、cancel/timeout、dataset sink readback、invalid target operation、resume token mismatch、dataset sink write failure、non-JSON normalized payload 与 carrier validation failure。
   - `#448` 覆盖 TaskRecord/result query/compatibility consumers。
   - `#449` 覆盖 sanitized evidence、dataset replay、resource boundary。
 - 集成/契约测试：

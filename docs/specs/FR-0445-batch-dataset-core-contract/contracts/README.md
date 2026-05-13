@@ -16,6 +16,8 @@
 - Core 必须执行 dataset record validation、dedup first-wins、dataset-id readback、batch-id readback 与 audit replay。
 - Core 使用 `adapter_key` / `source_trace` 承载脱敏 adapter identity 与来源追溯；该 identity 必须来自既有 `InputTarget` / read-side envelope，不得引入 provider selector、fallback、platform source name 或 marketplace 语义。
 - Core owns dataset identity visibility：`dataset_id` comes from request input or a stable derivation from `batch_id`, and must be surfaced through `BatchResultEnvelope` and `DatasetRecord`.
+- Core treats cancel / timeout as runtime stop boundaries: use `resumable` with processed outcome prefix and sanitized audit when a suffix remains.
+- Core treats dataset sink write failure as item failure: preserve the read-side result for audit, keep `dataset_record_ref` empty, and aggregate the batch with that item as failed.
 
 ## Adapter consumer rules
 
@@ -34,6 +36,7 @@
 - Dataset sink contract 只提供 write、dataset-id readback、batch-id readback 与 audit replay。
 - Dataset record 必须使用 sanitized adapter key、source trace、evidence ref、raw payload ref 与 JSON-safe normalized payload。
 - Dataset sink 不生成 dataset identity；它只接收并索引 Core-provided `dataset_id` / `batch_id`。
+- `source_trace.provider_path` may keep the published read-side sanitized opaque execution-path alias; raw provider route/path remains forbidden.
 - Sink 不得暴露 storage handle、本地路径、bucket URL、download path 或产品数据库 schema。
 
 ## Consumer rules

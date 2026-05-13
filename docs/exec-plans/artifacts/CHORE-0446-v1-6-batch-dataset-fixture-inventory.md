@@ -24,6 +24,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `batch_all_failed` | `FR-0403` | all item failures preserved, batch `all_failed`, no dataset records | `derived_from_published_contract` |
 | `batch_duplicate_target_first_wins` | `FR-0403` | first `dedup_key` writes dataset record; duplicate is `duplicate_skipped`; batch result remains `complete` when no non-duplicate item fails or resumes | `derived_from_published_contract` |
 | `batch_resume_after_interruption` | runtime carrier | interrupted envelope contains processed outcome prefix only; resumed terminal envelope returns canonical combined outcomes | `planned_for_runtime_fixture` |
+| `batch_cancel_timeout_resumable` | runtime carrier | cancel/timeout returns `resumable` with processed outcome prefix, sanitized audit, and no outcome for undispatched suffix | `planned_for_runtime_fixture` |
 | `dataset_write_readback` | dataset sink | written records can be read by `read_by_dataset(dataset_id)` and `read_by_batch(batch_id)` | `planned_for_runtime_fixture` |
 | `dataset_id_lifecycle` | batch request + dataset sink | dataset id is request-supplied or derived from batch id, then surfaced in batch result and dataset records | `planned_for_runtime_fixture` |
 | `dataset_audit_replay` | dataset sink | replay uses sanitized evidence refs and normalized payload only | `planned_for_runtime_fixture` |
@@ -31,7 +32,7 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `adapter_identity_sanitized` | `InputTarget` + read-side `SourceTrace` | batch item and dataset record retain Syvert adapter alias without source/provider/private leakage | `planned_for_runtime_fixture` |
 | `invalid_target_operation_rejected` | operation taxonomy | target item operation outside stable read-side set is rejected before execution | `planned_for_runtime_fixture` |
 | `resume_token_mismatch_rejected` | runtime carrier | resume token with mismatched batch id, target set hash, or next item position is rejected | `planned_for_runtime_fixture` |
-| `dataset_sink_write_failure_preserved` | dataset sink | dataset write failure is preserved as item/batch audit failure and not reported as dataset-written success | `planned_for_runtime_fixture` |
+| `dataset_sink_write_failure_preserved` | dataset sink | dataset write failure produces failed item outcome, empty dataset record ref, preserved read-side result audit, and failed batch aggregation | `planned_for_runtime_fixture` |
 | `normalized_payload_non_json_rejected` | dataset validator | non-JSON-safe normalized payload is rejected fail-closed | `planned_for_runtime_fixture` |
 | `carrier_validation_error_reported` | batch/dataset validators | invalid batch or dataset carrier returns contract validation error without raw/private leakage | `planned_for_runtime_fixture` |
 | `raw_payload_inline_rejected` | dataset validator | inline raw payload is rejected | `planned_for_runtime_fixture` |
@@ -40,6 +41,6 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 
 ## Acceptance For Batch 0
 
-- The matrix covers all success, partial success, partial failure, all failed, duplicate target, resume, invalid operation, resume mismatch, dataset write failure, JSON-safety failure, carrier validation failure, dataset replay, and resource boundary.
+- The matrix covers all success, partial success, partial failure, all failed, duplicate target, resume, cancel/timeout, invalid operation, resume mismatch, dataset write failure, JSON-safety failure, carrier validation failure, dataset replay, and resource boundary.
 - The matrix only references published contracts and sanitized aliases.
 - No raw payload files or source/path/storage/private fields are introduced.

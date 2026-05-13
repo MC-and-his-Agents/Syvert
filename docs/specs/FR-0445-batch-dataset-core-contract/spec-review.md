@@ -26,6 +26,8 @@
 - This follow-up resolves them by defining `dataset_id` ownership/visibility and separating interrupted `resumable` envelopes from resumed terminal envelopes with canonical combined outcomes.
 - Guardian merge-time review returned one coverage issue: frozen fail-closed boundaries lacked fixture/error/evidence entries.
 - This follow-up resolves it by adding planned verification entries for invalid operation, resume mismatch, dataset write failure, non-JSON normalized payload, and carrier validation failure.
+- Guardian fifth review returned three closure issues: cancel/timeout boundary, dataset write failure status mapping, and sanitized `source_trace.provider_path` alignment with read-side contracts.
+- This follow-up resolves them by defining cancel/timeout as resumable stop boundaries, mapping dataset write failure to failed item outcomes with empty record refs, and allowing only sanitized opaque `provider_path` aliases.
 
 ## Notes
 
