@@ -23,8 +23,9 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `batch_partial_success_permission_denied` | `FR-0404` | one succeeded outcome, one failed outcome, batch `partial_success` | `derived_from_published_contract` |
 | `batch_all_failed` | `FR-0403` | all item failures preserved, batch `all_failed`, no dataset records | `derived_from_published_contract` |
 | `batch_duplicate_target_first_wins` | `FR-0403` | first `dedup_key` writes dataset record; duplicate is `duplicate_skipped`; batch result remains `complete` when no non-duplicate item fails or resumes | `derived_from_published_contract` |
-| `batch_resume_after_interruption` | runtime carrier | resumable result contains processed outcome prefix only; resume token binds batch id, target set hash, next item index | `planned_for_runtime_fixture` |
+| `batch_resume_after_interruption` | runtime carrier | interrupted envelope contains processed outcome prefix only; resumed terminal envelope returns canonical combined outcomes | `planned_for_runtime_fixture` |
 | `dataset_write_readback` | dataset sink | written records can be read by `read_by_dataset(dataset_id)` and `read_by_batch(batch_id)` | `planned_for_runtime_fixture` |
+| `dataset_id_lifecycle` | batch request + dataset sink | dataset id is request-supplied or derived from batch id, then surfaced in batch result and dataset records | `planned_for_runtime_fixture` |
 | `dataset_audit_replay` | dataset sink | replay uses sanitized evidence refs and normalized payload only | `planned_for_runtime_fixture` |
 | `item_resource_boundary` | resource governance | item operation consumes existing resource governance; batch has no login precondition | `derived_from_published_contract` |
 | `adapter_identity_sanitized` | `InputTarget` + read-side `SourceTrace` | batch item and dataset record retain Syvert adapter alias without source/provider/private leakage | `planned_for_runtime_fixture` |

@@ -3,8 +3,9 @@
 ## BatchRequest
 
 - 用途：表达一个 Core batch execution request。
-- 最小字段：`batch_id`、`target_set`、`resume_token`（可选）、`dataset_sink_ref`（可选）、`audit_context`。
+- 最小字段：`batch_id`、`target_set`、`resume_token`（可选）、`dataset_sink_ref`（可选）、`dataset_id`（可选）、`audit_context`。
 - 约束：`target_set` 必须是非空 `BatchTargetItem` 数组；`resume_token` 必须绑定同一 `batch_id` 与 target set hash；`dataset_sink_ref` 是 opaque sink alias，不得包含 storage handle、本地路径、bucket URL 或产品数据库 schema。
+- `dataset_id` lifecycle：当 `dataset_sink_ref` 存在时，caller 可提供稳定 `dataset_id`；未提供时 Core 必须从 `batch_id` 派生稳定 JSON-safe dataset id，并在 `BatchResultEnvelope.dataset_id` 与每个 `DatasetRecord.dataset_id` 中回显。Dataset sink 不负责生成 opaque dataset id。
 
 ## BatchTargetItem
 
@@ -23,9 +24,10 @@
 ## BatchResultEnvelope
 
 - 用途：表达整个 batch 的 terminal result。
-- 最小字段：`batch_id`、`operation`、`result_status`、`item_outcomes`、`resume_token`（可选）、`dataset_sink_ref`（可选）、`audit_trace`。
+- 最小字段：`batch_id`、`operation`、`result_status`、`item_outcomes`、`resume_token`（可选）、`dataset_sink_ref`（可选）、`dataset_id`（可选）、`audit_trace`。
 - 约束：`operation` 固定为 `batch_execution`；`result_status` 至少支持 `complete`、`partial_success`、`all_failed`、`resumable`。
 - `resumable` 约束：`item_outcomes` 只包含已完成处理的 target-set 前缀；未执行 item 不生成 placeholder outcome。`resume_token.next_item_index` 是第一个未处理 item 的 index，consumer 必须用它判断剩余 target set。
+- resume invocation 约束：使用有效 `resume_token` 后返回新的 batch envelope；若完成，`item_outcomes` 必须是完整 target set 的 canonical combined outcomes（保留中断前前缀并追加本次执行后缀）。若再次中断，`item_outcomes` 必须扩展为截至新 `next_item_index` 的已处理前缀。
 
 ## BatchResumeToken
 
@@ -44,6 +46,7 @@
 - 用途：表达 batch/dataset sink 中的最小沉淀记录。
 - 最小字段：`dataset_record_id`、`dataset_id`、`source_operation`、`adapter_key`、`target_ref`、`raw_payload_ref`、`normalized_payload`、`evidence_ref`、`source_trace`、`dedup_key`、`batch_id`、`batch_item_id`、`recorded_at`。
 - 约束：`normalized_payload` 必须是 JSON-safe public payload；`raw_payload_ref` 只能是 reference 或 null，不得内联 raw payload；`dedup_key` first-wins。
+- `dataset_id` 必须来自 `BatchRequest.dataset_id` 或 Core 从 `batch_id` 派生的 stable id，并与 `BatchResultEnvelope.dataset_id` 一致。
 - `adapter_key` 与 `source_trace` 只能保留 read-side envelope 已允许的脱敏来源追溯信息，不得恢复平台 source name、provider selector、fallback、账号池、代理池、storage handle 或本地路径。
 
 ## DatasetSink

@@ -33,13 +33,15 @@
 ## 需求说明
 
 - Core 必须能接收一组 `BatchTargetItem`，每个 item 绑定稳定 read-side operation、脱敏 `adapter_key`、target type、target ref、dedup key 与可选 request cursor；`adapter_key` 复用现有 `InputTarget.adapter_key` 的 Syvert 内部 alias 语义，不得承载平台名、source name、provider route、账号池或 fallback 策略。
+- 当 request 绑定 `dataset_sink_ref` 时，`dataset_id` 必须由 caller 提供或由 Core 从 `batch_id` 派生，并在 batch result 与 dataset record 中回显；dataset sink 不生成不可追溯 dataset identity。
 - Core 必须为每个已处理 item 生成独立 `BatchItemOutcome`，并保留 item-level success envelope 或 failure envelope；partial failure 不得吞掉 item 级错误。
 - Core 必须在 batch-level result 中表达 `complete`、`partial_success`、`all_failed` 与 `resumable`。
 - duplicate `dedup_key` 采用 first-wins：第一个 item 正常执行或写入，后续 duplicate item 标记 `duplicate_skipped`，不得写第二份 dataset record。
 - `duplicate_skipped` 参与 batch 聚合时按 neutral terminal outcome 处理：若所有非 duplicate item 都 succeeded，batch result 为 `complete`；若至少一个非 duplicate item succeeded 且至少一个 failed，batch result 为 `partial_success`；若所有非 duplicate item 都 failed，batch result 为 `all_failed`；若执行中断且可恢复，batch result 为 `resumable`。
 - `BatchResumeToken` 只用于恢复 target set 的 runtime position，不承载 scheduler、业务优先级、运营策略或 provider fallback。
-- `result_status=resumable` 时，`item_outcomes` 只包含已经处理完成的 target-set 前缀；未执行 item 不生成 pending/not_started outcome，调用方必须通过 `resume_token.next_item_index` 和原始 target set 判断剩余范围。
-- resume 后必须复用同一 `batch_id`、target set hash、dedup state 与 dataset sink state；已写入 dataset record 的 item 不得重复写入，已标记 `duplicate_skipped` 的 item 不得在恢复后变成 success write。
+- 初次执行中断并返回 `result_status=resumable` 时，`item_outcomes` 只包含已经处理完成的 target-set 前缀；未执行 item 不生成 pending/not_started outcome，调用方必须通过 `resume_token.next_item_index` 和原始 target set 判断剩余范围。
+- 使用 resume token 发起恢复执行后，Core 必须返回新的 batch envelope；若恢复后完成，`item_outcomes` 必须包含完整 target set 的 canonical combined outcomes。若再次中断，`item_outcomes` 必须扩展为截至新 `next_item_index` 的已处理前缀。
+- resume 后必须复用同一 `batch_id`、target set hash、dedup state、`dataset_id` 与 dataset sink state；已写入 dataset record 的 item 不得重复写入，已标记 `duplicate_skipped` 的 item 不得在恢复后变成 success write。
 - 成功 item 可投影为 `DatasetRecord.normalized_payload`，同时保留 `source_operation`、`adapter_key`、`target_ref`、`raw_payload_ref`、`evidence_ref` 与 `dedup_key`。
 - Dataset sink 必须支持 write、readback、audit replay 的最小 contract；首个实现只能使用 JSON-safe reference sink，不引入产品数据库 schema、storage handle 或内容库模型。
 - `BatchItemOutcome` 必须复用已有 read-side operation result envelope；不得在 batch contract 中重新定义 creator/comment/media/content 的私有字段。
@@ -74,8 +76,11 @@ Then 第一个 item 按正常路径处理，后续 duplicate item 返回 `duplic
 ### 场景 5：resume token 只恢复 runtime position
 
 Given batch execution 在第 N 个 item 后中断，并生成 resume token
+When Core 返回 interrupted envelope
+Then 该 envelope 的 `result_status=resumable`，且只包含前 N 个已处理 item 的 outcomes；token 不包含 scheduler rule、business priority、provider fallback 或 marketplace 信息
+
 When caller 使用该 token 恢复同一 batch target set
-Then Core 返回的 resumable batch result 只包含前 N 个已处理 item 的 outcomes，并从 recorded runtime position 继续执行；token 不包含 scheduler rule、business priority、provider fallback 或 marketplace 信息
+Then Core 从 recorded runtime position 继续执行，并在恢复完成时返回包含完整 target set canonical outcomes 的 terminal envelope；dataset dedup/write state 不重复写入已完成 item
 
 ### 场景 6：dataset record 可回读和审计
 
