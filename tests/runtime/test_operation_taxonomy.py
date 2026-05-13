@@ -14,6 +14,7 @@ from syvert.operation_taxonomy import (
     DEFAULT_OPERATION_TAXONOMY,
     OperationTaxonomyContractError,
     OperationTaxonomyEntry,
+    STABLE_BATCH_EXECUTION_ENTRY,
     STABLE_CONTENT_DETAIL_ENTRY,
     is_stable_operation,
     proposed_operation_taxonomy_entries,
@@ -132,6 +133,26 @@ class OperationTaxonomyTests(unittest.TestCase):
             )
         )
 
+    def test_stable_batch_execution_lookup_returns_runtime_entry(self) -> None:
+        entry = stable_operation_entry(
+            operation="batch_execution",
+            target_type="operation_batch",
+            collection_mode="batch",
+        )
+
+        self.assertEqual(entry, STABLE_BATCH_EXECUTION_ENTRY)
+        self.assertEqual(entry.capability_family, "batch_execution")
+        self.assertTrue(entry.runtime_delivery)
+        self.assertEqual(entry.lifecycle, CAPABILITY_LIFECYCLE_STABLE)
+        self.assertEqual(entry.contract_refs, ("FR-0445",))
+        self.assertTrue(
+            is_stable_operation(
+                operation="batch_execution",
+                target_type="operation_batch",
+                collection_mode="batch",
+            )
+        )
+
     def test_proposed_candidates_are_registered_but_not_stable_runtime_operations(self) -> None:
         proposed_operations = {entry.operation for entry in proposed_operation_taxonomy_entries()}
 
@@ -144,7 +165,6 @@ class OperationTaxonomyTests(unittest.TestCase):
                 "media_asset_fetch",
                 "media_upload",
                 "content_publish",
-                "batch_execution",
                 "scheduled_execution",
                 "dataset_sink",
             },

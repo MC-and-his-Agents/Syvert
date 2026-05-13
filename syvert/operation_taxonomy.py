@@ -189,6 +189,22 @@ STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY = OperationTaxonomyEntry(
     ),
 )
 
+STABLE_BATCH_EXECUTION_ENTRY = OperationTaxonomyEntry(
+    capability_family="batch_execution",
+    operation="batch_execution",
+    target_type="operation_batch",
+    execution_mode="batch",
+    collection_mode="batch",
+    lifecycle=CAPABILITY_LIFECYCLE_STABLE,
+    runtime_delivery=True,
+    contract_refs=("FR-0445",),
+    admission_evidence_refs=(
+        "tests.runtime.test_batch_dataset",
+        "tests.runtime.test_operation_taxonomy",
+    ),
+    notes=("v1.6.0 batch/dataset Core contract carrier; wraps stable read-side item operations only.",),
+)
+
 PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
     OperationTaxonomyEntry(
         capability_family="content_search",
@@ -263,18 +279,6 @@ PROPOSED_OPERATION_TAXONOMY_ENTRIES = (
         notes=("reserved candidate only; no v1.1 runtime capability",),
     ),
     OperationTaxonomyEntry(
-        capability_family="batch_execution",
-        operation="batch_execution",
-        target_type="operation_batch",
-        execution_mode="batch",
-        collection_mode="batch",
-        lifecycle=CAPABILITY_LIFECYCLE_PROPOSED,
-        runtime_delivery=False,
-        contract_refs=("FR-0368",),
-        admission_evidence_refs=(),
-        notes=("reserved candidate only; no v1.1 runtime capability",),
-    ),
-    OperationTaxonomyEntry(
         capability_family="scheduled_execution",
         operation="scheduled_execution",
         target_type="schedule",
@@ -307,6 +311,7 @@ DEFAULT_OPERATION_TAXONOMY = (
     STABLE_COMMENT_COLLECTION_ENTRY,
     STABLE_CREATOR_PROFILE_BY_ID_ENTRY,
     STABLE_MEDIA_ASSET_FETCH_BY_REF_ENTRY,
+    STABLE_BATCH_EXECUTION_ENTRY,
     *PROPOSED_OPERATION_TAXONOMY_ENTRIES,
 )
 
