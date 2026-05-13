@@ -25,7 +25,6 @@
 - 本次纳入：
   - `syvert/batch_dataset.py`
   - `syvert/operation_taxonomy.py`
-  - `scripts/common.py`（仅修复 issue-scoped worktree repo locator，确保默认 discovery / PR scripts 不漂移到其他 repo）
   - `tests/__init__.py`（仅启用根目录默认 unittest discovery 进入治理测试包）
   - `tests/runtime/test_batch_dataset.py`
   - `tests/runtime/test_operation_taxonomy.py`
@@ -58,7 +57,6 @@
 - dataset sink write failure 映射为 failed item，保留 read-side success envelope 供审计。
 - resume token 只表达 runtime position，不表达 scheduler、priority、workflow、provider fallback 或 marketplace。
 - batch 本身不要求真实账号；item operation 需要资源时继续经过 existing resource governance。
-- issue-scoped worktree 名称（如 `syvert-447-runtime`）解析为 canonical Syvert repo，避免本地验证和 PR scripts 读取其他 repo 语义。
 - guardian follow-up：resume 会校验 prior outcomes 与 target-set 前缀、dedup state 和 dataset sink readback；绑定 `dataset_sink_ref` 但缺 sink 时 fail-closed；`source_trace` 只允许 sanitized Core 字段；search/list request cursor 当前 fail-closed，避免静默丢弃。
 
 ## 已验证项

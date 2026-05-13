@@ -223,9 +223,6 @@ def default_github_repo() -> str:
     for repo_name in repo_names:
         if repo_name in REPO_CANONICAL_GITHUB_REPOS:
             return REPO_CANONICAL_GITHUB_REPOS[repo_name]
-        for canonical_name, canonical_repo in REPO_CANONICAL_GITHUB_REPOS.items():
-            if repo_name.startswith(f"{canonical_name}-"):
-                return canonical_repo
     completed = run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT, check=False)
     if completed.returncode == 0:
         parsed = parse_github_repo_from_remote_url(completed.stdout.strip())
