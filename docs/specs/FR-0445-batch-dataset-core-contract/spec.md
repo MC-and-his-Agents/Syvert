@@ -12,7 +12,7 @@
 
 ## 背景与目标
 
-- 背景：`v1.1.0` Operation Taxonomy、`v1.2.0` Resource Governance 与 `#381` Read-Side Capabilities 已完成。Batch / Dataset Foundation 现在可以消费稳定 read-side result envelope，而不是重新定义平台对象。
+- 背景：`v1.1.0` Operation Taxonomy 与 `v1.2.0` Resource Governance 已发布；read-side release slices `v1.3.0`、`v1.4.0`、`v1.5.0` 已发布并提供稳定 read-side result envelope。Phase `#381` closeout 仍由独立事项收口，不作为本 FR 的 completed truth。
 - 目标：冻结 `v1.6.0` Batch / Dataset Core formal contract，定义 batch request / target set、item-level outcome、partial success/failure、resume token、batch audit trace、dataset record / sink 最小模型、dataset readback 与 audit replay。
 
 ## 范围
@@ -36,6 +36,7 @@
 - Core 必须为每个 item 生成独立 `BatchItemOutcome`，并保留 item-level success envelope 或 failure envelope；partial failure 不得吞掉 item 级错误。
 - Core 必须在 batch-level result 中表达 `complete`、`partial_success`、`all_failed` 与 `resumable`。
 - duplicate `dedup_key` 采用 first-wins：第一个 item 正常执行或写入，后续 duplicate item 标记 `duplicate_skipped`，不得写第二份 dataset record。
+- `duplicate_skipped` 参与 batch 聚合时按 neutral terminal outcome 处理：若所有非 duplicate item 都 succeeded，batch result 为 `complete`；若至少一个非 duplicate item succeeded 且至少一个 failed，batch result 为 `partial_success`；若所有非 duplicate item 都 failed，batch result 为 `all_failed`；若执行中断且可恢复，batch result 为 `resumable`。
 - `BatchResumeToken` 只用于恢复 target set 的 runtime position，不承载 scheduler、业务优先级、运营策略或 provider fallback。
 - 成功 item 可投影为 `DatasetRecord.normalized_payload`，同时保留 `source_operation`、`target_ref`、`raw_payload_ref`、`evidence_ref` 与 `dedup_key`。
 - Dataset sink 必须支持 write、readback、audit replay 的最小 contract；首个实现只能使用 JSON-safe reference sink，不引入产品数据库 schema、storage handle 或内容库模型。
@@ -66,7 +67,7 @@ Then batch result 返回 `result_status=all_failed`，每个 item outcome 都包
 
 Given batch request 包含两个相同 `dedup_key` 的 target item
 When Core 执行 batch
-Then 第一个 item 按正常路径处理，后续 duplicate item 返回 `duplicate_skipped`，且 dataset sink 不写第二份 record
+Then 第一个 item 按正常路径处理，后续 duplicate item 返回 `duplicate_skipped`，dataset sink 不写第二份 record；若没有失败或中断，batch result 返回 `result_status=complete`
 
 ### 场景 5：resume token 只恢复 runtime position
 

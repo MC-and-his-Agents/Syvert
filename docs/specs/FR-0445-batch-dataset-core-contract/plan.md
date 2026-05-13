@@ -63,7 +63,8 @@
 
 ## 进入实现前条件
 
-- [x] `#381` 已关闭为 completed。
+- [x] Read-side release slices `v1.3.0`、`v1.4.0`、`v1.5.0` 已发布，可作为 Batch / Dataset item result envelope 输入。
+- [x] Phase `#381` closeout 仍由独立事项收口，本 FR 不声明其 completed truth。
 - [x] `#382` 已确认为 deferred-roadmap / not planned / not completed。
 - [x] `#444/#445/#446-#450` 已完成 GitHub admission。
 - [ ] `#446` spec review 已通过。

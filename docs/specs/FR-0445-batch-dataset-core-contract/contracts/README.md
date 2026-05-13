@@ -13,7 +13,7 @@
 - Core 拥有 `batch_execution` public carrier、target set、item outcome、resume token、audit trace、dataset record 与 reference dataset sink contract。
 - Core 只封装已稳定 read-side result envelope，不重新定义 creator/comment/media/content 私有字段。
 - Core 必须保留 item-level success/failure truth；batch-level partial success 不得吞掉 item-level error。
-- Core 必须执行 dataset record validation、dedup first-wins、readback 与 audit replay。
+- Core 必须执行 dataset record validation、dedup first-wins、dataset-id readback、batch-id readback 与 audit replay。
 
 ## Adapter consumer rules
 
@@ -29,7 +29,7 @@
 
 ## Dataset sink rules
 
-- Dataset sink contract 只提供 write/read/audit replay。
+- Dataset sink contract 只提供 write、dataset-id readback、batch-id readback 与 audit replay。
 - Dataset record 必须使用 sanitized evidence ref、raw payload ref 与 JSON-safe normalized payload。
 - Sink 不得暴露 storage handle、本地路径、bucket URL、download path 或产品数据库 schema。
 

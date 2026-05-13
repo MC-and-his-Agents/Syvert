@@ -18,7 +18,8 @@
 
 ## Findings
 
-- No blocker found in the formal spec slice.
+- Guardian review on PR `#451` returned `REQUEST_CHANGES` for three issues: `#381` completed truth drift, missing batch-id dataset readback surface, and undefined `duplicate_skipped` batch aggregation semantics.
+- This follow-up resolves those blockers by aligning upstream truth with published read-side release slices, adding `read_by_batch(batch_id)`, and defining `duplicate_skipped` as a neutral terminal outcome for batch aggregation.
 
 ## Notes
 

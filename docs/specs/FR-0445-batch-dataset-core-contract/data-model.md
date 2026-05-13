@@ -16,7 +16,7 @@
 
 - 用途：表达 batch 内每个 item 的结果。
 - 最小字段：`item_id`、`operation`、`target_ref`、`outcome_status`、`result_envelope`（可选）、`error_envelope`（可选）、`dataset_record_ref`（可选）、`audit`。
-- 约束：`outcome_status` 至少支持 `succeeded`、`failed`、`duplicate_skipped`；`duplicate_skipped` 不得携带 success result envelope，不得写 dataset record。
+- 约束：`outcome_status` 至少支持 `succeeded`、`failed`、`duplicate_skipped`；`duplicate_skipped` 不得携带 success result envelope，不得写 dataset record；batch result 聚合时将其视为 neutral terminal outcome，不单独制造 `partial_success`。
 
 ## BatchResultEnvelope
 
@@ -45,5 +45,6 @@
 ## DatasetSink
 
 - 用途：表达最小 sink contract。
-- 最小能力：`write(record)`、`read(dataset_id)`、`audit_replay(dataset_id)`。
+- 最小能力：`write(record)`、`read_by_dataset(dataset_id)`、`read_by_batch(batch_id)`、`audit_replay(dataset_id)`。
+- readback 语义：`read_by_dataset(dataset_id)` 返回该 dataset 的 JSON-safe records；`read_by_batch(batch_id)` 返回该 batch 写入的 JSON-safe records；两者都不得返回 storage handle、本地路径、source name 或 raw payload inline。
 - 约束：首版 reference sink 可为 in-memory / JSON-safe carrier；不得绑定产品数据库 schema、storage handle、content library lifecycle 或 BI model。

@@ -22,9 +22,9 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `batch_all_success_two_items` | `FR-0403` + `FR-0405` | batch result `complete`; two succeeded outcomes; two dataset records | `derived_from_published_contract` |
 | `batch_partial_success_permission_denied` | `FR-0404` | one succeeded outcome, one failed outcome, batch `partial_success` | `derived_from_published_contract` |
 | `batch_all_failed` | `FR-0403` | all item failures preserved, batch `all_failed`, no dataset records | `derived_from_published_contract` |
-| `batch_duplicate_target_first_wins` | `FR-0403` | first `dedup_key` writes dataset record; duplicate is `duplicate_skipped` | `derived_from_published_contract` |
+| `batch_duplicate_target_first_wins` | `FR-0403` | first `dedup_key` writes dataset record; duplicate is `duplicate_skipped`; batch result remains `complete` when no non-duplicate item fails or resumes | `derived_from_published_contract` |
 | `batch_resume_after_interruption` | runtime carrier | resume token binds batch id, target set hash, next item index | `planned_for_runtime_fixture` |
-| `dataset_write_readback` | dataset sink | written records can be read by dataset id and batch id | `planned_for_runtime_fixture` |
+| `dataset_write_readback` | dataset sink | written records can be read by `read_by_dataset(dataset_id)` and `read_by_batch(batch_id)` | `planned_for_runtime_fixture` |
 | `dataset_audit_replay` | dataset sink | replay uses sanitized evidence refs and normalized payload only | `planned_for_runtime_fixture` |
 | `item_resource_boundary` | resource governance | item operation consumes existing resource governance; batch has no login precondition | `derived_from_published_contract` |
 | `raw_payload_inline_rejected` | dataset validator | inline raw payload is rejected | `planned_for_runtime_fixture` |

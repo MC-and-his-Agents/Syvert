@@ -3,7 +3,7 @@
 | 风险 | 影响 | 缓解 | 回滚 |
 | --- | --- | --- | --- |
 | batch contract 漂移成 scheduler | Core 会提前承载调度语义 | spec 明确 resume token 只恢复 runtime position | 删除 scheduler 字段与场景 |
-| dataset sink 漂移成内容库或 BI 产品 | Core 职责边界扩大到上层应用 | sink 只保留 write/read/audit replay | 回滚产品字段 |
+| dataset sink 漂移成内容库或 BI 产品 | Core 职责边界扩大到上层应用 | sink 只保留 write、dataset-id readback、batch-id readback、audit replay | 回滚产品字段 |
 | read-side envelope 被 batch 重写 | 破坏 `v1.3.0`-`v1.5.0` published contracts | BatchItemOutcome 只封装既有 envelope | 回滚重定义字段，单独开 remediation |
 | raw/source/path/storage 泄漏 | evidence 与 dataset record 污染发布 truth | 所有 evidence ref 使用 sanitized alias | 删除污染 artifact 并重跑 leakage scan |
 | duplicate dedup key 语义不稳定 | dataset record 重复或审计不一致 | first-wins，duplicate item 标记 `duplicate_skipped` | 回滚 duplicate policy |
