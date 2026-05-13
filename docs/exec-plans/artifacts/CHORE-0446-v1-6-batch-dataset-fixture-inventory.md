@@ -29,12 +29,17 @@ This artifact records the sanitized fixture and error inventory consumed by `FR-
 | `dataset_audit_replay` | dataset sink | replay uses sanitized evidence refs and normalized payload only | `planned_for_runtime_fixture` |
 | `item_resource_boundary` | resource governance | item operation consumes existing resource governance; batch has no login precondition | `derived_from_published_contract` |
 | `adapter_identity_sanitized` | `InputTarget` + read-side `SourceTrace` | batch item and dataset record retain Syvert adapter alias without source/provider/private leakage | `planned_for_runtime_fixture` |
+| `invalid_target_operation_rejected` | operation taxonomy | target item operation outside stable read-side set is rejected before execution | `planned_for_runtime_fixture` |
+| `resume_token_mismatch_rejected` | runtime carrier | resume token with mismatched batch id, target set hash, or next item position is rejected | `planned_for_runtime_fixture` |
+| `dataset_sink_write_failure_preserved` | dataset sink | dataset write failure is preserved as item/batch audit failure and not reported as dataset-written success | `planned_for_runtime_fixture` |
+| `normalized_payload_non_json_rejected` | dataset validator | non-JSON-safe normalized payload is rejected fail-closed | `planned_for_runtime_fixture` |
+| `carrier_validation_error_reported` | batch/dataset validators | invalid batch or dataset carrier returns contract validation error without raw/private leakage | `planned_for_runtime_fixture` |
 | `raw_payload_inline_rejected` | dataset validator | inline raw payload is rejected | `planned_for_runtime_fixture` |
 | `storage_handle_rejected` | dataset validator | local path, bucket URL, storage handle, signed URL are rejected | `planned_for_runtime_fixture` |
 | `provider_selector_rejected` | batch validator | selector/fallback/marketplace fields are rejected | `planned_for_runtime_fixture` |
 
 ## Acceptance For Batch 0
 
-- The matrix covers all success, partial success, partial failure, all failed, duplicate target, resume, dataset replay, and resource boundary.
+- The matrix covers all success, partial success, partial failure, all failed, duplicate target, resume, invalid operation, resume mismatch, dataset write failure, JSON-safety failure, carrier validation failure, dataset replay, and resource boundary.
 - The matrix only references published contracts and sanitized aliases.
 - No raw payload files or source/path/storage/private fields are introduced.

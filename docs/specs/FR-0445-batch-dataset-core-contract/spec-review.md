@@ -24,6 +24,8 @@
 - This follow-up resolves them by adding `adapter_key` / `source_trace` as sanitized Core carriers and defining `resumable` item outcomes as the processed target-set prefix with remaining work identified by `resume_token.next_item_index`.
 - Guardian third review returned two closure issues: dataset identity lifecycle and post-resume terminal envelope semantics.
 - This follow-up resolves them by defining `dataset_id` ownership/visibility and separating interrupted `resumable` envelopes from resumed terminal envelopes with canonical combined outcomes.
+- Guardian merge-time review returned one coverage issue: frozen fail-closed boundaries lacked fixture/error/evidence entries.
+- This follow-up resolves it by adding planned verification entries for invalid operation, resume mismatch, dataset write failure, non-JSON normalized payload, and carrier validation failure.
 
 ## Notes
 
