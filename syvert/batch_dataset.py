@@ -134,6 +134,8 @@ class BatchResumeToken:
     target_set_hash: str
     next_item_index: int
     issued_at: str
+    dataset_sink_ref: str | None = None
+    dataset_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -546,6 +548,8 @@ def batch_resume_token_to_dict(token: BatchResumeToken) -> dict[str, Any]:
         "target_set_hash": token.target_set_hash,
         "next_item_index": token.next_item_index,
         "issued_at": token.issued_at,
+        **({"dataset_sink_ref": token.dataset_sink_ref} if token.dataset_sink_ref is not None else {}),
+        **({"dataset_id": token.dataset_id} if token.dataset_id is not None else {}),
     }
 
 
@@ -697,6 +701,8 @@ def _resumable_result(
         target_set_hash=target_set_hash,
         next_item_index=next_item_index,
         issued_at=now().isoformat().replace("+00:00", "Z"),
+        dataset_sink_ref=request.dataset_sink_ref,
+        dataset_id=dataset_id,
     )
     return BatchResultEnvelope(
         batch_id=request.batch_id,
@@ -719,6 +725,12 @@ def _resumable_result(
 def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, target_set_hash: str) -> None:
     if token.batch_id != request.batch_id or token.target_set_hash != target_set_hash:
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
+    if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):
+        raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
+    if token.dataset_sink_ref is not None:
+        _validate_sanitized_ref(token.dataset_sink_ref, field="resume_token.dataset_sink_ref")
+    if token.dataset_id is not None:
+        _validate_sanitized_ref(token.dataset_id, field="resume_token.dataset_id")
     if token.next_item_index < 0 or token.next_item_index > len(request.target_set):
         raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
 

@@ -602,6 +602,49 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
 
+    def test_resume_rejects_omitted_dataset_sink_ref_boundary(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        resumed_request = BatchRequest(
+            batch_id="batch-001",
+            target_set=(target("item-1", "alpha"), target("item-2", "beta")),
+            resume_token=first.resume_token,
+            dataset_sink_ref=None,
+            audit_context={"evidence_ref": "evidence:batch"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(resumed_request, sink=sink, prior_item_outcomes=first.item_outcomes)
+
+        self.assertEqual(context.exception.code, "invalid_resume_token")
+
+    def test_resume_rejects_changed_dataset_id_boundary(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        resumed_request = BatchRequest(
+            batch_id="batch-001",
+            target_set=(target("item-1", "alpha"), target("item-2", "beta")),
+            resume_token=first.resume_token,
+            dataset_sink_ref="dataset-sink:reference",
+            dataset_id="dataset:changed",
+            audit_context={"evidence_ref": "evidence:batch"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(resumed_request, sink=sink, prior_item_outcomes=first.item_outcomes)
+
+        self.assertEqual(context.exception.code, "invalid_resume_token")
+
     def test_resume_token_mismatch_fails_closed(self) -> None:
         token = BatchResumeToken(
             resume_token="resume:bad",
