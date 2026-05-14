@@ -215,6 +215,29 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         )
         self.assertIn("evidence:batch", result.audit_trace["evidence_refs"])
 
+    def test_request_validation_rejects_unsafe_public_ids(self) -> None:
+        unsafe_batch = BatchRequest(
+            batch_id="http://evil/batch",
+            target_set=(target("item-1", "alpha"),),
+            dataset_sink_ref="dataset-sink:reference",
+            audit_context={"evidence_ref": "evidence:batch"},
+        )
+        with self.assertRaises(BatchDatasetContractError) as batch_context:
+            self.execute(unsafe_batch)
+
+        self.assertEqual(batch_context.exception.code, "unsafe_ref")
+
+        unsafe_item = BatchRequest(
+            batch_id="batch-001",
+            target_set=(target("http://evil/item", "alpha"),),
+            dataset_sink_ref="dataset-sink:reference",
+            audit_context={"evidence_ref": "evidence:batch"},
+        )
+        with self.assertRaises(BatchDatasetContractError) as item_context:
+            self.execute(unsafe_item)
+
+        self.assertEqual(item_context.exception.code, "unsafe_ref")
+
     def test_all_stable_read_side_item_operations_are_projected_through_existing_envelopes(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: MultiReadSideAdapter()}
         sink = ReferenceDatasetSink()

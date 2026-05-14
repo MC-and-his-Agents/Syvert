@@ -348,7 +348,7 @@ def execute_batch_request(
 def validate_batch_request(request: BatchRequest) -> BatchRequest:
     if not isinstance(request, BatchRequest):
         raise BatchDatasetContractError("invalid_batch_request", "BatchRequest expected")
-    _require_non_empty_string(request.batch_id, field="batch_id")
+    _validate_sanitized_ref(_require_non_empty_string(request.batch_id, field="batch_id"), field="batch_id")
     if not request.target_set:
         raise BatchDatasetContractError("empty_target_set", "BatchRequest.target_set must not be empty")
     for index, item in enumerate(request.target_set):
@@ -365,7 +365,7 @@ def validate_batch_request(request: BatchRequest) -> BatchRequest:
 def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> BatchTargetItem:
     if not isinstance(item, BatchTargetItem):
         raise BatchDatasetContractError("invalid_target_item", "BatchTargetItem expected", details={"index": index})
-    _require_non_empty_string(item.item_id, field="item_id")
+    _validate_sanitized_ref(_require_non_empty_string(item.item_id, field="item_id"), field="item_id")
     _validate_sanitized_ref(item.adapter_key, field="adapter_key")
     if item.operation not in ALLOWED_BATCH_ITEM_OPERATIONS:
         raise BatchDatasetContractError(
