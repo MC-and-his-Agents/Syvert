@@ -1159,12 +1159,12 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     "dataset_record_id": "record-alias",
                     "source_trace": {
                         **record.source_trace,
-                        "provider_path": "provider:sanitized:download-bucket-secret",
+                        "provider_path": "provider:sanitized:download-bucket-public",
                     },
                 }
             )
         )
-        self.assertEqual(alias_record.source_trace["provider_path"], "provider:sanitized:download-bucket-secret")
+        self.assertEqual(alias_record.source_trace["provider_path"], "provider:sanitized:download-bucket-public")
 
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
@@ -1193,6 +1193,10 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             "s3://private-bucket/raw",
             "provider:account-pool:main",
             "provider:proxy-pool:main",
+            "provider:fallback:route",
+            "provider:marketplace:route",
+            "provider:credential:route",
+            "provider:signed-download-bucket",
             "provider:token=secret",
         ):
             with self.subTest(provider_path=provider_path):

@@ -1063,6 +1063,12 @@ def _validate_provider_path(provider_path: str) -> None:
         "/etc/",
         "\\",
         "token=",
+        "credential",
+        "secret",
+        "signed",
+        "storage-handle",
+        "fallback",
+        "marketplace",
         "account-pool",
         "proxy-pool",
     )
