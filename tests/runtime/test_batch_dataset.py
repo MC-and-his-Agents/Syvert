@@ -823,6 +823,59 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "unsafe_ref")
 
+    def test_local_absolute_path_ref_is_rejected_but_raw_alias_is_allowed(self) -> None:
+        sink = ReferenceDatasetSink()
+        record = sink.write(
+            {
+                "dataset_record_id": "record-1",
+                "dataset_id": "dataset-1",
+                "source_operation": "content_search_by_keyword",
+                "adapter_key": TEST_ADAPTER_KEY,
+                "target_ref": "alpha",
+                "raw_payload_ref": "raw://alpha",
+                "normalized_payload": {"items": []},
+                "evidence_ref": "evidence:alpha",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "fetched_at": "2026-05-13T10:00:00Z",
+                    "evidence_alias": "evidence:alpha",
+                },
+                "dedup_key": "dedup:alpha",
+                "batch_id": "batch-001",
+                "batch_item_id": "item-1",
+                "recorded_at": "2026-05-13T10:00:00Z",
+            }
+        )
+        self.assertEqual(record.raw_payload_ref, "raw://alpha")
+
+        for local_path in ("/home/me/raw.json", "/etc/passwd"):
+            with self.subTest(local_path=local_path):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    ReferenceDatasetSink().write(
+                        {
+                            "dataset_record_id": f"record-{local_path.rsplit('/', 1)[-1]}",
+                            "dataset_id": "dataset-1",
+                            "source_operation": "content_search_by_keyword",
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "target_ref": "alpha",
+                            "raw_payload_ref": local_path,
+                            "normalized_payload": {"items": []},
+                            "evidence_ref": "evidence:alpha",
+                            "source_trace": {
+                                "adapter_key": TEST_ADAPTER_KEY,
+                                "provider_path": "provider://sanitized",
+                                "fetched_at": "2026-05-13T10:00:00Z",
+                                "evidence_alias": "evidence:alpha",
+                            },
+                            "dedup_key": f"dedup:{local_path.rsplit('/', 1)[-1]}",
+                            "batch_id": "batch-001",
+                            "batch_item_id": "item-1",
+                            "recorded_at": "2026-05-13T10:00:00Z",
+                        }
+                    )
+                self.assertEqual(context.exception.code, "unsafe_ref")
+
     def test_sanitized_provider_path_is_allowed_but_raw_path_rejected(self) -> None:
         result = self.execute(request(target("item-1", "alpha")))
         record = ReferenceDatasetSink().write(

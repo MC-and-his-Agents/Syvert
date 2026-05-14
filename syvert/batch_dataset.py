@@ -955,6 +955,8 @@ def _validate_provider_path(provider_path: str) -> None:
 def _validate_sanitized_ref(value: str, *, field: str) -> str:
     normalized = _require_non_empty_string(value, field=field)
     lowered = normalized.lower()
+    if normalized.startswith("/"):
+        raise BatchDatasetContractError("unsafe_ref", f"{field} contains a local absolute path", details={"field": field})
     if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains forbidden private or storage token", details={"field": field})
     _ensure_json_safe(normalized, field=field)
