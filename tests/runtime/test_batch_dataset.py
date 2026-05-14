@@ -675,6 +675,35 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_item_outcome")
 
+    def test_resume_without_dataset_sink_rejects_forged_dataset_record_ref(self) -> None:
+        first = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=(target("item-1", "alpha"), target("item-2", "beta")),
+                dataset_sink_ref=None,
+                audit_context={"evidence_ref": "evidence:batch"},
+            ),
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{**first.item_outcomes[0].__dict__, "dataset_record_ref": "dataset:forged:item-1"}
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                BatchRequest(
+                    batch_id="batch-001",
+                    target_set=(target("item-1", "alpha"), target("item-2", "beta")),
+                    resume_token=first.resume_token,
+                    dataset_sink_ref=None,
+                    audit_context={"evidence_ref": "evidence:batch"},
+                ),
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+
     def test_resume_rejects_duplicate_prior_outcome_with_error_payload(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -1123,6 +1152,19 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             }
         )
         self.assertEqual(record.source_trace["provider_path"], "provider://sanitized")
+        alias_record = validate_dataset_record(
+            type(record)(
+                **{
+                    **record.__dict__,
+                    "dataset_record_id": "record-alias",
+                    "source_trace": {
+                        **record.source_trace,
+                        "provider_path": "provider:sanitized:download-bucket-secret",
+                    },
+                }
+            )
+        )
+        self.assertEqual(alias_record.source_trace["provider_path"], "provider:sanitized:download-bucket-secret")
 
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
@@ -1151,7 +1193,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             "s3://private-bucket/raw",
             "provider:account-pool:main",
             "provider:proxy-pool:main",
-            "provider:secret-token",
+            "provider:token=secret",
         ):
             with self.subTest(provider_path=provider_path):
                 with self.assertRaises(BatchDatasetContractError):

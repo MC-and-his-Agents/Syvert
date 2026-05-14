@@ -995,6 +995,12 @@ def _validate_resume_outcome_prefix(
                 "prior duplicate_skipped outcome must not reference a dataset record",
                 details={"index": index, "item_id": item.item_id},
             )
+        if request.dataset_sink_ref is None and outcome.dataset_record_ref is not None:
+            raise BatchDatasetContractError(
+                "resume_dataset_state_mismatch",
+                "prior outcome must not reference a dataset record when resume has no dataset sink boundary",
+                details={"index": index, "item_id": item.item_id},
+            )
         if (
             request.dataset_sink_ref is not None
             and not duplicate
@@ -1043,11 +1049,27 @@ def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
 
 
 def _validate_provider_path(provider_path: str) -> None:
-    forbidden = ("http://", "https://", "file://", "/tmp/", "/var/", "\\", "selector", "fallback", "marketplace")
+    forbidden = (
+        "http://",
+        "https://",
+        "s3://",
+        "gs://",
+        "storage://",
+        "file://",
+        "/tmp/",
+        "/var/",
+        "/users/",
+        "/home/",
+        "/etc/",
+        "\\",
+        "token=",
+        "account-pool",
+        "proxy-pool",
+    )
     if provider_path.startswith("/"):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
     lowered = provider_path.lower()
-    if any(token in lowered for token in forbidden) or any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
+    if any(token in lowered for token in forbidden):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
 
 
