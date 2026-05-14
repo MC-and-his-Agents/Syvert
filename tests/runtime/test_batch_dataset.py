@@ -97,6 +97,21 @@ class FailingCollectionAdapter(CollectionAdapter):
         )
 
 
+class TimeoutCollectionAdapter(CollectionAdapter):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def execute(self, request):
+        from syvert.runtime import PlatformAdapterError
+
+        self.calls += 1
+        raise PlatformAdapterError(
+            code="execution_timeout",
+            message="execution timed out",
+            details={"control_code": "execution_timeout", "evidence_ref": "evidence:timeout"},
+        )
+
+
 class FailingDatasetSink(ReferenceDatasetSink):
     def write(self, record):
         raise BatchDatasetContractError(
@@ -166,6 +181,14 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(len(sink.read_by_dataset("dataset:batch-001")), 2)
         self.assertEqual(len(sink.read_by_batch("batch-001")), 2)
         self.assertEqual(sink.audit_replay("dataset:batch-001")[0]["evidence_ref"], "alias://collection-page-1")
+        self.assertEqual(result.audit_trace["batch_id"], "batch-001")
+        self.assertEqual(result.audit_trace["started_at"], "2026-05-13T10:00:00Z")
+        self.assertEqual(result.audit_trace["finished"], True)
+        self.assertEqual(
+            result.audit_trace["item_trace_refs"],
+            ("audit:batch:batch-001:item-1", "audit:batch:batch-001:item-2"),
+        )
+        self.assertIn("evidence:batch", result.audit_trace["evidence_refs"])
 
     def test_all_stable_read_side_item_operations_are_projected_through_existing_envelopes(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: MultiReadSideAdapter()}
@@ -322,6 +345,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_outcome_prefix_mismatch")
 
+    def test_fresh_execution_rejects_prior_outcomes_without_resume_token(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta")),
+                sink=sink,
+                prior_item_outcomes=first.item_outcomes,
+            )
+
+        self.assertEqual(context.exception.code, "resume_outcome_prefix_mismatch")
+
     def test_resume_rejects_success_prefix_without_dataset_sink_state(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -353,6 +394,26 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             self.execute(request(target("item-1", "alpha"), resume_token=token))
 
         self.assertEqual(context.exception.code, "invalid_resume_token")
+
+    def test_timeout_item_failure_stops_batch_as_resumable(self) -> None:
+        adapter = TimeoutCollectionAdapter()
+        self.adapters = {TEST_ADAPTER_KEY: adapter}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_RESUMABLE)
+        self.assertEqual(adapter.calls, 1)
+        self.assertEqual(len(result.item_outcomes), 1)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertEqual(result.resume_token.next_item_index, 1)
+        self.assertEqual(result.audit_trace["finished"], False)
+        self.assertEqual(result.audit_trace["stop_reason"], "execution_timeout")
+        self.assertEqual(result.audit_trace["item_trace_refs"], ("audit:batch:batch-001:item-1",))
+        self.assertIn("evidence:batch:execution_timeout", result.audit_trace["evidence_refs"])
 
     def test_invalid_target_operation_is_rejected(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
@@ -537,6 +598,19 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_source_trace")
+
+    def test_audit_context_evidence_ref_must_be_sanitized(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                BatchRequest(
+                    batch_id="batch-001",
+                    target_set=(target("item-1", "alpha"),),
+                    dataset_sink_ref="dataset-sink:reference",
+                    audit_context={"evidence_ref": "file:///tmp/raw-payload.json"},
+                )
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_ref")
 
 
 if __name__ == "__main__":

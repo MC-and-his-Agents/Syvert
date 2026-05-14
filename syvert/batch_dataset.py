@@ -21,6 +21,14 @@ BATCH_ITEM_FAILED = "failed"
 BATCH_ITEM_DUPLICATE_SKIPPED = "duplicate_skipped"
 DATASET_WRITE_FAILED = "dataset_write_failed"
 DATASET_SINK_UNAVAILABLE = "dataset_sink_unavailable"
+STOP_BOUNDARY_ERROR_CODES = frozenset(
+    {
+        "execution_timeout",
+        "execution_cancelled",
+        "task_cancelled",
+        "cancelled",
+    }
+)
 
 ALLOWED_BATCH_ITEM_OPERATIONS = frozenset(
     {
@@ -205,13 +213,15 @@ def execute_batch_request(
         _validate_resume_token(validated.resume_token, request=validated, target_set_hash=target_set_hash)
         start_index = validated.resume_token.next_item_index
     outcomes = list(_canonical_item_outcomes(prior_item_outcomes))
-    if start_index and len(outcomes) != start_index:
+    dataset_id = _dataset_id_for_request(validated)
+    now = now_factory or (lambda: datetime.now(timezone.utc))
+    started_at = now().isoformat().replace("+00:00", "Z")
+    if len(outcomes) != start_index:
         raise BatchDatasetContractError(
             "resume_outcome_prefix_mismatch",
             "prior item outcomes must match resume_token.next_item_index",
             details={"prior_outcomes": len(outcomes), "next_item_index": start_index},
         )
-    dataset_id = _dataset_id_for_request(validated)
     if start_index:
         _validate_resume_outcome_prefix(
             validated,
@@ -221,7 +231,6 @@ def execute_batch_request(
             next_item_index=start_index,
         )
     seen_dedup_keys = {validated.target_set[index].dedup_key for index in range(min(start_index, len(validated.target_set)))}
-    now = now_factory or (lambda: datetime.now(timezone.utc))
     task_id_factory = task_id_factory or (lambda: f"batch-item-{uuid4().hex}")
     stop_at = stop_after_items if stop_after_items is not None else len(validated.target_set)
 
@@ -233,6 +242,7 @@ def execute_batch_request(
                 target_set_hash=target_set_hash,
                 next_item_index=index,
                 dataset_id=dataset_id,
+                started_at=started_at,
                 now=now,
                 stop_reason=stop_reason,
             )
@@ -255,16 +265,26 @@ def execute_batch_request(
             adapters=adapters,
             task_id_factory=task_id_factory,
         )
-        outcomes.append(
-            _outcome_from_task_envelope(
-                item,
-                envelope,
-                request=validated,
-                dataset_id=dataset_id,
-                dataset_sink=dataset_sink,
-                now=now,
-            )
+        outcome = _outcome_from_task_envelope(
+            item,
+            envelope,
+            request=validated,
+            dataset_id=dataset_id,
+            dataset_sink=dataset_sink,
+            now=now,
         )
+        outcomes.append(outcome)
+        if _is_stop_boundary_outcome(outcome) and index + 1 < len(validated.target_set):
+            return _resumable_result(
+                validated,
+                outcomes=outcomes,
+                target_set_hash=target_set_hash,
+                next_item_index=index + 1,
+                dataset_id=dataset_id,
+                started_at=started_at,
+                now=now,
+                stop_reason=str((outcome.error_envelope or {}).get("code") or "execution_interrupted"),
+            )
 
     return BatchResultEnvelope(
         batch_id=validated.batch_id,
@@ -273,7 +293,12 @@ def execute_batch_request(
         item_outcomes=tuple(outcomes),
         dataset_sink_ref=validated.dataset_sink_ref,
         dataset_id=dataset_id,
-        audit_trace={"batch_id": validated.batch_id, "finished": True, "item_count": len(outcomes)},
+        audit_trace=_batch_audit_trace(
+            validated,
+            outcomes=outcomes,
+            started_at=started_at,
+            finished=True,
+        ),
     )
 
 
@@ -290,6 +315,7 @@ def validate_batch_request(request: BatchRequest) -> BatchRequest:
     if request.dataset_id is not None:
         _validate_sanitized_ref(request.dataset_id, field="dataset_id")
     _ensure_json_safe(request.audit_context, field="audit_context")
+    _audit_context_evidence_refs(request.audit_context)
     return request
 
 
@@ -562,9 +588,11 @@ def _resumable_result(
     target_set_hash: str,
     next_item_index: int,
     dataset_id: str | None,
+    started_at: str,
     now: Callable[[], datetime],
     stop_reason: str,
 ) -> BatchResultEnvelope:
+    _validate_sanitized_ref(stop_reason, field="stop_reason")
     token = BatchResumeToken(
         resume_token=f"resume:{request.batch_id}:{next_item_index}",
         batch_id=request.batch_id,
@@ -580,7 +608,13 @@ def _resumable_result(
         resume_token=token,
         dataset_sink_ref=request.dataset_sink_ref,
         dataset_id=dataset_id,
-        audit_trace={"batch_id": request.batch_id, "stop_reason": stop_reason, "evidence_refs": (f"evidence:batch:{stop_reason}",)},
+        audit_trace=_batch_audit_trace(
+            request,
+            outcomes=outcomes,
+            started_at=started_at,
+            finished=False,
+            stop_reason=stop_reason,
+        ),
     )
 
 
@@ -602,6 +636,59 @@ def _aggregate_batch_result(outcomes: Sequence[BatchItemOutcome]) -> str:
     if failed and not succeeded:
         return BATCH_RESULT_ALL_FAILED
     return BATCH_RESULT_PARTIAL_SUCCESS
+
+
+def _is_stop_boundary_outcome(outcome: BatchItemOutcome) -> bool:
+    if outcome.outcome_status != BATCH_ITEM_FAILED or outcome.error_envelope is None:
+        return False
+    code = outcome.error_envelope.get("code")
+    return isinstance(code, str) and code in STOP_BOUNDARY_ERROR_CODES
+
+
+def _batch_audit_trace(
+    request: BatchRequest,
+    *,
+    outcomes: Sequence[BatchItemOutcome],
+    started_at: str,
+    finished: bool,
+    stop_reason: str | None = None,
+) -> Mapping[str, Any]:
+    item_trace_refs = tuple(_item_trace_ref(request.batch_id, outcome.item_id) for outcome in outcomes)
+    evidence_refs = list(_audit_context_evidence_refs(request.audit_context))
+    for outcome in outcomes:
+        if outcome.source_trace and isinstance(outcome.source_trace.get("evidence_alias"), str):
+            evidence_refs.append(_validate_sanitized_ref(outcome.source_trace["evidence_alias"], field="audit_trace.evidence_refs"))
+    if stop_reason is not None:
+        _validate_sanitized_ref(stop_reason, field="audit_trace.stop_reason")
+        evidence_refs.append(_validate_sanitized_ref(f"evidence:batch:{stop_reason}", field="audit_trace.evidence_refs"))
+    return {
+        "batch_id": request.batch_id,
+        "started_at": started_at,
+        "finished": finished,
+        "item_count": len(outcomes),
+        "item_trace_refs": item_trace_refs,
+        "evidence_refs": tuple(dict.fromkeys(evidence_refs)),
+        **({"stop_reason": stop_reason} if stop_reason is not None else {}),
+    }
+
+
+def _item_trace_ref(batch_id: str, item_id: str) -> str:
+    return _validate_sanitized_ref(f"audit:batch:{batch_id}:{item_id}", field="audit_trace.item_trace_refs")
+
+
+def _audit_context_evidence_refs(audit_context: Mapping[str, Any]) -> tuple[str, ...]:
+    refs: list[str] = []
+    for field in ("evidence_ref", "evidence_alias"):
+        value = audit_context.get(field)
+        if value is not None:
+            refs.append(_validate_sanitized_ref(str(value), field=f"audit_context.{field}"))
+    values = audit_context.get("evidence_refs")
+    if values is not None:
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            raise BatchDatasetContractError("invalid_field", "audit_context.evidence_refs must be a sequence")
+        for index, value in enumerate(values):
+            refs.append(_validate_sanitized_ref(str(value), field=f"audit_context.evidence_refs[{index}]"))
+    return tuple(dict.fromkeys(refs))
 
 
 def _dataset_id_for_request(request: BatchRequest) -> str | None:
