@@ -1003,6 +1003,21 @@ def _validate_resume_outcome_prefix(
                 "prior outcome must not reference a dataset record when resume has no dataset sink boundary",
                 details={"index": index, "item_id": item.item_id},
             )
+        if request.dataset_sink_ref is not None and outcome.outcome_status in {
+            BATCH_ITEM_FAILED,
+            BATCH_ITEM_DUPLICATE_SKIPPED,
+        }:
+            stale_records = [
+                record
+                for record in dataset_records.values()
+                if record.batch_id == request.batch_id and record.batch_item_id == item.item_id
+            ]
+            if stale_records:
+                raise BatchDatasetContractError(
+                    "resume_dataset_state_mismatch",
+                    "prior failed or duplicate_skipped outcome must not have a dataset record in the resumed sink",
+                    details={"index": index, "item_id": item.item_id},
+                )
         if (
             request.dataset_sink_ref is not None
             and not duplicate

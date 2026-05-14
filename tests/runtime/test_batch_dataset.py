@@ -711,6 +711,68 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
 
+    def test_resume_rejects_failed_prior_outcome_with_stale_sink_record(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged_failed = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "outcome_status": BATCH_ITEM_FAILED,
+                "result_envelope": None,
+                "error_envelope": {"code": "permission_denied", "message": "permission denied", "details": {}},
+                "dataset_record_ref": None,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged_failed,),
+            )
+
+        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+
+    def test_resume_rejects_duplicate_prior_outcome_with_stale_sink_record(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(
+                target("item-1", "alpha", dedup_key="same"),
+                target("item-2", "alpha", dedup_key="same"),
+                target("item-3", "beta"),
+            ),
+            sink=sink,
+            stop_after_items=2,
+            stop_reason="timeout",
+        )
+        stale = type(sink.read_by_batch("batch-001")[0])(
+            **{
+                **sink.read_by_batch("batch-001")[0].__dict__,
+                "dataset_record_id": "dataset:batch-001:item-2",
+                "batch_item_id": "item-2",
+            }
+        )
+        sink._records.append(stale)
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(
+                    target("item-1", "alpha", dedup_key="same"),
+                    target("item-2", "alpha", dedup_key="same"),
+                    target("item-3", "beta"),
+                    resume_token=first.resume_token,
+                ),
+                sink=sink,
+                prior_item_outcomes=first.item_outcomes,
+            )
+
+        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+
     def test_resume_rejects_duplicate_prior_outcome_with_error_payload(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
