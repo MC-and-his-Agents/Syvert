@@ -753,38 +753,37 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "non_json_safe_value")
 
     def test_dataset_validator_rejects_private_normalized_payload_fields(self) -> None:
-        with self.assertRaises(BatchDatasetContractError) as context:
-            ReferenceDatasetSink().write(
-                {
-                    "dataset_record_id": "record-1",
-                    "dataset_id": "dataset-1",
-                    "source_operation": "content_search_by_keyword",
-                    "adapter_key": TEST_ADAPTER_KEY,
-                    "target_ref": "alpha",
-                    "raw_payload_ref": "raw://alpha",
-                    "normalized_payload": {
-                        "items": [
-                            {
-                                "canonical_ref": "content://item-1",
-                                "raw_payload_ref": "https://storage.example/raw.json",
-                            }
-                        ]
-                    },
-                    "evidence_ref": "evidence:alpha",
-                    "source_trace": {
-                        "adapter_key": TEST_ADAPTER_KEY,
-                        "provider_path": "provider://sanitized",
-                        "fetched_at": "2026-05-13T10:00:00Z",
-                        "evidence_alias": "evidence:alpha",
-                    },
-                    "dedup_key": "dedup:alpha",
-                    "batch_id": "batch-001",
-                    "batch_item_id": "item-1",
-                    "recorded_at": "2026-05-13T10:00:00Z",
-                }
-            )
-
-        self.assertEqual(context.exception.code, "unsafe_normalized_payload")
+        payloads = (
+            {"items": [{"canonical_ref": "content://item-1", "raw_payload_ref": "raw://alpha"}]},
+            {"items": [{"canonical_ref": "content://item-1", "Raw_Payload_Ref": "raw://alpha"}]},
+            {"items": [{"canonical_ref": "content://item-1", "RAW_PAYLOAD": {"id": "raw"}}]},
+        )
+        for index, normalized_payload in enumerate(payloads, start=1):
+            with self.subTest(index=index):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    ReferenceDatasetSink().write(
+                        {
+                            "dataset_record_id": f"record-{index}",
+                            "dataset_id": "dataset-1",
+                            "source_operation": "content_search_by_keyword",
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "target_ref": "alpha",
+                            "raw_payload_ref": "raw://alpha",
+                            "normalized_payload": normalized_payload,
+                            "evidence_ref": "evidence:alpha",
+                            "source_trace": {
+                                "adapter_key": TEST_ADAPTER_KEY,
+                                "provider_path": "provider://sanitized",
+                                "fetched_at": "2026-05-13T10:00:00Z",
+                                "evidence_alias": "evidence:alpha",
+                            },
+                            "dedup_key": f"dedup:alpha:{index}",
+                            "batch_id": "batch-001",
+                            "batch_item_id": "item-1",
+                            "recorded_at": "2026-05-13T10:00:00Z",
+                        }
+                    )
+                self.assertEqual(context.exception.code, "unsafe_normalized_payload")
 
     def test_runtime_dataset_normalized_payload_strips_raw_fields(self) -> None:
         sink = ReferenceDatasetSink()
@@ -921,6 +920,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                                 **record.__dict__,
                                 "dataset_record_id": f"record-{local_path.rsplit('/', 1)[-1]}",
                                 "source_trace": {**record.source_trace, "provider_path": local_path},
+                            }
+                        )
+                    )
+        for provider_path in (
+            "storage://private-bucket/raw",
+            "s3://private-bucket/raw",
+            "provider:account-pool:main",
+            "provider:proxy-pool:main",
+            "provider:secret-token",
+        ):
+            with self.subTest(provider_path=provider_path):
+                with self.assertRaises(BatchDatasetContractError):
+                    validate_dataset_record(
+                        type(record)(
+                            **{
+                                **record.__dict__,
+                                "dataset_record_id": f"record-{abs(hash(provider_path))}",
+                                "source_trace": {**record.source_trace, "provider_path": provider_path},
                             }
                         )
                     )

@@ -64,6 +64,7 @@
 - guardian rerun4 follow-up：`BatchItemOutcome` canonical validation 强制 status/payload invariant，`succeeded` 必须有 result envelope，`failed` 必须有 error envelope 且不得引用 dataset record，`duplicate_skipped` 不得携带 result/error/dataset record。
 - guardian rerun5 follow-up：sanitized ref validator 拒绝所有以 `/` 开头的本地绝对路径，同时保留 `raw://` 等 sanitized alias。
 - guardian rerun6 follow-up：`source_trace.provider_path` 专用 validator 同样拒绝以 `/` 开头的本地绝对路径。
+- guardian rerun7 follow-up：`source_trace.provider_path` 复用 storage/private token denylist，`normalized_payload` 私有字段检测改为大小写不敏感，同时 public payload 仍允许 sanitized `raw_payload_ref`。
 
 ## 已验证项
 
@@ -101,6 +102,8 @@
   - 结果：第六轮 `REQUEST_CHANGES`，阻断项为 sanitized ref 仍允许 `/home`、`/etc` 等本地绝对路径；已在当前 follow-up 修复并补测试。
 - `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun6.json`
   - 结果：第七轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许本地绝对路径；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun7.json`
+  - 结果：第八轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许 storage/private routing aliases，以及 `normalized_payload` 私有字段大小写绕过；已在当前 follow-up 修复并补测试。
 
 ## 待验证项
 

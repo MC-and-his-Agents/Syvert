@@ -72,6 +72,7 @@ _FORBIDDEN_REF_TOKENS = (
     "proxy-pool",
 )
 _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS = (
+    "raw_payload",
     "storage_handle",
     "storage_url",
     "download_url",
@@ -950,7 +951,8 @@ def _validate_provider_path(provider_path: str) -> None:
     forbidden = ("http://", "https://", "file://", "/tmp/", "/var/", "\\", "selector", "fallback", "marketplace")
     if provider_path.startswith("/"):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
-    if any(token in provider_path.lower() for token in forbidden):
+    lowered = provider_path.lower()
+    if any(token in lowered for token in forbidden) or any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
 
 
@@ -983,7 +985,7 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
-            if key_text in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS:
+            if key_text.lower() in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS:
                 raise BatchDatasetContractError(
                     "unsafe_normalized_payload",
                     "normalized_payload contains a private raw/source/storage field",
@@ -1020,6 +1022,8 @@ def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
 
 def _validate_public_payload_key(key: str, *, field: str) -> None:
     lowered = key.lower()
+    if lowered == "raw_payload_ref":
+        return
     if any(token in lowered for token in _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS):
         raise BatchDatasetContractError(
             "unsafe_public_payload",
