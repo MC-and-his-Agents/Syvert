@@ -1404,6 +1404,8 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             "s3://private-bucket/raw",
             "provider:account-pool:main",
             "provider:proxy-pool:main",
+            "provider:route:main",
+            "provider:routing:main",
             "provider:fallback:route",
             "provider:marketplace:route",
             "provider:credential:route",

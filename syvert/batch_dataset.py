@@ -1165,6 +1165,8 @@ def _validate_provider_path(provider_path: str) -> None:
         "secret",
         "signed",
         "storage-handle",
+        "route",
+        "routing",
         "fallback",
         "marketplace",
         "account-pool",
