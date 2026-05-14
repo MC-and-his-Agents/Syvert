@@ -1258,20 +1258,6 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             }
         )
         self.assertEqual(record.source_trace["provider_path"], "provider://sanitized")
-        alias_record = validate_dataset_record(
-            type(record)(
-                **{
-                    **record.__dict__,
-                    "dataset_record_id": "record-alias",
-                    "source_trace": {
-                        **record.source_trace,
-                        "provider_path": "provider:sanitized:download-bucket-public",
-                    },
-                }
-            )
-        )
-        self.assertEqual(alias_record.source_trace["provider_path"], "provider:sanitized:download-bucket-public")
-
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
                 type(record)(
@@ -1303,6 +1289,9 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             "provider:marketplace:route",
             "provider:credential:route",
             "provider:signed-download-bucket",
+            "provider:sanitized:download-bucket-public",
+            "provider:sanitized:private-download-bucket",
+            "provider:sanitized:raw-route",
             "provider:token=secret",
         ):
             with self.subTest(provider_path=provider_path):
