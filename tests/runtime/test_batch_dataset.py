@@ -15,10 +15,12 @@ from syvert.batch_dataset import (
     BatchDatasetContractError,
     BatchItemOutcome,
     BatchRequest,
+    BatchResultEnvelope,
     BatchResumeToken,
     BatchTargetItem,
     ReferenceDatasetSink,
     batch_result_envelope_to_dict,
+    batch_resume_token_to_dict,
     batch_target_set_hash,
     execute_batch_request,
     validate_batch_item_outcome,
@@ -243,6 +245,86 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ("audit:batch:batch-001:item-1", "audit:batch:batch-001:item-2"),
         )
         self.assertIn("evidence:batch", result.audit_trace["evidence_refs"])
+
+    def test_batch_result_serialization_rejects_unsafe_top_level_carriers(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        unsafe_cases = (
+            ("batch_id", {"batch_id": "file:///tmp/raw-batch.json"}, "unsafe_ref"),
+            ("dataset_sink_ref", {"dataset_sink_ref": "storage://private/sink"}, "unsafe_ref"),
+            ("dataset_id", {"dataset_id": "/etc/dataset"}, "unsafe_ref"),
+            ("result_status", {"result_status": "provider_fallback"}, "invalid_batch_result_status"),
+            (
+                "audit evidence",
+                {"audit_trace": {**result.audit_trace, "evidence_refs": ("file:///tmp/raw.json",)}},
+                "unsafe_public_payload",
+            ),
+            (
+                "audit stop reason",
+                {"audit_trace": {**result.audit_trace, "stop_reason": "provider:fallback:marketplace"}},
+                "unsafe_public_payload",
+            ),
+        )
+        for _label, overrides, code in unsafe_cases:
+            forged = BatchResultEnvelope(
+                batch_id=overrides.get("batch_id", result.batch_id),
+                operation=overrides.get("operation", result.operation),
+                result_status=overrides.get("result_status", result.result_status),
+                item_outcomes=result.item_outcomes,
+                resume_token=overrides.get("resume_token", result.resume_token),
+                dataset_sink_ref=overrides.get("dataset_sink_ref", result.dataset_sink_ref),
+                dataset_id=overrides.get("dataset_id", result.dataset_id),
+                audit_trace=overrides.get("audit_trace", result.audit_trace),
+            )
+            with self.subTest(_label):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_result_envelope_to_dict(forged)
+
+                self.assertEqual(context.exception.code, code)
+
+    def test_batch_result_serialization_rejects_invalid_resume_boundary(self) -> None:
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchResultEnvelope(
+            batch_id=first.batch_id,
+            operation=first.operation,
+            result_status=first.result_status,
+            item_outcomes=first.item_outcomes,
+            resume_token=BatchResumeToken(**{**first.resume_token.__dict__, "dataset_id": "dataset:other"}),
+            dataset_sink_ref=first.dataset_sink_ref,
+            dataset_id=first.dataset_id,
+            audit_trace=first.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_resume_token")
+
+    def test_resume_token_serialization_rejects_unsafe_runtime_position_carriers(self) -> None:
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        unsafe_cases = (
+            ("resume_token", "provider:fallback:marketplace", "unsafe_ref"),
+            ("batch_id", "file:///tmp/batch", "unsafe_ref"),
+            ("target_set_hash", "provider:fallback:marketplace", "unsafe_ref"),
+            ("next_item_index", -1, "invalid_resume_position"),
+            ("issued_at", " file:///tmp/token", "unsafe_ref"),
+            ("dataset_sink_ref", "storage://private/sink", "unsafe_ref"),
+            ("dataset_id", "/etc/dataset", "unsafe_ref"),
+        )
+        for field, value, code in unsafe_cases:
+            forged = BatchResumeToken(**{**first.resume_token.__dict__, field: value})
+            with self.subTest(field):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_resume_token_to_dict(forged)
+
+                self.assertEqual(context.exception.code, code)
 
     def test_request_validation_rejects_unsafe_public_ids(self) -> None:
         unsafe_batch = BatchRequest(

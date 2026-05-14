@@ -450,6 +450,7 @@ def validate_dataset_record(record: DatasetRecord) -> DatasetRecord:
 
 
 def batch_result_envelope_to_dict(envelope: BatchResultEnvelope) -> dict[str, Any]:
+    validate_batch_result_envelope(envelope)
     return {
         "batch_id": envelope.batch_id,
         "operation": envelope.operation,
@@ -460,6 +461,63 @@ def batch_result_envelope_to_dict(envelope: BatchResultEnvelope) -> dict[str, An
         **({"dataset_id": envelope.dataset_id} if envelope.dataset_id else {}),
         "audit_trace": dict(envelope.audit_trace),
     }
+
+
+def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResultEnvelope:
+    if not isinstance(envelope, BatchResultEnvelope):
+        raise BatchDatasetContractError("invalid_batch_result_envelope", "BatchResultEnvelope expected")
+    _validate_sanitized_ref(envelope.batch_id, field="batch_id")
+    if envelope.operation != BATCH_EXECUTION_OPERATION:
+        raise BatchDatasetContractError(
+            "invalid_batch_operation",
+            "batch result envelope operation must be batch_execution",
+            details={"operation": envelope.operation},
+        )
+    if envelope.result_status not in {
+        BATCH_RESULT_COMPLETE,
+        BATCH_RESULT_PARTIAL_SUCCESS,
+        BATCH_RESULT_ALL_FAILED,
+        BATCH_RESULT_RESUMABLE,
+    }:
+        raise BatchDatasetContractError(
+            "invalid_batch_result_status",
+            "batch result_status is not part of the batch contract",
+            details={"result_status": envelope.result_status},
+        )
+    for outcome in envelope.item_outcomes:
+        validate_batch_item_outcome(outcome)
+    if envelope.resume_token is not None:
+        validate_batch_resume_token(envelope.resume_token)
+        if envelope.resume_token.batch_id != envelope.batch_id:
+            raise BatchDatasetContractError(
+                "invalid_resume_token",
+                "resume token batch boundary does not match result envelope",
+            )
+        if (
+            envelope.resume_token.dataset_sink_ref != envelope.dataset_sink_ref
+            or envelope.resume_token.dataset_id != envelope.dataset_id
+        ):
+            raise BatchDatasetContractError(
+                "invalid_resume_token",
+                "resume token dataset boundary does not match result envelope",
+            )
+    if envelope.result_status == BATCH_RESULT_RESUMABLE and envelope.resume_token is None:
+        raise BatchDatasetContractError(
+            "invalid_batch_result_envelope",
+            "resumable batch result must carry a resume token",
+        )
+    if envelope.result_status != BATCH_RESULT_RESUMABLE and envelope.resume_token is not None:
+        raise BatchDatasetContractError(
+            "invalid_batch_result_envelope",
+            "non-resumable batch result must not carry a resume token",
+        )
+    if envelope.dataset_sink_ref is not None:
+        _validate_sanitized_ref(envelope.dataset_sink_ref, field="dataset_sink_ref")
+    if envelope.dataset_id is not None:
+        _validate_sanitized_ref(envelope.dataset_id, field="dataset_id")
+    _require_mapping(envelope.audit_trace, field="audit_trace")
+    _validate_public_payload_no_leakage(envelope.audit_trace, field="audit_trace", validate_strings=True)
+    return envelope
 
 
 def batch_item_outcome_to_dict(outcome: BatchItemOutcome) -> dict[str, Any]:
@@ -559,6 +617,7 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
 
 
 def batch_resume_token_to_dict(token: BatchResumeToken) -> dict[str, Any]:
+    validate_batch_resume_token(token)
     return {
         "resume_token": token.resume_token,
         "batch_id": token.batch_id,
@@ -568,6 +627,29 @@ def batch_resume_token_to_dict(token: BatchResumeToken) -> dict[str, Any]:
         **({"dataset_sink_ref": token.dataset_sink_ref} if token.dataset_sink_ref is not None else {}),
         **({"dataset_id": token.dataset_id} if token.dataset_id is not None else {}),
     }
+
+
+def validate_batch_resume_token(token: BatchResumeToken) -> BatchResumeToken:
+    if not isinstance(token, BatchResumeToken):
+        raise BatchDatasetContractError("invalid_resume_token", "BatchResumeToken expected")
+    _validate_sanitized_ref(token.resume_token, field="resume_token")
+    _validate_sanitized_ref(token.batch_id, field="resume_token.batch_id")
+    _validate_sanitized_ref(token.target_set_hash, field="resume_token.target_set_hash")
+    if (
+        not isinstance(token.next_item_index, int)
+        or isinstance(token.next_item_index, bool)
+        or token.next_item_index < 0
+    ):
+        raise BatchDatasetContractError(
+            "invalid_resume_position",
+            "resume token next_item_index must be a non-negative integer",
+        )
+    _validate_sanitized_ref(token.issued_at, field="resume_token.issued_at")
+    if token.dataset_sink_ref is not None:
+        _validate_sanitized_ref(token.dataset_sink_ref, field="resume_token.dataset_sink_ref")
+    if token.dataset_id is not None:
+        _validate_sanitized_ref(token.dataset_id, field="resume_token.dataset_id")
+    return token
 
 
 def batch_target_set_hash(target_set: Sequence[BatchTargetItem]) -> str:
@@ -770,17 +852,12 @@ def _resumable_result(
 
 
 def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, target_set_hash: str) -> None:
-    _validate_sanitized_ref(token.resume_token, field="resume_token")
-    _validate_sanitized_ref(token.issued_at, field="resume_token.issued_at")
+    validate_batch_resume_token(token)
     if token.batch_id != request.batch_id or token.target_set_hash != target_set_hash:
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
     if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):
         raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
-    if token.dataset_sink_ref is not None:
-        _validate_sanitized_ref(token.dataset_sink_ref, field="resume_token.dataset_sink_ref")
-    if token.dataset_id is not None:
-        _validate_sanitized_ref(token.dataset_id, field="resume_token.dataset_id")
-    if token.next_item_index < 0 or token.next_item_index > len(request.target_set):
+    if token.next_item_index > len(request.target_set):
         raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
 
 
