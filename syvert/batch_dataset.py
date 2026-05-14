@@ -341,7 +341,7 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
     _validate_sanitized_ref(item.dedup_key, field="dedup_key")
     if item.request_cursor is not None:
         _ensure_json_safe(item.request_cursor, field="request_cursor")
-        if item.operation in {"content_search_by_keyword", "content_list_by_creator"}:
+        if item.operation in {"content_search_by_keyword", "content_list_by_creator", "creator_profile_by_id"}:
             raise BatchDatasetContractError(
                 "unsupported_request_cursor",
                 "batch request_cursor is not yet supported for this item operation",
@@ -477,7 +477,7 @@ def _outcome_from_task_envelope(
     dataset_sink: ReferenceDatasetSink | None,
     now: Callable[[], datetime],
 ) -> BatchItemOutcome:
-    source_trace = envelope.get("source_trace") if isinstance(envelope.get("source_trace"), Mapping) else None
+    source_trace = _validated_optional_source_trace(envelope)
     if envelope.get("status") != "success":
         return BatchItemOutcome(
             item_id=item.item_id,
@@ -743,6 +743,16 @@ def _canonical_item_outcomes(outcomes: Sequence[BatchItemOutcome]) -> tuple[Batc
     return tuple(outcomes)
 
 
+def _validated_optional_source_trace(envelope: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    source_trace = envelope.get("source_trace")
+    if source_trace is None:
+        return None
+    if not isinstance(source_trace, Mapping):
+        raise BatchDatasetContractError("invalid_field", "source_trace must be an object")
+    _validate_source_trace(source_trace)
+    return dict(source_trace)
+
+
 def _validate_resume_outcome_prefix(
     request: BatchRequest,
     *,
@@ -759,6 +769,12 @@ def _validate_resume_outcome_prefix(
     for index in range(next_item_index):
         item = request.target_set[index]
         outcome = outcomes[index]
+        if outcome.outcome_status not in {BATCH_ITEM_SUCCEEDED, BATCH_ITEM_FAILED, BATCH_ITEM_DUPLICATE_SKIPPED}:
+            raise BatchDatasetContractError(
+                "resume_outcome_status_invalid",
+                "prior item outcome status is not part of the batch contract",
+                details={"index": index, "item_id": item.item_id, "outcome_status": outcome.outcome_status},
+            )
         if (
             outcome.item_id != item.item_id
             or outcome.operation != item.operation
@@ -776,6 +792,12 @@ def _validate_resume_outcome_prefix(
             raise BatchDatasetContractError(
                 "resume_dedup_state_mismatch",
                 "prior duplicate item outcome does not preserve duplicate_skipped state",
+                details={"index": index, "item_id": item.item_id},
+            )
+        if not duplicate and outcome.outcome_status == BATCH_ITEM_DUPLICATE_SKIPPED:
+            raise BatchDatasetContractError(
+                "resume_dedup_state_mismatch",
+                "prior non-duplicate item outcome must not be duplicate_skipped",
                 details={"index": index, "item_id": item.item_id},
             )
         if outcome.outcome_status == BATCH_ITEM_DUPLICATE_SKIPPED and outcome.dataset_record_ref is not None:

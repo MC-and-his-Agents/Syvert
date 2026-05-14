@@ -13,6 +13,7 @@ from syvert.batch_dataset import (
     BATCH_RESULT_PARTIAL_SUCCESS,
     BATCH_RESULT_RESUMABLE,
     BatchDatasetContractError,
+    BatchItemOutcome,
     BatchRequest,
     BatchResumeToken,
     BatchTargetItem,
@@ -110,6 +111,19 @@ class TimeoutCollectionAdapter(CollectionAdapter):
             message="execution timed out",
             details={"control_code": "execution_timeout", "evidence_ref": "evidence:timeout"},
         )
+
+
+class UnsafeSourceTraceAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["source_trace"] = {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "https://provider.example/raw",
+            "fetched_at": "2026-05-13T10:00:00Z",
+            "evidence_alias": "evidence:unsafe",
+            "storage_handle": "private-storage-handle",
+        }
+        return payload
 
 
 class FailingDatasetSink(ReferenceDatasetSink):
@@ -345,6 +359,48 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_outcome_prefix_mismatch")
 
+    def test_resume_rejects_non_duplicate_prior_outcome_marked_duplicate_skipped(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{**first.item_outcomes[0].__dict__, "outcome_status": BATCH_ITEM_DUPLICATE_SKIPPED}
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "resume_dedup_state_mismatch")
+
+    def test_resume_rejects_unknown_prior_outcome_status(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{**first.item_outcomes[0].__dict__, "outcome_status": "stale_pending"}
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "resume_outcome_status_invalid")
+
     def test_fresh_execution_rejects_prior_outcomes_without_resume_token(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -433,6 +489,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                         target_ref="alpha",
                         dedup_key="dedup:alpha",
                         request_cursor={"continuation_token": "next-page"},
+                    )
+                )
+            )
+
+        self.assertEqual(context.exception.code, "unsupported_request_cursor")
+
+    def test_creator_profile_request_cursor_is_rejected_instead_of_silently_dropped(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(
+                    BatchTargetItem(
+                        item_id="creator",
+                        operation="creator_profile_by_id",
+                        adapter_key=TEST_ADAPTER_KEY,
+                        target_type="creator",
+                        target_ref="creator:alpha",
+                        dedup_key="dedup:creator",
+                        request_cursor={"profile_cursor": "ignored"},
                     )
                 )
             )
@@ -598,6 +672,23 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_source_trace")
+
+    def test_batch_item_outcome_does_not_expose_unsafe_source_trace_without_dataset_sink(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeSourceTraceAdapter()}
+
+        result = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=(target("item-1", "alpha"),),
+                dataset_sink_ref=None,
+                audit_context={"evidence_ref": "evidence:batch"},
+            )
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertIsNone(result.item_outcomes[0].source_trace)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "invalid_adapter_success_payload")
 
     def test_audit_context_evidence_ref_must_be_sanitized(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
