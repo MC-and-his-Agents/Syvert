@@ -98,6 +98,17 @@ class FailingCollectionAdapter(CollectionAdapter):
         )
 
 
+class UnsafeFailingCollectionAdapter(CollectionAdapter):
+    def execute(self, request):
+        from syvert.runtime import PlatformAdapterError
+
+        raise PlatformAdapterError(
+            code="permission_denied",
+            message="permission denied",
+            details={"local_path": "/etc/passwd", "evidence_ref": "evidence:permission-denied"},
+        )
+
+
 class TimeoutCollectionAdapter(CollectionAdapter):
     def __init__(self) -> None:
         self.calls = 0
@@ -288,6 +299,16 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
         self.assertEqual(result.item_outcomes[1].outcome_status, BATCH_ITEM_FAILED)
         self.assertEqual(result.item_outcomes[1].error_envelope["code"], "permission_denied")
+
+    def test_failed_item_unsafe_error_details_are_sanitized_before_return(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeFailingCollectionAdapter()}
+
+        result = self.execute(request(target("item-1", "alpha")))
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "unsafe_item_outcome")
+        self.assertNotIn("/etc/passwd", repr(result.item_outcomes[0].error_envelope))
 
     def test_all_failed_has_no_dataset_records(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}

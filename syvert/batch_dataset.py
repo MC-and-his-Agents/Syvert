@@ -287,13 +287,16 @@ def execute_batch_request(
         item = validated.target_set[index]
         if item.dedup_key in seen_dedup_keys:
             outcomes.append(
-                BatchItemOutcome(
-                    item_id=item.item_id,
-                    operation=item.operation,
-                    adapter_key=item.adapter_key,
-                    target_ref=item.target_ref,
-                    outcome_status=BATCH_ITEM_DUPLICATE_SKIPPED,
-                    audit={"reason": "duplicate_dedup_key", "dedup_key": item.dedup_key},
+                _validated_public_outcome(
+                    item,
+                    BatchItemOutcome(
+                        item_id=item.item_id,
+                        operation=item.operation,
+                        adapter_key=item.adapter_key,
+                        target_ref=item.target_ref,
+                        outcome_status=BATCH_ITEM_DUPLICATE_SKIPPED,
+                        audit={"reason": "duplicate_dedup_key", "dedup_key": item.dedup_key},
+                    ),
                 )
             )
             continue
@@ -311,7 +314,7 @@ def execute_batch_request(
             dataset_sink=dataset_sink,
             now=now,
         )
-        outcomes.append(outcome)
+        outcomes.append(_validated_public_outcome(item, outcome))
         if _is_stop_boundary_outcome(outcome) and index + 1 < len(validated.target_set):
             return _resumable_result(
                 validated,
@@ -738,6 +741,26 @@ def _is_stop_boundary_outcome(outcome: BatchItemOutcome) -> bool:
         return False
     code = outcome.error_envelope.get("code")
     return isinstance(code, str) and code in STOP_BOUNDARY_ERROR_CODES
+
+
+def _validated_public_outcome(item: BatchTargetItem, outcome: BatchItemOutcome) -> BatchItemOutcome:
+    try:
+        validate_batch_item_outcome(outcome)
+    except BatchDatasetContractError as error:
+        return BatchItemOutcome(
+            item_id=item.item_id,
+            operation=item.operation,
+            adapter_key=item.adapter_key,
+            target_ref=item.target_ref,
+            outcome_status=BATCH_ITEM_FAILED,
+            error_envelope={
+                "code": "unsafe_item_outcome",
+                "message": "batch item outcome contained unsafe public carrier data",
+                "details": {"blocked_code": error.code},
+            },
+            audit={"reason": "unsafe_item_outcome", "blocked_code": error.code},
+        )
+    return outcome
 
 
 def _batch_audit_trace(

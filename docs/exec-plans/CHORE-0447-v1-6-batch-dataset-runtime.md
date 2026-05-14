@@ -65,13 +65,14 @@
 - guardian rerun5 follow-up：sanitized ref validator 拒绝所有以 `/` 开头的本地绝对路径，同时保留 `raw://` 等 sanitized alias。
 - guardian rerun6 follow-up：`source_trace.provider_path` 专用 validator 同样拒绝以 `/` 开头的本地绝对路径。
 - guardian rerun7 follow-up：`source_trace.provider_path` 复用 storage/private token denylist，`normalized_payload` 私有字段检测改为大小写不敏感，同时 public payload 仍允许 sanitized `raw_payload_ref`。
+- guardian rerun8 follow-up：`execute_batch_request` 在返回前验证新产生的 `BatchItemOutcome`，将 unsafe adapter failure payload 转换成 sanitized `unsafe_item_outcome` failure，避免直接暴露 unsafe error details。
 
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，34 tests。
+  - 结果：通过，35 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record`
-  - 结果：通过，88 tests。
+  - 结果：通过，89 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.governance.test_open_pr`
@@ -104,6 +105,8 @@
   - 结果：第七轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许本地绝对路径；已在当前 follow-up 修复并补测试。
 - `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun7.json`
   - 结果：第八轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许 storage/private routing aliases，以及 `normalized_payload` 私有字段大小写绕过；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun8.json`
+  - 结果：第九轮 `REQUEST_CHANGES`，阻断项为 failed item error envelope 返回前未做 public-carrier leakage validation；已在当前 follow-up 修复并补测试。
 
 ## 待验证项
 
