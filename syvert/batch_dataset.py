@@ -8,7 +8,7 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from syvert.runtime import CollectionPolicy, CoreTaskRequest, InputTarget, TaskInput, TaskRequest, execute_task
+from syvert.runtime import CollectionPolicy, CoreTaskRequest, InputTarget, TaskInput, TaskRequest, execute_task, is_valid_rfc3339_utc
 
 
 BATCH_EXECUTION_OPERATION = "batch_execution"
@@ -505,6 +505,15 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
         raise BatchDatasetContractError(
             "invalid_batch_result_envelope",
             "resumable batch result must carry a resume token",
+        )
+    if (
+        envelope.result_status == BATCH_RESULT_RESUMABLE
+        and envelope.resume_token is not None
+        and envelope.resume_token.next_item_index != len(envelope.item_outcomes)
+    ):
+        raise BatchDatasetContractError(
+            "invalid_resume_token",
+            "resumable batch result token must point to the processed item prefix",
         )
     if envelope.result_status != BATCH_RESULT_RESUMABLE and envelope.resume_token is not None:
         raise BatchDatasetContractError(
@@ -1139,7 +1148,7 @@ def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
             _require_non_empty_string(source_trace.get("resource_profile_ref"), field="source_trace.resource_profile_ref"),
             field="source_trace.resource_profile_ref",
         )
-    _require_non_empty_string(source_trace.get("fetched_at"), field="source_trace.fetched_at")
+    _validate_public_timestamp(source_trace.get("fetched_at"), field="source_trace.fetched_at")
 
 
 def _validate_provider_path(provider_path: str) -> None:
@@ -1190,6 +1199,18 @@ def _validate_target_ref(operation: str, value: str, *, field: str) -> str:
         _validate_public_payload_string(normalized, field=field)
         return normalized
     return _validate_sanitized_ref(normalized, field=field)
+
+
+def _validate_public_timestamp(value: Any, *, field: str) -> str:
+    normalized = _require_non_empty_string(value, field=field)
+    if not is_valid_rfc3339_utc(normalized):
+        raise BatchDatasetContractError(
+            "invalid_timestamp",
+            f"{field} must be an RFC3339 UTC timestamp",
+            details={"field": field},
+        )
+    _validate_public_payload_string(normalized, field=field)
+    return normalized
 
 
 def _validate_sanitized_ref(value: str, *, field: str) -> str:

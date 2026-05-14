@@ -303,6 +303,22 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_resume_token")
 
+        forged_position = BatchResultEnvelope(
+            batch_id=first.batch_id,
+            operation=first.operation,
+            result_status=first.result_status,
+            item_outcomes=(),
+            resume_token=first.resume_token,
+            dataset_sink_ref=first.dataset_sink_ref,
+            dataset_id=first.dataset_id,
+            audit_trace=first.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as position_context:
+            batch_result_envelope_to_dict(forged_position)
+
+        self.assertEqual(position_context.exception.code, "invalid_resume_token")
+
     def test_resume_token_serialization_rejects_unsafe_runtime_position_carriers(self) -> None:
         first = self.execute(
             request(target("item-1", "alpha"), target("item-2", "beta")),
@@ -681,6 +697,33 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_source_trace")
+
+    def test_resume_rejects_prior_outcome_with_invalid_source_trace_timestamp(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "source_trace": {
+                    **first.item_outcomes[0].source_trace,
+                    "fetched_at": "/etc/passwd",
+                },
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_timestamp")
 
     def test_resume_rejects_prior_outcome_with_unsafe_result_envelope(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1367,6 +1410,17 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             }
         )
         self.assertEqual(record.source_trace["provider_path"], "provider://sanitized")
+        with self.assertRaises(BatchDatasetContractError) as timestamp_context:
+            validate_dataset_record(
+                type(record)(
+                    **{
+                        **record.__dict__,
+                        "dataset_record_id": "record-invalid-fetched-at",
+                        "source_trace": {**record.source_trace, "fetched_at": "/etc/passwd"},
+                    }
+                )
+            )
+        self.assertEqual(timestamp_context.exception.code, "invalid_timestamp")
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
                 type(record)(
@@ -1471,6 +1525,20 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
         self.assertIsNone(result.item_outcomes[0].source_trace)
         self.assertEqual(result.item_outcomes[0].error_envelope["code"], "invalid_adapter_success_payload")
+
+    def test_batch_item_outcome_rejects_invalid_source_trace_timestamp(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        forged = BatchItemOutcome(
+            **{
+                **result.item_outcomes[0].__dict__,
+                "source_trace": {**result.item_outcomes[0].source_trace, "fetched_at": "/etc/passwd"},
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(forged)
+
+        self.assertEqual(context.exception.code, "invalid_timestamp")
 
     def test_audit_context_evidence_ref_must_be_sanitized(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
