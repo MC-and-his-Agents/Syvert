@@ -948,6 +948,8 @@ def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
 
 def _validate_provider_path(provider_path: str) -> None:
     forbidden = ("http://", "https://", "file://", "/tmp/", "/var/", "\\", "selector", "fallback", "marketplace")
+    if provider_path.startswith("/"):
+        raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
     if any(token in provider_path.lower() for token in forbidden):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
 

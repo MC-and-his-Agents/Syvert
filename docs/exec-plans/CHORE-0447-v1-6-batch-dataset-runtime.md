@@ -63,6 +63,7 @@
 - guardian rerun3 follow-up：prior `BatchItemOutcome` 进入 resume 前强制 canonical validation；`DatasetRecord.normalized_payload` 递归拒绝 raw/source/storage/private 字段；sanitized ref validator 拒绝真实 URL、bucket/storage URL 和本地路径。
 - guardian rerun4 follow-up：`BatchItemOutcome` canonical validation 强制 status/payload invariant，`succeeded` 必须有 result envelope，`failed` 必须有 error envelope 且不得引用 dataset record，`duplicate_skipped` 不得携带 result/error/dataset record。
 - guardian rerun5 follow-up：sanitized ref validator 拒绝所有以 `/` 开头的本地绝对路径，同时保留 `raw://` 等 sanitized alias。
+- guardian rerun6 follow-up：`source_trace.provider_path` 专用 validator 同样拒绝以 `/` 开头的本地绝对路径。
 
 ## 已验证项
 
@@ -98,6 +99,8 @@
   - 结果：第五轮 `REQUEST_CHANGES`，阻断项为 failed prior outcomes 缺失 error envelope 或伪造 dataset_record_ref；已在当前 follow-up 修复并补测试。
 - `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun5.json`
   - 结果：第六轮 `REQUEST_CHANGES`，阻断项为 sanitized ref 仍允许 `/home`、`/etc` 等本地绝对路径；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun6.json`
+  - 结果：第七轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许本地绝对路径；已在当前 follow-up 修复并补测试。
 
 ## 待验证项
 

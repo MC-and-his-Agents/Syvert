@@ -912,6 +912,18 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     }
                 )
             )
+        for local_path in ("/home/me/provider-route", "/etc/provider-route"):
+            with self.subTest(local_path=local_path):
+                with self.assertRaises(BatchDatasetContractError):
+                    validate_dataset_record(
+                        type(record)(
+                            **{
+                                **record.__dict__,
+                                "dataset_record_id": f"record-{local_path.rsplit('/', 1)[-1]}",
+                                "source_trace": {**record.source_trace, "provider_path": local_path},
+                            }
+                        )
+                    )
 
     def test_source_trace_rejects_private_extra_fields(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
