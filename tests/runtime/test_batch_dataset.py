@@ -1103,6 +1103,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             {"items": [{"canonical_ref": "content://item-1", "sourceName": "private-source"}]},
             {"items": [{"canonical_ref": "content://item-1", "RAW_PAYLOAD": {"id": "raw"}}]},
             {"items": [{"canonical_ref": "content://item-1", "artifact": "/etc/passwd"}]},
+            {"items": [{"canonical_ref": "content://item-1", "artifact": " /etc/passwd"}]},
             {"items": [{"canonical_ref": "content://item-1", "artifact": "storage://private-bucket/raw"}]},
         )
         for index, normalized_payload in enumerate(payloads, start=1):
@@ -1179,6 +1180,32 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_ref")
+
+        with self.assertRaises(BatchDatasetContractError) as whitespace_context:
+            ReferenceDatasetSink().write(
+                {
+                    "dataset_record_id": "record-1",
+                    "dataset_id": "dataset-1",
+                    "source_operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "raw_payload_ref": " /etc/passwd",
+                    "normalized_payload": {"items": []},
+                    "evidence_ref": "evidence:alpha",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-05-13T10:00:00Z",
+                        "evidence_alias": "evidence:alpha",
+                    },
+                    "dedup_key": "dedup:alpha",
+                    "batch_id": "batch-001",
+                    "batch_item_id": "item-1",
+                    "recorded_at": "2026-05-13T10:00:00Z",
+                }
+            )
+
+        self.assertEqual(whitespace_context.exception.code, "unsafe_ref")
 
     def test_local_absolute_path_ref_is_rejected_but_raw_alias_is_allowed(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1280,6 +1307,16 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                             }
                         )
                     )
+        with self.assertRaises(BatchDatasetContractError):
+            validate_dataset_record(
+                type(record)(
+                    **{
+                        **record.__dict__,
+                        "dataset_record_id": "record-whitespace-path",
+                        "source_trace": {**record.source_trace, "provider_path": " /etc/provider-route"},
+                    }
+                )
+            )
         for provider_path in (
             "storage://private-bucket/raw",
             "s3://private-bucket/raw",
@@ -1375,6 +1412,18 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(non_string_context.exception.code, "invalid_field")
+
+        with self.assertRaises(BatchDatasetContractError) as whitespace_context:
+            self.execute(
+                BatchRequest(
+                    batch_id="batch-001",
+                    target_set=(target("item-1", "alpha"),),
+                    dataset_sink_ref="dataset-sink:reference",
+                    audit_context={"evidence_ref": " file:///tmp/raw-payload.json"},
+                )
+            )
+
+        self.assertEqual(whitespace_context.exception.code, "unsafe_ref")
 
     def test_source_trace_alias_fields_must_be_strings(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:

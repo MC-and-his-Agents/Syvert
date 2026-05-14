@@ -1093,9 +1093,13 @@ def _validate_provider_path(provider_path: str) -> None:
         "account-pool",
         "proxy-pool",
     )
-    if provider_path.startswith("/"):
+    normalized = _require_non_empty_string(provider_path, field="source_trace.provider_path")
+    stripped = normalized.strip()
+    if stripped != normalized:
+        raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not contain surrounding whitespace")
+    if stripped.startswith("/"):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
-    lowered = provider_path.lower()
+    lowered = stripped.lower()
     if any(token in lowered for token in forbidden):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
 
@@ -1111,13 +1115,16 @@ def _validate_target_ref(operation: str, value: str, *, field: str) -> str:
 
 def _validate_sanitized_ref(value: str, *, field: str) -> str:
     normalized = _require_non_empty_string(value, field=field)
-    lowered = normalized.lower()
-    if normalized.startswith("/"):
+    stripped = normalized.strip()
+    if stripped != normalized:
+        raise BatchDatasetContractError("unsafe_ref", f"{field} contains surrounding whitespace", details={"field": field})
+    lowered = stripped.lower()
+    if stripped.startswith("/"):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains a local absolute path", details={"field": field})
     if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains forbidden private or storage token", details={"field": field})
-    _ensure_json_safe(normalized, field=field)
-    return normalized
+    _ensure_json_safe(stripped, field=field)
+    return stripped
 
 
 def _strip_normalized_payload_private_fields(value: Any) -> Any:
@@ -1202,8 +1209,9 @@ def _validate_public_payload_key(key: str, *, field: str) -> None:
 
 
 def _validate_public_payload_string(value: str, *, field: str) -> None:
-    lowered = value.lower()
-    if value.startswith("/") or any(
+    stripped = value.strip()
+    lowered = stripped.lower()
+    if stripped.startswith("/") or any(
         token in lowered
         for token in (
             "http://",
@@ -1234,8 +1242,9 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
 
 
 def _validate_normalized_payload_string(value: str, *, field: str) -> None:
-    lowered = value.lower()
-    if value.startswith("/") or value.startswith("\\") or lowered.startswith(
+    stripped = value.strip()
+    lowered = stripped.lower()
+    if stripped.startswith("/") or stripped.startswith("\\") or lowered.startswith(
         ("http://", "https://", "s3://", "gs://", "storage://", "file://")
     ):
         raise BatchDatasetContractError(
