@@ -60,13 +60,14 @@
 - guardian follow-up：resume 会校验 prior outcomes 与 target-set 前缀、dedup state 和 dataset sink readback；绑定 `dataset_sink_ref` 但缺 sink 时 fail-closed；`source_trace` 只允许 sanitized Core 字段；search/list request cursor 当前 fail-closed，避免静默丢弃。
 - guardian rerun follow-up：timeout/cancel 类已 dispatch item failure 在存在 suffix 时返回 `resumable`；fresh run 拒绝携带 prior outcomes；batch audit trace 补齐 `started_at`、`item_trace_refs`、sanitized `evidence_refs` 与 stop reason 校验。
 - guardian rerun2 follow-up：resume prefix 拒绝未知 outcome status 和非重复 item 的 `duplicate_skipped`；所有 BatchItemOutcome source_trace 先经 sanitized validator；`creator_profile_by_id` request cursor 当前 fail-closed，避免静默丢弃。
+- guardian rerun3 follow-up：prior `BatchItemOutcome` 进入 resume 前强制 canonical validation；`DatasetRecord.normalized_payload` 递归拒绝 raw/source/storage/private 字段；sanitized ref validator 拒绝真实 URL、bucket/storage URL 和本地路径。
 
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，25 tests。
+  - 结果：通过，30 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record`
-  - 结果：通过，79 tests。
+  - 结果：通过，84 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.governance.test_open_pr`
@@ -89,6 +90,8 @@
   - 结果：第二轮 `REQUEST_CHANGES`，阻断项为 timeout/cancel resumable boundary、fresh run prior outcome contamination、BatchAuditTrace 最小字段与 sanitized refs；已在当前 follow-up 修复并补测试。
 - `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun2.json`
   - 结果：第三轮 `REQUEST_CHANGES`，阻断项为 resume outcome status、BatchItemOutcome source_trace sanitation、creator profile cursor 静默丢弃；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun3.json`
+  - 结果：第四轮 `REQUEST_CHANGES`，阻断项为 prior outcome unsafe carrier smuggling、normalized_payload 泄漏、raw storage URL refs；已在当前 follow-up 修复并补测试。
 
 ## 待验证项
 

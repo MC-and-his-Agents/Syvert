@@ -49,9 +49,15 @@ TARGET_TYPE_BY_OPERATION = {
 }
 
 _FORBIDDEN_REF_TOKENS = (
+    "http://",
+    "https://",
+    "s3://",
+    "gs://",
+    "storage://",
     "file://",
     "/tmp/",
     "/var/",
+    "/users/",
     "\\",
     "token=",
     "secret",
@@ -64,6 +70,37 @@ _FORBIDDEN_REF_TOKENS = (
     "marketplace",
     "account-pool",
     "proxy-pool",
+)
+_FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS = (
+    "storage_handle",
+    "storage_url",
+    "download_url",
+    "local_path",
+    "file_path",
+    "source_name",
+    "provider_path",
+    "account_material",
+    "account_secret",
+    "private_account",
+    "private_creator",
+    "private_media",
+    "cookie",
+    "credential",
+    "session_token",
+)
+_FORBIDDEN_NORMALIZED_PAYLOAD_KEYS = frozenset(
+    {
+        "raw_payload",
+        "raw_payload_ref",
+        "source_trace",
+        "provider_path",
+        "storage_handle",
+        "storage_url",
+        "download_url",
+        "local_path",
+        "file_path",
+        "source_name",
+    }
 )
 _ALLOWED_SOURCE_TRACE_FIELDS = frozenset(
     {"adapter_key", "provider_path", "fetched_at", "evidence_alias", "resource_profile_ref"}
@@ -385,6 +422,7 @@ def validate_dataset_record(record: DatasetRecord) -> DatasetRecord:
     if record.raw_payload_ref is not None:
         _validate_sanitized_ref(record.raw_payload_ref, field="raw_payload_ref")
     _ensure_json_safe(record.normalized_payload, field="normalized_payload")
+    _validate_normalized_payload_no_leakage(record.normalized_payload, field="normalized_payload")
     _validate_sanitized_ref(record.evidence_ref, field="evidence_ref")
     _validate_source_trace(record.source_trace)
     _validate_sanitized_ref(record.dedup_key, field="dedup_key")
@@ -408,6 +446,7 @@ def batch_result_envelope_to_dict(envelope: BatchResultEnvelope) -> dict[str, An
 
 
 def batch_item_outcome_to_dict(outcome: BatchItemOutcome) -> dict[str, Any]:
+    validate_batch_item_outcome(outcome)
     return {
         "item_id": outcome.item_id,
         "operation": outcome.operation,
@@ -439,6 +478,35 @@ def dataset_record_to_dict(record: DatasetRecord) -> dict[str, Any]:
         "batch_item_id": record.batch_item_id,
         "recorded_at": record.recorded_at,
     }
+
+
+def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
+    if not isinstance(outcome, BatchItemOutcome):
+        raise BatchDatasetContractError("invalid_item_outcome", "BatchItemOutcome expected")
+    _validate_sanitized_ref(outcome.item_id, field="item_id")
+    if outcome.operation not in ALLOWED_BATCH_ITEM_OPERATIONS:
+        raise BatchDatasetContractError("invalid_target_operation", "batch item outcome operation is not admitted")
+    _validate_sanitized_ref(outcome.adapter_key, field="adapter_key")
+    _validate_sanitized_ref(outcome.target_ref, field="target_ref")
+    if outcome.outcome_status not in {BATCH_ITEM_SUCCEEDED, BATCH_ITEM_FAILED, BATCH_ITEM_DUPLICATE_SKIPPED}:
+        raise BatchDatasetContractError(
+            "invalid_item_outcome_status",
+            "batch item outcome_status is not part of the batch contract",
+            details={"outcome_status": outcome.outcome_status},
+        )
+    if outcome.result_envelope is not None:
+        _require_mapping(outcome.result_envelope, field="result_envelope")
+        _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope")
+    if outcome.error_envelope is not None:
+        _require_mapping(outcome.error_envelope, field="error_envelope")
+        _validate_public_payload_no_leakage(outcome.error_envelope, field="error_envelope")
+    if outcome.dataset_record_ref is not None:
+        _validate_sanitized_ref(outcome.dataset_record_ref, field="dataset_record_ref")
+    if outcome.source_trace is not None:
+        _validate_source_trace(outcome.source_trace)
+    _require_mapping(outcome.audit, field="audit")
+    _validate_public_payload_no_leakage(outcome.audit, field="audit")
+    return outcome
 
 
 def batch_resume_token_to_dict(token: BatchResumeToken) -> dict[str, Any]:
@@ -701,9 +769,12 @@ def _dataset_id_for_request(request: BatchRequest) -> str | None:
 
 def _normalized_payload_from_envelope(envelope: Mapping[str, Any]) -> Any:
     if "normalized" in envelope:
-        return envelope["normalized"]
+        return _strip_normalized_payload_private_fields(envelope["normalized"])
     if "items" in envelope:
-        return {"items": envelope["items"], "result_status": envelope.get("result_status")}
+        return {
+            "items": _strip_normalized_payload_private_fields(envelope["items"]),
+            "result_status": envelope.get("result_status"),
+        }
     if "profile" in envelope:
         return {"profile": envelope["profile"], "result_status": envelope.get("result_status")}
     if "media" in envelope:
@@ -738,8 +809,7 @@ def _source_trace_from_envelope(
 
 def _canonical_item_outcomes(outcomes: Sequence[BatchItemOutcome]) -> tuple[BatchItemOutcome, ...]:
     for outcome in outcomes:
-        if not isinstance(outcome, BatchItemOutcome):
-            raise BatchDatasetContractError("invalid_item_outcome", "prior outcomes must be BatchItemOutcome")
+        validate_batch_item_outcome(outcome)
     return tuple(outcomes)
 
 
@@ -863,6 +933,79 @@ def _validate_sanitized_ref(value: str, *, field: str) -> str:
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains forbidden private or storage token", details={"field": field})
     _ensure_json_safe(normalized, field=field)
     return normalized
+
+
+def _strip_normalized_payload_private_fields(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            key: _strip_normalized_payload_private_fields(item)
+            for key, item in value.items()
+            if str(key) not in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS
+        }
+    if isinstance(value, list):
+        return [_strip_normalized_payload_private_fields(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_strip_normalized_payload_private_fields(item) for item in value)
+    return value
+
+
+def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS:
+                raise BatchDatasetContractError(
+                    "unsafe_normalized_payload",
+                    "normalized_payload contains a private raw/source/storage field",
+                    details={"field": f"{field}.{key_text}"},
+                )
+            _validate_public_payload_key(key_text, field=f"{field}.{key_text}")
+            _validate_normalized_payload_no_leakage(item, field=f"{field}.{key_text}")
+        return
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for index, item in enumerate(value):
+            _validate_normalized_payload_no_leakage(item, field=f"{field}[{index}]")
+        return
+    if isinstance(value, str):
+        _validate_public_payload_string(value, field=field)
+
+
+def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text == "source_trace" and isinstance(item, Mapping):
+                _validate_source_trace(item)
+                continue
+            _validate_public_payload_key(key_text, field=f"{field}.{key_text}")
+            _validate_public_payload_no_leakage(item, field=f"{field}.{key_text}")
+        return
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for index, item in enumerate(value):
+            _validate_public_payload_no_leakage(item, field=f"{field}[{index}]")
+        return
+    if isinstance(value, str):
+        _validate_public_payload_string(value, field=field)
+
+
+def _validate_public_payload_key(key: str, *, field: str) -> None:
+    lowered = key.lower()
+    if any(token in lowered for token in _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS):
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "public batch/dataset carrier contains a private field",
+            details={"field": field},
+        )
+
+
+def _validate_public_payload_string(value: str, *, field: str) -> None:
+    lowered = value.lower()
+    if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "public batch/dataset carrier contains a raw path, storage handle, or private token",
+            details={"field": field},
+        )
 
 
 def _require_non_empty_string(value: Any, *, field: str) -> str:

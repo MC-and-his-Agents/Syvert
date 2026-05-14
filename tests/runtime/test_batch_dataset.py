@@ -399,7 +399,64 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 prior_item_outcomes=(forged,),
             )
 
-        self.assertEqual(context.exception.code, "resume_outcome_status_invalid")
+        self.assertEqual(context.exception.code, "invalid_item_outcome_status")
+
+    def test_resume_rejects_prior_outcome_with_unsafe_source_trace(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "https://provider.example/route",
+                    "fetched_at": "2026-05-13T10:00:00Z",
+                    "evidence_alias": "evidence:unsafe",
+                    "storage_handle": "private-storage-handle",
+                },
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_source_trace")
+
+    def test_resume_rejects_prior_outcome_with_unsafe_result_envelope(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "result_envelope": {
+                    **first.item_outcomes[0].result_envelope,
+                    "storage_handle": "private-storage-handle",
+                },
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_public_payload")
 
     def test_fresh_execution_rejects_prior_outcomes_without_resume_token(self) -> None:
         sink = ReferenceDatasetSink()
@@ -608,6 +665,77 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "non_json_safe_value")
 
+    def test_dataset_validator_rejects_private_normalized_payload_fields(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            ReferenceDatasetSink().write(
+                {
+                    "dataset_record_id": "record-1",
+                    "dataset_id": "dataset-1",
+                    "source_operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "raw_payload_ref": "raw://alpha",
+                    "normalized_payload": {
+                        "items": [
+                            {
+                                "canonical_ref": "content://item-1",
+                                "raw_payload_ref": "https://storage.example/raw.json",
+                            }
+                        ]
+                    },
+                    "evidence_ref": "evidence:alpha",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-05-13T10:00:00Z",
+                        "evidence_alias": "evidence:alpha",
+                    },
+                    "dedup_key": "dedup:alpha",
+                    "batch_id": "batch-001",
+                    "batch_item_id": "item-1",
+                    "recorded_at": "2026-05-13T10:00:00Z",
+                }
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_normalized_payload")
+
+    def test_runtime_dataset_normalized_payload_strips_raw_fields(self) -> None:
+        sink = ReferenceDatasetSink()
+
+        self.execute(request(target("item-1", "alpha")), sink=sink)
+        record = sink.read_by_batch("batch-001")[0]
+        item_payload = record.normalized_payload["items"][0]
+
+        self.assertNotIn("raw_payload_ref", item_payload)
+        self.assertNotIn("source_trace", item_payload)
+
+    def test_raw_storage_url_ref_is_rejected(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            ReferenceDatasetSink().write(
+                {
+                    "dataset_record_id": "record-1",
+                    "dataset_id": "dataset-1",
+                    "source_operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "raw_payload_ref": "https://storage.example/raw.json",
+                    "normalized_payload": {"items": []},
+                    "evidence_ref": "evidence:alpha",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-05-13T10:00:00Z",
+                        "evidence_alias": "evidence:alpha",
+                    },
+                    "dedup_key": "dedup:alpha",
+                    "batch_id": "batch-001",
+                    "batch_item_id": "item-1",
+                    "recorded_at": "2026-05-13T10:00:00Z",
+                }
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_ref")
+
     def test_sanitized_provider_path_is_allowed_but_raw_path_rejected(self) -> None:
         result = self.execute(request(target("item-1", "alpha")))
         record = ReferenceDatasetSink().write(
@@ -618,7 +746,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 "adapter_key": TEST_ADAPTER_KEY,
                 "target_ref": "alpha",
                 "raw_payload_ref": "raw://alpha",
-                "normalized_payload": batch_result_envelope_to_dict(result),
+                "normalized_payload": {"items": []},
                 "evidence_ref": "evidence:alpha",
                 "source_trace": {
                     "adapter_key": TEST_ADAPTER_KEY,
