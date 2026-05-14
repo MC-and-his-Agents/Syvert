@@ -1385,6 +1385,67 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     )
                 self.assertEqual(context.exception.code, "unsafe_ref")
 
+    def test_prefixed_local_path_refs_are_rejected_in_public_carriers(self) -> None:
+        base_record = {
+            "dataset_record_id": "record-1",
+            "dataset_id": "dataset-1",
+            "source_operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "alpha",
+            "raw_payload_ref": "raw://alpha",
+            "normalized_payload": {"items": []},
+            "evidence_ref": "evidence:alpha",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "fetched_at": "2026-05-13T10:00:00Z",
+                "evidence_alias": "evidence:alpha",
+            },
+            "dedup_key": "dedup:alpha",
+            "batch_id": "batch-001",
+            "batch_item_id": "item-1",
+            "recorded_at": "2026-05-13T10:00:00Z",
+        }
+        dataset_cases = (
+            ("raw_payload_ref", "raw:///etc/passwd"),
+            ("evidence_ref", "evidence:/etc/passwd"),
+            ("dataset_record_id", "record:/home/me/raw.json"),
+            ("dataset_id", "dataset:/home/me/raw.json"),
+        )
+        for field, value in dataset_cases:
+            with self.subTest(field=field):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    ReferenceDatasetSink().write({**base_record, field: value})
+
+                self.assertEqual(context.exception.code, "unsafe_ref")
+
+        result = self.execute(request(target("item-1", "alpha")))
+        with self.assertRaises(BatchDatasetContractError) as outcome_context:
+            validate_batch_item_outcome(
+                BatchItemOutcome(
+                    **{
+                        **result.item_outcomes[0].__dict__,
+                        "dataset_record_ref": "record:/etc/passwd",
+                    }
+                )
+            )
+        self.assertEqual(outcome_context.exception.code, "unsafe_ref")
+
+        with self.assertRaises(BatchDatasetContractError) as envelope_context:
+            batch_result_envelope_to_dict(
+                BatchResultEnvelope(
+                    batch_id=result.batch_id,
+                    operation=result.operation,
+                    result_status=result.result_status,
+                    item_outcomes=result.item_outcomes,
+                    resume_token=result.resume_token,
+                    dataset_sink_ref=result.dataset_sink_ref,
+                    dataset_id="dataset:/home/me/raw.json",
+                    audit_trace=result.audit_trace,
+                )
+            )
+        self.assertEqual(envelope_context.exception.code, "unsafe_ref")
+
     def test_sanitized_provider_path_is_allowed_but_raw_path_rejected(self) -> None:
         result = self.execute(request(target("item-1", "alpha")))
         record = ReferenceDatasetSink().write(

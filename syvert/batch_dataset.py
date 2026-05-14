@@ -57,6 +57,8 @@ _FORBIDDEN_REF_TOKENS = (
     "file://",
     "/tmp/",
     "/var/",
+    "/etc/",
+    "/home/",
     "/users/",
     "\\",
     "token=",
