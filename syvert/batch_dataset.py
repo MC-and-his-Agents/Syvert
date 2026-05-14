@@ -1016,7 +1016,7 @@ def _strip_normalized_payload_private_fields(value: Any) -> Any:
         return {
             key: _strip_normalized_payload_private_fields(item)
             for key, item in value.items()
-            if str(key) not in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS
+            if not _is_private_normalized_payload_key(str(key))
         }
     if isinstance(value, list):
         return [_strip_normalized_payload_private_fields(item) for item in value]
@@ -1029,7 +1029,7 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
-            if key_text.lower() in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS:
+            if _is_private_normalized_payload_key(key_text):
                 raise BatchDatasetContractError(
                     "unsafe_normalized_payload",
                     "normalized_payload contains a private raw/source/storage field",
@@ -1068,7 +1068,10 @@ def _validate_public_payload_key(key: str, *, field: str) -> None:
     lowered = key.lower()
     if lowered == "raw_payload_ref":
         return
-    if any(token in lowered for token in _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS):
+    compact = _compact_private_key(lowered)
+    if any(token in lowered for token in _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS) or any(
+        _compact_private_key(token) in compact for token in _FORBIDDEN_PUBLIC_PAYLOAD_KEY_TOKENS
+    ):
         raise BatchDatasetContractError(
             "unsafe_public_payload",
             "public batch/dataset carrier contains a private field",
@@ -1106,6 +1109,18 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
             "public batch/dataset carrier contains a raw path, storage handle, or private token",
             details={"field": field},
         )
+
+
+def _is_private_normalized_payload_key(key: str) -> bool:
+    lowered = key.lower()
+    compact = _compact_private_key(lowered)
+    return lowered in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS or any(
+        _compact_private_key(token) == compact for token in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS
+    )
+
+
+def _compact_private_key(value: str) -> str:
+    return "".join(char for char in value.lower() if char not in {"_", "-", " "})
 
 
 def _require_non_empty_string(value: Any, *, field: str) -> str:

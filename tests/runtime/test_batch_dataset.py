@@ -513,6 +513,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 "result_envelope": {
                     **first.item_outcomes[0].result_envelope,
                     "storage_handle": "private-storage-handle",
+                    "storageHandle": "private-storage-handle",
                 },
             }
         )
@@ -867,6 +868,9 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         payloads = (
             {"items": [{"canonical_ref": "content://item-1", "raw_payload_ref": "raw://alpha"}]},
             {"items": [{"canonical_ref": "content://item-1", "Raw_Payload_Ref": "raw://alpha"}]},
+            {"items": [{"canonical_ref": "content://item-1", "rawPayloadRef": "raw://alpha"}]},
+            {"items": [{"canonical_ref": "content://item-1", "providerPath": "provider://raw"}]},
+            {"items": [{"canonical_ref": "content://item-1", "sourceName": "private-source"}]},
             {"items": [{"canonical_ref": "content://item-1", "RAW_PAYLOAD": {"id": "raw"}}]},
         )
         for index, normalized_payload in enumerate(payloads, start=1):
