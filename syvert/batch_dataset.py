@@ -1130,6 +1130,8 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
         for index, item in enumerate(value):
             _validate_normalized_payload_no_leakage(item, field=f"{field}[{index}]")
         return
+    if isinstance(value, str):
+        _validate_normalized_payload_string(value, field=field)
 
 
 def _validate_public_payload_no_leakage(value: Any, *, field: str, validate_strings: bool) -> None:
@@ -1206,6 +1208,24 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
         raise BatchDatasetContractError(
             "unsafe_public_payload",
             "public batch/dataset carrier contains a raw path, storage handle, or private token",
+            details={"field": field},
+        )
+
+
+def _validate_normalized_payload_string(value: str, *, field: str) -> None:
+    lowered = value.lower()
+    if value.startswith("/") or value.startswith("\\") or lowered.startswith(
+        ("http://", "https://", "s3://", "gs://", "storage://", "file://")
+    ):
+        raise BatchDatasetContractError(
+            "unsafe_normalized_payload",
+            "normalized_payload contains a raw path, storage handle, or private token",
+            details={"field": field},
+        )
+    if any(token in lowered for token in ("token=", "account-pool", "proxy-pool", "storage-handle")):
+        raise BatchDatasetContractError(
+            "unsafe_normalized_payload",
+            "normalized_payload contains a raw path, storage handle, or private token",
             details={"field": field},
         )
 

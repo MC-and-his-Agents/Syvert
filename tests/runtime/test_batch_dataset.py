@@ -159,6 +159,13 @@ class UnsafeSourceTraceAdapter(CollectionAdapter):
         return payload
 
 
+class UnsafeNormalizedPayloadAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["items"][0]["normalized"]["artifact"] = "/etc/passwd"
+        return payload
+
+
 class FailingDatasetSink(ReferenceDatasetSink):
     def write(self, record):
         raise BatchDatasetContractError(
@@ -1009,6 +1016,8 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             {"items": [{"canonical_ref": "content://item-1", "providerPath": "provider://raw"}]},
             {"items": [{"canonical_ref": "content://item-1", "sourceName": "private-source"}]},
             {"items": [{"canonical_ref": "content://item-1", "RAW_PAYLOAD": {"id": "raw"}}]},
+            {"items": [{"canonical_ref": "content://item-1", "artifact": "/etc/passwd"}]},
+            {"items": [{"canonical_ref": "content://item-1", "artifact": "storage://private-bucket/raw"}]},
         )
         for index, normalized_payload in enumerate(payloads, start=1):
             with self.subTest(index=index):
@@ -1036,6 +1045,17 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                         }
                     )
                 self.assertEqual(context.exception.code, "unsafe_normalized_payload")
+
+    def test_runtime_dataset_normalized_payload_rejects_unsafe_string_values(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeNormalizedPayloadAdapter()}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "invalid_adapter_success_payload")
+        self.assertEqual(sink.read_by_batch("batch-001"), ())
 
     def test_runtime_dataset_normalized_payload_strips_raw_fields(self) -> None:
         sink = ReferenceDatasetSink()
