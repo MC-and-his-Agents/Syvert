@@ -494,6 +494,32 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
             "batch item outcome_status is not part of the batch contract",
             details={"outcome_status": outcome.outcome_status},
         )
+    if outcome.outcome_status == BATCH_ITEM_SUCCEEDED and outcome.result_envelope is None:
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "succeeded batch item outcome must carry a read-side result envelope",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
+    if outcome.outcome_status == BATCH_ITEM_FAILED and outcome.error_envelope is None:
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "failed batch item outcome must carry an item-level error envelope",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
+    if outcome.outcome_status == BATCH_ITEM_FAILED and outcome.dataset_record_ref is not None:
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "failed batch item outcome must not reference a dataset record",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
+    if outcome.outcome_status == BATCH_ITEM_DUPLICATE_SKIPPED and (
+        outcome.result_envelope is not None or outcome.error_envelope is not None or outcome.dataset_record_ref is not None
+    ):
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "duplicate_skipped batch item outcome must not carry result, error, or dataset record refs",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
     if outcome.result_envelope is not None:
         _require_mapping(outcome.result_envelope, field="result_envelope")
         _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope")

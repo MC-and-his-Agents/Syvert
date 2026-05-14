@@ -378,7 +378,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 prior_item_outcomes=(forged,),
             )
 
-        self.assertEqual(context.exception.code, "resume_dedup_state_mismatch")
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
 
     def test_resume_rejects_unknown_prior_outcome_status(self) -> None:
         sink = ReferenceDatasetSink()
@@ -457,6 +457,93 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_public_payload")
+
+    def test_resume_rejects_failed_prior_outcome_without_error_envelope(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "outcome_status": BATCH_ITEM_FAILED,
+                "result_envelope": None,
+                "error_envelope": None,
+                "dataset_record_ref": None,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
+
+    def test_resume_rejects_failed_prior_outcome_with_dataset_record_ref(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "outcome_status": BATCH_ITEM_FAILED,
+                "result_envelope": None,
+                "error_envelope": {"code": "permission_denied", "message": "permission denied", "details": {}},
+                "dataset_record_ref": "dataset:batch-001:item-1",
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
+
+    def test_resume_rejects_duplicate_prior_outcome_with_error_payload(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(
+                target("item-1", "alpha", dedup_key="same"),
+                target("item-2", "alpha", dedup_key="same"),
+                target("item-3", "beta"),
+            ),
+            sink=sink,
+            stop_after_items=2,
+            stop_reason="timeout",
+        )
+        forged_duplicate = BatchItemOutcome(
+            **{
+                **first.item_outcomes[1].__dict__,
+                "error_envelope": {"code": "stale", "message": "stale", "details": {}},
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(
+                    target("item-1", "alpha", dedup_key="same"),
+                    target("item-2", "alpha", dedup_key="same"),
+                    target("item-3", "beta"),
+                    resume_token=first.resume_token,
+                ),
+                sink=sink,
+                prior_item_outcomes=(first.item_outcomes[0], forged_duplicate),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
 
     def test_fresh_execution_rejects_prior_outcomes_without_resume_token(self) -> None:
         sink = ReferenceDatasetSink()
