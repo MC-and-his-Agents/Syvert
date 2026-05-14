@@ -2739,7 +2739,8 @@ def project_to_adapter_request(
             collection_mode=request.policy.collection_mode,
             request_cursor=(
                 clone_request_cursor(request.request_cursor)
-                if request.target.capability == COMMENT_COLLECTION
+                if request.target.capability
+                in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR, COMMENT_COLLECTION}
                 else normalize_media_fetch_policy(request.request_cursor)
                 if request.target.capability == MEDIA_ASSET_FETCH_BY_REF
                 else None

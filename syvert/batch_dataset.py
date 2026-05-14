@@ -8,7 +8,7 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from syvert.runtime import TaskInput, TaskRequest, execute_task
+from syvert.runtime import CollectionPolicy, CoreTaskRequest, InputTarget, TaskInput, TaskRequest, execute_task
 
 
 BATCH_EXECUTION_OPERATION = "batch_execution"
@@ -384,7 +384,9 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
     _validate_sanitized_ref(item.dedup_key, field="dedup_key")
     if item.request_cursor is not None:
         _ensure_json_safe(item.request_cursor, field="request_cursor")
-        if item.operation in {"content_search_by_keyword", "content_list_by_creator", "creator_profile_by_id"}:
+        if item.operation in {"content_search_by_keyword", "content_list_by_creator"}:
+            _validate_continuation_request_cursor(item.request_cursor, index=index)
+        elif item.operation == "creator_profile_by_id":
             raise BatchDatasetContractError(
                 "unsupported_request_cursor",
                 "batch request_cursor is not yet supported for this item operation",
@@ -660,10 +662,14 @@ def _outcome_from_task_envelope(
     )
 
 
-def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest:
+def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest | CoreTaskRequest:
     if item.operation == "content_search_by_keyword":
+        if item.request_cursor is not None:
+            return _core_paginated_task_request_from_batch_item(item)
         task_input = TaskInput(keyword=item.target_ref, continuation_token=_continuation_token(item.request_cursor))
     elif item.operation == "content_list_by_creator":
+        if item.request_cursor is not None:
+            return _core_paginated_task_request_from_batch_item(item)
         task_input = TaskInput(creator_id=item.target_ref, continuation_token=_continuation_token(item.request_cursor))
     elif item.operation == "comment_collection":
         task_input = TaskInput(content_ref=item.target_ref, comment_request_cursor=item.request_cursor)
@@ -676,11 +682,37 @@ def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest:
     return TaskRequest(adapter_key=item.adapter_key, capability=item.operation, input=task_input)
 
 
+def _core_paginated_task_request_from_batch_item(item: BatchTargetItem) -> CoreTaskRequest:
+    return CoreTaskRequest(
+        target=InputTarget(
+            adapter_key=item.adapter_key,
+            capability=item.operation,
+            target_type=item.target_type,
+            target_value=item.target_ref,
+        ),
+        policy=CollectionPolicy(collection_mode="paginated"),
+        request_cursor={"continuation_token": _continuation_token(item.request_cursor)},
+    )
+
+
 def _continuation_token(request_cursor: Mapping[str, Any] | None) -> str | None:
     if not request_cursor:
         return None
     token = request_cursor.get("continuation_token")
     return token if isinstance(token, str) else None
+
+
+def _validate_continuation_request_cursor(request_cursor: Mapping[str, Any], *, index: int) -> None:
+    allowed_fields = {"continuation_token"}
+    extra_fields = sorted(str(field) for field in request_cursor if field not in allowed_fields)
+    if extra_fields:
+        raise BatchDatasetContractError(
+            "unsupported_request_cursor",
+            "batch request_cursor contains fields outside the paginated continuation contract",
+            details={"fields": extra_fields, "index": index},
+        )
+    token = request_cursor.get("continuation_token")
+    _require_non_empty_string(token, field="request_cursor.continuation_token")
 
 
 def _resumable_result(
@@ -811,13 +843,23 @@ def _audit_context_evidence_refs(audit_context: Mapping[str, Any]) -> tuple[str,
     for field in ("evidence_ref", "evidence_alias"):
         value = audit_context.get(field)
         if value is not None:
-            refs.append(_validate_sanitized_ref(str(value), field=f"audit_context.{field}"))
+            refs.append(
+                _validate_sanitized_ref(
+                    _require_non_empty_string(value, field=f"audit_context.{field}"),
+                    field=f"audit_context.{field}",
+                )
+            )
     values = audit_context.get("evidence_refs")
     if values is not None:
         if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
             raise BatchDatasetContractError("invalid_field", "audit_context.evidence_refs must be a sequence")
         for index, value in enumerate(values):
-            refs.append(_validate_sanitized_ref(str(value), field=f"audit_context.evidence_refs[{index}]"))
+            refs.append(
+                _validate_sanitized_ref(
+                    _require_non_empty_string(value, field=f"audit_context.evidence_refs[{index}]"),
+                    field=f"audit_context.evidence_refs[{index}]",
+                )
+            )
     return tuple(dict.fromkeys(refs))
 
 
@@ -978,7 +1020,10 @@ def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
     _validate_provider_path(provider_path)
     _validate_sanitized_ref(evidence_alias, field="source_trace.evidence_alias")
     if source_trace.get("resource_profile_ref") is not None:
-        _validate_sanitized_ref(str(source_trace.get("resource_profile_ref")), field="source_trace.resource_profile_ref")
+        _validate_sanitized_ref(
+            _require_non_empty_string(source_trace.get("resource_profile_ref"), field="source_trace.resource_profile_ref"),
+            field="source_trace.resource_profile_ref",
+        )
     _require_non_empty_string(source_trace.get("fetched_at"), field="source_trace.fetched_at")
 
 

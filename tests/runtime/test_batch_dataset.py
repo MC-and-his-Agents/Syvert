@@ -56,6 +56,27 @@ class CursorRecordingAdapter(CollectionAdapter):
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class PaginatedCursorRecordingAdapter:
+    supported_capabilities = frozenset({"content_search", "content_list"})
+    supported_targets = frozenset({"keyword", "creator"})
+    supported_collection_modes = frozenset({"paginated"})
+
+    def __init__(self) -> None:
+        self.request_cursors = []
+
+    def execute(self, request):
+        self.request_cursors.append(request.request.request_cursor)
+        if request.capability == "content_search":
+            return make_collection_result(target_ref=request.target_value)
+        if request.capability == "content_list":
+            return make_collection_result(
+                operation="content_list_by_creator",
+                target_type="creator",
+                target_ref=request.target_value,
+            )
+        raise AssertionError(f"unexpected capability {request.capability}")
+
+
 class MultiReadSideAdapter:
     supported_capabilities = frozenset(
         {
@@ -733,23 +754,37 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_target_operation")
 
-    def test_search_request_cursor_is_rejected_instead_of_silently_dropped(self) -> None:
-        with self.assertRaises(BatchDatasetContractError) as context:
-            self.execute(
-                request(
-                    BatchTargetItem(
-                        item_id="item-1",
-                        operation="content_search_by_keyword",
-                        adapter_key=TEST_ADAPTER_KEY,
-                        target_type="keyword",
-                        target_ref="alpha",
-                        dedup_key="dedup:alpha",
-                        request_cursor={"continuation_token": "next-page"},
-                    )
-                )
-            )
+    def test_search_and_list_request_cursors_are_passed_to_existing_item_path(self) -> None:
+        adapter = PaginatedCursorRecordingAdapter()
+        self.adapters = {TEST_ADAPTER_KEY: adapter}
 
-        self.assertEqual(context.exception.code, "unsupported_request_cursor")
+        self.execute(
+            request(
+                BatchTargetItem(
+                    item_id="search",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_type="keyword",
+                    target_ref="alpha",
+                    dedup_key="dedup:search",
+                    request_cursor={"continuation_token": "search-page"},
+                ),
+                BatchTargetItem(
+                    item_id="list",
+                    operation="content_list_by_creator",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_type="creator",
+                    target_ref="creator:alpha",
+                    dedup_key="dedup:list",
+                    request_cursor={"continuation_token": "list-page"},
+                ),
+            )
+        )
+
+        self.assertEqual(
+            adapter.request_cursors,
+            [{"continuation_token": "search-page"}, {"continuation_token": "list-page"}],
+        )
 
     def test_creator_profile_request_cursor_is_rejected_instead_of_silently_dropped(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
@@ -1114,6 +1149,46 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "unsafe_ref")
+
+        with self.assertRaises(BatchDatasetContractError) as non_string_context:
+            self.execute(
+                BatchRequest(
+                    batch_id="batch-001",
+                    target_set=(target("item-1", "alpha"),),
+                    dataset_sink_ref="dataset-sink:reference",
+                    audit_context={"evidence_ref": {"alias": "evidence:batch"}},
+                )
+            )
+
+        self.assertEqual(non_string_context.exception.code, "invalid_field")
+
+    def test_source_trace_alias_fields_must_be_strings(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            ReferenceDatasetSink().write(
+                {
+                    "dataset_record_id": "record-1",
+                    "dataset_id": "dataset-1",
+                    "source_operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "raw_payload_ref": "raw://alpha",
+                    "normalized_payload": {"items": []},
+                    "evidence_ref": "evidence:alpha",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-05-13T10:00:00Z",
+                        "evidence_alias": "evidence:alpha",
+                        "resource_profile_ref": {"profile": "resource:public"},
+                    },
+                    "dedup_key": "dedup:alpha",
+                    "batch_id": "batch-001",
+                    "batch_item_id": "item-1",
+                    "recorded_at": "2026-05-13T10:00:00Z",
+                }
+            )
+
+        self.assertEqual(context.exception.code, "invalid_field")
 
 
 if __name__ == "__main__":
