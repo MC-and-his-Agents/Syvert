@@ -770,6 +770,8 @@ def _resumable_result(
 
 
 def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, target_set_hash: str) -> None:
+    _validate_sanitized_ref(token.resume_token, field="resume_token")
+    _validate_sanitized_ref(token.issued_at, field="resume_token.issued_at")
     if token.batch_id != request.batch_id or token.target_set_hash != target_set_hash:
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
     if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):

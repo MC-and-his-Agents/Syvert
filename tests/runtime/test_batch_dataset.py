@@ -837,6 +837,30 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_resume_token")
 
+    def test_resume_token_carrier_rejects_routing_semantics(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged_token = BatchResumeToken(
+            **{
+                **first.resume_token.__dict__,
+                "resume_token": f"{first.resume_token.resume_token}:provider:fallback:marketplace",
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=forged_token),
+                sink=sink,
+                prior_item_outcomes=first.item_outcomes,
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_ref")
+
     def test_timeout_item_failure_stops_batch_as_resumable(self) -> None:
         adapter = TimeoutCollectionAdapter()
         self.adapters = {TEST_ADAPTER_KEY: adapter}
