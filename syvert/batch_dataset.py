@@ -357,8 +357,8 @@ def validate_batch_request(request: BatchRequest) -> BatchRequest:
         _validate_sanitized_ref(request.dataset_sink_ref, field="dataset_sink_ref")
     if request.dataset_id is not None:
         _validate_sanitized_ref(request.dataset_id, field="dataset_id")
-    _ensure_json_safe(request.audit_context, field="audit_context")
-    _audit_context_evidence_refs(request.audit_context)
+    audit_context = _require_mapping(request.audit_context, field="audit_context")
+    _audit_context_evidence_refs(audit_context)
     return request
 
 
@@ -380,7 +380,7 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
             "batch target_type does not match operation",
             details={"operation": item.operation, "target_type": item.target_type, "expected": expected_target_type},
         )
-    _validate_sanitized_ref(item.target_ref, field="target_ref")
+    _validate_target_ref(item.operation, item.target_ref, field="target_ref")
     _validate_sanitized_ref(item.dedup_key, field="dedup_key")
     if item.request_cursor is not None:
         _ensure_json_safe(item.request_cursor, field="request_cursor")
@@ -424,7 +424,7 @@ def validate_dataset_record(record: DatasetRecord) -> DatasetRecord:
     if record.source_operation not in ALLOWED_BATCH_ITEM_OPERATIONS:
         raise BatchDatasetContractError("invalid_source_operation", "dataset source_operation is not admitted")
     _validate_sanitized_ref(record.adapter_key, field="adapter_key")
-    _validate_sanitized_ref(record.target_ref, field="target_ref")
+    _validate_target_ref(record.source_operation, record.target_ref, field="target_ref")
     if record.raw_payload_ref is not None:
         _validate_sanitized_ref(record.raw_payload_ref, field="raw_payload_ref")
     _ensure_json_safe(record.normalized_payload, field="normalized_payload")
@@ -493,7 +493,7 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
     if outcome.operation not in ALLOWED_BATCH_ITEM_OPERATIONS:
         raise BatchDatasetContractError("invalid_target_operation", "batch item outcome operation is not admitted")
     _validate_sanitized_ref(outcome.adapter_key, field="adapter_key")
-    _validate_sanitized_ref(outcome.target_ref, field="target_ref")
+    _validate_target_ref(outcome.operation, outcome.target_ref, field="target_ref")
     if outcome.outcome_status not in {BATCH_ITEM_SUCCEEDED, BATCH_ITEM_FAILED, BATCH_ITEM_DUPLICATE_SKIPPED}:
         raise BatchDatasetContractError(
             "invalid_item_outcome_status",
@@ -991,6 +991,15 @@ def _validate_provider_path(provider_path: str) -> None:
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
 
 
+def _validate_target_ref(operation: str, value: str, *, field: str) -> str:
+    normalized = _require_non_empty_string(value, field=field)
+    if operation == "content_search_by_keyword":
+        _ensure_json_safe(normalized, field=field)
+        _validate_public_payload_string(normalized, field=field)
+        return normalized
+    return _validate_sanitized_ref(normalized, field=field)
+
+
 def _validate_sanitized_ref(value: str, *, field: str) -> str:
     normalized = _require_non_empty_string(value, field=field)
     lowered = normalized.lower()
@@ -1069,7 +1078,29 @@ def _validate_public_payload_key(key: str, *, field: str) -> None:
 
 def _validate_public_payload_string(value: str, *, field: str) -> None:
     lowered = value.lower()
-    if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
+    if value.startswith("/") or any(
+        token in lowered
+        for token in (
+            "http://",
+            "https://",
+            "s3://",
+            "gs://",
+            "storage://",
+            "file://",
+            "/tmp/",
+            "/var/",
+            "/users/",
+            "/home/",
+            "/etc/",
+            "\\",
+            "token=",
+            "account-pool",
+            "proxy-pool",
+            "selector",
+            "fallback",
+            "marketplace",
+        )
+    ):
         raise BatchDatasetContractError(
             "unsafe_public_payload",
             "public batch/dataset carrier contains a raw path, storage handle, or private token",

@@ -238,6 +238,30 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(item_context.exception.code, "unsafe_ref")
 
+    def test_search_keyword_allows_common_content_words(self) -> None:
+        sink = ReferenceDatasetSink()
+        result = self.execute(
+            request(target("item-1", "download bucket secret", dedup_key="dedup:keyword-common")),
+            sink=sink,
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
+        self.assertEqual(sink.read_by_batch("batch-001")[0].target_ref, "download bucket secret")
+
+    def test_malformed_audit_context_fails_closed(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                BatchRequest(
+                    batch_id="batch-001",
+                    target_set=(target("item-1", "alpha"),),
+                    dataset_sink_ref="dataset-sink:reference",
+                    audit_context=[],
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_field")
+
     def test_all_stable_read_side_item_operations_are_projected_through_existing_envelopes(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: MultiReadSideAdapter()}
         sink = ReferenceDatasetSink()
