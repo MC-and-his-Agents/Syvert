@@ -21,6 +21,7 @@ from syvert.batch_dataset import (
     batch_result_envelope_to_dict,
     batch_target_set_hash,
     execute_batch_request,
+    validate_batch_item_outcome,
     validate_dataset_record,
 )
 from tests.runtime.test_task_record import (
@@ -282,6 +283,44 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "invalid_field")
+
+    def test_public_payload_allows_free_text_urls_and_rejects_success_error_mix(self) -> None:
+        validate_batch_item_outcome(
+            BatchItemOutcome(
+                item_id="item-1",
+                operation="content_search_by_keyword",
+                adapter_key=TEST_ADAPTER_KEY,
+                target_ref="alpha",
+                outcome_status=BATCH_ITEM_SUCCEEDED,
+                result_envelope={
+                    "status": "success",
+                    "items": [
+                        {
+                            "canonical_ref": "content://item-1",
+                            "display_text": "mentions https://example.invalid and /home text as content",
+                        }
+                    ],
+                    "raw_payload_ref": "raw://alpha",
+                },
+                audit={"reason": "dataset_record_written"},
+            )
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(
+                BatchItemOutcome(
+                    item_id="item-1",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_ref="alpha",
+                    outcome_status=BATCH_ITEM_SUCCEEDED,
+                    result_envelope={"status": "success", "items": []},
+                    error_envelope={"code": "stale", "message": "stale", "details": {}},
+                    audit={"reason": "dataset_record_written"},
+                )
+            )
+
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
 
     def test_all_stable_read_side_item_operations_are_projected_through_existing_envelopes(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: MultiReadSideAdapter()}

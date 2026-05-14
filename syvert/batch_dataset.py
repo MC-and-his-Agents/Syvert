@@ -106,6 +106,15 @@ _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS = frozenset(
 _ALLOWED_SOURCE_TRACE_FIELDS = frozenset(
     {"adapter_key", "provider_path", "fetched_at", "evidence_alias", "resource_profile_ref"}
 )
+_PUBLIC_REF_VALUE_KEYS = frozenset(
+    {
+        "raw_payload_ref",
+        "evidence_ref",
+        "evidence_alias",
+        "dataset_record_ref",
+        "resource_profile_ref",
+    }
+)
 
 
 class BatchDatasetContractError(ValueError):
@@ -506,6 +515,12 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
         raise BatchDatasetContractError(
             "invalid_item_outcome",
             "succeeded batch item outcome must carry a read-side result envelope",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
+    if outcome.outcome_status == BATCH_ITEM_SUCCEEDED and outcome.error_envelope is not None:
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "succeeded batch item outcome must not carry an error envelope",
             details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
         )
     if outcome.outcome_status == BATCH_ITEM_FAILED and outcome.error_envelope is None:
@@ -1087,8 +1102,6 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
         for index, item in enumerate(value):
             _validate_normalized_payload_no_leakage(item, field=f"{field}[{index}]")
         return
-    if isinstance(value, str):
-        _validate_public_payload_string(value, field=field)
 
 
 def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
@@ -1099,14 +1112,17 @@ def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
                 _validate_source_trace(item)
                 continue
             _validate_public_payload_key(key_text, field=f"{field}.{key_text}")
+            if _is_public_ref_value_key(key_text) and item is not None:
+                _validate_sanitized_ref(
+                    _require_non_empty_string(item, field=f"{field}.{key_text}"),
+                    field=f"{field}.{key_text}",
+                )
             _validate_public_payload_no_leakage(item, field=f"{field}.{key_text}")
         return
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for index, item in enumerate(value):
             _validate_public_payload_no_leakage(item, field=f"{field}[{index}]")
         return
-    if isinstance(value, str):
-        _validate_public_payload_string(value, field=field)
 
 
 def _validate_public_payload_key(key: str, *, field: str) -> None:
@@ -1161,6 +1177,14 @@ def _is_private_normalized_payload_key(key: str) -> bool:
     compact = _compact_private_key(lowered)
     return lowered in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS or any(
         _compact_private_key(token) == compact for token in _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS
+    )
+
+
+def _is_public_ref_value_key(key: str) -> bool:
+    lowered = key.lower()
+    compact = _compact_private_key(lowered)
+    return lowered in _PUBLIC_REF_VALUE_KEYS or any(
+        _compact_private_key(token) == compact for token in _PUBLIC_REF_VALUE_KEYS
     )
 
 
