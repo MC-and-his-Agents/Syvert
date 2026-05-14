@@ -322,6 +322,40 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_item_outcome")
 
+    def test_error_and_audit_strings_reject_raw_paths(self) -> None:
+        for index, outcome in enumerate(
+            (
+                BatchItemOutcome(
+                    item_id="item-1",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_ref="alpha",
+                    outcome_status=BATCH_ITEM_FAILED,
+                    error_envelope={
+                        "code": "permission_denied",
+                        "message": "failed at /etc/passwd",
+                        "details": {"path": "/etc/passwd"},
+                    },
+                    audit={"reason": "item_failed"},
+                ),
+                BatchItemOutcome(
+                    item_id="item-1",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_ref="alpha",
+                    outcome_status=BATCH_ITEM_FAILED,
+                    error_envelope={"code": "permission_denied", "message": "permission denied", "details": {}},
+                    audit={"reason": "file:///tmp/raw"},
+                ),
+            ),
+            start=1,
+        ):
+            with self.subTest(index=index):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_item_outcome(outcome)
+
+                self.assertEqual(context.exception.code, "unsafe_public_payload")
+
     def test_all_stable_read_side_item_operations_are_projected_through_existing_envelopes(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: MultiReadSideAdapter()}
         sink = ReferenceDatasetSink()

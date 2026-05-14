@@ -545,16 +545,16 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
         )
     if outcome.result_envelope is not None:
         _require_mapping(outcome.result_envelope, field="result_envelope")
-        _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope")
+        _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope", validate_strings=False)
     if outcome.error_envelope is not None:
         _require_mapping(outcome.error_envelope, field="error_envelope")
-        _validate_public_payload_no_leakage(outcome.error_envelope, field="error_envelope")
+        _validate_public_payload_no_leakage(outcome.error_envelope, field="error_envelope", validate_strings=True)
     if outcome.dataset_record_ref is not None:
         _validate_sanitized_ref(outcome.dataset_record_ref, field="dataset_record_ref")
     if outcome.source_trace is not None:
         _validate_source_trace(outcome.source_trace)
     _require_mapping(outcome.audit, field="audit")
-    _validate_public_payload_no_leakage(outcome.audit, field="audit")
+    _validate_public_payload_no_leakage(outcome.audit, field="audit", validate_strings=True)
     return outcome
 
 
@@ -1104,7 +1104,7 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
         return
 
 
-def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
+def _validate_public_payload_no_leakage(value: Any, *, field: str, validate_strings: bool) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
@@ -1117,12 +1117,22 @@ def _validate_public_payload_no_leakage(value: Any, *, field: str) -> None:
                     _require_non_empty_string(item, field=f"{field}.{key_text}"),
                     field=f"{field}.{key_text}",
                 )
-            _validate_public_payload_no_leakage(item, field=f"{field}.{key_text}")
+            _validate_public_payload_no_leakage(
+                item,
+                field=f"{field}.{key_text}",
+                validate_strings=validate_strings,
+            )
         return
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for index, item in enumerate(value):
-            _validate_public_payload_no_leakage(item, field=f"{field}[{index}]")
+            _validate_public_payload_no_leakage(
+                item,
+                field=f"{field}[{index}]",
+                validate_strings=validate_strings,
+            )
         return
+    if validate_strings and isinstance(value, str):
+        _validate_public_payload_string(value, field=field)
 
 
 def _validate_public_payload_key(key: str, *, field: str) -> None:
