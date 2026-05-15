@@ -404,6 +404,12 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
     _validate_sanitized_ref(item.dedup_key, field="dedup_key")
     if item.request_cursor is not None:
         _ensure_json_safe(item.request_cursor, field="request_cursor")
+        if not isinstance(item.request_cursor, Mapping):
+            raise BatchDatasetContractError(
+                "invalid_field",
+                "request_cursor must be an object",
+                details={"field": "request_cursor", "index": index},
+            )
         if item.operation in {"content_search_by_keyword", "content_list_by_creator"}:
             _validate_continuation_request_cursor(item.request_cursor, index=index)
         elif item.operation == "creator_profile_by_id":

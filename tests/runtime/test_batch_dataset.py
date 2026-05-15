@@ -24,6 +24,7 @@ from syvert.batch_dataset import (
     batch_target_set_hash,
     execute_batch_request,
     validate_batch_item_outcome,
+    validate_batch_target_item,
     validate_dataset_record,
 )
 from syvert.runtime import TaskInput, TaskRequest, execute_task
@@ -1209,6 +1210,36 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             adapter.request_cursors,
             [{"continuation_token": "search-page"}, {"continuation_token": "list-page"}],
         )
+
+    def test_paginated_request_cursor_must_be_object(self) -> None:
+        cases = (
+            BatchTargetItem(
+                item_id="search",
+                operation="content_search_by_keyword",
+                adapter_key=TEST_ADAPTER_KEY,
+                target_type="keyword",
+                target_ref="alpha",
+                dedup_key="dedup:search",
+                request_cursor=[],
+            ),
+            BatchTargetItem(
+                item_id="list",
+                operation="content_list_by_creator",
+                adapter_key=TEST_ADAPTER_KEY,
+                target_type="creator",
+                target_ref="creator:alpha",
+                dedup_key="dedup:list",
+                request_cursor=[],
+            ),
+        )
+
+        for index, item in enumerate(cases):
+            with self.subTest(operation=item.operation):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_target_item(item, index=index)
+
+                self.assertEqual(context.exception.code, "invalid_field")
+                self.assertEqual(context.exception.details["field"], "request_cursor")
 
     def test_creator_profile_request_cursor_is_rejected_instead_of_silently_dropped(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
