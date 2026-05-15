@@ -23,6 +23,7 @@ from syvert.batch_dataset import (
     batch_resume_token_to_dict,
     batch_target_set_hash,
     execute_batch_request,
+    validate_batch_request,
     validate_batch_item_outcome,
     validate_batch_target_item,
     validate_dataset_record,
@@ -649,6 +650,27 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             self.execute(unsafe_item)
 
         self.assertEqual(item_context.exception.code, "unsafe_ref")
+
+    def test_request_validation_rejects_malformed_media_fetch_cursor(self) -> None:
+        media_item = BatchTargetItem(
+            item_id="media",
+            operation="media_asset_fetch_by_ref",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_type="media_ref",
+            target_ref="media:alpha",
+            dedup_key="dedup:media",
+            request_cursor={"allow_download": "yes", "storage_handle": "secret"},
+        )
+
+        for validator in (
+            lambda: validate_batch_target_item(media_item),
+            lambda: validate_batch_request(request(media_item)),
+        ):
+            with self.subTest(validator=validator):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validator()
+
+                self.assertEqual(context.exception.code, "invalid_task_request")
 
     def test_request_validation_rejects_duplicate_item_ids(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
@@ -1644,6 +1666,38 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             self.execute(request(target("item-1", "alpha"), resume_token=token))
 
         self.assertEqual(context.exception.code, "invalid_resume_token")
+
+    def test_request_validation_rejects_malformed_nested_resume_token_matrix(self) -> None:
+        sink = ReferenceDatasetSink()
+        target_set = (target("item-1", "alpha"), target("item-2", "beta"))
+        first = self.execute(
+            request(*target_set),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        cases = (
+            ("bad-token-id", {**first.resume_token.__dict__, "resume_token": "not-a-token"}, "invalid_resume_token"),
+            ("wrong-batch", {**first.resume_token.__dict__, "batch_id": "other-batch"}, "invalid_resume_token"),
+            ("wrong-target-hash", {**first.resume_token.__dict__, "target_set_hash": "sha256:other"}, "invalid_resume_token"),
+            ("wrong-dataset", {**first.resume_token.__dict__, "dataset_id": "dataset:other"}, "invalid_resume_token"),
+            ("outside-target-set", {**first.resume_token.__dict__, "next_item_index": 3}, "invalid_resume_position"),
+        )
+
+        for label, token_payload, expected_code in cases:
+            with self.subTest(label=label):
+                forged_request = BatchRequest(
+                    batch_id="batch-001",
+                    target_set=target_set,
+                    resume_token=BatchResumeToken(**token_payload),
+                    dataset_sink_ref="dataset-sink:reference",
+                    audit_context={"evidence_ref": "evidence:batch"},
+                )
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_request(forged_request)
+
+                self.assertEqual(context.exception.code, expected_code)
 
     def test_resume_token_carrier_rejects_routing_semantics(self) -> None:
         sink = ReferenceDatasetSink()

@@ -88,13 +88,14 @@
 - root-cause sweep follow-up：将 `BatchItemOutcome`、`BatchResultEnvelope`、resume prior outcome、dataset sink readback、serialization round-trip、typed `BatchRequest` entrypoint 作为同一套 public carrier contract 排查；新增恶意/漂移 carrier 矩阵覆盖 result wrapper 缺失/漂移、audit trace shape drift、resume sink record identity drift、prior cursor context reattach 与 public serialization 不泄露 cursor context。
 - merge gate integration follow-up：成功 `result_envelope` 的 read-side payload 继续允许自由文本 URL/路径片段，但 runtime wrapper 子集单独执行 public string/ref 泄漏校验；`task_record_ref`、`ref_id`、`envelope_ref` 等 wrapper 嵌套引用纳入 sanitized ref 校验，恶意 wrapper 矩阵覆盖 `task_record_ref`、`runtime_result_refs`、`execution_control_events` 与 runtime log message 漂移。
 - sink-bound identity follow-up：系统排查 `BatchRequest -> BatchResultEnvelope -> BatchResumeToken -> resume/readback serialization` dataset boundary；执行路径继续由 Core 派生或回显 `dataset_id`，public result/resume carrier validator 额外拒绝带 `dataset_sink_ref` 但缺 `dataset_id` 的伪造载荷。
+- request admission follow-up：系统排查 `validate_batch_request()` / `validate_batch_target_item()` 与 execution 深层校验一致性；media fetch `request_cursor` 复用共享 `validate_media_fetch_policy()`，嵌套 `resume_token` 在 public request validator 中校验 shape、`batch_id`、target-set hash、dataset boundary、position 与 token id 绑定，避免 invalid request 降级为 item-level runtime failure 或 preflight false positive。
 
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，85 tests。
+  - 结果：通过，87 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，259 tests。
+  - 结果：通过，261 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -319,6 +320,8 @@
   - 结果：integration recheck `REQUEST_CHANGES`，阻断项为成功 `result_envelope` 可选 runtime wrapper refs 未单独脱敏；已在正式 worktree 本地系统修复 wrapper 子集校验并补恶意 wrapper 矩阵，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-e4a6e9e.json`
   - 结果：`REQUEST_CHANGES`，阻断项为 sink-bound `BatchResultEnvelope` / `BatchResumeToken` 可省略 mandatory `dataset_id`。已停止 guardian/merge gate 重跑，转为本地 sink-bound dataset identity sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-401e9b3.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 media fetch cursor 未在 batch admission 校验、`validate_batch_request()` 未校验嵌套 resume token。已停止 guardian/merge gate 重跑，转为本地 request admission validator sweep；待本地矩阵与完整验证通过后再提交推送。
 
 ## 待验证项
 

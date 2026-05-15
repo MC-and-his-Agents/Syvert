@@ -16,6 +16,7 @@ from syvert.runtime import (
     TaskRequest,
     execute_task,
     is_valid_rfc3339_utc,
+    validate_media_fetch_policy,
     validate_success_payload,
 )
 
@@ -480,6 +481,12 @@ def validate_batch_request(request: BatchRequest) -> BatchRequest:
         _validate_sanitized_ref(request.dataset_sink_ref, field="dataset_sink_ref")
     if request.dataset_id is not None:
         _validate_sanitized_ref(request.dataset_id, field="dataset_id")
+    if request.resume_token is not None:
+        _validate_resume_token(
+            request.resume_token,
+            request=request,
+            target_set_hash=batch_target_set_hash(request.target_set),
+        )
     audit_context = _require_mapping(request.audit_context, field="audit_context")
     _audit_context_evidence_refs(audit_context)
     return request
@@ -521,6 +528,8 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
                 "batch request_cursor is not yet supported for this item operation",
                 details={"operation": item.operation, "index": index},
             )
+        elif item.operation == "media_asset_fetch_by_ref":
+            _validate_media_fetch_request_cursor(item.request_cursor, index=index)
     return item
 
 
@@ -1010,6 +1019,16 @@ def _validate_continuation_request_cursor(request_cursor: Mapping[str, Any], *, 
     _require_non_empty_string(token, field="request_cursor.continuation_token")
 
 
+def _validate_media_fetch_request_cursor(request_cursor: Mapping[str, Any], *, index: int) -> None:
+    error = validate_media_fetch_policy(request_cursor)
+    if error is not None:
+        raise BatchDatasetContractError(
+            error.get("code", "invalid_task_request"),
+            error.get("message", "media fetch request_cursor does not match the shared fetch policy contract"),
+            details={**dict(error.get("details", {})), "field": "request_cursor", "index": index},
+        )
+
+
 def _resumable_result(
     request: BatchRequest,
     *,
@@ -1057,6 +1076,12 @@ def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, ta
         raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
     if token.next_item_index > len(request.target_set):
         raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
+    expected_resume_token = f"resume:{request.batch_id}:{token.next_item_index}"
+    if token.resume_token != expected_resume_token:
+        raise BatchDatasetContractError(
+            "invalid_resume_token",
+            "resume token id must bind to batch_id and next_item_index",
+        )
 
 
 def _aggregate_batch_result(outcomes: Sequence[BatchItemOutcome]) -> str:
