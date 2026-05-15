@@ -1184,6 +1184,39 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_resume_position")
 
+    def test_sinkless_resume_returns_combined_terminal_outcomes(self) -> None:
+        target_set = (target("item-1", "alpha"), target("item-2", "beta"))
+        first = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=target_set,
+                dataset_sink_ref=None,
+                audit_context={"evidence_ref": "evidence:batch"},
+            ),
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+
+        self.assertEqual(first.result_status, BATCH_RESULT_RESUMABLE)
+        self.assertIsNotNone(first.resume_token)
+        self.assertIsNone(first.resume_token.dataset_sink_ref)
+        self.assertIsNone(first.resume_token.dataset_id)
+        resumed = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=target_set,
+                resume_token=first.resume_token,
+                dataset_sink_ref=None,
+                audit_context={"evidence_ref": "evidence:batch"},
+            ),
+            prior_item_outcomes=first.item_outcomes,
+        )
+
+        self.assertEqual(resumed.result_status, BATCH_RESULT_COMPLETE)
+        self.assertIsNone(resumed.resume_token)
+        self.assertEqual([outcome.item_id for outcome in resumed.item_outcomes], ["item-1", "item-2"])
+        self.assertTrue(all(outcome.dataset_record_ref is None for outcome in resumed.item_outcomes))
+
     def test_resume_rejects_forged_prior_outcome_prefix(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -1475,7 +1508,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 prior_item_outcomes=(forged,),
             )
 
-        self.assertEqual(context.exception.code, "invalid_resume_token")
+        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
 
     def test_resume_rejects_failed_prior_outcome_with_stale_sink_record(self) -> None:
         sink = ReferenceDatasetSink()

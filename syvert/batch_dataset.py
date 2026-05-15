@@ -1098,8 +1098,6 @@ def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, ta
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
     if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):
         raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
-    if request.dataset_sink_ref is None:
-        raise BatchDatasetContractError("invalid_resume_token", "resume requires a dataset sink boundary")
     if token.next_item_index > len(request.target_set):
         raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
     expected_resume_token = f"resume:{request.batch_id}:{token.next_item_index}"
@@ -1402,7 +1400,9 @@ def _validate_resume_runtime_position(
     dataset_sink: ReferenceDatasetSink | None,
     next_item_index: int,
 ) -> None:
-    if request.dataset_sink_ref is None or dataset_id is None or dataset_sink is None:
+    if request.dataset_sink_ref is None:
+        return
+    if dataset_id is None or dataset_sink is None:
         raise BatchDatasetContractError(
             "resume_dataset_state_missing",
             "resume requires dataset sink readback state to prove runtime position",
