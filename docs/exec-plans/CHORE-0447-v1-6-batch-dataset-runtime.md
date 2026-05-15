@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `647fa03` 已处理 guardian rerun20 的 result boundary blockers 并通过 checks；guardian rerun21 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface 但 runtime 仍要求 typed `BatchRequest`；当前本地待提交修复已移除 shared request/snapshot admission，保留 typed `BatchRequest` / `execute_batch_request` 作为唯一 batch execution 入口，并更新直接 `execute_task` 负例，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `647fa03` 已处理 guardian rerun20 的 result boundary blockers 并通过 checks；guardian rerun21 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface 但 runtime 仍要求 typed `BatchRequest`；当前 PR head 随本执行计划提交消费，已移除 shared request/snapshot admission，保留 typed `BatchRequest` / `execute_batch_request` 作为唯一 batch execution 入口，并更新直接 `execute_task` 负例，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -323,4 +323,4 @@
 - Guardian rerun18 remediation checkpoint：`1ccbf622376d`
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
 - Guardian rerun20 remediation checkpoint：`835a61f0c965`
-- Guardian rerun21 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun21 remediation checkpoint：`da60c85c82dd`
