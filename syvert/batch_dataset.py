@@ -177,6 +177,23 @@ _FORBIDDEN_NORMALIZED_PAYLOAD_KEYS = frozenset(
 _ALLOWED_SOURCE_TRACE_FIELDS = frozenset(
     {"adapter_key", "provider_path", "fetched_at", "evidence_alias", "resource_profile_ref"}
 )
+_DATASET_RECORD_FIELDS = frozenset(
+    {
+        "dataset_record_id",
+        "dataset_id",
+        "source_operation",
+        "adapter_key",
+        "target_ref",
+        "raw_payload_ref",
+        "normalized_payload",
+        "evidence_ref",
+        "source_trace",
+        "dedup_key",
+        "batch_id",
+        "batch_item_id",
+        "recorded_at",
+    }
+)
 _PUBLIC_REF_VALUE_KEYS = frozenset(
     {
         "raw_payload_ref",
@@ -543,6 +560,13 @@ def canonical_dataset_record(record: DatasetRecord | Mapping[str, Any]) -> Datas
     if isinstance(record, DatasetRecord):
         normalized = record
     elif isinstance(record, Mapping):
+        extra_fields = sorted(set(record) - _DATASET_RECORD_FIELDS)
+        if extra_fields:
+            raise BatchDatasetContractError(
+                "invalid_dataset_record",
+                "dataset record contains fields outside the public carrier contract",
+                details={"fields": extra_fields},
+            )
         normalized = DatasetRecord(
             dataset_record_id=_require_non_empty_string(record.get("dataset_record_id"), field="dataset_record_id"),
             dataset_id=_require_non_empty_string(record.get("dataset_id"), field="dataset_id"),
@@ -576,7 +600,7 @@ def validate_dataset_record(record: DatasetRecord) -> DatasetRecord:
     _ensure_json_safe(record.normalized_payload, field="normalized_payload")
     _validate_normalized_payload_no_leakage(record.normalized_payload, field="normalized_payload")
     _validate_sanitized_ref(record.evidence_ref, field="evidence_ref")
-    _validate_source_trace(record.source_trace)
+    _validate_source_trace(record.source_trace, adapter_key=record.adapter_key)
     _validate_sanitized_ref(record.dedup_key, field="dedup_key")
     _validate_sanitized_ref(record.batch_id, field="batch_id")
     _validate_sanitized_ref(record.batch_item_id, field="batch_item_id")
@@ -778,7 +802,12 @@ def validate_batch_item_outcome(
         )
     if outcome.result_envelope is not None:
         _require_mapping(outcome.result_envelope, field="result_envelope")
-        _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope", validate_strings=False)
+        _validate_public_payload_no_leakage(
+            outcome.result_envelope,
+            field="result_envelope",
+            validate_strings=False,
+            adapter_key=outcome.adapter_key,
+        )
         _validate_result_envelope_boundary(
             operation=outcome.operation,
             adapter_key=outcome.adapter_key,
@@ -794,7 +823,7 @@ def validate_batch_item_outcome(
     if outcome.dataset_record_ref is not None:
         _validate_sanitized_ref(outcome.dataset_record_ref, field="dataset_record_ref")
     if outcome.source_trace is not None:
-        _validate_source_trace(outcome.source_trace)
+        _validate_source_trace(outcome.source_trace, adapter_key=outcome.adapter_key)
     _require_mapping(outcome.audit, field="audit")
     _validate_public_payload_no_leakage(outcome.audit, field="audit", validate_strings=True)
     return outcome
@@ -874,7 +903,7 @@ def _outcome_from_task_envelope(
     now: Callable[[], datetime],
 ) -> BatchItemOutcome:
     try:
-        source_trace = _validated_optional_source_trace(envelope)
+        source_trace = _validated_optional_source_trace(envelope, adapter_key=item.adapter_key)
     except BatchDatasetContractError as error:
         return _unsafe_item_outcome(item, error)
     if envelope.get("status") != "success":
@@ -1249,7 +1278,7 @@ def _source_trace_from_envelope(
 ) -> Mapping[str, Any]:
     source_trace = envelope.get("source_trace")
     if isinstance(source_trace, Mapping):
-        _validate_source_trace(source_trace)
+        _validate_source_trace(source_trace, adapter_key=item.adapter_key)
         return dict(source_trace)
     return {
         "adapter_key": item.adapter_key,
@@ -1274,13 +1303,13 @@ def _canonical_item_outcomes(
     return tuple(canonical)
 
 
-def _validated_optional_source_trace(envelope: Mapping[str, Any]) -> Mapping[str, Any] | None:
+def _validated_optional_source_trace(envelope: Mapping[str, Any], *, adapter_key: str) -> Mapping[str, Any] | None:
     source_trace = envelope.get("source_trace")
     if source_trace is None:
         return None
     if not isinstance(source_trace, Mapping):
         raise BatchDatasetContractError("invalid_field", "source_trace must be an object")
-    _validate_source_trace(source_trace)
+    _validate_source_trace(source_trace, adapter_key=adapter_key)
     return dict(source_trace)
 
 
@@ -1472,6 +1501,8 @@ def _validate_result_envelope_boundary(
         code=code,
         index=index,
     )
+    if isinstance(result_envelope.get("source_trace"), Mapping):
+        _validate_source_trace(result_envelope["source_trace"], adapter_key=adapter_key)
     payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
     if operation == "comment_collection" and request_cursor is None and _comment_result_requires_cursor_context(payload):
         raise BatchDatasetContractError(
@@ -1614,6 +1645,33 @@ def _validate_batch_audit_trace(envelope: BatchResultEnvelope) -> None:
             _require_non_empty_string(audit_trace["stop_reason"], field="audit_trace.stop_reason"),
             field="audit_trace.stop_reason",
         )
+    if envelope.result_status == BATCH_RESULT_RESUMABLE:
+        if audit_trace["finished"] is not False:
+            raise BatchDatasetContractError(
+                "invalid_batch_audit_trace",
+                "resumable batch audit_trace.finished must be false",
+            )
+        if "stop_reason" not in audit_trace:
+            raise BatchDatasetContractError(
+                "invalid_batch_audit_trace",
+                "resumable batch audit_trace must carry stop_reason",
+            )
+        if envelope.resume_token is None:
+            raise BatchDatasetContractError(
+                "invalid_batch_audit_trace",
+                "resumable batch audit_trace must bind to a resume token",
+            )
+    else:
+        if audit_trace["finished"] is not True:
+            raise BatchDatasetContractError(
+                "invalid_batch_audit_trace",
+                "terminal batch audit_trace.finished must be true",
+            )
+        if "stop_reason" in audit_trace:
+            raise BatchDatasetContractError(
+                "invalid_batch_audit_trace",
+                "terminal batch audit_trace must not carry stop_reason",
+            )
 
 
 def _validate_sanitized_ref_sequence(value: Any, *, field: str) -> tuple[str, ...]:
@@ -1625,7 +1683,7 @@ def _validate_sanitized_ref_sequence(value: Any, *, field: str) -> tuple[str, ..
     return tuple(refs)
 
 
-def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
+def _validate_source_trace(source_trace: Mapping[str, Any], *, adapter_key: str | None = None) -> None:
     extra_fields = set(source_trace) - _ALLOWED_SOURCE_TRACE_FIELDS
     if extra_fields:
         raise BatchDatasetContractError(
@@ -1633,10 +1691,16 @@ def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
             "source_trace contains fields outside the sanitized Core contract",
             details={"fields": sorted(extra_fields)},
         )
-    adapter_key = _require_non_empty_string(source_trace.get("adapter_key"), field="source_trace.adapter_key")
+    source_trace_adapter_key = _require_non_empty_string(source_trace.get("adapter_key"), field="source_trace.adapter_key")
     provider_path = _require_non_empty_string(source_trace.get("provider_path"), field="source_trace.provider_path")
     evidence_alias = _require_non_empty_string(source_trace.get("evidence_alias"), field="source_trace.evidence_alias")
-    _validate_sanitized_ref(adapter_key, field="source_trace.adapter_key")
+    _validate_sanitized_ref(source_trace_adapter_key, field="source_trace.adapter_key")
+    if adapter_key is not None and source_trace_adapter_key != adapter_key:
+        raise BatchDatasetContractError(
+            "source_trace_boundary_mismatch",
+            "source_trace.adapter_key must match the enclosing adapter_key",
+            details={"adapter_key": source_trace_adapter_key, "expected": adapter_key},
+        )
     _validate_provider_path(provider_path)
     _validate_sanitized_ref(evidence_alias, field="source_trace.evidence_alias")
     if source_trace.get("resource_profile_ref") is not None:
@@ -1801,12 +1865,18 @@ def _validate_normalized_payload_no_leakage(value: Any, *, field: str) -> None:
         _validate_normalized_payload_string(value, field=field)
 
 
-def _validate_public_payload_no_leakage(value: Any, *, field: str, validate_strings: bool) -> None:
+def _validate_public_payload_no_leakage(
+    value: Any,
+    *,
+    field: str,
+    validate_strings: bool,
+    adapter_key: str | None = None,
+) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
             if key_text == "source_trace" and isinstance(item, Mapping):
-                _validate_source_trace(item)
+                _validate_source_trace(item, adapter_key=adapter_key)
                 continue
             _validate_public_payload_key(key_text, field=f"{field}.{key_text}")
             if _is_public_ref_value_key(key_text) and item is not None:
@@ -1818,6 +1888,7 @@ def _validate_public_payload_no_leakage(value: Any, *, field: str, validate_stri
                 item,
                 field=f"{field}.{key_text}",
                 validate_strings=validate_strings,
+                adapter_key=adapter_key,
             )
         return
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
@@ -1826,6 +1897,7 @@ def _validate_public_payload_no_leakage(value: Any, *, field: str, validate_stri
                 item,
                 field=f"{field}[{index}]",
                 validate_strings=validate_strings,
+                adapter_key=adapter_key,
             )
         return
     if validate_strings and isinstance(value, str):

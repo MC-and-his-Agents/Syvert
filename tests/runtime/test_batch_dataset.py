@@ -193,6 +193,18 @@ class UnsafeSourceTraceAdapter(CollectionAdapter):
         return payload
 
 
+class MismatchedSourceTraceAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["source_trace"] = {
+            "adapter_key": "douyin",
+            "provider_path": "provider://sanitized",
+            "fetched_at": "2026-05-13T10:00:00Z",
+            "evidence_alias": "evidence:drift",
+        }
+        return payload
+
+
 class UnsafeProviderPathAdapter(CollectionAdapter):
     def execute(self, request):
         payload = make_collection_result(target_ref=request.input.keyword or "")
@@ -508,6 +520,84 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
 
+    def test_batch_result_serialization_rejects_audit_trace_state_drift_matrix(self) -> None:
+        complete = self.execute(request(target("item-1", "alpha")))
+        self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
+        all_failed = self.execute(request(target("item-1", "alpha")))
+        self.adapters = {TEST_ADAPTER_KEY: CollectionAdapter(), "failed": FailingCollectionAdapter()}
+        partial = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=(
+                    target("item-1", "alpha"),
+                    BatchTargetItem(
+                        item_id="item-2",
+                        operation="content_search_by_keyword",
+                        adapter_key="failed",
+                        target_type="keyword",
+                        target_ref="beta",
+                        dedup_key="dedup:beta",
+                    ),
+                ),
+                dataset_sink_ref="dataset-sink:reference",
+            )
+        )
+        self.adapters = {TEST_ADAPTER_KEY: CollectionAdapter()}
+        resumable = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            stop_after_items=1,
+            stop_reason="execution_timeout",
+        )
+        valid_resumable = batch_result_envelope_to_dict(resumable)
+        self.assertEqual(valid_resumable["audit_trace"]["finished"], False)
+        self.assertEqual(valid_resumable["audit_trace"]["stop_reason"], "execution_timeout")
+
+        cases = (
+            (
+                "complete-unfinished-stop",
+                complete,
+                {**complete.audit_trace, "finished": False, "stop_reason": "execution_timeout"},
+            ),
+            (
+                "partial-stop",
+                partial,
+                {**partial.audit_trace, "stop_reason": "execution_timeout"},
+            ),
+            (
+                "all-failed-unfinished",
+                all_failed,
+                {**all_failed.audit_trace, "finished": False},
+            ),
+            (
+                "resumable-finished",
+                resumable,
+                {**resumable.audit_trace, "finished": True},
+            ),
+            (
+                "resumable-missing-stop",
+                resumable,
+                {field: value for field, value in resumable.audit_trace.items() if field != "stop_reason"},
+            ),
+        )
+
+        for label, source, audit_trace in cases:
+            with self.subTest(label=label):
+                forged = BatchResultEnvelope(
+                    batch_id=source.batch_id,
+                    operation=source.operation,
+                    result_status=source.result_status,
+                    item_outcomes=source.item_outcomes,
+                    resume_token=source.resume_token,
+                    dataset_sink_ref=source.dataset_sink_ref,
+                    dataset_id=source.dataset_id,
+                    audit_trace=audit_trace,
+                )
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_result_envelope_to_dict(forged)
+
+                self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
+
     def test_batch_result_serialization_rejects_aggregate_status_drift(self) -> None:
         success = self.execute(request(target("item-1", "alpha")))
         self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
@@ -811,6 +901,29 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             validate_batch_item_outcome(forged)
 
         self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
+
+    def test_batch_item_outcome_rejects_nested_result_item_source_trace_adapter_drift(self) -> None:
+        result_envelope = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
+        result_envelope["items"][0]["source_trace"] = {
+            "adapter_key": "douyin",
+            "provider_path": "provider://sanitized",
+            "fetched_at": "2026-05-13T10:00:00Z",
+            "evidence_alias": "evidence:nested-drift",
+        }
+        forged = BatchItemOutcome(
+            item_id="item-1",
+            operation="content_search_by_keyword",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_ref="alpha",
+            outcome_status=BATCH_ITEM_SUCCEEDED,
+            result_envelope=result_envelope,
+            audit={"reason": "dataset_record_written"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(forged)
+
+        self.assertEqual(context.exception.code, "source_trace_boundary_mismatch")
 
     def test_batch_item_outcome_rejects_malformed_runtime_result_wrapper_matrix(self) -> None:
         base = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
@@ -1686,6 +1799,11 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         for overrides in cases:
             with self.subTest(overrides=overrides):
                 tampered_sink = ReferenceDatasetSink()
+                if "adapter_key" in overrides:
+                    with self.assertRaises(BatchDatasetContractError) as write_context:
+                        tampered_sink.write(type(record)(**{**record.__dict__, **overrides}))
+                    self.assertEqual(write_context.exception.code, "source_trace_boundary_mismatch")
+                    continue
                 tampered_sink.write(type(record)(**{**record.__dict__, **overrides}))
 
                 with self.assertRaises(BatchDatasetContractError) as context:
@@ -2625,6 +2743,39 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "unsafe_source_trace")
 
+    def test_dataset_record_mapping_rejects_extra_top_level_fields(self) -> None:
+        base_record = {
+            "dataset_record_id": "record-1",
+            "dataset_id": "dataset-1",
+            "source_operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "alpha",
+            "raw_payload_ref": "raw://alpha",
+            "normalized_payload": {"items": []},
+            "evidence_ref": "evidence:alpha",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "fetched_at": "2026-05-13T10:00:00Z",
+                "evidence_alias": "evidence:alpha",
+            },
+            "dedup_key": "dedup:alpha",
+            "batch_id": "batch-001",
+            "batch_item_id": "item-1",
+            "recorded_at": "2026-05-13T10:00:00Z",
+        }
+
+        for field, value in (
+            ("storage_handle", "private-storage-handle"),
+            ("debug", {"raw": "/private/raw.json"}),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    ReferenceDatasetSink().write({**base_record, field: value})
+
+                self.assertEqual(context.exception.code, "invalid_dataset_record")
+                self.assertEqual(context.exception.details["fields"], [field])
+
     def test_batch_item_outcome_does_not_expose_unsafe_source_trace_without_dataset_sink(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: UnsafeSourceTraceAdapter()}
 
@@ -2655,6 +2806,45 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             validate_batch_item_outcome(forged)
 
         self.assertEqual(context.exception.code, "invalid_timestamp")
+
+    def test_source_trace_adapter_key_must_match_public_carrier_boundary(self) -> None:
+        sink = ReferenceDatasetSink()
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+        outcome = result.item_outcomes[0]
+        record = sink.read_by_dataset(result.dataset_id)[0]
+        mismatched_trace = {**outcome.source_trace, "adapter_key": "douyin"}
+
+        with self.assertRaises(BatchDatasetContractError) as outcome_context:
+            validate_batch_item_outcome(BatchItemOutcome(**{**outcome.__dict__, "source_trace": mismatched_trace}))
+        self.assertEqual(outcome_context.exception.code, "source_trace_boundary_mismatch")
+
+        with self.assertRaises(BatchDatasetContractError) as result_context:
+            validate_batch_item_outcome(
+                BatchItemOutcome(
+                    **{
+                        **outcome.__dict__,
+                        "result_envelope": {**outcome.result_envelope, "source_trace": mismatched_trace},
+                    }
+                )
+            )
+        self.assertEqual(result_context.exception.code, "source_trace_boundary_mismatch")
+
+        with self.assertRaises(BatchDatasetContractError) as record_context:
+            validate_dataset_record(type(record)(**{**record.__dict__, "source_trace": mismatched_trace}))
+        self.assertEqual(record_context.exception.code, "source_trace_boundary_mismatch")
+
+    def test_adapter_source_trace_drift_fails_closed_before_dataset_readback(self) -> None:
+        sink = ReferenceDatasetSink()
+        self.adapters = {TEST_ADAPTER_KEY: MismatchedSourceTraceAdapter()}
+
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertIsNone(result.item_outcomes[0].source_trace)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "unsafe_item_outcome")
+        self.assertEqual(result.item_outcomes[0].error_envelope["details"]["blocked_code"], "source_trace_boundary_mismatch")
+        self.assertEqual(sink.read_by_dataset("dataset:batch-001"), ())
 
     def test_batch_item_outcome_allows_plain_error_and_audit_text(self) -> None:
         outcome = BatchItemOutcome(
