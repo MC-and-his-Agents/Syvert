@@ -206,9 +206,16 @@ class ReferenceDatasetSink:
     def __init__(self) -> None:
         self._records: list[DatasetRecord] = []
         self._dedup_keys: set[tuple[str, str]] = set()
+        self._record_ids: set[str] = set()
 
     def write(self, record: DatasetRecord | Mapping[str, Any]) -> DatasetRecord:
         normalized = canonical_dataset_record(record)
+        if normalized.dataset_record_id in self._record_ids:
+            raise BatchDatasetContractError(
+                "duplicate_dataset_record",
+                "dataset sink dataset_record_id already exists",
+                details={"dataset_record_id": normalized.dataset_record_id},
+            )
         dedup_identity = (normalized.dataset_id, normalized.dedup_key)
         if dedup_identity in self._dedup_keys:
             raise BatchDatasetContractError(
@@ -219,6 +226,7 @@ class ReferenceDatasetSink:
         stored = _clone_dataset_record(normalized)
         self._records.append(stored)
         self._dedup_keys.add(dedup_identity)
+        self._record_ids.add(normalized.dataset_record_id)
         return _clone_dataset_record(stored)
 
     def read_by_dataset(self, dataset_id: str) -> tuple[DatasetRecord, ...]:
@@ -371,8 +379,16 @@ def validate_batch_request(request: BatchRequest) -> BatchRequest:
     _validate_sanitized_ref(_require_non_empty_string(request.batch_id, field="batch_id"), field="batch_id")
     if not request.target_set:
         raise BatchDatasetContractError("empty_target_set", "BatchRequest.target_set must not be empty")
+    seen_item_ids: set[str] = set()
     for index, item in enumerate(request.target_set):
         validate_batch_target_item(item, index=index)
+        if item.item_id in seen_item_ids:
+            raise BatchDatasetContractError(
+                "duplicate_item_id",
+                "BatchRequest.target_set item_id values must be unique",
+                details={"item_id": item.item_id, "index": index},
+            )
+        seen_item_ids.add(item.item_id)
     if request.dataset_sink_ref is not None:
         _validate_sanitized_ref(request.dataset_sink_ref, field="dataset_sink_ref")
     if request.dataset_id is not None:
@@ -681,7 +697,7 @@ def validate_batch_resume_token(token: BatchResumeToken) -> BatchResumeToken:
             "invalid_resume_position",
             "resume token next_item_index must be a non-negative integer",
         )
-    _validate_sanitized_ref(token.issued_at, field="resume_token.issued_at")
+    _validate_public_timestamp(token.issued_at, field="resume_token.issued_at")
     if token.dataset_sink_ref is not None:
         _validate_sanitized_ref(token.dataset_sink_ref, field="resume_token.dataset_sink_ref")
     if token.dataset_id is not None:

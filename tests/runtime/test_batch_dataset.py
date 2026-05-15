@@ -467,7 +467,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ("batch_id", "file:///tmp/batch", "unsafe_ref"),
             ("target_set_hash", "provider:fallback:marketplace", "unsafe_ref"),
             ("next_item_index", -1, "invalid_resume_position"),
-            ("issued_at", " file:///tmp/token", "unsafe_ref"),
+            ("issued_at", "not-a-timestamp", "invalid_timestamp"),
             ("dataset_sink_ref", "storage://private/sink", "unsafe_ref"),
             ("dataset_id", "/etc/dataset", "unsafe_ref"),
         )
@@ -501,6 +501,18 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             self.execute(unsafe_item)
 
         self.assertEqual(item_context.exception.code, "unsafe_ref")
+
+    def test_request_validation_rejects_duplicate_item_ids(self) -> None:
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(
+                    target("item-1", "alpha", dedup_key="dedup:alpha"),
+                    target("item-1", "beta", dedup_key="dedup:beta"),
+                )
+            )
+
+        self.assertEqual(context.exception.code, "duplicate_item_id")
+        self.assertEqual(context.exception.details["item_id"], "item-1")
 
     def test_search_keyword_allows_common_content_words(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1562,6 +1574,36 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(whitespace_context.exception.code, "unsafe_ref")
+
+    def test_reference_sink_rejects_duplicate_dataset_record_id(self) -> None:
+        sink = ReferenceDatasetSink()
+        record = {
+            "dataset_record_id": "record-1",
+            "dataset_id": "dataset-1",
+            "source_operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "alpha",
+            "raw_payload_ref": "raw://alpha",
+            "normalized_payload": {"items": []},
+            "evidence_ref": "evidence:alpha",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "fetched_at": "2026-05-13T10:00:00Z",
+                "evidence_alias": "evidence:alpha",
+            },
+            "dedup_key": "dedup:alpha",
+            "batch_id": "batch-001",
+            "batch_item_id": "item-1",
+            "recorded_at": "2026-05-13T10:00:00Z",
+        }
+
+        sink.write(record)
+        with self.assertRaises(BatchDatasetContractError) as context:
+            sink.write({**record, "dedup_key": "dedup:beta", "batch_item_id": "item-2"})
+
+        self.assertEqual(context.exception.code, "duplicate_dataset_record")
+        self.assertEqual(context.exception.details["dataset_record_id"], "record-1")
 
     def test_local_absolute_path_ref_is_rejected_but_raw_alias_is_allowed(self) -> None:
         sink = ReferenceDatasetSink()
