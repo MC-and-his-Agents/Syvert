@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；最新推送 head `136c560a76ac` 已处理 guardian rerun15 的 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` / `source_ref` HTTPS URL blocker 并通过 checks；guardian rerun16 针对 `136c560a76ac0a6c80dfe39f5695278ac5d361ad` 返回 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix，另有执行计划 scope/current evidence artifact gaps；最新本地待提交修复已处理该 blocker 与 artifact gaps，待完成系统性本地排查后再提交、推送与 guardian。
+- PR `#452`：open；上一 review head `136c560a76ac0a6c80dfe39f5695278ac5d361ad` 已处理 guardian rerun15 的 normalized payload sanitizer blocker 并通过 checks；guardian rerun16 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix，另有执行计划 scope/current evidence artifact gaps；当前 PR head 随本执行计划提交消费，已包含 rerun16 blocker 与 artifact gaps 修复，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -287,10 +287,10 @@
 - Initial branch checkpoint：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
 - Guardian rerun9 remediation checkpoint：`df7f6d10b7d3b41f42127e34705301c3184c9d8c`
 - Guardian rerun10 remediation checkpoint：`e79ef6cb02a8513116129f1332a8f329443c03e6`
-- Latest pushed checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
+- Current PR head checkpoint：由 GitHub PR `#452` head_sha 消费；本执行计划随最新 PR head 提交，不再把临时旧 head 作为当前状态。
 - Guardian rerun11 remediation checkpoint：`24a115d066902c7987f36597ec2c9f9388ac20a8`
 - Guardian rerun12 remediation checkpoint：`ac5e94cfc59364d2210a175e7d7b4a6884a8f2e3`
 - Guardian rerun13 remediation checkpoint：`1857321eccccb785f0eae602373f5e365b51c9d7`
 - Guardian rerun14 remediation checkpoint：`72b2af37cd82f3de725be9a017f71f9ae6c5fe05`
 - Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
-- Guardian rerun16 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
