@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；当前本地待提交修复已让 runtime-generated outcome 携带非序列化 request cursor context，并补 reply-cursor comment result serialization 回归测试，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；当前 PR head 随本执行计划提交消费，已让 runtime-generated outcome 携带非序列化 request cursor context，并补 reply-cursor comment result serialization 回归测试，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -327,4 +327,4 @@
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
 - Guardian rerun20 remediation checkpoint：`835a61f0c965`
 - Guardian rerun21 remediation checkpoint：`da60c85c82dd`
-- Guardian rerun22 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun22 remediation checkpoint：`1a2334fefc89`
