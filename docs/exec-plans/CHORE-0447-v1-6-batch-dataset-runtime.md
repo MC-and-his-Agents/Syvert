@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `f09e7bb` 已处理 guardian rerun18 的 public carrier validator 缺口并通过 checks；guardian rerun19 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未 1:1 绑定 item outcomes；当前本地待提交修复已补 request_cursor-aware outcome validation、cursor-sensitive standalone fail-closed、canonical item trace ref 校验与 focused tests，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `f09e7bb` 已处理 guardian rerun18 的 public carrier validator 缺口并通过 checks；guardian rerun19 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未 1:1 绑定 item outcomes；当前 PR head 随本执行计划提交消费，已补 request_cursor-aware outcome validation、cursor-sensitive standalone fail-closed、canonical item trace ref 校验与 focused tests，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -311,4 +311,4 @@
 - Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
 - Guardian rerun17 remediation checkpoint：`92a9fe56b022`
 - Guardian rerun18 remediation checkpoint：`1ccbf622376d`
-- Guardian rerun19 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
