@@ -11,7 +11,7 @@
 - Parent FR：`#445`
 - 关联 spec：`docs/specs/FR-0445-batch-dataset-core-contract/spec.md`
 - 关联 decision：
-- 关联 PR：
+- 关联 PR：`#452`
 - 状态：`active`
 
 ## 目标
@@ -42,6 +42,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
+- PR `#452`：open；最新本地修复提交 `df7f6d10b7d3` 已处理 guardian rerun9 findings，待推送后重新执行 checks 与 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -66,9 +67,28 @@
 - guardian rerun6 follow-up：`source_trace.provider_path` 专用 validator 同样拒绝以 `/` 开头的本地绝对路径。
 - guardian rerun7 follow-up：`source_trace.provider_path` 复用 storage/private token denylist，`normalized_payload` 私有字段检测改为大小写不敏感，同时 public payload 仍允许 sanitized `raw_payload_ref`。
 - guardian rerun8 follow-up：`execute_batch_request` 在返回前验证新产生的 `BatchItemOutcome`，将 unsafe adapter failure payload 转换成 sanitized `unsafe_item_outcome` failure，避免直接暴露 unsafe error details。
+- guardian rerun9 follow-up：dataset sink 写入前先验证待公开 success outcome，unsafe success 不写 dataset record；JSON-safe 校验改为 strict JSON，拒绝 `NaN` / `Infinity`。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，57 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.governance.test_open_pr`
+  - 结果：通过，211 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，35 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record`
@@ -107,10 +127,13 @@
   - 结果：第八轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许 storage/private routing aliases，以及 `normalized_payload` 私有字段大小写绕过；已在当前 follow-up 修复并补测试。
 - `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun8.json`
   - 结果：第九轮 `REQUEST_CHANGES`，阻断项为 failed item error envelope 返回前未做 public-carrier leakage validation；已在当前 follow-up 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-cb3fa0c.json`
+  - 结果：第十轮 `REQUEST_CHANGES`，阻断项为 unsafe success outcome 已先写入 dataset record、`_ensure_json_safe` 允许 `NaN` / `Infinity`；已由提交 `df7f6d10b7d3` 修复并补测试。
 
 ## 待验证项
 
-- PR guardian review rerun
+- 推送最新修复后等待 PR checks 全绿。
+- PR guardian review rerun（绑定推送后的最新 head）
 - `python3 scripts/pr_guardian.py merge-if-safe`
 
 ## 未决风险
@@ -127,3 +150,4 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - Initial branch checkpoint：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
+- Guardian rerun9 remediation checkpoint：`df7f6d10b7d3b41f42127e34705301c3184c9d8c`
