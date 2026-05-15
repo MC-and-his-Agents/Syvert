@@ -47,7 +47,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；当前 head `06166e582683482dda3fba77aa56297a2480fea4` 已完成 #447 runtime carrier root-cause sweep，GitHub checks 全绿。最新 guardian 对该 head 未发现新的静态 runtime correctness bug，当前阻断为 repo-backed review artifact 不闭合：scope 声明、head-bound validation evidence、risk/rollback 缺失；本次提交只修正执行计划工件，不扩大 runtime scope。
+- PR `#452`：open；runtime implementation head `ba745efaf9d436ad49582a181e62248773db283f` 已完成 #447 shared runtime cursor boundary root-cause sweep、本地矩阵、完整验证与 GitHub checks。最新 guardian 对该 implementation head 给出 `APPROVE`；随后 merge gate 仅因本执行计划仍指向旧 head `06166e582683482dda3fba77aa56297a2480fea4` 而拒绝合并。本次提交只重绑 repo-backed provenance / validation evidence 到 `ba745efaf9d436ad49582a181e62248773db283f`，不扩大 runtime scope。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -100,6 +100,10 @@
 
 - Local shared runtime cursor boundary remediation on `493c0b9d6258c6ba8aa89521c6ad7b8f549f946e`：
   - 结果：通过；未触发 guardian / merge gate。
+- Runtime implementation head `ba745efaf9d436ad49582a181e62248773db283f`：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
+  - guardian review：`APPROVE`，未发现基于当前 diff 的阻断性问题。
+  - merge gate：`REQUEST_CHANGES`，阻断仅为本执行计划 head/provenance 仍指向旧 `06166e582683482dda3fba77aa56297a2480fea4`，非 runtime correctness blocker。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，91 tests。
 - `python3 -m unittest tests.runtime.test_runtime`
@@ -120,7 +124,7 @@
   - 结果：通过。
 - `git diff --check`
   - 结果：通过。
-- Current reviewed runtime head `06166e582683482dda3fba77aa56297a2480fea4`：
+- Prior reviewed runtime head `06166e582683482dda3fba77aa56297a2480fea4`：
   - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
   - guardian review：`REQUEST_CHANGES`，未发现新的静态 runtime correctness bug；阻断仅为本 repo-backed artifact scope/evidence/risk/rollback 不闭合。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
