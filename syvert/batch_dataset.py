@@ -346,7 +346,7 @@ def execute_batch_request(
     if validated.resume_token is not None:
         _validate_resume_token(validated.resume_token, request=validated, target_set_hash=target_set_hash)
         start_index = validated.resume_token.next_item_index
-    outcomes = list(_canonical_item_outcomes(prior_item_outcomes))
+    outcomes = list(_canonical_item_outcomes(prior_item_outcomes, target_set=validated.target_set))
     dataset_id = _dataset_id_for_request(validated)
     now = now_factory or (lambda: datetime.now(timezone.utc))
     started_at = now().isoformat().replace("+00:00", "Z")
@@ -677,7 +677,11 @@ def dataset_record_to_dict(record: DatasetRecord) -> dict[str, Any]:
     }
 
 
-def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
+def validate_batch_item_outcome(
+    outcome: BatchItemOutcome,
+    *,
+    request_cursor: Mapping[str, Any] | None = None,
+) -> BatchItemOutcome:
     if not isinstance(outcome, BatchItemOutcome):
         raise BatchDatasetContractError("invalid_item_outcome", "BatchItemOutcome expected")
     _validate_sanitized_ref(outcome.item_id, field="item_id")
@@ -729,7 +733,7 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
         _validate_result_envelope_boundary(
             operation=outcome.operation,
             target_ref=outcome.target_ref,
-            request_cursor=None,
+            request_cursor=request_cursor,
             result_envelope=outcome.result_envelope,
             item_id=outcome.item_id,
             code="result_envelope_boundary_mismatch",
@@ -1173,9 +1177,14 @@ def _source_trace_from_envelope(
     }
 
 
-def _canonical_item_outcomes(outcomes: Sequence[BatchItemOutcome]) -> tuple[BatchItemOutcome, ...]:
-    for outcome in outcomes:
-        validate_batch_item_outcome(outcome)
+def _canonical_item_outcomes(
+    outcomes: Sequence[BatchItemOutcome],
+    *,
+    target_set: Sequence[BatchTargetItem] | None = None,
+) -> tuple[BatchItemOutcome, ...]:
+    for index, outcome in enumerate(outcomes):
+        request_cursor = target_set[index].request_cursor if target_set is not None and index < len(target_set) else None
+        validate_batch_item_outcome(outcome, request_cursor=request_cursor)
     return tuple(outcomes)
 
 
@@ -1326,6 +1335,12 @@ def _validate_result_envelope_boundary(
     target_type = TARGET_TYPE_BY_OPERATION[operation]
     payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[operation]
     payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
+    if operation == "comment_collection" and request_cursor is None and _comment_result_requires_cursor_context(payload):
+        raise BatchDatasetContractError(
+            code,
+            "comment_collection result_envelope requires request_cursor context",
+            details={"item_id": item_id, **({"index": index} if index is not None else {})},
+        )
     error = validate_success_payload(
         payload,
         capability=operation,
@@ -1342,6 +1357,24 @@ def _validate_result_envelope_boundary(
             "batch item result_envelope does not match operation/target boundary",
             details=details,
         )
+
+
+def _comment_result_requires_cursor_context(payload: Mapping[str, Any]) -> bool:
+    next_continuation = payload.get("next_continuation")
+    if isinstance(next_continuation, Mapping) and next_continuation.get("resume_comment_ref") is not None:
+        return True
+    items = payload.get("items")
+    if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
+        return False
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        normalized = item.get("normalized")
+        if not isinstance(normalized, Mapping):
+            continue
+        if normalized.get("parent_comment_ref") is not None or normalized.get("target_comment_ref") is not None:
+            return True
+    return False
 
 
 def _validate_batch_audit_trace(envelope: BatchResultEnvelope) -> None:
@@ -1381,7 +1414,14 @@ def _validate_batch_audit_trace(envelope: BatchResultEnvelope) -> None:
             "batch audit_trace.item_count must match item outcomes",
             details={"item_count": audit_trace["item_count"], "expected": len(envelope.item_outcomes)},
         )
-    _validate_sanitized_ref_sequence(audit_trace["item_trace_refs"], field="audit_trace.item_trace_refs")
+    item_trace_refs = _validate_sanitized_ref_sequence(audit_trace["item_trace_refs"], field="audit_trace.item_trace_refs")
+    expected_trace_refs = tuple(_item_trace_ref(envelope.batch_id, outcome.item_id) for outcome in envelope.item_outcomes)
+    if item_trace_refs != expected_trace_refs:
+        raise BatchDatasetContractError(
+            "invalid_batch_audit_trace",
+            "batch audit_trace.item_trace_refs must bind to item outcomes",
+            details={"item_trace_refs": item_trace_refs, "expected": expected_trace_refs},
+        )
     _validate_sanitized_ref_sequence(audit_trace["evidence_refs"], field="audit_trace.evidence_refs")
     if "stop_reason" in audit_trace:
         _validate_sanitized_ref(
@@ -1390,11 +1430,13 @@ def _validate_batch_audit_trace(envelope: BatchResultEnvelope) -> None:
         )
 
 
-def _validate_sanitized_ref_sequence(value: Any, *, field: str) -> None:
+def _validate_sanitized_ref_sequence(value: Any, *, field: str) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         raise BatchDatasetContractError("invalid_batch_audit_trace", f"{field} must be a sequence")
+    refs: list[str] = []
     for index, item in enumerate(value):
-        _validate_sanitized_ref(_require_non_empty_string(item, field=f"{field}[{index}]"), field=f"{field}[{index}]")
+        refs.append(_validate_sanitized_ref(_require_non_empty_string(item, field=f"{field}[{index}]"), field=f"{field}[{index}]"))
+    return tuple(refs)
 
 
 def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:

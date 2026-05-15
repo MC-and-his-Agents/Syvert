@@ -417,6 +417,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
 
+    def test_batch_result_serialization_rejects_forged_item_trace_refs(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        forged = BatchResultEnvelope(
+            batch_id=result.batch_id,
+            operation=result.operation,
+            result_status=result.result_status,
+            item_outcomes=result.item_outcomes,
+            resume_token=result.resume_token,
+            dataset_sink_ref=result.dataset_sink_ref,
+            dataset_id=result.dataset_id,
+            audit_trace={**result.audit_trace, "item_trace_refs": ("audit:batch:batch-001:other-item",)},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
+
     def test_batch_result_serialization_rejects_aggregate_status_drift(self) -> None:
         success = self.execute(request(target("item-1", "alpha")))
         self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
@@ -626,6 +644,25 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             target_ref="alpha",
             outcome_status=BATCH_ITEM_SUCCEEDED,
             result_envelope=make_creator_profile_result(target_ref="creator-1"),
+            audit={"reason": "dataset_record_written"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(forged)
+
+        self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
+
+    def test_batch_item_outcome_rejects_cursor_bound_comment_without_cursor_context(self) -> None:
+        result_envelope = make_comment_collection_result(target_ref="content:alpha")
+        result_envelope["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
+        result_envelope["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
+        forged = BatchItemOutcome(
+            item_id="comments",
+            operation="comment_collection",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_ref="content:alpha",
+            outcome_status=BATCH_ITEM_SUCCEEDED,
+            result_envelope=result_envelope,
             audit={"reason": "dataset_record_written"},
         )
 
