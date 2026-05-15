@@ -26,13 +26,14 @@
   - `syvert/batch_dataset.py`
   - `syvert/operation_taxonomy.py`
   - `syvert/runtime.py`
-  - `syvert/task_record.py`
   - `tests/__init__.py`（仅启用根目录默认 unittest discovery 进入治理测试包）
   - `tests/runtime/test_batch_dataset.py`
-  - `tests/runtime/test_models.py`
   - `tests/runtime/test_operation_taxonomy.py`
-  - `tests/runtime/test_task_record.py`
   - 本执行计划
+- 本次验证复用但当前 diff 未修改：
+  - `syvert/task_record.py`：仅通过 existing TaskRecord codec/consumer tests 验证 `batch_execution` 不进入 shared `TaskRequest` / `TaskRecord` admitted surface；`#448` 才迁移 TaskRecord/result query/compat consumers。
+  - `tests/runtime/test_models.py`：仅作为 read-side success payload contract 复用验证，未在 `#447` 重新定义 read-side result envelope。
+  - `tests/runtime/test_task_record.py`：仅验证既有 TaskRecord codec 与 read-side fixture 兼容；runtime carrier 的实现改动集中在 `batch_dataset.py`。
 - 本次不纳入：
   - TaskRecord/result query/compatibility consumer migration（`#448`）
   - sanitized evidence artifact 与 replay matrix（`#449`）
@@ -46,7 +47,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；merge gate integration recheck 随后发现 resume prior envelope wrapper 与 dataset sink readback identity 缺口。当前 PR head 随本执行计划提交消费，已完成 #447 root-cause sweep：runtime-generated/prior outcomes 携带非序列化 request cursor context、result envelope wrapper 字段必填且绑定、dataset record readback identity 完整绑定、audit trace drift matrix 与 serialization matrix 覆盖已补齐；待推送、等待 checks、再运行单次 guardian。
+- PR `#452`：open；当前 head `06166e582683482dda3fba77aa56297a2480fea4` 已完成 #447 runtime carrier root-cause sweep，GitHub checks 全绿。最新 guardian 对该 head 未发现新的静态 runtime correctness bug，当前阻断为 repo-backed review artifact 不闭合：scope 声明、head-bound validation evidence、risk/rollback 缺失；本次提交只修正执行计划工件，不扩大 runtime scope。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -96,6 +97,9 @@
 
 ## 已验证项
 
+- Current reviewed runtime head `06166e582683482dda3fba77aa56297a2480fea4`：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
+  - guardian review：`REQUEST_CHANGES`，未发现新的静态 runtime correctness bug；阻断仅为本 repo-backed artifact scope/evidence/risk/rollback 不闭合。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，91 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
@@ -337,20 +341,25 @@
 
 ## 待验证项
 
-- 推送最新修复后等待 PR checks 全绿。
-- PR guardian review rerun（绑定推送后的最新 head）
-- `python3 scripts/pr_guardian.py merge-if-safe`
+- 本 artifact-only 修正推送后等待 GitHub checks 全绿。
+- PR guardian review rerun（绑定 artifact 修正后的最新 head）。
+- guardian approve 后运行 `python3 scripts/pr_guardian.py merge-if-safe`。
 
-## 未决风险
+## 风险与缓解
 
+- Public carrier validator 过宽可能泄漏 raw path、storage handle、provider route 或 private account/material；缓解：统一 sanitizer、operation-specific cursor/policy validator、恶意/漂移 carrier matrix 与 `git diff --check` / unittest / governance gate。
+- Resume token / prior outcome 状态机漂移可能导致重跑已处理 item、重复 dataset write 或夹带伪造 envelope；缓解：target-set hash、token id、prefix outcome、dedup state、sink readback identity、terminal-position 与 sink-less resume tests。
+- Typed `BatchRequest` entrypoint 若重新进入 shared `TaskRequest` / TaskRecord admitted surface，会扩大 Core contract；缓解：`execute_task(batch_execution)` fail-closed 测试，`#448` 单独处理 TaskRecord/result query/compat consumer migration。
+- Reference sink 只是 JSON-safe in-memory contract proof，不代表产品数据库 schema；缓解：`#449` 另交 sanitized evidence，`#450` 另做 release closeout/decision。
 - `#448` 仍需证明 TaskRecord/result query/compatibility consumers 消费 batch/dataset public carriers。
 - `#449` 仍需提供 replayable sanitized evidence matrix。
 - 若 runtime carrier 暴露 read-side envelope defect，必须新建 remediation Work Item，不能混入本 PR。
 
 ## 回滚方式
 
-- 使用独立 revert PR 撤销本 Work Item 的 runtime/test/doc 增量。
+- 使用独立 revert PR 撤销本 Work Item 的 runtime/test/doc 增量，不直接改写 main 历史。
 - 保留 `#445` formal spec 与 `#447` GitHub truth，由后续 Work Item 重新交付 runtime carrier。
+- 若仅 sanitizer/resume validator 发现回归，优先 revert 对应 `fix(runtime): ...` follow-up commit，再重新跑 focused matrix、full unittest、guards 与 guardian。
 
 ## 最近一次 checkpoint 对应的 head SHA
 
