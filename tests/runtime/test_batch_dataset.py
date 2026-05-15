@@ -168,6 +168,13 @@ class UnsafeNormalizedPayloadAdapter(CollectionAdapter):
         return payload
 
 
+class UnsafeSuccessAuditAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["audit"] = {"local_path": "/etc/passwd"}
+        return payload
+
+
 class FailingDatasetSink(ReferenceDatasetSink):
     def write(self, record):
         raise BatchDatasetContractError(
@@ -565,6 +572,18 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
         self.assertEqual(sink.read_by_batch("batch-001"), ())
+
+    def test_unsafe_success_outcome_does_not_write_dataset_record(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeSuccessAuditAdapter()}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "unsafe_item_outcome")
+        self.assertEqual(sink.read_by_batch("batch-001"), ())
+        self.assertEqual(sink.read_by_dataset("dataset:batch-001"), ())
 
     def test_duplicate_target_is_neutral_and_first_wins(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1499,6 +1518,19 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             }
         )
         self.assertEqual(record.source_trace["provider_path"], "provider://sanitized")
+        for invalid_number in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(invalid_number=invalid_number):
+                with self.assertRaises(BatchDatasetContractError) as json_context:
+                    validate_dataset_record(
+                        type(record)(
+                            **{
+                                **record.__dict__,
+                                "dataset_record_id": f"record-non-finite-{repr(invalid_number)}",
+                                "normalized_payload": {"score": invalid_number},
+                            }
+                        )
+                    )
+                self.assertEqual(json_context.exception.code, "non_json_safe_value")
         with self.assertRaises(BatchDatasetContractError) as timestamp_context:
             validate_dataset_record(
                 type(record)(

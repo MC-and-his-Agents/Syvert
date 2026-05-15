@@ -730,6 +730,21 @@ def _outcome_from_task_envelope(
             source_trace=source_trace,
             audit={"reason": "item_succeeded_without_dataset_sink"},
         )
+    pre_write_outcome = _validated_public_outcome(
+        item,
+        BatchItemOutcome(
+            item_id=item.item_id,
+            operation=item.operation,
+            adapter_key=item.adapter_key,
+            target_ref=item.target_ref,
+            outcome_status=BATCH_ITEM_SUCCEEDED,
+            result_envelope=dict(envelope),
+            source_trace=source_trace,
+            audit={"reason": "item_succeeded_pending_dataset_write"},
+        ),
+    )
+    if pre_write_outcome.outcome_status != BATCH_ITEM_SUCCEEDED:
+        return pre_write_outcome
     record = DatasetRecord(
         dataset_record_id=f"{dataset_id}:{item.item_id}",
         dataset_id=dataset_id,
@@ -1422,7 +1437,7 @@ def _require_mapping(value: Any, *, field: str) -> Mapping[str, Any]:
 
 def _ensure_json_safe(value: Any, *, field: str) -> None:
     try:
-        json.dumps(value, sort_keys=True)
+        json.dumps(value, sort_keys=True, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise BatchDatasetContractError(
             "non_json_safe_value",
