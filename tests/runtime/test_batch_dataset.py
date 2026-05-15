@@ -163,6 +163,18 @@ class UnsafeSourceTraceAdapter(CollectionAdapter):
         return payload
 
 
+class UnsafeProviderPathAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["source_trace"] = {
+            "adapter_key": TEST_ADAPTER_KEY,
+            "provider_path": "https://provider.example/route",
+            "fetched_at": "2026-05-13T10:00:00Z",
+            "evidence_alias": "evidence:unsafe-provider-path",
+        }
+        return payload
+
+
 class UnsafeNormalizedPayloadAdapter(CollectionAdapter):
     def execute(self, request):
         payload = make_collection_result(target_ref=request.input.keyword or "")
@@ -184,6 +196,11 @@ class FailingDatasetSink(ReferenceDatasetSink):
             "write failed",
             details={"evidence_ref": "evidence:dataset-write-failed"},
         )
+
+
+class RuntimeFailingDatasetSink(ReferenceDatasetSink):
+    def write(self, record):
+        raise RuntimeError("disk unavailable at /private/storage")
 
 
 def now() -> datetime:
@@ -642,6 +659,19 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.item_outcomes[0].error_envelope["code"], "unsafe_item_outcome")
         self.assertEqual(sink.read_by_batch("batch-001"), ())
         self.assertEqual(sink.read_by_dataset("dataset:batch-001"), ())
+
+    def test_unsafe_success_source_trace_is_failed_item_not_batch_exception(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeProviderPathAdapter()}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "unsafe_item_outcome")
+        self.assertEqual(result.item_outcomes[0].error_envelope["details"]["blocked_code"], "unsafe_provider_path")
+        self.assertIsNone(result.item_outcomes[0].result_envelope)
+        self.assertEqual(sink.read_by_batch("batch-001"), ())
 
     def test_duplicate_target_is_neutral_and_first_wins(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1294,6 +1324,17 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
         self.assertIsNone(result.item_outcomes[0].dataset_record_ref)
         self.assertEqual(result.item_outcomes[0].error_envelope["code"], "dataset_write_failed")
+        self.assertIsNotNone(result.item_outcomes[0].result_envelope)
+
+    def test_dataset_sink_runtime_failure_is_failed_item(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")), sink=RuntimeFailingDatasetSink())
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertIsNone(result.item_outcomes[0].dataset_record_ref)
+        self.assertEqual(result.item_outcomes[0].error_envelope["code"], "dataset_write_failed")
+        self.assertEqual(result.item_outcomes[0].error_envelope["details"]["error_type"], "RuntimeError")
+        self.assertNotIn("/private/storage", repr(result.item_outcomes[0].error_envelope))
         self.assertIsNotNone(result.item_outcomes[0].result_envelope)
 
     def test_dataset_sink_ref_without_sink_fails_closed(self) -> None:

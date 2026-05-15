@@ -704,7 +704,10 @@ def _outcome_from_task_envelope(
     dataset_sink: ReferenceDatasetSink | None,
     now: Callable[[], datetime],
 ) -> BatchItemOutcome:
-    source_trace = _validated_optional_source_trace(envelope)
+    try:
+        source_trace = _validated_optional_source_trace(envelope)
+    except BatchDatasetContractError as error:
+        return _unsafe_item_outcome(item, error)
     if envelope.get("status") != "success":
         return BatchItemOutcome(
             item_id=item.item_id,
@@ -784,6 +787,22 @@ def _outcome_from_task_envelope(
             outcome_status=BATCH_ITEM_FAILED,
             result_envelope=dict(envelope),
             error_envelope={"code": DATASET_WRITE_FAILED, "message": error.message, "details": error.details},
+            source_trace=source_trace,
+            audit={"reason": DATASET_WRITE_FAILED},
+        )
+    except Exception as error:
+        return BatchItemOutcome(
+            item_id=item.item_id,
+            operation=item.operation,
+            adapter_key=item.adapter_key,
+            target_ref=item.target_ref,
+            outcome_status=BATCH_ITEM_FAILED,
+            result_envelope=dict(envelope),
+            error_envelope={
+                "code": DATASET_WRITE_FAILED,
+                "message": "dataset sink write failed",
+                "details": {"error_type": type(error).__name__},
+            },
             source_trace=source_trace,
             audit={"reason": DATASET_WRITE_FAILED},
         )
@@ -926,20 +945,24 @@ def _validated_public_outcome(item: BatchTargetItem, outcome: BatchItemOutcome) 
     try:
         validate_batch_item_outcome(outcome)
     except BatchDatasetContractError as error:
-        return BatchItemOutcome(
-            item_id=item.item_id,
-            operation=item.operation,
-            adapter_key=item.adapter_key,
-            target_ref=item.target_ref,
-            outcome_status=BATCH_ITEM_FAILED,
-            error_envelope={
-                "code": "unsafe_item_outcome",
-                "message": "batch item outcome contained unsafe public carrier data",
-                "details": {"blocked_code": error.code},
-            },
-            audit={"reason": "unsafe_item_outcome", "blocked_code": error.code},
-        )
+        return _unsafe_item_outcome(item, error)
     return outcome
+
+
+def _unsafe_item_outcome(item: BatchTargetItem, error: BatchDatasetContractError) -> BatchItemOutcome:
+    return BatchItemOutcome(
+        item_id=item.item_id,
+        operation=item.operation,
+        adapter_key=item.adapter_key,
+        target_ref=item.target_ref,
+        outcome_status=BATCH_ITEM_FAILED,
+        error_envelope={
+            "code": "unsafe_item_outcome",
+            "message": "batch item outcome contained unsafe public carrier data",
+            "details": {"blocked_code": error.code},
+        },
+        audit={"reason": "unsafe_item_outcome", "blocked_code": error.code},
+    )
 
 
 def _batch_audit_trace(
