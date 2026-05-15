@@ -124,6 +124,22 @@ class FailingCollectionAdapter(CollectionAdapter):
         )
 
 
+class KeywordFailingCollectionAdapter(CollectionAdapter):
+    def __init__(self, failing_keywords: set[str]) -> None:
+        self.failing_keywords = failing_keywords
+
+    def execute(self, request):
+        from syvert.runtime import PlatformAdapterError
+
+        if request.input.keyword in self.failing_keywords:
+            raise PlatformAdapterError(
+                code="permission_denied",
+                message="permission denied",
+                details={"evidence_ref": "evidence:permission-denied"},
+            )
+        return make_collection_result(target_ref=request.input.keyword or "")
+
+
 class UnsafeFailingCollectionAdapter(CollectionAdapter):
     def execute(self, request):
         from syvert.runtime import PlatformAdapterError
@@ -232,11 +248,16 @@ def target(
     )
 
 
-def request(*items: BatchTargetItem, resume_token: BatchResumeToken | None = None) -> BatchRequest:
+def request(
+    *items: BatchTargetItem,
+    resume_token: BatchResumeToken | None = None,
+    dataset_id: str | None = None,
+) -> BatchRequest:
     return BatchRequest(
         batch_id="batch-001",
         target_set=items,
         resume_token=resume_token,
+        dataset_id=dataset_id,
         dataset_sink_ref="dataset-sink:reference",
         audit_context={"evidence_ref": "evidence:batch"},
     )
@@ -762,6 +783,57 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
         self.assertEqual(result.item_outcomes[1].outcome_status, BATCH_ITEM_DUPLICATE_SKIPPED)
         self.assertEqual(len(sink.read_by_batch("batch-001")), 1)
+
+    def test_duplicate_skipped_is_neutral_when_other_items_fail(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: KeywordFailingCollectionAdapter({"beta"})}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(
+            request(
+                target("item-1", "alpha", dedup_key="same"),
+                target("item-2", "alpha", dedup_key="same"),
+                target("item-3", "beta"),
+            ),
+            sink=sink,
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_PARTIAL_SUCCESS)
+        self.assertEqual(
+            [outcome.outcome_status for outcome in result.item_outcomes],
+            [BATCH_ITEM_SUCCEEDED, BATCH_ITEM_DUPLICATE_SKIPPED, BATCH_ITEM_FAILED],
+        )
+        self.assertEqual(len(sink.read_by_batch("batch-001")), 1)
+
+    def test_duplicate_skipped_is_neutral_when_all_non_duplicates_fail(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: KeywordFailingCollectionAdapter({"beta"})}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(
+            request(
+                target("item-1", "beta", dedup_key="same"),
+                target("item-2", "beta", dedup_key="same"),
+            ),
+            sink=sink,
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(
+            [outcome.outcome_status for outcome in result.item_outcomes],
+            [BATCH_ITEM_FAILED, BATCH_ITEM_DUPLICATE_SKIPPED],
+        )
+        self.assertEqual(sink.read_by_batch("batch-001"), ())
+
+    def test_caller_dataset_id_round_trips_to_result_and_records(self) -> None:
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(request(target("item-1", "alpha"), dataset_id="dataset:custom-001"), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
+        self.assertEqual(result.dataset_id, "dataset:custom-001")
+        records = sink.read_by_batch("batch-001")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].dataset_id, "dataset:custom-001")
+        self.assertEqual(sink.read_by_dataset("dataset:custom-001")[0].dataset_id, "dataset:custom-001")
 
     def test_resume_returns_prefix_then_combined_terminal_outcomes(self) -> None:
         sink = ReferenceDatasetSink()
