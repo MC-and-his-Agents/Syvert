@@ -594,6 +594,21 @@ def execute_task_internal(
             None,
         )
 
+    if normalized_request.target.capability == "batch_execution":
+        return TaskExecutionResult(
+            pre_accepted_failure_envelope(
+                task_id,
+                normalized_request.target.adapter_key,
+                normalized_request.target.capability,
+                runtime_contract_error(
+                    "batch_execution_requires_batch_request",
+                    "batch_execution must use the typed BatchRequest carrier through execute_batch_request",
+                    details={"required_entrypoint": "execute_batch_request"},
+                ),
+            ),
+            None,
+        )
+
     adapter_key = normalized_request.target.adapter_key
     capability = normalized_request.target.capability
     capability_family, capability_family_error = resolve_capability_family(capability)

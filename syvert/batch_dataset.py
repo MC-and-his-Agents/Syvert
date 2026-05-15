@@ -216,17 +216,18 @@ class ReferenceDatasetSink:
                 "dataset sink first-wins dedup_key already exists",
                 details={"dataset_id": normalized.dataset_id, "dedup_key": normalized.dedup_key},
             )
-        self._records.append(normalized)
+        stored = _clone_dataset_record(normalized)
+        self._records.append(stored)
         self._dedup_keys.add(dedup_identity)
-        return normalized
+        return _clone_dataset_record(stored)
 
     def read_by_dataset(self, dataset_id: str) -> tuple[DatasetRecord, ...]:
         dataset_id = _require_non_empty_string(dataset_id, field="dataset_id")
-        return tuple(record for record in self._records if record.dataset_id == dataset_id)
+        return tuple(_clone_dataset_record(record) for record in self._records if record.dataset_id == dataset_id)
 
     def read_by_batch(self, batch_id: str) -> tuple[DatasetRecord, ...]:
         batch_id = _require_non_empty_string(batch_id, field="batch_id")
-        return tuple(record for record in self._records if record.batch_id == batch_id)
+        return tuple(_clone_dataset_record(record) for record in self._records if record.batch_id == batch_id)
 
     def audit_replay(self, dataset_id: str) -> tuple[Mapping[str, Any], ...]:
         return tuple(
@@ -244,6 +245,12 @@ class ReferenceDatasetSink:
             }
             for record in self.read_by_dataset(dataset_id)
         )
+
+
+def _clone_dataset_record(record: DatasetRecord) -> DatasetRecord:
+    return canonical_dataset_record(
+        json.loads(json.dumps(dataset_record_to_dict(record), sort_keys=True, allow_nan=False))
+    )
 
 
 def execute_batch_request(

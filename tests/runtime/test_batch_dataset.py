@@ -26,6 +26,7 @@ from syvert.batch_dataset import (
     validate_batch_item_outcome,
     validate_dataset_record,
 )
+from syvert.runtime import TaskInput, TaskRequest, execute_task
 from tests.runtime.test_task_record import (
     make_collection_result,
     make_comment_collection_result,
@@ -252,6 +253,62 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ("audit:batch:batch-001:item-1", "audit:batch:batch-001:item-2"),
         )
         self.assertIn("evidence:batch", result.audit_trace["evidence_refs"])
+
+    def test_reference_sink_readback_is_defensive_copy(self) -> None:
+        sink = ReferenceDatasetSink()
+        original_record = {
+            "dataset_record_id": "record-1",
+            "dataset_id": "dataset-1",
+            "source_operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "alpha",
+            "raw_payload_ref": "raw://alpha",
+            "normalized_payload": {"items": [{"title_or_text_hint": "safe"}]},
+            "evidence_ref": "evidence:alpha",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "fetched_at": "2026-05-13T10:00:00Z",
+                "evidence_alias": "evidence:alpha",
+            },
+            "dedup_key": "dedup:alpha",
+            "batch_id": "batch-001",
+            "batch_item_id": "item-1",
+            "recorded_at": "2026-05-13T10:00:00Z",
+        }
+
+        written = sink.write(original_record)
+        original_record["normalized_payload"]["items"][0]["local_path"] = "/etc/passwd"
+        written.normalized_payload["items"][0]["storage_handle"] = "private-storage-handle"
+        first_read = sink.read_by_dataset("dataset-1")[0]
+        first_read.normalized_payload["items"][0]["download_url"] = "https://private.example/raw"
+        first_replay = sink.audit_replay("dataset-1")[0]
+        first_replay["normalized_payload"]["items"][0]["file_path"] = "/tmp/raw.json"
+
+        second_read = sink.read_by_dataset("dataset-1")[0]
+        second_replay = sink.audit_replay("dataset-1")[0]
+        self.assertEqual(second_read.normalized_payload, {"items": [{"title_or_text_hint": "safe"}]})
+        self.assertEqual(second_replay["normalized_payload"], {"items": [{"title_or_text_hint": "safe"}]})
+
+    def test_execute_task_rejects_direct_batch_execution_adapter_payload(self) -> None:
+        class LegacyBatchAdapter:
+            supported_capabilities = frozenset({"batch_execution"})
+            supported_targets = frozenset({"operation_batch"})
+            supported_collection_modes = frozenset({"batch"})
+
+            def execute(self, request):
+                return {"raw": {"provider_batch": True}, "normalized": {"provider_batch": True}}
+
+        envelope = execute_task(
+            TaskRequest(adapter_key=TEST_ADAPTER_KEY, capability="batch_execution", input=TaskInput()),
+            adapters={TEST_ADAPTER_KEY: LegacyBatchAdapter()},
+            task_id_factory=lambda: "task-direct-batch",
+        )
+
+        self.assertEqual(envelope["status"], "failed")
+        self.assertEqual(envelope["error"]["category"], "runtime_contract")
+        self.assertEqual(envelope["error"]["code"], "batch_execution_requires_batch_request")
+        self.assertEqual(envelope["error"]["details"]["task_record_ref"], "none")
 
     def test_batch_result_serialization_rejects_unsafe_top_level_carriers(self) -> None:
         result = self.execute(request(target("item-1", "alpha")))
