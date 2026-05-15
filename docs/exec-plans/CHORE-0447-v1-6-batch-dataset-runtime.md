@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `0b6027a` 已处理 guardian rerun16 的 resume prior success nested envelope blocker 与 artifact gaps 并通过 checks；guardian rerun17 针对该 head 返回 `REQUEST_CHANGES`，未发现新实现 blocker，要求补充 duplicate+failure aggregation、caller-provided `dataset_id` round-trip、batch TaskRecord snapshot round-trip 覆盖；当前本地待提交修复已补齐三类合同验证缺口，待系统性本地排查后提交、推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `0b6027a` 已处理 guardian rerun16 的 resume prior success nested envelope blocker 与 artifact gaps 并通过 checks；guardian rerun17 针对该 head 返回 `REQUEST_CHANGES`，未发现新实现 blocker，要求补充 duplicate+failure aggregation、caller-provided `dataset_id` round-trip、batch TaskRecord snapshot round-trip 覆盖；当前 PR head 随本执行计划提交消费，已补齐三类合同验证缺口，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -299,4 +299,4 @@
 - Guardian rerun14 remediation checkpoint：`72b2af37cd82f3de725be9a017f71f9ae6c5fe05`
 - Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
 - Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
-- Guardian rerun17 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun17 remediation checkpoint：`92a9fe56b022`
