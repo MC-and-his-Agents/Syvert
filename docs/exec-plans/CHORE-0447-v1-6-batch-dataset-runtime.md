@@ -47,7 +47,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；head `3eed6441834137987e91aa8e7e6efb9e8f4dc0f1` GitHub checks 全绿，但 guardian 对该 head 给出 `REQUEST_CHANGES`：`source_trace.adapter_key` 未绑定外层 adapter，terminal/resumable `BatchResultEnvelope.audit_trace` 状态未绑定。当前正式 worktree 已停止 guardian/merge gate 重跑，转为 #447 public carrier truth-boundary root-cause sweep；本地修复覆盖 `BatchItemOutcome`、`BatchResultEnvelope`、`DatasetRecord` mapping/readback、nested `result_envelope.source_trace`、serialization round-trip 与 typed `BatchRequest` execution path，待提交推送后再跑 GitHub checks 与单次 guardian。
+- PR `#452`：open；head `3eed6441834137987e91aa8e7e6efb9e8f4dc0f1` GitHub checks 全绿，但 guardian 对该 head 给出 `REQUEST_CHANGES`：`source_trace.adapter_key` 未绑定外层 adapter，terminal/resumable `BatchResultEnvelope.audit_trace` 状态未绑定。已停止 guardian/merge gate 重跑并完成 #447 public carrier truth-boundary root-cause sweep；runtime implementation commit `9e436fd7478de3ac92898d2af82af4a7ba78bc26` 覆盖 `BatchItemOutcome`、`BatchResultEnvelope`、`DatasetRecord` mapping/readback、nested `result_envelope.source_trace`、serialization round-trip 与 typed `BatchRequest` execution path，且 GitHub checks 全绿。下一步只在当前证据同步后运行一次 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -99,7 +99,8 @@
 
 ## 已验证项
 
-- Local public carrier truth-boundary remediation after `3eed6441834137987e91aa8e7e6efb9e8f4dc0f1`：
+- Runtime implementation commit `9e436fd7478de3ac92898d2af82af4a7ba78bc26` public carrier truth-boundary remediation：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
   - 结果：通过；未触发 guardian / merge gate。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，96 tests。
