@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `db2afea` 已处理 guardian rerun17 的三类合同验证缺口并通过 checks；guardian rerun18 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone `BatchItemOutcome` success `result_envelope` 未绑定 declared operation/target，另有 `BatchResultEnvelope.audit_trace` 最小结构未强制；当前本地待提交修复已收紧两个 validator 并补 focused tests，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `db2afea` 已处理 guardian rerun17 的三类合同验证缺口并通过 checks；guardian rerun18 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone `BatchItemOutcome` success `result_envelope` 未绑定 declared operation/target，另有 `BatchResultEnvelope.audit_trace` 最小结构未强制；当前 PR head 随本执行计划提交消费，已收紧两个 validator 并补 focused tests，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -305,4 +305,4 @@
 - Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
 - Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
 - Guardian rerun17 remediation checkpoint：`92a9fe56b022`
-- Guardian rerun18 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun18 remediation checkpoint：`1ccbf622376d`
