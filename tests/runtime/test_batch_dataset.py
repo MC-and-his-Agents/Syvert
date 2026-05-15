@@ -422,6 +422,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, code)
 
+    def test_batch_result_serialization_rejects_sink_without_dataset_identity(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        forged = BatchResultEnvelope(
+            batch_id=result.batch_id,
+            operation=result.operation,
+            result_status=result.result_status,
+            item_outcomes=result.item_outcomes,
+            resume_token=result.resume_token,
+            dataset_sink_ref=result.dataset_sink_ref,
+            dataset_id=None,
+            audit_trace=result.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_dataset_boundary")
+
     def test_batch_result_serialization_rejects_incomplete_audit_trace(self) -> None:
         result = self.execute(request(target("item-1", "alpha")))
         forged = BatchResultEnvelope(
@@ -595,6 +613,19 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     batch_resume_token_to_dict(forged)
 
                 self.assertEqual(context.exception.code, code)
+
+    def test_resume_token_serialization_rejects_sink_without_dataset_identity(self) -> None:
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchResumeToken(**{**first.resume_token.__dict__, "dataset_id": None})
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_resume_token_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_dataset_boundary")
 
     def test_request_validation_rejects_unsafe_public_ids(self) -> None:
         unsafe_batch = BatchRequest(

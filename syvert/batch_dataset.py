@@ -653,6 +653,11 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
         )
     if envelope.dataset_sink_ref is not None:
         _validate_sanitized_ref(envelope.dataset_sink_ref, field="dataset_sink_ref")
+        if envelope.dataset_id is None:
+            raise BatchDatasetContractError(
+                "invalid_dataset_boundary",
+                "batch result envelope with dataset_sink_ref must carry dataset_id",
+            )
     if envelope.dataset_id is not None:
         _validate_sanitized_ref(envelope.dataset_id, field="dataset_id")
     _require_mapping(envelope.audit_trace, field="audit_trace")
@@ -801,6 +806,11 @@ def validate_batch_resume_token(token: BatchResumeToken) -> BatchResumeToken:
     _validate_public_timestamp(token.issued_at, field="resume_token.issued_at")
     if token.dataset_sink_ref is not None:
         _validate_sanitized_ref(token.dataset_sink_ref, field="resume_token.dataset_sink_ref")
+        if token.dataset_id is None:
+            raise BatchDatasetContractError(
+                "invalid_dataset_boundary",
+                "resume token with dataset_sink_ref must carry dataset_id",
+            )
     if token.dataset_id is not None:
         _validate_sanitized_ref(token.dataset_id, field="resume_token.dataset_id")
     return token

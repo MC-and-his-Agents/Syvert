@@ -87,6 +87,7 @@
 - guardian rerun22 follow-up：`BatchItemOutcome` 携带非序列化 `request_cursor_context` 供 batch result validation/serialization 复用；public carrier dict 不输出 cursor context，standalone outcome 缺少 context 时仍对 cursor-sensitive comment result fail-closed。
 - root-cause sweep follow-up：将 `BatchItemOutcome`、`BatchResultEnvelope`、resume prior outcome、dataset sink readback、serialization round-trip、typed `BatchRequest` entrypoint 作为同一套 public carrier contract 排查；新增恶意/漂移 carrier 矩阵覆盖 result wrapper 缺失/漂移、audit trace shape drift、resume sink record identity drift、prior cursor context reattach 与 public serialization 不泄露 cursor context。
 - merge gate integration follow-up：成功 `result_envelope` 的 read-side payload 继续允许自由文本 URL/路径片段，但 runtime wrapper 子集单独执行 public string/ref 泄漏校验；`task_record_ref`、`ref_id`、`envelope_ref` 等 wrapper 嵌套引用纳入 sanitized ref 校验，恶意 wrapper 矩阵覆盖 `task_record_ref`、`runtime_result_refs`、`execution_control_events` 与 runtime log message 漂移。
+- sink-bound identity follow-up：系统排查 `BatchRequest -> BatchResultEnvelope -> BatchResumeToken -> resume/readback serialization` dataset boundary；执行路径继续由 Core 派生或回显 `dataset_id`，public result/resume carrier validator 额外拒绝带 `dataset_sink_ref` 但缺 `dataset_id` 的伪造载荷。
 
 ## 已验证项
 
@@ -316,6 +317,8 @@
   - 结果：integration recheck `REQUEST_CHANGES`，阻断项为 resume prior outcome read-side wrapper 未绑定、dataset sink readback 未完整校验 record identity；已在正式 worktree root-cause sweep 中系统修复并补本地矩阵，待提交推送。
 - `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
   - 结果：integration recheck `REQUEST_CHANGES`，阻断项为成功 `result_envelope` 可选 runtime wrapper refs 未单独脱敏；已在正式 worktree 本地系统修复 wrapper 子集校验并补恶意 wrapper 矩阵，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-e4a6e9e.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 sink-bound `BatchResultEnvelope` / `BatchResumeToken` 可省略 mandatory `dataset_id`。已停止 guardian/merge gate 重跑，转为本地 sink-bound dataset identity sweep；待本地矩阵与完整验证通过后再提交推送。
 
 ## 待验证项
 
