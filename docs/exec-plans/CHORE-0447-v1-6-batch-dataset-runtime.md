@@ -42,7 +42,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；最新推送 head `5c2b05d8ca06` 已处理 guardian rerun10 findings 并通过 checks；最新推送提交 `24a115d06690` 已处理 guardian rerun11 的 `request_cursor` 非对象裸 `AttributeError` blocker 并通过 checks；最新本地待提交修复已处理 guardian rerun12 的 unsafe `source_trace.provider_path` batch abort 与非合同类 dataset sink write 异常冒泡 blockers，待推送后重新执行 checks 与 guardian。
+- PR `#452`：open；最新推送 head `5c2b05d8ca06` 已处理 guardian rerun10 findings 并通过 checks；最新推送提交 `ac5e94cfc593` 已处理 guardian rerun12 的 unsafe `source_trace.provider_path` batch abort 与非合同类 dataset sink write 异常冒泡 blockers 并通过 checks；最新本地待提交修复已处理 guardian rerun13 的 Windows 盘符本地路径绕过与 batch result aggregate status drift blockers，待推送后重新执行 checks 与 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -71,9 +71,28 @@
 - guardian rerun10 follow-up：`ReferenceDatasetSink` 在 write/read/audit 边界返回防御性 JSON-safe clone，避免写后/读后可变对象污染；通用 `execute_task` 对 `batch_execution` fail-closed，强制使用 typed `execute_batch_request`。
 - guardian rerun11 follow-up：`BatchTargetItem.request_cursor` 在 operation-specific continuation 校验前必须是 JSON object；search/list 非对象 cursor 统一失败为 `BatchDatasetContractError(code="invalid_field")`，避免 `.get()` 裸 `AttributeError`。
 - guardian rerun12 follow-up：success envelope 的 unsafe `source_trace.provider_path` 在 outcome 构造前失败时转换为 sanitized `unsafe_item_outcome` failed item；dataset sink write 的普通运行时异常转换为 `dataset_write_failed` failed item，避免单 item 故障中断整个 batch。
+- guardian rerun13 follow-up：所有 batch/dataset sanitizer 拒绝 Windows drive-letter absolute paths；`validate_batch_result_envelope` 强制 `result_status` 与 item outcome 聚合一致，拒绝 forged terminal aggregate drift。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，63 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，240 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，62 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
@@ -191,7 +210,9 @@
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-5c2b05d.json`
   - 结果：第十二轮 `REQUEST_CHANGES`，阻断项为 search/list `request_cursor` 接受 JSON-safe 非对象后进入 continuation `.get()` 裸 `AttributeError`；已由提交 `24a115d06690` 修复并补测试。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-24a115d.json`
-  - 结果：第十三轮 `REQUEST_CHANGES`，阻断项为 unsafe success `source_trace.provider_path` 在 outcome 构造前中断 batch、非 `BatchDatasetContractError` 的 dataset sink write 异常冒泡；已在正式 worktree 本地修复并补测试，待提交推送。
+  - 结果：第十三轮 `REQUEST_CHANGES`，阻断项为 unsafe success `source_trace.provider_path` 在 outcome 构造前中断 batch、非 `BatchDatasetContractError` 的 dataset sink write 异常冒泡；已由提交 `ac5e94cfc593` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-ac5e94c.json`
+  - 结果：第十四轮 `REQUEST_CHANGES`，阻断项为 Windows drive-letter absolute paths 绕过 sanitizer、batch result validator 接受 aggregate status drift；已在正式 worktree 本地修复并补测试，待提交推送。
 
 ## 待验证项
 
@@ -217,4 +238,5 @@
 - Guardian rerun10 remediation checkpoint：`e79ef6cb02a8513116129f1332a8f329443c03e6`
 - Latest pushed checkpoint：`5c2b05d8ca060f9c2dd1e918e69bde89012c8544`
 - Guardian rerun11 remediation checkpoint：`24a115d066902c7987f36597ec2c9f9388ac20a8`
-- Guardian rerun12 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun12 remediation checkpoint：`ac5e94cfc59364d2210a175e7d7b4a6884a8f2e3`
+- Guardian rerun13 remediation checkpoint：pending local commit from formal worktree

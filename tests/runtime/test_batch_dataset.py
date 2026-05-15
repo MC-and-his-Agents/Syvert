@@ -332,7 +332,9 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         result = self.execute(request(target("item-1", "alpha")))
         unsafe_cases = (
             ("batch_id", {"batch_id": "file:///tmp/raw-batch.json"}, "unsafe_ref"),
+            ("windows batch_id", {"batch_id": "C:/work/raw-batch.json"}, "unsafe_ref"),
             ("dataset_sink_ref", {"dataset_sink_ref": "storage://private/sink"}, "unsafe_ref"),
+            ("windows dataset_id", {"dataset_id": "D:/exports/dataset.json"}, "unsafe_ref"),
             ("dataset_id", {"dataset_id": "/etc/dataset"}, "unsafe_ref"),
             ("result_status", {"result_status": "provider_fallback"}, "invalid_batch_result_status"),
             (
@@ -343,6 +345,11 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             (
                 "audit stop reason",
                 {"audit_trace": {**result.audit_trace, "stop_reason": "storage://private/stop-reason"}},
+                "unsafe_public_payload",
+            ),
+            (
+                "windows audit payload",
+                {"audit_trace": {**result.audit_trace, "stop_reason": "C:/work/cache.json"}},
                 "unsafe_public_payload",
             ),
         )
@@ -362,6 +369,54 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     batch_result_envelope_to_dict(forged)
 
                 self.assertEqual(context.exception.code, code)
+
+    def test_batch_result_serialization_rejects_aggregate_status_drift(self) -> None:
+        success = self.execute(request(target("item-1", "alpha")))
+        self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
+        failed = self.execute(request(target("item-1", "alpha")))
+        self.adapters = {TEST_ADAPTER_KEY: CollectionAdapter(), "failed": FailingCollectionAdapter()}
+        mixed = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=(
+                    target("item-1", "alpha"),
+                    BatchTargetItem(
+                        item_id="item-2",
+                        operation="content_search_by_keyword",
+                        adapter_key="failed",
+                        target_type="keyword",
+                        target_ref="beta",
+                        dedup_key="dedup:beta",
+                    ),
+                ),
+                dataset_sink_ref="dataset-sink:reference",
+            ),
+        )
+        cases = (
+            ("success-as-all-failed", success, BATCH_RESULT_ALL_FAILED, BATCH_RESULT_COMPLETE),
+            ("failed-as-complete", failed, BATCH_RESULT_COMPLETE, BATCH_RESULT_ALL_FAILED),
+            ("mixed-as-complete", mixed, BATCH_RESULT_COMPLETE, BATCH_RESULT_PARTIAL_SUCCESS),
+            ("mixed-as-all-failed", mixed, BATCH_RESULT_ALL_FAILED, BATCH_RESULT_PARTIAL_SUCCESS),
+        )
+
+        for label, source, forged_status, expected in cases:
+            with self.subTest(label=label):
+                forged = BatchResultEnvelope(
+                    batch_id=source.batch_id,
+                    operation=source.operation,
+                    result_status=forged_status,
+                    item_outcomes=source.item_outcomes,
+                    resume_token=source.resume_token,
+                    dataset_sink_ref=source.dataset_sink_ref,
+                    dataset_id=source.dataset_id,
+                    audit_trace=source.audit_trace,
+                )
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_result_envelope_to_dict(forged)
+
+                self.assertEqual(context.exception.code, "invalid_batch_result_status")
+                self.assertEqual(context.exception.details["expected"], expected)
 
     def test_batch_result_serialization_rejects_invalid_resume_boundary(self) -> None:
         first = self.execute(
@@ -1705,7 +1760,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     }
                 )
             )
-        for local_path in ("/home/me/provider-route", "/etc/provider-route"):
+        for local_path in ("/home/me/provider-route", "/etc/provider-route", "C:/work/provider-route", "D:\\exports\\provider-route"):
             with self.subTest(local_path=local_path):
                 with self.assertRaises(BatchDatasetContractError):
                     validate_dataset_record(
@@ -1717,6 +1772,16 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                             }
                         )
                     )
+        for field, value, code in (
+            ("raw_payload_ref", "C:/work/raw.json", "unsafe_ref"),
+            ("evidence_ref", "D:/exports/evidence.json", "unsafe_ref"),
+            ("normalized_payload", {"artifact": "C:/work/cache.json"}, "unsafe_normalized_payload"),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaises(BatchDatasetContractError) as local_path_context:
+                    validate_dataset_record(type(record)(**{**record.__dict__, "dataset_record_id": f"record-windows-{field}", field: value}))
+
+                self.assertEqual(local_path_context.exception.code, code)
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
                 type(record)(

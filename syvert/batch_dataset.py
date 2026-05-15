@@ -503,6 +503,17 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
         )
     for outcome in envelope.item_outcomes:
         validate_batch_item_outcome(outcome)
+    expected_result_status = (
+        BATCH_RESULT_RESUMABLE
+        if envelope.result_status == BATCH_RESULT_RESUMABLE
+        else _aggregate_batch_result(envelope.item_outcomes)
+    )
+    if envelope.result_status != expected_result_status:
+        raise BatchDatasetContractError(
+            "invalid_batch_result_status",
+            "batch result_status does not match item outcome aggregation",
+            details={"result_status": envelope.result_status, "expected": expected_result_status},
+        )
     if envelope.resume_token is not None:
         validate_batch_resume_token(envelope.resume_token)
         if envelope.resume_token.batch_id != envelope.batch_id:
@@ -1240,7 +1251,7 @@ def _validate_provider_path(provider_path: str) -> None:
     stripped = normalized.strip()
     if stripped != normalized:
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not contain surrounding whitespace")
-    if stripped.startswith("/"):
+    if stripped.startswith("/") or _is_windows_absolute_path(stripped):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
     lowered = stripped.lower()
     if any(token in lowered for token in forbidden):
@@ -1302,7 +1313,7 @@ def _validate_sanitized_ref(value: str, *, field: str) -> str:
     if stripped != normalized:
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains surrounding whitespace", details={"field": field})
     lowered = stripped.lower()
-    if stripped.startswith("/"):
+    if stripped.startswith("/") or _is_windows_absolute_path(stripped):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains a local absolute path", details={"field": field})
     if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains forbidden private or storage token", details={"field": field})
@@ -1394,7 +1405,7 @@ def _validate_public_payload_key(key: str, *, field: str) -> None:
 def _validate_public_payload_string(value: str, *, field: str) -> None:
     stripped = value.strip()
     lowered = stripped.lower()
-    if stripped.startswith("/") or any(
+    if stripped.startswith("/") or _is_windows_absolute_path(stripped) or any(
         token in lowered
         for token in (
             "http://",
@@ -1422,7 +1433,7 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
 def _validate_normalized_payload_string(value: str, *, field: str) -> None:
     stripped = value.strip()
     lowered = stripped.lower()
-    if stripped.startswith("/") or stripped.startswith("\\") or lowered.startswith(
+    if stripped.startswith("/") or stripped.startswith("\\") or _is_windows_absolute_path(stripped) or lowered.startswith(
         ("http://", "https://", "s3://", "gs://", "storage://", "file://")
     ):
         raise BatchDatasetContractError(
@@ -1436,6 +1447,10 @@ def _validate_normalized_payload_string(value: str, *, field: str) -> None:
             "normalized_payload contains a raw path, storage handle, or private token",
             details={"field": field},
         )
+
+
+def _is_windows_absolute_path(value: str) -> bool:
+    return len(value) >= 3 and value[1] == ":" and value[0].isalpha() and value[2] in {"/", "\\"}
 
 
 def _is_private_normalized_payload_key(key: str) -> bool:
