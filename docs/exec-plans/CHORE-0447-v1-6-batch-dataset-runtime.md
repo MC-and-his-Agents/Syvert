@@ -62,7 +62,7 @@
 - dataset sink write failure 映射为 failed item，保留 read-side success envelope 供审计。
 - resume token 只表达 runtime position，不表达 scheduler、priority、workflow、provider fallback 或 marketplace。
 - batch 本身不要求真实账号；item operation 需要资源时继续经过 existing resource governance。
-- guardian follow-up：resume 会校验 prior outcomes 与 target-set 前缀、dedup state 和 dataset sink readback；绑定 `dataset_sink_ref` 但缺 sink 时 fail-closed；`source_trace` 只允许 sanitized Core 字段；search/list request cursor 当前 fail-closed，避免静默丢弃。
+- guardian follow-up：resume 会校验 prior outcomes 与 target-set 前缀、dedup state 和 dataset sink readback；绑定 `dataset_sink_ref` 但缺 sink 时 fail-closed；`source_trace` 只允许 sanitized Core 字段；search/list request cursor 已按 operation-specific JSON object continuation contract 校验并透传，避免静默丢弃。
 - guardian rerun follow-up：timeout/cancel 类已 dispatch item failure 在存在 suffix 时返回 `resumable`；fresh run 拒绝携带 prior outcomes；batch audit trace 补齐 `started_at`、`item_trace_refs`、sanitized `evidence_refs` 与 stop reason 校验。
 - guardian rerun2 follow-up：resume prefix 拒绝未知 outcome status 和非重复 item 的 `duplicate_skipped`；所有 BatchItemOutcome source_trace 先经 sanitized validator；`creator_profile_by_id` request cursor 当前 fail-closed，避免静默丢弃。
 - guardian rerun3 follow-up：prior `BatchItemOutcome` 进入 resume 前强制 canonical validation；`DatasetRecord.normalized_payload` 递归拒绝 raw/source/storage/private 字段；sanitized ref validator 拒绝真实 URL、bucket/storage URL 和本地路径。
