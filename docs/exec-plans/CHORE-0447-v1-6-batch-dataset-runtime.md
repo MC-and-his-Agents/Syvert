@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `272c62b` 已处理 guardian rerun19 的 cursor boundary 与 item trace binding blockers 并通过 checks；guardian rerun20 针对该 head 返回 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 `_validated_public_outcome` 传入 `request_cursor`、result envelope 校验只验证 subset 导致额外字段绕过；当前本地待提交修复已向 generated outcome validation 传入 item cursor、拒绝 read-side envelope 外 top-level 字段并补 focused tests，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `272c62b` 已处理 guardian rerun19 的 cursor boundary 与 item trace binding blockers 并通过 checks；guardian rerun20 针对该 head 返回 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 `_validated_public_outcome` 传入 `request_cursor`、result envelope 校验只验证 subset 导致额外字段绕过；当前 PR head 随本执行计划提交消费，已向 generated outcome validation 传入 item cursor、拒绝 read-side envelope 外 top-level 字段并补 focused tests，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -317,4 +317,4 @@
 - Guardian rerun17 remediation checkpoint：`92a9fe56b022`
 - Guardian rerun18 remediation checkpoint：`1ccbf622376d`
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
-- Guardian rerun20 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun20 remediation checkpoint：`835a61f0c965`
