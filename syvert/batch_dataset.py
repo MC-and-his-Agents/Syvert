@@ -761,6 +761,16 @@ def validate_batch_item_outcome(
             "failed batch item outcome must not reference a dataset record",
             details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
         )
+    if (
+        outcome.outcome_status == BATCH_ITEM_FAILED
+        and outcome.result_envelope is not None
+        and not _failed_outcome_may_retain_result_envelope(outcome.error_envelope)
+    ):
+        raise BatchDatasetContractError(
+            "invalid_item_outcome",
+            "failed batch item outcome may only retain result_envelope for dataset write failures",
+            details={"item_id": outcome.item_id, "outcome_status": outcome.outcome_status},
+        )
     if outcome.outcome_status == BATCH_ITEM_DUPLICATE_SKIPPED and (
         outcome.result_envelope is not None or outcome.error_envelope is not None or outcome.dataset_record_ref is not None
     ):
@@ -832,6 +842,12 @@ def validate_batch_resume_token(token: BatchResumeToken) -> BatchResumeToken:
     if token.dataset_id is not None:
         _validate_sanitized_ref(token.dataset_id, field="resume_token.dataset_id")
     return token
+
+
+def _failed_outcome_may_retain_result_envelope(error_envelope: Mapping[str, Any] | None) -> bool:
+    if not isinstance(error_envelope, Mapping):
+        return False
+    return error_envelope.get("code") in {DATASET_WRITE_FAILED, DATASET_SINK_UNAVAILABLE}
 
 
 def batch_target_set_hash(target_set: Sequence[BatchTargetItem]) -> str:
@@ -1098,8 +1114,8 @@ def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, ta
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
     if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):
         raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
-    if token.next_item_index > len(request.target_set):
-        raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
+    if token.next_item_index >= len(request.target_set):
+        raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside resumable suffix")
     expected_resume_token = f"resume:{request.batch_id}:{token.next_item_index}"
     if token.resume_token != expected_resume_token:
         raise BatchDatasetContractError(

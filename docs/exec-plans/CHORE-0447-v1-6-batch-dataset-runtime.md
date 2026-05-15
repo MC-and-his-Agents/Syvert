@@ -92,13 +92,14 @@
 - resume/ref boundary follow-up：系统排查 resume runtime position 与 public sanitized ref；resume 必须通过 dataset sink readback state 证明 `next_item_index` 未回退，缺 dataset sink boundary 时 fail-closed；sanitized ref 拒绝 traversal、无 scheme 的 filesystem-like relative path 与相对路径样式，同时保留既有 `raw://` / `alias://` public alias。
 - sink-less resume follow-up：纠正 resume runtime position 策略，sink-bound resume 继续用 dataset sink readback 证明未回退，sink-less resume 使用 token boundary、prior outcome prefix 与 dedup state 恢复，避免返回不可使用的 `resume_token`。
 - provider-path sanitizer follow-up：`source_trace.provider_path` 与 public ref sanitizer 对齐，拒绝 traversal、`./`、`../` 与无 scheme 的 filesystem-like relative path，同时保留 `provider://sanitized` 正例。
+- resume terminal/state-machine follow-up：resume token `next_item_index` 必须指向未处理 suffix，拒绝 terminal-position token；failed `BatchItemOutcome` 只有 dataset write/sink failure 这类 runtime path 可保留 success `result_envelope`，防止 resume prior failed outcome 夹带伪造 success envelope。
 
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，90 tests。
+  - 结果：通过，91 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，264 tests。
+  - 结果：通过，265 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -331,6 +332,8 @@
   - 结果：`REQUEST_CHANGES`，阻断项为 sink-less batch 返回不可使用的 resume token。已停止 guardian/merge gate 重跑，转为本地 resume with/without dataset sink sweep；待本地矩阵与完整验证通过后再提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-b05c998.json`
   - 结果：`REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 允许相对路径样式。已停止 guardian/merge gate 重跑，转为本地 provider-path sanitizer sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-5e02663.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 terminal-position resume token 被接受、failed prior outcome 可夹带伪造 success envelope。已停止 guardian/merge gate 重跑，转为本地 resume terminal/state-machine sweep；待本地矩阵与完整验证通过后再提交推送。
 
 ## 待验证项
 

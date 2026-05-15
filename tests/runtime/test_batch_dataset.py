@@ -1481,6 +1481,32 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_item_outcome")
 
+    def test_resume_rejects_failed_prior_outcome_with_forged_result_envelope(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "outcome_status": BATCH_ITEM_FAILED,
+                "error_envelope": {"code": "permission_denied", "message": "permission denied", "details": {}},
+                "dataset_record_ref": None,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "invalid_item_outcome")
+
     def test_resume_without_dataset_sink_rejects_forged_dataset_record_ref(self) -> None:
         first = self.execute(
             BatchRequest(
@@ -1771,6 +1797,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ("wrong-batch", {**first.resume_token.__dict__, "batch_id": "other-batch"}, "invalid_resume_token"),
             ("wrong-target-hash", {**first.resume_token.__dict__, "target_set_hash": "sha256:other"}, "invalid_resume_token"),
             ("wrong-dataset", {**first.resume_token.__dict__, "dataset_id": "dataset:other"}, "invalid_resume_token"),
+            ("terminal-position", {**first.resume_token.__dict__, "resume_token": "resume:batch-001:2", "next_item_index": 2}, "invalid_resume_position"),
             ("outside-target-set", {**first.resume_token.__dict__, "next_item_index": 3}, "invalid_resume_position"),
         )
 
