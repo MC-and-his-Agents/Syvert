@@ -737,6 +737,22 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ("wrong-capability", {**base, "capability": "comment_collection"}, "result_envelope_boundary_mismatch"),
             ("wrong-adapter", {**base, "adapter_key": "other-adapter"}, "result_envelope_boundary_mismatch"),
             ("unsafe-task-id", {**base, "task_id": "file:///tmp/task"}, "unsafe_ref"),
+            ("unsafe-task-record-ref", {**base, "task_record_ref": "file:///tmp/task-record"}, "unsafe_ref"),
+            (
+                "unsafe-runtime-result-ref",
+                {**base, "runtime_result_refs": [{"ref_type": "ExecutionAttemptOutcome", "ref_id": "s3://bucket/raw"}]},
+                "unsafe_ref",
+            ),
+            (
+                "unsafe-control-event-ref",
+                {**base, "execution_control_events": [{"event_id": "event-1", "task_record_ref": "/Users/mc/private"}]},
+                "unsafe_ref",
+            ),
+            (
+                "unsafe-runtime-log-message",
+                {**base, "runtime_structured_log_events": [{"event_id": "event-1", "message": "token=secret"}]},
+                "unsafe_public_payload",
+            ),
         )
 
         for label, result_envelope, expected_code in cases:

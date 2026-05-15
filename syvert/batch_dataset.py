@@ -185,6 +185,9 @@ _PUBLIC_REF_VALUE_KEYS = frozenset(
         "evidence_alias",
         "dataset_record_ref",
         "resource_profile_ref",
+        "task_record_ref",
+        "envelope_ref",
+        "ref_id",
     }
 )
 _NORMALIZED_PUBLIC_URL_REF_KEYS = frozenset({"canonical_ref", "source_ref"})
@@ -1444,6 +1447,16 @@ def _validate_result_envelope_wrapper(
             details={**details, "adapter_key": result_envelope["adapter_key"], "expected": adapter_key},
         )
     _validate_sanitized_ref(_require_non_empty_string(result_envelope["task_id"], field="result_envelope.task_id"), field="result_envelope.task_id")
+    wrapper_payload = {
+        field: result_envelope[field]
+        for field in _RESULT_ENVELOPE_WRAPPER_FIELDS
+        if field in result_envelope
+    }
+    _validate_public_payload_no_leakage(
+        wrapper_payload,
+        field="result_envelope.wrapper",
+        validate_strings=True,
+    )
 
 
 def _comment_result_requires_cursor_context(payload: Mapping[str, Any]) -> bool:
