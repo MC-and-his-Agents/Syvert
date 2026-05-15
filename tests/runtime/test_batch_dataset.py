@@ -84,7 +84,7 @@ class PaginatedCursorRecordingAdapter:
         self.request_cursors = []
 
     def execute(self, request):
-        self.request_cursors.append(request.request.request_cursor)
+        self.request_cursors.append({"continuation_token": request.input.continuation_token})
         if request.capability == "content_search":
             return make_collection_result(target_ref=request.target_value)
         if request.capability == "content_list":

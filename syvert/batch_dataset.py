@@ -10,9 +10,6 @@ from uuid import uuid4
 
 from syvert.read_side_collection import validate_comment_request_cursor
 from syvert.runtime import (
-    CollectionPolicy,
-    CoreTaskRequest,
-    InputTarget,
     TaskInput,
     TaskRequest,
     execute_task,
@@ -991,14 +988,10 @@ def _outcome_from_task_envelope(
     )
 
 
-def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest | CoreTaskRequest:
+def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest:
     if item.operation == "content_search_by_keyword":
-        if item.request_cursor is not None:
-            return _core_paginated_task_request_from_batch_item(item)
         task_input = TaskInput(keyword=item.target_ref, continuation_token=_continuation_token(item.request_cursor))
     elif item.operation == "content_list_by_creator":
-        if item.request_cursor is not None:
-            return _core_paginated_task_request_from_batch_item(item)
         task_input = TaskInput(creator_id=item.target_ref, continuation_token=_continuation_token(item.request_cursor))
     elif item.operation == "comment_collection":
         task_input = TaskInput(content_ref=item.target_ref, comment_request_cursor=item.request_cursor)
@@ -1009,19 +1002,6 @@ def _task_request_from_batch_item(item: BatchTargetItem) -> TaskRequest | CoreTa
     else:
         raise BatchDatasetContractError("invalid_target_operation", "batch target operation is not admitted")
     return TaskRequest(adapter_key=item.adapter_key, capability=item.operation, input=task_input)
-
-
-def _core_paginated_task_request_from_batch_item(item: BatchTargetItem) -> CoreTaskRequest:
-    return CoreTaskRequest(
-        target=InputTarget(
-            adapter_key=item.adapter_key,
-            capability=item.operation,
-            target_type=item.target_type,
-            target_value=item.target_ref,
-        ),
-        policy=CollectionPolicy(collection_mode="paginated"),
-        request_cursor={"continuation_token": _continuation_token(item.request_cursor)},
-    )
 
 
 def _continuation_token(request_cursor: Mapping[str, Any] | None) -> str | None:

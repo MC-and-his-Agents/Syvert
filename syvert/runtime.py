@@ -269,17 +269,18 @@ class AdapterTaskRequest:
     target_value: str
     collection_mode: str
     request_cursor: Mapping[str, Any] | None = None
+    continuation_token: str | None = None
 
     @property
     def input(self) -> TaskInput:
         if self.target_type == "url":
             return TaskInput(url=self.target_value)
         if self.target_type == "keyword":
-            return TaskInput(keyword=self.target_value)
+            return TaskInput(keyword=self.target_value, continuation_token=self.continuation_token)
         if self.target_type == "content":
             return TaskInput(content_ref=self.target_value, comment_request_cursor=self.request_cursor)
         if self.target_type == "creator":
-            return TaskInput(creator_id=self.target_value)
+            return TaskInput(creator_id=self.target_value, continuation_token=self.continuation_token)
         if self.target_type == "media_ref":
             return TaskInput(media_ref=self.target_value, media_fetch_policy=self.request_cursor)
         return TaskInput()
@@ -788,7 +789,11 @@ def execute_task_internal(
                 None,
             )
 
-    adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
+    adapter_request, projection_error = project_to_adapter_request(
+        normalized_request,
+        capability_family,
+        legacy_continuation_token=legacy_continuation_token_from_task_request(request, capability),
+    )
     if projection_error is not None:
         return TaskExecutionResult(
             pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_error),
@@ -2730,6 +2735,8 @@ def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, An
 def project_to_adapter_request(
     request: CoreTaskRequest,
     capability_family: str,
+    *,
+    legacy_continuation_token: str | None = None,
 ) -> tuple[AdapterTaskRequest | None, dict[str, Any] | None]:
     return (
         AdapterTaskRequest(
@@ -2739,15 +2746,24 @@ def project_to_adapter_request(
             collection_mode=request.policy.collection_mode,
             request_cursor=(
                 clone_request_cursor(request.request_cursor)
-                if request.target.capability
-                in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR, COMMENT_COLLECTION}
+                if request.target.capability == COMMENT_COLLECTION
                 else normalize_media_fetch_policy(request.request_cursor)
                 if request.target.capability == MEDIA_ASSET_FETCH_BY_REF
                 else None
             ),
+            continuation_token=legacy_continuation_token,
         ),
         None,
     )
+
+
+def legacy_continuation_token_from_task_request(request: Any, capability: str) -> str | None:
+    if type(request) is not TaskRequest:
+        return None
+    if capability not in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR}:
+        return None
+    token = request.input.continuation_token
+    return token if isinstance(token, str) and token else None
 
 
 def clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:

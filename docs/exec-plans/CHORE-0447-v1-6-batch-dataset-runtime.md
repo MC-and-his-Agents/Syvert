@@ -94,9 +94,32 @@
 - sink-less resume follow-up：纠正 resume runtime position 策略，sink-bound resume 继续用 dataset sink readback 证明未回退，sink-less resume 使用 token boundary、prior outcome prefix 与 dedup state 恢复，避免返回不可使用的 `resume_token`。
 - provider-path sanitizer follow-up：`source_trace.provider_path` 与 public ref sanitizer 对齐，拒绝 traversal、`./`、`../` 与无 scheme 的 filesystem-like relative path，同时保留 `provider://sanitized` 正例。
 - resume terminal/state-machine follow-up：resume token `next_item_index` 必须指向未处理 suffix，拒绝 terminal-position token；failed `BatchItemOutcome` 只有 dataset write/sink failure 这类 runtime path 可保留 success `result_envelope`，防止 resume prior failed outcome 夹带伪造 success envelope。
+- shared runtime cursor boundary follow-up：merge gate integration recheck 发现 search/list `CoreTaskRequest.request_cursor` 成为未校验共享 runtime 输入面；已收敛为 batch-only continuation 行为，batch 经既有 `TaskInput.continuation_token` 传递 search/list 游标，shared `CoreTaskRequest` search/list cursor 不再转发到 adapter context。
 
 ## 已验证项
 
+- Local shared runtime cursor boundary remediation on `493c0b9d6258c6ba8aa89521c6ad7b8f549f946e`：
+  - 结果：通过；未触发 guardian / merge gate。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，91 tests。
+- `python3 -m unittest tests.runtime.test_runtime`
+  - 结果：通过，155 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，420 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
 - Current reviewed runtime head `06166e582683482dda3fba77aa56297a2480fea4`：
   - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
   - guardian review：`REQUEST_CHANGES`，未发现新的静态 runtime correctness bug；阻断仅为本 repo-backed artifact scope/evidence/risk/rollback 不闭合。
@@ -338,12 +361,14 @@
   - 结果：`REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 允许相对路径样式。已停止 guardian/merge gate 重跑，转为本地 provider-path sanitizer sweep；待本地矩阵与完整验证通过后再提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-5e02663.json`
   - 结果：`REQUEST_CHANGES`，阻断项为 terminal-position resume token 被接受、failed prior outcome 可夹带伪造 success envelope。已停止 guardian/merge gate 重跑，转为本地 resume terminal/state-machine sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
+  - 结果：integration recheck `REQUEST_CHANGES`，阻断项为 search/list `CoreTaskRequest.request_cursor` 被 shared runtime 转发但缺 admission/snapshot/evidence binding。已停止 guardian/merge gate 重跑，转为本地 shared runtime cursor boundary sweep；本 PR 采用 batch-only continuation 收口，不扩大共享 runtime search/list cursor contract。
 
 ## 待验证项
 
-- 本 artifact-only 修正推送后等待 GitHub checks 全绿。
-- PR guardian review rerun（绑定 artifact 修正后的最新 head）。
-- guardian approve 后运行 `python3 scripts/pr_guardian.py merge-if-safe`。
+- shared runtime cursor boundary 修正提交推送后等待 GitHub checks 全绿。
+- GitHub checks 全绿后只运行一次 PR guardian review（绑定最新 head）。
+- guardian approve 后再运行一次 `python3 scripts/pr_guardian.py merge-if-safe`。
 
 ## 风险与缓解
 
