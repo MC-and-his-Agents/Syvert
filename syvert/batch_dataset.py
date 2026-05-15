@@ -8,6 +8,7 @@ import json
 from typing import Any
 from uuid import uuid4
 
+from syvert.read_side_collection import validate_comment_request_cursor
 from syvert.runtime import (
     CollectionPolicy,
     CoreTaskRequest,
@@ -522,6 +523,8 @@ def validate_batch_target_item(item: BatchTargetItem, *, index: int = 0) -> Batc
             )
         if item.operation in {"content_search_by_keyword", "content_list_by_creator"}:
             _validate_continuation_request_cursor(item.request_cursor, index=index)
+        elif item.operation == "comment_collection":
+            _validate_comment_collection_request_cursor(item.request_cursor, target_ref=item.target_ref, index=index)
         elif item.operation == "creator_profile_by_id":
             raise BatchDatasetContractError(
                 "unsupported_request_cursor",
@@ -1025,6 +1028,21 @@ def _validate_media_fetch_request_cursor(request_cursor: Mapping[str, Any], *, i
         raise BatchDatasetContractError(
             error.get("code", "invalid_task_request"),
             error.get("message", "media fetch request_cursor does not match the shared fetch policy contract"),
+            details={**dict(error.get("details", {})), "field": "request_cursor", "index": index},
+        )
+
+
+def _validate_comment_collection_request_cursor(
+    request_cursor: Mapping[str, Any],
+    *,
+    target_ref: str,
+    index: int,
+) -> None:
+    error = validate_comment_request_cursor(request_cursor, target_ref=target_ref)
+    if error is not None:
+        raise BatchDatasetContractError(
+            error.get("code", "signature_or_request_invalid"),
+            error.get("message", "comment_collection request_cursor does not match the shared cursor contract"),
             details={**dict(error.get("details", {})), "field": "request_cursor", "index": index},
         )
 

@@ -672,6 +672,34 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, "invalid_task_request")
 
+    def test_request_validation_rejects_malformed_comment_cursor(self) -> None:
+        comment_item = BatchTargetItem(
+            item_id="comments",
+            operation="comment_collection",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_type="content",
+            target_ref="content:alpha",
+            dedup_key="dedup:comments",
+            request_cursor={
+                "reply_cursor": {
+                    "reply_cursor_token": "reply-cursor-1",
+                    "reply_cursor_family": "opaque",
+                    "resume_target_ref": "content:other",
+                    "resume_comment_ref": "comment:root-1",
+                }
+            },
+        )
+
+        for validator in (
+            lambda: validate_batch_target_item(comment_item),
+            lambda: validate_batch_request(request(comment_item)),
+        ):
+            with self.subTest(validator=validator):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validator()
+
+                self.assertEqual(context.exception.code, "cursor_invalid_or_expired")
+
     def test_request_validation_rejects_duplicate_item_ids(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
             self.execute(
