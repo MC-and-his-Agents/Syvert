@@ -1482,6 +1482,30 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 )
             )
         self.assertEqual(timestamp_context.exception.code, "invalid_timestamp")
+        with self.assertRaises(BatchDatasetContractError) as mapping_timestamp_context:
+            ReferenceDatasetSink().write(
+                {
+                    "dataset_record_id": "record-mapping-invalid-recorded-at",
+                    "dataset_id": "dataset-1",
+                    "source_operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "raw_payload_ref": "raw://alpha",
+                    "normalized_payload": {"items": []},
+                    "evidence_ref": "evidence:alpha",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-05-13T10:00:00Z",
+                        "evidence_alias": "evidence:alpha",
+                    },
+                    "dedup_key": "dedup:alpha-mapping",
+                    "batch_id": "batch-001",
+                    "batch_item_id": "item-1",
+                    "recorded_at": "/etc/passwd",
+                }
+            )
+        self.assertEqual(mapping_timestamp_context.exception.code, "invalid_timestamp")
         with self.assertRaises(BatchDatasetContractError):
             validate_dataset_record(
                 type(record)(

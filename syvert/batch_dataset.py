@@ -447,7 +447,7 @@ def validate_dataset_record(record: DatasetRecord) -> DatasetRecord:
     _validate_sanitized_ref(record.dedup_key, field="dedup_key")
     _validate_sanitized_ref(record.batch_id, field="batch_id")
     _validate_sanitized_ref(record.batch_item_id, field="batch_item_id")
-    _require_non_empty_string(record.recorded_at, field="recorded_at")
+    _validate_public_timestamp(record.recorded_at, field="recorded_at")
     return record
 
 

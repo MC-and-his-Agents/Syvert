@@ -7,6 +7,7 @@ from syvert.runtime import (
     CollectionPolicy,
     CoreTaskRequest,
     InputTarget,
+    normalize_request,
     TaskInput,
     TaskRequest,
     validate_request,
@@ -64,6 +65,22 @@ class TaskRequestValidationTests(unittest.TestCase):
 
         self.assertIsNotNone(error)
         self.assertEqual(error["code"], "invalid_capability")
+
+    def test_accepts_batch_execution_request(self) -> None:
+        request = TaskRequest(
+            adapter_key="xhs",
+            capability="batch_execution",
+            input=TaskInput(),
+        )
+
+        normalized_request, error = normalize_request(request)
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(normalized_request)
+        self.assertEqual(normalized_request.target.capability, "batch_execution")
+        self.assertEqual(normalized_request.target.target_type, "operation_batch")
+        self.assertEqual(normalized_request.target.target_value, "batch_execution")
+        self.assertEqual(normalized_request.policy.collection_mode, "batch")
 
     def test_rejects_missing_input_url(self) -> None:
         request = TaskRequest(

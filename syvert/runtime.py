@@ -64,7 +64,7 @@ MEDIA_ASSET_FETCH = "media_asset_fetch"
 LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
 DIRECT_COLLECTION_MODE = "direct"
-ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
+ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref", "operation_batch"})
 ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", DIRECT_COLLECTION_MODE})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {
@@ -74,6 +74,7 @@ CAPABILITY_FAMILY_BY_OPERATION = {
     COMMENT_COLLECTION: COMMENT_COLLECTION_FAMILY,
     CREATOR_PROFILE_BY_ID: CREATOR_PROFILE,
     MEDIA_ASSET_FETCH_BY_REF: MEDIA_ASSET_FETCH,
+    "batch_execution": "batch_execution",
 }
 ALLOWED_CONTENT_TYPES = {"video", "image_post", "mixed_media", "unknown"}
 CREATOR_PROFILE_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
@@ -3246,6 +3247,12 @@ def _project_task_input_to_target(
     capability: str,
     input_value: TaskInput,
 ) -> tuple[InputTarget, CollectionPolicy, dict[str, Any] | None]:
+    if capability == "batch_execution":
+        return (
+            InputTarget(adapter_key=adapter_key, capability=capability, target_type="operation_batch", target_value=capability),
+            CollectionPolicy(collection_mode="batch"),
+            None,
+        )
     if capability == CONTENT_DETAIL_BY_URL:
         if not isinstance(input_value.url, str) or not input_value.url:
             return (
