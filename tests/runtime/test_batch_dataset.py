@@ -182,6 +182,14 @@ class UnsafeNormalizedPayloadAdapter(CollectionAdapter):
         return payload
 
 
+class PublicUrlCollectionAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["items"][0]["source_ref"] = "https://example.com/posts/1"
+        payload["items"][0]["normalized"]["canonical_ref"] = "https://example.com/posts/1"
+        return payload
+
+
 class UnsafeSuccessAuditAdapter(CollectionAdapter):
     def execute(self, request):
         payload = make_collection_result(target_ref=request.input.keyword or "")
@@ -1511,6 +1519,54 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
         self.assertEqual(result.item_outcomes[0].error_envelope["code"], "invalid_adapter_success_payload")
         self.assertEqual(sink.read_by_batch("batch-001"), ())
+
+    def test_runtime_dataset_allows_public_collection_canonical_ref_urls(self) -> None:
+        self.adapters = {TEST_ADAPTER_KEY: PublicUrlCollectionAdapter()}
+        sink = ReferenceDatasetSink()
+
+        result = self.execute(request(target("item-1", "alpha")), sink=sink)
+
+        self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
+        record = sink.read_by_batch("batch-001")[0]
+        self.assertEqual(record.normalized_payload["items"][0]["source_ref"], "https://example.com/posts/1")
+        self.assertEqual(record.normalized_payload["items"][0]["normalized"]["canonical_ref"], "https://example.com/posts/1")
+
+    def test_dataset_normalized_payload_rejects_url_in_non_ref_or_private_url_ref(self) -> None:
+        record = {
+            "dataset_record_id": "record-1",
+            "dataset_id": "dataset-1",
+            "source_operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "alpha",
+            "raw_payload_ref": "raw://alpha",
+            "normalized_payload": {"items": []},
+            "evidence_ref": "evidence:alpha",
+            "source_trace": {
+                "adapter_key": TEST_ADAPTER_KEY,
+                "provider_path": "provider://sanitized",
+                "fetched_at": "2026-05-13T10:00:00Z",
+                "evidence_alias": "evidence:alpha",
+            },
+            "dedup_key": "dedup:alpha",
+            "batch_id": "batch-001",
+            "batch_item_id": "item-1",
+            "recorded_at": "2026-05-13T10:00:00Z",
+        }
+        cases = (
+            {"items": [{"artifact": "https://example.com/posts/1"}]},
+            {"items": [{"normalized": {"canonical_ref": "https://storage.example/private/raw.json"}}]},
+            {"items": [{"normalized": {"canonical_ref": "file:///Users/mc/private/raw.json"}}]},
+            {"items": [{"normalized": {"source_ref": "storage://private-bucket/raw"}}]},
+            {"items": [{"normalized": {"source_ref": "C:\\Users\\mc\\private\\raw.json"}}]},
+        )
+
+        for index, normalized_payload in enumerate(cases, start=1):
+            with self.subTest(index=index):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    ReferenceDatasetSink().write({**record, "dataset_record_id": f"record-url-{index}", "normalized_payload": normalized_payload})
+
+                self.assertEqual(context.exception.code, "unsafe_normalized_payload")
 
     def test_runtime_dataset_normalized_payload_strips_raw_fields(self) -> None:
         sink = ReferenceDatasetSink()

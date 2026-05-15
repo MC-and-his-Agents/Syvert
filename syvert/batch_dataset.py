@@ -117,6 +117,19 @@ _PUBLIC_REF_VALUE_KEYS = frozenset(
         "resource_profile_ref",
     }
 )
+_NORMALIZED_PUBLIC_URL_REF_KEYS = frozenset({"canonical_ref", "source_ref"})
+_NORMALIZED_PUBLIC_URL_REF_COMPACT_KEYS = frozenset({"canonicalref", "sourceref"})
+_FORBIDDEN_PUBLIC_URL_TOKENS = (
+    "storage",
+    "bucket",
+    "download",
+    "raw",
+    "private",
+    "credential",
+    "secret",
+    "signed",
+    "token=",
+)
 
 
 class BatchDatasetContractError(ValueError):
@@ -1449,14 +1462,26 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
 def _validate_normalized_payload_string(value: str, *, field: str) -> None:
     stripped = value.strip()
     lowered = stripped.lower()
-    if stripped.startswith("/") or stripped.startswith("\\") or _is_windows_absolute_path(stripped) or lowered.startswith(
-        ("http://", "https://", "s3://", "gs://", "storage://", "file://")
-    ):
+    if stripped.startswith("/") or stripped.startswith("\\") or _is_windows_absolute_path(stripped):
         raise BatchDatasetContractError(
             "unsafe_normalized_payload",
             "normalized_payload contains a raw path, storage handle, or private token",
             details={"field": field},
         )
+    if lowered.startswith(("s3://", "gs://", "storage://", "file://")):
+        raise BatchDatasetContractError(
+            "unsafe_normalized_payload",
+            "normalized_payload contains a raw path, storage handle, or private token",
+            details={"field": field},
+        )
+    if lowered.startswith(("http://", "https://")):
+        if not _is_normalized_public_url_ref_field(field) or any(token in lowered for token in _FORBIDDEN_PUBLIC_URL_TOKENS):
+            raise BatchDatasetContractError(
+                "unsafe_normalized_payload",
+                "normalized_payload contains a raw path, storage handle, or private token",
+                details={"field": field},
+            )
+        return
     if any(token in lowered for token in ("token=", "account-pool", "proxy-pool", "storage-handle")):
         raise BatchDatasetContractError(
             "unsafe_normalized_payload",
@@ -1467,6 +1492,11 @@ def _validate_normalized_payload_string(value: str, *, field: str) -> None:
 
 def _is_windows_absolute_path(value: str) -> bool:
     return len(value) >= 3 and value[1] == ":" and value[0].isalpha() and value[2] in {"/", "\\"}
+
+
+def _is_normalized_public_url_ref_field(field: str) -> bool:
+    key = field.rsplit(".", 1)[-1]
+    return _compact_private_key(key) in _NORMALIZED_PUBLIC_URL_REF_COMPACT_KEYS
 
 
 def _is_private_normalized_payload_key(key: str) -> bool:
