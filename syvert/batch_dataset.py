@@ -8,7 +8,16 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from syvert.runtime import CollectionPolicy, CoreTaskRequest, InputTarget, TaskInput, TaskRequest, execute_task, is_valid_rfc3339_utc
+from syvert.runtime import (
+    CollectionPolicy,
+    CoreTaskRequest,
+    InputTarget,
+    TaskInput,
+    TaskRequest,
+    execute_task,
+    is_valid_rfc3339_utc,
+    validate_success_payload,
+)
 
 
 BATCH_EXECUTION_OPERATION = "batch_execution"
@@ -46,6 +55,52 @@ TARGET_TYPE_BY_OPERATION = {
     "comment_collection": "content",
     "creator_profile_by_id": "creator",
     "media_asset_fetch_by_ref": "media_ref",
+}
+_COLLECTION_SUCCESS_PAYLOAD_FIELDS = frozenset(
+    {
+        "operation",
+        "target",
+        "items",
+        "has_more",
+        "next_continuation",
+        "result_status",
+        "error_classification",
+        "raw_payload_ref",
+        "source_trace",
+        "audit",
+    }
+)
+_SUCCESS_PAYLOAD_FIELDS_BY_OPERATION = {
+    "content_search_by_keyword": _COLLECTION_SUCCESS_PAYLOAD_FIELDS,
+    "content_list_by_creator": _COLLECTION_SUCCESS_PAYLOAD_FIELDS,
+    "comment_collection": _COLLECTION_SUCCESS_PAYLOAD_FIELDS,
+    "creator_profile_by_id": frozenset(
+        {
+            "operation",
+            "target",
+            "result_status",
+            "error_classification",
+            "profile",
+            "raw_payload_ref",
+            "source_trace",
+            "audit",
+        }
+    ),
+    "media_asset_fetch_by_ref": frozenset(
+        {
+            "operation",
+            "target",
+            "content_type",
+            "fetch_policy",
+            "fetch_outcome",
+            "result_status",
+            "error_classification",
+            "raw_payload_ref",
+            "source_trace",
+            "media",
+            "audit",
+        }
+    ),
 }
 
 _FORBIDDEN_REF_TOKENS = (
@@ -1158,6 +1213,8 @@ def _validate_resume_outcome_prefix(
                 "prior item outcome does not match target_set prefix",
                 details={"index": index, "item_id": item.item_id},
             )
+        if outcome.outcome_status == BATCH_ITEM_SUCCEEDED:
+            _validate_prior_success_result_envelope(item, outcome.result_envelope, index=index)
         duplicate = item.dedup_key in seen_dedup_keys
         seen_dedup_keys.add(item.dedup_key)
         if duplicate and outcome.outcome_status != BATCH_ITEM_DUPLICATE_SKIPPED:
@@ -1222,6 +1279,40 @@ def _validate_resume_outcome_prefix(
                     "prior successful outcome dataset record is not present in the resumed sink",
                     details={"index": index, "item_id": item.item_id},
                 )
+
+
+def _validate_prior_success_result_envelope(
+    item: BatchTargetItem,
+    result_envelope: Mapping[str, Any] | None,
+    *,
+    index: int,
+) -> None:
+    if result_envelope is None:
+        raise BatchDatasetContractError(
+            "resume_result_envelope_mismatch",
+            "prior successful outcome must carry a read-side result envelope",
+            details={"index": index, "item_id": item.item_id},
+        )
+    payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[item.operation]
+    payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
+    error = validate_success_payload(
+        payload,
+        capability=item.operation,
+        target_type=item.target_type,
+        target_value=item.target_ref,
+        request_cursor=item.request_cursor,
+    )
+    if error is not None:
+        raise BatchDatasetContractError(
+            "resume_result_envelope_mismatch",
+            "prior successful outcome result_envelope does not match target_set prefix",
+            details={
+                "index": index,
+                "item_id": item.item_id,
+                "reason": error.get("code"),
+                **dict(error.get("details", {})),
+            },
+        )
 
 
 def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:

@@ -834,6 +834,39 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_outcome_prefix_mismatch")
 
+    def test_resume_rejects_forged_prior_success_result_envelope_target(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged_envelope = {
+            **first.item_outcomes[0].result_envelope,
+            "operation": "content_list_by_creator",
+            "target": {
+                "operation": "content_list_by_creator",
+                "target_type": "creator",
+                "target_ref": "creator-beta",
+            },
+        }
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "result_envelope": forged_envelope,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "resume_result_envelope_mismatch")
+
     def test_resume_rejects_non_duplicate_prior_outcome_marked_duplicate_skipped(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(

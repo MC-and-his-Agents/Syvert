@@ -25,9 +25,13 @@
 - 本次纳入：
   - `syvert/batch_dataset.py`
   - `syvert/operation_taxonomy.py`
+  - `syvert/runtime.py`
+  - `syvert/task_record.py`
   - `tests/__init__.py`（仅启用根目录默认 unittest discovery 进入治理测试包）
   - `tests/runtime/test_batch_dataset.py`
+  - `tests/runtime/test_models.py`
   - `tests/runtime/test_operation_taxonomy.py`
+  - `tests/runtime/test_task_record.py`
   - 本执行计划
 - 本次不纳入：
   - TaskRecord/result query/compatibility consumer migration（`#448`）
@@ -42,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；最新推送 head `72b2af37cd82` 已处理 guardian rerun14 的 duplicate `item_id` / `dataset_record_id` identity collision 与 resume token `issued_at` timestamp validation blockers 并通过 checks；最新本地待提交修复已处理 guardian rerun15 的 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` / `source_ref` HTTPS URL blocker，待完成系统性本地排查后再提交、推送与 guardian。
+- PR `#452`：open；最新推送 head `136c560a76ac` 已处理 guardian rerun15 的 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` / `source_ref` HTTPS URL blocker 并通过 checks；guardian rerun16 针对 `136c560a76ac0a6c80dfe39f5695278ac5d361ad` 返回 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix，另有执行计划 scope/current evidence artifact gaps；最新本地待提交修复已处理该 blocker 与 artifact gaps，待完成系统性本地排查后再提交、推送与 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -74,13 +78,16 @@
 - guardian rerun13 follow-up：所有 batch/dataset sanitizer 拒绝 Windows drive-letter absolute paths；`validate_batch_result_envelope` 强制 `result_status` 与 item outcome 聚合一致，拒绝 forged terminal aggregate drift。
 - guardian rerun14 follow-up：`BatchRequest.target_set` 拒绝重复 `item_id`；`ReferenceDatasetSink` 拒绝重复 `dataset_record_id`；`BatchResumeToken.issued_at` 改用 RFC3339 UTC timestamp validator。
 - guardian rerun15 follow-up：`DatasetRecord.normalized_payload` 允许稳定 read-side collection 合同中的公开 `canonical_ref` / `source_ref` HTTPS URL，同时继续拒绝非 ref URL、storage/private/raw/download/signed/token URL、本地路径、Windows 盘符路径与 storage/file scheme。
+- guardian rerun16 follow-up：resume prefix 校验对 prior successful outcome 的 nested `result_envelope` 重新执行 operation/target/request_cursor success-payload validation，拒绝伪造外层 outcome 与内层 read-side envelope 不一致的 prior success。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，68 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_read_side_collection`
-  - 结果：通过，75 tests。
+  - 结果：通过，76 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，244 tests。
+  - 结果：通过，245 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -254,7 +261,9 @@
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-1857321.json`
   - 结果：第十五轮 `REQUEST_CHANGES`，阻断项为 duplicate `item_id` 可碰撞 dataset/audit identity、`BatchResumeToken.issued_at` 接受非 timestamp；已由提交 `72b2af37cd82` 修复并补测试。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-72b2af3.json`
-  - 结果：第十六轮 `REQUEST_CHANGES`，阻断项为 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` HTTPS URL；已在正式 worktree 本地修复，补充公开 `canonical_ref` / `source_ref` 正例与非 ref URL、private/storage/file/Windows path 负例，待提交推送。
+  - 结果：第十六轮 `REQUEST_CHANGES`，阻断项为 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` HTTPS URL；已由提交 `136c560a76ac` 修复，补充公开 `canonical_ref` / `source_ref` 正例与非 ref URL、private/storage/file/Windows path 负例。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-136c560.json`
+  - 结果：第十七轮 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix；artifact gaps 为执行计划 scope 缺少 `runtime.py` / `task_record.py` / 对应测试文件，current-state/evidence 仍指向旧 head。已在正式 worktree 本地修复，待提交推送。
 
 ## 待验证项
 
@@ -278,9 +287,10 @@
 - Initial branch checkpoint：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
 - Guardian rerun9 remediation checkpoint：`df7f6d10b7d3b41f42127e34705301c3184c9d8c`
 - Guardian rerun10 remediation checkpoint：`e79ef6cb02a8513116129f1332a8f329443c03e6`
-- Latest pushed checkpoint：`72b2af37cd82f3de725be9a017f71f9ae6c5fe05`
+- Latest pushed checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
 - Guardian rerun11 remediation checkpoint：`24a115d066902c7987f36597ec2c9f9388ac20a8`
 - Guardian rerun12 remediation checkpoint：`ac5e94cfc59364d2210a175e7d7b4a6884a8f2e3`
 - Guardian rerun13 remediation checkpoint：`1857321eccccb785f0eae602373f5e365b51c9d7`
 - Guardian rerun14 remediation checkpoint：`72b2af37cd82f3de725be9a017f71f9ae6c5fe05`
-- Guardian rerun15 remediation checkpoint：pending local commit from formal worktree
+- Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
+- Guardian rerun16 remediation checkpoint：pending local commit from formal worktree
