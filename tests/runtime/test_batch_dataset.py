@@ -260,7 +260,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             ),
             (
                 "audit stop reason",
-                {"audit_trace": {**result.audit_trace, "stop_reason": "provider:fallback:marketplace"}},
+                {"audit_trace": {**result.audit_trace, "stop_reason": "storage://private/stop-reason"}},
                 "unsafe_public_payload",
             ),
         )
@@ -604,6 +604,32 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertIsNone(resumed.resume_token)
         self.assertEqual([outcome.item_id for outcome in resumed.item_outcomes], ["item-1", "item-2"])
         self.assertEqual(len(sink.read_by_batch("batch-001")), 2)
+
+    def test_resume_stop_after_items_advances_from_resume_position(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta"), target("item-3", "gamma")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+
+        second = self.execute(
+            request(
+                target("item-1", "alpha"),
+                target("item-2", "beta"),
+                target("item-3", "gamma"),
+                resume_token=first.resume_token,
+            ),
+            sink=sink,
+            prior_item_outcomes=first.item_outcomes,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+
+        self.assertEqual(second.result_status, BATCH_RESULT_RESUMABLE)
+        self.assertEqual(second.resume_token.next_item_index, 2)
+        self.assertEqual([outcome.item_id for outcome in second.item_outcomes], ["item-1", "item-2"])
 
     def test_resume_rejects_forged_prior_outcome_prefix(self) -> None:
         sink = ReferenceDatasetSink()
@@ -1626,6 +1652,23 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             validate_batch_item_outcome(forged)
 
         self.assertEqual(context.exception.code, "invalid_timestamp")
+
+    def test_batch_item_outcome_allows_plain_error_and_audit_text(self) -> None:
+        outcome = BatchItemOutcome(
+            item_id="item-1",
+            operation="content_search_by_keyword",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_ref="alpha",
+            outcome_status=BATCH_ITEM_FAILED,
+            error_envelope={
+                "code": "adapter_unavailable",
+                "message": "fallback unavailable",
+                "details": {"reason": "selector returned no marketplace match"},
+            },
+            audit={"reason": "fallback unavailable"},
+        )
+
+        validate_batch_item_outcome(outcome)
 
     def test_audit_context_evidence_ref_must_be_sanitized(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:

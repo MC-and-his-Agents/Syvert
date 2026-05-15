@@ -283,7 +283,9 @@ def execute_batch_request(
         )
     seen_dedup_keys = {validated.target_set[index].dedup_key for index in range(min(start_index, len(validated.target_set)))}
     task_id_factory = task_id_factory or (lambda: f"batch-item-{uuid4().hex}")
-    stop_at = stop_after_items if stop_after_items is not None else len(validated.target_set)
+    stop_at = len(validated.target_set)
+    if stop_after_items is not None:
+        stop_at = min(len(validated.target_set), start_index + stop_after_items)
 
     for index in range(start_index, len(validated.target_set)):
         if index >= stop_at:
@@ -1357,11 +1359,6 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
             "/etc/",
             "\\",
             "token=",
-            "account-pool",
-            "proxy-pool",
-            "selector",
-            "fallback",
-            "marketplace",
         )
     ):
         raise BatchDatasetContractError(
