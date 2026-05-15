@@ -27,10 +27,11 @@ SHARED_CAPABILITIES = frozenset(
         "comment_collection",
         "media_asset_fetch_by_ref",
         "creator_profile_by_id",
+        "batch_execution",
     }
 )
-SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref"})
-SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", "direct"})
+SHARED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref", "operation_batch"})
+SHARED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", "direct", "batch"})
 ALLOWED_CONTENT_TYPES = frozenset({"video", "image_post", "mixed_media", "unknown"})
 CREATOR_PROFILE_RESULT_STATUSES = frozenset({"complete", "unavailable", "failed"})
 CREATOR_PROFILE_UNAVAILABLE_CLASSIFICATIONS = frozenset(

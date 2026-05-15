@@ -107,6 +107,19 @@ class TaskRequestValidationTests(unittest.TestCase):
 
         self.assertIsNone(validate_request(request))
 
+    def test_accepts_batch_execution_core_request_model(self) -> None:
+        request = CoreTaskRequest(
+            target=InputTarget(
+                adapter_key="xhs",
+                capability="batch_execution",
+                target_type="operation_batch",
+                target_value="batch_execution",
+            ),
+            policy=CollectionPolicy(collection_mode="batch"),
+        )
+
+        self.assertIsNone(validate_request(request))
+
     def test_rejects_empty_target_value(self) -> None:
         request = CoreTaskRequest(
             target=InputTarget(

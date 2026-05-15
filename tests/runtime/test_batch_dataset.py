@@ -368,13 +368,13 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
     def test_search_keyword_allows_common_content_words(self) -> None:
         sink = ReferenceDatasetSink()
         result = self.execute(
-            request(target("item-1", "download bucket secret", dedup_key="dedup:keyword-common")),
+            request(target("item-1", "fallback selector marketplace account-pool guide", dedup_key="dedup:keyword-common")),
             sink=sink,
         )
 
         self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
-        self.assertEqual(sink.read_by_batch("batch-001")[0].target_ref, "download bucket secret")
+        self.assertEqual(sink.read_by_batch("batch-001")[0].target_ref, "fallback selector marketplace account-pool guide")
 
     def test_malformed_audit_context_fails_closed(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
@@ -1078,7 +1078,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         adapter = PaginatedCursorRecordingAdapter()
         self.adapters = {TEST_ADAPTER_KEY: adapter}
 
-        self.execute(
+        result = self.execute(
             request(
                 BatchTargetItem(
                     item_id="search",
@@ -1101,6 +1101,8 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
         )
 
+        self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
+        self.assertEqual([outcome.outcome_status for outcome in result.item_outcomes], [BATCH_ITEM_SUCCEEDED, BATCH_ITEM_SUCCEEDED])
         self.assertEqual(
             adapter.request_cursors,
             [{"continuation_token": "search-page"}, {"continuation_token": "list-page"}],

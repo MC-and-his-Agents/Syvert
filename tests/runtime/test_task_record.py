@@ -16,6 +16,7 @@ from syvert.task_record import (
     start_task_record,
     task_record_from_dict,
     task_record_to_dict,
+    validate_request_snapshot,
 )
 from tests.runtime.resource_fixtures import ResourceStoreEnvMixin, baseline_resource_requirement_declarations
 
@@ -429,6 +430,17 @@ class MediaAssetFetchAdapter:
 
 
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
+    def test_batch_execution_request_snapshot_is_admitted(self) -> None:
+        validate_request_snapshot(
+            TaskRequestSnapshot(
+                adapter_key=TEST_ADAPTER_KEY,
+                capability="batch_execution",
+                target_type="operation_batch",
+                target_value="batch_execution",
+                collection_mode="batch",
+            )
+        )
+
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(

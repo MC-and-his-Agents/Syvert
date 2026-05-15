@@ -65,7 +65,7 @@ LEGACY_COLLECTION_MODE = "hybrid"
 PAGINATED_COLLECTION_MODE = "paginated"
 DIRECT_COLLECTION_MODE = "direct"
 ALLOWED_TARGET_TYPES = frozenset({"url", "content", "content_id", "creator", "creator_id", "keyword", "media_ref", "operation_batch"})
-ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", DIRECT_COLLECTION_MODE})
+ALLOWED_COLLECTION_MODES = frozenset({"public", "authenticated", "hybrid", "paginated", DIRECT_COLLECTION_MODE, "batch"})
 ALLOWED_EXECUTION_CONTROL_CONCURRENCY_SCOPES = frozenset({"global", "adapter", "adapter_capability"})
 CAPABILITY_FAMILY_BY_OPERATION = {
     CONTENT_DETAIL_BY_URL: CONTENT_DETAIL,

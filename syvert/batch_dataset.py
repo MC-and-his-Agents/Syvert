@@ -1198,9 +1198,37 @@ def _validate_target_ref(operation: str, value: str, *, field: str) -> str:
     normalized = _require_non_empty_string(value, field=field)
     if operation == "content_search_by_keyword":
         _ensure_json_safe(normalized, field=field)
-        _validate_public_payload_string(normalized, field=field)
+        _validate_search_keyword(normalized, field=field)
         return normalized
     return _validate_sanitized_ref(normalized, field=field)
+
+
+def _validate_search_keyword(value: str, *, field: str) -> None:
+    stripped = value.strip()
+    lowered = stripped.lower()
+    if stripped.startswith("/") or stripped.startswith("\\") or any(
+        token in lowered
+        for token in (
+            "http://",
+            "https://",
+            "s3://",
+            "gs://",
+            "storage://",
+            "file://",
+            "/tmp/",
+            "/var/",
+            "/users/",
+            "/home/",
+            "/etc/",
+            "\\",
+            "token=",
+        )
+    ):
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "search keyword contains a raw path, storage handle, or private token",
+            details={"field": field},
+        )
 
 
 def _validate_public_timestamp(value: Any, *, field: str) -> str:
