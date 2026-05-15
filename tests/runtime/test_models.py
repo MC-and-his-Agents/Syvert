@@ -7,7 +7,6 @@ from syvert.runtime import (
     CollectionPolicy,
     CoreTaskRequest,
     InputTarget,
-    normalize_request,
     TaskInput,
     TaskRequest,
     validate_request,
@@ -66,22 +65,6 @@ class TaskRequestValidationTests(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertEqual(error["code"], "invalid_capability")
 
-    def test_accepts_batch_execution_request(self) -> None:
-        request = TaskRequest(
-            adapter_key="xhs",
-            capability="batch_execution",
-            input=TaskInput(),
-        )
-
-        normalized_request, error = normalize_request(request)
-
-        self.assertIsNone(error)
-        self.assertIsNotNone(normalized_request)
-        self.assertEqual(normalized_request.target.capability, "batch_execution")
-        self.assertEqual(normalized_request.target.target_type, "operation_batch")
-        self.assertEqual(normalized_request.target.target_value, "batch_execution")
-        self.assertEqual(normalized_request.policy.collection_mode, "batch")
-
     def test_rejects_missing_input_url(self) -> None:
         request = TaskRequest(
             adapter_key="xhs",
@@ -103,19 +86,6 @@ class TaskRequestValidationTests(unittest.TestCase):
                 target_value="https://www.xiaohongshu.com/explore/abc123",
             ),
             policy=CollectionPolicy(collection_mode="hybrid"),
-        )
-
-        self.assertIsNone(validate_request(request))
-
-    def test_accepts_batch_execution_core_request_model(self) -> None:
-        request = CoreTaskRequest(
-            target=InputTarget(
-                adapter_key="xhs",
-                capability="batch_execution",
-                target_type="operation_batch",
-                target_value="batch_execution",
-            ),
-            policy=CollectionPolicy(collection_mode="batch"),
         )
 
         self.assertIsNone(validate_request(request))

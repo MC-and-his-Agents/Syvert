@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `272c62b` 已处理 guardian rerun19 的 cursor boundary 与 item trace binding blockers 并通过 checks；guardian rerun20 针对该 head 返回 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 `_validated_public_outcome` 传入 `request_cursor`、result envelope 校验只验证 subset 导致额外字段绕过；当前 PR head 随本执行计划提交消费，已向 generated outcome validation 传入 item cursor、拒绝 read-side envelope 外 top-level 字段并补 focused tests，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `647fa03` 已处理 guardian rerun20 的 result boundary blockers 并通过 checks；guardian rerun21 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface 但 runtime 仍要求 typed `BatchRequest`；当前本地待提交修复已移除 shared request/snapshot admission，保留 typed `BatchRequest` / `execute_batch_request` 作为唯一 batch execution 入口，并更新直接 `execute_task` 负例，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -83,9 +83,12 @@
 - guardian rerun18 follow-up：`validate_batch_item_outcome` 对 standalone success/attached `result_envelope` 执行 operation/target boundary validation；`validate_batch_result_envelope` 强制 batch audit trace 包含 `batch_id`、`started_at`、`finished`、`item_count`、`item_trace_refs`、`evidence_refs` 与可选 `stop_reason` 的最小结构。
 - guardian rerun19 follow-up：prior outcome canonical validation 携带对应 `BatchTargetItem.request_cursor`；缺少 cursor 上下文时 cursor-sensitive `comment_collection` result fail-closed；`audit_trace.item_trace_refs` 必须与 `item_outcomes` 等长并逐项等于 `audit:batch:{batch_id}:{item_id}`。
 - guardian rerun20 follow-up：正常 batch execution 产生的 outcome public validation 携带 `BatchTargetItem.request_cursor`，避免合法 cursor-sensitive comment result 被误降级；result envelope boundary 校验拒绝 read-side contract 与 runtime terminal wrapper 之外的额外 top-level 字段。
+- guardian rerun21 follow-up：移除 `batch_execution` 在 shared `TaskRequest` / `CoreTaskRequest` / `TaskRequestSnapshot` admitted surface 中的投影；direct `execute_task` 继续以 `invalid_capability` fail-closed，typed batch runtime 仅通过 `BatchRequest` / `execute_batch_request` 进入。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_models tests.runtime.test_task_record`
+  - 结果：通过，133 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，77 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
@@ -99,7 +102,7 @@
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_read_side_collection`
   - 结果：通过，76 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，255 tests。
+  - 结果：通过，251 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -284,6 +287,8 @@
   - 结果：第二十轮 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未绑定 item outcomes。已在正式 worktree 本地修复并补 focused tests，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-272c62b.json`
   - 结果：第二十一轮 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 generated outcome validation 传入 request cursor、result envelope 校验只验证 subset 导致额外字段绕过。已在正式 worktree 本地修复并补 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-647fa03.json`
+  - 结果：第二十二轮 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface，与 typed `BatchRequest` runtime boundary 冲突。已在正式 worktree 本地移除 shared admission 并调整测试，待提交推送。
 
 ## 待验证项
 
@@ -318,3 +323,4 @@
 - Guardian rerun18 remediation checkpoint：`1ccbf622376d`
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
 - Guardian rerun20 remediation checkpoint：`835a61f0c965`
+- Guardian rerun21 remediation checkpoint：pending local commit from formal worktree

@@ -350,7 +350,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(second_read.normalized_payload, {"items": [{"title_or_text_hint": "safe"}]})
         self.assertEqual(second_replay["normalized_payload"], {"items": [{"title_or_text_hint": "safe"}]})
 
-    def test_execute_task_rejects_direct_batch_execution_adapter_payload(self) -> None:
+    def test_execute_task_rejects_direct_batch_execution_as_shared_request(self) -> None:
         class LegacyBatchAdapter:
             supported_capabilities = frozenset({"batch_execution"})
             supported_targets = frozenset({"operation_batch"})
@@ -366,8 +366,8 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(envelope["status"], "failed")
-        self.assertEqual(envelope["error"]["category"], "runtime_contract")
-        self.assertEqual(envelope["error"]["code"], "batch_execution_requires_batch_request")
+        self.assertEqual(envelope["error"]["category"], "invalid_input")
+        self.assertEqual(envelope["error"]["code"], "invalid_capability")
         self.assertEqual(envelope["error"]["details"]["task_record_ref"], "none")
 
     def test_batch_result_serialization_rejects_unsafe_top_level_carriers(self) -> None:
