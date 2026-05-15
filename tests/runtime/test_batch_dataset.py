@@ -276,6 +276,16 @@ def request(
     )
 
 
+def runtime_result_envelope(payload, *, task_id="task-test-1", adapter_key=TEST_ADAPTER_KEY, capability=None):
+    return {
+        "task_id": task_id,
+        "adapter_key": adapter_key,
+        "capability": capability or payload["operation"],
+        "status": "success",
+        **payload,
+    }
+
+
 class BatchDatasetRuntimeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.adapters = {TEST_ADAPTER_KEY: CollectionAdapter()}
@@ -448,6 +458,35 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
 
+    def test_batch_result_serialization_rejects_audit_trace_shape_drift_matrix(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        cases = (
+            ("wrong-batch", {**result.audit_trace, "batch_id": "other-batch"}),
+            ("wrong-count", {**result.audit_trace, "item_count": 2}),
+            ("bool-count", {**result.audit_trace, "item_count": True}),
+            ("extra-field", {**result.audit_trace, "debug": "extra"}),
+            ("string-trace-refs", {**result.audit_trace, "item_trace_refs": "audit:batch:batch-001:item-1"}),
+            ("wrong-evidence-type", {**result.audit_trace, "evidence_refs": "evidence:batch"}),
+        )
+
+        for label, audit_trace in cases:
+            with self.subTest(label=label):
+                forged = BatchResultEnvelope(
+                    batch_id=result.batch_id,
+                    operation=result.operation,
+                    result_status=result.result_status,
+                    item_outcomes=result.item_outcomes,
+                    resume_token=result.resume_token,
+                    dataset_sink_ref=result.dataset_sink_ref,
+                    dataset_id=result.dataset_id,
+                    audit_trace=audit_trace,
+                )
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_result_envelope_to_dict(forged)
+
+                self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
+
     def test_batch_result_serialization_rejects_aggregate_status_drift(self) -> None:
         success = self.execute(request(target("item-1", "alpha")))
         self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
@@ -617,7 +656,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_field")
 
     def test_public_payload_allows_free_text_urls_and_rejects_success_error_mix(self) -> None:
-        result_envelope = make_collection_result(target_ref="alpha")
+        result_envelope = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
         result_envelope["items"][0]["normalized"]["title_or_text_hint"] = (
             "mentions https://example.invalid and /home text as content"
         )
@@ -656,7 +695,10 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             adapter_key=TEST_ADAPTER_KEY,
             target_ref="alpha",
             outcome_status=BATCH_ITEM_SUCCEEDED,
-            result_envelope=make_creator_profile_result(target_ref="creator-1"),
+            result_envelope=runtime_result_envelope(
+                make_creator_profile_result(target_ref="creator-1"),
+                capability="creator_profile_by_id",
+            ),
             audit={"reason": "dataset_record_written"},
         )
 
@@ -666,7 +708,10 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
 
     def test_batch_item_outcome_rejects_extra_result_envelope_fields(self) -> None:
-        result_envelope = make_creator_profile_result(target_ref="creator-1")
+        result_envelope = runtime_result_envelope(
+            make_creator_profile_result(target_ref="creator-1"),
+            capability="creator_profile_by_id",
+        )
         result_envelope["debug"] = {"raw": "not in public contract"}
         forged = BatchItemOutcome(
             item_id="creator",
@@ -683,8 +728,39 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
 
+    def test_batch_item_outcome_rejects_malformed_runtime_result_wrapper_matrix(self) -> None:
+        base = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
+        cases = (
+            ("missing-status", {key: value for key, value in base.items() if key != "status"}, "result_envelope_boundary_mismatch"),
+            ("missing-task-id", {key: value for key, value in base.items() if key != "task_id"}, "result_envelope_boundary_mismatch"),
+            ("failed-status", {**base, "status": "failed"}, "result_envelope_boundary_mismatch"),
+            ("wrong-capability", {**base, "capability": "comment_collection"}, "result_envelope_boundary_mismatch"),
+            ("wrong-adapter", {**base, "adapter_key": "other-adapter"}, "result_envelope_boundary_mismatch"),
+            ("unsafe-task-id", {**base, "task_id": "file:///tmp/task"}, "unsafe_ref"),
+        )
+
+        for label, result_envelope, expected_code in cases:
+            with self.subTest(label=label):
+                forged = BatchItemOutcome(
+                    item_id="item-1",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_ref="alpha",
+                    outcome_status=BATCH_ITEM_SUCCEEDED,
+                    result_envelope=result_envelope,
+                    audit={"reason": "dataset_record_written"},
+                )
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_item_outcome(forged)
+
+                self.assertEqual(context.exception.code, expected_code)
+
     def test_batch_item_outcome_rejects_cursor_bound_comment_without_cursor_context(self) -> None:
-        result_envelope = make_comment_collection_result(target_ref="content:alpha")
+        result_envelope = runtime_result_envelope(
+            make_comment_collection_result(target_ref="content:alpha"),
+            capability="comment_collection",
+        )
         result_envelope["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
         result_envelope["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
         forged = BatchItemOutcome(
@@ -1024,6 +1100,35 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             **{
                 **first.item_outcomes[0].__dict__,
                 "result_envelope": forged_envelope,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=sink,
+                prior_item_outcomes=(forged,),
+            )
+
+        self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
+
+    def test_resume_rejects_forged_prior_success_result_envelope_wrapper(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        forged = BatchItemOutcome(
+            **{
+                **first.item_outcomes[0].__dict__,
+                "result_envelope": {
+                    **first.item_outcomes[0].result_envelope,
+                    "status": "failed",
+                    "capability": "comment_collection",
+                    "adapter_key": "other-adapter",
+                },
             }
         )
 
@@ -1377,6 +1482,65 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
 
+    def test_resume_rejects_tampered_success_dataset_record_identity(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        record = sink.read_by_batch("batch-001")[0]
+        cases = (
+            {"target_ref": "other-target"},
+            {"source_operation": "content_list_by_creator"},
+            {"adapter_key": "other-adapter"},
+            {"dataset_record_id": "dataset:batch-001:other-item"},
+        )
+
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                tampered_sink = ReferenceDatasetSink()
+                tampered_sink.write(type(record)(**{**record.__dict__, **overrides}))
+
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    self.execute(
+                        request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                        sink=tampered_sink,
+                        prior_item_outcomes=first.item_outcomes,
+                    )
+
+                self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+
+    def test_resume_rejects_success_dataset_record_with_wrong_batch_identity(self) -> None:
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(target("item-1", "alpha"), target("item-2", "beta")),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        record = sink.read_by_batch("batch-001")[0]
+        tampered_sink = ReferenceDatasetSink()
+        tampered_sink.write(
+            type(record)(
+                **{
+                    **record.__dict__,
+                    "dataset_record_id": "dataset:batch-001:item-1-tampered",
+                    "batch_item_id": "other-item",
+                }
+            )
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(target("item-1", "alpha"), target("item-2", "beta"), resume_token=first.resume_token),
+                sink=tampered_sink,
+                prior_item_outcomes=first.item_outcomes,
+            )
+
+        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+
     def test_resume_rejects_omitted_dataset_sink_ref_boundary(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -1626,6 +1790,60 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(adapter.request_cursors, [cursor])
         payload = batch_result_envelope_to_dict(result)
         self.assertEqual(payload["item_outcomes"][0]["outcome_status"], BATCH_ITEM_SUCCEEDED)
+        self.assertNotIn("request_cursor_context", payload["item_outcomes"][0])
+
+    def test_resume_reattaches_cursor_context_for_prior_comment_outcome_serialization(self) -> None:
+        adapter = ReplyCommentCollectionAdapter()
+        self.adapters = {TEST_ADAPTER_KEY: adapter}
+        cursor = {
+            "reply_cursor": {
+                "reply_cursor_token": "reply-cursor-1",
+                "reply_cursor_family": "opaque",
+                "resume_target_ref": "content:alpha",
+                "resume_comment_ref": "comment:root-1",
+                "issued_at": "2026-05-09T10:00:00Z",
+            }
+        }
+        first_item = BatchTargetItem(
+            item_id="comments",
+            operation="comment_collection",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_type="content",
+            target_ref="content:alpha",
+            dedup_key="dedup:comments",
+            request_cursor=cursor,
+        )
+        second_item = BatchTargetItem(
+            item_id="comments-duplicate",
+            operation="comment_collection",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_type="content",
+            target_ref="content:alpha",
+            dedup_key="dedup:comments",
+            request_cursor=cursor,
+        )
+        sink = ReferenceDatasetSink()
+        first = self.execute(
+            request(first_item, second_item),
+            sink=sink,
+            stop_after_items=1,
+            stop_reason="timeout",
+        )
+        prior_without_context = tuple(
+            BatchItemOutcome(**{key: value for key, value in outcome.__dict__.items() if key != "request_cursor_context"})
+            for outcome in first.item_outcomes
+        )
+
+        resumed = self.execute(
+            request(first_item, second_item, resume_token=first.resume_token),
+            sink=sink,
+            prior_item_outcomes=prior_without_context,
+        )
+
+        self.assertEqual(resumed.result_status, BATCH_RESULT_COMPLETE)
+        payload = batch_result_envelope_to_dict(resumed)
+        self.assertEqual(payload["item_outcomes"][0]["outcome_status"], BATCH_ITEM_SUCCEEDED)
+        self.assertNotIn("request_cursor_context", payload["item_outcomes"][0])
 
     def test_dataset_write_failure_is_failed_item(self) -> None:
         result = self.execute(request(target("item-1", "alpha")), sink=FailingDatasetSink())

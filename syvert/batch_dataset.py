@@ -116,6 +116,7 @@ _RESULT_ENVELOPE_WRAPPER_FIELDS = frozenset(
         "runtime_execution_metric_samples",
     }
 )
+_REQUIRED_RESULT_ENVELOPE_WRAPPER_FIELDS = frozenset({"task_id", "adapter_key", "capability", "status"})
 
 _FORBIDDEN_REF_TOKENS = (
     "http://",
@@ -747,6 +748,7 @@ def validate_batch_item_outcome(
         _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope", validate_strings=False)
         _validate_result_envelope_boundary(
             operation=outcome.operation,
+            adapter_key=outcome.adapter_key,
             target_ref=outcome.target_ref,
             request_cursor=request_cursor,
             result_envelope=outcome.result_envelope,
@@ -1204,10 +1206,14 @@ def _canonical_item_outcomes(
     *,
     target_set: Sequence[BatchTargetItem] | None = None,
 ) -> tuple[BatchItemOutcome, ...]:
+    canonical: list[BatchItemOutcome] = []
     for index, outcome in enumerate(outcomes):
-        request_cursor = target_set[index].request_cursor if target_set is not None and index < len(target_set) else None
-        validate_batch_item_outcome(outcome, request_cursor=request_cursor)
-    return tuple(outcomes)
+        item = target_set[index] if target_set is not None and index < len(target_set) else None
+        request_cursor = item.request_cursor if item is not None else None
+        enriched = _with_request_cursor_context(item, outcome) if item is not None else outcome
+        validate_batch_item_outcome(enriched, request_cursor=request_cursor)
+        canonical.append(enriched)
+    return tuple(canonical)
 
 
 def _validated_optional_source_trace(envelope: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -1310,9 +1316,13 @@ def _validate_resume_outcome_prefix(
             record = dataset_records.get(outcome.dataset_record_ref)
             if (
                 record is None
+                or record.dataset_record_id != outcome.dataset_record_ref
                 or record.batch_id != request.batch_id
                 or record.batch_item_id != item.item_id
                 or record.dedup_key != item.dedup_key
+                or record.source_operation != item.operation
+                or record.adapter_key != item.adapter_key
+                or record.target_ref != item.target_ref
             ):
                 raise BatchDatasetContractError(
                     "resume_dataset_state_mismatch",
@@ -1335,6 +1345,7 @@ def _validate_prior_success_result_envelope(
         )
     _validate_result_envelope_boundary(
         operation=item.operation,
+        adapter_key=item.adapter_key,
         target_ref=item.target_ref,
         request_cursor=item.request_cursor,
         result_envelope=result_envelope,
@@ -1347,6 +1358,7 @@ def _validate_prior_success_result_envelope(
 def _validate_result_envelope_boundary(
     *,
     operation: str,
+    adapter_key: str,
     target_ref: str,
     request_cursor: Mapping[str, Any] | None,
     result_envelope: Mapping[str, Any],
@@ -1363,6 +1375,14 @@ def _validate_result_envelope_boundary(
             "batch item result_envelope contains fields outside the read-side contract",
             details={"item_id": item_id, "fields": extra_fields, **({"index": index} if index is not None else {})},
         )
+    _validate_result_envelope_wrapper(
+        operation=operation,
+        adapter_key=adapter_key,
+        result_envelope=result_envelope,
+        item_id=item_id,
+        code=code,
+        index=index,
+    )
     payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
     if operation == "comment_collection" and request_cursor is None and _comment_result_requires_cursor_context(payload):
         raise BatchDatasetContractError(
@@ -1386,6 +1406,44 @@ def _validate_result_envelope_boundary(
             "batch item result_envelope does not match operation/target boundary",
             details=details,
         )
+
+
+def _validate_result_envelope_wrapper(
+    *,
+    operation: str,
+    adapter_key: str,
+    result_envelope: Mapping[str, Any],
+    item_id: str,
+    code: str,
+    index: int | None,
+) -> None:
+    details = {"item_id": item_id, **({"index": index} if index is not None else {})}
+    missing = sorted(field for field in _REQUIRED_RESULT_ENVELOPE_WRAPPER_FIELDS if field not in result_envelope)
+    if missing:
+        raise BatchDatasetContractError(
+            code,
+            "batch item result_envelope is missing runtime wrapper fields",
+            details={**details, "missing": missing},
+        )
+    if result_envelope["status"] != "success":
+        raise BatchDatasetContractError(
+            code,
+            "batch item result_envelope status must be success",
+            details={**details, "status": result_envelope["status"]},
+        )
+    if result_envelope["capability"] != operation:
+        raise BatchDatasetContractError(
+            code,
+            "batch item result_envelope capability must match operation",
+            details={**details, "capability": result_envelope["capability"], "expected": operation},
+        )
+    if result_envelope["adapter_key"] != adapter_key:
+        raise BatchDatasetContractError(
+            code,
+            "batch item result_envelope adapter_key must match outcome",
+            details={**details, "adapter_key": result_envelope["adapter_key"], "expected": adapter_key},
+        )
+    _validate_sanitized_ref(_require_non_empty_string(result_envelope["task_id"], field="result_envelope.task_id"), field="result_envelope.task_id")
 
 
 def _comment_result_requires_cursor_context(payload: Mapping[str, Any]) -> bool:

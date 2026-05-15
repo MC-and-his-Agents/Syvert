@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；当前 PR head 随本执行计划提交消费，已让 runtime-generated outcome 携带非序列化 request cursor context，并补 reply-cursor comment result serialization 回归测试，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；merge gate integration recheck 随后发现 resume prior envelope wrapper 与 dataset sink readback identity 缺口。当前本地待提交修复完成 #447 root-cause sweep：runtime-generated/prior outcomes 携带非序列化 request cursor context、result envelope wrapper 字段必填且绑定、dataset record readback identity 完整绑定、audit trace drift matrix 与 serialization matrix 覆盖已补齐；待推送、等待 checks、再运行单次 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -85,9 +85,28 @@
 - guardian rerun20 follow-up：正常 batch execution 产生的 outcome public validation 携带 `BatchTargetItem.request_cursor`，避免合法 cursor-sensitive comment result 被误降级；result envelope boundary 校验拒绝 read-side contract 与 runtime terminal wrapper 之外的额外 top-level 字段。
 - guardian rerun21 follow-up：移除 `batch_execution` 在 shared `TaskRequest` / `CoreTaskRequest` / `TaskRequestSnapshot` admitted surface 中的投影；direct `execute_task` 继续以 `invalid_capability` fail-closed，typed batch runtime 仅通过 `BatchRequest` / `execute_batch_request` 进入。
 - guardian rerun22 follow-up：`BatchItemOutcome` 携带非序列化 `request_cursor_context` 供 batch result validation/serialization 复用；public carrier dict 不输出 cursor context，standalone outcome 缺少 context 时仍对 cursor-sensitive comment result fail-closed。
+- root-cause sweep follow-up：将 `BatchItemOutcome`、`BatchResultEnvelope`、resume prior outcome、dataset sink readback、serialization round-trip、typed `BatchRequest` entrypoint 作为同一套 public carrier contract 排查；新增恶意/漂移 carrier 矩阵覆盖 result wrapper 缺失/漂移、audit trace shape drift、resume sink record identity drift、prior cursor context reattach 与 public serialization 不泄露 cursor context。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，83 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，257 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_models tests.runtime.test_task_record`
   - 结果：通过，133 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
@@ -292,6 +311,8 @@
   - 结果：第二十二轮 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface，与 typed `BatchRequest` runtime boundary 冲突。已在正式 worktree 本地移除 shared admission 并调整测试，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-fd99b0f.json`
   - 结果：第二十三轮 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive comment batch result 在 public carrier serialization 时丢失 request cursor context。已在正式 worktree 本地修复并补 serialization 回归测试，待提交推送。
+- `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
+  - 结果：integration recheck `REQUEST_CHANGES`，阻断项为 resume prior outcome read-side wrapper 未绑定、dataset sink readback 未完整校验 record identity；已在正式 worktree root-cause sweep 中系统修复并补本地矩阵，待提交推送。
 
 ## 待验证项
 
@@ -328,3 +349,4 @@
 - Guardian rerun20 remediation checkpoint：`835a61f0c965`
 - Guardian rerun21 remediation checkpoint：`da60c85c82dd`
 - Guardian rerun22 remediation checkpoint：`1a2334fefc89`
+- Root-cause sweep remediation checkpoint：pending local commit from formal worktree
