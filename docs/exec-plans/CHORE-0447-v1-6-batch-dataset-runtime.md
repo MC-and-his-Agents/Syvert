@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `f09e7bb` 已处理 guardian rerun18 的 public carrier validator 缺口并通过 checks；guardian rerun19 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未 1:1 绑定 item outcomes；当前 PR head 随本执行计划提交消费，已补 request_cursor-aware outcome validation、cursor-sensitive standalone fail-closed、canonical item trace ref 校验与 focused tests，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `272c62b` 已处理 guardian rerun19 的 cursor boundary 与 item trace binding blockers 并通过 checks；guardian rerun20 针对该 head 返回 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 `_validated_public_outcome` 传入 `request_cursor`、result envelope 校验只验证 subset 导致额外字段绕过；当前本地待提交修复已向 generated outcome validation 传入 item cursor、拒绝 read-side envelope 外 top-level 字段并补 focused tests，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -82,9 +82,12 @@
 - guardian rerun17 follow-up：补充合同覆盖，证明 `duplicate_skipped` 在 mixed failure 与 all-failed 聚合中保持 neutral、caller-provided `dataset_id` 会回显到 batch result 与 dataset records、`batch_execution` request snapshot 可经 TaskRecord codec round-trip。
 - guardian rerun18 follow-up：`validate_batch_item_outcome` 对 standalone success/attached `result_envelope` 执行 operation/target boundary validation；`validate_batch_result_envelope` 强制 batch audit trace 包含 `batch_id`、`started_at`、`finished`、`item_count`、`item_trace_refs`、`evidence_refs` 与可选 `stop_reason` 的最小结构。
 - guardian rerun19 follow-up：prior outcome canonical validation 携带对应 `BatchTargetItem.request_cursor`；缺少 cursor 上下文时 cursor-sensitive `comment_collection` result fail-closed；`audit_trace.item_trace_refs` 必须与 `item_outcomes` 等长并逐项等于 `audit:batch:{batch_id}:{item_id}`。
+- guardian rerun20 follow-up：正常 batch execution 产生的 outcome public validation 携带 `BatchTargetItem.request_cursor`，避免合法 cursor-sensitive comment result 被误降级；result envelope boundary 校验拒绝 read-side contract 与 runtime terminal wrapper 之外的额外 top-level 字段。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，77 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
   - 结果：通过，75 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
@@ -96,7 +99,7 @@
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_read_side_collection`
   - 结果：通过，76 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，253 tests。
+  - 结果：通过，255 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -279,6 +282,8 @@
   - 结果：第十九轮 `REQUEST_CHANGES`，阻断项为 standalone batch item success `result_envelope` 可跨 read-side contract 漂移、batch result `audit_trace` 可为空或缺最小结构。已在正式 worktree 本地收紧 validator 并补 focused tests，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-f09e7bb.json`
   - 结果：第二十轮 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未绑定 item outcomes。已在正式 worktree 本地修复并补 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-272c62b.json`
+  - 结果：第二十一轮 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 generated outcome validation 传入 request cursor、result envelope 校验只验证 subset 导致额外字段绕过。已在正式 worktree 本地修复并补 focused tests，待提交推送。
 
 ## 待验证项
 
@@ -312,3 +317,4 @@
 - Guardian rerun17 remediation checkpoint：`92a9fe56b022`
 - Guardian rerun18 remediation checkpoint：`1ccbf622376d`
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
+- Guardian rerun20 remediation checkpoint：pending local commit from formal worktree

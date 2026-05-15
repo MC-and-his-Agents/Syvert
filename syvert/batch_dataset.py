@@ -102,6 +102,20 @@ _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION = {
         }
     ),
 }
+_RESULT_ENVELOPE_WRAPPER_FIELDS = frozenset(
+    {
+        "task_id",
+        "adapter_key",
+        "capability",
+        "status",
+        "task_record_ref",
+        "runtime_result_refs",
+        "execution_control_events",
+        "runtime_failure_signal",
+        "runtime_structured_log_events",
+        "runtime_execution_metric_samples",
+    }
+)
 
 _FORBIDDEN_REF_TOKENS = (
     "http://",
@@ -1051,7 +1065,7 @@ def _is_stop_boundary_outcome(outcome: BatchItemOutcome) -> bool:
 
 def _validated_public_outcome(item: BatchTargetItem, outcome: BatchItemOutcome) -> BatchItemOutcome:
     try:
-        validate_batch_item_outcome(outcome)
+        validate_batch_item_outcome(outcome, request_cursor=item.request_cursor)
     except BatchDatasetContractError as error:
         return _unsafe_item_outcome(item, error)
     return outcome
@@ -1334,6 +1348,13 @@ def _validate_result_envelope_boundary(
 ) -> None:
     target_type = TARGET_TYPE_BY_OPERATION[operation]
     payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[operation]
+    extra_fields = sorted(set(result_envelope) - (payload_fields | _RESULT_ENVELOPE_WRAPPER_FIELDS))
+    if extra_fields:
+        raise BatchDatasetContractError(
+            code,
+            "batch item result_envelope contains fields outside the read-side contract",
+            details={"item_id": item_id, "fields": extra_fields, **({"index": index} if index is not None else {})},
+        )
     payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
     if operation == "comment_collection" and request_cursor is None and _comment_result_requires_cursor_context(payload):
         raise BatchDatasetContractError(

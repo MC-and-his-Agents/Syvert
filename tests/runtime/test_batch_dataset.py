@@ -61,6 +61,19 @@ class CursorRecordingAdapter(CollectionAdapter):
         return make_comment_collection_result(target_ref=request.input.content_ref or "")
 
 
+class ReplyCommentCollectionAdapter(CursorRecordingAdapter):
+    def execute(self, request):
+        self.request_cursors.append(request.input.comment_request_cursor)
+        payload = make_comment_collection_result(target_ref=request.input.content_ref or "")
+        payload["items"][0]["source_id"] = "reply-1"
+        payload["items"][0]["source_ref"] = "comment://reply-1"
+        payload["items"][0]["normalized"]["source_id"] = "reply-1"
+        payload["items"][0]["normalized"]["canonical_ref"] = "comment:reply-1"
+        payload["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
+        payload["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
+        return payload
+
+
 class PaginatedCursorRecordingAdapter:
     supported_capabilities = frozenset({"content_search", "content_list"})
     supported_targets = frozenset({"keyword", "creator"})
@@ -644,6 +657,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             target_ref="alpha",
             outcome_status=BATCH_ITEM_SUCCEEDED,
             result_envelope=make_creator_profile_result(target_ref="creator-1"),
+            audit={"reason": "dataset_record_written"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(forged)
+
+        self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
+
+    def test_batch_item_outcome_rejects_extra_result_envelope_fields(self) -> None:
+        result_envelope = make_creator_profile_result(target_ref="creator-1")
+        result_envelope["debug"] = {"raw": "not in public contract"}
+        forged = BatchItemOutcome(
+            item_id="creator",
+            operation="creator_profile_by_id",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_ref="creator-1",
+            outcome_status=BATCH_ITEM_SUCCEEDED,
+            result_envelope=result_envelope,
             audit={"reason": "dataset_record_written"},
         )
 
@@ -1561,6 +1592,37 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
         )
 
+        self.assertEqual(adapter.request_cursors, [cursor])
+
+    def test_cursor_sensitive_comment_outcome_uses_item_cursor_for_public_validation(self) -> None:
+        adapter = ReplyCommentCollectionAdapter()
+        self.adapters = {TEST_ADAPTER_KEY: adapter}
+        cursor = {
+            "reply_cursor": {
+                "reply_cursor_token": "reply-cursor-1",
+                "reply_cursor_family": "opaque",
+                "resume_target_ref": "content:alpha",
+                "resume_comment_ref": "comment:root-1",
+                "issued_at": "2026-05-09T10:00:00Z",
+            }
+        }
+
+        result = self.execute(
+            request(
+                BatchTargetItem(
+                    item_id="comments",
+                    operation="comment_collection",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_type="content",
+                    target_ref="content:alpha",
+                    dedup_key="dedup:comments",
+                    request_cursor=cursor,
+                )
+            )
+        )
+
+        self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
         self.assertEqual(adapter.request_cursors, [cursor])
 
     def test_dataset_write_failure_is_failed_item(self) -> None:
