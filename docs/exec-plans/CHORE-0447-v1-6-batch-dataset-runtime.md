@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `647fa03` 已处理 guardian rerun20 的 result boundary blockers 并通过 checks；guardian rerun21 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface 但 runtime 仍要求 typed `BatchRequest`；当前 PR head 随本执行计划提交消费，已移除 shared request/snapshot admission，保留 typed `BatchRequest` / `execute_batch_request` 作为唯一 batch execution 入口，并更新直接 `execute_task` 负例，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `fd99b0f` 已处理 guardian rerun21 的 typed entrypoint boundary blocker 并通过 checks；guardian rerun22 针对该 head 返回 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive `comment_collection` batch result 在 `batch_result_envelope_to_dict` serialization 时丢失 cursor context；当前本地待提交修复已让 runtime-generated outcome 携带非序列化 request cursor context，并补 reply-cursor comment result serialization 回归测试，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -84,6 +84,7 @@
 - guardian rerun19 follow-up：prior outcome canonical validation 携带对应 `BatchTargetItem.request_cursor`；缺少 cursor 上下文时 cursor-sensitive `comment_collection` result fail-closed；`audit_trace.item_trace_refs` 必须与 `item_outcomes` 等长并逐项等于 `audit:batch:{batch_id}:{item_id}`。
 - guardian rerun20 follow-up：正常 batch execution 产生的 outcome public validation 携带 `BatchTargetItem.request_cursor`，避免合法 cursor-sensitive comment result 被误降级；result envelope boundary 校验拒绝 read-side contract 与 runtime terminal wrapper 之外的额外 top-level 字段。
 - guardian rerun21 follow-up：移除 `batch_execution` 在 shared `TaskRequest` / `CoreTaskRequest` / `TaskRequestSnapshot` admitted surface 中的投影；direct `execute_task` 继续以 `invalid_capability` fail-closed，typed batch runtime 仅通过 `BatchRequest` / `execute_batch_request` 进入。
+- guardian rerun22 follow-up：`BatchItemOutcome` 携带非序列化 `request_cursor_context` 供 batch result validation/serialization 复用；public carrier dict 不输出 cursor context，standalone outcome 缺少 context 时仍对 cursor-sensitive comment result fail-closed。
 
 ## 已验证项
 
@@ -289,6 +290,8 @@
   - 结果：第二十一轮 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 generated outcome validation 传入 request cursor、result envelope 校验只验证 subset 导致额外字段绕过。已在正式 worktree 本地修复并补 focused tests，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-647fa03.json`
   - 结果：第二十二轮 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface，与 typed `BatchRequest` runtime boundary 冲突。已在正式 worktree 本地移除 shared admission 并调整测试，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-fd99b0f.json`
+  - 结果：第二十三轮 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive comment batch result 在 public carrier serialization 时丢失 request cursor context。已在正式 worktree 本地修复并补 serialization 回归测试，待提交推送。
 
 ## 待验证项
 
@@ -324,3 +327,4 @@
 - Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
 - Guardian rerun20 remediation checkpoint：`835a61f0c965`
 - Guardian rerun21 remediation checkpoint：`da60c85c82dd`
+- Guardian rerun22 remediation checkpoint：pending local commit from formal worktree

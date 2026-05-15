@@ -1624,6 +1624,8 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
         self.assertEqual(adapter.request_cursors, [cursor])
+        payload = batch_result_envelope_to_dict(result)
+        self.assertEqual(payload["item_outcomes"][0]["outcome_status"], BATCH_ITEM_SUCCEEDED)
 
     def test_dataset_write_failure_is_failed_item(self) -> None:
         result = self.execute(request(target("item-1", "alpha")), sink=FailingDatasetSink())

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -253,6 +253,7 @@ class BatchItemOutcome:
     dataset_record_ref: str | None = None
     source_trace: Mapping[str, Any] | None = None
     audit: Mapping[str, Any] = field(default_factory=dict)
+    request_cursor_context: Mapping[str, Any] | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -600,7 +601,7 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
             details={"result_status": envelope.result_status},
         )
     for outcome in envelope.item_outcomes:
-        validate_batch_item_outcome(outcome)
+        validate_batch_item_outcome(outcome, request_cursor=outcome.request_cursor_context)
     expected_result_status = (
         BATCH_RESULT_RESUMABLE
         if envelope.result_status == BATCH_RESULT_RESUMABLE
@@ -657,7 +658,7 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
 
 
 def batch_item_outcome_to_dict(outcome: BatchItemOutcome) -> dict[str, Any]:
-    validate_batch_item_outcome(outcome)
+    validate_batch_item_outcome(outcome, request_cursor=outcome.request_cursor_context)
     return {
         "item_id": outcome.item_id,
         "operation": outcome.operation,
@@ -1064,11 +1065,18 @@ def _is_stop_boundary_outcome(outcome: BatchItemOutcome) -> bool:
 
 
 def _validated_public_outcome(item: BatchTargetItem, outcome: BatchItemOutcome) -> BatchItemOutcome:
+    outcome = _with_request_cursor_context(item, outcome)
     try:
         validate_batch_item_outcome(outcome, request_cursor=item.request_cursor)
     except BatchDatasetContractError as error:
         return _unsafe_item_outcome(item, error)
     return outcome
+
+
+def _with_request_cursor_context(item: BatchTargetItem, outcome: BatchItemOutcome) -> BatchItemOutcome:
+    if outcome.result_envelope is None or item.request_cursor is None or outcome.request_cursor_context is not None:
+        return outcome
+    return replace(outcome, request_cursor_context=dict(item.request_cursor))
 
 
 def _unsafe_item_outcome(item: BatchTargetItem, error: BatchDatasetContractError) -> BatchItemOutcome:
