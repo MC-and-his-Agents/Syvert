@@ -399,6 +399,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
                 self.assertEqual(context.exception.code, code)
 
+    def test_batch_result_serialization_rejects_incomplete_audit_trace(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        forged = BatchResultEnvelope(
+            batch_id=result.batch_id,
+            operation=result.operation,
+            result_status=result.result_status,
+            item_outcomes=result.item_outcomes,
+            resume_token=result.resume_token,
+            dataset_sink_ref=result.dataset_sink_ref,
+            dataset_id=result.dataset_id,
+            audit_trace={},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_batch_audit_trace")
+
     def test_batch_result_serialization_rejects_aggregate_status_drift(self) -> None:
         success = self.execute(request(target("item-1", "alpha")))
         self.adapters = {TEST_ADAPTER_KEY: FailingCollectionAdapter()}
@@ -568,6 +586,10 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "invalid_field")
 
     def test_public_payload_allows_free_text_urls_and_rejects_success_error_mix(self) -> None:
+        result_envelope = make_collection_result(target_ref="alpha")
+        result_envelope["items"][0]["normalized"]["title_or_text_hint"] = (
+            "mentions https://example.invalid and /home text as content"
+        )
         validate_batch_item_outcome(
             BatchItemOutcome(
                 item_id="item-1",
@@ -575,16 +597,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 adapter_key=TEST_ADAPTER_KEY,
                 target_ref="alpha",
                 outcome_status=BATCH_ITEM_SUCCEEDED,
-                result_envelope={
-                    "status": "success",
-                    "items": [
-                        {
-                            "canonical_ref": "content://item-1",
-                            "display_text": "mentions https://example.invalid and /home text as content",
-                        }
-                    ],
-                    "raw_payload_ref": "raw://alpha",
-                },
+                result_envelope=result_envelope,
                 audit={"reason": "dataset_record_written"},
             )
         )
@@ -604,6 +617,22 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "invalid_item_outcome")
+
+    def test_batch_item_outcome_rejects_wrong_read_side_result_envelope(self) -> None:
+        forged = BatchItemOutcome(
+            item_id="item-1",
+            operation="content_search_by_keyword",
+            adapter_key=TEST_ADAPTER_KEY,
+            target_ref="alpha",
+            outcome_status=BATCH_ITEM_SUCCEEDED,
+            result_envelope=make_creator_profile_result(target_ref="creator-1"),
+            audit={"reason": "dataset_record_written"},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(forged)
+
+        self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
 
     def test_error_and_audit_strings_reject_raw_paths(self) -> None:
         for index, outcome in enumerate(
@@ -937,7 +966,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 prior_item_outcomes=(forged,),
             )
 
-        self.assertEqual(context.exception.code, "resume_result_envelope_mismatch")
+        self.assertEqual(context.exception.code, "result_envelope_boundary_mismatch")
 
     def test_resume_rejects_non_duplicate_prior_outcome_marked_duplicate_skipped(self) -> None:
         sink = ReferenceDatasetSink()

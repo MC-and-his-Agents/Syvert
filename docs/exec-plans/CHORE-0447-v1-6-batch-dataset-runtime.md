@@ -46,7 +46,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；上一 review head `0b6027a` 已处理 guardian rerun16 的 resume prior success nested envelope blocker 与 artifact gaps 并通过 checks；guardian rerun17 针对该 head 返回 `REQUEST_CHANGES`，未发现新实现 blocker，要求补充 duplicate+failure aggregation、caller-provided `dataset_id` round-trip、batch TaskRecord snapshot round-trip 覆盖；当前 PR head 随本执行计划提交消费，已补齐三类合同验证缺口，待推送、等待 checks、再运行 guardian。
+- PR `#452`：open；上一 review head `db2afea` 已处理 guardian rerun17 的三类合同验证缺口并通过 checks；guardian rerun18 针对该 head 返回 `REQUEST_CHANGES`，阻断项为 standalone `BatchItemOutcome` success `result_envelope` 未绑定 declared operation/target，另有 `BatchResultEnvelope.audit_trace` 最小结构未强制；当前本地待提交修复已收紧两个 validator 并补 focused tests，待推送、等待 checks、再运行 guardian。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -80,9 +80,12 @@
 - guardian rerun15 follow-up：`DatasetRecord.normalized_payload` 允许稳定 read-side collection 合同中的公开 `canonical_ref` / `source_ref` HTTPS URL，同时继续拒绝非 ref URL、storage/private/raw/download/signed/token URL、本地路径、Windows 盘符路径与 storage/file scheme。
 - guardian rerun16 follow-up：resume prefix 校验对 prior successful outcome 的 nested `result_envelope` 重新执行 operation/target/request_cursor success-payload validation，拒绝伪造外层 outcome 与内层 read-side envelope 不一致的 prior success。
 - guardian rerun17 follow-up：补充合同覆盖，证明 `duplicate_skipped` 在 mixed failure 与 all-failed 聚合中保持 neutral、caller-provided `dataset_id` 会回显到 batch result 与 dataset records、`batch_execution` request snapshot 可经 TaskRecord codec round-trip。
+- guardian rerun18 follow-up：`validate_batch_item_outcome` 对 standalone success/attached `result_envelope` 执行 operation/target boundary validation；`validate_batch_result_envelope` 强制 batch audit trace 包含 `batch_id`、`started_at`、`finished`、`item_count`、`item_trace_refs`、`evidence_refs` 与可选 `stop_reason` 的最小结构。
 
 ## 已验证项
 
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，73 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_task_record`
   - 结果：通过，108 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset`
@@ -90,7 +93,7 @@
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_read_side_collection`
   - 结果：通过，76 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，249 tests。
+  - 结果：通过，251 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -269,6 +272,8 @@
   - 结果：第十七轮 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix；artifact gaps 为执行计划 scope 缺少 `runtime.py` / `task_record.py` / 对应测试文件，current-state/evidence 仍指向旧 head。已在正式 worktree 本地修复，待提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-0b6027a.json`
   - 结果：第十八轮 `REQUEST_CHANGES`，未发现新实现 blocker；缺口为 duplicate+failure aggregation、caller-provided `dataset_id` round-trip、batch TaskRecord snapshot round-trip 覆盖不足。已在正式 worktree 本地补齐 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-db2afea.json`
+  - 结果：第十九轮 `REQUEST_CHANGES`，阻断项为 standalone batch item success `result_envelope` 可跨 read-side contract 漂移、batch result `audit_trace` 可为空或缺最小结构。已在正式 worktree 本地收紧 validator 并补 focused tests，待提交推送。
 
 ## 待验证项
 
@@ -300,3 +305,4 @@
 - Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
 - Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
 - Guardian rerun17 remediation checkpoint：`92a9fe56b022`
+- Guardian rerun18 remediation checkpoint：pending local commit from formal worktree

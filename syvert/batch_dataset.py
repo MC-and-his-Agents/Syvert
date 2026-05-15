@@ -638,6 +638,7 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
         _validate_sanitized_ref(envelope.dataset_id, field="dataset_id")
     _require_mapping(envelope.audit_trace, field="audit_trace")
     _validate_public_payload_no_leakage(envelope.audit_trace, field="audit_trace", validate_strings=True)
+    _validate_batch_audit_trace(envelope)
     return envelope
 
 
@@ -725,6 +726,14 @@ def validate_batch_item_outcome(outcome: BatchItemOutcome) -> BatchItemOutcome:
     if outcome.result_envelope is not None:
         _require_mapping(outcome.result_envelope, field="result_envelope")
         _validate_public_payload_no_leakage(outcome.result_envelope, field="result_envelope", validate_strings=False)
+        _validate_result_envelope_boundary(
+            operation=outcome.operation,
+            target_ref=outcome.target_ref,
+            request_cursor=None,
+            result_envelope=outcome.result_envelope,
+            item_id=outcome.item_id,
+            code="result_envelope_boundary_mismatch",
+        )
     if outcome.error_envelope is not None:
         _require_mapping(outcome.error_envelope, field="error_envelope")
         _validate_public_payload_no_leakage(outcome.error_envelope, field="error_envelope", validate_strings=True)
@@ -1293,26 +1302,99 @@ def _validate_prior_success_result_envelope(
             "prior successful outcome must carry a read-side result envelope",
             details={"index": index, "item_id": item.item_id},
         )
-    payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[item.operation]
+    _validate_result_envelope_boundary(
+        operation=item.operation,
+        target_ref=item.target_ref,
+        request_cursor=item.request_cursor,
+        result_envelope=result_envelope,
+        item_id=item.item_id,
+        index=index,
+        code="resume_result_envelope_mismatch",
+    )
+
+
+def _validate_result_envelope_boundary(
+    *,
+    operation: str,
+    target_ref: str,
+    request_cursor: Mapping[str, Any] | None,
+    result_envelope: Mapping[str, Any],
+    item_id: str,
+    code: str,
+    index: int | None = None,
+) -> None:
+    target_type = TARGET_TYPE_BY_OPERATION[operation]
+    payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[operation]
     payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
     error = validate_success_payload(
         payload,
-        capability=item.operation,
-        target_type=item.target_type,
-        target_value=item.target_ref,
-        request_cursor=item.request_cursor,
+        capability=operation,
+        target_type=target_type,
+        target_value=target_ref,
+        request_cursor=request_cursor,
     )
     if error is not None:
+        details = {"item_id": item_id, "reason": error.get("code"), **dict(error.get("details", {}))}
+        if index is not None:
+            details["index"] = index
         raise BatchDatasetContractError(
-            "resume_result_envelope_mismatch",
-            "prior successful outcome result_envelope does not match target_set prefix",
-            details={
-                "index": index,
-                "item_id": item.item_id,
-                "reason": error.get("code"),
-                **dict(error.get("details", {})),
-            },
+            code,
+            "batch item result_envelope does not match operation/target boundary",
+            details=details,
         )
+
+
+def _validate_batch_audit_trace(envelope: BatchResultEnvelope) -> None:
+    audit_trace = envelope.audit_trace
+    allowed_fields = {
+        "batch_id",
+        "started_at",
+        "finished",
+        "item_count",
+        "item_trace_refs",
+        "evidence_refs",
+        "stop_reason",
+    }
+    required_fields = allowed_fields - {"stop_reason"}
+    missing = sorted(field for field in required_fields if field not in audit_trace)
+    extra = sorted(set(audit_trace) - allowed_fields)
+    if missing or extra:
+        raise BatchDatasetContractError(
+            "invalid_batch_audit_trace",
+            "batch audit_trace does not match the public carrier schema",
+            details={"missing": missing, "extra": extra},
+        )
+    if audit_trace["batch_id"] != envelope.batch_id:
+        raise BatchDatasetContractError(
+            "invalid_batch_audit_trace",
+            "batch audit_trace.batch_id must match batch_id",
+            details={"batch_id": audit_trace["batch_id"], "expected": envelope.batch_id},
+        )
+    _validate_public_timestamp(audit_trace["started_at"], field="audit_trace.started_at")
+    if not isinstance(audit_trace["finished"], bool):
+        raise BatchDatasetContractError("invalid_batch_audit_trace", "batch audit_trace.finished must be boolean")
+    if not isinstance(audit_trace["item_count"], int) or isinstance(audit_trace["item_count"], bool):
+        raise BatchDatasetContractError("invalid_batch_audit_trace", "batch audit_trace.item_count must be an integer")
+    if audit_trace["item_count"] != len(envelope.item_outcomes):
+        raise BatchDatasetContractError(
+            "invalid_batch_audit_trace",
+            "batch audit_trace.item_count must match item outcomes",
+            details={"item_count": audit_trace["item_count"], "expected": len(envelope.item_outcomes)},
+        )
+    _validate_sanitized_ref_sequence(audit_trace["item_trace_refs"], field="audit_trace.item_trace_refs")
+    _validate_sanitized_ref_sequence(audit_trace["evidence_refs"], field="audit_trace.evidence_refs")
+    if "stop_reason" in audit_trace:
+        _validate_sanitized_ref(
+            _require_non_empty_string(audit_trace["stop_reason"], field="audit_trace.stop_reason"),
+            field="audit_trace.stop_reason",
+        )
+
+
+def _validate_sanitized_ref_sequence(value: Any, *, field: str) -> None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise BatchDatasetContractError("invalid_batch_audit_trace", f"{field} must be a sequence")
+    for index, item in enumerate(value):
+        _validate_sanitized_ref(_require_non_empty_string(item, field=f"{field}[{index}]"), field=f"{field}[{index}]")
 
 
 def _validate_source_trace(source_trace: Mapping[str, Any]) -> None:
