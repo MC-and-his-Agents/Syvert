@@ -89,13 +89,14 @@
 - merge gate integration follow-up：成功 `result_envelope` 的 read-side payload 继续允许自由文本 URL/路径片段，但 runtime wrapper 子集单独执行 public string/ref 泄漏校验；`task_record_ref`、`ref_id`、`envelope_ref` 等 wrapper 嵌套引用纳入 sanitized ref 校验，恶意 wrapper 矩阵覆盖 `task_record_ref`、`runtime_result_refs`、`execution_control_events` 与 runtime log message 漂移。
 - sink-bound identity follow-up：系统排查 `BatchRequest -> BatchResultEnvelope -> BatchResumeToken -> resume/readback serialization` dataset boundary；执行路径继续由 Core 派生或回显 `dataset_id`，public result/resume carrier validator 额外拒绝带 `dataset_sink_ref` 但缺 `dataset_id` 的伪造载荷。
 - request admission follow-up：系统排查 `validate_batch_request()` / `validate_batch_target_item()` 与 execution 深层校验一致性；`comment_collection` 与 media fetch `request_cursor` 复用共享 cursor/policy validator，嵌套 `resume_token` 在 public request validator 中校验 shape、`batch_id`、target-set hash、dataset boundary、position 与 token id 绑定，避免 invalid request 降级为 item-level runtime failure 或 preflight false positive。
+- resume/ref boundary follow-up：系统排查 resume runtime position 与 public sanitized ref；resume 必须通过 dataset sink readback state 证明 `next_item_index` 未回退，缺 dataset sink boundary 时 fail-closed；sanitized ref 拒绝 traversal、无 scheme 的 filesystem-like relative path 与相对路径样式，同时保留既有 `raw://` / `alias://` public alias。
 
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，88 tests。
+  - 结果：通过，89 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，262 tests。
+  - 结果：通过，263 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
@@ -322,6 +323,8 @@
   - 结果：`REQUEST_CHANGES`，阻断项为 sink-bound `BatchResultEnvelope` / `BatchResumeToken` 可省略 mandatory `dataset_id`。已停止 guardian/merge gate 重跑，转为本地 sink-bound dataset identity sweep；待本地矩阵与完整验证通过后再提交推送。
 - `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-401e9b3.json`
   - 结果：`REQUEST_CHANGES`，阻断项为 media fetch cursor 未在 batch admission 校验、`validate_batch_request()` 未校验嵌套 resume token。已停止 guardian/merge gate 重跑，转为本地 request admission validator sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-afd321e.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 resume token 可回退重跑已处理 item、public sanitized refs 允许相对路径样式。已停止 guardian/merge gate 重跑，转为本地 resume position / sanitized ref boundary sweep；待本地矩阵与完整验证通过后再提交推送。
 
 ## 待验证项
 

@@ -378,6 +378,12 @@ def execute_batch_request(
             details={"prior_outcomes": len(outcomes), "next_item_index": start_index},
         )
     if start_index:
+        _validate_resume_runtime_position(
+            validated,
+            dataset_id=dataset_id,
+            dataset_sink=dataset_sink,
+            next_item_index=start_index,
+        )
         _validate_resume_outcome_prefix(
             validated,
             outcomes=outcomes,
@@ -1092,6 +1098,8 @@ def _validate_resume_token(token: BatchResumeToken, *, request: BatchRequest, ta
         raise BatchDatasetContractError("invalid_resume_token", "resume token boundary does not match batch request")
     if token.dataset_sink_ref != request.dataset_sink_ref or token.dataset_id != _dataset_id_for_request(request):
         raise BatchDatasetContractError("invalid_resume_token", "resume token dataset boundary does not match batch request")
+    if request.dataset_sink_ref is None:
+        raise BatchDatasetContractError("invalid_resume_token", "resume requires a dataset sink boundary")
     if token.next_item_index > len(request.target_set):
         raise BatchDatasetContractError("invalid_resume_position", "resume token next_item_index is outside target set")
     expected_resume_token = f"resume:{request.batch_id}:{token.next_item_index}"
@@ -1385,6 +1393,35 @@ def _validate_resume_outcome_prefix(
                     "prior successful outcome dataset record is not present in the resumed sink",
                     details={"index": index, "item_id": item.item_id},
                 )
+
+
+def _validate_resume_runtime_position(
+    request: BatchRequest,
+    *,
+    dataset_id: str | None,
+    dataset_sink: ReferenceDatasetSink | None,
+    next_item_index: int,
+) -> None:
+    if request.dataset_sink_ref is None or dataset_id is None or dataset_sink is None:
+        raise BatchDatasetContractError(
+            "resume_dataset_state_missing",
+            "resume requires dataset sink readback state to prove runtime position",
+        )
+    item_index_by_id = {item.item_id: index for index, item in enumerate(request.target_set)}
+    for record in dataset_sink.read_by_dataset(dataset_id):
+        if record.batch_id != request.batch_id:
+            continue
+        record_index = item_index_by_id.get(record.batch_item_id)
+        if record_index is not None and record_index >= next_item_index:
+            raise BatchDatasetContractError(
+                "invalid_resume_position",
+                "resume token next_item_index rewinds existing dataset sink state",
+                details={
+                    "batch_item_id": record.batch_item_id,
+                    "record_index": record_index,
+                    "next_item_index": next_item_index,
+                },
+            )
 
 
 def _validate_prior_success_result_envelope(
@@ -1712,10 +1749,23 @@ def _validate_sanitized_ref(value: str, *, field: str) -> str:
     lowered = stripped.lower()
     if stripped.startswith("/") or _is_windows_absolute_path(stripped):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains a local absolute path", details={"field": field})
+    if _contains_relative_path_ref(stripped):
+        raise BatchDatasetContractError("unsafe_ref", f"{field} contains a relative path", details={"field": field})
     if any(token in lowered for token in _FORBIDDEN_REF_TOKENS):
         raise BatchDatasetContractError("unsafe_ref", f"{field} contains forbidden private or storage token", details={"field": field})
     _ensure_json_safe(stripped, field=field)
     return stripped
+
+
+def _contains_relative_path_ref(value: str) -> bool:
+    lowered = value.lower()
+    if lowered.startswith(("../", "./")) or any(token in lowered for token in ("/../", "/./")):
+        return True
+    if lowered.endswith(("/..", "/.")):
+        return True
+    if "/" in value:
+        return "://" not in value
+    return False
 
 
 def _strip_normalized_payload_private_fields(value: Any) -> Any:

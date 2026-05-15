@@ -386,8 +386,10 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         unsafe_cases = (
             ("batch_id", {"batch_id": "file:///tmp/raw-batch.json"}, "unsafe_ref"),
             ("windows batch_id", {"batch_id": "C:/work/raw-batch.json"}, "unsafe_ref"),
+            ("relative batch_id", {"batch_id": "batch:../raw.json"}, "unsafe_ref"),
             ("dataset_sink_ref", {"dataset_sink_ref": "storage://private/sink"}, "unsafe_ref"),
             ("windows dataset_id", {"dataset_id": "D:/exports/dataset.json"}, "unsafe_ref"),
+            ("relative dataset_id", {"dataset_id": "dataset:cache/state.json"}, "unsafe_ref"),
             ("dataset_id", {"dataset_id": "/etc/dataset"}, "unsafe_ref"),
             ("result_status", {"result_status": "provider_fallback"}, "invalid_batch_result_status"),
             (
@@ -600,6 +602,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         )
         unsafe_cases = (
             ("resume_token", "provider:fallback:marketplace", "unsafe_ref"),
+            ("resume_token", "resume:cache/state.json", "unsafe_ref"),
             ("batch_id", "file:///tmp/batch", "unsafe_ref"),
             ("target_set_hash", "provider:fallback:marketplace", "unsafe_ref"),
             ("next_item_index", -1, "invalid_resume_position"),
@@ -1155,6 +1158,32 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(second.resume_token.next_item_index, 2)
         self.assertEqual([outcome.item_id for outcome in second.item_outcomes], ["item-1", "item-2"])
 
+    def test_resume_rejects_rewound_runtime_position(self) -> None:
+        sink = ReferenceDatasetSink()
+        target_set = (target("item-1", "alpha"), target("item-2", "beta"), target("item-3", "gamma"))
+        second = self.execute(
+            request(*target_set),
+            sink=sink,
+            stop_after_items=2,
+            stop_reason="timeout",
+        )
+        rewound_token = BatchResumeToken(
+            **{
+                **second.resume_token.__dict__,
+                "resume_token": "resume:batch-001:1",
+                "next_item_index": 1,
+            }
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            self.execute(
+                request(*target_set, resume_token=rewound_token),
+                sink=sink,
+                prior_item_outcomes=second.item_outcomes[:1],
+            )
+
+        self.assertEqual(context.exception.code, "invalid_resume_position")
+
     def test_resume_rejects_forged_prior_outcome_prefix(self) -> None:
         sink = ReferenceDatasetSink()
         first = self.execute(
@@ -1446,7 +1475,7 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                 prior_item_outcomes=(forged,),
             )
 
-        self.assertEqual(context.exception.code, "resume_dataset_state_mismatch")
+        self.assertEqual(context.exception.code, "invalid_resume_token")
 
     def test_resume_rejects_failed_prior_outcome_with_stale_sink_record(self) -> None:
         sink = ReferenceDatasetSink()
