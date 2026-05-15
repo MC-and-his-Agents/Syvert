@@ -2502,7 +2502,15 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
                     }
                 )
             )
-        for local_path in ("/home/me/provider-route", "/etc/provider-route", "C:/work/provider-route", "D:\\exports\\provider-route"):
+        for local_path in (
+            "/home/me/provider-route",
+            "/etc/provider-route",
+            "C:/work/provider-route",
+            "D:\\exports\\provider-route",
+            "provider/relative/path",
+            "./provider/path",
+            "../provider/path",
+        ):
             with self.subTest(local_path=local_path):
                 with self.assertRaises(BatchDatasetContractError):
                     validate_dataset_record(

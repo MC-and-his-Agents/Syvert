@@ -1687,6 +1687,8 @@ def _validate_provider_path(provider_path: str) -> None:
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not contain surrounding whitespace")
     if stripped.startswith("/") or _is_windows_absolute_path(stripped):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a local absolute path")
+    if _contains_relative_path_ref(stripped):
+        raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must not be a relative path")
     lowered = stripped.lower()
     if any(token in lowered for token in forbidden):
         raise BatchDatasetContractError("unsafe_provider_path", "source_trace.provider_path must be a sanitized alias")
