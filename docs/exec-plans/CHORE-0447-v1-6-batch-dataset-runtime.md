@@ -92,9 +92,9 @@
 ## 已验证项
 
 - `python3 -m unittest tests.runtime.test_batch_dataset`
-  - 结果：通过，83 tests。
+  - 结果：通过，85 tests。
 - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
-  - 结果：通过，257 tests。
+  - 结果：通过，259 tests。
 - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - `python3 scripts/spec_guard.py --mode ci --all`
