@@ -126,3 +126,6 @@
 ## 最近一次 checkpoint 对应的 head SHA
 
 - Consumer migration checkpoint：`2df4d3cca1dd8b4e64d01c931750af7342da56e8`
+- Strict batch public carrier validation checkpoint：`15140180888cf2820dcb4e5ff8fd6fe5428ec897`
+- Cursor-sensitive public carrier compatibility checkpoint：`1e632913489b2aa1eaf00f7bb3f39417341bf24f`
+- Live PR head 以 GitHub `headRefOid` 为准；metadata-only checkpoint 只更新本执行计划记录。
