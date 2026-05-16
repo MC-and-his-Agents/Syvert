@@ -47,7 +47,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；latest remote head `fd791cb989f38c688a99b188059ea1395bc53d80` GitHub checks 全绿，guardian `APPROVE`，merge gate `REQUEST_CHANGES`。当前 merge blockers：shared `CoreTaskRequest.request_cursor` for search/list 被接受但静默丢弃；terminal `BatchResultEnvelope` 可接受空 `item_outcomes` 作为 `all_failed`。已在 runtime remediation commit `78c95eb6cc7afe04e9a07a5c047ce50ca7c30bd3` 修复：shared Core search/list cursor 直接 fail-closed，batch-only continuation 仍经 typed `BatchRequest` / `TaskInput.continuation_token` 传递；terminal batch result validator 拒绝空 outcomes。下一步是推送 evidence sync，等待 GitHub checks，然后只运行一次 guardian，再只运行一次 merge gate。
+- PR `#452`：open；latest remote head `3c1409c254f9b137ca7f7575cad14f173410555d` GitHub checks 全绿。Guardian 对该 head 给出 `REQUEST_CHANGES`：sink-bound successful batch results 可缺 `dataset_record_ref`；`content_search_by_keyword` target keyword 仍允许 Windows absolute path。已在 runtime remediation commit `1a73f9f3b400919e12dad859dfca0eb754046bf5` 修复：sink-bound success outcome 必须携带 `dataset_record_ref`；search keyword validator 拒绝 Windows drive-letter absolute paths。下一步是推送 evidence sync，等待 GitHub checks，然后只运行一次 guardian，再只运行一次 merge gate。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -97,9 +97,31 @@
 - shared runtime cursor boundary follow-up：merge gate integration recheck 发现 search/list `CoreTaskRequest.request_cursor` 成为未校验共享 runtime 输入面；已收敛为 batch-only continuation 行为，batch 经既有 `TaskInput.continuation_token` 传递 search/list 游标，shared `CoreTaskRequest` search/list cursor 不再转发到 adapter context。
 - public carrier truth-boundary follow-up：停止高成本 review probing 后做本地 root-cause sweep；`source_trace.adapter_key` 现在必须与 enclosing `BatchItemOutcome` / `DatasetRecord` / `result_envelope` adapter 绑定，嵌套 `result_envelope.items[*].source_trace` 同样绑定；`DatasetRecord` mapping 输入拒绝未知顶层字段，避免 durable carrier 静默丢弃恶意/漂移字段；`BatchResultEnvelope.audit_trace` 现在按 `result_status` 绑定 terminal/resumable truth，terminal 必须 `finished=true` 且无 `stop_reason`，resumable 必须 `finished=false`、携带 `stop_reason` 与 `resume_token`。
 - merge gate blocker follow-up：`CoreTaskRequest.request_cursor` 对 `content_search_by_keyword` / `content_list_by_creator` 不再作为 shared runtime admitted surface，传入时以 `unsupported_request_cursor` fail-closed，避免 adapter 侧静默丢弃；typed batch wrapper 的 search/list continuation 继续通过 `TaskInput.continuation_token` 传递。`validate_batch_result_envelope()` 对非 `resumable` 终态强制至少一个 `BatchItemOutcome`，拒绝空 terminal `all_failed` forged carrier。
+- guardian follow-up after `3c1409c`：`validate_batch_result_envelope()` 在 `dataset_sink_ref` 存在时强制所有 `succeeded` item outcome 携带 `dataset_record_ref`，防止 public carrier 声称 dataset delivery 但没有 durable record；`_validate_search_keyword()` 与 public ref sanitizer 对齐，拒绝 `C:/...` / `D:/...` 这类 Windows absolute paths。
 
 ## 已验证项
 
+- Runtime remediation commit `1a73f9f3b400919e12dad859dfca0eb754046bf5` for guardian findings：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface`
+  - 结果：通过，4 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，254 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，428 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
 - Runtime remediation commit `78c95eb6cc7afe04e9a07a5c047ce50ca7c30bd3` for merge gate blockers：
   - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface`
   - 结果：通过，2 tests。
