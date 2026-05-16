@@ -11,7 +11,7 @@
 - Parent FR：`#445`
 - 关联 spec：`docs/specs/FR-0445-batch-dataset-core-contract/spec.md`
 - 关联 artifact：`docs/exec-plans/artifacts/CHORE-0449-v1-6-batch-dataset-evidence.md`
-- 关联 PR：
+- 关联 PR：`#454`
 - 状态：`active`
 
 ## 目标
@@ -41,6 +41,7 @@
 - Work Item `#447`：runtime carrier PR `#452` 已合入，merge commit `926a378dbec0c93fe2766eff8f4e3277083797c5`。
 - Work Item `#448`：consumer PR `#453` 已合入，merge commit `23cbce712138e5edaba8e199cba419ff31dd0956`。
 - Work Item `#449`：active evidence。
+- PR：`#454`
 - Workspace key：`issue-449-445-v1-6-0-batch-dataset-evidence`
 - Branch：`issue-449-445-v1-6-0-batch-dataset-evidence`
 - Worktree：formal issue-scoped worktree for `#449`
