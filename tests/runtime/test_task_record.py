@@ -429,6 +429,164 @@ class MediaAssetFetchAdapter:
 
 
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
+    def make_batch_record(self):
+        request = TaskRequestSnapshot(
+            adapter_key="core",
+            capability="batch_execution",
+            target_type="operation_batch",
+            target_value="batch-001",
+            collection_mode="batch",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-batch-1",
+                request=request,
+                occurred_at="2026-05-16T10:00:00Z",
+            ),
+            occurred_at="2026-05-16T10:00:01Z",
+        )
+        return finish_task_record(
+            record,
+            {
+                "task_id": "task-record-batch-1",
+                "adapter_key": "core",
+                "capability": "batch_execution",
+                "status": "success",
+                "task_record_ref": "task_record:task-record-batch-1",
+                "batch_id": "batch-001",
+                "operation": "batch_execution",
+                "result_status": "complete",
+                "dataset_sink_ref": "sink:reference",
+                "dataset_id": "dataset:batch-001",
+                "item_outcomes": [
+                    {
+                        "item_id": "item-1",
+                        "operation": "content_search_by_keyword",
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "target_ref": "deep learning",
+                        "outcome_status": "succeeded",
+                        "result_envelope": {
+                            "task_id": "batch-item-1",
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "capability": "content_search_by_keyword",
+                            "status": "success",
+                            **make_collection_result(target_ref="deep learning"),
+                        },
+                        "dataset_record_ref": "dataset:batch-001:item-1",
+                        "source_trace": {
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "provider_path": "provider://sanitized",
+                            "fetched_at": "2026-05-16T10:00:01Z",
+                            "evidence_alias": "alias://batch-item-1",
+                        },
+                        "audit": {"reason": "dataset_record_written"},
+                    }
+                ],
+                "audit_trace": {
+                    "batch_id": "batch-001",
+                    "started_at": "2026-05-16T10:00:00Z",
+                    "finished": True,
+                    "item_count": 1,
+                    "item_trace_refs": ["audit:batch:batch-001:item-1"],
+                    "evidence_refs": ["evidence:batch:item"],
+                },
+            },
+            occurred_at="2026-05-16T10:00:02Z",
+        )
+
+    def make_record_from_batch_envelope(self, *, task_id: str, batch_id: str, envelope: dict[str, object]):
+        record = start_task_record(
+            create_task_record(
+                task_id,
+                TaskRequestSnapshot(
+                    adapter_key="core",
+                    capability="batch_execution",
+                    target_type="operation_batch",
+                    target_value=batch_id,
+                    collection_mode="batch",
+                ),
+                occurred_at="2026-05-16T10:00:00Z",
+            ),
+            occurred_at="2026-05-16T10:00:01Z",
+        )
+        return finish_task_record(record, envelope, occurred_at="2026-05-16T10:00:02Z")
+
+    def make_cursor_sensitive_batch_envelope(
+        self,
+        *,
+        task_id: str = "task-record-batch-comments",
+        batch_id: str = "batch-comments",
+    ) -> dict[str, object]:
+        from syvert.batch_dataset import BatchItemOutcome, BatchResultEnvelope, batch_result_envelope_to_dict
+
+        cursor = {
+            "reply_cursor": {
+                "reply_cursor_token": "reply-cursor-1",
+                "reply_cursor_family": "opaque",
+                "resume_target_ref": "content:alpha",
+                "resume_comment_ref": "comment:root-1",
+                "issued_at": "2026-05-09T10:00:00Z",
+            }
+        }
+        result_envelope = {
+            "task_id": "batch-comment-item-1",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "comment_collection",
+            "status": "success",
+            **make_comment_collection_result(target_ref="content:alpha"),
+        }
+        result_envelope["items"][0]["source_id"] = "reply-1"
+        result_envelope["items"][0]["source_ref"] = "comment://reply-1"
+        result_envelope["items"][0]["dedup_key"] = "comment:reply-1"
+        result_envelope["items"][0]["normalized"]["source_id"] = "reply-1"
+        result_envelope["items"][0]["normalized"]["canonical_ref"] = "comment:reply-1"
+        result_envelope["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
+        result_envelope["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
+        batch_payload = batch_result_envelope_to_dict(
+            BatchResultEnvelope(
+                batch_id=batch_id,
+                operation="batch_execution",
+                result_status="complete",
+                item_outcomes=(
+                    BatchItemOutcome(
+                        item_id="comments",
+                        operation="comment_collection",
+                        adapter_key=TEST_ADAPTER_KEY,
+                        target_ref="content:alpha",
+                        outcome_status="succeeded",
+                        result_envelope=result_envelope,
+                        dataset_record_ref=f"dataset:{batch_id}:comments",
+                        source_trace={
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "provider_path": "provider://sanitized",
+                            "fetched_at": "2026-05-16T10:00:01Z",
+                            "evidence_alias": "alias://batch-comment-item-1",
+                        },
+                        audit={"reason": "dataset_record_written"},
+                        request_cursor_context=cursor,
+                    ),
+                ),
+                dataset_sink_ref="sink:reference",
+                dataset_id=f"dataset:{batch_id}",
+                audit_trace={
+                    "batch_id": batch_id,
+                    "started_at": "2026-05-16T10:00:00Z",
+                    "finished": True,
+                    "item_count": 1,
+                    "item_trace_refs": [f"audit:batch:{batch_id}:comments"],
+                    "evidence_refs": ["evidence:batch:item"],
+                },
+            )
+        )
+        return {
+            "task_id": task_id,
+            "adapter_key": "core",
+            "capability": "batch_execution",
+            "status": "success",
+            "task_record_ref": f"task_record:{task_id}",
+            **batch_payload,
+        }
+
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
@@ -448,6 +606,267 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(restored, outcome.task_record)
         self.assertEqual(restored.status, "succeeded")
+
+    def test_round_trips_batch_execution_record(self) -> None:
+        record = self.make_batch_record()
+
+        payload = task_record_to_dict(record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.request.capability, "batch_execution")
+        self.assertEqual(restored.request.target_type, "operation_batch")
+        self.assertEqual(restored.request.collection_mode, "batch")
+        self.assertEqual(restored.result.envelope["operation"], "batch_execution")
+        self.assertEqual(restored.result.envelope["item_outcomes"][0]["dataset_record_ref"], "dataset:batch-001:item-1")
+        self.assertNotIn("request_cursor_context", repr(payload))
+
+    def test_round_trips_sinkless_and_non_complete_batch_boundaries(self) -> None:
+        complete_payload = task_record_to_dict(self.make_batch_record())["result"]["envelope"]
+
+        sinkless = json.loads(json.dumps(complete_payload))
+        sinkless["task_id"] = "task-record-batch-sinkless"
+        sinkless["task_record_ref"] = "task_record:task-record-batch-sinkless"
+        sinkless["batch_id"] = "batch-sinkless"
+        sinkless["dataset_sink_ref"] = None
+        sinkless["dataset_id"] = None
+        sinkless["item_outcomes"][0].pop("dataset_record_ref")
+        sinkless["audit_trace"]["batch_id"] = "batch-sinkless"
+        sinkless["audit_trace"]["item_trace_refs"] = ["audit:batch:batch-sinkless:item-1"]
+
+        failed_item = {
+            "item_id": "item-2",
+            "operation": "content_search_by_keyword",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "target_ref": "graph learning",
+            "outcome_status": "failed",
+            "error_envelope": {
+                "category": "runtime_contract",
+                "code": "adapter_failed",
+                "message": "adapter failed",
+                "details": {"reason": "platform_unavailable"},
+            },
+            "audit": {"reason": "adapter_failed"},
+        }
+        partial = json.loads(json.dumps(complete_payload))
+        partial["task_id"] = "task-record-batch-partial"
+        partial["task_record_ref"] = "task_record:task-record-batch-partial"
+        partial["batch_id"] = "batch-partial"
+        partial["dataset_id"] = "dataset:batch-partial"
+        partial["result_status"] = "partial_success"
+        partial["item_outcomes"].append(failed_item)
+        partial["audit_trace"]["batch_id"] = "batch-partial"
+        partial["audit_trace"]["item_count"] = 2
+        partial["audit_trace"]["item_trace_refs"] = [
+            "audit:batch:batch-partial:item-1",
+            "audit:batch:batch-partial:item-2",
+        ]
+
+        all_failed = json.loads(json.dumps(partial))
+        all_failed["task_id"] = "task-record-batch-all-failed"
+        all_failed["task_record_ref"] = "task_record:task-record-batch-all-failed"
+        all_failed["batch_id"] = "batch-all-failed"
+        all_failed["dataset_id"] = "dataset:batch-all-failed"
+        all_failed["result_status"] = "all_failed"
+        all_failed["item_outcomes"] = [failed_item]
+        all_failed["audit_trace"]["batch_id"] = "batch-all-failed"
+        all_failed["audit_trace"]["item_count"] = 1
+        all_failed["audit_trace"]["item_trace_refs"] = ["audit:batch:batch-all-failed:item-2"]
+
+        resumable = json.loads(json.dumps(complete_payload))
+        resumable["task_id"] = "task-record-batch-resumable"
+        resumable["task_record_ref"] = "task_record:task-record-batch-resumable"
+        resumable["batch_id"] = "batch-resumable"
+        resumable["dataset_id"] = "dataset:batch-resumable"
+        resumable["result_status"] = "resumable"
+        resumable["resume_token"] = {
+            "resume_token": "resume:batch-resumable:1",
+            "batch_id": "batch-resumable",
+            "target_set_hash": "sha256:batch-resumable",
+            "next_item_index": 1,
+            "issued_at": "2026-05-16T10:00:02Z",
+            "dataset_sink_ref": "sink:reference",
+            "dataset_id": "dataset:batch-resumable",
+        }
+        resumable["audit_trace"]["batch_id"] = "batch-resumable"
+        resumable["audit_trace"]["finished"] = False
+        resumable["audit_trace"]["item_trace_refs"] = ["audit:batch:batch-resumable:item-1"]
+        resumable["audit_trace"]["stop_reason"] = "interrupted"
+
+        cases = (
+            ("sinkless", sinkless, "batch-sinkless"),
+            ("partial", partial, "batch-partial"),
+            ("all_failed", all_failed, "batch-all-failed"),
+            ("resumable", resumable, "batch-resumable"),
+        )
+        for label, envelope, batch_id in cases:
+            with self.subTest(label=label):
+                restored = task_record_from_dict(
+                    task_record_to_dict(
+                        self.make_record_from_batch_envelope(
+                            task_id=str(envelope["task_id"]),
+                            batch_id=batch_id,
+                            envelope=envelope,
+                        )
+                    )
+                )
+
+                self.assertEqual(restored.result.envelope["batch_id"], batch_id)
+                self.assertEqual(restored.result.envelope["result_status"], envelope["result_status"])
+
+    def test_round_trips_serialized_cursor_sensitive_batch_result(self) -> None:
+        envelope = self.make_cursor_sensitive_batch_envelope()
+
+        restored = task_record_from_dict(
+            task_record_to_dict(
+                self.make_record_from_batch_envelope(
+                    task_id="task-record-batch-comments",
+                    batch_id="batch-comments",
+                    envelope=envelope,
+                )
+            )
+        )
+
+        self.assertEqual(restored.result.envelope["batch_id"], "batch-comments")
+        self.assertNotIn("request_cursor_context", repr(restored.result.envelope))
+
+    def test_cursor_sensitive_batch_result_restores_cursor_for_downstream_validation(self) -> None:
+        import syvert.batch_dataset as batch_dataset
+
+        envelope = self.make_cursor_sensitive_batch_envelope()
+        validation_attempts = []
+        original_validate = batch_dataset.validate_batch_result_envelope
+
+        def recording_validate(candidate):
+            validation_attempts.append(candidate)
+            return original_validate(candidate)
+
+        with mock.patch("syvert.batch_dataset.validate_batch_result_envelope", side_effect=recording_validate):
+            restored = task_record_from_dict(
+                task_record_to_dict(
+                    self.make_record_from_batch_envelope(
+                        task_id="task-record-batch-comments",
+                        batch_id="batch-comments",
+                        envelope=envelope,
+                    )
+                )
+            )
+
+        self.assertEqual(restored.result.envelope["batch_id"], "batch-comments")
+        self.assertGreaterEqual(len(validation_attempts), 2)
+        self.assertIsNone(validation_attempts[0].item_outcomes[0].request_cursor_context)
+        self.assertEqual(
+            validation_attempts[1].item_outcomes[0].request_cursor_context,
+            {"reply_cursor": {"resume_comment_ref": "comment:root-1"}},
+        )
+
+    def test_rejects_cursor_sensitive_batch_result_target_drift(self) -> None:
+        envelope = self.make_cursor_sensitive_batch_envelope()
+        envelope["item_outcomes"][0]["result_envelope"]["target"]["target_ref"] = "content:other"
+
+        with self.assertRaises(TaskRecordContractError):
+            self.make_record_from_batch_envelope(
+                task_id="task-record-batch-comments",
+                batch_id="batch-comments",
+                envelope=envelope,
+            )
+
+    def test_rejects_cursor_sensitive_batch_result_ambiguous_public_thread(self) -> None:
+        envelope = self.make_cursor_sensitive_batch_envelope()
+        result_envelope = envelope["item_outcomes"][0]["result_envelope"]
+        second_item = json.loads(json.dumps(result_envelope["items"][0]))
+        second_item["dedup_key"] = "comment:reply-2"
+        second_item["source_id"] = "reply-2"
+        second_item["source_ref"] = "comment://reply-2"
+        second_item["normalized"]["source_id"] = "reply-2"
+        second_item["normalized"]["canonical_ref"] = "comment:reply-2"
+        second_item["normalized"]["root_comment_ref"] = "comment:other-root"
+        second_item["normalized"]["parent_comment_ref"] = "comment:other-root"
+        second_item["normalized"]["target_comment_ref"] = "comment:other-root"
+        result_envelope["items"].append(second_item)
+
+        with self.assertRaises(TaskRecordContractError):
+            self.make_record_from_batch_envelope(
+                task_id="task-record-batch-comments",
+                batch_id="batch-comments",
+                envelope=envelope,
+            )
+
+    def test_rejects_batch_execution_result_status_drift(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["result_status"] = "all_failed"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_execution_top_level_raw_payload(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["raw"] = {"provider_batch": True}
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_execution_top_level_extra_private_field(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["provider_route"] = "provider:fallback:marketplace"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_execution_request_snapshot_unsafe_batch_id(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-batch-unsafe-id",
+                TaskRequestSnapshot(
+                    adapter_key="core",
+                    capability="batch_execution",
+                    target_type="operation_batch",
+                    target_value="file:///tmp/raw-batch",
+                    collection_mode="batch",
+                ),
+                occurred_at="2026-05-16T10:00:00Z",
+            )
+
+    def test_rejects_batch_item_extra_private_field(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["request_cursor_context"] = {
+            "provider_route": "provider:fallback:marketplace"
+        }
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_failed_batch_item_with_dataset_record_ref(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        item = payload["result"]["envelope"]["item_outcomes"][0]
+        item["outcome_status"] = "failed"
+        item.pop("result_envelope")
+        item["error_envelope"] = {
+            "category": "runtime_contract",
+            "code": "dataset_write_failed",
+            "message": "dataset write failed",
+            "details": {"reason": "sink_unavailable"},
+        }
+        payload["result"]["envelope"]["result_status"] = "all_failed"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_item_result_envelope_target_drift(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["result_envelope"]["target"]["target_ref"] = "other-query"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_item_result_envelope_private_source_trace(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["result_envelope"]["source_trace"][
+            "provider_path"
+        ] = "cache/state.json"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
 
     def test_round_trips_comment_collection_record(self) -> None:
         outcome = execute_task_with_record(

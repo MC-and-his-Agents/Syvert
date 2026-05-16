@@ -205,6 +205,177 @@ def make_failed_envelope(
     }
 
 
+def make_batch_request_snapshot(batch_id: str = "batch-001") -> TaskRequestSnapshot:
+    return TaskRequestSnapshot(
+        adapter_key="core",
+        capability="batch_execution",
+        target_type="operation_batch",
+        target_value=batch_id,
+        collection_mode="batch",
+    )
+
+
+def make_batch_success_envelope(task_id: str, batch_id: str = "batch-001") -> dict[str, object]:
+    return {
+        "task_id": task_id,
+        "adapter_key": "core",
+        "capability": "batch_execution",
+        "status": "success",
+        "task_record_ref": f"task_record:{task_id}",
+        "batch_id": batch_id,
+        "operation": "batch_execution",
+        "result_status": "complete",
+        "dataset_sink_ref": "sink:reference",
+        "dataset_id": f"dataset:{batch_id}",
+        "item_outcomes": [
+            {
+                "item_id": "item-1",
+                "operation": "content_search_by_keyword",
+                "adapter_key": TEST_ADAPTER_KEY,
+                "target_ref": "deep learning",
+                "outcome_status": "succeeded",
+                "result_envelope": {
+                    "task_id": "batch-item-1",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "capability": "content_search_by_keyword",
+                    "status": "success",
+                    "operation": "content_search_by_keyword",
+                    "target": {
+                        "operation": "content_search_by_keyword",
+                        "target_type": "keyword",
+                        "target_ref": "deep learning",
+                    },
+                    "items": [],
+                    "has_more": False,
+                    "next_continuation": None,
+                    "result_status": "complete",
+                    "error_classification": "platform_failed",
+                    "raw_payload_ref": "raw://page-1",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-04-24T00:00:01Z",
+                        "evidence_alias": "alias://batch-item-1",
+                    },
+                    "audit": {},
+                },
+                "dataset_record_ref": f"dataset:{batch_id}:item-1",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "fetched_at": "2026-04-24T00:00:01Z",
+                    "evidence_alias": "alias://batch-item-1",
+                },
+                "audit": {"reason": "dataset_record_written"},
+            }
+        ],
+        "audit_trace": {
+            "batch_id": batch_id,
+            "started_at": "2026-04-24T00:00:00Z",
+            "finished": True,
+            "item_count": 1,
+            "item_trace_refs": [f"audit:batch:{batch_id}:item-1"],
+            "evidence_refs": ["evidence:batch:item"],
+        },
+    }
+
+
+def make_cursor_comment_batch_success_envelope(
+    task_id: str,
+    batch_id: str = "batch-comments",
+) -> dict[str, object]:
+    return {
+        "task_id": task_id,
+        "adapter_key": "core",
+        "capability": "batch_execution",
+        "status": "success",
+        "task_record_ref": f"task_record:{task_id}",
+        "batch_id": batch_id,
+        "operation": "batch_execution",
+        "result_status": "complete",
+        "dataset_sink_ref": "sink:reference",
+        "dataset_id": f"dataset:{batch_id}",
+        "item_outcomes": [
+            {
+                "item_id": "comments",
+                "operation": "comment_collection",
+                "adapter_key": TEST_ADAPTER_KEY,
+                "target_ref": "content:alpha",
+                "outcome_status": "succeeded",
+                "result_envelope": {
+                    "task_id": "batch-comment-item-1",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "capability": "comment_collection",
+                    "status": "success",
+                    "operation": "comment_collection",
+                    "target": {
+                        "operation": "comment_collection",
+                        "target_type": "content",
+                        "target_ref": "content:alpha",
+                    },
+                    "items": [
+                        {
+                            "item_type": "comment",
+                            "dedup_key": "comment:reply-1",
+                            "source_id": "reply-1",
+                            "source_ref": "comment://reply-1",
+                            "normalized": {
+                                "source_platform": TEST_ADAPTER_KEY,
+                                "source_type": "comment",
+                                "source_id": "reply-1",
+                                "canonical_ref": "comment:reply-1",
+                                "body_text_hint": "reply",
+                                "author_ref": "creator-1",
+                                "published_at": "2026-04-24T00:00:01Z",
+                                "root_comment_ref": "comment:root-1",
+                                "parent_comment_ref": "comment:root-1",
+                                "target_comment_ref": "comment:root-1",
+                            },
+                            "visibility_status": "visible",
+                            "reply_cursor": None,
+                            "raw_payload_ref": "raw://comment/reply-1",
+                            "source_trace": {
+                                "adapter_key": TEST_ADAPTER_KEY,
+                                "provider_path": "provider://sanitized",
+                                "fetched_at": "2026-04-24T00:00:01Z",
+                                "evidence_alias": "alias://comment-reply-1",
+                            },
+                        }
+                    ],
+                    "has_more": False,
+                    "next_continuation": None,
+                    "result_status": "partial_result",
+                    "error_classification": "parse_failed",
+                    "raw_payload_ref": "raw://comment/page-1",
+                    "source_trace": {
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "provider_path": "provider://sanitized",
+                        "fetched_at": "2026-04-24T00:00:01Z",
+                        "evidence_alias": "alias://comment-page-1",
+                    },
+                    "audit": {"page_index": 1},
+                },
+                "dataset_record_ref": f"dataset:{batch_id}:comments",
+                "source_trace": {
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "provider_path": "provider://sanitized",
+                    "fetched_at": "2026-04-24T00:00:01Z",
+                    "evidence_alias": "alias://batch-comment-item-1",
+                },
+                "audit": {"reason": "dataset_record_written"},
+            }
+        ],
+        "audit_trace": {
+            "batch_id": batch_id,
+            "started_at": "2026-04-24T00:00:00Z",
+            "finished": True,
+            "item_count": 1,
+            "item_trace_refs": [f"audit:batch:{batch_id}:comments"],
+            "evidence_refs": ["evidence:batch:item"],
+        },
+    }
+
+
 class CliHttpSamePathTests(ResourceStoreEnvMixin, unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -563,6 +734,61 @@ class CliHttpSamePathTests(ResourceStoreEnvMixin, unittest.TestCase):
                 self.assertEqual(result_response.body["status"], "failed")
                 self.assertEqual(result_response.body["error"]["category"], "invalid_input")
                 self.assertEqual(result_response.body["error"]["code"], "result_not_ready")
+
+    def test_batch_task_record_query_and_http_result_share_public_carrier(self) -> None:
+        task_id = "task-batch-query-same-path"
+        accepted = create_task_record(
+            task_id,
+            make_batch_request_snapshot("batch-001"),
+            occurred_at="2026-04-24T00:00:00Z",
+        )
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        terminal = finish_task_record(
+            running,
+            make_batch_success_envelope(task_id, "batch-001"),
+            occurred_at="2026-04-24T00:00:02Z",
+        )
+        self.write_record_lifecycle(terminal)
+
+        query_exit_code, query_payload, query_stream = self.query_cli_task(task_id)
+        status_response = self.make_http_service().status(task_id)
+        result_response = self.make_http_service().result(task_id)
+
+        self.assertEqual(query_exit_code, 0)
+        self.assertEqual(query_stream, "stdout")
+        self.assertEqual(status_response.status_code, 200)
+        self.assertEqual(status_response.body, query_payload)
+        self.assertEqual(result_response.status_code, 200)
+        self.assertEqual(result_response.body, query_payload["result"]["envelope"])
+        self.assertEqual(result_response.body["operation"], "batch_execution")
+        self.assertEqual(result_response.body["dataset_id"], "dataset:batch-001")
+        self.assertEqual(result_response.body["item_outcomes"][0]["dataset_record_ref"], "dataset:batch-001:item-1")
+        self.assertNotIn("request_cursor_context", repr(result_response.body))
+
+    def test_cursor_comment_batch_query_and_http_result_share_public_carrier(self) -> None:
+        task_id = "task-batch-comment-query-same-path"
+        accepted = create_task_record(
+            task_id,
+            make_batch_request_snapshot("batch-comments"),
+            occurred_at="2026-04-24T00:00:00Z",
+        )
+        running = start_task_record(accepted, occurred_at="2026-04-24T00:00:01Z")
+        terminal = finish_task_record(
+            running,
+            make_cursor_comment_batch_success_envelope(task_id, "batch-comments"),
+            occurred_at="2026-04-24T00:00:02Z",
+        )
+        self.write_record_lifecycle(terminal)
+
+        query_exit_code, query_payload, query_stream = self.query_cli_task(task_id)
+        result_response = self.make_http_service().result(task_id)
+
+        self.assertEqual(query_exit_code, 0)
+        self.assertEqual(query_stream, "stdout")
+        self.assertEqual(result_response.status_code, 200)
+        self.assertEqual(result_response.body, query_payload["result"]["envelope"])
+        self.assertEqual(result_response.body["item_outcomes"][0]["operation"], "comment_collection")
+        self.assertNotIn("request_cursor_context", repr(result_response.body))
 
     def test_runtime_result_refs_are_preserved_across_cli_query_and_http_result(self) -> None:
         task_id = "task-observability-same-path"
