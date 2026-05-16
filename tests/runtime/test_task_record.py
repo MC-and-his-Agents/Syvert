@@ -730,6 +730,36 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.result.envelope["batch_id"], "batch-comments")
         self.assertNotIn("request_cursor_context", repr(restored.result.envelope))
 
+    def test_cursor_sensitive_batch_result_restores_cursor_for_downstream_validation(self) -> None:
+        import syvert.batch_dataset as batch_dataset
+
+        envelope = self.make_cursor_sensitive_batch_envelope()
+        validation_attempts = []
+        original_validate = batch_dataset.validate_batch_result_envelope
+
+        def recording_validate(candidate):
+            validation_attempts.append(candidate)
+            return original_validate(candidate)
+
+        with mock.patch("syvert.batch_dataset.validate_batch_result_envelope", side_effect=recording_validate):
+            restored = task_record_from_dict(
+                task_record_to_dict(
+                    self.make_record_from_batch_envelope(
+                        task_id="task-record-batch-comments",
+                        batch_id="batch-comments",
+                        envelope=envelope,
+                    )
+                )
+            )
+
+        self.assertEqual(restored.result.envelope["batch_id"], "batch-comments")
+        self.assertGreaterEqual(len(validation_attempts), 2)
+        self.assertIsNone(validation_attempts[0].item_outcomes[0].request_cursor_context)
+        self.assertEqual(
+            validation_attempts[1].item_outcomes[0].request_cursor_context,
+            {"reply_cursor": {"resume_comment_ref": "comment:root-1"}},
+        )
+
     def test_rejects_cursor_sensitive_batch_result_target_drift(self) -> None:
         envelope = self.make_cursor_sensitive_batch_envelope()
         envelope["item_outcomes"][0]["result_envelope"]["target"]["target_ref"] = "content:other"
