@@ -2660,6 +2660,12 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         media_policy_error = validate_media_fetch_policy(request.request_cursor)
         if media_policy_error is not None:
             return None, media_policy_error
+    elif target.capability in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR} and request.request_cursor is not None:
+        return None, invalid_input_error(
+            "unsupported_request_cursor",
+            "shared CoreTaskRequest request_cursor is not admitted for search/list pagination",
+            details={"capability": target.capability},
+        )
     execution_control_policy = request.execution_control_policy or default_execution_control_policy()
     if execution_control_policy is request.execution_control_policy:
         return request, None

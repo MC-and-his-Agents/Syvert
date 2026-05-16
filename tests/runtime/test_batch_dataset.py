@@ -684,6 +684,24 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(position_context.exception.code, "invalid_resume_token")
 
+    def test_batch_result_serialization_rejects_empty_terminal_envelope(self) -> None:
+        result = self.execute(request(target("item-1", "alpha")))
+        forged = BatchResultEnvelope(
+            batch_id=result.batch_id,
+            operation=result.operation,
+            result_status=BATCH_RESULT_ALL_FAILED,
+            item_outcomes=(),
+            resume_token=None,
+            dataset_sink_ref=result.dataset_sink_ref,
+            dataset_id=result.dataset_id,
+            audit_trace={**result.audit_trace, "item_count": 0, "item_trace_refs": ()},
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_batch_result_envelope")
+
     def test_resume_token_serialization_rejects_unsafe_runtime_position_carriers(self) -> None:
         first = self.execute(
             request(target("item-1", "alpha"), target("item-2", "beta")),

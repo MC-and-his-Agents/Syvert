@@ -643,6 +643,11 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
             "batch result_status is not part of the batch contract",
             details={"result_status": envelope.result_status},
         )
+    if envelope.result_status != BATCH_RESULT_RESUMABLE and not envelope.item_outcomes:
+        raise BatchDatasetContractError(
+            "invalid_batch_result_envelope",
+            "terminal batch result must carry at least one item outcome",
+        )
     for outcome in envelope.item_outcomes:
         validate_batch_item_outcome(outcome, request_cursor=outcome.request_cursor_context)
     expected_result_status = (

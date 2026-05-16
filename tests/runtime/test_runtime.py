@@ -1125,7 +1125,7 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(adapter.last_request.input.continuation_token, "search-page-2")
         self.assertIsNone(adapter.last_request.request.request_cursor)
 
-    def test_core_search_and_list_request_cursor_is_not_adapter_surface(self) -> None:
+    def test_core_search_and_list_request_cursor_fails_closed_on_shared_surface(self) -> None:
         cases = (
             (
                 CollectionSearchAdapter(),
@@ -1164,9 +1164,10 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 task_id_factory=lambda task_id=task_id: task_id,
             )
 
-            self.assertEqual(result.envelope["status"], "success")
-            self.assertIsNone(adapter.last_request.request.request_cursor)
-            self.assertIsNone(adapter.last_request.input.continuation_token)
+            self.assertEqual(result.envelope["status"], "failed")
+            self.assertEqual(result.envelope["error"]["category"], "invalid_input")
+            self.assertEqual(result.envelope["error"]["code"], "unsupported_request_cursor")
+            self.assertIsNone(getattr(adapter, "last_request", None))
 
     def test_execute_task_builds_media_asset_fetch_success_envelope_from_adapter_payload(self) -> None:
         adapter = MediaAssetFetchAdapter()
