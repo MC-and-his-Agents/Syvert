@@ -763,6 +763,27 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(partial_context.exception.code, "invalid_dataset_boundary")
 
+    def test_sinkless_result_rejects_forged_dataset_record_ref(self) -> None:
+        result = self.execute(BatchRequest(batch_id="batch-001", target_set=(target("item-1", "alpha"),)))
+        forged_outcome = BatchItemOutcome(
+            **{**result.item_outcomes[0].__dict__, "dataset_record_ref": "dataset:forged:item-1"}
+        )
+        forged = BatchResultEnvelope(
+            batch_id=result.batch_id,
+            operation=result.operation,
+            result_status=result.result_status,
+            item_outcomes=(forged_outcome,),
+            resume_token=result.resume_token,
+            dataset_sink_ref=None,
+            dataset_id=result.dataset_id,
+            audit_trace=result.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as context:
+            batch_result_envelope_to_dict(forged)
+
+        self.assertEqual(context.exception.code, "invalid_dataset_boundary")
+
     def test_resume_token_serialization_rejects_unsafe_runtime_position_carriers(self) -> None:
         first = self.execute(
             request(target("item-1", "alpha"), target("item-2", "beta")),

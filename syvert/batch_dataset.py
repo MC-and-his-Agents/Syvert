@@ -709,6 +709,14 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
                     "sink-bound successful item outcome must carry dataset_record_ref",
                     details={"item_id": outcome.item_id},
                 )
+    else:
+        for outcome in envelope.item_outcomes:
+            if outcome.dataset_record_ref is not None:
+                raise BatchDatasetContractError(
+                    "invalid_dataset_boundary",
+                    "sinkless batch result must not carry dataset_record_ref",
+                    details={"item_id": outcome.item_id},
+                )
     if envelope.dataset_id is not None:
         _validate_sanitized_ref(envelope.dataset_id, field="dataset_id")
     _require_mapping(envelope.audit_trace, field="audit_trace")
