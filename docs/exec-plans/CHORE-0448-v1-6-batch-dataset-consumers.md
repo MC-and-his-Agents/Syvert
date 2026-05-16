@@ -57,6 +57,7 @@
   - `resume_token.next_item_index` 只指向已处理 item 前缀；
   - batch terminal 顶层不得携带 `raw` / `normalized` payload。
 - Guardian follow-up：TaskRecord batch projection 重建 canonical `BatchResultEnvelope` 并调用 #447 public carrier validator，避免 failed item 伪造 `dataset_record_ref`、nested `result_envelope` target drift、source/audit/private carrier 泄漏等宽松读取；同时对原始 batch envelope 顶层、`resume_token` 与 `item_outcomes` 执行严格字段集校验，避免 canonical projection 忽略的额外私有字段被原样回读。
+- Merge-gate follow-up：TaskRecord 接受 `batch_result_envelope_to_dict` 序列化后的 cursor-sensitive comment batch public carrier；该 public carrier 按 #447 约定不暴露 `request_cursor_context`，consumer 只从公开 comment result 中校验 schema/target/source/continuation 并派生本地验证用 thread ref，再交回 canonical batch validator 校验 aggregation、dataset boundary 与 audit。
 - CLI query、HTTP status 与 HTTP result 可读取同一 batch TaskRecord public carrier，且不会暴露 `request_cursor_context`。
 - Batch target item consumer 只消费稳定 read-side runtime slices；compatibility consumers 遇到 dataset normalized payload 形状时 fail-closed。
 
@@ -86,19 +87,26 @@
   - 结果：通过，1 test。
   - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
   - 结果：通过，385 tests。
+- Merge-gate follow-up validation：
+  - `python3 -m unittest tests.runtime.test_task_record.TaskRecordCodecTests.test_round_trips_serialized_cursor_sensitive_batch_result`
+  - 结果：通过，1 test。
+  - `python3 -m unittest tests.runtime.test_task_record`
+  - 结果：通过，45 tests。
+  - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，386 tests。
 - Full unittest discovery：
   - `python3 -m unittest discover`
   - 结果：通过，527 tests。
 - Guards：
   - `python3 scripts/spec_guard.py --mode ci --all`
   - 结果：通过。
-  - `python3 scripts/docs_guard.py --mode ci`
+  - `python3 scripts/docs_guard.py`
   - 结果：通过。
-  - `python3 scripts/workflow_guard.py --mode ci`
+  - `python3 scripts/workflow_guard.py`
   - 结果：通过。
-  - `python3 scripts/version_guard.py --mode ci`
+  - `python3 scripts/version_guard.py`
   - 结果：通过。
-  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - `python3 scripts/governance_gate.py --base-ref origin/main --head-ref HEAD`
   - 结果：通过。
   - `git diff --check`
   - 结果：通过。
@@ -106,7 +114,7 @@
 ## 未决风险
 
 - 当前实现只迁移消费者读取 public batch carrier，不提供新的 batch/dataset CLI/HTTP submit endpoint。
-- TaskRecord consumer 复用 canonical batch/dataset carrier validation；若发现 read-side carrier 缺陷，仍须单独开修复项。
+- TaskRecord consumer 复用 canonical batch/dataset carrier validation；cursor-sensitive comment public carrier 的私有 request cursor omission 仅在 consumer 读回中按公开字段受控恢复验证上下文。若发现 read-side carrier 缺陷，仍须单独开修复项。
 - #449 仍需补 sanitized evidence 与 replayable proof。
 - `python3 .loom/bin/loom_check.py .` 已运行但失败，失败项为 Loom full-runtime/adoption scaffold 缺失（如 `tools/loom_init.py`、`skills/*`、`packages/loom-installer`、adoption docs），不属于 #448 consumer migration 范围；Syvert repo-native guards 与 GitHub checks 已通过。
 

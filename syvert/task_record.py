@@ -1182,10 +1182,24 @@ def validate_batch_success_terminal_envelope(record: TaskRecord, envelope: Mappi
 
 def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> None:
     from syvert.batch_dataset import (
-        BatchItemOutcome,
+        BatchDatasetContractError,
+        validate_batch_result_envelope,
+    )
+
+    canonical = _batch_result_envelope_from_projection(envelope)
+    try:
+        validate_batch_result_envelope(canonical)
+    except BatchDatasetContractError as error:
+        if _is_missing_public_cursor_context_error(error):
+            _validate_batch_result_projection_with_public_cursor_omission(canonical)
+            return
+        raise
+
+
+def _batch_result_envelope_from_projection(envelope: Mapping[str, Any]) -> Any:
+    from syvert.batch_dataset import (
         BatchResultEnvelope,
         BatchResumeToken,
-        validate_batch_result_envelope,
     )
 
     item_outcomes = envelope.get("item_outcomes")
@@ -1204,7 +1218,10 @@ def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> 
                 resume_token_payload.get("resume_token"),
                 field="result.envelope.resume_token.resume_token",
             ),
-            batch_id=require_string(resume_token_payload.get("batch_id"), field="result.envelope.resume_token.batch_id"),
+            batch_id=require_string(
+                resume_token_payload.get("batch_id"),
+                field="result.envelope.resume_token.batch_id",
+            ),
             target_set_hash=require_string(
                 resume_token_payload.get("target_set_hash"),
                 field="result.envelope.resume_token.target_set_hash",
@@ -1213,7 +1230,10 @@ def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> 
                 resume_token_payload.get("next_item_index"),
                 field="result.envelope.resume_token.next_item_index",
             ),
-            issued_at=require_string(resume_token_payload.get("issued_at"), field="result.envelope.resume_token.issued_at"),
+            issued_at=require_string(
+                resume_token_payload.get("issued_at"),
+                field="result.envelope.resume_token.issued_at",
+            ),
             dataset_sink_ref=require_optional_string(
                 resume_token_payload.get("dataset_sink_ref"),
                 field="result.envelope.resume_token.dataset_sink_ref",
@@ -1226,17 +1246,169 @@ def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> 
     audit_trace = envelope.get("audit_trace")
     if not isinstance(audit_trace, Mapping):
         raise TaskRecordContractError("batch TaskTerminalResult.envelope.audit_trace 必须是对象")
-    canonical = BatchResultEnvelope(
+    return BatchResultEnvelope(
         batch_id=require_string(envelope.get("batch_id"), field="result.envelope.batch_id"),
         operation=require_string(envelope.get("operation"), field="result.envelope.operation"),
         result_status=require_string(envelope.get("result_status"), field="result.envelope.result_status"),
-        item_outcomes=tuple(_batch_item_outcome_from_projection(item, index=index) for index, item in enumerate(item_outcomes)),
+        item_outcomes=tuple(
+            _batch_item_outcome_from_projection(item, index=index)
+            for index, item in enumerate(item_outcomes)
+        ),
         resume_token=resume_token,
-        dataset_sink_ref=require_optional_string(envelope.get("dataset_sink_ref"), field="result.envelope.dataset_sink_ref"),
+        dataset_sink_ref=require_optional_string(
+            envelope.get("dataset_sink_ref"),
+            field="result.envelope.dataset_sink_ref",
+        ),
         dataset_id=require_optional_string(envelope.get("dataset_id"), field="result.envelope.dataset_id"),
         audit_trace=dict(audit_trace),
     )
-    validate_batch_result_envelope(canonical)
+
+
+def _is_missing_public_cursor_context_error(error: Exception) -> bool:
+    return (
+        getattr(error, "code", None) == "result_envelope_boundary_mismatch"
+        and "requires request_cursor context" in str(getattr(error, "message", error))
+    )
+
+
+def _validate_batch_result_projection_with_public_cursor_omission(envelope: Any) -> None:
+    from syvert.batch_dataset import (
+        BatchItemOutcome,
+        BatchResultEnvelope,
+        validate_batch_result_envelope,
+    )
+
+    cursor_restored_outcomes = []
+    for outcome in envelope.item_outcomes:
+        if _outcome_uses_public_cursor_omission(outcome):
+            request_cursor_context = _validate_cursor_sensitive_public_result_envelope(outcome)
+            cursor_restored_outcomes.append(
+                BatchItemOutcome(
+                    item_id=outcome.item_id,
+                    operation=outcome.operation,
+                    adapter_key=outcome.adapter_key,
+                    target_ref=outcome.target_ref,
+                    outcome_status=outcome.outcome_status,
+                    result_envelope=outcome.result_envelope,
+                    error_envelope=outcome.error_envelope,
+                    dataset_record_ref=outcome.dataset_record_ref,
+                    source_trace=outcome.source_trace,
+                    audit=outcome.audit,
+                    request_cursor_context=request_cursor_context,
+                )
+            )
+            continue
+        cursor_restored_outcomes.append(outcome)
+    if len(cursor_restored_outcomes) == len(envelope.item_outcomes) and all(
+        not _outcome_uses_public_cursor_omission(outcome) for outcome in envelope.item_outcomes
+    ):
+        raise TaskRecordContractError("batch public carrier cursor context fallback 未命中")
+    validate_batch_result_envelope(
+        BatchResultEnvelope(
+            batch_id=envelope.batch_id,
+            operation=envelope.operation,
+            result_status=envelope.result_status,
+            item_outcomes=tuple(cursor_restored_outcomes),
+            resume_token=envelope.resume_token,
+            dataset_sink_ref=envelope.dataset_sink_ref,
+            dataset_id=envelope.dataset_id,
+            audit_trace=envelope.audit_trace,
+        )
+    )
+
+
+def _outcome_uses_public_cursor_omission(outcome: Any) -> bool:
+    from syvert.batch_dataset import _comment_result_requires_cursor_context
+
+    return (
+        outcome.operation == COMMENT_COLLECTION_OPERATION
+        and outcome.result_envelope is not None
+        and _comment_result_requires_cursor_context(outcome.result_envelope)
+    )
+
+
+def _validate_cursor_sensitive_public_result_envelope(outcome: Any) -> Mapping[str, Any]:
+    from syvert.batch_dataset import (
+        _RESULT_ENVELOPE_WRAPPER_FIELDS,
+        _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION,
+        TARGET_TYPE_BY_OPERATION,
+        _validate_public_continuation_carriers,
+        _validate_result_envelope_wrapper,
+        _validate_source_trace,
+    )
+
+    result_envelope = outcome.result_envelope
+    if not isinstance(result_envelope, Mapping):
+        raise TaskRecordContractError("batch item result_envelope 必须是对象")
+    payload_fields = _SUCCESS_PAYLOAD_FIELDS_BY_OPERATION[outcome.operation]
+    extra_fields = sorted(set(result_envelope) - (payload_fields | _RESULT_ENVELOPE_WRAPPER_FIELDS))
+    if extra_fields:
+        raise TaskRecordContractError("batch item result_envelope 包含未批准字段")
+    _validate_result_envelope_wrapper(
+        operation=outcome.operation,
+        adapter_key=outcome.adapter_key,
+        result_envelope=result_envelope,
+        item_id=outcome.item_id,
+        code="result_envelope_boundary_mismatch",
+        index=None,
+    )
+    if isinstance(result_envelope.get("source_trace"), Mapping):
+        _validate_source_trace(result_envelope["source_trace"], adapter_key=outcome.adapter_key)
+    payload = {field: result_envelope[field] for field in payload_fields if field in result_envelope}
+    comment_envelope = comment_collection_result_envelope_from_dict(payload)
+    target = result_envelope.get("target")
+    if not isinstance(target, Mapping):
+        raise TaskRecordContractError("batch item result_envelope.target 必须是对象")
+    if (
+        target.get("operation") != outcome.operation
+        or target.get("target_type") != TARGET_TYPE_BY_OPERATION[outcome.operation]
+        or target.get("target_ref") != outcome.target_ref
+    ):
+        raise TaskRecordContractError("batch item result_envelope target 与 item 不一致")
+    _validate_public_continuation_carriers(
+        result_envelope.get("next_continuation"),
+        field="result_envelope.next_continuation",
+    )
+    thread_ref = _infer_public_comment_thread_ref(comment_envelope)
+    return {"reply_cursor": {"resume_comment_ref": thread_ref}}
+
+
+def _infer_public_comment_thread_ref(comment_envelope: Any) -> str:
+    continuation = comment_envelope.next_continuation
+    continuation_ref = getattr(continuation, "resume_comment_ref", None)
+    if isinstance(continuation_ref, str) and continuation_ref:
+        return continuation_ref
+
+    candidates: list[str] = []
+    cursor_sensitive_items = []
+    for item in comment_envelope.items:
+        normalized = item.normalized
+        if normalized.parent_comment_ref is None and normalized.target_comment_ref is None:
+            continue
+        cursor_sensitive_items.append(item)
+        for value in (
+            normalized.root_comment_ref,
+            normalized.parent_comment_ref,
+            normalized.target_comment_ref,
+        ):
+            if isinstance(value, str) and value and value not in candidates:
+                candidates.append(value)
+    for candidate in candidates:
+        if all(_comment_public_item_binds_ref(item, candidate) for item in cursor_sensitive_items):
+            return candidate
+    raise TaskRecordContractError("batch public carrier 缺少可验证的 comment cursor thread")
+
+
+def _comment_public_item_binds_ref(item: Any, comment_ref: str) -> bool:
+    normalized = item.normalized
+    return (
+        normalized.root_comment_ref == comment_ref
+        or normalized.parent_comment_ref == comment_ref
+        or (
+            normalized.parent_comment_ref != normalized.root_comment_ref
+            and normalized.target_comment_ref == comment_ref
+        )
+    )
 
 
 def _batch_item_outcome_from_projection(item: Any, *, index: int) -> Any:

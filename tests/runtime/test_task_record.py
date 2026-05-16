@@ -528,6 +528,102 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(restored.result.envelope["item_outcomes"][0]["dataset_record_ref"], "dataset:batch-001:item-1")
         self.assertNotIn("request_cursor_context", repr(payload))
 
+    def test_round_trips_serialized_cursor_sensitive_batch_result(self) -> None:
+        from syvert.batch_dataset import BatchItemOutcome, BatchResultEnvelope, batch_result_envelope_to_dict
+
+        cursor = {
+            "reply_cursor": {
+                "reply_cursor_token": "reply-cursor-1",
+                "reply_cursor_family": "opaque",
+                "resume_target_ref": "content:alpha",
+                "resume_comment_ref": "comment:root-1",
+                "issued_at": "2026-05-09T10:00:00Z",
+            }
+        }
+        result_envelope = {
+            "task_id": "batch-comment-item-1",
+            "adapter_key": TEST_ADAPTER_KEY,
+            "capability": "comment_collection",
+            "status": "success",
+            **make_comment_collection_result(target_ref="content:alpha"),
+        }
+        result_envelope["items"][0]["source_id"] = "reply-1"
+        result_envelope["items"][0]["source_ref"] = "comment://reply-1"
+        result_envelope["items"][0]["normalized"]["source_id"] = "reply-1"
+        result_envelope["items"][0]["normalized"]["canonical_ref"] = "comment:reply-1"
+        result_envelope["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
+        result_envelope["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
+        batch_payload = batch_result_envelope_to_dict(
+            BatchResultEnvelope(
+                batch_id="batch-comments",
+                operation="batch_execution",
+                result_status="complete",
+                item_outcomes=(
+                    BatchItemOutcome(
+                        item_id="comments",
+                        operation="comment_collection",
+                        adapter_key=TEST_ADAPTER_KEY,
+                        target_ref="content:alpha",
+                        outcome_status="succeeded",
+                        result_envelope=result_envelope,
+                        dataset_record_ref="dataset:batch-comments:comments",
+                        source_trace={
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "provider_path": "provider://sanitized",
+                            "fetched_at": "2026-05-16T10:00:01Z",
+                            "evidence_alias": "alias://batch-comment-item-1",
+                        },
+                        audit={"reason": "dataset_record_written"},
+                        request_cursor_context=cursor,
+                    ),
+                ),
+                dataset_sink_ref="sink:reference",
+                dataset_id="dataset:batch-comments",
+                audit_trace={
+                    "batch_id": "batch-comments",
+                    "started_at": "2026-05-16T10:00:00Z",
+                    "finished": True,
+                    "item_count": 1,
+                    "item_trace_refs": ["audit:batch:batch-comments:comments"],
+                    "evidence_refs": ["evidence:batch:item"],
+                },
+            )
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-batch-comments",
+                TaskRequestSnapshot(
+                    adapter_key="core",
+                    capability="batch_execution",
+                    target_type="operation_batch",
+                    target_value="batch-comments",
+                    collection_mode="batch",
+                ),
+                occurred_at="2026-05-16T10:00:00Z",
+            ),
+            occurred_at="2026-05-16T10:00:01Z",
+        )
+
+        restored = task_record_from_dict(
+            task_record_to_dict(
+                finish_task_record(
+                    record,
+                    {
+                        "task_id": "task-record-batch-comments",
+                        "adapter_key": "core",
+                        "capability": "batch_execution",
+                        "status": "success",
+                        "task_record_ref": "task_record:task-record-batch-comments",
+                        **batch_payload,
+                    },
+                    occurred_at="2026-05-16T10:00:02Z",
+                )
+            )
+        )
+
+        self.assertEqual(restored.result.envelope["batch_id"], "batch-comments")
+        self.assertNotIn("request_cursor_context", repr(restored.result.envelope))
+
     def test_rejects_batch_execution_result_status_drift(self) -> None:
         payload = task_record_to_dict(self.make_batch_record())
         payload["result"]["envelope"]["result_status"] = "all_failed"
