@@ -47,7 +47,7 @@
 - FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
 - Work Item `#446`：completed，spec PR `#451` 已合入。
 - Work Item `#447`：active runtime carrier。
-- PR `#452`：open；latest remote head `fba405b4c6dbeaba711fc2aad87a63dd2663816e` GitHub checks 全绿，guardian `APPROVE`，merge gate `REQUEST_CHANGES`。Merge gate blocker：continuation token sanitizer 仍接受 filesystem-like relative paths、fallback/marketplace/routing/raw markers。已在 runtime remediation commit `eb1430189a6473c2d9c5c6179448ecfef9a42ee2` 修复：continuation token public-safe 校验拒绝 relative path shape，并拒绝 raw / fallback / marketplace / route / routing semantics。下一步是推送 evidence sync，等待 GitHub checks，然后只运行一次 guardian，再只运行一次 merge gate。
+- PR `#452`：open；latest remote head `788af7d0c391aa4eb9896f09899bfb3c48059f37` GitHub checks 全绿，guardian `REQUEST_CHANGES`。Guardian blocker：direct legacy `TaskRequest.input.continuation_token` for search/list bypasses the typed `BatchRequest` continuation sanitizer and reaches adapter execution. 已在 runtime remediation commit `89c06e38aeaac7cc590e1f8bc25bea3027705902` 修复：`normalize_request()` 对 legacy search/list continuation token 执行同等 public-safe admission，拒绝 private token、relative path、storage/raw、fallback/marketplace/routing 与 Windows/path-shaped values。下一步是推送 evidence sync，等待 GitHub checks，然后只运行一次 guardian，再只运行一次 merge gate。
 - Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
 - Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
@@ -100,9 +100,31 @@
 - guardian follow-up after `3c1409c`：`validate_batch_result_envelope()` 在 `dataset_sink_ref` 存在时强制所有 `succeeded` item outcome 携带 `dataset_record_ref`，防止 public carrier 声称 dataset delivery 但没有 durable record；`_validate_search_keyword()` 与 public ref sanitizer 对齐，拒绝 `C:/...` / `D:/...` 这类 Windows absolute paths。
 - merge gate follow-up after `671b987`：search/list batch continuation token 复用 public payload string guard 并额外拒绝 `credential` / `secret` / `signed` / `private` / storage / routing markers；read-side `next_continuation` 中的 `continuation_token` 递归执行同一校验，防止 adapter success envelope 将 private cursor 泄漏到 public batch result。
 - merge gate follow-up after `fba405b`：continuation token sanitizer 复用 `_contains_relative_path_ref()` 拒绝 `cache/state.json` 等无 scheme filesystem-like relative paths，并补充拒绝 `raw`、`fallback`、`marketplace`、`route`、`routing` markers；request-side search/list cursor 与 result-side `next_continuation` 共用同一 validator。
+- guardian follow-up after `788af7d`：legacy `TaskRequest.input.continuation_token` 不再绕过 sanitizer；shared runtime 在 `normalize_request()` 阶段对 `content_search_by_keyword` / `content_list_by_creator` direct TaskRequest continuation token 执行 public-safe admission，阻断后不会投影到 adapter input。
 
 ## 已验证项
 
+- Runtime remediation commit `89c06e38aeaac7cc590e1f8bc25bea3027705902` for direct TaskRequest continuation ingress finding：
+  - `python3 -m unittest tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_rejects_unsafe_legacy_search_and_list_continuation tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，8 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，257 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，431 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
 - Runtime remediation commit `eb1430189a6473c2d9c5c6179448ecfef9a42ee2` for continuation token relative path / routing marker findings：
   - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
   - 结果：通过，7 tests。
