@@ -1,0 +1,591 @@
+# CHORE-0447 v1.6 batch / dataset runtime 执行计划
+
+## 关联信息
+
+- item_key：`CHORE-0447-v1-6-batch-dataset-runtime`
+- Issue：`#447`
+- item_type：`CHORE`
+- release：`v1.6.0`
+- sprint：`2026-S25`
+- Parent Phase：`#444`
+- Parent FR：`#445`
+- 关联 spec：`docs/specs/FR-0445-batch-dataset-core-contract/spec.md`
+- 关联 decision：
+- 关联 PR：`#452`
+- 状态：`active`
+
+## 目标
+
+- 交付 Core batch/dataset runtime carriers、validators、reference dataset sink 与 batch item execution wrapper。
+- 复用现有 read-side item result envelope，不重新定义 creator/comment/media/content 私有字段。
+- 将 `batch_execution` admitted 为 `FR-0445` 的 stable runtime taxonomy slice。
+
+## 范围
+
+- 本次纳入：
+  - `syvert/batch_dataset.py`
+  - `syvert/operation_taxonomy.py`
+  - `syvert/runtime.py`
+  - `tests/__init__.py`（仅启用根目录默认 unittest discovery 进入治理测试包）
+  - `tests/runtime/test_batch_dataset.py`
+  - `tests/runtime/test_operation_taxonomy.py`
+  - 本执行计划
+- 本次验证复用但当前 diff 未修改：
+  - `syvert/task_record.py`：仅通过 existing TaskRecord codec/consumer tests 验证 `batch_execution` 不进入 shared `TaskRequest` / `TaskRecord` admitted surface；`#448` 才迁移 TaskRecord/result query/compat consumers。
+  - `tests/runtime/test_models.py`：仅作为 read-side success payload contract 复用验证，未在 `#447` 重新定义 read-side result envelope。
+  - `tests/runtime/test_task_record.py`：仅验证既有 TaskRecord codec 与 read-side fixture 兼容；runtime carrier 的实现改动集中在 `batch_dataset.py`。
+- 本次不纳入：
+  - TaskRecord/result query/compatibility consumer migration（`#448`）
+  - sanitized evidence artifact 与 replay matrix（`#449`）
+  - release closeout、annotated tag、GitHub Release 或 published truth carrier（`#450`）
+  - scheduler、write-side、content library、BI、UI、provider selector/fallback/marketplace
+  - raw payload files、source names、本地路径、storage handles、private account/media/creator fields
+
+## 当前停点
+
+- Phase `#444`：open。
+- FR `#445`：open，已显式绑定 `v1.6.0 / 2026-S25`。
+- Work Item `#446`：completed，spec PR `#451` 已合入。
+- Work Item `#447`：active runtime carrier。
+- PR `#452`：open；latest remote head `59297c358bc0123a329df3179f4860308e560afc` GitHub checks 全绿，guardian `REQUEST_CHANGES`。Guardian blocker：failed item `error_envelope` / `audit` public carriers still allowed filesystem-like relative path strings such as `cache/state.json`。已在 runtime remediation commit `24491741722df2cf5a0f8f23f22e0f3ad413504f` 修复：`_validate_public_payload_string()` 复用 `_contains_relative_path_ref()`，failed item error/audit 等 validate_strings 路径拒绝 relative path leakage。下一步是推送 evidence sync，等待 GitHub checks，然后只运行一次 guardian，再只运行一次 merge gate。
+- Workspace key：`issue-447-445-v1-6-0-batch-dataset-runtime`
+- Branch：`issue-447-445-v1-6-0-batch-dataset-runtime`
+- Baseline：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
+
+## 已实现合同
+
+- `BatchRequest` / `BatchTargetItem` / `BatchResumeToken` / `BatchItemOutcome` / `BatchResultEnvelope` public carriers。
+- `DatasetRecord` 与 JSON-safe in-memory `ReferenceDatasetSink`。
+- `execute_batch_request` wrapper 逐 item 调用现有 `execute_task` path。
+- 支持 `complete`、`partial_success`、`all_failed`、`resumable` batch result status。
+- 支持 `succeeded`、`failed`、`duplicate_skipped` item status。
+- duplicate `dedup_key` 采用 first-wins，重复 item neutral skip 且不写第二份 dataset record。
+- dataset sink write failure 映射为 failed item，保留 read-side success envelope 供审计。
+- resume token 只表达 runtime position，不表达 scheduler、priority、workflow、provider fallback 或 marketplace。
+- batch 本身不要求真实账号；item operation 需要资源时继续经过 existing resource governance。
+- guardian follow-up：resume 会校验 prior outcomes 与 target-set 前缀、dedup state 和 dataset sink readback；绑定 `dataset_sink_ref` 但缺 sink 时 fail-closed；`source_trace` 只允许 sanitized Core 字段；search/list request cursor 已按 operation-specific JSON object continuation contract 校验并透传，避免静默丢弃。
+- guardian rerun follow-up：timeout/cancel 类已 dispatch item failure 在存在 suffix 时返回 `resumable`；fresh run 拒绝携带 prior outcomes；batch audit trace 补齐 `started_at`、`item_trace_refs`、sanitized `evidence_refs` 与 stop reason 校验。
+- guardian rerun2 follow-up：resume prefix 拒绝未知 outcome status 和非重复 item 的 `duplicate_skipped`；所有 BatchItemOutcome source_trace 先经 sanitized validator；`creator_profile_by_id` request cursor 当前 fail-closed，避免静默丢弃。
+- guardian rerun3 follow-up：prior `BatchItemOutcome` 进入 resume 前强制 canonical validation；`DatasetRecord.normalized_payload` 递归拒绝 raw/source/storage/private 字段；sanitized ref validator 拒绝真实 URL、bucket/storage URL 和本地路径。
+- guardian rerun4 follow-up：`BatchItemOutcome` canonical validation 强制 status/payload invariant，`succeeded` 必须有 result envelope，`failed` 必须有 error envelope 且不得引用 dataset record，`duplicate_skipped` 不得携带 result/error/dataset record。
+- guardian rerun5 follow-up：sanitized ref validator 拒绝所有以 `/` 开头的本地绝对路径，同时保留 `raw://` 等 sanitized alias。
+- guardian rerun6 follow-up：`source_trace.provider_path` 专用 validator 同样拒绝以 `/` 开头的本地绝对路径。
+- guardian rerun7 follow-up：`source_trace.provider_path` 复用 storage/private token denylist，`normalized_payload` 私有字段检测改为大小写不敏感，同时 public payload 仍允许 sanitized `raw_payload_ref`。
+- guardian rerun8 follow-up：`execute_batch_request` 在返回前验证新产生的 `BatchItemOutcome`，将 unsafe adapter failure payload 转换成 sanitized `unsafe_item_outcome` failure，避免直接暴露 unsafe error details。
+- guardian rerun9 follow-up：dataset sink 写入前先验证待公开 success outcome，unsafe success 不写 dataset record；JSON-safe 校验改为 strict JSON，拒绝 `NaN` / `Infinity`。
+- guardian rerun10 follow-up：`ReferenceDatasetSink` 在 write/read/audit 边界返回防御性 JSON-safe clone，避免写后/读后可变对象污染；通用 `execute_task` 对 `batch_execution` fail-closed，强制使用 typed `execute_batch_request`。
+- guardian rerun11 follow-up：`BatchTargetItem.request_cursor` 在 operation-specific continuation 校验前必须是 JSON object；search/list 非对象 cursor 统一失败为 `BatchDatasetContractError(code="invalid_field")`，避免 `.get()` 裸 `AttributeError`。
+- guardian rerun12 follow-up：success envelope 的 unsafe `source_trace.provider_path` 在 outcome 构造前失败时转换为 sanitized `unsafe_item_outcome` failed item；dataset sink write 的普通运行时异常转换为 `dataset_write_failed` failed item，避免单 item 故障中断整个 batch。
+- guardian rerun13 follow-up：所有 batch/dataset sanitizer 拒绝 Windows drive-letter absolute paths；`validate_batch_result_envelope` 强制 `result_status` 与 item outcome 聚合一致，拒绝 forged terminal aggregate drift。
+- guardian rerun14 follow-up：`BatchRequest.target_set` 拒绝重复 `item_id`；`ReferenceDatasetSink` 拒绝重复 `dataset_record_id`；`BatchResumeToken.issued_at` 改用 RFC3339 UTC timestamp validator。
+- guardian rerun15 follow-up：`DatasetRecord.normalized_payload` 允许稳定 read-side collection 合同中的公开 `canonical_ref` / `source_ref` HTTPS URL，同时继续拒绝非 ref URL、storage/private/raw/download/signed/token URL、本地路径、Windows 盘符路径与 storage/file scheme。
+- guardian rerun16 follow-up：resume prefix 校验对 prior successful outcome 的 nested `result_envelope` 重新执行 operation/target/request_cursor success-payload validation，拒绝伪造外层 outcome 与内层 read-side envelope 不一致的 prior success。
+- guardian rerun17 follow-up：补充合同覆盖，证明 `duplicate_skipped` 在 mixed failure 与 all-failed 聚合中保持 neutral、caller-provided `dataset_id` 会回显到 batch result 与 dataset records、`batch_execution` request snapshot 可经 TaskRecord codec round-trip。
+- guardian rerun18 follow-up：`validate_batch_item_outcome` 对 standalone success/attached `result_envelope` 执行 operation/target boundary validation；`validate_batch_result_envelope` 强制 batch audit trace 包含 `batch_id`、`started_at`、`finished`、`item_count`、`item_trace_refs`、`evidence_refs` 与可选 `stop_reason` 的最小结构。
+- guardian rerun19 follow-up：prior outcome canonical validation 携带对应 `BatchTargetItem.request_cursor`；缺少 cursor 上下文时 cursor-sensitive `comment_collection` result fail-closed；`audit_trace.item_trace_refs` 必须与 `item_outcomes` 等长并逐项等于 `audit:batch:{batch_id}:{item_id}`。
+- guardian rerun20 follow-up：正常 batch execution 产生的 outcome public validation 携带 `BatchTargetItem.request_cursor`，避免合法 cursor-sensitive comment result 被误降级；result envelope boundary 校验拒绝 read-side contract 与 runtime terminal wrapper 之外的额外 top-level 字段。
+- guardian rerun21 follow-up：移除 `batch_execution` 在 shared `TaskRequest` / `CoreTaskRequest` / `TaskRequestSnapshot` admitted surface 中的投影；direct `execute_task` 继续以 `invalid_capability` fail-closed，typed batch runtime 仅通过 `BatchRequest` / `execute_batch_request` 进入。
+- guardian rerun22 follow-up：`BatchItemOutcome` 携带非序列化 `request_cursor_context` 供 batch result validation/serialization 复用；public carrier dict 不输出 cursor context，standalone outcome 缺少 context 时仍对 cursor-sensitive comment result fail-closed。
+- root-cause sweep follow-up：将 `BatchItemOutcome`、`BatchResultEnvelope`、resume prior outcome、dataset sink readback、serialization round-trip、typed `BatchRequest` entrypoint 作为同一套 public carrier contract 排查；新增恶意/漂移 carrier 矩阵覆盖 result wrapper 缺失/漂移、audit trace shape drift、resume sink record identity drift、prior cursor context reattach 与 public serialization 不泄露 cursor context。
+- merge gate integration follow-up：成功 `result_envelope` 的 read-side payload 继续允许自由文本 URL/路径片段，但 runtime wrapper 子集单独执行 public string/ref 泄漏校验；`task_record_ref`、`ref_id`、`envelope_ref` 等 wrapper 嵌套引用纳入 sanitized ref 校验，恶意 wrapper 矩阵覆盖 `task_record_ref`、`runtime_result_refs`、`execution_control_events` 与 runtime log message 漂移。
+- sink-bound identity follow-up：系统排查 `BatchRequest -> BatchResultEnvelope -> BatchResumeToken -> resume/readback serialization` dataset boundary；执行路径继续由 Core 派生或回显 `dataset_id`，public result/resume carrier validator 额外拒绝带 `dataset_sink_ref` 但缺 `dataset_id` 的伪造载荷。
+- request admission follow-up：系统排查 `validate_batch_request()` / `validate_batch_target_item()` 与 execution 深层校验一致性；`comment_collection` 与 media fetch `request_cursor` 复用共享 cursor/policy validator，嵌套 `resume_token` 在 public request validator 中校验 shape、`batch_id`、target-set hash、dataset boundary、position 与 token id 绑定，避免 invalid request 降级为 item-level runtime failure 或 preflight false positive。
+- resume/ref boundary follow-up：系统排查 resume runtime position 与 public sanitized ref；resume 必须通过 dataset sink readback state 证明 `next_item_index` 未回退，缺 dataset sink boundary 时 fail-closed；sanitized ref 拒绝 traversal、无 scheme 的 filesystem-like relative path 与相对路径样式，同时保留既有 `raw://` / `alias://` public alias。
+- sink-less resume follow-up：纠正 resume runtime position 策略，sink-bound resume 继续用 dataset sink readback 证明未回退，sink-less resume 使用 token boundary、prior outcome prefix 与 dedup state 恢复，避免返回不可使用的 `resume_token`。
+- provider-path sanitizer follow-up：`source_trace.provider_path` 与 public ref sanitizer 对齐，拒绝 traversal、`./`、`../` 与无 scheme 的 filesystem-like relative path，同时保留 `provider://sanitized` 正例。
+- resume terminal/state-machine follow-up：resume token `next_item_index` 必须指向未处理 suffix，拒绝 terminal-position token；failed `BatchItemOutcome` 只有 dataset write/sink failure 这类 runtime path 可保留 success `result_envelope`，防止 resume prior failed outcome 夹带伪造 success envelope。
+- shared runtime cursor boundary follow-up：merge gate integration recheck 发现 search/list `CoreTaskRequest.request_cursor` 成为未校验共享 runtime 输入面；已收敛为 batch-only continuation 行为，batch 经既有 `TaskInput.continuation_token` 传递 search/list 游标，shared `CoreTaskRequest` search/list cursor 不再转发到 adapter context。
+- public carrier truth-boundary follow-up：停止高成本 review probing 后做本地 root-cause sweep；`source_trace.adapter_key` 现在必须与 enclosing `BatchItemOutcome` / `DatasetRecord` / `result_envelope` adapter 绑定，嵌套 `result_envelope.items[*].source_trace` 同样绑定；`DatasetRecord` mapping 输入拒绝未知顶层字段，避免 durable carrier 静默丢弃恶意/漂移字段；`BatchResultEnvelope.audit_trace` 现在按 `result_status` 绑定 terminal/resumable truth，terminal 必须 `finished=true` 且无 `stop_reason`，resumable 必须 `finished=false`、携带 `stop_reason` 与 `resume_token`。
+- merge gate blocker follow-up：`CoreTaskRequest.request_cursor` 对 `content_search_by_keyword` / `content_list_by_creator` 不再作为 shared runtime admitted surface，传入时以 `unsupported_request_cursor` fail-closed，避免 adapter 侧静默丢弃；typed batch wrapper 的 search/list continuation 继续通过 `TaskInput.continuation_token` 传递。`validate_batch_result_envelope()` 对非 `resumable` 终态强制至少一个 `BatchItemOutcome`，拒绝空 terminal `all_failed` forged carrier。
+- guardian follow-up after `3c1409c`：`validate_batch_result_envelope()` 在 `dataset_sink_ref` 存在时强制所有 `succeeded` item outcome 携带 `dataset_record_ref`，防止 public carrier 声称 dataset delivery 但没有 durable record；`_validate_search_keyword()` 与 public ref sanitizer 对齐，拒绝 `C:/...` / `D:/...` 这类 Windows absolute paths。
+- merge gate follow-up after `671b987`：search/list batch continuation token 复用 public payload string guard 并额外拒绝 `credential` / `secret` / `signed` / `private` / storage / routing markers；read-side `next_continuation` 中的 `continuation_token` 递归执行同一校验，防止 adapter success envelope 将 private cursor 泄漏到 public batch result。
+- merge gate follow-up after `fba405b`：continuation token sanitizer 复用 `_contains_relative_path_ref()` 拒绝 `cache/state.json` 等无 scheme filesystem-like relative paths，并补充拒绝 `raw`、`fallback`、`marketplace`、`route`、`routing` markers；request-side search/list cursor 与 result-side `next_continuation` 共用同一 validator。
+- guardian follow-up after `788af7d`：legacy `TaskRequest.input.continuation_token` 不再绕过 sanitizer；shared runtime 在 `normalize_request()` 阶段对 `content_search_by_keyword` / `content_list_by_creator` direct TaskRequest continuation token 执行 public-safe admission，阻断后不会投影到 adapter input。
+- merge gate follow-up after `0b2a2d0`：`BatchResultEnvelope` dataset boundary 增加反向约束；sink-bound success 必须有 `dataset_record_ref`，sinkless result 必须没有任何 item-level `dataset_record_ref`，避免无 sink 的 public carrier 伪造 durable dataset delivery。
+- guardian follow-up after `59297c3`：public payload string sanitizer 对 failed item `error_envelope` / `audit` 等 validate_strings 路径拒绝 filesystem-like relative refs，覆盖 `cache/state.json`、`state/raw.json` 这类相对本地路径样式泄漏。
+
+## 已验证项
+
+- Runtime remediation commit `24491741722df2cf5a0f8f23f22e0f3ad413504f` for failed item relative path public carrier finding：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_failed_item_public_carriers_reject_relative_path_strings tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sinkless_result_rejects_forged_dataset_record_ref tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_rejects_unsafe_legacy_search_and_list_continuation tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，10 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，259 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，433 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `318bf32fd49e4ee17bef377af176bfdeff6581bf` for sinkless dataset record truth-boundary finding：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sinkless_result_rejects_forged_dataset_record_ref tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_rejects_unsafe_legacy_search_and_list_continuation tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，9 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，258 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，432 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `89c06e38aeaac7cc590e1f8bc25bea3027705902` for direct TaskRequest continuation ingress finding：
+  - `python3 -m unittest tests.runtime.test_runtime.RuntimeExecutionTests.test_execute_task_rejects_unsafe_legacy_search_and_list_continuation tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，8 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，257 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，431 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `eb1430189a6473c2d9c5c6179448ecfef9a42ee2` for continuation token relative path / routing marker findings：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，7 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，256 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，430 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `c5af19eb544edbc389e49341a0b0bcaba130c9d7` for continuation token trust-boundary findings：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_paginated_request_cursor_rejects_private_continuation_tokens tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_result_next_continuation_rejects_private_token tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_and_list_request_cursors_are_passed_to_existing_item_path`
+  - 结果：通过，7 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，256 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，430 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `1a73f9f3b400919e12dad859dfca0eb754046bf5` for guardian findings：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_sink_bound_result_rejects_success_without_dataset_record_ref tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_search_keyword_rejects_windows_absolute_path tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface`
+  - 结果：通过，4 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，254 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，428 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime remediation commit `78c95eb6cc7afe04e9a07a5c047ce50ca7c30bd3` for merge gate blockers：
+  - `python3 -m unittest tests.runtime.test_batch_dataset.BatchDatasetRuntimeTests.test_batch_result_serialization_rejects_empty_terminal_envelope tests.runtime.test_runtime.RuntimeExecutionTests.test_core_search_and_list_request_cursor_fails_closed_on_shared_surface`
+  - 结果：通过，2 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime`
+  - 结果：通过，252 tests。
+  - `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，426 tests。
+  - `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+  - `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+  - `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+  - `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+  - `git diff --check`
+  - 结果：通过。
+- Runtime implementation commit `9e436fd7478de3ac92898d2af82af4a7ba78bc26` public carrier truth-boundary remediation：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
+  - 结果：通过；未触发 guardian / merge gate。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，96 tests。
+- `python3 -m unittest tests.runtime.test_runtime`
+  - 结果：通过，155 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，425 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- Local shared runtime cursor boundary remediation on `493c0b9d6258c6ba8aa89521c6ad7b8f549f946e`：
+  - 结果：通过；未触发 guardian / merge gate。
+- Runtime implementation head `ba745efaf9d436ad49582a181e62248773db283f`：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
+  - guardian review：`APPROVE`，未发现基于当前 diff 的阻断性问题。
+  - merge gate：`REQUEST_CHANGES`，阻断仅为本执行计划 head/provenance 仍指向旧 `06166e582683482dda3fba77aa56297a2480fea4`，非 runtime correctness blocker。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，91 tests。
+- `python3 -m unittest tests.runtime.test_runtime`
+  - 结果：通过，155 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，420 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- Prior reviewed runtime head `06166e582683482dda3fba77aa56297a2480fea4`：
+  - GitHub checks 全绿：Commit Check、Docs Guard、Governance Gate、Spec Guard。
+  - guardian review：`REQUEST_CHANGES`，未发现新的静态 runtime correctness bug；阻断仅为本 repo-backed artifact scope/evidence/risk/rollback 不闭合。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，91 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，265 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_models tests.runtime.test_task_record`
+  - 结果：通过，133 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，77 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，75 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，73 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_task_record`
+  - 结果：通过，108 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，68 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_read_side_collection`
+  - 结果：通过，76 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，251 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，65 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，242 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，63 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，240 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，62 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，239 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，60 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，237 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，59 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.runtime.test_models tests.governance.test_open_pr`
+  - 结果：通过，236 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，57 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.governance.test_open_pr`
+  - 结果：通过，211 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 -m unittest tests.runtime.test_batch_dataset`
+  - 结果：通过，35 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record`
+  - 结果：通过，89 tests。
+- `python3 -m unittest discover`
+  - 结果：通过，527 tests。
+- `python3 -m unittest tests.runtime.test_batch_dataset tests.runtime.test_operation_taxonomy tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_task_record tests.governance.test_open_pr`
+  - 结果：通过，171 tests。
+- `python3 scripts/spec_guard.py --mode ci --all`
+  - 结果：通过。
+- `python3 scripts/docs_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/workflow_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/version_guard.py --mode ci`
+  - 结果：通过。
+- `python3 scripts/governance_gate.py --mode ci --base-ref origin/main --head-ref HEAD`
+  - 结果：通过。
+- `git diff --check`
+  - 结果：通过。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian.json`
+  - 结果：首轮 `REQUEST_CHANGES`，阻断项为 resume state、dataset sink 缺失、source_trace enforcement、search/list cursor 静默丢弃；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun.json`
+  - 结果：第二轮 `REQUEST_CHANGES`，阻断项为 timeout/cancel resumable boundary、fresh run prior outcome contamination、BatchAuditTrace 最小字段与 sanitized refs；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun2.json`
+  - 结果：第三轮 `REQUEST_CHANGES`，阻断项为 resume outcome status、BatchItemOutcome source_trace sanitation、creator profile cursor 静默丢弃；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun3.json`
+  - 结果：第四轮 `REQUEST_CHANGES`，阻断项为 prior outcome unsafe carrier smuggling、normalized_payload 泄漏、raw storage URL refs；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun4.json`
+  - 结果：第五轮 `REQUEST_CHANGES`，阻断项为 failed prior outcomes 缺失 error envelope 或伪造 dataset_record_ref；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun5.json`
+  - 结果：第六轮 `REQUEST_CHANGES`，阻断项为 sanitized ref 仍允许 `/home`、`/etc` 等本地绝对路径；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun6.json`
+  - 结果：第七轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许本地绝对路径；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun7.json`
+  - 结果：第八轮 `REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 仍允许 storage/private routing aliases，以及 `normalized_payload` 私有字段大小写绕过；已在当前 follow-up 修复并补测试。
+- `python3 /private/tmp/pr_guardian_danger_452_clone.py review 452 --post-review --json-output /private/tmp/syvert-pr-452-guardian-rerun8.json`
+  - 结果：第九轮 `REQUEST_CHANGES`，阻断项为 failed item error envelope 返回前未做 public-carrier leakage validation；已在当前 follow-up 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-cb3fa0c.json`
+  - 结果：第十轮 `REQUEST_CHANGES`，阻断项为 unsafe success outcome 已先写入 dataset record、`_ensure_json_safe` 允许 `NaN` / `Infinity`；已由提交 `df7f6d10b7d3` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-d538236.json`
+  - 结果：第十一轮 `REQUEST_CHANGES`，阻断项为 reference sink 可被 post-validation mutation 污染、直接 `execute_task` 可绕过 `batch_execution` typed contract；已由提交 `e79ef6cb02a8` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-5c2b05d.json`
+  - 结果：第十二轮 `REQUEST_CHANGES`，阻断项为 search/list `request_cursor` 接受 JSON-safe 非对象后进入 continuation `.get()` 裸 `AttributeError`；已由提交 `24a115d06690` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-24a115d.json`
+  - 结果：第十三轮 `REQUEST_CHANGES`，阻断项为 unsafe success `source_trace.provider_path` 在 outcome 构造前中断 batch、非 `BatchDatasetContractError` 的 dataset sink write 异常冒泡；已由提交 `ac5e94cfc593` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-ac5e94c.json`
+  - 结果：第十四轮 `REQUEST_CHANGES`，阻断项为 Windows drive-letter absolute paths 绕过 sanitizer、batch result validator 接受 aggregate status drift；已由提交 `1857321ecccc` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-1857321.json`
+  - 结果：第十五轮 `REQUEST_CHANGES`，阻断项为 duplicate `item_id` 可碰撞 dataset/audit identity、`BatchResumeToken.issued_at` 接受非 timestamp；已由提交 `72b2af37cd82` 修复并补测试。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-72b2af3.json`
+  - 结果：第十六轮 `REQUEST_CHANGES`，阻断项为 normalized payload sanitizer 误拒稳定 read-side collection 公开 `canonical_ref` HTTPS URL；已由提交 `136c560a76ac` 修复，补充公开 `canonical_ref` / `source_ref` 正例与非 ref URL、private/storage/file/Windows path 负例。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-136c560.json`
+  - 结果：第十七轮 `REQUEST_CHANGES`，阻断项为 resume prior success 的 nested `result_envelope` 未重新绑定 target-set prefix；artifact gaps 为执行计划 scope 缺少 `runtime.py` / `task_record.py` / 对应测试文件，current-state/evidence 仍指向旧 head。已在正式 worktree 本地修复，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-0b6027a.json`
+  - 结果：第十八轮 `REQUEST_CHANGES`，未发现新实现 blocker；缺口为 duplicate+failure aggregation、caller-provided `dataset_id` round-trip、batch TaskRecord snapshot round-trip 覆盖不足。已在正式 worktree 本地补齐 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-db2afea.json`
+  - 结果：第十九轮 `REQUEST_CHANGES`，阻断项为 standalone batch item success `result_envelope` 可跨 read-side contract 漂移、batch result `audit_trace` 可为空或缺最小结构。已在正式 worktree 本地收紧 validator 并补 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-f09e7bb.json`
+  - 结果：第二十轮 `REQUEST_CHANGES`，阻断项为 standalone success outcome 校验丢失 cursor boundary、`audit_trace.item_trace_refs` 未绑定 item outcomes。已在正式 worktree 本地修复并补 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-272c62b.json`
+  - 结果：第二十一轮 `REQUEST_CHANGES`，阻断项为正常 batch execution 路径未向 generated outcome validation 传入 request cursor、result envelope 校验只验证 subset 导致额外字段绕过。已在正式 worktree 本地修复并补 focused tests，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-647fa03.json`
+  - 结果：第二十二轮 `REQUEST_CHANGES`，阻断项为 `batch_execution` 被误加入 shared TaskRequest/TaskRecord admitted surface，与 typed `BatchRequest` runtime boundary 冲突。已在正式 worktree 本地移除 shared admission 并调整测试，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-fd99b0f.json`
+  - 结果：第二十三轮 `REQUEST_CHANGES`，阻断项为合法 cursor-sensitive comment batch result 在 public carrier serialization 时丢失 request cursor context。已在正式 worktree 本地修复并补 serialization 回归测试，待提交推送。
+- `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
+  - 结果：integration recheck `REQUEST_CHANGES`，阻断项为 resume prior outcome read-side wrapper 未绑定、dataset sink readback 未完整校验 record identity；已在正式 worktree root-cause sweep 中系统修复并补本地矩阵，待提交推送。
+- `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
+  - 结果：integration recheck `REQUEST_CHANGES`，阻断项为成功 `result_envelope` 可选 runtime wrapper refs 未单独脱敏；已在正式 worktree 本地系统修复 wrapper 子集校验并补恶意 wrapper 矩阵，待提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-e4a6e9e.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 sink-bound `BatchResultEnvelope` / `BatchResumeToken` 可省略 mandatory `dataset_id`。已停止 guardian/merge gate 重跑，转为本地 sink-bound dataset identity sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-401e9b3.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 media fetch cursor 未在 batch admission 校验、`validate_batch_request()` 未校验嵌套 resume token。已停止 guardian/merge gate 重跑，转为本地 request admission validator sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-afd321e.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 resume token 可回退重跑已处理 item、public sanitized refs 允许相对路径样式。已停止 guardian/merge gate 重跑，转为本地 resume position / sanitized ref boundary sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-ccf06ac.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 sink-less batch 返回不可使用的 resume token。已停止 guardian/merge gate 重跑，转为本地 resume with/without dataset sink sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-b05c998.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 `source_trace.provider_path` 允许相对路径样式。已停止 guardian/merge gate 重跑，转为本地 provider-path sanitizer sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py review 452 --post-review --json-output /tmp/syvert-pr-452-guardian-5e02663.json`
+  - 结果：`REQUEST_CHANGES`，阻断项为 terminal-position resume token 被接受、failed prior outcome 可夹带伪造 success envelope。已停止 guardian/merge gate 重跑，转为本地 resume terminal/state-machine sweep；待本地矩阵与完整验证通过后再提交推送。
+- `python3 scripts/pr_guardian.py merge-if-safe 452 --post-review --confirm-integration-recheck`
+  - 结果：integration recheck `REQUEST_CHANGES`，阻断项为 search/list `CoreTaskRequest.request_cursor` 被 shared runtime 转发但缺 admission/snapshot/evidence binding。已停止 guardian/merge gate 重跑，转为本地 shared runtime cursor boundary sweep；本 PR 采用 batch-only continuation 收口，不扩大共享 runtime search/list cursor contract。
+- `python3 scripts/pr_guardian.py review 452 --post-review`
+  - 结果：`REQUEST_CHANGES`，阻断项为 `source_trace.adapter_key` 可与执行 adapter 漂移、terminal `BatchResultEnvelope` 可携带 resumable-only stop state。已停止 guardian/merge gate 重跑，转为本地 public carrier truth-boundary sweep；待本地矩阵、完整验证、GitHub checks 通过后再单次 guardian。
+
+## 待验证项
+
+- shared runtime cursor boundary 修正提交推送后等待 GitHub checks 全绿。
+- GitHub checks 全绿后只运行一次 PR guardian review（绑定最新 head）。
+- guardian approve 后再运行一次 `python3 scripts/pr_guardian.py merge-if-safe`。
+
+## 风险与缓解
+
+- Public carrier validator 过宽可能泄漏 raw path、storage handle、provider route 或 private account/material；缓解：统一 sanitizer、operation-specific cursor/policy validator、恶意/漂移 carrier matrix 与 `git diff --check` / unittest / governance gate。
+- Resume token / prior outcome 状态机漂移可能导致重跑已处理 item、重复 dataset write 或夹带伪造 envelope；缓解：target-set hash、token id、prefix outcome、dedup state、sink readback identity、terminal-position 与 sink-less resume tests。
+- Typed `BatchRequest` entrypoint 若重新进入 shared `TaskRequest` / TaskRecord admitted surface，会扩大 Core contract；缓解：`execute_task(batch_execution)` fail-closed 测试，`#448` 单独处理 TaskRecord/result query/compat consumer migration。
+- Reference sink 只是 JSON-safe in-memory contract proof，不代表产品数据库 schema；缓解：`#449` 另交 sanitized evidence，`#450` 另做 release closeout/decision。
+- `#448` 仍需证明 TaskRecord/result query/compatibility consumers 消费 batch/dataset public carriers。
+- `#449` 仍需提供 replayable sanitized evidence matrix。
+- 若 runtime carrier 暴露 read-side envelope defect，必须新建 remediation Work Item，不能混入本 PR。
+
+## 回滚方式
+
+- 使用独立 revert PR 撤销本 Work Item 的 runtime/test/doc 增量，不直接改写 main 历史。
+- 保留 `#445` formal spec 与 `#447` GitHub truth，由后续 Work Item 重新交付 runtime carrier。
+- 若仅 sanitizer/resume validator 发现回归，优先 revert 对应 `fix(runtime): ...` follow-up commit，再重新跑 focused matrix、full unittest、guards 与 guardian。
+
+## 最近一次 checkpoint 对应的 head SHA
+
+- Initial branch checkpoint：`0486d7755b0d3fe6b50a5d513d6aba136ab2ad7a`
+- Guardian rerun9 remediation checkpoint：`df7f6d10b7d3b41f42127e34705301c3184c9d8c`
+- Guardian rerun10 remediation checkpoint：`e79ef6cb02a8513116129f1332a8f329443c03e6`
+- Current PR head checkpoint：由 GitHub PR `#452` head_sha 消费；本执行计划随最新 PR head 提交，不再把临时旧 head 作为当前状态。
+- Guardian rerun11 remediation checkpoint：`24a115d066902c7987f36597ec2c9f9388ac20a8`
+- Guardian rerun12 remediation checkpoint：`ac5e94cfc59364d2210a175e7d7b4a6884a8f2e3`
+- Guardian rerun13 remediation checkpoint：`1857321eccccb785f0eae602373f5e365b51c9d7`
+- Guardian rerun14 remediation checkpoint：`72b2af37cd82f3de725be9a017f71f9ae6c5fe05`
+- Guardian rerun15 remediation checkpoint：`136c560a76ac0a6c80dfe39f5695278ac5d361ad`
+- Guardian rerun16 remediation checkpoint：`b56c77d0d7e7`
+- Guardian rerun17 remediation checkpoint：`92a9fe56b022`
+- Guardian rerun18 remediation checkpoint：`1ccbf622376d`
+- Guardian rerun19 remediation checkpoint：`a0e4b0377e0b`
+- Guardian rerun20 remediation checkpoint：`835a61f0c965`
+- Guardian rerun21 remediation checkpoint：`da60c85c82dd`
+- Guardian rerun22 remediation checkpoint：`1a2334fefc89`
+- Root-cause sweep remediation checkpoint：`a4ae326a597f`

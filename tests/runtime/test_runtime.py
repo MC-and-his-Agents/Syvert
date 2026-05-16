@@ -418,6 +418,25 @@ class CollectionSearchAdapter:
         )
 
 
+class CollectionListAdapter:
+    adapter_key = TEST_ADAPTER_KEY
+    supported_capabilities = frozenset({"content_list"})
+    supported_targets = frozenset({"creator"})
+    supported_collection_modes = frozenset({"paginated"})
+    resource_requirement_declarations = baseline_resource_requirement_declarations(
+        adapter_key=TEST_ADAPTER_KEY,
+        capability="content_list",
+    )
+
+    def execute(self, request: TaskRequest) -> dict[str, object]:
+        self.last_request = request
+        return make_collection_result(
+            operation="content_list_by_creator",
+            target_type="creator",
+            target_ref=request.input.creator_id or "",
+        )
+
+
 class CommentCollectionAdapter:
     adapter_key = TEST_ADAPTER_KEY
     supported_capabilities = frozenset({"comment_collection"})
@@ -1087,6 +1106,96 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(result.envelope["target"]["target_ref"], "deep learning")
         self.assertEqual(result.task_record.request.target_type, "keyword")
         self.assertEqual(adapter.last_request.collection_mode, "paginated")
+
+    def test_execute_task_passes_legacy_search_continuation_without_core_cursor_surface(self) -> None:
+        adapter = CollectionSearchAdapter()
+        request = TaskRequest(
+            adapter_key=TEST_ADAPTER_KEY,
+            capability="content_search_by_keyword",
+            input=TaskInput(keyword="deep learning", continuation_token="search-page-2"),
+        )
+
+        result = execute_task_with_record(
+            request,
+            adapters={TEST_ADAPTER_KEY: adapter},
+            task_id_factory=lambda: "task-runtime-collection-search-continuation",
+        )
+
+        self.assertEqual(result.envelope["status"], "success")
+        self.assertEqual(adapter.last_request.input.continuation_token, "search-page-2")
+        self.assertIsNone(adapter.last_request.request.request_cursor)
+
+    def test_execute_task_rejects_unsafe_legacy_search_and_list_continuation(self) -> None:
+        cases = (
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="token=secret")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="cache/state.json")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="storage://private/raw")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="provider:fallback:route")),
+            ("content_list_by_creator", TaskInput(creator_id="creator-001", continuation_token="D:/exports/raw.json")),
+            ("content_list_by_creator", TaskInput(creator_id="creator-001", continuation_token="provider:routing:marketplace")),
+        )
+
+        for index, (capability, task_input) in enumerate(cases):
+            adapter = CollectionSearchAdapter() if capability == "content_search_by_keyword" else CollectionListAdapter()
+            with self.subTest(capability=capability, continuation_token=task_input.continuation_token):
+                result = execute_task_with_record(
+                    TaskRequest(
+                        adapter_key=TEST_ADAPTER_KEY,
+                        capability=capability,
+                        input=task_input,
+                    ),
+                    adapters={TEST_ADAPTER_KEY: adapter},
+                    task_id_factory=lambda index=index: f"task-runtime-unsafe-continuation-{index}",
+                )
+
+                self.assertEqual(result.envelope["status"], "failed")
+                self.assertEqual(result.envelope["error"]["category"], "invalid_input")
+                self.assertEqual(result.envelope["error"]["code"], "unsafe_continuation_token")
+                self.assertIsNone(getattr(adapter, "last_request", None))
+
+    def test_core_search_and_list_request_cursor_fails_closed_on_shared_surface(self) -> None:
+        cases = (
+            (
+                CollectionSearchAdapter(),
+                CoreTaskRequest(
+                    target=InputTarget(
+                        adapter_key=TEST_ADAPTER_KEY,
+                        capability="content_search_by_keyword",
+                        target_type="keyword",
+                        target_value="deep learning",
+                    ),
+                    policy=CollectionPolicy(collection_mode="paginated"),
+                    request_cursor={"continuation_token": "search-page-2"},
+                ),
+                "task-runtime-core-search-cursor-not-forwarded",
+            ),
+            (
+                CollectionListAdapter(),
+                CoreTaskRequest(
+                    target=InputTarget(
+                        adapter_key=TEST_ADAPTER_KEY,
+                        capability="content_list_by_creator",
+                        target_type="creator",
+                        target_value="creator-001",
+                    ),
+                    policy=CollectionPolicy(collection_mode="paginated"),
+                    request_cursor={"continuation_token": "list-page-2"},
+                ),
+                "task-runtime-core-list-cursor-not-forwarded",
+            ),
+        )
+
+        for adapter, request, task_id in cases:
+            result = execute_task_with_record(
+                request,
+                adapters={TEST_ADAPTER_KEY: adapter},
+                task_id_factory=lambda task_id=task_id: task_id,
+            )
+
+            self.assertEqual(result.envelope["status"], "failed")
+            self.assertEqual(result.envelope["error"]["category"], "invalid_input")
+            self.assertEqual(result.envelope["error"]["code"], "unsupported_request_cursor")
+            self.assertIsNone(getattr(adapter, "last_request", None))
 
     def test_execute_task_builds_media_asset_fetch_success_envelope_from_adapter_payload(self) -> None:
         adapter = MediaAssetFetchAdapter()

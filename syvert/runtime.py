@@ -269,17 +269,18 @@ class AdapterTaskRequest:
     target_value: str
     collection_mode: str
     request_cursor: Mapping[str, Any] | None = None
+    continuation_token: str | None = None
 
     @property
     def input(self) -> TaskInput:
         if self.target_type == "url":
             return TaskInput(url=self.target_value)
         if self.target_type == "keyword":
-            return TaskInput(keyword=self.target_value)
+            return TaskInput(keyword=self.target_value, continuation_token=self.continuation_token)
         if self.target_type == "content":
             return TaskInput(content_ref=self.target_value, comment_request_cursor=self.request_cursor)
         if self.target_type == "creator":
-            return TaskInput(creator_id=self.target_value)
+            return TaskInput(creator_id=self.target_value, continuation_token=self.continuation_token)
         if self.target_type == "media_ref":
             return TaskInput(media_ref=self.target_value, media_fetch_policy=self.request_cursor)
         return TaskInput()
@@ -788,7 +789,11 @@ def execute_task_internal(
                 None,
             )
 
-    adapter_request, projection_error = project_to_adapter_request(normalized_request, capability_family)
+    adapter_request, projection_error = project_to_adapter_request(
+        normalized_request,
+        capability_family,
+        legacy_continuation_token=legacy_continuation_token_from_task_request(request, capability),
+    )
     if projection_error is not None:
         return TaskExecutionResult(
             pre_accepted_failure_envelope(task_id, adapter_key, capability, projection_error),
@@ -2610,6 +2615,10 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
             policy_error = validate_media_fetch_policy(request.input.media_fetch_policy)
             if policy_error is not None:
                 return None, policy_error
+        if request.capability in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR}:
+            continuation_error = validate_public_continuation_token(request.input.continuation_token)
+            if continuation_error is not None:
+                return None, continuation_error
         return (
             CoreTaskRequest(
                 target=target,
@@ -2655,6 +2664,12 @@ def normalize_request(request: Any) -> tuple[CoreTaskRequest | None, dict[str, A
         media_policy_error = validate_media_fetch_policy(request.request_cursor)
         if media_policy_error is not None:
             return None, media_policy_error
+    elif target.capability in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR} and request.request_cursor is not None:
+        return None, invalid_input_error(
+            "unsupported_request_cursor",
+            "shared CoreTaskRequest request_cursor is not admitted for search/list pagination",
+            details={"capability": target.capability},
+        )
     execution_control_policy = request.execution_control_policy or default_execution_control_policy()
     if execution_control_policy is request.execution_control_policy:
         return request, None
@@ -2730,6 +2745,8 @@ def resolve_capability_family(capability: str) -> tuple[str | None, dict[str, An
 def project_to_adapter_request(
     request: CoreTaskRequest,
     capability_family: str,
+    *,
+    legacy_continuation_token: str | None = None,
 ) -> tuple[AdapterTaskRequest | None, dict[str, Any] | None]:
     return (
         AdapterTaskRequest(
@@ -2744,9 +2761,91 @@ def project_to_adapter_request(
                 if request.target.capability == MEDIA_ASSET_FETCH_BY_REF
                 else None
             ),
+            continuation_token=legacy_continuation_token,
         ),
         None,
     )
+
+
+def legacy_continuation_token_from_task_request(request: Any, capability: str) -> str | None:
+    if type(request) is not TaskRequest:
+        return None
+    if capability not in {CONTENT_SEARCH_BY_KEYWORD, CONTENT_LIST_BY_CREATOR}:
+        return None
+    token = request.input.continuation_token
+    return token if isinstance(token, str) and token else None
+
+
+def validate_public_continuation_token(token: Any) -> dict[str, Any] | None:
+    if token is None:
+        return None
+    if not isinstance(token, str) or not token.strip():
+        return invalid_input_error(
+            "invalid_continuation_token",
+            "continuation_token must be a non-empty public string",
+            details={"field": "input.continuation_token"},
+        )
+    if token.strip() != token:
+        return invalid_input_error(
+            "unsafe_continuation_token",
+            "continuation_token must not contain surrounding whitespace",
+            details={"field": "input.continuation_token"},
+        )
+    lowered = token.lower()
+    if token.startswith(("/", "\\")) or _is_windows_absolute_path(token) or _contains_filesystem_like_relative_ref(token):
+        return invalid_input_error(
+            "unsafe_continuation_token",
+            "continuation_token must not contain local path semantics",
+            details={"field": "input.continuation_token"},
+        )
+    if any(
+        marker in lowered
+        for marker in (
+            "http://",
+            "https://",
+            "s3://",
+            "gs://",
+            "storage://",
+            "file://",
+            "token=",
+            "raw",
+            "credential",
+            "secret",
+            "signed",
+            "private",
+            "storage-handle",
+            "storage_handle",
+            "account-pool",
+            "proxy-pool",
+            "bucket",
+            "download",
+            "fallback",
+            "marketplace",
+            "route",
+            "routing",
+        )
+    ):
+        return invalid_input_error(
+            "unsafe_continuation_token",
+            "continuation_token must not contain private routing or storage semantics",
+            details={"field": "input.continuation_token"},
+        )
+    return None
+
+
+def _contains_filesystem_like_relative_ref(value: str) -> bool:
+    lowered = value.lower()
+    if lowered.startswith(("../", "./")) or any(token in lowered for token in ("/../", "/./")):
+        return True
+    if lowered.endswith(("/..", "/.")):
+        return True
+    if "/" in value:
+        return "://" not in value
+    return False
+
+
+def _is_windows_absolute_path(value: str) -> bool:
+    return len(value) >= 3 and value[1] == ":" and value[0].isalpha() and value[2] in {"/", "\\"}
 
 
 def clone_request_cursor(request_cursor: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
