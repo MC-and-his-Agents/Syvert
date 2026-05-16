@@ -1125,6 +1125,34 @@ class RuntimeExecutionTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         self.assertEqual(adapter.last_request.input.continuation_token, "search-page-2")
         self.assertIsNone(adapter.last_request.request.request_cursor)
 
+    def test_execute_task_rejects_unsafe_legacy_search_and_list_continuation(self) -> None:
+        cases = (
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="token=secret")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="cache/state.json")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="storage://private/raw")),
+            ("content_search_by_keyword", TaskInput(keyword="deep learning", continuation_token="provider:fallback:route")),
+            ("content_list_by_creator", TaskInput(creator_id="creator-001", continuation_token="D:/exports/raw.json")),
+            ("content_list_by_creator", TaskInput(creator_id="creator-001", continuation_token="provider:routing:marketplace")),
+        )
+
+        for index, (capability, task_input) in enumerate(cases):
+            adapter = CollectionSearchAdapter() if capability == "content_search_by_keyword" else CollectionListAdapter()
+            with self.subTest(capability=capability, continuation_token=task_input.continuation_token):
+                result = execute_task_with_record(
+                    TaskRequest(
+                        adapter_key=TEST_ADAPTER_KEY,
+                        capability=capability,
+                        input=task_input,
+                    ),
+                    adapters={TEST_ADAPTER_KEY: adapter},
+                    task_id_factory=lambda index=index: f"task-runtime-unsafe-continuation-{index}",
+                )
+
+                self.assertEqual(result.envelope["status"], "failed")
+                self.assertEqual(result.envelope["error"]["category"], "invalid_input")
+                self.assertEqual(result.envelope["error"]["code"], "unsafe_continuation_token")
+                self.assertIsNone(getattr(adapter, "last_request", None))
+
     def test_core_search_and_list_request_cursor_fails_closed_on_shared_surface(self) -> None:
         cases = (
             (
