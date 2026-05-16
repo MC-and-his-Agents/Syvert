@@ -1062,7 +1062,7 @@ def _validate_continuation_request_cursor(request_cursor: Mapping[str, Any], *, 
             details={"fields": extra_fields, "index": index},
         )
     token = request_cursor.get("continuation_token")
-    _require_non_empty_string(token, field="request_cursor.continuation_token")
+    _validate_public_continuation_token(token, field="request_cursor.continuation_token")
 
 
 def _validate_media_fetch_request_cursor(request_cursor: Mapping[str, Any], *, index: int) -> None:
@@ -1522,6 +1522,7 @@ def _validate_result_envelope_boundary(
             "comment_collection result_envelope requires request_cursor context",
             details={"item_id": item_id, **({"index": index} if index is not None else {})},
         )
+    _validate_public_continuation_carriers(payload.get("next_continuation"), field="result_envelope.next_continuation")
     error = validate_success_payload(
         payload,
         capability=operation,
@@ -1957,6 +1958,55 @@ def _validate_public_payload_string(value: str, *, field: str) -> None:
             "public batch/dataset carrier contains a raw path, storage handle, or private token",
             details={"field": field},
         )
+
+
+def _validate_public_continuation_carriers(value: Any, *, field: str) -> None:
+    if value is None:
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            child_field = f"{field}.{key}"
+            if str(key) == "continuation_token" and item is not None:
+                _validate_public_continuation_token(item, field=child_field)
+                continue
+            _validate_public_continuation_carriers(item, field=child_field)
+        return
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for index, item in enumerate(value):
+            _validate_public_continuation_carriers(item, field=f"{field}[{index}]")
+
+
+def _validate_public_continuation_token(value: Any, *, field: str) -> str:
+    token = _require_non_empty_string(value, field=field)
+    if token.strip() != token:
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "continuation token must be a sanitized public carrier",
+            details={"field": field},
+        )
+    _validate_public_payload_string(token, field=field)
+    lowered = token.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "credential",
+            "secret",
+            "signed",
+            "private",
+            "storage-handle",
+            "storage_handle",
+            "account-pool",
+            "proxy-pool",
+            "bucket",
+            "download",
+        )
+    ):
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "continuation token must not contain private routing or storage markers",
+            details={"field": field},
+        )
+    return token
 
 
 def _validate_normalized_payload_string(value: str, *, field: str) -> None:

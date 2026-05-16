@@ -232,6 +232,13 @@ class PublicUrlCollectionAdapter(CollectionAdapter):
         return payload
 
 
+class UnsafeContinuationAdapter(CollectionAdapter):
+    def execute(self, request):
+        payload = make_collection_result(target_ref=request.input.keyword or "")
+        payload["next_continuation"] = {"continuation_token": "token=secret"}
+        return payload
+
+
 class UnsafeSuccessAuditAdapter(CollectionAdapter):
     def execute(self, request):
         payload = make_collection_result(target_ref=request.input.keyword or "")
@@ -2098,6 +2105,34 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
             [{"continuation_token": "search-page"}, {"continuation_token": "list-page"}],
         )
 
+    def test_paginated_request_cursor_rejects_private_continuation_tokens(self) -> None:
+        cases = (
+            ("content_search_by_keyword", "keyword", "alpha", "/etc/passwd"),
+            ("content_search_by_keyword", "keyword", "alpha", "storage://private/raw"),
+            ("content_search_by_keyword", "keyword", "alpha", "token=secret"),
+            ("content_list_by_creator", "creator", "creator:alpha", "D:/exports/raw.json"),
+            ("content_list_by_creator", "creator", "creator:alpha", "signed-private-page"),
+        )
+
+        for operation, target_type, target_ref, token in cases:
+            with self.subTest(operation=operation, token=token):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    self.execute(
+                        request(
+                            BatchTargetItem(
+                                item_id="cursor",
+                                operation=operation,
+                                adapter_key=TEST_ADAPTER_KEY,
+                                target_type=target_type,
+                                target_ref=target_ref,
+                                dedup_key=f"dedup:{operation}",
+                                request_cursor={"continuation_token": token},
+                            )
+                        )
+                    )
+
+                self.assertEqual(context.exception.code, "unsafe_public_payload")
+
     def test_paginated_request_cursor_must_be_object(self) -> None:
         cases = (
             BatchTargetItem(
@@ -2260,6 +2295,32 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         payload = batch_result_envelope_to_dict(resumed)
         self.assertEqual(payload["item_outcomes"][0]["outcome_status"], BATCH_ITEM_SUCCEEDED)
         self.assertNotIn("request_cursor_context", payload["item_outcomes"][0])
+
+    def test_result_next_continuation_rejects_private_token(self) -> None:
+        forged_envelope = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
+        forged_envelope["next_continuation"] = {"continuation_token": "token=secret"}
+        with self.assertRaises(BatchDatasetContractError) as context:
+            validate_batch_item_outcome(
+                BatchItemOutcome(
+                    item_id="item-1",
+                    operation="content_search_by_keyword",
+                    adapter_key=TEST_ADAPTER_KEY,
+                    target_ref="alpha",
+                    outcome_status=BATCH_ITEM_SUCCEEDED,
+                    result_envelope=forged_envelope,
+                    audit={"reason": "dataset_record_written"},
+                )
+            )
+
+        self.assertEqual(context.exception.code, "unsafe_public_payload")
+
+        self.adapters = {TEST_ADAPTER_KEY: UnsafeContinuationAdapter()}
+
+        result = self.execute(request(target("item-1", "alpha")))
+
+        self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
+        self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
+        self.assertNotIn("token=secret", repr(batch_result_envelope_to_dict(result)))
 
     def test_dataset_write_failure_is_failed_item(self) -> None:
         result = self.execute(request(target("item-1", "alpha")), sink=FailingDatasetSink())
