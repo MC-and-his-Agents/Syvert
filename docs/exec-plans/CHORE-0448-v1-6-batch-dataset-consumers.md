@@ -10,7 +10,7 @@
 - Parent Phase：`#444`
 - Parent FR：`#445`
 - 关联 spec：`docs/specs/FR-0445-batch-dataset-core-contract/spec.md`
-- 关联 PR：
+- 关联 PR：`#453`
 - 状态：`active`
 
 ## 目标
@@ -43,7 +43,8 @@
 - Branch：`issue-448-445-v1-6-0-batch-dataset-consumers`
 - Worktree：`/Users/mc/code/worktrees/syvert/issue-448-445-v1-6-0-batch-dataset-consumers`
 - Baseline：`926a378dbec0c93fe2766eff8f4e3277083797c5`
-- PR：待创建。
+- PR：`#453` / `https://github.com/MC-and-his-Agents/Syvert/pull/453`
+- PR metadata follow-up 不刷新 checkpoint head；live review head 以 PR `headRefOid`、GitHub checks、guardian state 与 merge gate 为准。
 
 ## 已实现合同
 
