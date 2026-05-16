@@ -1943,7 +1943,7 @@ def _validate_public_payload_key(key: str, *, field: str) -> None:
 def _validate_public_payload_string(value: str, *, field: str) -> None:
     stripped = value.strip()
     lowered = stripped.lower()
-    if stripped.startswith("/") or _is_windows_absolute_path(stripped) or any(
+    if stripped.startswith("/") or _is_windows_absolute_path(stripped) or _contains_relative_path_ref(stripped) or any(
         token in lowered
         for token in (
             "http://",

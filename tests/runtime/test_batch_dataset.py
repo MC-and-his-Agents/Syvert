@@ -19,6 +19,7 @@ from syvert.batch_dataset import (
     BatchResumeToken,
     BatchTargetItem,
     ReferenceDatasetSink,
+    batch_item_outcome_to_dict,
     batch_result_envelope_to_dict,
     batch_resume_token_to_dict,
     batch_target_set_hash,
@@ -2351,6 +2352,30 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.result_status, BATCH_RESULT_ALL_FAILED)
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_FAILED)
         self.assertNotIn("token=secret", repr(batch_result_envelope_to_dict(result)))
+
+    def test_failed_item_public_carriers_reject_relative_path_strings(self) -> None:
+        cases = (
+            {"error_envelope": {"code": "failed", "message": "failed at cache/state.json", "details": {}}},
+            {"error_envelope": {"code": "failed", "message": "failed", "details": {"path": "cache/state.json"}}},
+            {"audit": {"reason": "failed", "path": "state/raw.json"}},
+        )
+
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                payload = {
+                    "item_id": "item-1",
+                    "operation": "content_search_by_keyword",
+                    "adapter_key": TEST_ADAPTER_KEY,
+                    "target_ref": "alpha",
+                    "outcome_status": BATCH_ITEM_FAILED,
+                    "error_envelope": {"code": "failed", "message": "failed", "details": {}},
+                    "audit": {"reason": "failed"},
+                    **overrides,
+                }
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    batch_item_outcome_to_dict(BatchItemOutcome(**payload))
+
+                self.assertEqual(context.exception.code, "unsafe_public_payload")
 
     def test_dataset_write_failure_is_failed_item(self) -> None:
         result = self.execute(request(target("item-1", "alpha")), sink=FailingDatasetSink())
