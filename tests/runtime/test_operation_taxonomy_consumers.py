@@ -13,6 +13,7 @@ from syvert.adapter_provider_compatibility_decision import (
     COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT,
     decide_adapter_provider_compatibility,
 )
+from syvert.batch_dataset import BatchDatasetContractError, BatchTargetItem, validate_batch_target_item
 from syvert.operation_taxonomy import stable_operation_entry
 from syvert.provider_capability_offer import (
     APPROVED_CAPABILITY_OFFER,
@@ -135,6 +136,79 @@ class OperationTaxonomyConsumerMigrationTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "matched")
         self.assertEqual(decision.capability, "comment_collection")
         self.assertEqual(decision.execution_slice.operation, "comment_collection")
+
+    def test_batch_target_items_consume_stable_read_side_runtime_slices(self) -> None:
+        cases = (
+            ("content_search_by_keyword", "keyword", "deep learning"),
+            ("content_list_by_creator", "creator", "creator-001"),
+            ("comment_collection", "content", "content-001"),
+            ("creator_profile_by_id", "creator", "creator-001"),
+            ("media_asset_fetch_by_ref", "media_ref", "media:asset-001"),
+        )
+
+        for operation, target_type, target_ref in cases:
+            with self.subTest(operation=operation):
+                collection_mode = (
+                    "paginated"
+                    if operation in {"content_search_by_keyword", "content_list_by_creator", "comment_collection"}
+                    else "direct"
+                )
+                stable = stable_operation_entry(
+                    operation=operation,
+                    target_type=target_type,
+                    collection_mode=collection_mode,
+                )
+                item = BatchTargetItem(
+                    item_id=f"item-{operation}",
+                    operation=operation,
+                    adapter_key="xhs",
+                    target_type=target_type,
+                    target_ref=target_ref,
+                    dedup_key=f"dedup:{operation}",
+                )
+
+                self.assertTrue(stable.runtime_delivery)
+                self.assertEqual(validate_batch_target_item(item), item)
+
+    def test_batch_target_item_rejects_provider_compatibility_as_operation(self) -> None:
+        with self.assertRaises(BatchDatasetContractError):
+            validate_batch_target_item(
+                BatchTargetItem(
+                    item_id="item-provider",
+                    operation="provider_compatibility_decision",
+                    adapter_key="xhs",
+                    target_type="content",
+                    target_ref="content-001",
+                    dedup_key="dedup:provider",
+                )
+            )
+
+    def test_compatibility_consumers_do_not_accept_dataset_normalized_payload(self) -> None:
+        private_dataset_payload = {
+            "dataset_record": {
+                "normalized_payload": {
+                    "private_creator": "creator-private",
+                    "provider_route": "provider:fallback:marketplace",
+                }
+            }
+        }
+
+        requirement = copy_requirement()
+        requirement.update(private_dataset_payload)
+        self.assertEqual(
+            validate_adapter_capability_requirement(requirement).status,
+            ADAPTER_REQUIREMENT_STATUS_INVALID,
+        )
+
+        offer = copy_offer()
+        offer.update(private_dataset_payload)
+        self.assertEqual(validate_provider_capability_offer(offer).status, PROVIDER_OFFER_STATUS_INVALID)
+
+        decision_input = copy_decision_input()
+        decision_input.update(private_dataset_payload)
+        decision = decide_adapter_provider_compatibility(decision_input)
+        self.assertEqual(decision.decision_status, COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT)
+        self.assertEqual(decision.matched_profiles, ())
 
     def test_adapter_requirement_rejects_proposed_taxonomy_candidate(self) -> None:
         requirement = copy_requirement()

@@ -429,6 +429,72 @@ class MediaAssetFetchAdapter:
 
 
 class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
+    def make_batch_record(self):
+        request = TaskRequestSnapshot(
+            adapter_key="core",
+            capability="batch_execution",
+            target_type="operation_batch",
+            target_value="batch-001",
+            collection_mode="batch",
+        )
+        record = start_task_record(
+            create_task_record(
+                "task-record-batch-1",
+                request=request,
+                occurred_at="2026-05-16T10:00:00Z",
+            ),
+            occurred_at="2026-05-16T10:00:01Z",
+        )
+        return finish_task_record(
+            record,
+            {
+                "task_id": "task-record-batch-1",
+                "adapter_key": "core",
+                "capability": "batch_execution",
+                "status": "success",
+                "task_record_ref": "task_record:task-record-batch-1",
+                "batch_id": "batch-001",
+                "operation": "batch_execution",
+                "result_status": "complete",
+                "dataset_sink_ref": "sink:reference",
+                "dataset_id": "dataset:batch-001",
+                "item_outcomes": [
+                    {
+                        "item_id": "item-1",
+                        "operation": "content_search_by_keyword",
+                        "adapter_key": TEST_ADAPTER_KEY,
+                        "target_ref": "deep learning",
+                        "outcome_status": "succeeded",
+                        "result_envelope": {
+                            "task_id": "batch-item-1",
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "capability": "content_search_by_keyword",
+                            "status": "success",
+                            **make_collection_result(target_ref="deep learning"),
+                        },
+                        "dataset_record_ref": "dataset:batch-001:item-1",
+                        "source_trace": {
+                            "adapter_key": TEST_ADAPTER_KEY,
+                            "provider_path": "provider://sanitized",
+                            "fetched_at": "2026-05-16T10:00:01Z",
+                            "evidence_alias": "alias://batch-item-1",
+                        },
+                        "audit": {"reason": "dataset_record_written"},
+                    }
+                ],
+                "audit_trace": {
+                    "batch_id": "batch-001",
+                    "started_at": "2026-05-16T10:00:00Z",
+                    "finished_at": "2026-05-16T10:00:01Z",
+                    "finished": True,
+                    "item_count": 1,
+                    "item_trace_refs": ["audit:batch:batch-001:item-1"],
+                    "evidence_refs": ["evidence:batch:item"],
+                },
+            },
+            occurred_at="2026-05-16T10:00:02Z",
+        )
+
     def test_round_trips_success_record(self) -> None:
         outcome = execute_task_with_record(
             TaskRequest(
@@ -448,6 +514,34 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
 
         self.assertEqual(restored, outcome.task_record)
         self.assertEqual(restored.status, "succeeded")
+
+    def test_round_trips_batch_execution_record(self) -> None:
+        record = self.make_batch_record()
+
+        payload = task_record_to_dict(record)
+        restored = task_record_from_dict(payload)
+
+        self.assertEqual(restored, record)
+        self.assertEqual(restored.request.capability, "batch_execution")
+        self.assertEqual(restored.request.target_type, "operation_batch")
+        self.assertEqual(restored.request.collection_mode, "batch")
+        self.assertEqual(restored.result.envelope["operation"], "batch_execution")
+        self.assertEqual(restored.result.envelope["item_outcomes"][0]["dataset_record_ref"], "dataset:batch-001:item-1")
+        self.assertNotIn("request_cursor_context", repr(payload))
+
+    def test_rejects_batch_execution_result_status_drift(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["result_status"] = "all_failed"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_execution_top_level_raw_payload(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["raw"] = {"provider_batch": True}
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
 
     def test_round_trips_comment_collection_record(self) -> None:
         outcome = execute_task_with_record(
