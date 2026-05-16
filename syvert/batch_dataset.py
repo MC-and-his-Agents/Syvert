@@ -1985,10 +1985,17 @@ def _validate_public_continuation_token(value: Any, *, field: str) -> str:
             details={"field": field},
         )
     _validate_public_payload_string(token, field=field)
+    if _contains_relative_path_ref(token):
+        raise BatchDatasetContractError(
+            "unsafe_public_payload",
+            "continuation token must not contain filesystem-like relative paths",
+            details={"field": field},
+        )
     lowered = token.lower()
     if any(
         marker in lowered
         for marker in (
+            "raw",
             "credential",
             "secret",
             "signed",
@@ -1999,6 +2006,10 @@ def _validate_public_continuation_token(value: Any, *, field: str) -> str:
             "proxy-pool",
             "bucket",
             "download",
+            "fallback",
+            "marketplace",
+            "route",
+            "routing",
         )
     ):
         raise BatchDatasetContractError(

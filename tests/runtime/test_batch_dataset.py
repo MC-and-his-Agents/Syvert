@@ -2108,10 +2108,14 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
     def test_paginated_request_cursor_rejects_private_continuation_tokens(self) -> None:
         cases = (
             ("content_search_by_keyword", "keyword", "alpha", "/etc/passwd"),
+            ("content_search_by_keyword", "keyword", "alpha", "cache/state.json"),
             ("content_search_by_keyword", "keyword", "alpha", "storage://private/raw"),
             ("content_search_by_keyword", "keyword", "alpha", "token=secret"),
+            ("content_search_by_keyword", "keyword", "alpha", "provider:fallback:marketplace"),
+            ("content_search_by_keyword", "keyword", "alpha", "raw-page"),
             ("content_list_by_creator", "creator", "creator:alpha", "D:/exports/raw.json"),
             ("content_list_by_creator", "creator", "creator:alpha", "signed-private-page"),
+            ("content_list_by_creator", "creator", "creator:alpha", "provider:routing:next-page"),
         )
 
         for operation, target_type, target_ref, token in cases:
@@ -2297,22 +2301,27 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertNotIn("request_cursor_context", payload["item_outcomes"][0])
 
     def test_result_next_continuation_rejects_private_token(self) -> None:
-        forged_envelope = runtime_result_envelope(make_collection_result(target_ref="alpha"), capability="content_search_by_keyword")
-        forged_envelope["next_continuation"] = {"continuation_token": "token=secret"}
-        with self.assertRaises(BatchDatasetContractError) as context:
-            validate_batch_item_outcome(
-                BatchItemOutcome(
-                    item_id="item-1",
-                    operation="content_search_by_keyword",
-                    adapter_key=TEST_ADAPTER_KEY,
-                    target_ref="alpha",
-                    outcome_status=BATCH_ITEM_SUCCEEDED,
-                    result_envelope=forged_envelope,
-                    audit={"reason": "dataset_record_written"},
+        for token in ("token=secret", "cache/state.json", "provider:fallback:marketplace", "raw-page", "provider:routing:next"):
+            with self.subTest(token=token):
+                forged_envelope = runtime_result_envelope(
+                    make_collection_result(target_ref="alpha"),
+                    capability="content_search_by_keyword",
                 )
-            )
+                forged_envelope["next_continuation"] = {"continuation_token": token}
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_item_outcome(
+                        BatchItemOutcome(
+                            item_id="item-1",
+                            operation="content_search_by_keyword",
+                            adapter_key=TEST_ADAPTER_KEY,
+                            target_ref="alpha",
+                            outcome_status=BATCH_ITEM_SUCCEEDED,
+                            result_envelope=forged_envelope,
+                            audit={"reason": "dataset_record_written"},
+                        )
+                    )
 
-        self.assertEqual(context.exception.code, "unsafe_public_payload")
+                self.assertEqual(context.exception.code, "unsafe_public_payload")
 
         self.adapters = {TEST_ADAPTER_KEY: UnsafeContinuationAdapter()}
 
