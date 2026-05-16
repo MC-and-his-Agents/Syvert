@@ -100,4 +100,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- Consumer migration checkpoint：`0e602a161b7d05c172e8aaf7aa03cd145ca6a285`
+- Consumer migration checkpoint：`2df4d3cca1dd8b4e64d01c931750af7342da56e8`
