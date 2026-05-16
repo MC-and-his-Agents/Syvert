@@ -542,6 +542,36 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)
 
+    def test_rejects_batch_execution_top_level_extra_private_field(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["provider_route"] = "provider:fallback:marketplace"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_execution_request_snapshot_unsafe_batch_id(self) -> None:
+        with self.assertRaises(TaskRecordContractError):
+            create_task_record(
+                "task-record-batch-unsafe-id",
+                TaskRequestSnapshot(
+                    adapter_key="core",
+                    capability="batch_execution",
+                    target_type="operation_batch",
+                    target_value="file:///tmp/raw-batch",
+                    collection_mode="batch",
+                ),
+                occurred_at="2026-05-16T10:00:00Z",
+            )
+
+    def test_rejects_batch_item_extra_private_field(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["request_cursor_context"] = {
+            "provider_route": "provider:fallback:marketplace"
+        }
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
     def test_rejects_failed_batch_item_with_dataset_record_ref(self) -> None:
         payload = task_record_to_dict(self.make_batch_record())
         item = payload["result"]["envelope"]["item_outcomes"][0]

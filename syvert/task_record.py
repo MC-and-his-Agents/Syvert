@@ -22,6 +22,54 @@ TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
 BATCH_EXECUTION_OPERATION = "batch_execution"
 BATCH_TARGET_TYPE = "operation_batch"
 BATCH_COLLECTION_MODE = "batch"
+BATCH_TERMINAL_ENVELOPE_FIELDS = frozenset(
+    {
+        "task_id",
+        "adapter_key",
+        "capability",
+        "status",
+        "task_record_ref",
+        "runtime_result_refs",
+        "execution_control_events",
+        "runtime_failure_signal",
+        "runtime_failure_signals",
+        "runtime_structured_log_events",
+        "runtime_execution_metric_samples",
+        "batch_id",
+        "operation",
+        "result_status",
+        "item_outcomes",
+        "resume_token",
+        "dataset_sink_ref",
+        "dataset_id",
+        "audit_trace",
+    }
+)
+BATCH_ITEM_OUTCOME_FIELDS = frozenset(
+    {
+        "item_id",
+        "operation",
+        "adapter_key",
+        "target_ref",
+        "outcome_status",
+        "result_envelope",
+        "error_envelope",
+        "dataset_record_ref",
+        "source_trace",
+        "audit",
+    }
+)
+BATCH_RESUME_TOKEN_FIELDS = frozenset(
+    {
+        "resume_token",
+        "batch_id",
+        "target_set_hash",
+        "next_item_index",
+        "issued_at",
+        "dataset_sink_ref",
+        "dataset_id",
+    }
+)
 SHARED_CAPABILITIES = frozenset(
     {
         "content_detail_by_url",
@@ -789,6 +837,7 @@ def validate_request_snapshot(snapshot: TaskRequestSnapshot) -> None:
             raise TaskRecordContractError("batch TaskRequestSnapshot.target_type 必须为 operation_batch")
         if collection_mode != BATCH_COLLECTION_MODE:
             raise TaskRecordContractError("batch TaskRequestSnapshot.collection_mode 必须为 batch")
+        validate_batch_public_ref(target_value, field="TaskRequestSnapshot.target_value")
         return
     if capability not in SHARED_CAPABILITIES:
         raise TaskRecordContractError("TaskRequestSnapshot.capability 不在共享请求模型允许值范围内")
@@ -1113,6 +1162,9 @@ def validate_terminal_envelope_contract(record: TaskRecord, envelope: Mapping[st
 
 
 def validate_batch_success_terminal_envelope(record: TaskRecord, envelope: Mapping[str, Any]) -> None:
+    extra_fields = sorted(set(envelope) - BATCH_TERMINAL_ENVELOPE_FIELDS)
+    if extra_fields:
+        raise TaskRecordContractError("batch TaskTerminalResult.envelope 包含未批准字段")
     if "raw" in envelope or "normalized" in envelope:
         raise TaskRecordContractError("batch TaskTerminalResult.envelope 不得包含 raw/normalized 顶层 payload")
     if envelope.get("operation") != BATCH_EXECUTION_OPERATION:
@@ -1144,6 +1196,9 @@ def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> 
     if resume_token_payload is not None:
         if not isinstance(resume_token_payload, Mapping):
             raise TaskRecordContractError("batch TaskTerminalResult.envelope.resume_token 必须是对象")
+        extra_resume_fields = sorted(set(resume_token_payload) - BATCH_RESUME_TOKEN_FIELDS)
+        if extra_resume_fields:
+            raise TaskRecordContractError("batch TaskTerminalResult.envelope.resume_token 包含未批准字段")
         resume_token = BatchResumeToken(
             resume_token=require_string(
                 resume_token_payload.get("resume_token"),
@@ -1189,6 +1244,9 @@ def _batch_item_outcome_from_projection(item: Any, *, index: int) -> Any:
 
     if not isinstance(item, Mapping):
         raise TaskRecordContractError("batch item_outcomes 项必须是对象")
+    extra_fields = sorted(set(item) - BATCH_ITEM_OUTCOME_FIELDS)
+    if extra_fields:
+        raise TaskRecordContractError("batch item_outcome 包含未批准字段")
     field_prefix = f"result.envelope.item_outcomes[{index}]"
     audit = item.get("audit")
     if not isinstance(audit, Mapping):
@@ -1216,6 +1274,15 @@ def _optional_mapping_dict(value: Any, *, field: str) -> dict[str, Any] | None:
     if not isinstance(value, Mapping):
         raise TaskRecordContractError(f"{field} 必须是对象或 null")
     return dict(value)
+
+
+def validate_batch_public_ref(value: str, *, field: str) -> None:
+    from syvert.batch_dataset import _validate_sanitized_ref
+
+    try:
+        _validate_sanitized_ref(value, field=field)
+    except Exception as error:
+        raise TaskRecordContractError(f"{field} 不满足 batch public ref 约束") from error
 
 
 def validate_terminal_envelope_observability_contract(record: TaskRecord, envelope: Mapping[str, Any]) -> None:

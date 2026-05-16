@@ -56,7 +56,7 @@
   - sinkless item 不得伪造 `dataset_record_ref`；
   - `resume_token.next_item_index` 只指向已处理 item 前缀；
   - batch terminal 顶层不得携带 `raw` / `normalized` payload。
-- Guardian follow-up：TaskRecord batch projection 重建 canonical `BatchResultEnvelope` 并调用 #447 public carrier validator，避免 failed item 伪造 `dataset_record_ref`、nested `result_envelope` target drift、source/audit/private carrier 泄漏等宽松读取。
+- Guardian follow-up：TaskRecord batch projection 重建 canonical `BatchResultEnvelope` 并调用 #447 public carrier validator，避免 failed item 伪造 `dataset_record_ref`、nested `result_envelope` target drift、source/audit/private carrier 泄漏等宽松读取；同时对原始 batch envelope 顶层、`resume_token` 与 `item_outcomes` 执行严格字段集校验，避免 canonical projection 忽略的额外私有字段被原样回读。
 - CLI query、HTTP status 与 HTTP result 可读取同一 batch TaskRecord public carrier，且不会暴露 `request_cursor_context`。
 - Batch target item consumer 只消费稳定 read-side runtime slices；compatibility consumers 遇到 dataset normalized payload 形状时 fail-closed。
 
@@ -79,6 +79,13 @@
   - 结果：通过，1 test。
   - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
   - 结果：通过，382 tests。
+- Guardian rerun follow-up validation：
+  - `python3 -m unittest tests.runtime.test_task_record.TaskRecordCodecTests.test_round_trips_batch_execution_record tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_batch_execution_top_level_extra_private_field tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_batch_execution_request_snapshot_unsafe_batch_id tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_batch_item_extra_private_field tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_failed_batch_item_with_dataset_record_ref tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_batch_item_result_envelope_target_drift tests.runtime.test_task_record.TaskRecordCodecTests.test_rejects_batch_item_result_envelope_private_source_trace`
+  - 结果：通过，7 tests。
+  - `python3 -m unittest tests.runtime.test_cli_http_same_path.CliHttpSamePathTests.test_batch_task_record_query_and_http_result_share_public_carrier`
+  - 结果：通过，1 test。
+  - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，385 tests。
 - Full unittest discovery：
   - `python3 -m unittest discover`
   - 结果：通过，527 tests。
