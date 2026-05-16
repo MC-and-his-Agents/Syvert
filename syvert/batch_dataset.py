@@ -702,6 +702,13 @@ def validate_batch_result_envelope(envelope: BatchResultEnvelope) -> BatchResult
                 "invalid_dataset_boundary",
                 "batch result envelope with dataset_sink_ref must carry dataset_id",
             )
+        for outcome in envelope.item_outcomes:
+            if outcome.outcome_status == BATCH_ITEM_SUCCEEDED and outcome.dataset_record_ref is None:
+                raise BatchDatasetContractError(
+                    "invalid_dataset_boundary",
+                    "sink-bound successful item outcome must carry dataset_record_ref",
+                    details={"item_id": outcome.item_id},
+                )
     if envelope.dataset_id is not None:
         _validate_sanitized_ref(envelope.dataset_id, field="dataset_id")
     _require_mapping(envelope.audit_trace, field="audit_trace")
@@ -1771,7 +1778,7 @@ def _validate_target_ref(operation: str, value: str, *, field: str) -> str:
 def _validate_search_keyword(value: str, *, field: str) -> None:
     stripped = value.strip()
     lowered = stripped.lower()
-    if stripped.startswith("/") or stripped.startswith("\\") or any(
+    if stripped.startswith("/") or stripped.startswith("\\") or _is_windows_absolute_path(stripped) or any(
         token in lowered
         for token in (
             "http://",

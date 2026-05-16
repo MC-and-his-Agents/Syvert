@@ -702,6 +702,60 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
 
         self.assertEqual(context.exception.code, "invalid_batch_result_envelope")
 
+    def test_sink_bound_result_rejects_success_without_dataset_record_ref(self) -> None:
+        complete = self.execute(request(target("item-1", "alpha")))
+        success_without_ref = BatchItemOutcome(**{**complete.item_outcomes[0].__dict__, "dataset_record_ref": None})
+        forged_complete = BatchResultEnvelope(
+            batch_id=complete.batch_id,
+            operation=complete.operation,
+            result_status=complete.result_status,
+            item_outcomes=(success_without_ref,),
+            resume_token=complete.resume_token,
+            dataset_sink_ref=complete.dataset_sink_ref,
+            dataset_id=complete.dataset_id,
+            audit_trace=complete.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as complete_context:
+            batch_result_envelope_to_dict(forged_complete)
+
+        self.assertEqual(complete_context.exception.code, "invalid_dataset_boundary")
+
+        self.adapters = {TEST_ADAPTER_KEY: CollectionAdapter(), "failed": FailingCollectionAdapter()}
+        partial = self.execute(
+            BatchRequest(
+                batch_id="batch-001",
+                target_set=(
+                    target("item-1", "alpha"),
+                    BatchTargetItem(
+                        item_id="item-2",
+                        operation="content_search_by_keyword",
+                        adapter_key="failed",
+                        target_type="keyword",
+                        target_ref="beta",
+                        dedup_key="dedup:beta",
+                    ),
+                ),
+                dataset_sink_ref="dataset-sink:reference",
+            )
+        )
+        partial_success_without_ref = BatchItemOutcome(**{**partial.item_outcomes[0].__dict__, "dataset_record_ref": None})
+        forged_partial = BatchResultEnvelope(
+            batch_id=partial.batch_id,
+            operation=partial.operation,
+            result_status=BATCH_RESULT_PARTIAL_SUCCESS,
+            item_outcomes=(partial_success_without_ref, partial.item_outcomes[1]),
+            resume_token=partial.resume_token,
+            dataset_sink_ref=partial.dataset_sink_ref,
+            dataset_id=partial.dataset_id,
+            audit_trace=partial.audit_trace,
+        )
+
+        with self.assertRaises(BatchDatasetContractError) as partial_context:
+            batch_result_envelope_to_dict(forged_partial)
+
+        self.assertEqual(partial_context.exception.code, "invalid_dataset_boundary")
+
     def test_resume_token_serialization_rejects_unsafe_runtime_position_carriers(self) -> None:
         first = self.execute(
             request(target("item-1", "alpha"), target("item-2", "beta")),
@@ -833,6 +887,14 @@ class BatchDatasetRuntimeTests(unittest.TestCase):
         self.assertEqual(result.result_status, BATCH_RESULT_COMPLETE)
         self.assertEqual(result.item_outcomes[0].outcome_status, BATCH_ITEM_SUCCEEDED)
         self.assertEqual(sink.read_by_batch("batch-001")[0].target_ref, "fallback selector marketplace account-pool guide")
+
+    def test_search_keyword_rejects_windows_absolute_path(self) -> None:
+        for value in ("C:/work/cache.json", "D:/exports/raw.json"):
+            with self.subTest(value=value):
+                with self.assertRaises(BatchDatasetContractError) as context:
+                    validate_batch_target_item(target("item-1", value))
+
+                self.assertEqual(context.exception.code, "unsafe_public_payload")
 
     def test_malformed_audit_context_fails_closed(self) -> None:
         with self.assertRaises(BatchDatasetContractError) as context:
