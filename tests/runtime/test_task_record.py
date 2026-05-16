@@ -485,7 +485,6 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
                 "audit_trace": {
                     "batch_id": "batch-001",
                     "started_at": "2026-05-16T10:00:00Z",
-                    "finished_at": "2026-05-16T10:00:01Z",
                     "finished": True,
                     "item_count": 1,
                     "item_trace_refs": ["audit:batch:batch-001:item-1"],
@@ -539,6 +538,38 @@ class TaskRecordCodecTests(TaskRecordStoreEnvMixin, unittest.TestCase):
     def test_rejects_batch_execution_top_level_raw_payload(self) -> None:
         payload = task_record_to_dict(self.make_batch_record())
         payload["result"]["envelope"]["raw"] = {"provider_batch": True}
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_failed_batch_item_with_dataset_record_ref(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        item = payload["result"]["envelope"]["item_outcomes"][0]
+        item["outcome_status"] = "failed"
+        item.pop("result_envelope")
+        item["error_envelope"] = {
+            "category": "runtime_contract",
+            "code": "dataset_write_failed",
+            "message": "dataset write failed",
+            "details": {"reason": "sink_unavailable"},
+        }
+        payload["result"]["envelope"]["result_status"] = "all_failed"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_item_result_envelope_target_drift(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["result_envelope"]["target"]["target_ref"] = "other-query"
+
+        with self.assertRaises(TaskRecordContractError):
+            task_record_from_dict(payload)
+
+    def test_rejects_batch_item_result_envelope_private_source_trace(self) -> None:
+        payload = task_record_to_dict(self.make_batch_record())
+        payload["result"]["envelope"]["item_outcomes"][0]["result_envelope"]["source_trace"][
+            "provider_path"
+        ] = "cache/state.json"
 
         with self.assertRaises(TaskRecordContractError):
             task_record_from_dict(payload)

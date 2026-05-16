@@ -272,7 +272,6 @@ def make_batch_success_envelope(task_id: str, batch_id: str = "batch-001") -> di
         "audit_trace": {
             "batch_id": batch_id,
             "started_at": "2026-04-24T00:00:00Z",
-            "finished_at": "2026-04-24T00:00:02Z",
             "finished": True,
             "item_count": 1,
             "item_trace_refs": [f"audit:batch:{batch_id}:item-1"],

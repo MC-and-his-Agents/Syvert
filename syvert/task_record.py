@@ -22,17 +22,6 @@ TASK_LOG_STAGE_ORDER = {"admission": 0, "execution": 1, "completion": 2}
 BATCH_EXECUTION_OPERATION = "batch_execution"
 BATCH_TARGET_TYPE = "operation_batch"
 BATCH_COLLECTION_MODE = "batch"
-BATCH_RESULT_STATUSES = frozenset({"complete", "partial_success", "all_failed", "resumable"})
-BATCH_ITEM_STATUSES = frozenset({"succeeded", "failed", "duplicate_skipped"})
-BATCH_ITEM_OPERATIONS = frozenset(
-    {
-        "content_search_by_keyword",
-        "content_list_by_creator",
-        "comment_collection",
-        "creator_profile_by_id",
-        "media_asset_fetch_by_ref",
-    }
-)
 SHARED_CAPABILITIES = frozenset(
     {
         "content_detail_by_url",
@@ -1131,132 +1120,102 @@ def validate_batch_success_terminal_envelope(record: TaskRecord, envelope: Mappi
     batch_id = require_string(envelope.get("batch_id"), field="result.envelope.batch_id")
     if batch_id != record.request.target_value:
         raise TaskRecordContractError("batch TaskTerminalResult.envelope.batch_id 与请求快照不一致")
-    result_status = require_string(envelope.get("result_status"), field="result.envelope.result_status")
-    if result_status not in BATCH_RESULT_STATUSES:
-        raise TaskRecordContractError("batch TaskTerminalResult.envelope.result_status 不在允许值范围内")
+    try:
+        _validate_canonical_batch_result_projection(envelope)
+    except TaskRecordContractError:
+        raise
+    except Exception as error:
+        raise TaskRecordContractError("batch TaskTerminalResult.envelope 不满足 public carrier contract") from error
+
+
+def _validate_canonical_batch_result_projection(envelope: Mapping[str, Any]) -> None:
+    from syvert.batch_dataset import (
+        BatchItemOutcome,
+        BatchResultEnvelope,
+        BatchResumeToken,
+        validate_batch_result_envelope,
+    )
+
     item_outcomes = envelope.get("item_outcomes")
     if not isinstance(item_outcomes, list):
         raise TaskRecordContractError("batch TaskTerminalResult.envelope.item_outcomes 必须是数组")
-    if result_status != "resumable" and not item_outcomes:
-        raise TaskRecordContractError("terminal batch TaskTerminalResult.envelope 必须包含 item_outcomes")
-    for index, outcome in enumerate(item_outcomes):
-        if not isinstance(outcome, Mapping):
-            raise TaskRecordContractError("batch item_outcomes 项必须是对象")
-        validate_batch_item_outcome_projection(outcome, index=index)
-    if result_status != "resumable" and result_status != _batch_result_status_from_items(item_outcomes):
-        raise TaskRecordContractError("batch TaskTerminalResult.envelope.result_status 与 item_outcomes 不一致")
-    resume_token = envelope.get("resume_token")
-    if result_status == "resumable":
-        if not isinstance(resume_token, Mapping):
-            raise TaskRecordContractError("resumable batch TaskTerminalResult.envelope 必须包含 resume_token")
-        if require_string(resume_token.get("batch_id"), field="result.envelope.resume_token.batch_id") != batch_id:
-            raise TaskRecordContractError("batch resume_token.batch_id 与 batch_id 不一致")
-        next_item_index = coerce_int(
-            resume_token.get("next_item_index"),
-            field="result.envelope.resume_token.next_item_index",
+    resume_token_payload = envelope.get("resume_token")
+    resume_token = None
+    if resume_token_payload is not None:
+        if not isinstance(resume_token_payload, Mapping):
+            raise TaskRecordContractError("batch TaskTerminalResult.envelope.resume_token 必须是对象")
+        resume_token = BatchResumeToken(
+            resume_token=require_string(
+                resume_token_payload.get("resume_token"),
+                field="result.envelope.resume_token.resume_token",
+            ),
+            batch_id=require_string(resume_token_payload.get("batch_id"), field="result.envelope.resume_token.batch_id"),
+            target_set_hash=require_string(
+                resume_token_payload.get("target_set_hash"),
+                field="result.envelope.resume_token.target_set_hash",
+            ),
+            next_item_index=coerce_int(
+                resume_token_payload.get("next_item_index"),
+                field="result.envelope.resume_token.next_item_index",
+            ),
+            issued_at=require_string(resume_token_payload.get("issued_at"), field="result.envelope.resume_token.issued_at"),
+            dataset_sink_ref=require_optional_string(
+                resume_token_payload.get("dataset_sink_ref"),
+                field="result.envelope.resume_token.dataset_sink_ref",
+            ),
+            dataset_id=require_optional_string(
+                resume_token_payload.get("dataset_id"),
+                field="result.envelope.resume_token.dataset_id",
+            ),
         )
-        if next_item_index != len(item_outcomes):
-            raise TaskRecordContractError("batch resume_token.next_item_index 必须指向已处理 item 前缀")
-    elif resume_token is not None:
-        raise TaskRecordContractError("terminal batch TaskTerminalResult.envelope 不得包含 resume_token")
-    dataset_sink_ref = require_optional_string(
-        envelope.get("dataset_sink_ref"),
-        field="result.envelope.dataset_sink_ref",
-    )
-    dataset_id = require_optional_string(envelope.get("dataset_id"), field="result.envelope.dataset_id")
-    if dataset_sink_ref is not None and dataset_id is None:
-        raise TaskRecordContractError("batch TaskTerminalResult.envelope.dataset_sink_ref 必须绑定 dataset_id")
-    for outcome in item_outcomes:
-        dataset_record_ref = require_optional_string(
-            outcome.get("dataset_record_ref"),
-            field="result.envelope.item_outcomes.dataset_record_ref",
-        )
-        if dataset_sink_ref is not None and outcome.get("outcome_status") == "succeeded" and dataset_record_ref is None:
-            raise TaskRecordContractError("sink-bound batch succeeded item 必须包含 dataset_record_ref")
-        if dataset_sink_ref is None and dataset_record_ref is not None:
-            raise TaskRecordContractError("sinkless batch item 不得包含 dataset_record_ref")
     audit_trace = envelope.get("audit_trace")
     if not isinstance(audit_trace, Mapping):
         raise TaskRecordContractError("batch TaskTerminalResult.envelope.audit_trace 必须是对象")
-    if audit_trace.get("batch_id") != batch_id:
-        raise TaskRecordContractError("batch audit_trace.batch_id 与 batch_id 不一致")
-    if "item_count" in audit_trace and coerce_int(
-        audit_trace.get("item_count"),
-        field="result.envelope.audit_trace.item_count",
-    ) != len(item_outcomes):
-        raise TaskRecordContractError("batch audit_trace.item_count 与 item_outcomes 不一致")
+    canonical = BatchResultEnvelope(
+        batch_id=require_string(envelope.get("batch_id"), field="result.envelope.batch_id"),
+        operation=require_string(envelope.get("operation"), field="result.envelope.operation"),
+        result_status=require_string(envelope.get("result_status"), field="result.envelope.result_status"),
+        item_outcomes=tuple(_batch_item_outcome_from_projection(item, index=index) for index, item in enumerate(item_outcomes)),
+        resume_token=resume_token,
+        dataset_sink_ref=require_optional_string(envelope.get("dataset_sink_ref"), field="result.envelope.dataset_sink_ref"),
+        dataset_id=require_optional_string(envelope.get("dataset_id"), field="result.envelope.dataset_id"),
+        audit_trace=dict(audit_trace),
+    )
+    validate_batch_result_envelope(canonical)
 
 
-def validate_batch_item_outcome_projection(outcome: Mapping[str, Any], *, index: int) -> None:
-    item_prefix = f"result.envelope.item_outcomes[{index}]"
-    require_string(outcome.get("item_id"), field=f"{item_prefix}.item_id")
-    operation = require_string(outcome.get("operation"), field=f"{item_prefix}.operation")
-    if operation not in BATCH_ITEM_OPERATIONS:
-        raise TaskRecordContractError("batch item_outcome.operation 不在允许值范围内")
-    require_string(outcome.get("adapter_key"), field=f"{item_prefix}.adapter_key")
-    require_string(outcome.get("target_ref"), field=f"{item_prefix}.target_ref")
-    outcome_status = require_string(outcome.get("outcome_status"), field=f"{item_prefix}.outcome_status")
-    if outcome_status not in BATCH_ITEM_STATUSES:
-        raise TaskRecordContractError("batch item_outcome.outcome_status 不在允许值范围内")
-    result_envelope = outcome.get("result_envelope")
-    error_envelope = outcome.get("error_envelope")
-    if outcome_status == "succeeded":
-        if not isinstance(result_envelope, Mapping):
-            raise TaskRecordContractError("succeeded batch item_outcome 必须包含 result_envelope")
-        validate_batch_item_result_projection(result_envelope, operation=operation, adapter_key=outcome["adapter_key"])
-        if error_envelope is not None:
-            raise TaskRecordContractError("succeeded batch item_outcome 不得包含 error_envelope")
-    elif outcome_status == "failed":
-        if not isinstance(error_envelope, Mapping):
-            raise TaskRecordContractError("failed batch item_outcome 必须包含 error_envelope")
-        if result_envelope is not None:
-            if not isinstance(result_envelope, Mapping):
-                raise TaskRecordContractError("failed batch item_outcome.result_envelope 必须是对象")
-            validate_batch_item_result_projection(
-                result_envelope,
-                operation=operation,
-                adapter_key=outcome["adapter_key"],
-            )
-    elif result_envelope is not None or error_envelope is not None or outcome.get("dataset_record_ref") is not None:
-        raise TaskRecordContractError("duplicate_skipped batch item_outcome 不得包含 result/error/dataset refs")
-    if (
-        "source_trace" in outcome
-        and outcome["source_trace"] is not None
-        and not isinstance(outcome["source_trace"], Mapping)
-    ):
-        raise TaskRecordContractError("batch item_outcome.source_trace 必须是对象或 null")
-    audit = outcome.get("audit")
+def _batch_item_outcome_from_projection(item: Any, *, index: int) -> Any:
+    from syvert.batch_dataset import BatchItemOutcome
+
+    if not isinstance(item, Mapping):
+        raise TaskRecordContractError("batch item_outcomes 项必须是对象")
+    field_prefix = f"result.envelope.item_outcomes[{index}]"
+    audit = item.get("audit")
     if not isinstance(audit, Mapping):
         raise TaskRecordContractError("batch item_outcome.audit 必须是对象")
+    return BatchItemOutcome(
+        item_id=require_string(item.get("item_id"), field=f"{field_prefix}.item_id"),
+        operation=require_string(item.get("operation"), field=f"{field_prefix}.operation"),
+        adapter_key=require_string(item.get("adapter_key"), field=f"{field_prefix}.adapter_key"),
+        target_ref=require_string(item.get("target_ref"), field=f"{field_prefix}.target_ref"),
+        outcome_status=require_string(item.get("outcome_status"), field=f"{field_prefix}.outcome_status"),
+        result_envelope=_optional_mapping_dict(item.get("result_envelope"), field=f"{field_prefix}.result_envelope"),
+        error_envelope=_optional_mapping_dict(item.get("error_envelope"), field=f"{field_prefix}.error_envelope"),
+        dataset_record_ref=require_optional_string(
+            item.get("dataset_record_ref"),
+            field=f"{field_prefix}.dataset_record_ref",
+        ),
+        source_trace=_optional_mapping_dict(item.get("source_trace"), field=f"{field_prefix}.source_trace"),
+        audit=dict(audit),
+    )
 
 
-def validate_batch_item_result_projection(
-    result_envelope: Mapping[str, Any],
-    *,
-    operation: str,
-    adapter_key: str,
-) -> None:
-    if result_envelope.get("status") != "success":
-        raise TaskRecordContractError("batch item result_envelope.status 必须为 success")
-    if result_envelope.get("capability") != operation:
-        raise TaskRecordContractError("batch item result_envelope.capability 与 operation 不一致")
-    if result_envelope.get("adapter_key") != adapter_key:
-        raise TaskRecordContractError("batch item result_envelope.adapter_key 与 item adapter_key 不一致")
-
-
-def _batch_result_status_from_items(item_outcomes: list[Any]) -> str:
-    non_duplicate = [
-        outcome
-        for outcome in item_outcomes
-        if isinstance(outcome, Mapping) and outcome.get("outcome_status") != "duplicate_skipped"
-    ]
-    succeeded = any(outcome.get("outcome_status") == "succeeded" for outcome in non_duplicate)
-    failed = any(outcome.get("outcome_status") == "failed" for outcome in non_duplicate)
-    if succeeded and failed:
-        return "partial_success"
-    if failed:
-        return "all_failed"
-    return "complete"
+def _optional_mapping_dict(value: Any, *, field: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise TaskRecordContractError(f"{field} 必须是对象或 null")
+    return dict(value)
 
 
 def validate_terminal_envelope_observability_contract(record: TaskRecord, envelope: Mapping[str, Any]) -> None:
