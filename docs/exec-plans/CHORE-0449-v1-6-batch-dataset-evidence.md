@@ -106,4 +106,4 @@
 
 ## 最近一次 checkpoint 对应的 head SHA
 
-- Evidence replay checkpoint：pending local commit。
+- Evidence replay checkpoint：`0a340654d03ecbfeb52fa6a52e1e7c55fa4a4169`。
