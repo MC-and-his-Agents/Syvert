@@ -58,6 +58,7 @@
   - batch terminal 顶层不得携带 `raw` / `normalized` payload。
 - Guardian follow-up：TaskRecord batch projection 重建 canonical `BatchResultEnvelope` 并调用 #447 public carrier validator，避免 failed item 伪造 `dataset_record_ref`、nested `result_envelope` target drift、source/audit/private carrier 泄漏等宽松读取；同时对原始 batch envelope 顶层、`resume_token` 与 `item_outcomes` 执行严格字段集校验，避免 canonical projection 忽略的额外私有字段被原样回读。
 - Merge-gate follow-up：TaskRecord 接受 `batch_result_envelope_to_dict` 序列化后的 cursor-sensitive comment batch public carrier；该 public carrier 按 #447 约定不暴露 `request_cursor_context`，consumer 只从公开 comment result 中校验 schema/target/source/continuation 并派生本地验证用 thread ref，再交回 canonical batch validator 校验 aggregation、dataset boundary 与 audit。
+- Guardian follow-up 2：补齐 sinkless、`partial_success`、`all_failed`、`resumable` batch TaskRecord readback 覆盖；补 cursor-sensitive comment public carrier target drift 与多线程歧义拒绝；补真实 cursor-bearing `comment_collection` batch runtime admission/readback 证据。
 - CLI query、HTTP status 与 HTTP result 可读取同一 batch TaskRecord public carrier，且不会暴露 `request_cursor_context`。
 - Batch target item consumer 只消费稳定 read-side runtime slices；compatibility consumers 遇到 dataset normalized payload 形状时 fail-closed。
 
@@ -94,6 +95,11 @@
   - 结果：通过，45 tests。
   - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
   - 结果：通过，386 tests。
+- Guardian follow-up 2 validation：
+  - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers`
+  - 结果：通过，72 tests。
+  - `python3 -m unittest tests.runtime.test_task_record tests.runtime.test_cli_http_same_path tests.runtime.test_operation_taxonomy_consumers tests.runtime.test_batch_dataset tests.runtime.test_runtime tests.runtime.test_provider_no_leakage_guard tests.runtime.test_adapter_provider_compatibility_decision`
+  - 结果：通过，391 tests。
 - Full unittest discovery：
   - `python3 -m unittest discover`
   - 结果：通过，527 tests。

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import unittest
+from unittest import mock
 
 from syvert.adapter_capability_requirement import (
     ADAPTER_REQUIREMENT_STATUS_INVALID,
@@ -13,7 +15,14 @@ from syvert.adapter_provider_compatibility_decision import (
     COMPATIBILITY_DECISION_STATUS_INVALID_CONTRACT,
     decide_adapter_provider_compatibility,
 )
-from syvert.batch_dataset import BatchDatasetContractError, BatchTargetItem, validate_batch_target_item
+from syvert.batch_dataset import (
+    BatchDatasetContractError,
+    BatchRequest,
+    BatchTargetItem,
+    ReferenceDatasetSink,
+    execute_batch_request,
+    validate_batch_target_item,
+)
 from syvert.operation_taxonomy import stable_operation_entry
 from syvert.provider_capability_offer import (
     APPROVED_CAPABILITY_OFFER,
@@ -24,6 +33,28 @@ from syvert.provider_capability_offer import (
 from tests.runtime.adapter_capability_requirement_fixtures import copy_requirement
 from tests.runtime.adapter_provider_compatibility_decision_fixtures import copy_decision_input
 from tests.runtime.provider_capability_offer_fixtures import copy_offer
+from tests.runtime.test_task_record import TEST_ADAPTER_KEY, make_comment_collection_result
+
+
+class CursorCommentAdapter:
+    supported_capabilities = frozenset({"comment_collection"})
+    supported_targets = frozenset({"content"})
+    supported_collection_modes = frozenset({"paginated"})
+
+    def __init__(self) -> None:
+        self.request_cursors = []
+
+    def execute(self, request):
+        self.request_cursors.append(request.input.comment_request_cursor)
+        payload = make_comment_collection_result(target_ref=request.input.content_ref or "")
+        payload["items"][0]["dedup_key"] = "comment:reply-1"
+        payload["items"][0]["source_id"] = "reply-1"
+        payload["items"][0]["source_ref"] = "comment://reply-1"
+        payload["items"][0]["normalized"]["source_id"] = "reply-1"
+        payload["items"][0]["normalized"]["canonical_ref"] = "comment:reply-1"
+        payload["items"][0]["normalized"]["parent_comment_ref"] = "comment:root-1"
+        payload["items"][0]["normalized"]["target_comment_ref"] = "comment:root-1"
+        return payload
 
 
 class OperationTaxonomyConsumerMigrationTests(unittest.TestCase):
@@ -169,6 +200,52 @@ class OperationTaxonomyConsumerMigrationTests(unittest.TestCase):
 
                 self.assertTrue(stable.runtime_delivery)
                 self.assertEqual(validate_batch_target_item(item), item)
+
+    def test_batch_runtime_consumes_cursor_comment_runtime_slice(self) -> None:
+        stable = stable_operation_entry(
+            operation="comment_collection",
+            target_type="content",
+            collection_mode="paginated",
+        )
+        cursor = {
+            "reply_cursor": {
+                "reply_cursor_token": "reply-cursor-1",
+                "reply_cursor_family": "opaque",
+                "resume_target_ref": "content:alpha",
+                "resume_comment_ref": "comment:root-1",
+                "issued_at": "2026-05-09T10:00:00Z",
+            }
+        }
+        item = BatchTargetItem(
+            item_id="comments",
+            operation=stable.operation,
+            adapter_key=TEST_ADAPTER_KEY,
+            target_type=stable.target_type,
+            target_ref="content:alpha",
+            dedup_key="dedup:comments",
+            request_cursor=cursor,
+        )
+        adapter = CursorCommentAdapter()
+
+        with mock.patch.dict("syvert.runtime.RESOURCE_SLOTS_BY_OPERATION_AND_COLLECTION_MODE", {}, clear=True):
+            result = execute_batch_request(
+                BatchRequest(
+                    batch_id="batch-comments",
+                    target_set=(item,),
+                    dataset_sink_ref="sink:reference",
+                    audit_context={"evidence_ref": "evidence:batch"},
+                ),
+                adapters={TEST_ADAPTER_KEY: adapter},
+                dataset_sink=ReferenceDatasetSink(),
+                task_id_factory=lambda: "task-comment-batch",
+                now_factory=lambda: datetime(2026, 5, 16, 10, 0, 0, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(adapter.request_cursors, [cursor])
+        self.assertEqual(result.result_status, "complete")
+        self.assertEqual(result.item_outcomes[0].operation, "comment_collection")
+        self.assertEqual(result.item_outcomes[0].request_cursor_context, cursor)
+        self.assertEqual(result.item_outcomes[0].dataset_record_ref, "dataset:batch-comments:comments")
 
     def test_batch_target_item_rejects_provider_compatibility_as_operation(self) -> None:
         with self.assertRaises(BatchDatasetContractError):
