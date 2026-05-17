@@ -57,7 +57,11 @@ A single due trigger derived from a schedule record.
 - `due_at`
 - `claim_state`: `unclaimed`, `claimed`, `claim_lease_expired`, or `expired`.
 - `task_record_ref`: populated after Core task admission.
-- `result_state`: `pending`, `succeeded`, `failed`, `retry_exhausted`, `unknown_outcome`, or `manual_recovery_required`.
+- `result_state`: `pending`, `succeeded`, `failed`, `skipped`, `coalesced`, `retry_exhausted`, `unknown_outcome`, or `manual_recovery_required`.
+- `missed_run_decision`: optional `skip`, `coalesce`, or `catch_up` decision applied to a missed occurrence.
+- `missed_run_decision_ref`: scheduler evidence proving why the missed-run decision was selected.
+- `coalesced_into_occurrence_ref`: populated only when `missed_run_decision=coalesce`.
+- `catch_up_replay_ref`: populated only when `missed_run_decision=catch_up` and Core creates a replay occurrence or TaskRecord handoff.
 
 Allowed claim transitions:
 
@@ -66,14 +70,17 @@ Allowed claim transitions:
 - `claim_lease_expired` -> `unclaimed` only when no `task_record_ref` exists and scheduler evidence proves Core task handoff did not start.
 - `claim_lease_expired` -> `unknown_outcome` when handoff may have started but no terminal TaskRecord truth can be proven.
 - `expired` does not start target task execution.
+- `unclaimed` or `expired` -> `skipped` when `missed_run_decision=skip` and no TaskRecord handoff is created.
+- `unclaimed` or `expired` -> `coalesced` when `missed_run_decision=coalesce`; `coalesced_into_occurrence_ref` must point to the occurrence that carries the eventual handoff or terminal decision.
+- `unclaimed` or `expired` may remain `pending` when `missed_run_decision=catch_up` and the catch-up replay is still awaiting handoff.
 - Losing claim attempts do not mutate the shared occurrence into a duplicate terminal state; they record `duplicate_claim` on `ClaimLease.claim_result` and scheduler evidence.
 
 Allowed result transitions:
 
-- `pending` -> `succeeded`, `failed`, `retry_exhausted`, `unknown_outcome`, `manual_recovery_required`
+- `pending` -> `succeeded`, `failed`, `skipped`, `coalesced`, `retry_exhausted`, `unknown_outcome`, `manual_recovery_required`
 - `failed` may transition to `retry_exhausted` only when retry policy is exhausted.
 - `unknown_outcome` may transition to `manual_recovery_required`.
-- `succeeded`, `retry_exhausted`, and `manual_recovery_required` are terminal until a separate remediation Work Item defines recovery behavior.
+- `skipped`, `coalesced`, `succeeded`, `retry_exhausted`, and `manual_recovery_required` are terminal until a separate remediation Work Item defines recovery behavior.
 
 ## ClaimLease
 
@@ -94,7 +101,7 @@ Explicit behavior when one or more occurrences are missed.
 
 - `policy`: `skip`, `coalesce`, or `catch_up`.
 - `window_ref`: optional runtime window reference.
-- `decision_evidence_ref`: scheduler observation proving which policy was applied.
+- `decision_evidence_ref`: scheduler observation proving which policy was applied and which occurrence or replay reference carries any later handoff.
 
 ## SchedulerObservation
 
@@ -103,10 +110,17 @@ Auditable scheduler evidence. It is not a product analytics record.
 - `observation_id`
 - `schedule_id`
 - `occurrence_id`
-- `task_record_ref`
+- `task_record_ref`: nullable when the observation records a skip, coalesce, or catch-up decision before Core task handoff.
 - `dataset_record_ref`
 - `resource_trace_ref`
-- `status`: `observed_pending`, `observed_claim_lease_expired`, `observed_succeeded`, `observed_failed`, `observed_retry_exhausted`, `observed_unknown_outcome`, or `observed_manual_recovery_required`.
+- `status`: `observed_pending`, `observed_claim_lease_expired`, `observed_missed_skipped`, `observed_missed_coalesced`, `observed_missed_catch_up_pending`, `observed_missed_catch_up_handoff`, `observed_succeeded`, `observed_failed`, `observed_retry_exhausted`, `observed_unknown_outcome`, or `observed_manual_recovery_required`.
 - `evidence_ref`
 
 Observation status must mirror the occurrence `result_state` for execution outcomes. Claim-only observations such as `observed_claim_lease_expired` may explain why an occurrence returned to `unclaimed` or moved to `unknown_outcome`, but must not invent a separate success/failure truth.
+
+Missed-run observations are non-execution observations:
+
+- `observed_missed_skipped` mirrors `result_state=skipped`, keeps `task_record_ref` null, and records the selected `skip` policy.
+- `observed_missed_coalesced` mirrors `result_state=coalesced`, keeps `task_record_ref` null on the source occurrence, and records `coalesced_into_occurrence_ref`.
+- `observed_missed_catch_up_pending` records `missed_run_decision=catch_up` before TaskRecord handoff; `task_record_ref` may be null while the replay is pending.
+- `observed_missed_catch_up_handoff` records the replay occurrence or TaskRecord reference that carries the catch-up execution through the existing Core task path.

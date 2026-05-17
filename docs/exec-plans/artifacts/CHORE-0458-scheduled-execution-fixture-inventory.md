@@ -45,6 +45,9 @@ All fixture names are sanitized aliases. They do not represent real providers, a
 - Every occurrence must carry `schedule_id`, `occurrence_id`, due time, claim state, and scheduler observation ref.
 - Every successful handoff must reference an existing TaskRecord; batch targets additionally reference `FR-0445` dataset / batch evidence where applicable.
 - Missed run evidence must record the selected policy: `skip`, `coalesce`, or `catch_up`.
+- Skipped missed occurrences must use `observed_missed_skipped` with no TaskRecord handoff.
+- Coalesced missed occurrences must use `observed_missed_coalesced` plus `coalesced_into_occurrence_ref`; the source occurrence must not imply a hidden task handoff.
+- Catch-up missed occurrences must use `observed_missed_catch_up_pending` before replay handoff and `observed_missed_catch_up_handoff` once the replay occurrence or TaskRecord ref exists.
 - Duplicate claim evidence must include the losing claim result without starting a second task execution.
 - Unknown outcome and manual recovery evidence must avoid guessing success or failure.
 - Evidence must not include raw payload files, platform names, account identifiers, local paths, storage handles, or private provider fields.

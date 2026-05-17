@@ -44,6 +44,8 @@ And schedule layer 不得重新定义 item result envelope
 Given scheduler 停止期间错过一个或多个 occurrence
 When scheduler 恢复
 Then missed run policy 必须明确选择 skip、coalesce 或 catch-up
+And skip / coalesce / catch-up decision 必须有 SchedulerObservation 与 occurrence reference 承载
+And 没有 TaskRecord handoff 的 skipped / coalesced occurrence 必须保留可审计 observation
 And policy 不得隐式扩大成上层业务策略
 
 ### 重复 claiming

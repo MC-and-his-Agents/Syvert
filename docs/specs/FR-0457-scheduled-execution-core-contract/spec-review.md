@@ -28,6 +28,7 @@
 - Fixture/error/evidence inventory is present at `docs/exec-plans/artifacts/CHORE-0458-scheduled-execution-fixture-inventory.md`.
 - `TriggerRule` now distinguishes `DelayedTriggerRule` from `RecurringTriggerRule` with minimum Core-owned vocabulary.
 - `TriggerOccurrence.claim_state` only describes the shared occurrence; losing duplicate claim attempts are represented by `ClaimLease.claim_result=duplicate_claim` and evidence.
+- Missed-run policy decisions now have closed public carriers: skipped and coalesced occurrences use non-execution result states and observations, while catch-up replay uses pending / handoff observations that point back into the existing Core task path.
 - `plan.md` records the spec review gate and conditions for entering later runtime Work Items.
 
 ## Remaining risks
